@@ -109,7 +109,7 @@ interface HiveMessageValues {
   'assistant.journal.workspaceOnly': undefined
   'assistant.journal.yesterday': undefined
   'assistant.loadNames.blocked': undefined
-  'assistant.loadNames.filledNote': { projects: string | number; count: number; names: string | number }
+  'assistant.loadNames.filledNote': { count: number; names: string | number; projects: string | number }
   'assistant.loadNames.sameTwice': undefined
   'assistant.loadNames.taken': { project: string | number; name: string | number }
   'assistant.mcpSecret.argument': { start: string | number }
@@ -468,7 +468,7 @@ interface HiveMessageValues {
   'assistant.template.badSetting': { name: string | number; setting: string }
   'assistant.template.badToken': { name: string | number; token: string | number }
   'assistant.template.from09': undefined
-  'assistant.template.longNote': { name: string | number; max: string | number }
+  'assistant.template.longNote': { name: string | number; max: number }
   'assistant.template.newer': undefined
   'assistant.template.noAgents': undefined
   'assistant.template.noVersion': undefined

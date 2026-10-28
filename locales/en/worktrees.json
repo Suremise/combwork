@@ -160,8 +160,8 @@
     "description": "An error: the agent {agent} (its name) works in the project folder, so it has no worktree to recreate or unlink."
   },
   "worktrees.missing.slotFailed": {
-    "defaultMessage": "{agent}'s slot {slot} couldn't be made again: {why}",
-    "description": "An error: a slot lent to the agent {agent} (its name), whose folder was gone, couldn't be made again ({slot}: the slot's name; {why}: why, often git's message in English)."
+    "defaultMessage": "Slot {slot} of agent {agent} couldn't be made again: {why}",
+    "description": "An error: a slot lent to the agent {agent} (its name), whose folder was gone, couldn't be made again ({slot}: the slot's name; {why}: why, often git's message in English). A noun before the name (glossary §1 rule 4)."
   },
   "worktrees.missing.stillListed": {
     "defaultMessage": "git still lists {folder} as a worktree (it may be locked): unlock it, or run git worktree prune, then try again.",

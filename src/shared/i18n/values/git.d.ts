@@ -362,7 +362,7 @@ interface HiveMessageValues {
   'git.vc.switch.fresh': { to: string | number; from: string | number }
   'git.vc.switch.gitFolder': undefined
   'git.vc.switch.inFlight': { n: number; from: string | number }
-  'git.vc.switch.lane': { builder: string | number; name: string | number }
+  'git.vc.switch.lane': { name: string | number; builder: string | number }
   'git.vc.switch.laneUnnamed': { builder: string | number }
   'git.vc.switch.lanes': { n: number; from: string | number }
   'git.vc.switch.noGit': undefined

@@ -509,7 +509,7 @@
   "workspace.storage.reviewInChanges": "Review in Changes",
   "workspace.storage.size": "Size",
   "workspace.storage.skipped": "{count, plural, one {# item skipped:} other {# items skipped:}}",
-  "workspace.storage.slot": "{slot}, lent to {agent}",
+  "workspace.storage.slot": "{slot}, lent to agent {agent}",
   "workspace.storage.storage": "Storage",
   "workspace.storage.title": "Clean Up {name}",
   "workspace.storage.total": "Total",

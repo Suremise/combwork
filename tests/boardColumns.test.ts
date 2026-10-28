@@ -214,7 +214,7 @@ describe('who moves cards to On Hold and Passed', () => {
 
   it("another agent's card in Doing can't be moved on to Passed by a project agent", async () => {
     const c = await run(() => tasks.createTask({ title: 'In progress', project: 'alpha', agent: 'c1', column: 'doing' }, user))
-    await expect(run(() => tasks.updateTask(c.number, { column: 'passed' }, reviewer))).rejects.toThrow(/can't be moved to Passed by another agent/)
+    await expect(run(() => tasks.updateTask(c.number, { column: 'passed' }, reviewer))).rejects.toThrow(/another agent can't move it to Approved/)
   })
 
   it('an unknown column lists the six', async () => {

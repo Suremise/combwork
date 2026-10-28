@@ -163,13 +163,13 @@ describe('returns on a queue card', () => {
 
   it('why, in a few words: a conflict with its files, a red check by name, a hook, a temporary failure', () => {
     expect(returnWhy(recent({ outcome: 'returned', reason: 'conflict', files: ['tasks.ts'] }), null, 'main', tr, list)).toBe('conflict in tasks.ts')
-    expect(returnWhy(recent({ outcome: 'returned', reason: 'conflict', files: ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts'] }), null, 'main', tr, list)).toBe('conflict in a.ts, b.ts, and c.ts and 2 more')
+    expect(returnWhy(recent({ outcome: 'returned', reason: 'conflict', files: ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts'] }), null, 'main', tr, list)).toBe('conflict in a.ts, b.ts, c.ts, and 2 more')
     expect(returnWhy(recent({ outcome: 'returned', reason: 'conflict' }), null, 'main', tr, list)).toBe('conflict')
     expect(returnWhy(recent({ outcome: 'returned', reason: 'checks' }), 'unit', 'main', tr, list)).toBe('checks failed: unit')
     expect(returnWhy(recent({ outcome: 'returned', reason: 'checks' }), null, 'main', tr, list)).toBe('checks failed')
     expect(returnWhy(recent({ outcome: 'returned', reason: 'hook' }), null, 'main', tr, list)).toBe('a hook failed')
     expect(returnWhy(recent({ outcome: 'returned', reason: 'checks', transient: true }), 'unit', 'main', tr, list)).toBe('checks failed: unit (temporary)')
-    expect(returnedText(recent({ key: 'HI-108' }), 'conflict in tasks.ts', 'HB1', tr)).toBe('HI-108 returned to HB1: conflict in tasks.ts')
+    expect(returnedText(recent({ key: 'HI-108' }), 'conflict in tasks.ts', 'HB1', tr)).toBe('HI-108 returned to builder HB1: conflict in tasks.ts')
     expect(returnedText(recent({ key: 'HI-108' }), 'conflict', null, tr)).toBe('HI-108 returned: conflict')
   })
 

@@ -4,7 +4,7 @@ import { msg, type Msg } from './i18n/msg'
  * What the skills Hive ships are for (their SKILL.md description), as the window shows them (#1104), by skill name.
  * Display only: agents read the SKILL.md, in English. The window shows one translated while the workspace's copy still
  * has Hive's words; an edited description shows as written. tests/skillDescriptions.test.ts keeps these equal to the
- * SKILL.md files.
+ * SKILL.md files, or to SHIPPED_SKILL_SOURCES where the window words it its own way.
  */
 export const SHIPPED_SKILL_DESCRIPTIONS: Record<string, Msg> = {
   'board-hygiene': msg({ id: 'assistant.skills.shipped.boardHygiene', defaultMessage: "Tidy the board as the Hive Assistant: duplicates, unrecorded answers, stale blocked reasons. Use when asked to tidy the board.", description: "What a skill that ships with Hive (board-hygiene) is for: under its name in the Skills view and a project's Skills tab. Keep Hive Assistant as Hive names it. Decisions are what the user decided about a card, as the card shows them." }),
@@ -21,12 +21,20 @@ export const SHIPPED_SKILL_DESCRIPTIONS: Record<string, Msg> = {
   'triage-report': msg({ id: 'assistant.skills.shipped.triageReport', defaultMessage: "Turn a reported problem into a card with evidence as the Hive Assistant: cause first, then duplicates. Use when the user reports a problem.", description: "What a skill that ships with Hive (triage-report) is for: under its name in the Skills view and a project's Skills tab. Keep Hive Assistant as Hive names it." }),
   'tune-settings': msg({ id: 'assistant.skills.shipped.tuneSettings', defaultMessage: "Explain and suggest Hive's settings as the Hive Assistant; change one only when the user agrees. Use when asked what a setting does or how to make Hive behave differently, or when one would fix what you see.", description: "What a skill that ships with Hive (tune-settings) is for: under its name in the Skills view and a project's Skills tab." }),
   'use-hive-api': msg({ id: 'assistant.skills.shipped.useHiveApi', defaultMessage: "Call Hive's local HTTP API from a script or tool, or debug a hive tool against it. Use only when automating Hive over HTTP: for ordinary board, notes and handover work the hive tools are enough.", description: "What a skill that ships with Hive (use-hive-api) is for: under its name in the Skills view and a project's Skills tab. Keep HTTP and API; hive tools are the tools Hive gives agents (hive_…), keep hive in lower case." }),
-  'work-on-card': msg({ id: 'assistant.skills.shipped.workOnCard', defaultMessage: 'Carry a card from Hive\'s task board through its work, from Doing to Review with a summary. Use when given a card to work on ("work on AM-12", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).', description: "What a skill that ships with Hive (work-on-card) is for: under its name in the Skills view and a project's Skills tab. card-loop is another skill's name: keep it. Doing and Review are columns of the task board: use their names as the board shows them. \"work on AM-12\" is what you would ask an agent: translate it." }),
+  'work-on-card': msg({ id: 'assistant.skills.shipped.workOnCard', defaultMessage: 'Carry a card from Hive\'s task board through its work, from Active to Review with a summary. Use when given a card to work on ("work on AM-12", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).', description: "What a skill that ships with Hive (work-on-card) is for: under its name in the Skills view and a project's Skills tab. card-loop is another skill's name: keep it. Active and Review are stages of the task board (glossary 2.2): use their names as the board shows them. \"work on AM-12\" is what you would ask an agent: translate it." }),
   'workspace-note': msg({ id: 'assistant.skills.shipped.workspaceNote', defaultMessage: "Record a lasting decision, convention or gotcha in the workspace's shared notes. Use when asked to remember or document something for later, or when other agents will need what you learned. Not for work in progress.", description: "What a skill that ships with Hive (workspace-note) is for: under its name in the Skills view and a project's Skills tab. Shared notes are Hive's notes view: use its name as Hive shows it." })
+}
+
+/**
+ * The SKILL.md description, where the window's message words it otherwise (HI-1585: the board's stage names, which agents
+ * still read as the columns' old names): what an untouched copy is recognised by.
+ */
+export const SHIPPED_SKILL_SOURCES: Record<string, string> = {
+  'work-on-card': 'Carry a card from Hive\'s task board through its work, from Doing to Review with a summary. Use when given a card to work on ("work on AM-12", a card Hive started you on, more work on one back from Review). Not for reviewing one, nor a card loop (card-loop).' // i18n-ignore: the SKILL.md's own description (agents read it in English)
 }
 
 /** A Hive skill's description as the window shows it: one Hive ships, translated while its copy still has Hive's words. */
 export const shippedSkillDescription = (s: { name: string; description: string; level: string; bundled?: string }): Msg | undefined => {
   const shipped = s.level === 'hive' && s.bundled ? SHIPPED_SKILL_DESCRIPTIONS[s.name] : undefined
-  return shipped?.defaultMessage === s.description ? shipped : undefined
+  return shipped && (SHIPPED_SKILL_SOURCES[s.name] ?? shipped.defaultMessage) === s.description ? shipped : undefined
 }

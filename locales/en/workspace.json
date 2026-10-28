@@ -2044,8 +2044,8 @@
     "description": "Under the notice after Clean Up: items that couldn't be moved (each follows on a line)."
   },
   "workspace.storage.slot": {
-    "defaultMessage": "{slot}, lent to {agent}",
-    "description": "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), lent now to the agent {agent}. Glossary: slot."
+    "defaultMessage": "{slot}, lent to agent {agent}",
+    "description": "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), lent now to the agent {agent}. Glossary: slot. A noun before the name (glossary §1 rule 4)."
   },
   "workspace.storage.storage": {
     "defaultMessage": "Storage",

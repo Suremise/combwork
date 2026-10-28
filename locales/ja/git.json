@@ -375,7 +375,7 @@
   "git.vc.workflowTip": "ワークフローのオプションを表示",
   "git.worktree.agent": "{agent}のワークツリー",
   "git.worktree.badge": "ワークツリー",
-  "git.worktree.slotLease": "{kind, select, card {{slot}：{agent}が{card}を作業中} lane {{slot}：{agent}、レーン{lane}} carried {{slot}：{agent}用に保持（旧ワークツリー）} other {{slot}：貸し出しなし}}",
+  "git.worktree.slotLease": "{kind, select, card {{slot}：{agent}が{card}を作業中} lane {{slot}：{agent}、レーン{lane}} carried {{slot}：保持（旧ワークツリー）、エージェント{agent}} other {{slot}：貸し出しなし}}",
   "git.worktree.unused": "未使用のワークツリー",
   "git.worktrees.changes": "変更",
   "git.worktrees.copiesHeading": "レビュー用コピー（Hive）",

@@ -286,11 +286,21 @@ describe("an agent's old moves as intents (#1268)", () => {
     expect(stage(w, card)).toBe('active')
   })
 
+  it("another agent's card in progress names its stages as the project renamed them (HR5's HI-1585 round 1)", async () => {
+    const { w, wt } = await workspace({ ...PAIR, stageNames: { active: 'Building', review: 'Checking', approved: 'Accepted', done: 'Finished' } })
+    const card = await started(w, wt)
+    await expect(update(w, card, reviewer, { column: 'review' })).rejects.toThrow(/in Building with agent Builder.*move it to Checking\. Leave it where it is; agent Builder moves it to Checking when done/)
+    await expect(update(w, card, reviewer, { column: 'done' })).rejects.toThrow(/in Building with agent Builder.*move it to Finished\./)
+    // The board's column stays the API's id.
+    expect((await inWorkspace(w, () => tasks.getTask(card))).column).toBe('doing')
+  })
+
   it("Todo is put back, its comment the why; a reviewer can't take a card in Doing on to Review", async () => {
     const { w, wt } = await workspace()
     const card = await started(w, wt)
     // As before 1.0: another agent's card in Doing is its work in progress.
-    await expect(update(w, card, reviewer, { column: 'review' }, 'Mine now')).rejects.toThrow(/in Doing with Builder/)
+    // The board's stage names, by default (HI-1585).
+    await expect(update(w, card, reviewer, { column: 'review' }, 'Mine now')).rejects.toThrow(/in Active with agent Builder.*move it to Review\./)
     const back = await update(w, card, builder, { column: 'todo' }, 'Waiting for #9 first.')
     expect(back.card.column).toBe('todo')
     expect(back.said).toContain('As put back: next time call hive_put_back')

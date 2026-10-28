@@ -904,8 +904,8 @@
     "description": "A refused start (§16.19.2): the builder's branch (in its own worktree) still has the previous card's commits, which were merged into the target as one squashed commit, so the next card's change would include them. {card} and {earlier} are card keys like AM-12; {line} a branch name; {target} the branch merged into."
   },
   "workflow.refused.lane.lineBehind.next": {
-    "defaultMessage": "Leave it as it is: Hive brings {line} up to date with {target} once you are idle, or asks the user, and tells you when {card} can start.",
-    "description": "The next step after a start refused because the branch still has squashed work: wait (end the turn); Hive moves the branch, or asks the user first, and says when the card can start. {line} a branch name, {target} the branch merged into, {card} a card key."
+    "defaultMessage": "{reader, select, you {Leave it as it is: Hive brings {line} up to date with {target} once the agent is idle, or asks you first, and tells the agent when {card} can start.} other {Leave it as it is: Hive brings {line} up to date with {target} once you are idle, or asks the user, and tells you when {card} can start.}}",
+    "description": "The next step after a start refused because the branch still has squashed work: wait (end the turn); Hive moves the branch, or asks the user first, and says when the card can start. {line} a branch name, {target} the branch merged into, {card} a card key. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.lane.oneAtATime.change": {
     "defaultMessage": "A lane always takes one card at a time; turning off Settings → Advanced → Workflow rules are enforced turns every rule off.",
@@ -924,8 +924,8 @@
     "description": "A refused going ahead unchecked (#1467): what waits is a follow-up (a change asked of reviewed work, such as a screenshot's), which only its reviewer's answer settles. {card} is a card key."
   },
   "workflow.refused.loop.followUpChecked.next": {
-    "defaultMessage": "Wait for the reviewer's ok or gaps; if none comes, ask the user.",
-    "description": "The next step after going ahead with a follow-up unchecked (#1467). ok and gaps are the reviewer's answers, as agents name them: keep them as they are."
+    "defaultMessage": "{reader, select, you {The agent waits for the reviewer's ok or gaps; if none comes, it asks you.} other {Wait for the reviewer's ok or gaps; if none comes, ask the user.}}",
+    "description": "The next step after going ahead with a follow-up unchecked (#1467). ok and gaps are the reviewer's answers, as agents name them: keep them as they are. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.loop.followUpMerging.message": {
     "defaultMessage": "{card} is being merged now: a follow-up can no longer take it out of the merge queue.",
@@ -1012,24 +1012,24 @@
     "description": "The next step after a refused merge of a card Hive has already merged."
   },
   "workflow.refused.merge.hiveMerges.nextPaused": {
-    "defaultMessage": "It is in the merge queue for {target}, which is paused until it is resumed: wait for Done, or for it to come back.",
-    "description": "The next step after a refused merge of a card in a paused merge queue. {target} is a branch name."
+    "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until it is resumed: wait for Done, or for it to come back.}}",
+    "description": "The next step after a refused merge of a card in a paused merge queue. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.merge.hiveMerges.nextPausedAnswer": {
-    "defaultMessage": "It is in the merge queue for {target}, which is paused until the user answers in For you: wait for Done, or for it to come back.",
-    "description": "The next step after a refused merge of a card in a merge queue paused for the user's answer (in For you: whether to update the branch now, or how to settle a merge Hive couldn't finish). {target} is a branch name."
+    "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you answer in For you; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user answers in For you: wait for Done, or for it to come back.}}",
+    "description": "The next step after a refused merge of a card in a merge queue paused for the user's answer (in For you: whether to update the branch now, or how to settle a merge Hive couldn't finish). {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.merge.hiveMerges.nextPausedFix": {
-    "defaultMessage": "It is in the merge queue for {target}, which is paused until the user fixes what stopped it and resumes it: wait for Done, or for it to come back.",
-    "description": "The next step after a refused merge of a card in a merge queue paused by something only the user can fix (an error from git, say), then Resume. {target} is a branch name."
+    "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user fixes what stopped it and resumes it: wait for Done, or for it to come back.}}",
+    "description": "The next step after a refused merge of a card in a merge queue paused by something only the user can fix (an error from git, say), then Resume. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.merge.hiveMerges.nextPausedFolder": {
-    "defaultMessage": "It is in the merge queue for {target}, which is paused until the user puts right the folder {target} is checked out in and resumes it: wait for Done, or for it to come back.",
-    "description": "The next step after a refused merge of a card in a merge queue paused for the folder its branch is checked out in (on another branch, files staged or changed, agents at work there). {target} is a branch name."
+    "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you put right the folder {target} is checked out in and resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user puts right the folder {target} is checked out in and resumes it: wait for Done, or for it to come back.}}",
+    "description": "The next step after a refused merge of a card in a merge queue paused for the folder its branch is checked out in (on another branch, files staged or changed, agents at work there). {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.merge.hiveMerges.nextPausedRules": {
-    "defaultMessage": "It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it): wait for Done, or for it to come back.",
-    "description": "The next step after a refused merge of a card in a merge queue that paused while the workflow rules were turned off: Hive resumes it when they are turned on again. {target} is a branch name."
+    "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once you resume it); it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it): wait for Done, or for it to come back.}}",
+    "description": "The next step after a refused merge of a card in a merge queue that paused while the workflow rules were turned off: Hive resumes it when they are turned on again. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.merge.hiveMerges.nextQueued": {
     "defaultMessage": "It is in the merge queue for {target} (position {n, number}) and moves to Done once merged: wait for that, or for it to come back.",
@@ -1048,16 +1048,16 @@
     "description": "The next step after a refused merge of a card the merge queue is testing or merging now. {target} is a branch name."
   },
   "workflow.refused.move.needsOverride.change": {
-    "defaultMessage": "These rules are set in Version Control, where the user can change them.",
-    "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it)."
+    "defaultMessage": "{reader, select, you {These rules are set in Version Control, where you can change them.} other {These rules are set in Version Control, where the user can change them.}}",
+    "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it). {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.move.needsOverride.message": {
     "defaultMessage": "Moving {card} to {stage} skips: {rules}.",
     "description": "A move that skips rules: {rules} lists the rule names."
   },
   "workflow.refused.move.needsOverride.next": {
-    "defaultMessage": "Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.",
-    "description": "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request or after being told which rules the move skips."
+    "defaultMessage": "{reader, select, you {Moving it anyway needs your reason: one you gave for it, or one you give once told which rules this skips.} other {Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.}}",
+    "description": "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request or after being told which rules the move skips. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.move.noStage.change": {
     "defaultMessage": "A project's steps follow its options in Version Control.",
@@ -1120,8 +1120,8 @@
     "description": "The next step when Hive could not read what a rule needs."
   },
   "workflow.refused.platform.unknown.nextGone": {
-    "defaultMessage": "The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its Version Control tab (from the next card).",
-    "description": "The next step when a card was refused because its Git repository was removed or moved: the user restores it, or switches the project to None (no version control) in the Version Control tab, which applies to cards started after. Read by agents and shown in the window."
+    "defaultMessage": "{reader, select, you {The project's Git repository is gone: restore it, or switch the project to None in its Version Control tab (from the next card).} other {The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its Version Control tab (from the next card).}}",
+    "description": "The next step when a card was refused because its Git repository was removed or moved: the user restores it, or switches the project to None (no version control) in the Version Control tab, which applies to cards started after. Read by agents and shown in the window. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.queue.advancing.message": {
     "defaultMessage": "{card} is being merged into {target} now: it can no longer be taken out of the merge queue.",
@@ -1520,8 +1520,8 @@
     "description": "A heading of the Version Control tab’s Workflow section (Git): the project’s slots (worktrees Hive lends to cards and lanes) and its review and check copies (glossary 2.5: slot, review copy)."
   },
   "workflow.slots.held": {
-    "defaultMessage": "Held by {agent}'s ended session",
-    "description": "In the list of slots (Version Control → Slots and copies): the agent's ({agent}) last session there has ended, but Hive doesn't know that everything it started has, so nothing else uses the slot until it is released (#1506)."
+    "defaultMessage": "Held by an ended session of agent {agent}",
+    "description": "In the list of slots (Version Control → Slots and copies): the agent's ({agent}) last session there has ended, but Hive doesn't know that everything it started has, so nothing else uses the slot until it is released (#1506). A noun before the name (glossary §1 rule 4)."
   },
   "workflow.slots.inUse": {
     "defaultMessage": "Slots in use and ready",

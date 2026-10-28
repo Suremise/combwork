@@ -343,7 +343,7 @@ describe("the board's refusals: English for agents as before, the window's langu
     await run(() => tasks.updateTask(c.number, { agent: 'a1' }, user))
     const e = await caught(run(() => tasks.updateTask(c.number, { column: 'review' }, { kind: 'agent', name: 'Agent 2 (alpha)', self: { project: 'alpha', agentId: 'a2' }, scope: 'alpha' })))
     expect(e).toBeInstanceOf(tasks.TaskConflictError)
-    expect(e.message).toBe(`#${c.number} is in Doing with Agent 1, who is working on it: newer work is in progress, so it can't be moved to Review by another agent. Leave it where it is; Agent 1 moves it to Review when done, and the user can move it.`)
+    expect(e.message).toBe(`#${c.number} is in Active with agent Agent 1, who is working on it: newer work is in progress, so another agent can't move it to Review. Leave it where it is; agent Agent 1 moves it to Review when done, and the user can move it.`)
     expect(apiErrorReply(e).status).toBe(409)
   })
 

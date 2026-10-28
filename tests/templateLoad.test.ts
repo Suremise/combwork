@@ -47,8 +47,8 @@ describe('the Load template dialog (#268)', () => {
     const text = templateLoadDetail(plan, cfg, settings, () => info)
     expect(text).toContain('• Claude (its worktree and branch hive/claude stay): replaced by a new agent with the same name')
     expect(text).toContain('• Old\n')
-    expect(text).toMatch(/• claude — Builder, with Reviewer \(new\): Claude Code, Opus 5\.5 \(default\)/)
-    expect(text).toMatch(/• Reviewer — Reviewer, with claude: Claude Code, [^\n]*\n {4}Codex isn’t installed: Claude Code instead\.\n\n/)
+    expect(text).toMatch(/• claude — Builder \(paired: Reviewer\) \(new\): Claude Code, Opus 5\.5 \(default\)/)
+    expect(text).toMatch(/• Reviewer — Reviewer \(paired: claude\): Claude Code, [^\n]*\n {4}Codex isn’t installed: Claude Code instead\.\n\n/)
     // No worktree anywhere: nothing said of one for the created agents.
     expect(text).not.toMatch(/own worktree|reuses|setup command/)
     // Nothing removed: no Removed list and nothing about removed agents.

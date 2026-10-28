@@ -2601,8 +2601,11 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   `msg({ id, defaultMessage, description })` kept as data and shown with `tr()` (`tRich()` for markup) when rendered,
   never at module scope; a description for translators naming the rule; numbers as `{n, number}` or plurals;
   `npm run i18n:extract` after adding them [#1120 c, `locales/glossary-1.0.md` §1].
-- **Read by both** [#1264]: the sentences never name "the user" (the window says *you*, glossary §1 rule 10): a
-  `change` says where the rule is set ("This rule is set in Version Control → …"), and `override` who can skip it. A
+- **Read by both** [#1264, HI-1585]: a sentence that means the user says *the user* to agents and *you* in the window
+  (glossary §1 rule 10): it is one message with both whole-sentence wordings, `{reader, select, you {…} other {…}}`, the
+  reader given by the format (`refusal()`'s English for agents: `agent`; the window's lines: `you`), never kept in the
+  refusal's values, so a refusal recorded before it is shown either way. A `change` says where the rule is set ("This
+  rule is set in Version Control → …"), and `override` who can skip it. A
   value that is a name in the code (`{move}`, `{intent}`, `{moves}`, `{rule}`, `{rules}`) reaches agents as it is
   (the intents they call) and the window through its own message (`shared/workflow/texts.ts`: stage, move and rule
   names, the rules worded as the Version Control options); a stage (`{stage}`, `{stages}`) reaches both by the name the

@@ -120,7 +120,7 @@ const check = (name, ok, extra = '') => {
     await lib.until(() => idle(builder.id), HUNG_MS)
     check('…and the builder was woken once for it', wakes('Builder').filter(answerWake).length === 1, JSON.stringify(wakes('Builder')))
     // The card's history says whom Hive told of the answer (#1269 round 2), as the card dialog shows it.
-    const toldLine = 'Told Builder (alpha) of your answer'
+    const toldLine = 'Told agent Builder (alpha) of your answer'
     check("the card's history says whom Hive told of the answer", !!(await lib.until(async () => (await card(n))?.history.some((h) => h.by === 'Hive' && h.what === toldLine), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
     await showBoard(page)
     await openByTitle(page, n)

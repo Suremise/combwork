@@ -6,6 +6,6 @@ interface HiveMessageValues {
   'slots.release.notEnded': { slot: string | number }
   'slots.release.otherHive': { slot: string | number; pid: string | number }
   'slots.setting.bad': undefined
-  'slots.setting.badSize': undefined
-  'slots.setting.badText': undefined
+  'slots.setting.badSize': { min: number; max: number }
+  'slots.setting.badText': { max: number }
 }

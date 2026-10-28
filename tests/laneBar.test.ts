@@ -8,7 +8,7 @@ import { cardOldRulesNote, laneOldRulesNote, pulseLanes } from '../src/shared/la
 import { laneLegend, legendSources, segmentStage } from '../src/shared/laneStages'
 import { mustCompile } from '../src/shared/workflow/compile'
 import { preset } from '../src/shared/workflow/options'
-import { refusalLines, type RuleId } from '../src/shared/workflow/refusals'
+import { refusal, refusalLines, type RuleId } from '../src/shared/workflow/refusals'
 import type { LaneCard, LaneState, StoredText, TaskCard, TaskColumn } from '../src/shared/types'
 import { fmt, setLanguage, tr } from '../src/shared/i18n'
 import type { Tr } from '../src/shared/tasks'
@@ -431,8 +431,9 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
   const refused = { move: 'submit', rule: 'submit.empty', values: { card: 'alpha-7' }, at: '', times: 1 }
 
   it('a refused request (#1279): its reason and next step as the agent got them, the card named as the window names it; repeats counted after', () => {
-    expect(workNotes(badge({ refused }), 'review', null, short, tr, names, 'AL-7')).toEqual(['AL-7: nothing committed to review. Commit the card\'s work, then submit for review. If the user didn\'t ask you to commit, ask them.', 'Under review: a3f2c1d'])
-    expect(workNotes(badge({ refused: { ...refused, times: 3 } }), 'doing', null, short, tr, names, 'AL-7')[0]).toBe('AL-7: nothing committed to review. Commit the card\'s work, then submit for review. If the user didn\'t ask you to commit, ask them. (refused 3 times)')
+    // Each a whole sentence on a line of its own (HI-1585), the repeats on one after them.
+    expect(workNotes(badge({ refused }), 'review', null, short, tr, names, 'AL-7')).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review. If the user didn't ask you to commit, ask them.", 'Under review: a3f2c1d'])
+    expect(workNotes(badge({ refused: { ...refused, times: 3 } }), 'doing', null, short, tr, names, 'AL-7').slice(0, 3)).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review. If the user didn't ask you to commit, ask them.", 'Refused 3 times in a row.'])
     // A rule's names in the window's words (move.notFromHere names the stage and the moves).
     expect(workNotes(badge({ revision: null, refused: { move: 'submit', rule: 'move.notFromHere', values: { card: 'alpha-7', stage: 'todo', move: 'submit', moves: 'start' }, at: '', times: 1 } }), 'todo', null, short, tr, names, 'AL-7')[0]).toMatch(/^AL-7 /)
   })
@@ -663,5 +664,41 @@ describe("old rules keep their stages (HR4's #1421 round 1): the options now pro
     expect(now.find((g) => g.category === 'passed')!.stages).toEqual([])
     const ended = laneLegend(legendSources([{ project: 'alpha', stages: pair, cards: [7], frozen: [] }], () => soloNow, badges), tr)
     expect(ended.find((g) => g.category === 'passed')!.stages).toEqual([])
+  })
+})
+
+describe('refusals name the user as you in the window, as the user to agents (HI-1585, glossary §1 rule 10)', () => {
+  // The window's formats: the board's toast (forUser) and the card's stored refusals (CardWork), neither saying who reads.
+  const inCard = { one: (m: Parameters<typeof tr>[0], v?: Record<string, string | number>) => tr(m, v), list: (items: string[]) => fmt.list(items, 'unit'), names: true }
+  const toast = { ...inCard, forUser: true }
+  const override = { card: 'AL-1', stage: 'done', rules: 'review' }
+
+  it("agents' English is as before", () => {
+    const r = refusal('move.needsOverride', override)
+    expect(r.next).toBe("Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.")
+    expect(r.change).toBe('These rules are set in Version Control, where the user can change them.')
+    expect(refusal('loop.followUpChecked', { card: 'AL-1' }).next).toBe("Wait for the reviewer's ok or gaps; if none comes, ask the user.")
+    expect(refusal('lane.lineBehind', { card: 'AL-2', line: 'hive/AL-2', target: 'main', earlier: 'AL-1' }).next).toBe('Leave it as it is: Hive brings hive/AL-2 up to date with main once you are idle, or asks the user, and tells you when AL-2 can start.')
+    expect(refusal('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'answer' }).next).toBe('It is in the merge queue for main, which is paused until the user answers in For you: wait for Done, or for it to come back.')
+    expect(refusal('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }).next).toMatch(/^The project's Git repository is gone: ask the user to restore it/)
+  })
+
+  it('the window says you, on the card and in the toast alike, in English too', () => {
+    for (const f of [inCard, toast]) {
+      const l = refusalLines('move.needsOverride', override, f)
+      expect(l.next).toBe('Moving it anyway needs your reason: one you gave for it, or one you give once told which rules this skips.')
+      expect(l.change).toBe('These rules are set in Version Control, where you can change them.')
+    }
+    expect(refusalLines('loop.followUpChecked', { card: 'AL-1' }, inCard).next).toBe("The agent waits for the reviewer's ok or gaps; if none comes, it asks you.")
+    expect(refusalLines('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'fix' }, inCard).next).toBe('It is in the merge queue for main, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.')
+    expect(refusalLines('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }, inCard).next).toMatch(/^The project's Git repository is gone: restore it, or switch the project to None/)
+  })
+
+  it("who reads it is never kept in the refusal: one recorded before (no reader) or as an agent's reads as you in the window", () => {
+    const r = refusal('move.needsOverride', override)
+    expect(r.values).toEqual(override)
+    expect(refusalLines(r.rule, r.values, inCard).change).toBe('These rules are set in Version Control, where you can change them.')
+    // A recorded value never chooses for the window.
+    expect(refusalLines('move.needsOverride', { ...override, reader: 'agent' }, inCard).change).toBe('These rules are set in Version Control, where you can change them.')
   })
 })

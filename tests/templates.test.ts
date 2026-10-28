@@ -93,7 +93,7 @@ describe('the template format', () => {
     expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code', role: 'boss' }] })).toBe("A's role in the workflow isn't builder, reviewer or either.")
     const guessed = readTemplate({ ...ok, agents: [{ name: 'HI-R1', provider: 'codex' }, { name: 'Checker', provider: 'codex', note: 'reviews UI' }, { name: 'HI-B1', provider: 'claude-code' }] })
     expect(typeof guessed !== 'string' && guessed.agents.map((a) => a.role)).toEqual(['reviewer', 'reviewer', 'builder'])
-    expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code', note: 'x'.repeat(61) }] })).toMatch(/A's note is over 60 characters/)
+    expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code', note: 'x'.repeat(61) }] })).toMatch(/The note of agent A is over 60 characters/)
     // Pairs: a builder and a reviewer it has, each in one pair; a suggestion and a reviewer mode it doesn't know are dropped.
     const team = { ...ok, agents: [{ name: 'B1', provider: 'claude-code' }, { name: 'B2', provider: 'claude-code' }, { name: 'R1', provider: 'codex', role: 'reviewer' }, { name: 'E1', provider: 'codex', role: 'either' }] }
     const paired = readTemplate({ ...team, pairs: [{ builder: 'b1', reviewer: 'R1' }], suggestedPreset: 'team', reviewerMode: 'pool' })

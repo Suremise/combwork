@@ -39,7 +39,7 @@
   "worktrees.missing.noAgent": "Cet agent n’existe plus.",
   "worktrees.missing.noBranch": "La branche {branch} de l’agent {agent} n’existe plus, et le dossier du projet n’est sur aucune branche à partir de laquelle en créer une nouvelle.",
   "worktrees.missing.noTree": "L’agent {agent} ne travaille pas dans un worktree.",
-  "worktrees.missing.slotFailed": "L’emplacement {slot} de l’agent {agent} n’a pas pu être recréé : {why}",
+  "worktrees.missing.slotFailed": "L’emplacement {slot} de l’agent {agent} n’a pas pu être recréé : {why}",
   "worktrees.missing.stillListed": "git liste encore {folder} comme worktree (il est peut-être verrouillé) : déverrouille-le, ou lance git worktree prune, puis réessaie.",
   "worktrees.missing.stopFirst": "Arrête d’abord l’agent {agent}.",
   "worktrees.missing.thereRecreate": "Le dossier du worktree de l’agent {agent} est bien là ({folder}) : il n’y a rien à recréer.",

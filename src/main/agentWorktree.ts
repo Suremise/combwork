@@ -143,7 +143,7 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
     if (!f) throw hiveError(M.noTree, { agent: a.name })
     if (sessions.liveFor(projectPath, agentId)) throw hiveError(msg({ id: 'worktrees.missing.stopFirst', defaultMessage: 'Stop {agent} first.', description: "An error: the agent {agent} (its name) is running; its missing worktree can't be recreated until it stops." }), { agent: a.name })
     const why = await recreateSlot(workspaceOf(projectPath), projectPath, f, f.folder)
-    if (why) throw hiveError(msg({ id: 'worktrees.missing.slotFailed', defaultMessage: "{agent}'s slot {slot} couldn't be made again: {why}", description: "An error: a slot lent to the agent {agent} (its name), whose folder was gone, couldn't be made again ({slot}: the slot's name; {why}: why, often git's message in English)." }), { agent: a.name, slot: f.name, why })
+    if (why) throw hiveError(msg({ id: 'worktrees.missing.slotFailed', defaultMessage: "Slot {slot} of agent {agent} couldn't be made again: {why}", description: "An error: a slot lent to the agent {agent} (its name), whose folder was gone, couldn't be made again ({slot}: the slot's name; {why}: why, often git's message in English). A noun before the name (glossary §1 rule 4)." }), { agent: a.name, slot: f.name, why })
     return a
   }
   const old = legacyWorktree(a)

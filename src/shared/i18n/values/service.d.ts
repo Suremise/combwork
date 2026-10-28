@@ -164,7 +164,7 @@ interface HiveMessageValues {
   'service.keys.prefix': { key: string | number; other: string | number }
   'service.keys.taken': { key: string | number }
   'service.keys.unknownProject': undefined
-  'service.laneStart.busy': { agent: string | number; status: string }
+  'service.laneStart.busy': { status: string; agent: string | number }
   'service.laneStart.done': { card: string | number }
   'service.laneStart.needsReviewer': { project: string | number }
   'service.laneStart.noCards': undefined

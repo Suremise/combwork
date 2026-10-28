@@ -1736,8 +1736,8 @@
     "description": "A line in a lane segment's hover (Progress panel): the card is a no-code card (its work isn't code), so it has no commits to show. Glossary: no-code card."
   },
   "board.lane.workRefused": {
-    "defaultMessage": "{message} {next}{times, plural, one {} other { (refused # times)}}",
-    "description": "A line in a lane segment's hover (Progress panel), for its red notch: the card's latest request was refused by its workflow rules: why ({message}) and what to do next ({next}), each a whole sentence already translated, then, when it was refused more than once in a row, how many times ({times}; nothing when once). Glossary: refused, rule."
+    "defaultMessage": "Refused {times, number} times in a row.",
+    "description": "A line in a lane segment's hover (Progress panel), for its red notch, after the refusal's reason and next step (each a line of its own): the card's latest request was refused by its workflow rules this many times in a row ({times}, more than one). Glossary: refused, rule."
   },
   "board.lane.workRevision": {
     "defaultMessage": "{review, select, yes {Under review: {revision}} other {Revision: {revision}}}",
@@ -1872,8 +1872,8 @@
     "description": "Button of the Start Lane dialog while the builder or reviewer is busy: waits until they are idle, then starts the lane."
   },
   "board.laneStart.waiting": {
-    "defaultMessage": "Waiting for {agents} to be idle…",
-    "description": "In the Start Lane dialog, after Wait and Start: it waits for the busy agents ({agents}: their names, joined) before starting the lane. Cancel stops waiting."
+    "defaultMessage": "Waiting for these agents to be idle: {agents}…",
+    "description": "In the Start Lane dialog, after Wait and Start: it waits for the busy agents ({agents}: their names, joined) before starting the lane. Cancel stops waiting. The names follow a colon (glossary §1 rule 4)."
   },
   "board.lanes.abandon": {
     "defaultMessage": "Abandon Lane…",
@@ -2040,8 +2040,8 @@
     "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; Hive brings the builder's branch up to date before that card (after a squash merge, #1271); hooks: the agent {agent} (a name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so the lane is paused; checkCopy: its review or check waits for a check copy (a folder Hive keeps at one revision for a review or an isolated check) to be free; slot: every slot (a working folder Hive lends to a card or a lane) is in use, so the lane can't start until one is free; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
   },
   "board.lanes.waitsLink": {
-    "defaultMessage": "{why}. Click to show it.",
-    "description": "Tooltip of why a lane waits, in its header (Progress panel, #1446), when a click shows what it waits for: its slot or the slots in use (Branches & remotes), or the runs it waits on (the Runs tab). {why} is the reason as the header says it (\"waiting for a slot\")."
+    "defaultMessage": "Click to show it.",
+    "description": "Tooltip of why a lane waits, in its header (Progress panel, #1446), when a click shows what it waits for: its slot or the slots in use (Branches & remotes), or the runs it waits on (the Runs tab). It follows the reason, on a line of its own (\"waiting for a slot\")."
   },
   "board.lanes.waitsPreparing": {
     "defaultMessage": "waiting: preparing {slot}",
@@ -2428,8 +2428,8 @@
     "description": "A merge queue's card in the Progress panel when no card is waiting or being merged."
   },
   "board.queue.filesMore": {
-    "defaultMessage": "{files} and {n, plural, one {# more} other {# more}}",
-    "description": "Files a merge conflict named, when there are more than shown: the first few ({files}, a list) and how many more ({n})."
+    "defaultMessage": "{n, plural, one {# more} other {# more}}",
+    "description": "The last item of a list of the files a merge conflict named, when there are more than shown: how many more ({n}). The list joins it to the first few as your language joins a list (HI-1585: no \"and\" written around a list)."
   },
   "board.queue.inVersionControl": {
     "defaultMessage": "Queue in Version Control",
@@ -2604,12 +2604,12 @@
     "description": "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned (glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…)."
   },
   "board.queue.returnedTo": {
-    "defaultMessage": "{card} returned to {builder}: {why}",
-    "description": "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned to its builder ({builder}: an agent's name; glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…)."
+    "defaultMessage": "{card} returned to builder {builder}: {why}",
+    "description": "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned to its builder ({builder}: an agent's name; glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…). A noun before the name (glossary §1 rule 4)."
   },
   "board.queue.runBy": {
-    "defaultMessage": "Run by {profile}",
-    "description": "On a merge queue's card in the Progress panel: another Hive on this workspace runs the queue ({profile}: its profile's name, such as Hive-Dev)."
+    "defaultMessage": "Run by profile {profile}",
+    "description": "On a merge queue's card in the Progress panel: another Hive on this workspace runs the queue ({profile}: its profile's name, such as Hive-Dev). A noun before the name (glossary §1 rule 4)."
   },
   "board.queue.saidMerged": {
     "defaultMessage": "{card} merged",
@@ -3176,8 +3176,8 @@
     "description": "Why a card waiting in Review is stalled: its reviewer watches it but is busy with other work. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")."
   },
   "board.stalled.reviewWaitSilent": {
-    "defaultMessage": "{agent} is watching {card} but hasn't started reviewing it (it shows working, but has been silent for {silent, number} min: state unknown): in Review for {waited}.",
-    "description": "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started, and Hive can't tell what the reviewer is doing. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {silent} minutes, {waited} how long it has waited (\"40 min\", \"2 h 5 min\")."
+    "defaultMessage": "{agent} is watching {card} but hasn't started reviewing it (it shows working, but has been silent for {silent}: state unknown): in Review for {waited}.",
+    "description": "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started, and Hive can't tell what the reviewer is doing. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {silent} minutes, {waited} how long it has waited (\"40 min\", \"2 h 5 min\"). {silent} is a duration too, written like {waited}."
   },
   "board.stalled.wakeUntaken": {
     "defaultMessage": "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.",
@@ -3244,8 +3244,8 @@
     "description": "A button on the toast after a card started: shows the agent it started on."
   },
   "board.start.started": {
-    "defaultMessage": "{card} started on {agent}",
-    "description": "A toast's title after a card started: its name: its key, such as AM-12, or #12 for a card with none and the agent ({agent}, its name). The card's title follows."
+    "defaultMessage": "{card} started on agent {agent}",
+    "description": "A toast's title after a card started: its name: its key, such as AM-12, or #12 for a card with none and the agent ({agent}, its name). The card's title follows. A noun before the name (glossary §1 rule 4)."
   },
   "board.start.stopped": {
     "defaultMessage": "Stopped: starts a new conversation on the card.",
