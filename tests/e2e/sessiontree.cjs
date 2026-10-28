@@ -159,8 +159,8 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
         await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
         const fits = await el.evaluate((e) => {
           const edge = e.closest('.sessions-list').getBoundingClientRect().right
-          const row = e.parentElement
-          return e.getBoundingClientRect().right <= edge + 0.5 && row.scrollWidth <= row.clientWidth
+          const filters = e.parentElement
+          return e.getBoundingClientRect().right <= edge + 0.5 && filters.scrollWidth <= filters.clientWidth
         })
         check(`${name} at 200 px (${lang}, ${theme}): within the list, under the Archived box when it doesn't fit`, fits, await el.innerText().catch(() => ''))
         await list.screenshot({ path: path.join(lib.WORK, `sessiontree-narrow-${name}-${lang}-${theme}.png`) })
@@ -260,7 +260,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   {
     const { IntlMessageFormat } = require('intl-messageformat')
     const said = (code, values) => new IntlMessageFormat(JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', code, 'sessions.json'), 'utf8'))['sessions.search.count'], code).format(values)
-    const count = page.locator('.sessions-scope')
+    const countEl = page.locator('.sessions-scope')
     const width = await list.evaluate((e) => e.style.width)
     await list.evaluate((e) => (e.style.width = '200px'))
     await lib.until(async () => Math.round((await list.boundingBox()).width) === 200, HUNG_MS)
@@ -270,16 +270,16 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
       ['de', { kind: 'session', sessions: 1200, hits: 8000, more: '+' }]
     ]) {
       const text = said(code, values)
-      const was = await count.evaluate((e) => e.textContent)
-      const fits = await count.evaluate((e, t) => {
+      const was = await countEl.evaluate((e) => e.textContent)
+      const fits = await countEl.evaluate((e, t) => {
         e.textContent = t
         const edge = e.closest('.sessions-list').getBoundingClientRect().right
-        const row = e.parentElement
-        return e.getBoundingClientRect().right <= edge + 0.5 && row.scrollWidth <= row.clientWidth
+        const filters = e.parentElement
+        return e.getBoundingClientRect().right <= edge + 0.5 && filters.scrollWidth <= filters.clientWidth
       }, text)
       check(`a longer count at 200 px (${code}: ${text}) stays within the list`, fits, text)
       await list.screenshot({ path: path.join(lib.WORK, `sessiontree-narrow-longcount-${code}-dark.png`) })
-      await count.evaluate((e, t) => (e.textContent = t), was)
+      await countEl.evaluate((e, t) => (e.textContent = t), was)
     }
     await list.evaluate((e, w) => (e.style.width = w), width)
   }
