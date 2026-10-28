@@ -351,7 +351,7 @@ A tile waiting for you has a red border and a diamond; a stalled one has a squar
 
 **Tiles keep one size.** Every tile has room for all of these, shown or not, so tiles don't grow and shrink as runs start and end or replies come in, and nothing moves while you read. Text too long for its line (a card's title, a reply, a status, a run's title) ends in *…*: hover it to read it in full. The badges share one line, the warnings first: when they don't all fit, each is cut short with *…* (the background tasks' badge first, down to its icon), and hovering them lists them all in full.
 
-**Twelve tiles fit a page.** With more agents, the page buttons on the toolbar's right show the other pages (or press Ctrl+Alt+PageDown and Ctrl+Alt+PageUp). **Settings → Sessions → Tile order** chooses the order:
+**A page holds as many tiles as fit the window.** All your agents show on one page when they fit; when they don't (a small window, many agents), the page buttons on the toolbar's right show the other pages, and resizing the window pages again, keeping the tile you're on in view (or press Ctrl+Alt+PageDown and Ctrl+Alt+PageUp). **Settings → Sessions → Tile order** chooses the order:
 
 - **Same as panes** (the default): the tiles are in the panes' order, so a builder stays beside its reviewer, and moving an agent moves its tile too. A tile waiting for you or stalled stays where it is, highlighted, and a page button shows how many such tiles another page has.
 - **By urgency**: waiting for you and stalled first, then working, then idle, so anything that needs you is on page 1.

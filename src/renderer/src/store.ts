@@ -11,7 +11,7 @@ import { EMPTY_TIPS_STATE, type TipsState } from '@shared/tips'
 import { agentPtyKey, agentsPerPage, layoutFitting, layoutPanes, mostUrgent, projectLayout, projectSessionView } from '@shared/defaults'
 import { cellPage, cellPageCount, pageCells, pageIds, placedCells, type PaneCells } from '@shared/paneCells'
 import { projectAgentStates, type AgentState } from '@shared/agentState'
-import { tileOrder, tilePageOf, tilePageShown, tilesOnPage } from '@shared/tiles'
+import { tileOrder, tilePageOf, tilePageShown, tilesOnPage, tilesPerPage } from '@shared/tiles'
 import { agentProvider, providersInUse, providerWarnings, setInstalledCheck } from '@shared/providers'
 import { setDateStyle } from '@shared/dates'
 import { language as shownLanguage, msg, onLanguageChange, tr } from '@shared/i18n'
@@ -435,6 +435,8 @@ interface State {
   tileFocus: Record<string, string>
   /** Per project: the page of tiles the Tiles view shows (from 0). */
   tilePage: Record<string, number>
+  /** Per project: how many tiles fit its Tiles view's area, as last measured (HI-1951); none: TILES_PER_PAGE. */
+  tilesFit: Record<string, number>
   /**
    * Per project: whose folder the Changes and Files tabs show (a worktree agent's id; anything else = the project
    * folder). Changes also takes an unused worktree (#400): `unused:<its folder>`, or `unused` for the list of them all.
@@ -655,6 +657,7 @@ export const useStore = create<State>(() => ({
   pageFocus: {},
   tileFocus: {},
   tilePage: {},
+  tilesFit: {},
   changesRoot: {},
   vcSection: {},
   workflowPrefill: null,
@@ -910,7 +913,7 @@ export function agentsOnScreen(s: State = get()): Map<string, string[]> {
   // The Tiles view (#976): the agent its focus view shows, else the page of tiles.
   if (p && (s.projectTabs[p.path] ?? 'session') === 'session' && projectSessionView(p.config, s.settings) === 'tiles') {
     const focus = tileFocusOf(p, s)
-    out.set(p.path, focus ? [focus] : tilesOnPage(tileAgents(p, s), tilePage(p, s)).map((t) => t.a.id))
+    out.set(p.path, focus ? [focus] : tilesOnPage(tileAgents(p, s), tilePage(p, s), tilesPageSize(p, s)).map((t) => t.a.id))
   } else if (p && (s.projectTabs[p.path] ?? 'session') === 'session') {
     const focused = s.focusedAgent[p.path]
     const shown = paneAssignment(p, focused && p.agents.some((a) => a.id === focused) ? focused : (p.agents[0]?.id ?? null))
@@ -937,12 +940,27 @@ export function tileAgents(p: Pick<ProjectInfo, 'path' | 'name' | 'agents'>, s: 
   return tileOrder(states, s.settings?.sessions.tileOrder ?? 'panes').map((i) => ({ a: p.agents[i], state: states[i] }))
 }
 
+/** How many tiles a page of a project's Tiles view holds: as many as fit its area (HI-1951), TILES_PER_PAGE until measured. */
+export const tilesPageSize = (p: Pick<ProjectInfo, 'path'>, s: Pick<State, 'tilesFit'> = get()): number => tilesPerPage(s.tilesFit[p.path])
+
 /** The page of tiles a project's Tiles view shows. */
-export const tilePage = (p: Pick<ProjectInfo, 'path' | 'agents'>, s: Pick<State, 'tilePage'> = get()): number => tilePageShown(s.tilePage[p.path] ?? 0, p.agents.length)
+export const tilePage = (p: Pick<ProjectInfo, 'path' | 'agents'>, s: Pick<State, 'tilePage' | 'tilesFit'> = get()): number => tilePageShown(s.tilePage[p.path] ?? 0, p.agents.length, tilesPageSize(p, s))
 
 /** Shows a page of a project's tiles. */
 export function showTilePage(p: Pick<ProjectInfo, 'path' | 'agents'>, page: number): void {
-  set((s) => ({ tilePage: { ...s.tilePage, [p.path]: tilePageShown(page, p.agents.length) } }))
+  set((s) => ({ tilePage: { ...s.tilePage, [p.path]: tilePageShown(page, p.agents.length, tilesPageSize(p, s)) } }))
+}
+
+/**
+ * How many tiles fit a project's Tiles view now (HI-1951, measured as its area resizes): the page holds that many, and
+ * the page shown becomes the one with `keep` on it (the tile the keyboard is on, else the first shown), so it stays in view.
+ */
+export function setTilesFit(p: Pick<ProjectInfo, 'path' | 'name' | 'agents'>, fit: number, keep: string | null): void {
+  set((s) => {
+    if (s.tilesFit[p.path] === fit) return {}
+    const at = keep ? tileAgents(p, s).findIndex((t) => t.a.id === keep) : -1
+    return { tilesFit: { ...s.tilesFit, [p.path]: fit }, ...(at >= 0 ? { tilePage: { ...s.tilePage, [p.path]: tilePageOf(at, tilesPerPage(fit)) } } : {}) }
+  })
 }
 
 /** The agent a project's focus view shows (#976), while it is one of its agents; null: the grid of tiles. */
@@ -963,7 +981,7 @@ export function closeTile(p: ProjectInfo): string | null {
   set((s) => {
     const { [p.path]: _, ...rest } = s.tileFocus
     const at = id ? tileAgents(p, s).findIndex((t) => t.a.id === id) : -1
-    return { tileFocus: rest, ...(at >= 0 ? { tilePage: { ...s.tilePage, [p.path]: tilePageOf(at) } } : {}) }
+    return { tileFocus: rest, ...(at >= 0 ? { tilePage: { ...s.tilePage, [p.path]: tilePageOf(at, tilesPageSize(p, s)) } } : {}) }
   })
   return id
 }

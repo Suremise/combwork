@@ -1,6 +1,7 @@
 // The Session tab's Tiles view and focus view (#976). Thirteen agents, three of them running the fake Claude Code
-// (fake-claude/): A finished a turn (its reply on its tile), B works, M (the thirteenth) waits for a permission. Tiles: 12 a
-// page, so two pages; in the panes' order (Settings → Sessions → Tile order, the default) M is on page 2, highlighted, and
+// (fake-claude/): A finished a turn (its reply on its tile), B works, M (the thirteenth) waits for a permission. Tiles: as many
+// a page as fit (HI-1951): all 13 on one page at 1500×900; then the area made room for 12, so two pages, and resized
+// back and forth keeping the tile the keyboard is on; in the panes' order (Settings → Sessions → Tile order, the default) M is on page 2, highlighted, and
 // page 2's button counts it; By urgency puts it first. A tile shows the state's mark, name, provider, status and the start
 // of the latest reply. The keyboard: one tab stop in the grid, arrows between tiles, Enter opens the focus view (the agent's
 // live pane beside a strip of the others); Esc in the terminal stays the CLI's, Esc outside it (the strip), Ctrl+Alt+Esc,
@@ -61,11 +62,52 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await live(ids.M))?.status === 'waiting', HUNG_MS)
     await inv('workspace:refresh')
 
-    // --- Panes | Tiles: the grid of tiles, 12 on page 1.
+    // --- Panes | Tiles (HI-1951: a page holds as many tiles as fit): at 1500×900 all 13 fit, on one page, no page buttons.
     await page.locator('.view-switch [data-view="tiles"]').click()
     const tileNames = () => page.locator('.agent-tile .tile-name').allInnerTexts().catch(() => [])
-    check('Tiles: 12 tiles on page 1, in the panes order', !!(await lib.until(async () => (await tileNames()).join() === NAMES.slice(0, 12).join(), HUNG_MS)), (await tileNames()).join())
-    check('…all on screen at 1500×900, no scrolling', await page.locator('.agent-tiles').evaluate((el) => el.scrollHeight <= el.clientHeight))
+    const pager = page.locator('.session-toolbar .tile-pages')
+    check('Tiles: all 13 tiles on one page at 1500×900, in the panes order, no page buttons (HI-1951)', !!(await lib.until(async () => (await tileNames()).join() === NAMES.join() && (await pager.count()) === 0, HUNG_MS)), (await tileNames()).join())
+    check('…all on screen, no scrolling', await page.locator('.agent-tiles').evaluate((el) => el.scrollHeight <= el.clientHeight))
+    /** Both themes' screenshots of the window, for the Assistant's OK (HI-1951). */
+    const themed = async (name) => {
+      for (const theme of ['dark', 'light']) {
+        await inv('settings:update', { appearance: { theme } })
+        await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+        await page.mouse.move(5, 5)
+        await page.screenshot({ path: path.join(lib.WORK, `${name}-${theme}.png`) })
+      }
+      await inv('settings:update', { appearance: { theme: 'dark' } })
+    }
+    await themed('tilesview-onepage')
+    // A smaller window (1100×650): fewer fit, so the tiles page, the pager on the toolbar; back at 1500×900, one page again.
+    await lib.fitWindow(app, page, { width: 1100, height: 650 })
+    check('a smaller window: the tiles page (the pager shows, fewer than 13 on page 1)', !!(await lib.until(async () => (await pager.count()) === 1 && (await tileNames()).length < 13, HUNG_MS)), (await tileNames()).join())
+    await themed('tilesview-paged')
+    await lib.fitWindow(app, page, { width: 1500, height: 900 })
+    check('…the window back at 1500×900: one page of 13 again', !!(await lib.until(async () => (await pager.count()) === 0 && (await tileNames()).length === 13, HUNG_MS)), (await tileNames()).join())
+    /**
+     * The Tiles area made the size of `cols` columns × `rows` rows of tiles (a smaller window's, as the page measures it:
+     * its columns of at least 230 px and its height over a tile's), by a style of its own so it holds while the grid is
+     * drawn again (the focus view and back); null: the window's again.
+     */
+    const fitTiles = (cols, rows) =>
+      page.evaluate(([c, r]) => {
+        document.getElementById('tiles-fit-test')?.remove()
+        if (!c) return
+        const g = document.querySelector('.tile-grid')
+        const css = getComputedStyle(g)
+        const px = (v) => parseFloat(v) || 0
+        const h = g.querySelector('.agent-tile').offsetHeight
+        // c columns as wide as the suite's tiles were (short of room for one more: 200 px over, a column takes 238) and r rows.
+        const width = c * (230 + px(css.columnGap)) + px(css.paddingLeft) + px(css.paddingRight) + 200
+        const height = r * h + (r - 1) * px(css.rowGap) + px(css.paddingTop) + px(css.paddingBottom) + 10
+        const style = Object.assign(document.createElement('style'), { id: 'tiles-fit-test', textContent: `.agent-tiles { right: auto !important; bottom: auto !important; width: ${width}px !important; height: ${height}px !important; }` })
+        document.head.append(style)
+      }, [cols, rows])
+    // A smaller area, room for 12 (4 × 3): the page holds 12, so two pages, as the rest of the suite has them.
+    await fitTiles(4, 3)
+    check('a smaller Tiles area that holds 12: 12 tiles on page 1, in the panes order', !!(await lib.until(async () => (await tileNames()).join() === NAMES.slice(0, 12).join(), HUNG_MS)), (await tileNames()).join())
+    check('…all on screen, no scrolling', await page.locator('.agent-tiles').evaluate((el) => el.scrollHeight <= el.clientHeight))
     check('…no terminal drawn for them (none on screen)', (await page.locator('.terminal-host:not(.hidden)').count()) === 0)
     const tile = (name) => page.locator('.agent-tile', { has: page.locator('.tile-name', { hasText: new RegExp(`^${name}$`) }) })
     const aTile = await tile('A').evaluate((el) => ({ mark: [...(el.querySelector('.state-mark')?.classList ?? [])].join(' '), provider: el.querySelector('.tile-provider')?.textContent, reply: el.querySelector('.tile-reply')?.textContent }))
@@ -79,6 +121,18 @@ const check = (name, ok, extra = '') => {
     check("…page 2's accessible name says so", (await pageNames()) === 'Tile page 1 (current) | Tile page 2, 1 agent waiting for you or stalled', await pageNames())
     check("…in the accessibility tree too", !!(await page.getByRole('button', { name: 'Tile page 2, 1 agent waiting for you or stalled', exact: true }).count()))
     await page.screenshot({ path: path.join(lib.WORK, 'tilesview-grid.png') })
+    // Resizing moves between the two, keeping the tile the keyboard is on (HI-1951): M, on page 2, has it; the area grown,
+    // one page and M still has it; shrunk again, page 2 with M shows.
+    const keyboardOn = () => page.evaluate(() => document.activeElement?.closest?.('.agent-tile')?.querySelector('.tile-name')?.textContent ?? null)
+    await page.locator('.session-toolbar .tile-pages button').nth(1).click()
+    await lib.until(async () => (await tileNames()).join() === 'M', HUNG_MS)
+    await tile('M').focus()
+    await fitTiles(null)
+    check('the area grown: one page of all 13, no page buttons, M still with the keyboard', !!(await lib.until(async () => (await pager.count()) === 0 && (await tileNames()).length === 13 && (await keyboardOn()) === 'M', HUNG_MS)), JSON.stringify({ tiles: await tileNames(), on: await keyboardOn() }))
+    await fitTiles(4, 3)
+    check('…shrunk again: page 2 shown, M on it, still with the keyboard', !!(await lib.until(async () => (await pageButtons()) === '1 2*' && (await tileNames()).join() === 'M' && (await keyboardOn()) === 'M', HUNG_MS)), JSON.stringify({ pages: await pageButtons(), tiles: await tileNames(), on: await keyboardOn() }))
+    await page.locator('.session-toolbar .tile-pages button').nth(0).click()
+    await lib.until(async () => (await pageButtons()) === '1* 2(1)', HUNG_MS)
 
     // --- One height for every tile (#1145), whatever each shows: a reply (A), work (B), nothing (C…); and it stays while a
     // progress run starts on A (its progress line and bar) and ends. A's reply first runs to its two lines.
