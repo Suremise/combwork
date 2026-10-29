@@ -1728,7 +1728,7 @@
     "description": "What a skill that ships with Hive (tune-settings) is for: under its name in the Skills view and a project's Skills tab."
   },
   "assistant.skills.shipped.useHiveApi": {
-    "defaultMessage": "Call Hive's local HTTP API from a script or tool, or debug a hive tool against it. Use only when automating Hive over HTTP: for ordinary board, notes and handover work the hive tools are enough.",
+    "defaultMessage": "A hive tool's cases in detail (tools.md), and Hive's HTTP API for scripts. Use when a tool's description isn't enough, or to automate Hive over HTTP: board and notes work uses the tools.",
     "description": "What a skill that ships with Hive (use-hive-api) is for: under its name in the Skills view and a project's Skills tab. Keep HTTP and API; hive tools are the tools Hive gives agents (hive_…), keep hive in lower case."
   },
   "assistant.skills.shipped.workOnCard": {

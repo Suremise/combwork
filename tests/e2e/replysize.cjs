@@ -127,15 +127,53 @@ const prose = (seed, n) => {
     const r = JSON.parse(out.split('\n')[0]).result
     return { text: r.content[0].text, isError: !!r.isError }
   }
-  /** A tool's description as the agent (or the Assistant) is given it. */
-  const toolDescription = (name, role = 'agent') => {
-    const extra = { HIVE_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' } : { HIVE_API_TOKEN: apiToken, HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }) }
+  /** The tools a role is offered, as the CLI lists them ('assistant+settings': with Change settings on, every one of its own). */
+  const toolList = (role = 'agent') => {
+    const extra = { HIVE_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', HIVE_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' } : { HIVE_API_TOKEN: apiToken, HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }) }
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) + '\n',
       env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, ...extra }),
       timeout: 60000
     }).toString()
-    return JSON.parse(out.split('\n')[0]).result.tools.find((t) => t.name === name)?.description ?? ''
+    return JSON.parse(out.split('\n')[0]).result.tools
+  }
+  /** A tool's description as the agent (or the Assistant) is given it. */
+  const toolDescription = (name, role = 'agent') => toolList(role).find((t) => t.name === name)?.description ?? ''
+  // The tools' descriptions stay short (HI-2012): every description and parameter description, at any depth of its
+  // schema, and each role's total, within toolLimits.cjs. The Assistant is measured with Change settings on (all its own);
+  // hive_console (offered only with the developer console on, as here) is checked but left out of the totals.
+  {
+    const limits = require('./toolLimits.cjs')
+    const paramTexts = (schema) => {
+      const found = []
+      const walk = (o, at) => {
+        if (!o || typeof o !== 'object') return
+        if (typeof o.description === 'string') found.push([at, o.description])
+        // A parameter named description (hive_create_task's) is walked; only the text itself isn't.
+        for (const [k, v] of Object.entries(o)) if (typeof v === 'object') walk(v, `${at}.${k}`)
+      }
+      walk(schema?.properties, 'properties')
+      return found
+    }
+    for (const [role, list] of [['agent', 'agent'], ['assistant', 'assistant+settings']]) {
+      const over = []
+      let total = 0
+      for (const t of toolList(list)) {
+        const ex = limits.exceptions[t.name] ?? {}
+        const descMax = ex.description ?? limits.description
+        const paramMax = ex.parameter ?? limits.parameter
+        const counted = t.name !== 'hive_console'
+        if (counted) total += t.description.length
+        if (t.description.length > descMax) over.push(`${t.name} ${t.description.length}/${descMax}`)
+        for (const [at, d] of paramTexts(t.inputSchema)) {
+          if (counted) total += d.length
+          if (d.length > paramMax) over.push(`${t.name} ${at} ${d.length}/${paramMax}`)
+        }
+      }
+      console.log(`tool descriptions (${role}): ${total} characters`)
+      check(`tool descriptions (${role}): each within ${limits.description}, each parameter's within ${limits.parameter}`, over.length === 0, over.join('; '))
+      check(`tool descriptions (${role}): ${total} characters in all, within ${limits.total[role]}`, total <= limits.total[role])
+    }
   }
   const sizes = {}
   const texts = {}
@@ -463,7 +501,9 @@ const prose = (seed, n) => {
   const detailOk = detail.toolCalls === 12 && detail.recentTools.length === 10 && detail.currentTask.length <= 2001 && detail.latestReply.length <= 3001 && detail.recentTools.every((t) => t.summary.length <= 201) && detail.recentTools.some((t) => t.summary.length > 101)
   check('activity: detail is bounded as described (2000, 3000, last 10 of 12 calls at 200), not "in full"', detailOk, JSON.stringify({ calls: detail.toolCalls, tools: detail.recentTools?.length, task: detail.currentTask?.length, reply: detail.latestReply?.length }))
   check('activity: says what was cut, by its whole length', activity.clipped?.currentTask === longTask.length && activity.clipped?.latestReply === longReply.length && detail.clipped?.currentTask === longTask.length && detail.clipped?.latestReply === longReply.length, JSON.stringify([activity.clipped, detail.clipped]))
-  check('activity: the tool says the same bounds', /2000, 3000 and the last 10 calls/.test(toolDescription('hive_agent_activity', 'assistant')) && !/in full/.test(toolDescription('hive_agent_activity', 'assistant')))
+  // Its bounds are in use-hive-api's tools.md (HI-2012); the description says detail=true clips less.
+  const activityDetail = fs.readFileSync(path.join(lib.ROOT, 'resources', 'skills', 'use-hive-api', 'tools.md'), 'utf8')
+  check('activity: the tool and its detail say the same bounds', /detail=true clips less/.test(toolDescription('hive_agent_activity', 'assistant')) && /the task to 300 characters, the reply to 500, the last 3 tool calls at 100 each; `detail=true` raises that to 2000, 3000 and the last 10 calls at 200 each/.test(activityDetail) && !/in full/.test(toolDescription('hive_agent_activity', 'assistant')))
   measure('hive_wait_for_agents', tool('hive_wait_for_agents', { agents: [{ project: 'alpha', agent: 'Coder' }], timeoutSeconds: 5 }, 'assistant'), 1000)
   // An agent watch (#416): an agent not working is the answer at once, in a line; cancel says what it ended.
   const agentAlready = measure('hive_wait_for_agents (wake, not working)', tool('hive_wait_for_agents', { agents: [{ project: 'alpha', agent: 'Coder' }], wake: true }, 'assistant'), 300)

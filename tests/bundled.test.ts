@@ -429,7 +429,10 @@ describe('a workspace', () => {
       expect(forAgents).toEqual(expect.arrayContaining(['my-own', 'work-on-card', 'review-agent-work', 'merge-ready', 'handover', 'split-work']))
       expect(forAgents).not.toContain('coordinate-agents')
       expect(forAssistant).toEqual(expect.arrayContaining(['coordinate-agents', 'split-work', 'handover', 'pick-up', 'workspace-note']))
-      for (const n of ['my-own', 'work-on-card', 'review-agent-work', 'merge-ready', 'use-hive-api']) expect(forAssistant).not.toContain(n)
+      // use-hive-api is for both (HI-2012): its tools.md has the hive tools' cases.
+      expect(forAgents).toContain('use-hive-api')
+      expect(forAssistant).toContain('use-hive-api')
+      for (const n of ['my-own', 'work-on-card', 'review-agent-work', 'merge-ready']) expect(forAssistant).not.toContain(n)
     } finally {
       await wsMod.disposeWorkspaceService(w)
     }

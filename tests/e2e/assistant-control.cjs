@@ -74,7 +74,8 @@ const check = (name, ok, extra = '') => {
   check("the Assistant's hive tools use its token and role", mcp?.env.HIVE_API_TOKEN_FILE === tokenFile && mcp.env.HIVE_ROLE === 'assistant' && mcp.env.HIVE_ASSISTANT_CONTROL === 'projects', JSON.stringify(mcp?.env))
   // Its skills: the workspace's skills for the Assistant (coordinate-agents and the shared ones), none for agents only.
   const assistantSkills = fs.readdirSync(path.join(home, '.hive', 'launch-assistant', 'plugin', 'skills')).sort()
-  check('the Assistant gets the skills for it', ['coordinate-agents', 'handover', 'pick-up', 'split-work', 'workspace-note'].every((n) => assistantSkills.includes(n)) && !['work-on-card', 'review-agent-work', 'merge-ready', 'use-hive-api'].some((n) => assistantSkills.includes(n)), assistantSkills.join(','))
+  // use-hive-api is for both (HI-2012): its tools.md, the hive tools' detail, is copied with it.
+  check('the Assistant gets the skills for it', ['coordinate-agents', 'handover', 'pick-up', 'split-work', 'workspace-note', 'use-hive-api'].every((n) => assistantSkills.includes(n)) && fs.existsSync(path.join(home, '.hive', 'launch-assistant', 'plugin', 'skills', 'use-hive-api', 'tools.md')) && !['work-on-card', 'review-agent-work', 'merge-ready'].some((n) => assistantSkills.includes(n)), assistantSkills.join(','))
   // Its instructions: its control level and boundaries, the skill that says how, then the mode.
   const told = fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8')
   check('its instructions give its control level and point to coordinate-agents, before the mode', /Control agents and create projects/.test(told) && told.indexOf('coordinate-agents skill') > 0 && told.indexOf('coordinate-agents skill') < told.indexOf('# Your mode'), told.slice(0, 300))
