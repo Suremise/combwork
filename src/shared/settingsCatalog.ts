@@ -11,7 +11,7 @@
  * checks and the paths they name keep the English (an entry's title, desc and tip), whatever the user chose. Text only
  * the Assistant reads (when a setting helps, why it is read-only, what a value takes) stays English.
  */
-import type { AppSettings, ProjectConfig, ProviderId, WorkflowLevel, WorkspaceConfig } from './types'
+import type { AppSettings, CommandPoint, CustomCommand, ProjectConfig, ProviderId, WorkflowLevel, WorkspaceConfig } from './types'
 import type { PlatformId } from './platform/descriptors'
 import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from './loopLimits'
 import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES, SLOT_COPY_DEFAULT } from './defaults'
@@ -27,7 +27,7 @@ import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
 import { AUTO_PROVIDER, DEFAULT_PROJECT_PROVIDER, PROVIDERS, dangerModes, defaultProviderSettings, modeOption, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
 import { LEGACY_CONSUMED, ownOrLegacy } from './workflow/preferences'
-import { closeCommandOf } from './closeCommand'
+import { EMPTY_HIVE, EMPTY_WORKSPACE, resolvePoint } from './commands'
 
 /** Where a setting lives: Hive's own (Settings), a provider's page in Settings, the open workspace, or one project (Project Settings). */
 export type SettingScope = 'app' | 'provider' | 'workspace' | 'project'
@@ -258,13 +258,26 @@ const APP_ROWS: Row[] = [
   { section: 'general', key: 'confirmOnQuit', title: msg({ id: 'settings.general.confirmOnQuit.title', defaultMessage: 'Confirm before quitting', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.confirmOnQuit.desc', defaultMessage: 'When to ask before quitting stops running sessions.', description: 'What the setting "Confirm before quitting" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.confirmOnQuit.tip', defaultMessage: 'Quitting stops every running session. Their conversations are kept and can be resumed, so by default Hive only asks when an agent is in the middle of something (working, or waiting for your answer).', description: 'The info tip of the setting "Confirm before quitting" (Settings → General): more on what it does and when it applies.' }), type: 'select', options: [{ value: 'working', label: msg({ id: 'settings.general.confirmOnQuit.option.working', defaultMessage: 'When an agent is working', description: 'A choice of the setting "Confirm before quitting" (Settings → General).' }) }, { value: 'always', label: msg({ id: 'settings.general.confirmOnQuit.option.always', defaultMessage: 'Whenever sessions are running', description: 'A choice of the setting "Confirm before quitting" (Settings → General).' }) }, { value: 'never', label: msg({ id: 'settings.general.confirmOnQuit.option.never', defaultMessage: 'Never', description: 'A choice of the setting "Confirm before quitting" (Settings → General).' }) }] },
   {
     section: 'general',
+    key: 'commands',
+    title: msg({ id: 'settings.general.commands.title', defaultMessage: 'Commands', description: "A setting's title (Settings → General): the user's own named commands for Hive as a whole (HI-1954)." }),
+    desc: msg({ id: 'settings.general.commands.desc', defaultMessage: "Your own commands for Hive as a whole: run one by hand (here, or Run Command in the command palette), or pick them for When Hive quits, run, or for any workspace's open and close.", description: 'What the setting "Commands" does, under its title (Settings → General, HI-1954). When Hive quits, run is another setting\'s title: use its translation.' }),
+    tip: msg({
+      id: 'settings.general.commands.tip',
+      defaultMessage: "Saved in Hive's own settings, never in a workspace, so a repository you clone brings none that run by themselves. Only you can save them: the Assistant can suggest one for you to confirm.",
+      description: 'The info tip of the setting "Commands" (Settings → General, HI-1954).'
+    }),
+    type: 'custom',
+    wide: true
+  },
+  {
+    section: 'general',
     key: 'onQuit',
     title: msg({ id: 'settings.general.onQuit.title', defaultMessage: 'When Hive quits, run', description: "A setting's title (Settings → General): a command of the user's that Hive runs as it quits." }),
-    desc: msg({ id: 'settings.general.onQuit.desc', defaultMessage: "A command Hive runs as it quits, once every window's workspace has closed. Hive waits for it, showing it running.", description: 'What the setting "When Hive quits, run" does, under its title (Settings → General).' }),
+    desc: msg({ id: 'settings.general.onQuit.desc', defaultMessage: "The commands Hive runs, in order, as it quits, once every window's workspace has closed. Hive waits for them, showing them running.", description: 'What the setting "When Hive quits, run" does, under its title (Settings → General; HI-1954: a list of the user\'s commands).' }),
     tip: msg({
       id: 'settings.general.onQuit.tip',
-      defaultMessage: "cmd.exe runs it. '{reason}' becomes quit, or update when Hive restarts to install an update (only with that box ticked). Don't wait, in the panel Hive shows, lets Hive go on while the command carries on. Only you can set it: the Assistant can't change it.",
-      description: "The info tip of the setting \"When Hive quits, run\" (Settings → General). '{reason}' is a placeholder the user writes in the command, and quit and update are the values it becomes: keep all three as they are (the quotes around {reason} keep it from being read as a placeholder of this text). Don't wait is the name of a button of the panel."
+      defaultMessage: "Pick them from Commands above. '{reason}' becomes quit, or update when Hive restarts to install an update (only with that box ticked). Don't wait, in the dialog Hive shows, lets Hive go on while the rest run by themselves. Only you can set them: the Assistant can't change them.",
+      description: "The info tip of the setting \"When Hive quits, run\" (Settings → General; HI-1954). '{reason}' is a placeholder the user writes in a command, and quit and update are the values it becomes: keep all three as they are (the quotes around {reason} keep it from being read as a placeholder of this text). Commands is the title of the setting above; Don't wait is the name of a button of the dialog."
     }),
     type: 'custom',
     wide: true
@@ -372,13 +385,39 @@ const APP_ROWS: Row[] = [
   },
   {
     section: 'workspace',
+    key: 'commands',
+    title: msg({ id: 'settings.workspace.commands.title', defaultMessage: 'Commands', description: "A setting's title (Settings → Workspace): the user's own named commands for this workspace (HI-1954)." }),
+    desc: msg({ id: 'settings.workspace.commands.desc', defaultMessage: "This workspace's own commands: run one by hand (here, or Run Command in the command palette), or pick it, or one of Hive's, for when this workspace opens or closes.", description: 'What the setting "Commands" does, under its title (Settings → Workspace, HI-1954).' }),
+    tip: msg({
+      id: 'settings.workspace.commands.tip',
+      defaultMessage: "Saved in the workspace's .hive/workspace.json, which Hive keeps out of version control. Only you can save them: the Assistant can suggest one for you to confirm.",
+      description: 'The info tip of the setting "Commands" (Settings → Workspace, HI-1954). Keep the file path as it is.'
+    }),
+    type: 'custom',
+    wide: true
+  },
+  {
+    section: 'workspace',
+    key: 'onOpen',
+    title: msg({ id: 'settings.workspace.onOpen.title', defaultMessage: 'When this workspace opens, run', description: "A setting's title (Settings → Workspace): the user's commands Hive runs as the workspace opens (HI-1954)." }),
+    desc: msg({ id: 'settings.workspace.onOpen.desc', defaultMessage: "The commands Hive runs, in order, as this workspace opens: a local server or a database its agents need, say. Its agents start once they're done, or once you choose Don't wait.", description: 'What the setting "When this workspace opens, run" does, under its title (Settings → Workspace, HI-1954). Don\'t wait is the name of a button of the dialog Hive shows.' }),
+    tip: msg({
+      id: 'settings.workspace.onOpen.tip',
+      defaultMessage: "Pick them from Commands above. '{reason}' becomes open. If one fails, Hive asks: Rerun, Skip it and continue, or Stop here; a command ticked \"The commands after this need it\" leads with Stop here. Only you can set them: the Assistant can't change them.",
+      description: "The info tip of the setting \"When this workspace opens, run\" (Settings → Workspace, HI-1954). '{reason}' is a placeholder the user writes in a command, and open the value it becomes: keep both as they are. Rerun, Skip it and continue and Stop here are buttons of the dialog; the quoted text is a checkbox's label: use their translations."
+    }),
+    type: 'custom',
+    wide: true
+  },
+  {
+    section: 'workspace',
     key: 'onClose',
     title: msg({ id: 'settings.workspace.onClose.title', defaultMessage: 'When this workspace closes, run', description: "A setting's title (Settings → Workspace): a command of the user's that Hive runs as the open workspace closes." }),
-    desc: msg({ id: 'settings.workspace.onClose.desc', defaultMessage: 'A command Hive runs as this workspace closes: its window closes, another workspace opens in it, or Hive quits. Hive waits for it, showing it running.', description: 'What the setting "When this workspace closes, run" does, under its title (Settings → Workspace).' }),
+    desc: msg({ id: 'settings.workspace.onClose.desc', defaultMessage: 'The commands Hive runs, in order, as this workspace closes: its window closes, another workspace opens in it, or Hive quits. Hive waits for them, showing them running.', description: 'What the setting "When this workspace closes, run" does, under its title (Settings → Workspace; HI-1954: a list of the user\'s commands).' }),
     tip: msg({
       id: 'settings.workspace.onClose.tip',
-      defaultMessage: "cmd.exe runs it. '{workspace}' becomes the workspace's folder, '{name}' its name and '{reason}' why it closes: window, switch, quit, or update when Hive restarts to install an update (only with that box ticked). Saved in the workspace's .hive/workspace.json. Only you can set it: the Assistant can't change it.",
-      description: "The info tip of the setting \"When this workspace closes, run\" (Settings → Workspace). '{workspace}', '{name}' and '{reason}' are placeholders the user writes in the command, and window, switch, quit and update are the values {reason} becomes: keep them all as they are (the quotes around each placeholder keep it from being read as one of this text). Keep the file path as it is."
+      defaultMessage: "Pick them from Commands above. '{workspace}' becomes the workspace's folder, '{name}' its name and '{reason}' why it closes: window, switch, quit, or update when Hive restarts to install an update (only with that box ticked). Only you can set them: the Assistant can't change them.",
+      description: "The info tip of the setting \"When this workspace closes, run\" (Settings → Workspace; HI-1954). '{workspace}', '{name}' and '{reason}' are placeholders the user writes in a command, and window, switch, quit and update are the values {reason} becomes: keep them all as they are (the quotes around each placeholder keep it from being read as one of this text). Commands is the title of the setting above."
     }),
     type: 'custom',
     wide: true
@@ -985,7 +1024,7 @@ const SENSITIVE: [RegExp, string][] = [
   [/^(project\.)?[\w-]+\.(executablePath|extraArgs)$/, 'It decides what Hive runs: a CLI and its arguments'], // i18n-ignore: the Assistant's tools (English)
   [/^[\w-]+\.allowBackgroundSessions$/, "It lets sessions run out of Hive's reach (Hive can't see or stop them)"], // i18n-ignore: the Assistant's tools (English)
   [/^project\.worktreeSetup$/, 'It is a command Hive runs in every new worktree'], // i18n-ignore: the Assistant's tools (English)
-  [/^workspace\.onClose$|^general\.onQuit$/, 'It is a command Hive runs as a workspace closes or Hive quits'], // i18n-ignore: the Assistant's tools (English)
+  [/^workspace\.(onClose|onOpen|commands)$|^general\.(onQuit|commands)$/, 'Its commands run on this machine by themselves or by hand: the user saves them, the Assistant may only propose (HI-1954)'], // i18n-ignore: the Assistant's tools (English)
   [/^updates\.prerelease$/, 'It decides which builds of Hive install'], // i18n-ignore: the Assistant's tools (English)
   [/(^|\.)maxAgents$/, "Maximum agents is the user's team size, the most agents you may add"] // i18n-ignore: the Assistant's tools (English)
 ]
@@ -1070,6 +1109,9 @@ const DOCS_BY_ID: Record<string, string> = {
   'general.timeFormat': 'dates-and-times', // i18n-ignore: a user guide heading's id (#1535)
   'general.showTips': 'tips', // i18n-ignore: a user guide heading's id (#1535)
   'general.onQuit': 'close-commands', // i18n-ignore: a user guide heading's id (#1535)
+  'general.commands': 'commands', // i18n-ignore: a user guide heading's id (#1535)
+  'workspace.commands': 'commands', // i18n-ignore: a user guide heading's id (#1535)
+  'workspace.onOpen': 'close-commands', // i18n-ignore: a user guide heading's id (#1535)
   'workspace.onClose': 'close-commands', // i18n-ignore: a user guide heading's id (#1535)
   'sessions.transcriptWarnMB': 'long-conversations', // i18n-ignore: a user guide heading's id (#1535)
   'sessions.backupTranscripts': 'archiving-and-backups', // i18n-ignore: a user guide heading's id (#1535)
@@ -1175,11 +1217,11 @@ export function settingEntry(id: string): SettingEntry | undefined {
  * advanced value (#367) is advanced.json's override (`advanced`: its values) or the default, or the workspace's own (null:
  * Settings → Advanced's).
  */
-export function settingValue(e: SettingEntry, settings: AppSettings, project?: ProjectConfig | null, ws?: Pick<WorkspaceConfig, 'advanced' | 'workflow' | 'slotDefaults' | 'onClose'> | null, advanced?: Record<string, unknown> | null): unknown {
+export function settingValue(e: SettingEntry, settings: AppSettings, project?: ProjectConfig | null, ws?: Pick<WorkspaceConfig, 'advanced' | 'workflow' | 'slotDefaults' | 'commands'> | null, advanced?: Record<string, unknown> | null): unknown {
   if (e.action) return undefined
-  // The close commands (HI-1368): the command, as the tools read it (sensitive: they never set it).
-  if (e.id === 'workspace.onClose') return closeCommandOf(ws?.onClose)
-  if (e.id === 'general.onQuit') return closeCommandOf(settings.general?.onQuit)
+  // The user's commands (HI-1954): their names, and each point's in order, as the tools read them (sensitive: they never set them).
+  const commands = commandsSettingValue(e.id, settings, ws)
+  if (commands !== undefined) return commands
   if (e.advanced) return e.advanced.scope === 'workspace' ? (ws?.advanced?.[e.advanced.id] ?? null) : (advanced?.[e.advanced.id] ?? advancedDef(e.advanced.id)?.default)
   // A level's workflow default (#1422): its own value, or inherit.
   if (e.workflowLevel && e.workflow) return (e.workflowLevel.level === 'global' ? settings.workflow : ws?.workflow)?.[e.workflowLevel.platform]?.[e.workflow] ?? 'inherit'
@@ -1206,10 +1248,23 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
   return (settings[e.section as keyof AppSettings] as unknown as Record<string, unknown> | undefined)?.[e.key]
 }
 
+/** The user's commands as the settings tools read them (HI-1954): the lists' names, each point's names in order. */
+function commandsSettingValue(id: string, settings: AppSettings, ws?: Pick<WorkspaceConfig, 'commands'> | null): string[] | undefined {
+  const hive = settings.commands ?? EMPTY_HIVE
+  const own = ws?.commands ?? EMPTY_WORKSPACE
+  const names = (point: CommandPoint, workspace?: CustomCommand[]): string[] => resolvePoint(point, { hive: hive.list, workspace }).map((r) => r.command?.name ?? '(deleted)') // i18n-ignore: the tools' text
+  if (id === 'general.commands') return hive.list.map((c) => c.name)
+  if (id === 'general.onQuit') return names(hive.onQuit)
+  if (id === 'workspace.commands') return own.list.map((c) => c.name)
+  if (id === 'workspace.onOpen') return names(own.onOpen, own.list)
+  if (id === 'workspace.onClose') return names(own.onClose, own.list)
+  return undefined
+}
+
 /** A setting's default: Hive's, or for a project's, Inherit. */
 export function settingDefault(e: SettingEntry): unknown {
   if (e.action) return undefined
-  if (e.id === 'workspace.onClose' || e.id === 'general.onQuit') return ''
+  if (/^workspace\.(onClose|onOpen|commands)$|^general\.(onQuit|commands)$/.test(e.id)) return []
   if (e.advanced) return e.advanced.scope === 'workspace' ? null : advancedDef(e.advanced.id)?.default
   if (e.workflowLevel || e.slotLevel) return 'inherit'
   // A project's provider settings inherit, but its Extra arguments are added to Hive's: empty (DEFAULT_PROJECT_PROVIDER).
