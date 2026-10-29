@@ -185,6 +185,8 @@ const check = (name, ok, extra = '') => {
   check('hive_agent_activity: the wait it had, its model and effort', act.retryWaits?.waits === 1 && act.retryWaits.latest?.status === 429 && act.retryWaits.latest.tries === 1 && !act.retryWaits.latest.ongoing && act.retryWaits.latest.since === waiting.retryWait.since && typeof act.retryWaits.seconds === 'number' && typeof act.model === 'string' && act.model.length > 0 && typeof act.effort === 'string', JSON.stringify({ retryWaits: act.retryWaits, model: act.model, effort: act.effort }))
   const footTip = await lib.hoverTip(page, page.locator('.agent-pane').filter({ has: header }).locator('.pane-footer-bar .foot-model'), (t) => /This session has waited/.test(t))
   check("the footer model's hover says how long this session waited for retries", /This session has waited (under a minute|\d+ minutes?) in all for Codex to retry rate-limited or failed requests \(1 wait, the latest from .+\): time not spent on its work\./.test(footTip), footTip)
+  await page.screenshot({ path: path.join(lib.WORK, 'turnledger-retry-hover.png') })
+  await page.mouse.move(5, 5)
 
   // HI-1973: Claude Code's 429 tries, recorded only in its transcript, no hook while it waits: read after its quiet while
   // (5 s here), its pane says it is rate-limited, which try of how many and when it retries; its next hook clears it.
