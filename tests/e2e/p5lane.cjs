@@ -290,14 +290,19 @@ const ancestor = (x, y) => {
       await waitHung(async () => (await dialog.count()) === 1)
       await dialog.locator('#lane-start-builder').selectOption(b1.id)
       await dialog.locator('#lane-start-reviewer').selectOption(r1.id)
+      const was = (await live(b1.id))?.sessionId ?? null
       await dialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
       // Once lent its slot: a lane started just as the one before it ends waits for that lane's slot (its lease ends just
-      // after it), then the slot pass lends it and starts B1 with the brief (HI-2029). B1 may then be in a new
-      // conversation, with a new token (intent and reorderNow read it again on a 401).
+      // after it), then the slot pass lends it and starts B1 with the brief (HI-2029). B1 is then in a new conversation,
+      // with a new token (intent and reorderNow read it again on a 401): at once, or (HI-2034: lane A's end notice still
+      // being taken as lane B starts) once it is free, the lane owing it meanwhile.
       const lane = await waitHung(async () => {
         const l = (await inv('lanes:list')).find((x) => x.builder.id === b1.id && x.state !== 'ended' && JSON.stringify(x.cards.map((c) => c.number)) === JSON.stringify(cards))
-        return l?.slot ? l : null
+        return l?.slot && l.status?.why !== 'fresh' ? l : null
       })
+      // Never on in its old conversation (HI-2034): its new one, once the lane's start (or its owed launch) has given it.
+      const now = lane ? await waitHung(async () => { const id = (await live(b1.id))?.sessionId; return id && id !== was ? id : null }) : null
+      check(`…B1 works lane ${cards.join(', ')} in a new conversation (HI-2034)`, !!lane && !!now && now !== was, JSON.stringify({ was, now, status: lane?.status ?? null }))
       // Not started (HI-2027's lane C, once in five): what the window showed, said with the failure.
       if (!lane) {
         const shot = path.join(fx.shots, `lane-start-${cards.join('-')}-failed.png`)

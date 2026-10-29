@@ -5,7 +5,11 @@ import { cardRef } from '../shared/projectKeys'
 import { agentNowOf } from './cardStall'
 import { coalesced } from './coalesce'
 import { onHiveEvent } from './events'
-import { laneNow, lanesEnforced, laneStartHeld, laneViewsChanged, laneWaitsForSlot, listLanes, setLaneStartWaits } from './lanes'
+import { LANES_FRESH_START_WAIT_MINUTES, withValues } from '../shared/advanced'
+import { msg } from '../shared/i18n'
+import { advanced } from './advanced'
+import { launchFresh } from './laneStart'
+import { changeFreshStart, freshStartsNow, laneNow, lanesEnforced, laneStartHeld, laneViewsChanged, laneWaitsForSlot, listLanes, rawLanes, setLaneStartWaits } from './lanes'
 import { createLogger, userText } from './logger'
 import { withCardNames } from './projectKeys'
 import { offerNow, waitingForRun } from './deliveries'
@@ -40,6 +44,18 @@ const waiting = new Map<string, number>()
 const tried = new Map<string, { at: number; why: string; builder: string }>()
 const timers = new Map<string, NodeJS.Timeout>()
 const inFlight = new Set<Promise<unknown>>()
+/**
+ * Agents owed their new conversation (HI-2034, lanes' `freshStart`), builders and reviewers alike, by
+ * "<workspace>#<project>|<agent>": looked at again as each one's status changes, and by the tick, whether or not a card
+ * is due. The entries being launched now in this process, by id (one found launching and not here is a crash's).
+ */
+const owed = new Set<string>()
+const launchingNow = new Set<string>()
+
+const M = {
+  freshBlockedTitle: msg({ id: 'service.laneStarts.freshBlockedTitle', defaultMessage: '{agent}’s new conversation didn’t start', description: "A notification's title (HI-2034): a lane's agent ({agent}, its name) is owed a new conversation for the lane, and Hive has stopped trying to start it." }),
+  freshBlockedBody: msg({ id: 'service.laneStarts.freshBlockedBody', defaultMessage: '{why, select, timeout {It wasn’t free within {minutes, plural, one {# minute} other {# minutes}}.} uncertain {Hive closed while starting it, so it may not have started.} other {{reason}}} Retry it from the lane’s row in the Progress panel, or end the lane. Its cards wait until then.', description: "A notification's text (HI-2034), under \"{agent}'s new conversation didn't start\". why (select): the agent wasn't free (in a turn) within the wait, {minutes} minutes (Settings → Advanced); Hive closed while it was starting it; or (other) its start failed, {reason} saying why (a sentence, may be in English). Translate each." })
+}
 
 const builderKey = (wsPath: string, project: string, agentId: string): string => `${wsPath.toLowerCase()}#${project.toLowerCase()}|${agentId}`
 
@@ -90,7 +106,7 @@ class LaneChanged extends Error {}
  * and no wait for a slot (HI-2029: either may have begun since the look). `now`: the card as the start's write sees it.
  */
 function stillDue(ws: WorkspaceService, path: string, lane: { id: string; project: string; builder: { id: string } }, n: number, now?: TaskCard): boolean {
-  if (!ws.path || ws.path.toLowerCase() !== path.toLowerCase() || laneStartHeld(ws, lane.project, lane.builder.id) || laneWaitsForSlot(ws, lane.id)) return false
+  if (!ws.path || ws.path.toLowerCase() !== path.toLowerCase() || laneStartHeld(ws, lane.project, lane.builder.id) || laneWaitsForSlot(ws, lane.id) || builderOwed(ws, lane.id)) return false
   const v = laneNow(ws, { lane: lane.id }, now)
   return !!v && v.builder.id === lane.builder.id && laneStartDue(v)?.number === n
 }
@@ -117,13 +133,17 @@ export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
   }
 }
 
+/** Whether a lane's builder is owed its new conversation (HI-2034), as kept now: its cards wait for it, never the old one. */
+const builderOwed = (ws: WorkspaceService, id: string): boolean => freshStartsNow(ws, id).some((f) => f.role === 'builder')
+
 async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
+  await freshPass(ws, path)
   for (const lane of await listLanes(ws)) {
     const next = laneStartDue(lane)
     // A lane waiting for a slot (none was free as it started) has its stopped agents started once one is lent (slotCards'
     // pass), which keeps the wait until they are launched (HR1 on HI-2029: a `stoppedOnly` one too): its status says it
     // waits for a slot, and Hive's start comes after.
-    if (!next || laneWaitsForSlot(ws, lane.id)) continue
+    if (!next || laneWaitsForSlot(ws, lane.id) || builderOwed(ws, lane.id)) continue
     const projectPath = join(path, lane.project)
     waiting.set(builderKey(path, lane.project, lane.builder.id), next.number)
     const wait = (why: LaneStartWhy): void => void waits.set(waitKey(path, lane.id), { card: next.number, why, agent: lane.builder.name })
@@ -166,6 +186,53 @@ async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
   }
 }
 
+/**
+ * Each agent owed its new conversation (HI-2034, lanes' `freshStart`): launched once free (launchFresh: as Start Lane…
+ * would have, its obligation claimed and checked again at the launch), within LANES_FRESH_START_WAIT_MINUTES of its
+ * start; past that, or a launch found begun and not proven, no more is tried: blocked, with a notice, until the user
+ * retries it. An entry this process is launching is left alone; one found launching otherwise is a crash's, which
+ * launchFresh reconciles and never launches again by itself.
+ */
+async function freshPass(ws: WorkspaceService, path: string): Promise<void> {
+  for (const k of [...owed]) if (k.startsWith(`${path.toLowerCase()}#`)) owed.delete(k)
+  const wait = advanced.number(LANES_FRESH_START_WAIT_MINUTES)
+  for (const lane of await rawLanes(ws)) {
+    if (lane.state !== 'active' || !lane.freshStart) continue
+    const projectPath = join(path, lane.project)
+    for (const f of lane.freshStart) {
+      if (f.blocked) continue
+      owed.add(builderKey(path, lane.project, f.agent))
+      if (launchingNow.has(f.id)) continue
+      const name = f.role === 'builder' ? lane.builder.name : (lane.reviewer?.name ?? f.agent)
+      // Past its wait, and not being launched: no more tried, and the user told (never a turn interrupted for it).
+      if (!f.launching && Date.now() - Date.parse(f.since) > wait * 60_000) {
+        const blocked = await changeFreshStart(ws, lane.id, f.id, (x) => (x.launching || x.blocked ? x : { ...x, blocked: { at: new Date().toISOString(), why: 'timeout' } })) // i18n-ignore: a fresh start's blocked reason, a select key (never shown as it is)
+        if (blocked) tellBlocked(projectPath, name, 'timeout', wait, '')
+        continue
+      }
+      // Free (as a card's start needs it: idle with a line free, nothing of Hive's queued for it), or a crash's launch to reconcile.
+      if (!f.launching && (await builderWait(projectPath, { id: f.agent, name }))) continue
+      launchingNow.add(f.id)
+      try {
+        const out = await launchFresh(ws, projectPath, lane.id, f.id)
+        if (out === 'blocked') {
+          const now = freshStartsNow(ws, lane.id).find((x) => x.role === f.role)
+          if (now?.blocked) tellBlocked(projectPath, name, now.blocked.why, wait, now.blocked.message ?? '')
+        }
+      } catch (e) {
+        log.warn(`Lane ${lane.id}: starting ${userText(name)} in its new conversation`, e)
+      } finally {
+        launchingNow.delete(f.id)
+      }
+    }
+  }
+}
+
+/** The user told an agent's new conversation is no more tried (HI-2034), as a notice: the settings and quiet test copies apply. */
+function tellBlocked(projectPath: string, agent: string, why: 'timeout' | 'uncertain' | 'failed', minutes: number, reason: string): void {
+  sessions.notice(projectPath, withValues(M.freshBlockedTitle, { agent }), withValues(M.freshBlockedBody, { why, minutes, reason }))
+}
+
 /** A workspace's lanes may have a card to start: looked at once things settle, one look at a time. */
 function soon(ws: WorkspaceService): void {
   const k = ws.path?.toLowerCase()
@@ -189,7 +256,7 @@ function agentChanged(projectPath: string, agentId: string): void {
   if (!ws?.path) return
   const project = projectPath.slice(ws.path.length).replace(/^[\\/]+/, '')
   const k = builderKey(ws.path, project, agentId)
-  if (!waiting.has(k)) return
+  if (!waiting.has(k) && !owed.has(k)) return
   // Its status changed (a line Hive was typing into it went in, its turn ended): a start refused for that is tried again
   // now, not after RETRY_MS.
   for (const [key, t] of tried) if (t.builder === k) tried.delete(key)
@@ -216,8 +283,8 @@ export function startLaneStarts(): void {
   })
   // A start refused for now (a slot or a line to wait for, the user typing) is tried again while its card waits.
   const tick = setInterval(() => {
-    if (!waiting.size) return
-    for (const ws of openWorkspaces()) if (ws.path && [...waiting.keys()].some((k) => k.startsWith(`${ws.path!.toLowerCase()}#`))) soon(ws)
+    if (!waiting.size && !owed.size) return
+    for (const ws of openWorkspaces()) if (ws.path && [...waiting.keys(), ...owed].some((k) => k.startsWith(`${ws.path!.toLowerCase()}#`))) soon(ws)
   }, RETRY_MS)
   tick.unref?.()
 }

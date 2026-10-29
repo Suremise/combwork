@@ -4573,6 +4573,34 @@ a stopped agent is launched with it as a task delivery (`launchWith`), an idle o
 to start leaves the lane recorded and says why. A running lane's menu has **End Lane** and **Abandon Lane…** (asks
 first; `lanes:end`).
 
+**A busy agent's new conversation is owed, never dropped** [HI-2034, HR1's design s11]. An agent found not free at
+its launch (in a turn since the up-front check, a prompt Hive typed not taken yet, no line of Hive's free to go in:
+lane A's end notice as lane B started, in p5lane) was reported failed, and since HI-2029 Hive then gave the builder
+its first card in its **old** conversation. Now `launchAgents` records it with the lane (`freshStart`: id, agent,
+role, since, the old session; kept in the row's `extra`, changed only under the lanes' lock) and reports it
+`deferred` (the dialog's info toast: *B1 starts once it is free*). Asked to sign in again, or any other refusal that
+doesn't pass by itself, stays `failed`. A `stoppedOnly` start (the Assistant's, HI-1934) never owes one: a running
+agent is left as it is. **The pass** (`laneStarts.ts` `freshPass`, on board and lane changes, each owed agent's
+status changes and the 30 s tick, builders and reviewers alike, whether or not a card is due) launches each owed agent
+once free (`launchFresh`: as Start Lane would, the lane's brief, a new conversation, or started if it stopped
+meanwhile). The launch is claimed under the lock (`launching`), and its ownership (the lane running, the agent in that
+role, the same entry, unblocked) is checked again just before the old run stops (`newConversation`'s `allowed`); the
+entry is removed by its id only after the launch. **Bounded**: within Settings → Advanced → *Lanes: longest Hive waits
+to start a busy agent afresh* (`hive.lanes.freshStartWaitMinutes`, 10) of its start; past that it is `blocked`
+(`timeout`), a notice tells the user (the notification settings and quiet test copies apply), and nothing more is
+tried: no turn is interrupted. **Never unproven**: an entry found `launching` (a crash between the claim and its
+removal), or with a start task made for it since, is cleared only when the agent's live run is the one that task went
+into, in a conversation other than the old one (a run resuming the old conversation is not); otherwise it is
+`blocked` (`uncertain`) and never launched again by itself. A launch that fails is `blocked` (`failed`, with why).
+**The first-card barrier**: while the builder's entry is there, Hive's own start of its cards (HI-2029) skips the lane,
+at the look and in `stillDue`, so no card goes to the old conversation. **Visible**: the lane's status is `startWait`
+with `why: 'fresh'` (*waiting: B1 starts in a new conversation once it is free*), `freshBlocked` once blocked (*B1's
+new conversation didn't start (…): retry it, or end the lane*), and a blocked one stalls the lane's next card at once
+(the lane watch's `stalled`). **Recovery**: **Retry New Conversation** on the lane's row and in its menu
+(`lanes:retryFresh`), or the Assistant's `POST /v1/lanes/{id}/fresh-start` within Control (`lane-fresh-start`; a
+project agent is refused), makes each blocked entry a new obligation from now and cancels the start task an earlier
+launch left on its way; or End Lane.
+
 **The Assistant's and a script's lane start (HI-1900):** `POST /v1/lanes` naming its builder (`hive_lane start` from the
 Assistant) recorded the lane and nothing more, so a lane over stopped agents sat active with nothing lent and nobody
 working it (27 Oct, three lanes for 50 minutes). A new lane started so now starts its **stopped** agents as Start Lane

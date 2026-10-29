@@ -817,6 +817,8 @@ export interface HiveRequests {
   'lanes:list': () => LaneInfo[]
   /** The user ends a lane (abandoned: unmerged); returns it as it is now. */
   'lanes:end': (laneId: string, abandoned?: boolean) => LaneInfo
+  /** The user retries a lane's new conversations no more tried (HI-2034: an agent busy as the lane started): how many. */
+  'lanes:retryFresh': (laneId: string) => number
   /**
    * Start lane… (#1280): records a lane of a project's cards in order and starts its builder and reviewer, each in a
    * fresh conversation with the generated brief. Refused (nothing recorded) while either agent is busy.

@@ -712,6 +712,7 @@
   "assistant.undo.why.context": "The doc sections to read first stay as set.",
   "assistant.undo.why.decision": "A decision it recorded stays: only you change or remove decisions.",
   "assistant.undo.why.declarePaths": "The paths it declared stay with the card.",
+  "assistant.undo.why.freshRetried": "A lane agent's new conversation tried again isn't stopped by undo: end the lane if it isn't wanted.",
   "assistant.undo.why.handOver": "A hand-over can't be undone: the work went to the other agent.",
   "assistant.undo.why.laneEnded": "A lane that ended stays ended: start it again if it should go on.",
   "assistant.undo.why.laneReorderNow": "A card a lane reorder applied now put back stays in Todo: undo puts back only the lane's order.",

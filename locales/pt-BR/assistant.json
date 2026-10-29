@@ -703,6 +703,7 @@
   "assistant.undo.why.context": "As seções de documentos para ler primeiro ficam como foram definidas.",
   "assistant.undo.why.decision": "Uma decisão que ele registrou fica: só você altera ou remove decisões.",
   "assistant.undo.why.declarePaths": "Os caminhos que ele declarou ficam com o cartão.",
+  "assistant.undo.why.freshRetried": "Desfazer não interrompe a conversa nova de um agente da raia que foi tentada de novo: encerre a raia se ela não for desejada.",
   "assistant.undo.why.handOver": "Uma passagem de trabalho não pode ser desfeita: o trabalho foi para o outro agente.",
   "assistant.undo.why.laneEnded": "Uma raia encerrada continua encerrada: inicie-a de novo se ela deve continuar.",
   "assistant.undo.why.laneReorderNow": "Um cartão devolvido por uma reordenação da raia aplicada na hora continua em A fazer: desfazer restaura só a ordem da raia.",

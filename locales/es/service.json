@@ -172,6 +172,8 @@
   "service.laneStart.sameAgent": "El autor no puede ser su propio revisor.",
   "service.laneStart.starting": "El carril del agente {agent} ya se está iniciando.",
   "service.laneStart.unknownAgent": "{agent} no es un agente de {project}.",
+  "service.laneStarts.freshBlockedBody": "{why, select, timeout {No estuvo libre en {minutes, plural, one {# minuto} many {# minutos} other {# minutos}}.} uncertain {Hive se cerró mientras lo iniciaba, así que puede que no se haya iniciado.} other {{reason}}} Reinténtalo desde la fila del carril en el panel Progreso, o termina el carril. Sus tarjetas esperan hasta entonces.",
+  "service.laneStarts.freshBlockedTitle": "La conversación nueva de {agent} no se inició",
   "service.lanes.noWorkspace": "No hay ningún espacio de trabajo abierto",
   "service.lanes.unknown": "No existe el carril {id}",
   "service.metrics.badProvider": "provider debe ser el id de un proveedor",

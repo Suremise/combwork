@@ -255,6 +255,8 @@
   "settings.advanced.copilot.retry.context.desc": "Copilot のエラーのフックが、回復可能なエラーが再試行するモデルの呼び出しだったと示す場所（レート制限、またはサービスに接続できない場合）。Hive は Copilot が先に進むまで、エージェントを再試行待ちとして表示します。間違っていると、待機中のエージェントは「作業中」とだけ表示されます。",
   "settings.advanced.copilot.retry.message.title": "再試行：エラーメッセージ",
   "settings.advanced.copilot.retry.message.desc": "そのフックが呼び出しの失敗理由をどう表現するか：名前付きグループ status が拒否した HTTP ステータスになるか、グループ limited がレート制限（429）の言葉に一致するか、サービスに接続できなかったときにグループ network が一致する正規表現。Copilot のフックはサービス自身のエラーを伝え、ステータスがないことがよくあります。間違っていると、待機が理由なしで表示されます。",
+  "settings.advanced.hive.lanes.freshStartWaitMinutes.desc": "レーンはエージェントを新しい会話で開始します。レーン開始時に作業中のエージェント（ターン中、またはHiveが渡したばかりのメッセージを読んでいる）は、空きしだい、最長でこの時間まで開始を試みます。その後Hiveは試行をやめ、レーンの行にそう表示されます。そこで再試行するか、レーンを終了してください。Hiveがそのためにターンを中断したり、レーンのカードを古い会話に渡したりすることはありません。",
+  "settings.advanced.hive.lanes.freshStartWaitMinutes.title": "レーン：作業中のエージェントを新たに開始するまでHiveが待つ最長時間",
   "settings.advanced.hive.retry.tellAssistantAfterSeconds.title": "再試行待ち：Assistant に知らせるまでの時間",
   "settings.advanced.hive.retry.tellAssistantAfterSeconds.desc": "エージェントのコーディングエージェントが 1 回のターンでモデルへのリクエストの再試行を待ち続けられる時間（レート制限、またはサービスに接続できない場合）。これを過ぎると Hive が Hive Assistant に知らせます（1 ターンに 1 回）。0：知らせない。",
   "settings.advanced.codex.signIn.expired.desc": "Codexのセッションファイルにあるターンのエラーのうち、サインインが拒否されたか期限切れであることを示すものです（Codex自身がそのエラーを示さない場合）（#309）。",

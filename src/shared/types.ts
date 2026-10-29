@@ -3620,7 +3620,8 @@ export interface LaneStartInfo {
 /** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */
 export interface LaneStartResult {
   lane: LaneInfo
-  started: { agentId: string; name: string; role: 'builder' | 'reviewer'; how: 'started' | 'fresh' | 'failed'; why?: string }[]
+  /** `deferred` (HI-2034): in a turn or with a prompt it hadn't taken, so it starts in a new conversation once free (the lane's `freshStart`). */
+  started: { agentId: string; name: string; role: 'builder' | 'reviewer'; how: 'started' | 'fresh' | 'failed' | 'deferred'; why?: string }[]
   /** Its slot (#1438), or, with none free, why it waits: its agents start once one is. */
   slot?: string
   waitingForSlot?: string
@@ -3636,8 +3637,11 @@ export interface LaneStatus {
   ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
   /** hooks: the agent whose hooks aren't arriving, by name; startWait: the builder. */
   agent?: string
-  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy). */
-  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused'
+  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
+  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh'
+  /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */
+  freshBlocked?: 'timeout' | 'uncertain' | 'failed'
+  freshWhy?: string
   /** preparing (#1446): the slot being prepared. */
   slot?: string
   /**

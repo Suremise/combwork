@@ -1835,6 +1835,14 @@
     "defaultMessage": "Cards, in order",
     "description": "A field label in the Start Lane dialog: the cards the lane works through, in the order they are worked."
   },
+  "board.laneStart.deferred": {
+    "defaultMessage": "{agent} starts once it is free",
+    "description": "A toast's title (HI-2034): the lane was started, but its agent {agent} was busy (in a turn, or reading a message Hive had just given it), so it isn't in its new conversation yet."
+  },
+  "board.laneStart.deferredText": {
+    "defaultMessage": "Hive starts {agent} in a new conversation with the lane’s brief as soon as its turn is over. The lane’s row says so meanwhile, and its cards wait for it.",
+    "description": "The text of the toast when a lane's agent ({agent}) was busy as the lane started (HI-2034): Hive starts it in a new conversation once it is free; the lane's row in the Progress panel says it waits. Glossary: lane, conversation."
+  },
   "board.laneStart.down": {
     "defaultMessage": "Move {card} down",
     "description": "Tooltip of a button in the Start Lane dialog: moves the card ({card}, its key) one place later in the lane."
@@ -1995,6 +2003,10 @@
     "defaultMessage": "Fold the lanes",
     "description": "Tooltip of the Progress panel's Lanes bar: folds the lanes down to the bar."
   },
+  "board.lanes.freshBlocked": {
+    "defaultMessage": "{agent}’s new conversation didn’t start ({why, select, timeout {it wasn’t free in time} uncertain {Hive closed as it started} other {{reason}}}): retry it, or end the lane",
+    "description": "Why a lane waits, in its header in the Progress panel (HI-2034): its agent {agent} (an agent's name) is owed a new conversation for the lane, and Hive stopped trying. why (select): it wasn't free within the wait (Settings → Advanced); Hive closed while starting it, so it may not have started; or (other) its start failed, {reason} saying why (a sentence, may be in English). The row's Retry New Conversation button tries again. Translate each."
+  },
   "board.lanes.latestRun": {
     "defaultMessage": "{card}'s latest run: {run}, {state, select, running {running} passed {passed} failed {failed} other {stopped}}",
     "description": "Tooltip and accessible name of the dot after a lane's current card (Progress panel): that card's latest run ({run}: its title) and how it is going or went. Keep the select keys."
@@ -2067,6 +2079,14 @@
     "defaultMessage": "{state, select, done {Done} doing {Doing} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}",
     "description": "A card's state in a lane's cards, opened in the Progress panel's Lanes tab (its icon's name): done, being worked on, in review, not started, waiting for the user (blocked, on hold or at its round limit), gone from the board, or not recorded by the lane. Keep the select keys."
   },
+  "board.lanes.retryFresh": {
+    "defaultMessage": "Retry New Conversation",
+    "description": "A button in a lane's header (Progress panel) and an item of its menu (HI-2034): one of the lane's agents was owed a new conversation, and Hive stopped trying to start it (it wasn't free in time, Hive closed while starting it, or its start failed); this tries again, once the agent is free. Glossary: lane, conversation."
+  },
+  "board.lanes.retryFreshFailed": {
+    "defaultMessage": "Couldn't retry {lane}'s new conversation",
+    "description": "A toast's title (HI-2034): Retry New Conversation on a lane's row failed ({lane}: its builder / reviewer). The reason follows."
+  },
   "board.lanes.round": {
     "defaultMessage": "r{round}",
     "description": "A card's round in a lane's cards (Progress panel → Lanes), short: r1 for its first, r3 after two failed reviews."
@@ -2138,6 +2158,10 @@
   "board.lanes.waits": {
     "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} lineUpdate {waiting: bringing the builder’s branch up to date before {card}} hooks {paused: {agent}'s hooks aren't arriving} checkCopy {waiting for a check copy for {card}} slot {waiting for a slot} other {list changes after {card}}}",
     "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; Hive brings the builder's branch up to date before that card (after a squash merge, #1271); hooks: the agent {agent} (a name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so the lane is paused; checkCopy: its review or check waits for a check copy (a folder Hive keeps at one revision for a review or an isolated check) to be free; slot: every slot (a working folder Hive lends to a card or a lane) is in use, so the lane can't start until one is free; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
+  },
+  "board.lanes.waitsFresh": {
+    "defaultMessage": "waiting: {agent} starts in a new conversation once it is free",
+    "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-2034): its agent {agent} (an agent's name) was busy as the lane started (in a turn, or reading a message), so Hive starts it in a new conversation with the lane's brief once it is free. The lane isn't paused."
   },
   "board.lanes.waitsLink": {
     "defaultMessage": "Click to show it.",

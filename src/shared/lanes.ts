@@ -19,6 +19,44 @@ export interface LaneAgent {
 }
 
 /** A lane as kept (a row of the workspace's database, #1018; `.hive/lanes.json` before). Paused isn't kept: it is read from the board (the current card is blocked). */
+/**
+ * A lane agent's new conversation owed (HI-2034, LaneRecord `freshStart`). `id`: this obligation (a retry is a new one).
+ * `oldSession`: the conversation it must leave (its session id when deferred; null when unknown). `launching`: when a
+ * launch of it began (set under the lock just before it): one still set when Hive looks again (a crash in between) is
+ * never launched again by itself, only proven done by a new conversation of the agent since then, else blocked as
+ * `uncertain`. `blocked`: no more automatic tries (`timeout`: not free within the wait; `uncertain`; `failed`, with why)
+ * until the user retries it.
+ */
+export interface FreshStart {
+  id: string
+  agent: string
+  role: 'builder' | 'reviewer'
+  since: string
+  oldSession: string | null
+  launching?: string
+  blocked?: { at: string; why: 'timeout' | 'uncertain' | 'failed'; message?: string }
+}
+
+/** Fresh starts as kept (HI-2034): malformed ones left out; at most one per role. */
+function readFreshStarts(v: unknown): FreshStart[] | null {
+  if (!Array.isArray(v)) return null
+  const out: FreshStart[] = []
+  for (const f of v.slice(0, 4)) {
+    if (!isObj(f) || !text(f.id, 64) || !text(f.agent, 128) || (f.role !== 'builder' && f.role !== 'reviewer') || !time(f.since) || out.some((x) => x.role === f.role)) continue
+    const b = isObj(f.blocked) && time(f.blocked.at) && (f.blocked.why === 'timeout' || f.blocked.why === 'uncertain' || f.blocked.why === 'failed') ? f.blocked : null
+    out.push({
+      id: f.id as string,
+      agent: f.agent as string,
+      role: f.role,
+      since: f.since as string,
+      oldSession: text(f.oldSession, 128) ? (f.oldSession as string) : null,
+      ...(time(f.launching) ? { launching: f.launching as string } : {}),
+      ...(b ? { blocked: { at: b.at as string, why: b.why as 'timeout' | 'uncertain' | 'failed', ...(typeof b.message === 'string' ? { message: b.message.slice(0, 500) } : {}) } } : {})
+    })
+  }
+  return out.length ? out : null
+}
+
 export interface LaneRecord {
   id: string
   project: string
@@ -53,6 +91,13 @@ export interface LaneRecord {
    * `stoppedOnly`: recorded by the Assistant or a script (HI-1934), so only its agents stopped then are started.
    */
   slotWait?: { since: string; note: string; stoppedOnly?: true }
+  /**
+   * The lane's agents still owed their new conversation (HI-2034): its start found one in a turn or with a prompt it
+   * hadn't taken yet, so it is launched once free (laneStarts.ts' pass), within `hive.lanes.freshStartWaitMinutes`.
+   * Kept with the lane (its row's `extra`), changed only under the lanes' lock. While its builder's is here, Hive gives
+   * the builder no card (never into the old conversation).
+   */
+  freshStart?: FreshStart[]
   /**
    * The lane's brief for its builder (HI-1795: `hive_lane start`'s `brief`), kept with the lane (its row's `extra`).
    * `text` null: cleared. `rev` goes up at each change of text and each clear, never reused. In slots, every placement
@@ -140,7 +185,7 @@ export function laneStartDue(lane: Pick<LaneInfo, 'state' | 'cards'>): LaneCard 
  * turn or starting (`busy`), waiting on a watch of other work (`watching`), a line of Hive's on its way to it (`queued`),
  * its last start failed (`failed`), or Hive's start refused for now and tried again (`refused`).
  */
-export type LaneStartWhy = 'busy' | 'watching' | 'queued' | 'failed' | 'refused'
+export type LaneStartWhy = 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh'
 /** A lane's card waiting to be started, why, and its builder's name (LaneStatus `startWait`). */
 export interface LaneStartWait {
   card: number
@@ -187,7 +232,13 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   // Its card due to start and not started yet (HI-2029, laneStarts.ts: `startWait`), only while that card is the current
   // one and nothing else says why the lane waits: never "active" with its card untouched and nothing said. Not a pause.
   const waitsStart = running(rec) && !unrecorded && startWait && startWait.card === current && list.find((c) => c.number === current)?.column === 'todo' ? { reason: 'startWait' as const, card: startWait.card, why: startWait.why, agent: startWait.agent } : null
-  const status = running(rec) ? (hooks ?? noSlot ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null) ?? waitsStart ?? preparing) : null
+  // An agent still owed its new conversation (HI-2034, `freshStart`; its builder's first): said while Hive waits for it
+  // to be free, and before anything else but its hooks and its slot once no more is tried (the user retries it or ends
+  // the lane). Not a pause.
+  const owed = running(rec) && !unrecorded ? (rec.freshStart?.find((f) => f.role === 'builder') ?? rec.freshStart?.[0] ?? null) : null
+  const freshName = owed ? (owed.role === 'builder' ? rec.builder.name : (rec.reviewer?.name ?? owed.agent)) : ''
+  const fresh = owed ? { reason: 'startWait' as const, card: current, why: 'fresh' as const, agent: freshName, ...(owed.blocked ? { freshBlocked: owed.blocked.why, ...(owed.blocked.message ? { freshWhy: owed.blocked.message } : {}) } : {}) } : null
+  const status = running(rec) ? (hooks ?? noSlot ?? (fresh?.freshBlocked ? fresh : null) ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null) ?? fresh ?? waitsStart ?? preparing) : null
   // Reviewed by the pool (#1443): who gave its current card's last verdict, and who reviews it now (#1446), by name.
   const now = rec.pool && running(rec) && current !== null ? facts?.get(current) : undefined
   const agentName = (id: string): string => names?.get(id) ?? (rec.builder.id === id ? rec.builder.name : id)
@@ -338,6 +389,8 @@ export function laneStatusText(s: LaneStatus): string {
     case 'preparing':
       return `waiting: preparing ${s.slot ?? 'its slot'}`
     case 'startWait':
+      // An agent owed its new conversation (HI-2034): said of the agent, whichever card.
+      if (s.why === 'fresh') return s.freshBlocked ? `${s.agent ?? 'its agent'}'s new conversation didn't start (${s.freshBlocked === 'timeout' ? "it wasn't free in time" : s.freshBlocked === 'uncertain' ? 'Hive closed as it started' : (s.freshWhy ?? 'its start failed')}): retry it from the lane's row, or end the lane` : `waiting: ${s.agent ?? 'its agent'} starts in a new conversation once it is free`
       return `${card} waits to start: ${s.why === 'watching' ? `${s.agent ?? 'its builder'} is waiting on other work` : s.why === 'queued' ? `a line of Hive's is on its way to ${s.agent ?? 'its builder'}` : s.why === 'failed' ? `${s.agent ?? 'its builder'}'s last start failed` : s.why === 'refused' ? 'its start was refused for now; Hive tries again' : `${s.agent ?? 'its builder'} is in a turn`}`
   }
 }
@@ -392,6 +445,7 @@ export function readLane(v: unknown): LaneRecord | null {
   const snapshot = frozen?.every((c, i) => c && c.number === cards[i]) ? (frozen as LaneCard[]) : null
   // Its run (#1270): each part kept only when it reads as one (a queued list may be empty only while a card is in flight).
   const pending = Array.isArray(v.pending) && v.pending.length <= LANE_MAX_CARDS && v.pending.every((n) => whole(n, 1e9)) && new Set(v.pending).size === v.pending.length ? (v.pending as number[]) : null
+  const fresh = v.state === 'active' ? readFreshStarts(v.freshStart) : null
   return {
     id: v.id,
     project: v.project,
@@ -413,7 +467,8 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {}),
     ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000), ...(v.slotWait.stoppedOnly === true ? { stoppedOnly: true as const } : {}) } } : {}),
     ...(isObj(v.brief) && whole(v.brief.rev, 1e9) && (v.brief.text === null || typeof v.brief.text === 'string') && (v.brief.out === null || whole(v.brief.out, 1e9)) ? { brief: { text: v.brief.text === null ? null : (v.brief.text as string).slice(0, LANE_BRIEF_MAX), rev: v.brief.rev as number, out: v.brief.out as number | null, ...(text(v.brief.notIn, 128) ? { notIn: v.brief.notIn as string } : {}) } } : {}),
-    ...(v.pool === true && !reviewer ? { pool: true as const } : {})
+    ...(v.pool === true && !reviewer ? { pool: true as const } : {}),
+    ...(fresh ? { freshStart: fresh } : {})
   }
 }
 

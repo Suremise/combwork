@@ -372,6 +372,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.journal.builds.title': undefined
   'settings.advanced.hive.lanes.endWaitMinutes.desc': undefined
   'settings.advanced.hive.lanes.endWaitMinutes.title': undefined
+  'settings.advanced.hive.lanes.freshStartWaitMinutes.desc': undefined
+  'settings.advanced.hive.lanes.freshStartWaitMinutes.title': undefined
   'settings.advanced.hive.lanes.gentleEnd.desc': undefined
   'settings.advanced.hive.lanes.gentleEnd.title': undefined
   'settings.advanced.hive.lanes.waitReviewerMinutes.desc': undefined

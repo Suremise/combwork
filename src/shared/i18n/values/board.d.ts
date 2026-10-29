@@ -460,6 +460,8 @@ interface HiveMessageValues {
   'board.laneStart.busyNow': { agents: string | number; n: number }
   'board.laneStart.cancel': undefined
   'board.laneStart.cards': undefined
+  'board.laneStart.deferred': { agent: string | number }
+  'board.laneStart.deferredText': { agent: string | number }
   'board.laneStart.down': { card: string | number }
   'board.laneStart.intro': undefined
   'board.laneStart.name': undefined
@@ -500,6 +502,7 @@ interface HiveMessageValues {
   'board.lanes.endFailed': { lane: string | number }
   'board.lanes.expand': { open: string; lane: string | number }
   'board.lanes.fold': undefined
+  'board.lanes.freshBlocked': { agent: string | number; why: string; reason: string | number }
   'board.lanes.latestRun': { card: string | number; run: string | number; state: string }
   'board.lanes.legendButton': undefined
   'board.lanes.legendHold': { category: string | number }
@@ -518,6 +521,8 @@ interface HiveMessageValues {
   'board.lanes.projectLink': { project: string | number }
   'board.lanes.queue': { lane: string | number }
   'board.lanes.queueState': { state: string }
+  'board.lanes.retryFresh': undefined
+  'board.lanes.retryFreshFailed': { lane: string | number }
   'board.lanes.round': { round: string | number }
   'board.lanes.show': undefined
   'board.lanes.slotLine': { line: string | number }
@@ -536,6 +541,7 @@ interface HiveMessageValues {
   'board.lanes.waitedAtLeastTip': undefined
   'board.lanes.waitingForYou': { n: number }
   'board.lanes.waits': { reason: string; card: string | number; ask: string; agent: string | number }
+  'board.lanes.waitsFresh': { agent: string | number }
   'board.lanes.waitsLink': undefined
   'board.lanes.waitsPreparing': { slot: string | number }
   'board.lanes.waitsStart': { card: string | number; why: string; agent: string | number }

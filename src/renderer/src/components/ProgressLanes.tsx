@@ -136,8 +136,10 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
       { label: tr(SHOW_IN_ACTIVITY), icon: 'type-hierarchy', onClick: () => openWorkspaceActivity({ agents: [l.builder, ...(l.reviewer ? [l.reviewer] : [])].map((a) => activityAgentKey(l.project, a.agentId)) }) },
       { separator: true },
       { label: tr(msg({ id: 'board.lanes.usualOrder', defaultMessage: 'Usual Order', description: "A lane's context menu item in the Progress panel: puts the lanes back in their usual order, undoing the user's own." })), icon: 'list-ordered', detail: tr(msg({ id: 'board.lanes.usualOrderDetail', defaultMessage: 'Running lanes newest first, paused ones after them', description: 'Under Usual Order in a lane\'s context menu (Progress panel): what the usual order is.' })), disabled: !custom, onClick: usual },
-      // Ending one needs no tool (#1280, SPEC §16.11.3): End Lane, and Abandon Lane after asking.
+      // Ending one needs no tool (#1280, SPEC §16.11.3): End Lane, and Abandon Lane after asking. Its new conversation
+      // no more tried tried again first (HI-2034).
       { separator: true },
+      ...(freshBlocked(l) ? [{ label: tr(RETRY_FRESH), icon: 'refresh', onClick: () => void retryFresh(l) }] : []),
       { label: tr(msg({ id: 'board.lanes.end', defaultMessage: 'End Lane', description: "A lane's context menu item in the Progress panel: ends the lane (its agents' card loop is over; the cards stay as they are). Glossary: lane." })), icon: 'flag', onClick: () => void endLane(l, false) },
       { label: tr(msg({ id: 'board.lanes.abandon', defaultMessage: 'Abandon Lane…', description: "A lane's context menu item in the Progress panel: gives the lane up unmerged, after asking. Glossary: lane." })), icon: 'close', danger: true, onClick: () => void endLane(l, true) },
       { separator: true },
@@ -443,6 +445,20 @@ const LANE_DRAG = 'application/x-hive-lane'
 
 const START_LANE = msg({ id: 'board.lanes.start', defaultMessage: 'Start Lane…', description: "A button in the Progress panel's Lanes tab and an item of a lane's menu: opens Start Lane (a builder and a reviewer agent work through cards in turn). Glossary: lane." })
 
+const RETRY_FRESH = msg({ id: 'board.lanes.retryFresh', defaultMessage: 'Retry New Conversation', description: "A button in a lane's header (Progress panel) and an item of its menu (HI-2034): one of the lane's agents was owed a new conversation, and Hive stopped trying to start it (it wasn't free in time, Hive closed while starting it, or its start failed); this tries again, once the agent is free. Glossary: lane, conversation." })
+
+/** Whether a lane's agent is owed its new conversation and no more is tried (HI-2034): the row offers Retry. */
+const freshBlocked = (l: Lane): boolean => l.status?.reason === 'startWait' && l.status.why === 'fresh' && !!l.status.freshBlocked && !l.frozen
+
+/** Retries a lane's new conversations no more tried (HI-2034); a failure says why. */
+async function retryFresh(l: Lane): Promise<void> {
+  try {
+    await call('lanes:retryFresh', l.id)
+  } catch (e) {
+    notify('error', tr(msg({ id: 'board.lanes.retryFreshFailed', defaultMessage: "Couldn't retry {lane}'s new conversation", description: "A toast's title (HI-2034): Retry New Conversation on a lane's row failed ({lane}: its builder / reviewer). The reason follows." }), { lane: lanePair(l) }), errorMessage(e))
+  }
+}
+
 /** Ends a lane from its row (#1280): at once, or abandoned after asking; a failure says why. */
 async function endLane(l: Lane, abandoned: boolean): Promise<void> {
   const pair = lanePair(l)
@@ -718,6 +734,19 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
             <span className={cx('faint', 'progress-lane-waited', wait!.long && 'long')} data-action="lane-waited" title={l.status?.atLeast ? tr(WAITED_AT_LEAST_TIP) : undefined}>
               {waited}
             </span>
+          )}
+          {freshBlocked(l) && (
+            <button
+              type="button"
+              className="btn small subtle progress-lane-retry"
+              data-action="lane-retry-fresh"
+              onClick={(e) => {
+                e.stopPropagation()
+                void retryFresh(l)
+              }}
+            >
+              {tr(RETRY_FRESH)}
+            </button>
           )}
           {stalled && (
             <Tooltip content={`${cardLabelOf({ tasks }, stalled.n)}: ${stalled.why}`}>
