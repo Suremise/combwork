@@ -85,12 +85,7 @@ export async function presetInputs(projectPath: string, platform: PlatformId): P
   const tests = has('test') ? ['test'] : []
   const commands = Object.fromEntries([...quick.map((n) => [n, `npm run ${n}`]), ...tests.map((n) => [n, 'npm test'])]) // i18n-ignore: commands, run as written
   if (platform !== 'git') return { quick, tests, commands, identity: null }
-  // HI-2033: the default branch, asked once more as the identity is; still unread, the preset leaves its target empty
-  // (the default branch, read again at each merge), said in the log.
-  const branchOf = () => G.defaultBranch(projectPath).catch(() => null)
-  const firstBranch = await branchOf()
-  const target = typeof firstBranch === 'string' ? firstBranch : await branchOf()
-  if (typeof target !== 'string') log.warn(`the presets' target: git couldn't read the default branch of ${userText(projectPath)}; left empty (the default branch)`)
+  const target = await G.defaultBranch(projectPath).catch(() => null)
   // HI-2019: a read git couldn't make is asked once more; still unread, the form shows no identity (it has no state for
   // "couldn't read", and the queue reads it again itself before a merge).
   const read = () => G.identity(projectPath).catch(() => null)

@@ -320,9 +320,12 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     const t = prefill.template
     if (t) {
       const path = source.key
+      // HI-2033: the form is shown while this read waits; an edit made meanwhile (a preset chosen) is the user's and
+      // stays, as with a reload (`load`), rather than be replaced by the template's options under the same preset.
+      const edited = edits.current
       void source.read().then(
         (f) => {
-          if (pathRef.current !== path) return
+          if (pathRef.current !== path || edits.current !== edited) return
           show(path, f)
           if (f.platform !== t.platform) return notify('warning', tr(T.templateOtherPlatform, { template: t.name, platform: tr(PLATFORM_NAME[t.platform]), project: project?.name ?? '' }))
           const o = overlayTemplateWorkflow(t.section, { platform: f.platform, options: f.options, own: f.own, identity: f.identity })

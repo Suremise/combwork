@@ -316,8 +316,7 @@ function helpers(h) {
       const f = await inv('workflow:form', alpha)
       return f?.preset === 'team' ? f.options : null
     }, HUNG_MS)
-    // Its target main, or empty: the default branch, main, when git couldn't read it as the form was read (HI-2033).
-    must('Team saved from the tab: Hive merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'hiveMerges' && ['main', ''].includes(opts.target) && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
+    must('Team saved from the tab: Hive merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'hiveMerges' && opts.target === 'main' && !!opts.commands?.typecheck && !!opts.commands?.test && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
     await inv('project:updateConfig', alpha, { slots: { setup: `node "${path.join(fx.tools, 'setup.js')}"` } })
 
     // --- Two lanes from the window at once, each lent a slot, its builder started there in a new conversation.

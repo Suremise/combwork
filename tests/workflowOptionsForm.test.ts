@@ -212,19 +212,6 @@ describe('the Workflow section (#1278)', () => {
     expect(f.presets.find((p) => p.id === 'pair')!.options).toMatchObject({ finish: 'hiveMerges', target: 'main', mergeChecks: ['typecheck', 'lint'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint' } })
   })
 
-  it("asks git for the presets' target once more when a read fails for a moment, so Team still merges into main (HI-2033)", async () => {
-    const { w, repo } = await workspace({})
-    const G = await import('../src/main/platform/git')
-    const blip = vi.spyOn(G, 'defaultBranch').mockResolvedValueOnce({ unknown: true, what: 'the default branch (test)' })
-    try {
-      const f = await form.workflowForm(w, repo)
-      expect(blip).toHaveBeenCalledTimes(2)
-      expect(f.presets.find((p) => p.id === 'team')!.options.target).toBe('main')
-    } finally {
-      blip.mockRestore()
-    }
-  })
-
   it("Team turns on each card's focused tests with the project's own runner, and every preset keeps its commands (HI-1367)", async () => {
     const own = { commands: { 'focused.pick': 'node pick.js', 'focused.run': 'node run.js', mine: 'make mine' } }
     const { w, repo } = await workspace({ project: own, scripts: { typecheck: 'tsc' } })
