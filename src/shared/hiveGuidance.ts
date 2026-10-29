@@ -60,7 +60,7 @@ export function boardSkillsLine(off: ReadonlySet<string> = new Set()): string {
 }
 
 /** The inbox: read, act, then ack (#903), for every role and CLI; an item not acked shows as overdue (deliveries.ts). */
-const INBOX_RULE = `Hive tells you when your inbox has something ("[Hive] New in your inbox: …"): read it with hive_inbox, act on it, then ack it (hive_inbox with ack) before you wait or end your turn: one not acked within 30 minutes shows the user it's overdue.`
+const INBOX_RULE = `Hive tells you when your inbox has something ("[Hive] New in your inbox: …"): read it with hive_inbox, act on it, then ack it (hive_inbox with ack) before you wait or end your turn.`
 
 /**
  * `progress`: whether agents wrap long commands in hive-progress unasked (progressRule). `skillsOff`: the skills a
@@ -97,7 +97,7 @@ export function hiveInstructions(project: string, role: HiveRole = 'agent', prog
     // worktrees outlived them.
     "Put scratch, probes and logs in a temp folder (as the project's notes say, or your scratchpad), never in or beside a project or worktree, nor in its .codex, .claude or .agents (a stray .codex stops Codex's commands).",
     // P8 (#1529): the intents (SPEC §16.8.1); what the project's rules allow is Hive's to refuse and the skills' to describe.
-    "Board rules (Hive's, whatever a skill says, or if it is missing): move a card by its intent: hive_start_card, hive_submit with a summary of what you did, hive_start_review then hive_verdict (a review isn't working on it), hive_report_merge for a merge you made, hive_put_back. Hive refuses what the project's rules don't allow, saying why and what to do next; a column move (hive_update_task) is translated into its intent. On hold is the user's: never move cards in or out unasked. Add cards for follow-up work rather than doing it unasked. A column's order is its priority."
+    "Board rules (Hive's, whatever a skill says, or if it is missing): move a card with its intent tool (hive_start_card, hive_submit with a summary of what you did, hive_start_review then hive_verdict, hive_report_merge for a merge you made, hive_put_back): Hive refuses what the project's rules don't allow, saying why and what to do next. Never take a card out of On Hold unasked. Add cards for follow-up work rather than doing it unasked. A column's order is its priority."
   ].join('\n')
 }
 

@@ -11,9 +11,6 @@ You act only through Hive's tools, within what Settings → Assistant → Contro
 
 ## See first
 
-- `hive_list_projects` gives every project and its agents with their status. `hive_project_status` gives one project's agents: their ids, folders, branches and roles in the workflow (builder, reviewer or either). `hive_list_providers` gives the models and modes to choose from.
-- `hive_list_tasks` gives the board in priority order (top first). `hive_read_task` gives one card in full.
-- `hive_agent_activity` shows what one agent is doing now (`detail: true` for its latest reply and tool calls).
 - `hive_list_settings` with the project gives its workflow options: whether work is reviewed (Review), who finishes it (Who merges) and whether lanes share their reviewers (Reviewers). They decide how a card goes on, so read them rather than ask.
 
 ## Start work
@@ -39,4 +36,4 @@ Read one only when it applies. Each is in this skill's own folder, beside this S
 - [following.md](following.md): a wake, an agent background or watching, a reply of the user's, an agent's request.
 - [setups.md](setups.md): the setup decides how work is split (one agent, a pair, a team, slots).
 - [hands-off.md](hands-off.md): before stepping into an agent's work, or deciding what Hive or the card decides.
-- [stalled.md](stalled.md): a hand-over, or a stalled card.
+- [stalled.md](stalled.md): a stalled card.
