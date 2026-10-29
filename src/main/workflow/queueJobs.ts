@@ -322,4 +322,4 @@ async function retireIn(folder: string, lease: string, gone: (lease: string) => 
 }
 
 // The launcher (run by Node, waiting for its go-ahead) is launcher.ts's, shared with hive-progress's isolated checks (#1435).
-export { startLauncher } from './launcher'
+export { launcherNotStarted, startLauncher } from './launcher'

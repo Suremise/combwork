@@ -11,6 +11,21 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
+/** HI-2020: the queue's merge commit (mergeQueue's gitTree spawns it) failing to start, `times` times; else spawned. */
+const spawnFail = vi.hoisted(() => ({ match: '', times: 0 }))
+vi.mock('child_process', async (orig) => {
+  const real = (await orig()) as typeof import('child_process')
+  const { EventEmitter } = await import('events')
+  const spawn = (cmd: string, args: readonly string[], opts: object) => {
+    if (cmd !== 'git' || spawnFail.times <= 0 || !(args ?? []).join(' ').includes(spawnFail.match)) return real.spawn(cmd, args as string[], opts as never)
+    spawnFail.times--
+    const cp = Object.assign(new EventEmitter(), { stdout: null, stderr: null, pid: undefined })
+    setImmediate(() => cp.emit('error', Object.assign(new Error('spawn git EAGAIN'), { code: 'EAGAIN', errno: -11, syscall: 'spawn git' })))
+    return cp
+  }
+  return { ...real, spawn, default: { ...real, spawn } }
+})
+
 vi.mock('../src/main/workflow/queueHost', () => ({
   kickQueue: async () => undefined,
   queueChanged: () => undefined,
@@ -120,6 +135,21 @@ describe('a skipped card finishes at its submission (#1625)', () => {
     const ran: string[] = []
     const out = await new MergeQueue(wf, { folder: join(repo, '..', 'queue'), runCheck: async (name: string) => (ran.push(name), { ok: true, output: '' }) }).drain('main')
     expect(out).toMatchObject([{ outcome: 'integrated' }])
+    expect(ran).toEqual(['quick'])
+    expect(stageOf(w, card)).toBe('done')
+  })
+
+  it('HI-2020: its merge commit failing to start once (EAGAIN, a busy PC) is tried again, not a pause: merged, its check run once', async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await create(w, user, { skipReview: 'An installer build' })
+    await submitted(w, wt, card)
+    const wf = (await service.workflowFor(w, repo))!
+    const ran: string[] = []
+    Object.assign(spawnFail, { match: 'merge --no-ff', times: 1 })
+    const out = await new MergeQueue(wf, { folder: join(repo, '..', 'queue'), runCheck: async (name: string) => (ran.push(name), { ok: true, output: '' }) }).drain('main')
+    expect(spawnFail.times).toBe(0)
+    expect(out).toMatchObject([{ outcome: 'integrated' }])
+    expect(wf.store.queuePause('main')).toBeNull()
     expect(ran).toEqual(['quick'])
     expect(stageOf(w, card)).toBe('done')
   })
