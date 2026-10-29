@@ -3553,7 +3553,7 @@ class SessionManager {
         check()
         if (box === '') {
           probe = true
-          box = await press(CLEAR_PROBE, 'A letter typed', box)
+          box = await press(CLEAR_PROBE, 'A letter typed', box) // i18n-ignore: the key's name, for the log
           if (words(box) !== CLEAR_PROBE) {
             // A draft left (its redraw was late), the letter at its end: cleared with it.
             probe = false

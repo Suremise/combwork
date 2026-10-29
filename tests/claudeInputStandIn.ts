@@ -9,16 +9,19 @@
 // - `viewport`: the screen's rows (a box taller than that has its top rule off the screen);
 // - `lagMs`: how long the screen keeps showing its last drawing after the input changes (a CLI whose redraw is late);
 // - `shows`: what the screen shows until it first draws (a stale box), the input as it is otherwise;
-// - `input.answers`: how many keys it reads before it stops reading (a busy CLI), raised to read again.
+// - `input.answers`: how many keys it reads before it stops reading (a busy CLI), raised to read again;
+// - `ascii`: drawn as where the terminal doesn't say it shows Unicode (no TERM or WT_SESSION): ">" its prompt mark, and
+//   the session's name in its top rule.
 
 const RULE = '─'.repeat(60)
+const NAMED_RULE = `${'─'.repeat(53)} demo ─`
 const WIDTH = 58
 
 const graphemes = (text: string): string[] => [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)].map((g) => g.segment)
 
 /** The input box as Claude Code 2.1.312 draws it, holding `text`. */
-export function claudeBox(text = ''): string {
-  return `${RULE}\n❯ ${text ? rows(text).join('\n  ') : ''}\n${RULE}\n  ? for shortcuts`
+export function claudeBox(text = '', ascii = false): string {
+  return `${ascii ? NAMED_RULE : RULE}\n${ascii ? '>' : '❯'} ${text ? rows(text).join('\n  ') : ''}\n${RULE}\n  ? for shortcuts`
 }
 
 function rows(text: string): string[] {
@@ -41,13 +44,13 @@ export interface ClaudeInput {
   screen: { text(): string; textWithoutDim(): string; bracketedPaste(): boolean }
 }
 
-export function claudeInput(opts: { draft?: string; viewport?: number; lagMs?: number; shows?: string; paste?: boolean } = {}): ClaudeInput {
+export function claudeInput(opts: { draft?: string; viewport?: number; lagMs?: number; shows?: string; paste?: boolean; ascii?: boolean } = {}): ClaudeInput {
   const input = { text: opts.draft ?? '', sent: [] as string[], keys: 0, ctrlU: 0, answers: Infinity }
   let inPaste = false
   let source: (() => readonly string[]) | null = null
   let read = 0
   const draw = (): string => {
-    const lines = claudeBox(input.text).split('\n')
+    const lines = claudeBox(input.text, opts.ascii).split('\n')
     return lines.slice(-(opts.viewport ?? 1000)).join('\n')
   }
   let shown = opts.shows ?? draw()

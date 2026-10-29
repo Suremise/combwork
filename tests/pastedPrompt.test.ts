@@ -440,6 +440,13 @@ describe('a prompt Hive puts into a CLI (#597)', () => {
         expect(claude!.input.sent).toEqual(['the prompt'])
       })
 
+      it("the same, drawn where the terminal doesn't say it shows Unicode: \">\" its prompt mark, the session's name in its top rule", async () => {
+        await running(claudeCode, '\x1b[?2004h', null, { draft: DRAFT, ascii: true })
+        await sessions.sendPrompt(p, id, 'the prompt')
+        expect(writes).toEqual(['\x15', '\x15', '\x15', ...CLEARED, '\x1b[200~the prompt\x1b[201~', '\r'])
+        expect(claude!.input.sent).toEqual(['the prompt'])
+      })
+
       it('a draft taller than the screen, with line breaks: cleared whole (its top rule off the screen meanwhile), then sent alone', async () => {
         const tall = Array.from({ length: 14 }, (_, i) => `line ${i} ${'x'.repeat(70)}`).join('\n')
         await running(claudeCode, '\x1b[?2004h', null, { draft: tall, viewport: 20 })

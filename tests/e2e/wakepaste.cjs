@@ -1,9 +1,10 @@
 // A wake typed into a CLI that is busy for a moment (#597), on fake Claude Code sessions (fake-claude/): an agent and
-// the Assistant. While fake-slow-input is there the fake reads no input, so Hive's Ctrl+U, the line and its Enter reach
-// it in one read, as they reached a busy Claude Code, which took such a read as a paste with those keys in it as text
-// and sent the line neither on Enter nor on Enter again (the fake acts that out). Hive puts the line in as a bracketed
-// paste, which is text however it arrives: the wake is taken at its first Enter (the fake says which Enter sent it). A
-// wake typed while the CLI reads its input as usual is taken too. Whether Hive pressed Enter again isn't checked (#664):
+// the Assistant. While fake-slow-input is there the fake reads no input. Hive's Ctrl+U, the line and its Enter once
+// reached a busy Claude Code in one read, which it took as a paste with those keys in it as text and sent the line
+// neither on Enter nor on Enter again (the fake acts that out). Now Hive types into Claude Code only once a key of its
+// own shows in the input box (HI-1979): it puts the wake off, types nothing of it, and types it once the fake reads
+// again, as a bracketed paste, taken at its first Enter (the fake says which Enter sent it). A wake typed while the CLI
+// reads its input as usual is taken too. Whether Hive pressed Enter again isn't checked (#664):
 // it does when the CLI reads its input later than Hive's window to be taken (3 s here), as a starved CLI does under load,
 // and that Enter falls on an empty prompt; what is checked is that Hive's check of the wake ends and no mark stays.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -104,17 +105,22 @@ const check = (name, ok, extra = '') => {
     check(`${who}: …and Hive counts it taken`, await hiveSawTaken(p, id, 1), wakeLines(id).join(' | '))
     await lib.until(() => idle(p, id), HUNG_MS)
 
-    // Busy for a moment: Hive's Ctrl+U, the line and its Enter reach it in one read.
+    // Busy for a moment: Hive types nothing of the wake until a key of its own shows in the input box (HI-1979), so it
+    // puts the wake off, and types it once the CLI reads again: what reaches it in one read is only the keys clearing it.
     check(`${who} watches again`, !!(await watch()))
     const knob = path.join(claudeHome, `fake-slow-input-${String(name).replace(/[^\w-]/g, '_')}.txt`)
     fs.writeFileSync(knob, '')
     check(`${who}: its CLI stops reading its input`, !!(await lib.until(() => fs.existsSync(knob.replace(/\.txt$/, '.paused')), HUNG_MS)))
+    const putOff = () => hiveLog().split('\n').filter((l) => l.includes("its input wasn't seen empty")).length
     const typed = wakeLines(id).filter((l) => / Woke /.test(l)).length
+    const offBefore = putOff()
     const taken = mine().length
     await inv('tasks:comment', card, `Read in one go, for ${who}`)
-    // Hive has typed it and pressed Enter (its log says Woke once the Enter is in).
-    check(`${who}: Hive types the wake meanwhile`, !!(await lib.until(() => wakeLines(id).filter((l) => / Woke /.test(l)).length > typed, HUNG_MS)), wakeLines(id).join(' | '))
+    check(`${who}: Hive puts the wake off meanwhile`, !!(await lib.until(() => putOff() > offBefore, HUNG_MS)), hiveLog().split('\n').slice(-5).join(' | '))
+    check(`${who}: …typing none of it`, wakeLines(id).filter((l) => / Woke /.test(l)).length === typed, wakeLines(id).join(' | '))
     fs.rmSync(knob, { force: true })
+    // Hive has typed it and pressed Enter (its log says Woke once the Enter is in).
+    check(`${who}: once it reads again, Hive types the wake`, !!(await lib.until(() => wakeLines(id).filter((l) => / Woke /.test(l)).length > typed, HUNG_MS)), wakeLines(id).join(' | '))
     const got = await lib.until(() => mine().length > taken && mine().at(-1), HUNG_MS)
     check(`${who}: the wake its CLI read in one go is taken`, !!got && got.text.includes(`Read in one go, for ${who}`), JSON.stringify(mine()))
     check(`${who}: …at its first Enter, not lost in a paste`, got?.enter === 1, JSON.stringify(got))
