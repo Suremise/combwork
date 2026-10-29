@@ -144,6 +144,8 @@ describe("Hive's queue commits (#1350)", () => {
     cleanAt(e, before)
   })
 
+  // GIT_HEAVY_MS: a squash merge through the queue twice (the hook failing, then passing), 92 git processes; past 20 s in
+  // HI-2025's run beside three other full runs, and on HI-2001's loaded runs.
   it("squash: a pre-commit hook that fails returns the card with its output; one that passes, and the trailers are in the squash's commit", { timeout: GIT_HEAVY_MS }, async () => {
     const e = team({ style: 'squash' })
     const card = await queued(e, 'Squashed')

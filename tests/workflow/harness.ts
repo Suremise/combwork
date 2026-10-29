@@ -25,10 +25,12 @@ export const R2 = agentActor('R2')
 const ID = ['-c', 'user.name=Hive Test', '-c', 'user.email=test@hive.invalid']
 
 /**
- * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 50 to 100 git processes (Hive's own git per
- * queue step, about 95% of its time; nothing in it waits for time). Alone it takes 5 to 11 s; beside three other lanes'
- * full unit runs (CPU at 80%), 15 such tests passed 20 s (the run's limit, vitest.config.ts). A bound for a hung run, as
- * that limit is, never a wait: three times it. Only the tests named on HI-2025 take it.
+ * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Hive's own git per
+ * queue step, about 95% of its time; nothing in it waits for time). Alone they take 2 to 11 s. 15 such tests passed 20 s
+ * (the run's limit, vitest.config.ts) in HI-2025's runs of the workflow files under load: 5 in the baseline run, 13 in
+ * the run beside three other lanes' full unit runs (CPU at 80%), after git was made cheaper, and 1 in the first final
+ * set (some in more than one). A bound for a hung run, as that limit is, never a wait: three times it. Each test that
+ * takes it says why beside it; only those take it, and S27's second case, which shares its test.
  */
 export const GIT_HEAVY_MS = 60_000
 

@@ -561,6 +561,9 @@ describe('installing from scratch before the merge checks (S13, #187)', () => {
   }
 
   // Two entries a test: each entry is a whole card and merge (#1396: three in one test neared the bound under load).
+  // GIT_HEAVY_MS, for these three: two cards queued and merged, with the install's manifest reads, 92 git processes each.
+  // Past 20 s: this one in HI-2025's baseline run and its run beside three other full runs; "installs again" in that run;
+  // "always" in its first final set and on HI-2001's loaded runs.
   it('onManifestChange: installs for the first entry, not again while the manifests are unchanged', { timeout: GIT_HEAVY_MS }, async () => {
     expect(await installs('onManifestChange', [null, null])).toEqual([1, 1])
   })
@@ -584,6 +587,8 @@ describe('installing from scratch before the merge checks (S13, #187)', () => {
     expect(e.wf.state(card).entries.at(-1)?.failure?.log).toContain('missing script')
   })
 
+  // GIT_HEAVY_MS: two cards through the queue, each with a clean install and its check, 99 git processes; past 20 s in
+  // HI-2025's baseline run and its run beside three other full runs, and on HI-2001's loaded runs.
   it("S13's core: a package missing from package.json while the warm worktree still has it → clean install → the check fails → the target doesn't move", { timeout: GIT_HEAVY_MS }, async () => {
     const e = team({}, script("const fs = require('fs'); const missing = fs.readdirSync('.').filter((f) => f.endsWith('.js')).flatMap((f) => [...fs.readFileSync(f, 'utf8').matchAll(/require\\('([^']+)'\\)/g)].map((m) => m[1])).filter((d) => !fs.existsSync('node_modules/' + d)); if (missing.length) { console.error(\"Cannot find module '\" + missing[0] + \"'\"); process.exit(1) }"))
     commit(e.project, { 'package.json': '{"dependencies":{"left-pad":"1"}}\n', 'index.js': "require('left-pad')\n", '.gitignore': 'node_modules/\n' }, 'deps')
@@ -604,6 +609,8 @@ describe('installing from scratch before the merge checks (S13, #187)', () => {
 })
 
 describe("S4's core", () => {
+  // GIT_HEAVY_MS: two cards through the queue, each with its check, 96 git processes; past 20 s in HI-2025's run beside
+  // three other full runs, and on HI-2001's loaded runs.
   it('two approved changes, each fine alone and broken together → the second\'s checks fail → the target doesn\'t move', { timeout: GIT_HEAVY_MS }, async () => {
     // The check: a.txt and b.txt may each say "on", but not both.
     const e = team({}, script("const fs = require('fs'); const on = (f) => fs.existsSync(f) && fs.readFileSync(f, 'utf8').trim() === 'on'; if (on('a.txt') && on('b.txt')) { console.error('a and b are both on'); process.exit(1) }"))

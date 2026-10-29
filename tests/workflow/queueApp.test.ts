@@ -78,6 +78,8 @@ describe('the merge queue in the app (#1348)', () => {
     expect(e.wf.state(card).stage).toBe('done')
   })
 
+  // GIT_HEAVY_MS: two cards queued for two targets and recovered by two hosts, 85 git processes; past 20 s in HI-2025's
+  // run beside three other full runs.
   it('recovery per target: each host recovers only its own target\'s entries', { timeout: GIT_HEAVY_MS }, async () => {
     const e = team()
     detach(e)
