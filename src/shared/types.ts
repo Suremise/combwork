@@ -151,6 +151,8 @@ export interface AppSettings {
   keybindings: KeybindingOverrides
   /** The global default workflow options (SPEC §16.6.6), under each workspace's and project's own; absent: all off. */
   workflow?: WorkflowDefaults
+  /** The one-time steps settled in Hive's own defaults (HI-1997's `workflow.commitMessageDefault`), each saved with its change. */
+  stepsDone?: string[]
   /** Hive's default slot options for Git projects (HI-1765), under each workspace's and project's own (`slots`). */
   slotDefaults?: SlotDefaults
   updates: {
@@ -840,6 +842,8 @@ export interface WorkspaceConfig {
   journalSuggested?: boolean
   /** The workspace's default workflow options (SPEC §16.6.6), between the global ones and each project's own. */
   workflow?: WorkflowDefaults
+  /** The one-time steps settled in this workspace's own defaults (HI-1997's `workflow.commitMessageDefault`), each in the same write as its change. */
+  stepsDone?: string[]
   /** The workspace's default slot options (HI-1765), between Hive's and each project's own. */
   slotDefaults?: SlotDefaults
   /** Settings → Workspace → When this workspace closes, run (HI-1368); absent or an empty command: nothing runs. */
@@ -1267,6 +1271,11 @@ export interface ProjectWorkflow {
    * or a save that changes either; optionsForm.ts).
    */
   mergeAsk?: true
+  /**
+   * HI-1997: Git's commit message (G19) set to Hive's by a choice, not left by a preset: set by `writeWorkflow` when a
+   * write changes it to 'hive', kept while it stays so. The one-time switch to the branch's own keeps such a project's.
+   */
+  commitMessageChosen?: true
 }
 
 /** The answer to "How do you work? Solo / Pair / Team" (#1423): a preset was chosen, or Not now. */

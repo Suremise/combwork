@@ -499,7 +499,7 @@
   "workflow.value.style.merge": "Commit scalający",
   "workflow.value.style.rebase": "Rebase i przewinięcie",
   "workflow.value.style.squash": "Squash",
-  "workflow.why.commitMessage": "Klucz karty w historii łączy każde scalenie z jego kartą; projekt, który nie trzyma numerów kart w historii, używa własnego komunikatu gałęzi.",
+  "workflow.why.commitMessage": "Tytuły kart mogą wymieniać osoby i szczegóły, których publiczna historia nie powinna przechowywać; wybierz komunikat od Hive, aby klucz karty łączył każde scalenie z jego kartą.",
   "workflow.why.dependenciesDone": "To tanie, a żadna karta nie powstaje na pracy, której jeszcze nie ma.",
   "workflow.why.excluded": "Zależności i wyniki kompilacji nie są częścią tego, co dostarcza karta.",
   "workflow.why.finish": "Przy scalaniu przez kolejkę Hive nieudana praca nigdy nie trafia do gałęzi docelowej; przy pracy solo karta jest gotowa, gdy tylko jej praca ma commit.",

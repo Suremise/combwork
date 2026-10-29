@@ -122,6 +122,7 @@ import { adoptWorkspace } from './workflow/adoption'
 import { repairStages } from './workflow/stageRepair'
 import { attachableSource, attachToCard, cardAttachmentGroups, cardAttachments, previewCardAttachment, recoverCardAttachments, removeCardAttachment, stageDrafts } from './cardAttachments'
 import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
+import { settleCommitMessageDefault } from './workflow/commitMessageStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
@@ -390,6 +391,8 @@ function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): 
     'adoption, slots, repairs and what changed while closed', // i18n-ignore: a part of a log line's timing
     adoptWorkspace(ws)
       .then(() => settleSlotsUpToDate(ws))
+      // HI-1997: a commit message a preset stored as Hive's, switched once to the branch's own (a proven choice kept).
+      .then(() => settleCommitMessageDefault(ws))
       .then(() => step('slots'))
       .then(() => migrateSlots(ws))
       .then(() => repairStages(ws))

@@ -499,7 +499,7 @@
   "workflow.value.style.merge": "Commit de merge",
   "workflow.value.style.rebase": "Rebase e avanço rápido",
   "workflow.value.style.squash": "Squash",
-  "workflow.why.commitMessage": "A chave do cartão no histórico liga cada merge ao seu cartão; um projeto que mantém os números dos cartões fora do histórico usa a do próprio branch.",
+  "workflow.why.commitMessage": "Os títulos dos cartões podem citar pessoas e detalhes que um histórico público não deveria guardar; escolha a do Hive para ter a chave do cartão, que liga cada merge ao seu cartão.",
   "workflow.why.dependenciesDone": "É barato, e nenhum cartão é feito sobre trabalho que ainda não entrou.",
   "workflow.why.excluded": "Dependências e saída de build não fazem parte do que um cartão entrega.",
   "workflow.why.finish": "Com o merge pela fila do Hive, trabalho com falha nunca chega ao branch de destino; trabalhando sozinho, um cartão está concluído assim que é feito o commit.",

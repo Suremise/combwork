@@ -499,7 +499,7 @@
   "workflow.value.style.merge": "合并提交",
   "workflow.value.style.rebase": "变基并快进",
   "workflow.value.style.squash": "压缩合并",
-  "workflow.why.commitMessage": "历史中的卡片键会把每次合并关联到其卡片；不希望卡片编号出现在历史中的项目可使用分支自己的信息。",
+  "workflow.why.commitMessage": "卡片标题可能会提到不应留在公开历史中的人名和细节；选择 Hive 的信息可用卡片键把每次合并关联到其卡片。",
   "workflow.why.dependenciesDone": "成本很低，而且不会有卡片建立在尚未并入的工作之上。",
   "workflow.why.excluded": "依赖和构建输出不属于卡片交付的内容。",
   "workflow.why.finish": "通过 Hive 的队列合并，失败的工作永远不会进入目标分支；单人工作时，卡片一经提交即完成。",

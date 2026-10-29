@@ -650,7 +650,7 @@ export class MergeQueue {
 
   /** The message of Hive's merge commits (G19, HI-1697), as the project's options are now: like G18, never a ruleset's. */
   private commitMessage(): CommitMessage {
-    return this.wf.cfg.options().commitMessage ?? 'hive'
+    return this.wf.cfg.options().commitMessage ?? 'branch'
   }
 
   /** In a merge's `Integrated` write: the push of its target owed, when the options push it (G18). */

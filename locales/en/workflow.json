@@ -2000,8 +2000,8 @@
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
   },
   "workflow.why.commitMessage": {
-    "defaultMessage": "The card’s key in the history links each merge to its card; a project that keeps card numbers out of its history uses the branch’s own.",
-    "description": "Why the presets set “Commit message” to Hive’s (the card’s key and title, with trailers)."
+    "defaultMessage": "Card titles can name people and details a public history shouldn’t keep; choose Hive’s for the card’s key, linking each merge to its card.",
+    "description": "Why the presets set “Commit message” to the branch’s own (HI-1997), and what choosing Hive’s (the card’s key and title, with trailers) gives instead."
   },
   "workflow.why.dependenciesDone": {
     "defaultMessage": "It’s cheap, and no card is built on work that isn’t in yet.",

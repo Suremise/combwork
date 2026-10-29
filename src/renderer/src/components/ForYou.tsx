@@ -236,7 +236,8 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
   const limit = item.gate === ROUND_LIMIT_GATE
   const projectPath = useStore((s) => s.workspace?.projects.find((p) => p.name.toLowerCase() === card.project.toLowerCase())?.path)
   const [style, setStyle] = useState<WorkflowOptions['style']>('merge')
-  const [message, setMessage] = useState<CommitMessage>('hive')
+  // The branch's own first (HI-1997: every preset's), Hive's marked as how it merged until now.
+  const [message, setMessage] = useState<CommitMessage>('branch')
   // HI-1697: the merge queue's question before an upgraded project's first merge, answered with the two options.
   const chooseMerge = async (): Promise<void> => {
     if (!projectPath) return

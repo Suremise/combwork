@@ -3,6 +3,7 @@ import './threadPool'
 import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watches'
 import { initLoopWakes } from './loopWakes'
 import { migrateAgentsPerProject } from './workflow/preferences'
+import { settleGlobalCommitMessage } from './workflow/commitMessageStep'
 import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
 import { initReviewsOnOpen } from './reviewsOnOpen'
@@ -885,6 +886,8 @@ app.whenReady().then(async () => {
   advanced.load()
   // Agents per project from before HI-2001: Maximum agents in Hive's workflow defaults now.
   await migrateAgentsPerProject()
+  // HI-1997: Hive's own workflow defaults' commit message from a preset, switched once to the branch's own.
+  await settleGlobalCommitMessage()
   // Show developer features is one of them too, kept under its settings key: the file and the setting stay one value.
   bindAdvancedSettings(config)
   // The developer console's flight recorder (#698): its triggers are advanced settings, followed as they change.

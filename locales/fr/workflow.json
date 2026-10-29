@@ -499,7 +499,7 @@
   "workflow.value.style.merge": "Commit de fusion",
   "workflow.value.style.rebase": "Rebase et avance rapide",
   "workflow.value.style.squash": "Squash",
-  "workflow.why.commitMessage": "La clé de la carte dans l’historique relie chaque fusion à sa carte ; un projet qui garde les numéros de carte hors de son historique utilise celui de la branche.",
+  "workflow.why.commitMessage": "Les titres des cartes peuvent nommer des personnes et des détails qu’un historique public ne devrait pas garder ; choisis celui de Hive pour la clé de la carte, qui relie chaque fusion à sa carte.",
   "workflow.why.dependenciesDone": "Ça coûte peu, et aucune carte n’est bâtie sur du travail qui n’est pas encore intégré.",
   "workflow.why.excluded": "Les dépendances et les sorties de build ne font pas partie de ce qu’une carte livre.",
   "workflow.why.finish": "Avec une fusion par la file de Hive, un travail en échec n’atteint jamais la branche cible ; en solo, une carte est terminée dès qu’elle est commitée.",

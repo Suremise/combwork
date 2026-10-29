@@ -357,7 +357,7 @@ interface MergeChoiceRecord {
 }
 
 /** The project's recorded merge choice (HI-1697), or null; one that can't be read counts as recorded, never asked again. */
-function mergeChoiceOf(ws: WorkspaceService, projectName: string): MergeChoiceRecord | null {
+export function mergeChoiceOf(ws: WorkspaceService, projectName: string): MergeChoiceRecord | null {
   const v = FactStore.forBoard(ws, { project: projectName, key: projectName }).meta(MERGE_CHOICE_KEY)
   if (!v) return null
   try {
