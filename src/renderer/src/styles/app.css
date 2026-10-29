@@ -3093,6 +3093,30 @@ p.hint {
 .close-command-note {
   margin: 8px 0 0;
 }
+/* A list of the user's commands (HI-1954): each step's state, the one running or failed with its command and output. */
+.close-command-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.close-command-step-line {
+  gap: 8px;
+  align-items: center;
+}
+.close-command-step[data-state='waiting'] .close-command-step-line,
+.close-command-step[data-state='skipped'] .close-command-step-line {
+  color: var(--fg-muted);
+}
+.close-command-step .close-command-text,
+.close-command-step .close-command-output {
+  margin-left: 24px;
+}
+.close-command-warn {
+  color: var(--warning);
+}
 /* Settings → When this workspace closes, run / When Hive quits, run (HI-1368). */
 .close-command-settings {
   display: flex;

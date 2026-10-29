@@ -188,7 +188,8 @@ export async function runListInWindow(win: BrowserWindow | null, point: NonNulla
   const panel = shownPanel ?? showPanel(win, newRun(kind, '', 'running'))
   const id = panel.run.id
   let panelSteps: CloseCommandStep[] = steps.map((s) => ({ name: s.name, state: 'waiting', exitCode: null }))
-  panel.update({ state: 'running', point, steps: panelSteps, awaiting: null, startedAt: new Date().toISOString(), lines: [], command: '' })
+  const name = values().name
+  panel.update({ state: 'running', point, steps: panelSteps, awaiting: null, startedAt: new Date().toISOString(), lines: [], command: '', ...(name ? { workspace: name } : {}) })
   const root = runsRoot()
   const said = `${point} commands (${steps.map((s) => userText(s.name)).join(', ')})` // i18n-ignore: for the log
   const prefix = runPrefix(kind, place)

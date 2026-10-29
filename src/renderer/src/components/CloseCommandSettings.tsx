@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CloseCommandSetting } from '@shared/types'
 import { closeCommandOf, fillCloseCommand, type CloseCommandValues } from '@shared/closeCommand'
-import { DEFAULT_SETTINGS } from '@shared/defaults'
 import { msg, tr } from '@shared/i18n'
 import * as actions from '../actions'
 import { call } from '../api'
