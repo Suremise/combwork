@@ -1063,6 +1063,10 @@
     "defaultMessage": "Go to project",
     "description": "The command palette's placeholder when it lists projects (Go to Project…)."
   },
+  "shell.palette.runCommand": {
+    "defaultMessage": "Run Command: {name}",
+    "description": "One of the user's own commands in the command palette (Settings → Commands, HI-1954): choosing it runs it now. {name} is the command's name."
+  },
   "shell.path.copied": {
     "defaultMessage": "Path copied",
     "description": "A notification: a path (a folder or a worktree in a list) was copied to the clipboard in full."

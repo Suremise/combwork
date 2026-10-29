@@ -265,6 +265,7 @@
   "shell.palette.openCard": "カードを開く：{card} {title}",
   "shell.palette.placeholder": "コマンド名またはプロジェクト名を入力",
   "shell.palette.projectsPlaceholder": "プロジェクトに移動",
+  "shell.palette.runCommand": "コマンドを実行：{name}",
   "shell.path.copied": "パスをコピーしました",
   "shell.path.copy": "パスをコピー",
   "shell.path.copyFailed": "パスをコピーできませんでした",

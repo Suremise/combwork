@@ -2,6 +2,7 @@
   "errors.assistantUndo.gone": "Essa alteração do Assistente não é mais mantida: as alterações são mantidas por 7 dias.",
   "errors.assistantUndo.which": "Escolha uma alteração do Assistente para desfazer, ou as alterações de uma mensagem.",
   "errors.changes.notFile": "{file} não é um arquivo de {folder}.",
+  "errors.commands.otherWorkspace": "Esta janela agora mostra outro espaço de trabalho, então os comandos que você alterou não foram salvos.",
   "errors.console.hidden": "O console do desenvolvedor está oculto: ative Configurações → Avançado → Mostrar recursos de desenvolvedor.",
   "errors.console.notRecording": "Não é uma gravação do console do desenvolvedor",
   "errors.console.notSource": "Não é uma fonte do console do desenvolvedor que esta janela possa gravar",

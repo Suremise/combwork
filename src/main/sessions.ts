@@ -1764,6 +1764,7 @@ class SessionManager {
     // Its workspace's upgrade to 1.0 waits (#1207): hive.db takes no writes, so the session couldn't be recorded.
     const ws = workspaceFor(projectPath)?.path
     if (ws) assertUpgraded(ws)
+    if (workspaceFor(projectPath)?.openGate?.held) throw hiveError(msg({ id: 'session.start.openCommands', defaultMessage: "This workspace's open commands are still running: agents start once they're done or you move on.", description: "Starting an agent is refused while the commands the user set to run as the workspace opens are running (Settings → Workspace → When this workspace opens, run), shown in a dialog with Don't wait." }), undefined, { kind: 'conflict' })
     if (workspaceFor(projectPath)?.repairingMove) throw hiveError(msg({ id: 'session.start.repairing', defaultMessage: 'Hive is repairing this moved workspace: start the agent when Repair has finished.', description: "Starting an agent is refused while Repair… fixes a moved workspace's paths." }), undefined, { kind: 'conflict' })
     const why = this.fenced.get(resolve(projectPath).toLowerCase())?.at(-1)
     if (why) throw hiveError(msg({ id: 'session.start.fenced', defaultMessage: "{why}, so its agents can't start now.", description: "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\")." }), { why }, { kind: 'conflict' })

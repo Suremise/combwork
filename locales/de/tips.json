@@ -176,6 +176,8 @@
   "tips.copyDiagnostics.title": "Einen Fehler gefunden? Diagnosedaten kopieren",
   "tips.ctrlCvToCli.text": "Im Bereich eines Agenten kopiert Strg+C eine Auswahl, und Strg+V fügt ein. Schalte Einstellungen → Erweitert → „Strg+C und Strg+V gehen an die CLI“ ein, um beide Tasten stattdessen an die CLI zu senden, wie in jedem anderen Terminal; der Rechtsklick kopiert und fügt weiterhin ein.",
   "tips.ctrlCvToCli.title": "Strg+C und Strg+V an die CLI des Agenten geben",
+  "tips.customCommands.text": "Benenne einen Befehl einmal unter Einstellungen → Befehle und führe ihn aus der Befehlspalette aus (Befehl ausführen), oder wähle ihn für das Öffnen oder Schließen eines Arbeitsbereichs: etwa einen lokalen Server oder eine Datenbank, die deine Agenten brauchen. Beim Öffnen eines Arbeitsbereichs starten seine Agenten, sobald die Befehle fertig sind.",
+  "tips.customCommands.title": "Deine eigenen Befehle, nur einen Klick entfernt",
   "tips.dateFormat.text": "Hive zeigt Datumsangaben als {date} und Uhrzeiten als {time}. Einstellungen → Allgemein → Datumsformat und Zeitformat ändern sie überall, auch bei Sitzungen, die nach ihrem Startzeitpunkt benannt sind.",
   "tips.dateFormat.title": "Datumsangaben nach deinem Geschmack",
   "tips.defaultProvider.text": "Der Standardanbieter ist „Automatisch“, solange du keinen wählst: Neue Agenten verwenden den ersten Coding-Agenten, der eingeschaltet und installiert ist. So funktioniert auch Codex oder GitHub Copilot allein, ohne Claude Code. Wähle unter Einstellungen → Anbieter einen, um immer diesen zu verwenden.",

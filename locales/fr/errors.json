@@ -2,6 +2,7 @@
   "errors.assistantUndo.gone": "Cette modification de l’Assistant n’est plus conservée : les modifications sont conservées 7 jours.",
   "errors.assistantUndo.which": "Choisis une modification de l’Assistant à annuler, ou les modifications d’un message.",
   "errors.changes.notFile": "{file} n’est pas un fichier du dossier {folder}.",
+  "errors.commands.otherWorkspace": "Cette fenêtre affiche maintenant un autre espace de travail : les commandes que tu as modifiées n’ont donc pas été enregistrées.",
   "errors.console.hidden": "La console de développement est masquée : active Paramètres → Avancé → Afficher les fonctions pour développeurs.",
   "errors.console.notRecording": "Pas un enregistrement de la console de développement",
   "errors.console.notSource": "Pas une source de la console de développement que cette fenêtre peut enregistrer",

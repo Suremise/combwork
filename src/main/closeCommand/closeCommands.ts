@@ -1,8 +1,13 @@
 import { app, type BrowserWindow } from 'electron'
-import { existsSync } from 'original-fs'
+import { existsSync, writeFileSync } from 'original-fs'
 import { basename, join, sep } from 'path'
 import { homedir } from 'os'
-import type { CloseCommandRun, CloseCommandSetting, CloseReason } from '../../shared/types'
+import type { CloseCommandRun, CloseCommandStep, CloseReason, CommandRef, CommandsHive } from '../../shared/types'
+import { OBSERVE_MS, resolvePoint, type CommandReason, type CommandValues } from '../../shared/commands'
+import { msg } from '../../shared/i18n'
+import { hiveError } from '../hiveError'
+import { config } from '../config'
+import type { ListControl, ListStatus, ListStep } from './listRunner'
 import { emitTo } from '../events'
 import { createLogger, userText } from '../logger'
 import { childEnv } from '../ptyHost'
@@ -10,7 +15,7 @@ import { testQuiet } from '../testQuiet'
 import { checkEnv } from '../workflow/queueChecks'
 import type { WorkspaceService } from '../workspace'
 import { drainWorkspace, type DrainResult } from './drain'
-import { alive, carryRuns, type RunsCarried, planRun, pruneRuns, readRun, runFolderName, runPrefix, runsCloseCommands, startRun, START_MS } from './runs'
+import { alive, carryRuns, type RunsCarried, planList, pruneRuns, readList, runFolderName, runPrefix, runsCloseCommands, startRun, START_MS } from './runs'
 
 // HI-1368: the close commands as Hive runs them, in the window they belong to. A workspace's runs once it has closed
 // and Hive has finished writing it (the drain); Hive waits for it with a panel (Don't wait, or Close once it failed),
@@ -146,80 +151,174 @@ const newRun = (kind: 'workspace' | 'quit', command: string, state: CloseCommand
   ...(workspace ? { workspace } : {})
 })
 
+/** A list's run while Hive follows it, by its panel's id: its folder (for controls) and how its launch failure is settled. */
+const following = new Map<string, { dir: string | null; control: (action: ListControl['action'], step: number, attempt: number) => void }>()
+
 /**
- * Runs `command` for its window, following its runner until it ends, the user stops waiting (Don't wait), or the window
- * goes. A failure stays on the panel until the user closes it. `panel`: the one already up (its workspace's saving
- * step), which goes on to show the command. Never throws.
+ * The panel's choices on a failed step (closeCommand:control): Rerun, Skip it and continue, Stop here, for that step's
+ * attempt only, so a repeated or stale one does nothing (the runner takes each control once, HI-1954/s19 §2).
  */
-export async function runInWindow(win: BrowserWindow | null, kind: 'workspace' | 'quit', name: string | null, place: string | null, command: string, cwd: string, shownPanel?: Panel): Promise<RunOutcome> {
-  const startedAt = new Date()
-  const panel = shownPanel ?? showPanel(win, newRun(kind, command, 'running'))
-  panel.update({ state: 'running', startedAt: startedAt.toISOString(), lines: [] })
-  const root = runsRoot()
-  const said = `${kind === 'quit' ? 'When Hive quits' : `${userText(name ?? '')}'s close`} command ${userText(command)}` // i18n-ignore: for the log
-  const prefix = runPrefix(kind, place)
-  await pruneRuns(root, prefix).catch((e) => log.warn('pruning the close commands kept', e))
-  let dir: string
-  try {
-    dir = startRun(root, runFolderName(prefix, startedAt), command, cwd, { exec: process.execPath, script: runnerScript(), env: checkEnv(childEnv()) })
-  } catch (e) {
-    log.warn(`${said} couldn't start`, e)
-    panel.update({ state: 'failed', failure: 'spawn', error: (e as Error).message })
-    await panel.ended
-    return 'failed'
-  }
-  log.info(`${said} started (${userText(dir)})`)
-  // Followed until it ends, the user stops waiting, or the window goes; the panel's lines and state read as it goes.
-  const result = await new Promise<RunOutcome | 'gone'>((resolve) => {
-    let stopped = false
-    const stop = (r: RunOutcome | 'gone'): void => {
-      if (stopped) return
-      stopped = true
-      clearInterval(tick)
-      resolve(r)
-    }
-    void panel.ended.then((how) => stop(how === 'left' ? 'left' : 'gone'))
-    let reading = false
-    const tick = setInterval(() => {
-      if (reading || stopped) return
-      reading = true
-      void readRun(dir)
-        .then(({ status, lines }) => {
-          if (stopped) return
-          if (!status) {
-            if (Date.now() - startedAt.getTime() > START_MS) {
-              log.warn(`${said}: its runner wrote no status in ${START_MS / 1000} s`)
-              panel.update({ state: 'failed', failure: 'runner', lines })
-              stop('failed')
-            }
-            return
-          }
-          if (status.state === 'running') {
-            if (!alive(status.runnerPid)) {
-              log.warn(`${said}: its runner ended before the command did`)
-              panel.update({ state: 'failed', failure: 'runner', lines })
-              return stop('failed')
-            }
-            return panel.update({ lines })
-          }
-          const took = Math.round((Date.parse(status.endedAt ?? new Date().toISOString()) - startedAt.getTime()) / 1000)
-          if (status.state === 'spawnFailed') {
-            log.warn(`${said} couldn't start: ${userText(status.error ?? '')}`)
-            panel.update({ state: 'failed', failure: 'spawn', error: status.error, lines })
-            return stop('failed')
-          }
-          log.info(`${said} ended with exit code ${status.exitCode} after ${took} s (${status.bytesSeen} bytes of output)`)
-          if (status.exitCode === 0) return stop('ok')
-          panel.update({ state: 'failed', exitCode: status.exitCode, lines })
-          stop('failed')
-        })
-        .finally(() => (reading = false))
-    }, FOLLOW_MS)
+export function controlRun(win: BrowserWindow, id: string, action: unknown, step: unknown, attempt: unknown): void {
+  const s = shown.get(win.webContents.id)
+  const a = s?.run.awaiting
+  if (!s || s.run.id !== id || !a || a.step !== step || a.attempt !== attempt) return
+  if (action !== 'rerun' && action !== 'skip' && action !== 'stop') return
+  following.get(id)?.control(action, a.step, a.attempt)
+}
+
+/** Its panel's steps from the runner's status: those of this launch at `from` on, the earlier ones as they were. */
+function stepsFrom(panelSteps: CloseCommandStep[], status: ListStatus, from: number): CloseCommandStep[] {
+  return panelSteps.map((p, i) => {
+    const s = i >= from ? status.steps[i - from] : undefined
+    if (!s) return p
+    return { name: s.name, state: s.state, exitCode: s.exitCode, ...(s.failure ? { failure: s.failure } : {}), ...(s.detail ? { detail: s.detail } : {}), ...(s.startedAt ? { startedAt: s.startedAt } : {}), ...(s.endedAt ? { endedAt: s.endedAt } : {}) }
   })
-  if (result === 'left') log.info(`${said}: Hive stopped waiting for it (Don't wait); it carries on`)
-  if (result === 'ok') panel.end('dismissed')
-  if (result === 'failed') await panel.ended
-  return result === 'gone' ? 'left' : result
+}
+
+/**
+ * Runs a point's commands (`steps`, its templates as saved now) for its window, all in one runner (HI-1954, design
+ * HI-1954/s19 §2), followed until the list ends, the user stops waiting (Don't wait: the rest run on by themselves,
+ * in order), or the window goes. A failed step waits on the panel for the user's choice, which goes to the runner as a
+ * control; a launch that fails is the first step's failure, with the same choices (Skip launches the rest, so a list
+ * goes on to its end, HI-1954/s21). `values()`: the placeholders' values, read again for a Rerun. Never throws.
+ */
+export async function runListInWindow(win: BrowserWindow | null, point: NonNullable<CloseCommandRun['point']>, place: string | null, steps: ListStep[], values: () => CommandValues, shownPanel?: Panel): Promise<RunOutcome> {
+  // Kept with the workspace's runs, or When Hive quits' when there is no workspace (a Hive command run by hand from none).
+  const kind = point === 'quit' || !place ? 'quit' : 'workspace'
+  const panel = shownPanel ?? showPanel(win, newRun(kind, '', 'running'))
+  const id = panel.run.id
+  let panelSteps: CloseCommandStep[] = steps.map((s) => ({ name: s.name, state: 'waiting', exitCode: null }))
+  const name = values().name
+  panel.update({ state: 'running', point, steps: panelSteps, awaiting: null, startedAt: new Date().toISOString(), lines: [], command: '', ...(name ? { workspace: name } : {}) })
+  const root = runsRoot()
+  const said = `${point} commands (${steps.map((s) => userText(s.name)).join(', ')})` // i18n-ignore: for the log
+  const prefix = runPrefix(kind, place)
+  await pruneRuns(root, prefix).catch((e) => log.warn('pruning the commands kept', e))
+  const home = homedir()
+  let from = 0
+  let dir: string | null = null
+  let launchFailed = false
+  const show = (r: Partial<CloseCommandRun>): void => panel.update({ steps: panelSteps, ...r })
+  const launch = (): void => {
+    launchFailed = false
+    try {
+      dir = startRun(root, runFolderName(prefix, new Date()), { list: true, steps: steps.slice(from), values: values(), home }, home, { exec: process.execPath, script: runnerScript(), env: checkEnv(childEnv()) })
+      writeFileSync(join(dir, 'observer'), '')
+      if (unwatched) detach()
+      log.info(`${said} started at step ${from + 1} (${userText(dir)})`)
+    } catch (e) {
+      dir = null
+      launchFailed = true
+      log.warn(`${said} couldn't start at step ${from + 1}`, e)
+      panelSteps = panelSteps.map((p, i) => (i === from ? { ...p, state: 'failed', failure: 'spawn', detail: (e as Error).message } : p))
+      show({ state: 'failed', awaiting: { step: from, attempt: 0, needed: steps[from].needed } })
+    }
+  }
+  let settle!: (r: RunOutcome | 'gone') => void
+  const result = new Promise<RunOutcome | 'gone'>((r) => (settle = r))
+  following.set(id, {
+    get dir() {
+      return dir
+    },
+    control: (action, step, attempt) => {
+      if (launchFailed && step === from && attempt === 0) {
+        // The launch failed: Hive settles it, the runner never having started.
+        if (action === 'stop') {
+          panelSteps = panelSteps.map((p, i) => (i > from ? { ...p, state: 'skipped' } : p))
+          show({ awaiting: null })
+          return settle('failed')
+        }
+        if (action === 'skip') from++
+        if (from >= steps.length) {
+          show({ awaiting: null })
+          return settle('failed')
+        }
+        show({ state: 'running', awaiting: null })
+        return launch()
+      }
+      if (!dir) return
+      try {
+        writeFileSync(join(dir, `control-${step - from}-${attempt}.json`), JSON.stringify({ action, ...(action === 'rerun' ? { values: values() } : {}) }))
+      } catch (e) {
+        log.warn(`${said}: couldn't hand the runner the user's choice`, e)
+      }
+    }
+  })
+  // Don't wait, or no window to ask (none, or it went): nobody waits, so the runner settles failures by its rule now.
+  let unwatched = false
+  const detach = (): void => {
+    if (!dir) return
+    try {
+      writeFileSync(join(dir, 'control-detach.json'), JSON.stringify({ action: 'detach' }))
+    } catch (e) {
+      log.warn(`${said}: couldn't tell the runner nobody waits`, e)
+    }
+  }
+  void panel.ended.then((how) => {
+    unwatched = true
+    detach()
+    // A launch that failed with nobody to ask: it failed, as a command that couldn't start always has.
+    settle(how === 'left' ? 'left' : launchFailed ? 'failed' : 'gone')
+  })
+  launch()
+  // Followed until it ends, the user stops waiting, or the window goes; watched, so the runner waits for a choice.
+  let reading = false
+  let observed = Date.now()
+  const startedAt = Date.now()
+  const tick = setInterval(() => {
+    if (reading || !dir) return
+    const at = dir
+    reading = true
+    if (Date.now() - observed >= OBSERVE_MS) {
+      observed = Date.now()
+      try {
+        writeFileSync(join(at, 'observer'), '')
+      } catch {
+        // Tried again at the next tick's turn.
+      }
+    }
+    void readList(at)
+      .then(({ status, lines }) => {
+        if (at !== dir) return
+        if (!status) {
+          if (Date.now() - startedAt > START_MS) {
+            log.warn(`${said}: its runner wrote no status in ${START_MS / 1000} s`)
+            show({ state: 'failed', failure: 'runner', awaiting: null, lines })
+            settle('failed')
+          }
+          return
+        }
+        panelSteps = stepsFrom(panelSteps, status, from)
+        const cur = status.steps.findIndex((s) => s.state === 'running')
+        const now = status.awaiting ? status.steps[status.awaiting.step] : cur >= 0 ? status.steps[cur] : undefined
+        const common = { lines, command: now?.command ?? '', exitCode: now?.exitCode ?? null }
+        if (status.state === 'running' && !alive(status.runnerPid)) {
+          log.warn(`${said}: its runner ended before the list did`)
+          show({ ...common, state: 'failed', failure: 'runner', awaiting: null })
+          return settle('failed')
+        }
+        if (status.state === 'exited') {
+          const failed = status.steps.some((s) => s.state === 'failed')
+          log.info(`${said} ended ${status.ended}${failed ? ', with a step failed' : ''}${status.unattended ? ` (${status.unattended})` : ''}`)
+          show({ ...common, awaiting: null })
+          return settle(status.ended === 'done' && !failed ? 'ok' : 'failed')
+        }
+        if (status.awaiting) {
+          const a = status.awaiting
+          return show({ ...common, state: 'failed', awaiting: { step: from + a.step, attempt: a.attempt, needed: steps[from + a.step].needed } })
+        }
+        show({ ...common, state: 'running', awaiting: null })
+      })
+      .finally(() => (reading = false))
+  }, FOLLOW_MS)
+  const r = await result
+  clearInterval(tick)
+  following.delete(id)
+  if (r === 'left') log.info(`${said}: Hive stopped waiting (Don't wait); the rest run on by themselves`)
+  // A list that ended (done or stopped) goes; one whose runner went keeps its panel until it is closed.
+  if (r === 'ok' || (r === 'failed' && panel.run.failure !== 'runner')) panel.end('dismissed')
+  if (r === 'failed' && panel.run.failure === 'runner') await panel.ended
+  return r === 'gone' ? 'left' : r
 }
 
 /** A run that didn't happen because the workspace's close failed: said on its panel until closed. */
@@ -272,8 +371,10 @@ export function closeWithCommand(ws: WorkspaceService, reason: CloseReason, win:
   }
   if (!path) return ws.close().then(() => 'skipped' as const)
   const op: CloseOp = { path, place: ws.openPlace, skip: new AbortController(), wantDrain: !!o.drain, drainedOk: false, showSaving: () => undefined, done: Promise.resolve('skipped') }
-  const plan = planRun(ws.config.onClose, reason, { workspace: path }, { runs: closeCommandsRun() })
-  op.done = closeAndRun(ws, op, plan, win)
+  const plan = planList(ws.config.commands?.onClose, { hive: hiveCommands().list, workspace: ws.config.commands?.list }, reason, { runs: closeCommandsRun() })
+  // Its placeholders' values as it closes: its folder and projects, read while it is still open.
+  const values = workspaceValues(ws, reason)
+  op.done = closeAndRun(ws, op, plan, win, values)
   closing.set(ws, op)
   void op.done.finally(() => {
     if (closing.get(ws) === op) closing.delete(ws)
@@ -303,17 +404,18 @@ async function heldForTest(signal: AbortSignal): Promise<void> {
   while (existsSync(file) && !signal.aborted) await new Promise((r) => setTimeout(r, 100))
 }
 
-async function closeAndRun(ws: WorkspaceService, op: CloseOp, plan: ReturnType<typeof planRun>, win: BrowserWindow | null): Promise<RunOutcome> {
+async function closeAndRun(ws: WorkspaceService, op: CloseOp, plan: ReturnType<typeof planList>, win: BrowserWindow | null, values: CommandValues): Promise<RunOutcome> {
   const name = userText(basename(op.path))
-  if ('skip' in plan && plan.skip !== 'none') log.info(`${name}'s close command not run: ${plan.skip === 'test' ? 'a test copy of Hive' : 'Hive is restarting for an update'}`)
-  const hasCommand = 'command' in plan
+  if ('skip' in plan && plan.skip !== 'none') log.info(`${name}'s close commands not run: ${plan.skip === 'test' ? 'a test copy of Hive' : 'Hive is restarting for an update'}`)
+  if ('gone' in plan && plan.gone) log.info(`${name}'s close point picks ${plan.gone} command(s) no longer there: left out`)
+  const hasCommand = 'steps' in plan
   // The saving step's panel: up from the start when there is a command to run, or a caller needs it drained; brought up
   // later by a caller that joins needing that (a quit joining this window's close). Its Skip the command ends the
   // drain's wait, never the close.
   let panel: Panel | null = null
   op.showSaving = () => {
     if (panel) return
-    panel = showPanel(win, newRun('workspace', hasCommand ? plan.command : '', 'saving', basename(op.path)))
+    panel = showPanel(win, { ...newRun('workspace', '', 'saving', basename(op.path)), point: 'close', ...(hasCommand ? { steps: plan.steps.map((s) => ({ name: s.name, state: 'waiting' as const, exitCode: null })) } : {}) })
     void panel.skipped.then(() => {
       log.info(`${name}: the user skipped its close command; Hive finishes closing it`)
       op.skip.abort()
@@ -354,15 +456,15 @@ async function closeAndRun(ws: WorkspaceService, op: CloseOp, plan: ReturnType<t
     ended()
     return 'skipped'
   }
-  return runInWindow(win, 'workspace', basename(op.path), op.place ?? op.path.toLowerCase(), plan.command, op.path, (panel as Panel | null) ?? undefined)
+  return runListInWindow(win, 'close', op.place ?? op.path.toLowerCase(), plan.steps, () => values, (panel as Panel | null) ?? undefined)
 }
 
 /**
  * When Hive quits, run: in `win`, once every window's workspace has closed. `blocked`: one's close failed ('failed': the
  * panel says it didn't run) or the user didn't wait for one to finish saving ('left': it doesn't run, quietly).
  */
-export async function runQuitCommand(setting: CloseCommandSetting | undefined, reason: CloseReason, win: BrowserWindow | null, blocked: 'failed' | 'left' | null): Promise<RunOutcome> {
-  const plan = planRun(setting, reason, {}, { runs: closeCommandsRun() })
+export async function runQuitCommand(commands: CommandsHive, reason: CloseReason, win: BrowserWindow | null, blocked: 'failed' | 'left' | null): Promise<RunOutcome> {
+  const plan = planList(commands.onQuit, { hive: commands.list }, reason, { runs: closeCommandsRun() })
   if ('skip' in plan) {
     if (plan.skip !== 'none') log.info(`When Hive quits, run: not run (${plan.skip === 'test' ? 'a test copy of Hive' : 'Hive is restarting for an update'})`)
     return 'skipped'
@@ -373,16 +475,76 @@ export async function runQuitCommand(setting: CloseCommandSetting | undefined, r
   }
   if (blocked) {
     log.warn("When Hive quits, run: not run, as a workspace's close didn't finish")
-    return closeFailed(showPanel(win, newRun('quit', plan.command, 'failed')))
+    return closeFailed(showPanel(win, { ...newRun('quit', '', 'failed'), point: 'quit', steps: plan.steps.map((s) => ({ name: s.name, state: 'waiting' as const, exitCode: null })) }))
   }
-  return runInWindow(win, 'quit', null, null, plan.command, homedir())
+  return runListInWindow(win, 'quit', null, plan.steps, () => ({ reason }))
 }
 
 /** Whether When Hive quits, run will run for this quit (set, not a test copy, not skipped for an update). */
-export const quitCommandPlanned = (setting: CloseCommandSetting | undefined, reason: CloseReason): boolean => 'command' in planRun(setting, reason, {}, { runs: closeCommandsRun() })
+export const quitCommandPlanned = (commands: CommandsHive, reason: CloseReason): boolean => 'steps' in planList(commands.onQuit, { hive: commands.list }, reason, { runs: closeCommandsRun() })
 
 /** Whether a quit has anything to run: a window's workspace with a command, or When Hive quits. */
-export function quitRunsAny(workspaces: WorkspaceService[], global: CloseCommandSetting | undefined): boolean {
+export function quitRunsAny(workspaces: WorkspaceService[], commands: CommandsHive): boolean {
   if (!closeCommandsRun()) return false
-  return !!global?.command?.trim() || workspaces.some((w) => !!w.path && !!w.config.onClose?.command?.trim())
+  return commands.onQuit.run.length > 0 || workspaces.some((w) => !!w.path && !!w.config.commands?.onClose.run.length)
+}
+
+/**
+ * Runs one command by hand (HI-1954: the palette's Run Command, Settings' Run): its panel in this window, as a point's,
+ * with its one step, its placeholders the window's workspace's (none: Hive's own commands only make sense without them).
+ * A test copy runs one only through the suites' seam, as it runs the points.
+ */
+export function runByHand(win: BrowserWindow, ws: WorkspaceService | null, ref: CommandRef): void {
+  const c = resolvePoint({ run: [ref] }, { hive: hiveCommands().list, workspace: ws?.config.commands?.list })[0]?.command
+  if (!c) throw hiveError(M.gone, undefined, { kind: 'notFound' })
+  if (!closeCommandsRun()) throw hiveError(M.testCopy, undefined, { kind: 'conflict' })
+  const place = ws?.path ? (ws.openPlace ?? ws.path.toLowerCase()) : null
+  const step = { name: c.name, command: c.command, folder: c.folder ?? '', needed: false }
+  void runListInWindow(win, 'manual', place, [step], () => (ws?.path ? workspaceValues(ws, 'manual') : { reason: 'manual' })) // i18n-ignore: {reason}'s value, as the command reads it
+}
+
+const M = {
+  gone: msg({ id: 'commands.run.gone', defaultMessage: 'That command is no longer there.', description: 'An error: the user ran one of their commands by hand (Settings → Commands, or the command palette), but it was deleted meanwhile.' }),
+  testCopy: msg({ id: 'commands.run.testCopy', defaultMessage: "This is a test copy of Hive: it doesn't run your commands.", description: "An error in a test copy of Hive (one the developers' tests start): it never runs the user's own commands." })
+}
+
+/**
+ * A workspace's open point (HI-1954, design HI-1954/s19 §1 and s21 §3): its commands run in its window as it opens, its
+ * agents held by the gate reserved as it opened (WorkspaceService.open) until the list ends, the user stops waiting, or
+ * chooses Stop here; a launch that fails is the first step's failure, its choices the same. Closed or switched meanwhile,
+ * the gate settles as closed by itself, and nothing it held starts. Never throws.
+ */
+export async function runOpenCommands(ws: WorkspaceService): Promise<void> {
+  const gate = ws.openGate
+  if (!gate?.held || !ws.path) return
+  const name = userText(basename(ws.path))
+  try {
+    const plan = planList(ws.config.commands?.onOpen, { hive: hiveCommands().list, workspace: ws.config.commands?.list }, 'open', { runs: closeCommandsRun() })
+    if (!('steps' in plan)) {
+      gate.settle('done')
+      return
+    }
+    if (plan.gone) log.info(`${name}'s open point picks ${plan.gone} command(s) no longer there: left out`)
+    // Its projects from its folder: the open's first read of them (the window's view) may not have happened yet.
+    const known: Record<string, string> = {}
+    for (const p of await ws.listProjectPaths().catch(() => [])) known[basename(p).toLowerCase()] = p
+    if (!gate.held || ws.lifetime.aborted) return
+    const r = await runListInWindow(ws.window ?? null, 'open', ws.openPlace ?? ws.path.toLowerCase(), plan.steps, () => workspaceValues(ws, 'open', known))
+    if (gate.settle(r === 'left' ? 'detached' : r === 'ok' ? 'done' : 'stopped')) log.info(`${name}'s open commands: its agents may start (${gate.end})`)
+  } catch (e) {
+    log.warn(`${name}'s open commands`, e)
+    gate.settle('stopped')
+  }
+}
+
+/** Hive's own commands, as saved (Settings → Commands at Hive's level). */
+const hiveCommands = (): CommandsHive => config.settings.commands
+
+/** What a workspace's commands' placeholders stand for now: its folder, its name, why, and its projects by name. */
+export function workspaceValues(ws: WorkspaceService, reason: CommandReason, known: Record<string, string> = {}): CommandValues {
+  const path = ws.path ?? undefined
+  // `known`: its projects read from its folder, for an open whose first read of them hasn't happened yet (HR2's round 1).
+  const projects: Record<string, string> = { ...known }
+  for (const p of ws.info()?.projects ?? []) projects[p.name.toLowerCase()] = p.path
+  return { workspace: path, name: path ? basename(path) : undefined, reason, projects }
 }

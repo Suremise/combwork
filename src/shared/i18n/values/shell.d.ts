@@ -267,6 +267,7 @@ interface HiveMessageValues {
   'shell.palette.openCard': { card: string | number; title: string | number }
   'shell.palette.placeholder': undefined
   'shell.palette.projectsPlaceholder': undefined
+  'shell.palette.runCommand': { name: string | number }
   'shell.path.copied': undefined
   'shell.path.copy': undefined
   'shell.path.copyFailed': undefined

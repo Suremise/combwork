@@ -59,7 +59,7 @@ describe("a switch whose old workspace's close is held", () => {
     WorkspaceService.closingTasks.add(task)
     try {
       await w.open(wsA)
-      await w.saveWorkspaceConfigWith(() => ({ onClose: { command: 'backup {reason}', onUpdate: false } }))
+      await w.saveWorkspaceConfigWith(() => ({ commands: { list: [{ id: 'c-00000001', name: 'Backup', command: 'backup {reason}' }], onOpen: { run: [] }, onClose: { run: [{ scope: 'workspace', id: 'c-00000001' }] } } }))
       const win = fakeWin()
       let outcome: string | null = null
       const closing = closeWithCommand(w, 'switch', win as never).then((r) => (outcome = r))
@@ -78,7 +78,7 @@ describe("a switch whose old workspace's close is held", () => {
       // The switch opens the next workspace, once, with nothing of the old close left to run.
       await w.open(wsB)
       expect(w.path).toBe(wsB)
-      await expect(runQuitCommand({ command: 'backup all', onUpdate: false }, 'quit', null, 'left')).resolves.toBe('leftSaving')
+      await expect(runQuitCommand({ list: [{ id: 'c-0000000f', name: 'Quit', command: 'backup all' }], onQuit: { run: [{ scope: 'hive', id: 'c-0000000f' }] } }, 'quit', null, 'left')).resolves.toBe('leftSaving')
       expect(started).toEqual([])
     } finally {
       WorkspaceService.closingTasks.delete(task)

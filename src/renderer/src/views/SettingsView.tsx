@@ -1,6 +1,6 @@
 import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
-import { QuitCommand, WorkspaceCloseCommand } from '../components/CloseCommandSettings'
+import { HiveCommands, QuitPoint, WorkspaceCommands, WorkspacePoint } from '../components/CommandsSettings'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, McpServerInfo, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
@@ -54,7 +54,8 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'providers.list': () => <ProvidersList />,
   'providers.defaultProvider': () => <DefaultProviderPicker />,
   'general.language': () => <LanguagePicker />,
-  'general.onQuit': () => <QuitCommand />,
+  'general.commands': () => <HiveCommands />,
+  'general.onQuit': () => <QuitPoint />,
   'notifications.chimeSound': () => <ChimePicker />,
   'sessions.usageCacheClear': () => <ClearUsageCacheButton />,
   'sessions.resetPerformance': () => <ResetMetricsButton />,
@@ -62,7 +63,9 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'workspace.hiddenProjects': () => <HiddenProjectsList />,
   'workspace.storage': () => <WorkspaceStorageList />,
   'workspace.antivirus': () => <AntivirusPanel />,
-  'workspace.onClose': () => <WorkspaceCloseCommand />,
+  'workspace.commands': () => <WorkspaceCommands />,
+  'workspace.onOpen': () => <WorkspacePoint which="onOpen" />,
+  'workspace.onClose': () => <WorkspacePoint which="onClose" />,
   'board.colors': () => <ColumnColors />,
   'assistant.provider': () => <AssistantProviderPicker />,
   'assistant.connection': () => <AssistantConnectionPicker />,
