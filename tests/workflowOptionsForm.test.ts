@@ -1180,6 +1180,33 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
   })
 
+  it("answered Hive's inherited in the Git options a None project keeps: written there too, so switching back to Git is still Hive's (HR3's round 1)", async () => {
+    const { setKept } = await import('../src/shared/workflow/projectWorkflow')
+    const { commitMessage: _m, ...inheriting } = filled()
+    const { w, repo, ws } = await workspace({ project: inheriting, preset: 'pair', workspace: { git: { commitMessage: 'hive' } } })
+    // On None now, its Git options kept (#1419), inheriting Hive's from the workspace.
+    await w.mutateProjectConfig(repo, (c) => ({ workflow: setKept(c.workflow!, 'none') }))
+    expect((await w.projectConfig(repo)).workflow).toMatchObject({ platform: 'none', kept: { git: { preset: 'pair' } } })
+    const name = basename(repo)
+    await store.boardWrite(w, async () => FactStore.forBoard(w, { project: name, key: name }).setMeta(MERGE_CHOICE_KEY, JSON.stringify({ style: 'merge', commitMessage: 'hive', at: 'x', pending: false })))
+    const save = vi.spyOn(w, 'saveWorkspaceConfigWith').mockRejectedValueOnce(new Error('disk full'))
+    try {
+      await settleCommitMessageDefault(w)
+      expect((await w.projectConfig(repo)).workflow).toMatchObject({ commitMessageChosen: true, kept: { git: { options: { commitMessage: 'hive' } } } })
+      expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
+    } finally {
+      save.mockRestore()
+    }
+    await settleCommitMessageDefault(w)
+    const wsFile = JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8'))
+    expect(wsFile.workflow.git).not.toHaveProperty('commitMessage')
+    expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
+    // Back on Git: its own Hive's, over the workspace's defaults as they are now.
+    const back = setKept((await w.projectConfig(repo)).workflow!, 'git')
+    expect(back.commitMessageChosen).toBe(true)
+    expect(resolveOptions('git', { workspace: wsFile.workflow, project: back.options }).options.commitMessage).toBe('hive')
+  })
+
   it("a failed write leaves no board mark; the next run finishes, never undoing a project already settled (HR3's gap 3)", async () => {
     const { w, repo, ws } = await workspace({ project: filled(), preset: 'pair', workspace: { git: { commitMessage: 'hive' } } })
     const save = vi.spyOn(w, 'saveWorkspaceConfigWith').mockRejectedValueOnce(new Error('disk full'))

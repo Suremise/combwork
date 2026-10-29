@@ -51,6 +51,18 @@ export function settledCommitMessage(wf: ProjectWorkflow | null | undefined, cho
   return kept ? { ...written, kept: { ...written.kept, git: { ...keptGit!, options: kept } } } : written
 }
 
+/**
+ * A project whose Hive's was answered (its board's merge choice) but only inherited, with Hive's written into its own Git
+ * options, in force or kept for another platform (HR3's round 1), and marked chosen; null when they already set one.
+ */
+export function keptAnswered(wf: ProjectWorkflow | null | undefined): ProjectWorkflow | null {
+  if (!wf) return null
+  if (wf.platform === 'git') return wf.options?.commitMessage === undefined ? writeWorkflow(wf, { platform: 'git', preset: wf.preset, options: { ...wf.options, commitMessage: 'hive' } }) : null
+  const git = wf.kept?.git
+  if (!git || git.options?.commitMessage !== undefined) return null
+  return { ...wf, commitMessageChosen: true, kept: { ...wf.kept, git: { ...git, options: { ...git.options, commitMessage: 'hive' } } } }
+}
+
 /** Workflow defaults (Hive's or a workspace's) without a stored Hive's commit message for Git; null when they have none. */
 export function settledDefaults(levels: WorkflowDefaults | null | undefined): WorkflowDefaults | null {
   const git = withoutHive(levels?.git)
@@ -101,9 +113,10 @@ export async function settleCommitMessageDefault(ws: WorkspaceService, hooks: St
         // Answered Hive's but inheriting it (HR3's note on s26): written into its own Git options, in the same write, before
         // the workspace's or Hive's default it inherits from is dropped, so the choice keeps its effect.
         const wf = c.workflow
-        if (answered && wf?.platform === 'git' && wf.options?.commitMessage === undefined) {
+        const kept = answered ? keptAnswered(wf) : null
+        if (kept) {
           did = true
-          return { workflow: writeWorkflow(wf, { platform: 'git', preset: wf.preset, options: { ...wf.options, commitMessage: 'hive' } }), stepsDone: [...(c.stepsDone ?? []), COMMIT_MESSAGE_STEP] }
+          return { workflow: kept, stepsDone: [...(c.stepsDone ?? []), COMMIT_MESSAGE_STEP] }
         }
         const next = settledCommitMessage(wf, answered)
         did = !!next
