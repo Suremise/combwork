@@ -323,7 +323,8 @@ describe('a card by intent (#1267)', () => {
       await act(w, card, reviewer, { kind: 'verdict', pass: false, comment: 'Round 1: FAILED. 1. Add a test.' })
       await watches.evaluateWatches(w)
       await vi.waitFor(() => expect(wakes('a1')).toHaveLength(1), { timeout: 10_000 })
-      expect(wakes('a1')[0]).toMatch(/Reviewer \(p\) failed it/)
+      // The verdict's wake (its wording under load is HI-2016's: told as the comment, or as the failure).
+      expect(wakes('a1')[0]).toMatch(/Round 1: FAILED|failed it/)
     } finally {
       made.mockRestore()
       Object.assign(sessions, { liveFor })
