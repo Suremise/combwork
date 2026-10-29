@@ -278,13 +278,14 @@ same code while every required check still runs:
   failure in it is explained. It then runs the quick checks (`npm run typecheck`, `npm run lint`), the unit tests the
   change affects (`npx vitest run --changed <base>`, where `<base>` is the commit the card's work started from;
   uncommitted changes count too; it follows imports, so add the tests that read a changed file, such as a skill's
-  Markdown or a fixture), not the whole unit suite, and the one or two suites closest to the riskiest change,
-  and spends the rest of its time on its own probes. It reruns a whole suite or set only when there's no record, the
+  Markdown or a fixture), not the whole unit suite, and only the new or changed suites and those it doubts
+  (the one or two closest to the riskiest change), saying which on the card, and spends the rest of its time on its own probes. It reruns a whole suite or set only when there's no record, the
   fingerprint differs or the record is stale, a result looks wrong, or the change is to shared test infrastructure (the
   runner, `lib.cjs`, the run context, the scenario harness, `vitest.config.ts` or a helper in `tests/`), and says in
   its verdict which and why.
-- **Follow-up rounds** run the suites the fixes affect (`--affected`). **Before a card passes**, every suite it names
-  has run on its final code (the builder's last record).
+- **Follow-up rounds** run only the suites that failed plus those the fixes touch, by name (`--affected` can help pick
+  them). **Before a card passes**, every suite it names has run on its final code (the builder's last record). How
+  narrow a round's tests are, and what never runs on a card unless it asks, is AGENTS.md's **Tests per card**.
 - **A merge** (#1010; into main or an integration branch such as `feature/090-session`) runs **focused checks** on the
   merged code: typecheck, lint, the unit tests, and the cards' own focused suites (those their reviews ran, plus any
   suite the merge's conflicts touched), `npm run e2e -- <suites> --build --record`. **Not** the full set and **not**
@@ -296,7 +297,7 @@ same code while every required check still runs:
 - **The full set runs at checkpoints**: `npm run e2e -- --all --build --record` **on the integration branch when the
   lanes go quiet** (a phase's end, overnight with the load capped, before a long pause; a failure is carded at once and
   bisected over the merge commits since the last full run), for **every RC and release** (RELEASING.md, with the real
-  tier: `--all --real`), and **on request** (the user, or a reviewer who says why). Run the real tier on its own
+  tier: `--all --real`), and **on request** (the user, or a card that asks for it). Run the real tier on its own
   (`--all --only-real`) **after updating Claude Code or Codex**. `--affected` (below) stays a tool for picking the
   suites a change needs, such as a review round's fixes, and isn't any merge's gate.
 - **A flake fix, or a change to a suite's waits**, is proven by focused repeats under load (the `investigate-flake`
