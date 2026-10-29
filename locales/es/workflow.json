@@ -11,6 +11,7 @@
   "workflow.contradiction.subfolderTarget": "Este proyecto está dentro de un repositorio más grande: indica la rama en la que se fusiona su trabajo.",
   "workflow.contradiction.upToDateNeedsSlots": "Los slots solo se actualizan cuando cada tarjeta tiene su propia carpeta.",
   "workflow.forYou.decidedAfterMerge": "La tarjeta {card} recibió una decisión después de fusionarse: ¿necesita un seguimiento?",
+  "workflow.forYou.slotDirty": "{card} está hecha, pero {slot} tiene cambios sin confirmar, así que sigue en {line}. Confírmalos o descártalos allí: entonces Hive separa el slot en {target}, listo para su siguiente tarjeta.",
   "workflow.forYou.focusedSkip": "Las pruebas específicas de {card} se omitieron al fusionarla: {tests}. ¿Fusionarla con ellas omitidas?",
   "workflow.forYou.lineAsk": "{line} todavía tiene el trabajo de {card}, fusionado con squash en {target}: aprueba y Hive actualiza la rama una vez, o rechaza y hazlo tú antes de que empiece {next}.",
   "workflow.forYou.lineRefused": "Git no actualizó {line} con {target}: {reason}. {next} empieza cuando la rama esté actualizada.",

@@ -10,7 +10,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
-import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
+import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
 import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
@@ -31,6 +31,7 @@ import { NonePlatform } from '../platform/nonePlatform'
 import { isUnknown, unknown, type Maybe } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
+import { finishAccepts, recordFinish } from './finish'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
 
 import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
@@ -244,6 +245,8 @@ export class Write {
    */
   answer: string | null = null
   readonly woken: string[] = []
+  /** A builder's reported merge result nothing checked (Not checked), for the card's finish (HI-2014): a claim, never containment. */
+  claimed: string | null = null
   /** The card's stage when the write began. */
   readonly was: StageId
   constructor(
@@ -545,6 +548,8 @@ export class Workflow {
         w = new Write(tx, tx.card(card.id), ruleset, actor, tx.card(card.id).stage)
         const written = fn(w, prepared)
         this.closeSettled(w)
+        // Into Done by whatever route: its finish, once, in the move's own transaction (HI-2014).
+        if (w.current === 'done' && w.was !== 'done') recordFinish(tx, w.card.id, w.actor, w.ruleset?.id ?? null, w.written, { claimed: w.claimed })
         return written
       })
       // What the call runs alongside (the board's 0.9 fields), in the same transaction, once this write changed the card.
@@ -578,6 +583,71 @@ export class Workflow {
         this.wake(w, r.asker, `${w.card.key}: your question "${quoted}" no longer stands: the card is in Done.`, 'answer') // i18n-ignore: a wake, agent-facing
       }
     }
+  }
+
+  /**
+   * A step of a card's finish recorded once (HI-2014), in a write of its own: `superseded` when that finish is over (the
+   * card left Done, or finished again), `already` when the step was recorded. Recording `requests` in Done closes the
+   * card's asked questions in the same write (closeSettled), so no route leaves one open.
+   */
+  async finishStep(card: CardRecord, finish: number, step: FinishStepId): Promise<'done' | 'already' | 'superseded'> {
+    return this.write(card, null, 'hive', (w) => {
+      const s = w.state()
+      if (s.finished?.seq !== finish) {
+        const noted = w.tx.facts(card.id).some((f) => f.kind === 'FinishStep' && (f.data as FactData['FinishStep']).finish === finish && (f.data as FactData['FinishStep']).step === step)
+        if (!noted) w.fact('FinishStep', { finish, step, outcome: 'superseded', why: s.stage === 'done' ? 'finished again' : `left Done for ${s.stage}` }) // i18n-ignore: a fact's kind and codes, not text
+        return 'superseded'
+      }
+      if (s.finished.steps.includes(step)) return 'already'
+      w.fact('FinishStep', { finish, step, outcome: 'done' }) // i18n-ignore: a fact's kind and codes, not text
+      return 'done'
+    })
+  }
+
+  /**
+   * A finish's loop wake (HI-2014): its builder told the card is Done, once for the move that finished it, whatever made
+   * it. A board move's recorder already wrote it (the same move's `wake` action): nothing more. Only while the card is in
+   * a loop (it was reviewed by an agent, or its lane runs) and `finish` is still the card's. True when it was written.
+   */
+  async finishWake(card: CardRecord, finish: number): Promise<boolean> {
+    return this.write(card, null, 'hive', (w) => {
+      const s = w.state()
+      if (s.finished?.seq !== finish || !s.started) return false
+      const facts = w.tx.facts(card.id)
+      const moved = facts.findLast((f) => f.kind === 'Moved' && f.seq < finish && (f.data as FactData['Moved']).to === 'done')
+      if (!moved || w.tx.hasAction(card.id, 'wake', moved.seq)) return false
+      const lane = card.lane ? this.store.lane(card.lane) : null
+      const loop = facts.some((f) => f.kind === 'ReviewStarted') || (!!lane && !lane.ended)
+      if (!loop) return false
+      w.action('wake', { agent: 'builder', about: 'done', by: moved.actor }, moved.seq)
+      return true
+    })
+  }
+
+  /**
+   * A finished card's slot that couldn't be detached for uncommitted changes (HI-2014): asked of the user once (For you,
+   * SLOT_DIRTY_GATE), while that finish is the card's. False when it wasn't asked (asked already, or the finish is over).
+   */
+  async askSlotDirty(card: CardRecord, finish: number, v: { slot: string; line: string; target: string }): Promise<boolean> {
+    return this.write(card, null, 'hive', (w) => {
+      const s = w.state()
+      if (s.finished?.seq !== finish || s.requests.some((r) => r.gate === SLOT_DIRTY_GATE)) return false
+      this.askUser(w, 'decide', SLOT_DIRTY_GATE, workflowText(FOR_YOU.slotDirty, { card: card.key, ...v }), { unbound: true })
+      return true
+    })
+  }
+
+  /**
+   * The question about a finished card's slot closed (HI-2014): the slot is clean now, detached or another card's. Only
+   * while `finish` is the card's: a later finish's question is its own.
+   */
+  async closeSlotDirty(card: CardRecord, finish: number): Promise<boolean> {
+    return this.write(card, null, 'hive', (w) => {
+      const s = w.state()
+      const open = s.finished?.seq === finish ? s.requests.filter((r) => r.gate === SLOT_DIRTY_GATE) : []
+      for (const r of open) w.fact('RequestClosed', { request: r.request, why: 'slotClean' }) // i18n-ignore: a fact's kind and codes, not text
+      return open.length > 0
+    })
   }
 
   /**
@@ -991,8 +1061,9 @@ export class Workflow {
         out.push(key)
         continue
       }
-      // Done before 1.0, or never started under the rules (moved to Done by hand): nothing to look for in the target.
-      if (d.accepted || dep.preWorkflow || !d.started) continue
+      // Done before 1.0, or never started under the rules (moved to Done by hand): nothing to look for in the target. An
+      // override's Done counts as accepted (HI-2014, Darren's option A): its dependents start without its work in the target.
+      if (d.accepted || dep.preWorkflow || !d.started || finishAccepts(d.finished)) continue
       const revision = d.integrated?.revision ?? d.approved?.revision ?? d.latest?.revision
       const base = d.approved?.base ?? d.latest?.base ?? d.started?.base
       if (!revision || !base || !target || revision === base) {
@@ -1106,8 +1177,6 @@ export class Workflow {
     if (w.card.kind === 'no-code') {
       w.fact('Accepted', { submission: s.latest!.id }) // i18n-ignore: a fact's kind and codes, not text
       w.move('done', 'derived')
-      w.action('endLaneIfDone', {})
-      w.action('releaseSlot', {})
       return
     }
     if (o.finish === 'accept') {
@@ -1116,8 +1185,6 @@ export class Workflow {
       if (!isUnknown(fin.currentRevision) && fin.currentRevision === approved) {
         w.fact('Accepted', { revision: approved! }) // i18n-ignore: a fact's kind and codes, not text
         w.move('done', 'derived')
-        w.action('endLaneIfDone', {})
-        w.action('releaseSlot', {})
       } else {
         w.fact('Stale', { approved, current: isUnknown(fin.currentRevision) ? null : (fin.currentRevision ?? null), why: 'change' }) // i18n-ignore: a fact's kind and codes, not text
         w.move(hasStage(r, 'review') ? 'review' : 'active', 'derived')
@@ -1145,8 +1212,6 @@ export class Workflow {
         if (fin.contained === true) {
           w.fact('Integrated', { revision: s.approved!.revision!, target: s.started!.target ?? '', result: s.approved!.revision!, method: 'committed', by: 'hive' }) // i18n-ignore: a fact's kind and codes, not text
           w.move('done', 'derived')
-          w.action('endLaneIfDone', {})
-          w.action('releaseSlot', {})
         }
         return
       case 'notChecked':
@@ -1156,8 +1221,6 @@ export class Workflow {
           if (needOk) this.askUser(w, 'approve', 'okBefore', workflowText(FOR_YOU.okBefore, { card: w.card.key }))
         } else {
           w.move('done', 'derived')
-          w.action('endLaneIfDone', {})
-          w.action('releaseSlot', {})
         }
         return
       default:
@@ -1730,9 +1793,10 @@ export class Workflow {
       if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' }) // i18n-ignore: a fact's kind and codes, not text
       const open = hive ? openEntry(w.state()) : undefined
       if (open) w.fact('IntegrationCancelled', { entry: open.id, reason: 'integratedOutside' }) // i18n-ignore: a fact's kind and codes, not text
+      // Unchecked, its result is the builder's claim (HI-2014): kept on its finish, never read as the merge commit.
+      if (contained !== true) w.claimed = args.result ?? null
+      // Its slot, lane and the rest follow its finish (HI-2014).
       w.move('done', 'intent')
-      w.action('endLaneIfDone', {})
-      w.action('releaseSlot', {})
       return null
     })
     if (out) return this.refuse(card, actor, 'report merge', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
@@ -2057,10 +2121,12 @@ export class Workflow {
       const e = openEntry(s)
       if (e && to !== 'merging') w.fact('IntegrationCancelled', { entry: e.id, reason: 'user' }) // i18n-ignore: a fact's kind and codes, not text
       w.move(to, skipped.length ? 'override' : 'user')
-      if (to === 'done') w.action('endLaneIfDone', {})
       return null
     })
-    return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, to)
+    if (out) return this.refuse(card, by, 'move', out)
+    // An override's Done (Darren's option A, HI-2014): the reply says which cards waiting on it start without its work.
+    const waiting = to === 'done' && skipped.length ? this.store.cards().filter((c) => c.blockedBy.includes(card.id) && c.stage !== 'done').map((c) => c.key) : []
+    return this.ok(card, from, to, undefined, waiting.length ? [`${waiting.join(', ')} can start without ${card.key}'s work in the target: it is Done by an override, not merged.`] : undefined) // i18n-ignore: a reply's warning (agents and the Agent API read it)
   }
 
   /**
@@ -2595,6 +2661,8 @@ export class Workflow {
       case 'pin':
         await this.platformOf(card).perform(kind, payload)
         return
+      // A finish (HI-2014) ends its lane once all its cards are Done, as `endLaneIfDone` (written before it) still does.
+      case 'finish':
       case 'endLaneIfDone': {
         if (!card.lane) return
         const l = this.lane(card.lane)
@@ -2607,7 +2675,7 @@ export class Workflow {
         return
       }
       default:
-        // prepareReviewCopy, releaseSlot, enqueue: P5 and P7 build them; the queue reads its entries from facts.
+        // prepareReviewCopy, releaseSlot, enqueue: P5 and P7 build them (a finish's slot is the app's pass); the queue reads its entries from facts.
         return
     }
   }

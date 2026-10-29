@@ -376,9 +376,11 @@ describe('reconciliation acts with workflow rules enforced (#1263)', () => {
     git(repo, 'merge', '-q', '--no-ff', '-m', 'merge card', 'card')
     await reconcileNow(w, repo)
     expect(factsOf(w, card).find((f) => f.kind === 'Integrated')).toMatchObject({ actor: 'outside', data: { revision: head, by: 'outside' } })
-    expect(factsOf(w, card).at(-1)).toMatchObject({ kind: 'Moved', data: { to: 'done', cause: 'derived' } })
+    expect(factsOf(w, card).at(-2)).toMatchObject({ kind: 'Moved', data: { to: 'done', cause: 'derived' } })
+    // Its finish follows the move (HI-2014): a hand merge found in the target, verified.
+    expect(factsOf(w, card).at(-1)).toMatchObject({ kind: 'Finished', data: { how: 'reported', verified: expect.any(String) } })
     expect(await column(w, card)).toBe('done')
-    expect(actions(w, card).slice(before)).toEqual(['endLaneIfDone', 'releaseSlot'])
+    expect(actions(w, card).slice(before)).toEqual(['finish'])
     // Again: nothing more.
     await reconcileNow(w, repo)
     expect(kinds(w, card).filter((k) => k === 'Integrated' || k === 'Moved').slice(-2)).toEqual(['Integrated', 'Moved'])
@@ -426,11 +428,13 @@ describe('reconciliation acts with workflow rules enforced (#1263)', () => {
     await advanced.set(ENFORCE, true)
     await reconcileNow(w, repo)
     expect(await column(w, card)).toBe('done')
-    expect(factsOf(w, card).at(-1)).toMatchObject({ kind: 'Moved', data: { to: 'done', cause: 'derived' } })
+    expect(factsOf(w, card).at(-2)).toMatchObject({ kind: 'Moved', data: { to: 'done', cause: 'derived' } })
+    // Its finish follows the move (HI-2014): a hand merge found in the target, verified.
+    expect(factsOf(w, card).at(-1)).toMatchObject({ kind: 'Finished', data: { how: 'reported', verified: expect.any(String) } })
     expect(kinds(w, card).filter((k) => k === 'Integrated')).toHaveLength(1)
-    expect(actions(w, card)).toEqual(['endLaneIfDone', 'releaseSlot'])
+    expect(actions(w, card)).toEqual(['finish'])
     await reconcileNow(w, repo, ['main'])
-    expect(actions(w, card)).toEqual(['endLaneIfDone', 'releaseSlot'])
+    expect(actions(w, card)).toEqual(['finish'])
     expect(factsOf(w, card).filter((f) => f.kind === 'Moved' && (f.data as { cause: string }).cause === 'derived')).toHaveLength(1)
   })
 

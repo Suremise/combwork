@@ -595,6 +595,10 @@
     "defaultMessage": "Recorded as Done, as the board had it: its workflow still had it in {stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} other {{stage}}}",
     "description": "A line in a card's history, by Hive (HI-1674): the card was in the Done column, but a move had not reached its workflow, which still had it at an earlier stage ({stage}, select: a board stage; translate each); Hive recorded it as Done and closed its open questions."
   },
+  "tasks.history.startsWithout": {
+    "defaultMessage": "{card} was moved to Done without its work in the target ({reason}): this card can start without it.",
+    "description": "A comment from Hive on a card that depends on another (HI-2014): the user (or the Hive Assistant with the user's reason) moved {card} (a card's key, such as HI-12) to Done by an override, without its work being merged into the target branch; this card no longer waits for it and starts without that work. {reason} is the override's reason, in the words it was given."
+  },
   "tasks.history.takenFrom": {
     "defaultMessage": "Taken from {agent}",
     "description": "A line in a card's history: the card no longer belongs to the agent {agent} (its name)."

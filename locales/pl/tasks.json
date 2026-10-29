@@ -104,6 +104,7 @@
   "tasks.history.context": "Przeczytaj najpierw: {refs}",
   "tasks.history.contextRemoved": "Usunięto sekcje dokumentów do przeczytania najpierw",
   "tasks.history.created": "Utworzono w kolumnie {column, select, hold {Wstrzymane} todo {Do zrobienia} doing {Aktywne} review {Recenzja} passed {Zatwierdzone} done {Gotowe} other {{column}}}",
+  "tasks.history.startsWithout": "Kartę {card} przeniesiono do kolumny Gotowe bez jej pracy w gałęzi docelowej ({reason}): ta karta może wystartować bez niej.",
   "tasks.history.decision": "Zapisano decyzję: „{decision}”",
   "tasks.history.decisionChanged": "Zmieniono decyzję na „{decision}” (było: „{was}”)",
   "tasks.history.decisionRemoved": "Usunięto decyzję: „{decision}”",

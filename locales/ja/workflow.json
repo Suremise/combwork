@@ -11,6 +11,7 @@
   "workflow.contradiction.subfolderTarget": "このプロジェクトはより大きなリポジトリの中にあります。作業のマージ先ブランチを指定してください。",
   "workflow.contradiction.upToDateNeedsSlots": "スロットを最新にできるのは、カードごとに専用フォルダーがある場合だけです。",
   "workflow.forYou.decidedAfterMerge": "{card}：マージ後に決定事項が記録されました。フォローアップが必要ですか？",
+  "workflow.forYou.slotDirty": "{card}は完了しましたが、{slot}にコミットされていない変更があるため、{line}のままです。そこで変更をコミットするか破棄してください。その後Hiveがスロットを{target}でデタッチし、次のカードに備えます。",
   "workflow.forYou.focusedSkip": "{card}のマージ時に対象テストがスキップされました：{tests}。スキップしたままマージしますか？",
   "workflow.forYou.lineAsk": "{line}には、{target}にスカッシュでマージされた{card}の作業がまだ残っています。承認すると、Hiveがブランチを一度だけ最新にします。却下した場合は、{next}の開始前に自分で行ってください。",
   "workflow.forYou.lineRefused": "Gitは{line}を{target}に合わせて最新にできませんでした：{reason}。ブランチが最新になると{next}が開始します。",

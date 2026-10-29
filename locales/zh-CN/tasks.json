@@ -104,6 +104,7 @@
   "tasks.history.context": "先读：{refs}",
   "tasks.history.contextRemoved": "已移除先读的文档章节",
   "tasks.history.created": "创建于“{column, select, hold {搁置} todo {待办} doing {进行中} review {评审} passed {已批准} done {已完成} other {{column}}}”",
+  "tasks.history.startsWithout": "{card} 已在其工作未进入目标的情况下被移到“已完成”（{reason}）：此卡片可以在没有该工作的情况下开始。",
   "tasks.history.decision": "记录了决定：“{decision}”",
   "tasks.history.decisionChanged": "将一项决定改为“{decision}”（原为“{was}”）",
   "tasks.history.decisionRemoved": "删除了决定：“{decision}”",

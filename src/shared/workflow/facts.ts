@@ -160,6 +160,9 @@ export const QUEUE_STUCK_GATE = 'queueStuck'
  */
 export const FOCUSED_SKIP_GATE = 'focusedSkip'
 
+/** HI-2014: a finished card's slot kept on its line by uncommitted changes, until they are committed or discarded. */
+export const SLOT_DIRTY_GATE = 'slotDirty'
+
 /**
  * What an agent's question may offer the user to do on its card (#1630): move it to Done, make it no code, unblock it,
  * skip its review (HI-1734), each with the agent's suggested reason. One click does it as the user, with the reason, and
@@ -180,7 +183,7 @@ export const ASK_ACTIONS_MAX = 3
  * A request under any other gate is a question someone asked: an agent, the Assistant (`ask`), or a rule it couldn't
  * keep. A question settled another way is closed (#1638); Hive's own requests stay until met.
  */
-const HIVE_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, FOCUSED_SKIP_GATE, 'decision'])
+const HIVE_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, 'decision'])
 export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !HIVE_GATES.has(r.gate)
 
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
@@ -293,7 +296,8 @@ export interface FactData {
    * A request closed without an answer (#1638): its card reached Done (`done`), or the agent that asked moved the card
    * on itself (`carriedOn`: answered some other way, such as in its pane). It leaves For you as an answer does.
    */
-  RequestClosed: { request: string; why: 'done' | 'carriedOn' }
+  /** `slotClean` (HI-2014): a finished card's slot asked about (SLOT_DIRTY_GATE) became clean, or another card's. */
+  RequestClosed: { request: string; why: 'done' | 'carriedOn' | 'slotClean' }
   /** An answer (§16.8.5): `note` the user's reply; at the round limit, their `choice` and the rounds a carry on adds; `action`, an action the question offered, done (#1630; `note` its reason). */
   /** `byDecision` (HI-1932): answered by a decision the user made, recorded on the card (its id), by whom (the authenticated recorder), when. */
   Approval: { request: string; answer: 'approved' | 'declined' | 'answered'; note?: string; generation: number; submission?: number; choice?: RoundChoice; rounds?: number; action?: AskActionKind; byDecision?: { decision: string; recordedBy: string; at: string } }
@@ -363,7 +367,21 @@ export interface FactData {
   Gone: { what: 'line' | 'folder' | 'repository' | 'deliverables' }
   LaneChanged: { lane: string; before: number[]; after: number[] }
   Undone: { fact: number; by: Actor }
+  /**
+   * The card reached Done (HI-2014, the one finish path): written with every move into Done, whatever made it, and what
+   * follows (its slot, line, dependents, lane, requests) hangs off it (`finish` action). `how`: the route; `verified`:
+   * the merge commit the target was found to hold (its `Integrated` result), else null; `claimed`: a result a builder
+   * reported that nothing checked (Not checked), never read as containment. `by`/`reason`: an override's.
+   */
+  Finished: { how: FinishHow; verified: string | null; claimed?: string | null; by?: 'user' | 'assistant'; reason?: string }
+  /** A step of a finish done, or left (`superseded`: what it was for is no longer so), once each (HI-2014). */
+  FinishStep: { finish: number; step: FinishStepId; outcome: 'done' | 'superseded'; why?: string }
 }
+
+/** How a card reached Done (HI-2014): the queue, a builder's merge report (checked or not), accepted, an override, a board move. */
+export type FinishHow = 'queue' | 'reported' | 'unchecked' | 'accepted' | 'override' | 'board'
+/** The steps of a finish (HI-2014) a fact records as done: the board's own effects, each once. */
+export type FinishStepId = 'requests' | 'dependents' | 'lane' | 'wake' | 'journal'
 
 export type FactKind = keyof FactData
 
@@ -471,6 +489,8 @@ export interface CardState {
   step: { step: LoopAsk; id: string; seq: number; at: string; until: string | null; by: string | null } | null
   /** When the content-stale pass (`stale`) went stale: its `Stale` fact's time, which nothing later moves (HI-1763's stall). */
   staleSince: string | null
+  /** The card's finish while it is in Done (HI-2014): its `Finished` with its seq, and the steps of it done. */
+  finished: (FactData['Finished'] & { seq: number; steps: FinishStepId[] }) | null
   lastSeq: number
 }
 
@@ -521,6 +541,7 @@ export const emptyState = (): CardState => ({
   marks: {},
   blocked: null,
   step: null,
+  finished: null,
   lastSeq: 0
 })
 
@@ -693,7 +714,17 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       case 'Accepted':
         s.accepted = f.data as FactData['Accepted']
         break
+      case 'Finished':
+        s.finished = { ...(f.data as FactData['Finished']), seq: f.seq, steps: [] }
+        break
+      case 'FinishStep': {
+        const d = f.data as FactData['FinishStep']
+        if (s.finished?.seq === d.finish && !s.finished.steps.includes(d.step)) s.finished.steps.push(d.step)
+        break
+      }
       case 'Moved':
+        // Out of Done, its finish is over: the next move into Done is another (HI-2014).
+        if ((f.data as FactData['Moved']).to !== 'done') s.finished = null
         s.stage = (f.data as FactData['Moved']).to
         // A gate's request belongs to the stage it was asked in: the card leaving it retires the request.
         s.requests = s.requests.filter((r) => !isGateRequest(r) || r.stage === undefined || r.stage === s.stage)

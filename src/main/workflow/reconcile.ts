@@ -413,8 +413,6 @@ async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, r
     const open = openEntry(w.state())
     if (open) w.fact('IntegrationCancelled', { entry: open.id, reason: 'integratedOutside' }) // i18n-ignore: a fact's kind and codes, not text
     w.move('done', 'derived')
-    w.action('endLaneIfDone', {})
-    w.action('releaseSlot', {})
   })
 }
 

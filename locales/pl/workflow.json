@@ -11,6 +11,7 @@
   "workflow.contradiction.subfolderTarget": "Ten projekt jest wewnątrz większego repozytorium: wskaż gałąź, do której scalana jest jego praca.",
   "workflow.contradiction.upToDateNeedsSlots": "Sloty są aktualizowane tylko wtedy, gdy każda karta ma własny folder.",
   "workflow.forYou.decidedAfterMerge": "Decyzja na karcie {card} zapadła po scaleniu: czy potrzebna jest dalsza praca?",
+  "workflow.forYou.slotDirty": "Karta {card} jest gotowa, ale slot {slot} ma niezatwierdzone zmiany, więc zostaje na gałęzi {line}. Zatwierdź je lub odrzuć: wtedy Hive odłączy slot na {target}, gotowy na następną kartę.",
   "workflow.forYou.focusedSkip": "Testy ukierunkowane karty {card} zostały pominięte przy jej scaleniu: {tests}. Scalić ją z pominiętymi testami?",
   "workflow.forYou.lineAsk": "Gałąź {line} nadal zawiera pracę karty {card}, scaloną jako squash do {target}: zatwierdź, a Hive raz zaktualizuje gałąź, albo odrzuć i zrób to samodzielnie przed startem karty {next}.",
   "workflow.forYou.lineRefused": "Git nie zaktualizował gałęzi {line} do {target}: {reason}. Karta {next} wystartuje, gdy gałąź będzie aktualna.",
