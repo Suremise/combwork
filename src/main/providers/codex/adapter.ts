@@ -49,15 +49,18 @@ export function codexHome(): string {
   return process.env.CODEX_HOME || join(homedir(), '.codex')
 }
 
-/** A TOML file as an object; empty when missing or unreadable. Cached by modification time. */
-const tomlCache = new Map<string, { mtime: number; data: Record<string, any> }>()
+/**
+ * A TOML file as an object; empty when missing or unreadable. Cached by modification time and size: two writes in one
+ * tick of the clock share a modification time (HI-2051), so a change of size is one too.
+ */
+const tomlCache = new Map<string, { mtime: number; size: number; data: Record<string, any> }>()
 function readToml(path: string): Record<string, any> {
   try {
-    const m = statSync(path).mtimeMs
+    const { mtimeMs: m, size } = statSync(path)
     const c = tomlCache.get(path)
-    if (c && c.mtime === m) return c.data
+    if (c && c.mtime === m && c.size === size) return c.data
     const data = parseToml(readFileSync(path, 'utf8')) as Record<string, any>
-    tomlCache.set(path, { mtime: m, data })
+    tomlCache.set(path, { mtime: m, size, data })
     return data
   } catch {
     return {}

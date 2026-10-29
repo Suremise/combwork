@@ -102,7 +102,7 @@ describe('Codex: when a person must act', () => {
   })
 
   it("says a connection's folder is set up (HI-1870) when its launches run in a Windows sandbox: its own, or this PC's passed on", async () => {
-    const { mkdirSync, rmSync, writeFileSync } = await import('fs')
+    const { mkdirSync, rmSync, statSync, utimesSync, writeFileSync } = await import('fs')
     const pc = tempDir('hive-codex-pc-')
     const conn = tempDir('hive-codex-conn-')
     const before = process.env.CODEX_HOME
@@ -113,12 +113,18 @@ describe('Codex: when a person must act', () => {
       if (process.platform !== 'win32') return void expect(await codex.connectionSetUp(conn)).toBe(true)
       // Neither: Codex asks for its sandbox setup there.
       expect(await codex.connectionSetUp(conn)).toBe(false)
-      // This PC's, which its launches are given.
-      writeFileSync(joinPath(pc, 'config.toml'), '[windows]\nsandbox = "elevated"\n')
+      // This PC's, which its launches are given. Each write of it given the same modification time, as two writes in one
+      // tick of the clock have (HI-2051): the second is read all the same.
+      const pcConfig = (text: string): void => {
+        writeFileSync(joinPath(pc, 'config.toml'), text)
+        utimesSync(joinPath(pc, 'config.toml'), 1_800_000_000, 1_800_000_000)
+      }
+      pcConfig('[windows]\nsandbox = "elevated"\n')
       expect(sandboxed()).toBe(true)
       expect(await codex.connectionSetUp(conn)).toBe(true)
       // One the launches wouldn't pass on isn't counted.
-      writeFileSync(joinPath(pc, 'config.toml'), '[windows]\nsandbox = "not a kind"\n')
+      pcConfig('[windows]\nsandbox = "not a kind"\n')
+      expect(statSync(joinPath(pc, 'config.toml')).mtimeMs).toBe(1_800_000_000_000)
       expect(sandboxed()).toBe(false)
       expect(await codex.connectionSetUp(conn)).toBe(false)
       // Its own, as its Set Up writes it.
