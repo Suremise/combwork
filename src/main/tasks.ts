@@ -31,14 +31,13 @@ import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decision
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { afterBoardWrite, archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, type CardQuery } from './boardStore'
+import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, type CardQuery } from './boardStore'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { HiveError, hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { workspace, workspaceFor, type WorkspaceService } from './workspace'
 import { trash } from './trash'
-import { journalFact } from './journalService'
 import { cardRef } from '../shared/projectKeys'
 import { projectPreferences } from './workflow/preferences'
 
@@ -1190,8 +1189,8 @@ const englishSaid = (s: StoredText): string => {
  * A line in the card's history: its English (`what`), and as data (`whatText`, #846) for the window to show in its
  * language. Text from elsewhere (an agent-facing note, noteOnCard) is kept in English only.
  */
-function note(card: TaskCard, by: string, said: StoredText | string): void {
-  const at = new Date().toISOString()
+/** Adds a line to a card's history, at `at` (a change's one time, HI-2016) or now. */
+function note(card: TaskCard, by: string, said: StoredText | string, at = new Date().toISOString()): void {
   card.history = [...card.history, entryOf(at, by, said)].slice(-MAX_HISTORY)
   card.updatedAt = at
 }
@@ -2111,8 +2110,6 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
   const ws = workspace
   const by = actorName(actor)
   const comment = opts.comment === undefined ? null : commentText(opts.comment)
-  // Moved into Done: merged, a fact for the Assistant's journal (#1031) once it is saved.
-  let intoDone = false
   const result = await (async () => {
     const card = await getTask(n, ws)
     // A move the runtime made in this transaction (#1265) has saved the card's column already: its 0.9 fields (history,
@@ -2228,7 +2225,6 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       const order = place.order
       reordered = order !== card.order
       card.order = order
-      if (column === 'done' && card.column !== 'done') intoDone = true
       card.column = column
     }
     if (patch.decision !== undefined) {
@@ -2282,7 +2278,10 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // What changed, in the history's words (English), for a caller that confirms it (the hive tools' short replies).
     opts.said?.push(...said.map(englishSaid))
     if (!said.length && !reordered && !reviewed && !comment) return card
-    for (const s of said) note(card, by, s)
+    // One change, one time (HI-2016): its lines share it, so what reads them as one change (a failed verdict's own move
+    // back to Doing, watch.ts wakeAbout) does so however slowly they are written.
+    const at = new Date().toISOString()
+    for (const s of said) note(card, by, s, at)
     if (comment) addComment(card, by, comment)
     // The last thing before the write, after every read above: a caller whose authority can change while those awaits run
     // (the Assistant's control and session) checks it here, so a revoked change saves nothing. Unlike `check`, it doesn't
@@ -2292,7 +2291,6 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     return card
   })()
   changed(ws)
-  if (intoDone) afterBoardWrite(ws, () => journalFact(ws, { summary: `${cardRef(n)} "${result.title}" is Done (merged), moved there by ${by}`, project: result.project || null, links: [{ type: 'card', ref: String(n) }], tags: ['done'] })) // i18n-ignore: a journal fact (the Assistant's, English)
   return result
 }
 
@@ -2420,12 +2418,14 @@ export async function noteOnCard(n: number, what: string | StoredText, ws: Works
  * card. `still`: whether the card, as it is in the change, is still the one meant (its column, project and agent may
  * have changed since it was chosen). True when it was written. `said`: English text, or a message of the card history's
  * (shared/taskHistory.ts), kept as its English (`text`) and as data (`hiveText`, #846) for the window to show in its language.
+ * `key`: the comment's id, at most once on the card.
  */
-export async function commentAsHive(n: number, said: string | StoredText, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true): Promise<boolean> {
+export async function commentAsHive(n: number, said: string | StoredText, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string): Promise<boolean> {
   return boardLock(ws, async () => {
     const card = await getTask(n, ws)
-    if (card.archived || !still(card)) return false
-    addComment(card, BY.hive, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said)
+    // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing.
+    if (card.archived || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
+    addComment(card, BY.hive, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)
     await saveCard(ws, n, card)
     changed(ws)
     return true
@@ -2582,9 +2582,9 @@ function commentText(comment: string): string {
 }
 
 /** Adds a comment; one Hive writes itself can carry its text as data (`hiveText`) beside its English. */
-function addComment(c: TaskCard, by: string, t: string, hiveText?: StoredText): void {
+function addComment(c: TaskCard, by: string, t: string, hiveText?: StoredText, id?: string): void {
   const at = new Date().toISOString()
-  c.comments = [...c.comments, { at, by, text: t, ...(hiveText ? { hiveText } : {}), id: entryId() }].slice(-MAX_COMMENTS)
+  c.comments = [...c.comments, { at, by, text: t, ...(hiveText ? { hiveText } : {}), id: id ?? entryId() }].slice(-MAX_COMMENTS)
   c.updatedAt = at
 }
 

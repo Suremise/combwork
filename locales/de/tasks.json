@@ -104,6 +104,7 @@
   "tasks.history.context": "Zuerst lesen: {refs}",
   "tasks.history.contextRemoved": "Zuerst zu lesende Dokumentabschnitte entfernt",
   "tasks.history.created": "Erstellt in {column, select, hold {Geparkt} todo {Offen} doing {In Arbeit} review {Review} passed {Genehmigt} done {Erledigt} other {{column}}}",
+  "tasks.history.startsWithout": "{card} wurde ohne seine Arbeit im Ziel nach Erledigt verschoben ({reason}): Diese Karte kann ohne sie starten.",
   "tasks.history.decision": "Entscheidung festgehalten: „{decision}“",
   "tasks.history.decisionChanged": "Entscheidung geändert in „{decision}“ (vorher „{was}“)",
   "tasks.history.decisionRemoved": "Entscheidung entfernt: „{decision}“",

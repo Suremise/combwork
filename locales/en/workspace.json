@@ -515,6 +515,70 @@
     "defaultMessage": "{kind, select, quit {Your quit command couldn't be started} other {Your close command couldn't be started}}",
     "description": "The heading of the close command panel when Windows couldn't start the user's command (the system's reason follows). kind quit: the command run as Hive quits; other: as a workspace closes."
   },
+  "workspace.commands.dontWaitNote": {
+    "defaultMessage": "{point, select, open {If you don't wait, Hive goes on and the rest run by themselves, in order. Agents start now.} other {If you don't wait, Hive goes on and the rest run by themselves, in order.}}",
+    "description": "Under the commands dialog's Don't wait button (HI-1954): the commands not finished keep running in the background, one after another. point open: the workspace is opening, and its agents, held back meanwhile, can start now."
+  },
+  "workspace.commands.exitCode": {
+    "defaultMessage": "exit code {code}",
+    "description": "In the commands dialog's list (HI-1954): a command that failed, its exit code (a number, kept as it is)."
+  },
+  "workspace.commands.failedExit": {
+    "defaultMessage": "\"{name}\" failed (exit code {code})",
+    "description": "The heading of the commands dialog when one of the user's commands ended with an error (HI-1954). {name} is the command's name, {code} its exit code (a number, kept as it is)."
+  },
+  "workspace.commands.folder": {
+    "defaultMessage": "\"{name}\" didn't run: its folder isn't there",
+    "description": "The heading of the commands dialog when one of the user's commands didn't run because its working folder doesn't exist (HI-1954); the folder follows. {name} is the command's name."
+  },
+  "workspace.commands.neededWarn": {
+    "defaultMessage": "The commands after it need it: skipping it may make them fail.",
+    "description": "In the commands dialog when a failed command has \"The commands after this need it\" ticked (HI-1954): a warning beside Skip it and continue."
+  },
+  "workspace.commands.notRun": {
+    "defaultMessage": "didn't run",
+    "description": "In the commands dialog's list (HI-1954): a command that failed before it started (a placeholder, its folder, or Windows couldn't start it)."
+  },
+  "workspace.commands.placeholder": {
+    "defaultMessage": "\"{name}\" didn't run: {placeholders} can't be filled",
+    "description": "The heading of the commands dialog when one of the user's commands didn't run because placeholders in it have no value now (HI-1954): {placeholders} lists them as written, such as {project:api} or {workspace}. {name} is the command's name."
+  },
+  "workspace.commands.ranFor": {
+    "defaultMessage": "{time}",
+    "description": "In the commands dialog's list (HI-1954): how long a command took or has run so far. {time} is a short duration (\"12 s\", \"2 min\"); usually kept as it is."
+  },
+  "workspace.commands.rerun": {
+    "defaultMessage": "Rerun",
+    "description": "A button of the commands dialog when one of the user's commands failed (HI-1954): runs that command again."
+  },
+  "workspace.commands.running": {
+    "defaultMessage": "{point, select, open {Running your commands for when {workspace} opens…} close {Running your commands for when {workspace} closes…} quit {Running your commands for when Hive quits…} other {Running your command…}}",
+    "description": "The heading of the dialog Hive shows while it runs the user's own commands (HI-1954): as a workspace opens or closes ({workspace}: its folder name), as Hive quits, or one the user ran by hand (other)."
+  },
+  "workspace.commands.skipContinue": {
+    "defaultMessage": "Skip it and continue",
+    "description": "A button of the commands dialog when one of the user's commands failed (HI-1954): leaves it failed and runs the rest of the list."
+  },
+  "workspace.commands.skipped": {
+    "defaultMessage": "skipped",
+    "description": "In the commands dialog's list (HI-1954): a command skipped (Stop here, or after a failure)."
+  },
+  "workspace.commands.spawn": {
+    "defaultMessage": "\"{name}\" couldn't be started",
+    "description": "The heading of the commands dialog when Windows couldn't start one of the user's commands (HI-1954); the system's reason follows. {name} is the command's name."
+  },
+  "workspace.commands.steps": {
+    "defaultMessage": "The commands, in the order they run",
+    "description": "In the commands dialog (HI-1954): the accessible name of the list of the user's commands it runs."
+  },
+  "workspace.commands.stopHere": {
+    "defaultMessage": "Stop here",
+    "description": "A button of the commands dialog when one of the user's commands failed (HI-1954): runs none of the rest of the list; Hive goes on (a workspace opening still starts its agents)."
+  },
+  "workspace.commands.waiting": {
+    "defaultMessage": "waiting",
+    "description": "In the commands dialog's list (HI-1954): a command not run yet."
+  },
   "workspace.docs.about": {
     "defaultMessage": "About {app}",
     "description": "The Documentation view: opens About ({app}: Hive's name)."

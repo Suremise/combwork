@@ -159,6 +159,7 @@
   "session.start.couldNot": "Impossible de démarrer l’agent {agent}",
   "session.start.fenced": "{why} : ses agents ne peuvent donc pas démarrer maintenant.",
   "session.start.moveFailed": "Hive n’a pas pu déplacer les paramètres de modèle de {project} vers ses agents : {error}. Démarre-le à nouveau.",
+  "session.start.openCommands": "Les commandes d’ouverture de cet espace de travail sont encore en cours : les agents démarrent quand elles ont fini ou quand tu passes outre.",
   "session.start.openIn": "Cette conversation est déjà ouverte dans {agent}. Un agent ne peut reprendre qu’une session qu’aucun autre agent n’exécute.",
   "session.start.otherFolder": "Cette session a tourné dans {folder}. Reprends-la avec l’agent qui travaille dans ce dossier.",
   "session.start.projectRunning": "Une session tourne déjà pour ce projet. Arrête-la d’abord.",

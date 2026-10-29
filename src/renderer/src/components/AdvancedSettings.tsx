@@ -3,7 +3,7 @@ import { ADVANCED_DEFS, advancedRow, type AdvancedGroup, advancedShown, advanced
 import { msg, tr, tRich } from '@shared/i18n'
 import { INBOX_SWITCH_ID } from '@shared/inboxSwitches'
 import type { ProviderId } from '@shared/types'
-import { PROVIDERS, isProviderEnabled } from '@shared/providers'
+import { PROVIDERS, inProviderOrder, isProviderEnabled } from '@shared/providers'
 import { call, errorMessage } from '../api'
 import { chooseTab, notify, set, useRememberedTab, useStore } from '../store'
 import { NumberField } from './NumberField'
@@ -33,7 +33,7 @@ const T = {
 const TABS_KEY = 'settings.advanced'
 
 /**
- * Its tabs (HI-1839): Hive, then each CLI with advanced values, in the providers' order, as the descriptors name them;
+ * Its tabs (HI-1839): Hive, then each CLI with advanced values, in Hive's order here (shown in the user's, HI-1965), as the descriptors name them;
  * a group of a CLI Hive no longer offers keeps a tab after them.
  */
 const GROUPS: AdvancedGroup[] = (() => {
@@ -57,6 +57,8 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   // Its English matches as well as what it shows, as Settings' own rows do.
   const shown = rows.filter((r) => (!modifiedOnly || r.override !== undefined || r.workspaceValue !== undefined) && matches(`${r.def.id} ${r.def.setting ?? ''} ${groupName(r.def.group)} ${r.def.title} ${r.def.desc} ${shownText(r.def.text.title)} ${shownText(r.def.text.desc)}`))
   const settings = useStore((s) => s.settings)
+  // The CLIs' tabs in the user's order (HI-1965: Settings → Providers), Hive's first.
+  const groups = inProviderOrder(GROUPS, (g) => (isCli(g) ? g : null), settings)
   const idBase = useId()
   // Filtering (Settings' search, this list's filter, either Modified only): each tab counts its matches; the tab shown is
   // the remembered one while it has some, else the first that has; a tab clicked meanwhile narrows to it, unremembered,
@@ -72,7 +74,7 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   const count = (g: AdvancedGroup): number => shown.filter((r) => r.def.group === g).length
   // A value's own id searched for opens its group's tab, whatever is remembered.
   const exact = ADVANCED_DEFS.find((d) => words.length === 1 && d.id.toLowerCase() === words[0])?.group
-  const tab: AdvancedGroup = !filtering ? remembered : (filterTab ?? exact ?? (count(remembered) ? remembered : (GROUPS.find((g) => count(g) > 0) ?? remembered)))
+  const tab: AdvancedGroup = !filtering ? remembered : (filterTab ?? exact ?? (count(remembered) ? remembered : (groups.find((g) => count(g) > 0) ?? remembered)))
   const choose = (g: AdvancedGroup): void => (filtering ? setClicked({ key: filterKey, tab: g }) : chooseTab(TABS_KEY, g))
   if (!state) return null
   return (
@@ -102,10 +104,10 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
         label={tr(T.tabs)}
         value={tab}
         onChange={choose}
-        items={GROUPS.map((g) => ({ id: g, label: groupName(g), icon: isCli(g) ? <ProviderIcon provider={g} /> : <HiveMark className="tab-hex" />, ...(filtering ? { count: count(g) } : {}), ...(isCli(g) && !isProviderEnabled(settings, g) ? { muted: tr(T.cliOff, { cli: groupName(g) }), tag: tr(T.off) } : {}) }))}
+        items={groups.map((g) => ({ id: g, label: groupName(g), icon: isCli(g) ? <ProviderIcon provider={g} /> : <HiveMark className="tab-hex" />, ...(filtering ? { count: count(g) } : {}), ...(isCli(g) && !isProviderEnabled(settings, g) ? { muted: tr(T.cliOff, { cli: groupName(g) }), tag: tr(T.off) } : {}) }))}
       />
       {/* Every group's rows stay mounted, the tab shown alone visible: a value being typed is never lost to a switch. */}
-      {GROUPS.map((g) => {
+      {groups.map((g) => {
         const list = shown.filter((r) => r.def.group === g)
         return (
           <TabPanel key={g} idBase={idBase} id={g} selected={g === tab} className="advanced-group" data-group={g}>

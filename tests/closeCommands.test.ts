@@ -20,14 +20,18 @@ vi.mock('../src/main/closeCommand/runs', async (orig) => {
     ...real,
     runsCloseCommands: () => state.runs,
     pruneRuns: async () => undefined,
-    startRun: (_root: string, _folder: string, command: string) => {
-      state.started.push(command)
+    // A list's commands as they'd run, their placeholders filled in (HI-1954), or HI-1368's one command.
+    startRun: (_root: string, _folder: string, job: string | { steps: { command: string }[]; values: import('../src/shared/commands').CommandValues }) => {
+      state.started.push(typeof job === 'string' ? job : job.steps.map((s) => fillCommand(s.command, job.values).text).join(' && '))
       throw new Error('no runner in a unit test')
     }
   }
 })
 
 const { closeCommandState, closeWithCommand, dontWait, quitRunsAny, runQuitCommand } = await import('../src/main/closeCommand/closeCommands')
+const { fillCommand } = await import('../src/shared/commands')
+/** Hive's commands with When Hive quits running `command` (none: nothing), as Settings saves them (HI-1954). */
+const hive = (command: string, onUpdate = false) => ({ list: command ? [{ id: 'c-0000000f', name: 'Quit', command }] : [], onQuit: { run: command ? [{ scope: 'hive' as const, id: 'c-0000000f' }] : [], ...(onUpdate ? { onUpdate } : {}) } })
 const { EventEmitter } = await import('events')
 
 let windows = 0
@@ -48,7 +52,9 @@ function fakeWs(path: string | null, command = '', held?: Promise<void>) {
   const ws = {
     path,
     openPlace: path ? path.toLowerCase() : null,
-    config: { onClose: { command, onUpdate: false } },
+    // Its close point running `command` (HI-1954: a list of one), as Settings saves it.
+    config: { commands: { list: command ? [{ id: 'c-00000001', name: 'Backup', command }] : [], onOpen: { run: [] }, onClose: { run: command ? [{ scope: 'workspace' as const, id: 'c-00000001' }] : [] } } },
+    info: () => ({ projects: [] }),
     closes: 0,
     close: vi.fn(async () => {
       ws.closes++
@@ -166,7 +172,7 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3; t
       let outcome: string | null = null
       const r = closeWithCommand(ws as never, 'quit', win as never, { drain: true }).then((x) => (outcome = x))
       const saving = await panelIn(win, 'saving')
-      expect(saving).toMatchObject({ state: 'saving', workspace: 'Work', command })
+      expect(saving).toMatchObject({ state: 'saving', workspace: 'Work', ...(command ? { steps: [{ name: 'Backup', state: 'waiting' }] } : {}) })
       dontWait(win as never, saving!.id)
       expect(closeCommandState(win as never)).toMatchObject({ state: 'saving', skipped: true })
       await flush()
@@ -191,12 +197,15 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3; t
     // The step is up from the start: its close first, then its drain.
     for (let i = 0; i < 20 && !state.drains.length; i++) await Promise.resolve()
     state.drains[0].resolve({ drained: true })
-    // The runner's start fails (stood in): the same panel says so, until it is closed.
+    // The runner's start fails (stood in): the same panel says so, as its first step's failure, its choices offered (HI-1954).
     const failed = await panelIn(win, 'failed')
-    expect([failed?.id, failed?.failure]).toEqual([saving?.id, 'spawn'])
+    expect([failed?.id, failed?.steps?.[0]?.failure, failed?.awaiting]).toEqual([saving?.id, 'spawn', { step: 0, attempt: 0, needed: false }])
     expect(state.started).toEqual(['backup'])
-    const { dismiss } = await import('../src/main/closeCommand/closeCommands')
-    dismiss(win as never, failed!.id)
+    const { controlRun } = await import('../src/main/closeCommand/closeCommands')
+    // A choice for another attempt does nothing; Stop here ends it.
+    controlRun(win as never, failed!.id, 'stop', 0, 1)
+    expect(closeCommandState(win as never)?.state).toBe('failed')
+    controlRun(win as never, failed!.id, 'stop', 0, 0)
     await expect(r).resolves.toBe('failed')
   })
 
@@ -236,21 +245,21 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3; t
 
 describe('When Hive quits, run', () => {
   it("doesn't run after a workspace that wasn't finished being written, nor with none set", async () => {
-    await expect(runQuitCommand({ command: 'backup all', onUpdate: false }, 'quit', null, 'failed')).resolves.toBe('notDrained')
-    await expect(runQuitCommand({ command: 'backup all', onUpdate: false }, 'quit', null, 'left')).resolves.toBe('leftSaving')
-    await expect(runQuitCommand({ command: '', onUpdate: false }, 'quit', null, null)).resolves.toBe('skipped')
+    await expect(runQuitCommand(hive('backup all'), 'quit', null, 'failed')).resolves.toBe('notDrained')
+    await expect(runQuitCommand(hive('backup all'), 'quit', null, 'left')).resolves.toBe('leftSaving')
+    await expect(runQuitCommand(hive(''), 'quit', null, null)).resolves.toBe('skipped')
     expect(state.started).toHaveLength(0)
-    await expect(runQuitCommand({ command: 'backup all {reason}', onUpdate: false }, 'quit', null, null)).resolves.toBe('failed')
+    await expect(runQuitCommand(hive('backup all {reason}'), 'quit', null, null)).resolves.toBe('failed')
     expect(state.started).toEqual(['backup all quit'])
   })
 
   it('a quit has something to run only with a command set somewhere, and never in a test copy', () => {
     const plain = fakeWs('D:\\ws\\A')
     const withOne = fakeWs('D:\\ws\\B', 'backup')
-    expect(quitRunsAny([plain] as never, { command: '', onUpdate: false })).toBe(false)
-    expect(quitRunsAny([plain, withOne] as never, { command: '', onUpdate: false })).toBe(true)
-    expect(quitRunsAny([plain] as never, { command: 'x', onUpdate: false })).toBe(true)
+    expect(quitRunsAny([plain] as never, hive(''))).toBe(false)
+    expect(quitRunsAny([plain, withOne] as never, hive(''))).toBe(true)
+    expect(quitRunsAny([plain] as never, hive('x'))).toBe(true)
     state.runs = false
-    expect(quitRunsAny([withOne] as never, { command: 'x', onUpdate: false })).toBe(false)
+    expect(quitRunsAny([withOne] as never, hive('x'))).toBe(false)
   })
 })

@@ -452,6 +452,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.restart.resumeReadySeconds.title': undefined
   'settings.advanced.hive.retry.tellAssistantAfterSeconds.desc': undefined
   'settings.advanced.hive.retry.tellAssistantAfterSeconds.title': undefined
+  'settings.advanced.hive.sessions.terminalType.desc': undefined
+  'settings.advanced.hive.sessions.terminalType.title': undefined
   'settings.advanced.hive.showDeveloperFeatures.desc': undefined
   'settings.advanced.hive.showDeveloperFeatures.title': undefined
   'settings.advanced.hive.skills.removeIdleCopies.desc': undefined
@@ -701,12 +703,35 @@ interface HiveMessageValues {
   'settings.chime.soft': undefined
   'settings.closeCommand.command': undefined
   'settings.closeCommand.hint': undefined
-  'settings.closeCommand.noWorkspace': undefined
   'settings.closeCommand.onUpdate': undefined
   'settings.closeCommand.runs': { command: string | number }
   'settings.closeCommand.saveFailed': undefined
   'settings.columnColors.pick': { column: string | number }
   'settings.columnColors.reset': { column: string | number }
+  'settings.commands.add': undefined
+  'settings.commands.cancel': undefined
+  'settings.commands.cantFill': { placeholders: string | number }
+  'settings.commands.delete': undefined
+  'settings.commands.down': undefined
+  'settings.commands.edit': undefined
+  'settings.commands.empty': undefined
+  'settings.commands.folder': undefined
+  'settings.commands.gone': undefined
+  'settings.commands.hiveBadge': undefined
+  'settings.commands.name': undefined
+  'settings.commands.needed': undefined
+  'settings.commands.neededBadge': undefined
+  'settings.commands.noWorkspace': undefined
+  'settings.commands.placeholders': undefined
+  'settings.commands.pointAdd': undefined
+  'settings.commands.pointEmpty': undefined
+  'settings.commands.pointRemove': undefined
+  'settings.commands.run': undefined
+  'settings.commands.runFailed': undefined
+  'settings.commands.save': undefined
+  'settings.commands.titleEdit': undefined
+  'settings.commands.titleNew': undefined
+  'settings.commands.up': undefined
   'settings.connections.add.addServer': undefined
   'settings.connections.add.addSignIn': undefined
   'settings.connections.add.adding': undefined
@@ -807,6 +832,9 @@ interface HiveMessageValues {
   'settings.general.closeToTray.desc': undefined
   'settings.general.closeToTray.tip': undefined
   'settings.general.closeToTray.title': undefined
+  'settings.general.commands.desc': undefined
+  'settings.general.commands.tip': undefined
+  'settings.general.commands.title': undefined
   'settings.general.confirmOnQuit.desc': undefined
   'settings.general.confirmOnQuit.option.always': undefined
   'settings.general.confirmOnQuit.option.never': undefined
@@ -1152,6 +1180,9 @@ interface HiveMessageValues {
   'settings.provider.modelFallback.desc': { provider: string | number }
   'settings.provider.modelFallback.tip': undefined
   'settings.provider.modelFallback.title': undefined
+  'settings.provider.more': { provider: string | number }
+  'settings.provider.moveDown': undefined
+  'settings.provider.moveUp': undefined
   'settings.provider.notInstalled': undefined
   'settings.provider.notInstalledShort': undefined
   'settings.provider.off': { provider: string | number }
@@ -1159,6 +1190,8 @@ interface HiveMessageValues {
   'settings.provider.prices.descReported': { provider: string | number }
   'settings.provider.prices.tip': { checked: string | number; provider: string | number }
   'settings.provider.prices.title': undefined
+  'settings.provider.reorderFailed': undefined
+  'settings.provider.rowLabel': { provider: string | number; position: number; count: number }
   'settings.provider.settings': undefined
   'settings.provider.status.tip': { provider: string | number }
   'settings.provider.status.title': undefined
@@ -1175,6 +1208,7 @@ interface HiveMessageValues {
   'settings.providerOff.stop': undefined
   'settings.providerOff.stopFailed': { provider: string | number }
   'settings.providerOff.title': { provider: string | number }
+  'settings.providers.automaticOrder': { order: string | number }
   'settings.providers.defaultProvider.desc': undefined
   'settings.providers.defaultProvider.tip': undefined
   'settings.providers.defaultProvider.title': undefined
@@ -1336,12 +1370,18 @@ interface HiveMessageValues {
   'settings.workspace.antivirus.desc': undefined
   'settings.workspace.antivirus.tip': undefined
   'settings.workspace.antivirus.title': undefined
+  'settings.workspace.commands.desc': undefined
+  'settings.workspace.commands.tip': undefined
+  'settings.workspace.commands.title': undefined
   'settings.workspace.hiddenProjects.desc': undefined
   'settings.workspace.hiddenProjects.tip': undefined
   'settings.workspace.hiddenProjects.title': undefined
   'settings.workspace.onClose.desc': undefined
   'settings.workspace.onClose.tip': undefined
   'settings.workspace.onClose.title': undefined
+  'settings.workspace.onOpen.desc': undefined
+  'settings.workspace.onOpen.tip': undefined
+  'settings.workspace.onOpen.title': undefined
   'settings.workspace.storage.desc': undefined
   'settings.workspace.storage.tip': undefined
   'settings.workspace.storage.title': undefined

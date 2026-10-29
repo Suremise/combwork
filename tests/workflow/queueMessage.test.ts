@@ -43,8 +43,8 @@ describe("the merge's commit message (G19)", () => {
     expect(updateMessage('hive', 'main', 'RE-229', 'abc')).toBe('Merge main into RE-229\n\nHive-Card: RE-229\nHive-Revision: abc')
   })
 
-  it("isn't a rule, is Hive's in every preset, and shows only when Hive merges with a merge commit or squash", () => {
-    for (const p of ['solo', 'pairAgent', 'pair', 'team'] as const) expect(preset('git', p).commitMessage, p).toBe('hive')
+  it("isn't a rule, is the branch's own in every preset (HI-1997), and shows only when Hive merges with a merge commit or squash", () => {
+    for (const p of ['solo', 'pairAgent', 'pair', 'team'] as const) expect(preset('git', p).commitMessage, p).toBe('branch')
     expect('commitMessage' in ruleOptions({ ...preset('git', 'pair'), commitMessage: 'branch' })).toBe(false)
     expect(formShows('commitMessage', preset('git', 'pair'))).toBe(true)
     expect(formShows('commitMessage', { ...preset('git', 'pair'), style: 'squash' })).toBe(true)
@@ -98,15 +98,23 @@ describe('the merge queue writes the message the project chose (G19)', () => {
     expect(parents(e)).toBe(2)
   })
 
-  it("Hive's (the default): the card's key and title with its trailers, as before", async () => {
+  it("a new project (G19 as every preset sets it, HI-1997): the branch's own message, no key, no trailer", async () => {
     const e = merging({ style: 'squash' })
+    const c = await approved(e, 'Names someone private', [['Its own message', 'n.txt']])
+    expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    expect(body(e)).toBe('Its own message')
+    expect(body(e)).not.toMatch(new RegExp(`${c.key}|Hive-|private`))
+  })
+
+  it("Hive's, chosen: the card's key and title with its trailers, as before", async () => {
+    const e = merging({ style: 'squash', commitMessage: 'hive' })
     const c = await approved(e, 'Keyed', [['Its own message', 'k.txt']])
     expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
     expect(body(e)).toMatch(new RegExp(`^${c.key}: Keyed\\n\\nHive-Card: ${c.key}\\nHive-Revision: `))
   })
 
   it('read as the options are when the queue merges: changed after the card was approved, it applies', async () => {
-    const e = merging({ style: 'squash' })
+    const e = merging({ style: 'squash', commitMessage: 'hive' })
     await approved(e, 'Late change', [['Its message', 'l.txt']])
     e.options.commitMessage = 'branch'
     expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])

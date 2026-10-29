@@ -28,6 +28,7 @@ import { isUnknown, type Maybe } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
 import { resolvedOf } from './rulesets'
 import { FactStore, type Tx } from './factStore'
+import { recordFinish } from './finish'
 
 const log = createLogger('workflow')
 
@@ -359,8 +360,11 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     if (verdictFailed) roundLimit(tx, n, `${after.project}-${n}`, ruleset())
     let moved: number | null = null
     if (was !== to && moves) {
-      moved = tx.append(n, { kind: 'Moved', actor, source: 'recorded', ...ruleset(), data: { from: was, to, cause: causeOf(ctx?.actor) } }).seq // i18n-ignore: a fact's kind and codes, not text
+      const m = tx.append(n, { kind: 'Moved', actor, source: 'recorded', ...ruleset(), data: { from: was, to, cause: causeOf(ctx?.actor) } }) // i18n-ignore: a fact's kind and codes, not text
+      moved = m.seq
       tx.setStage(n, to)
+      // A board move into Done is a finish like any other (HI-2014): what follows hangs off it.
+      if (to === 'done') recordFinish(tx, n, actor, ruleset().ruleset ?? null, [m], { board: true })
     }
     // The runtime's own move: its loop wake is written here, with the board's other handoffs (a submission's reviewer
     // wake is the runtime's own).

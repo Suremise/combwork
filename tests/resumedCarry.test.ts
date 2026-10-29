@@ -82,6 +82,9 @@ async function setup(name: string) {
     before?.(r.folder, line)
     expect(await pool.release(r.lease, 'putBack')).toBe(true)
     await pool.drained(r.slot)
+    // Put back, a clean slot is detached at its target (HI-2014; its line kept, with X's work): B1, resumed there, takes
+    // its line again. A test's own `before` (detached, its line gone) sets where it is itself.
+    if (!before) sh(r.folder, 'switch', '-q', line)
     const carried = await pool.carry('b1', { name: r.slot, folder: r.folder })
     if (!carried) throw new Error('Resume could not take the slot')
     const RUN = 'run-b1'

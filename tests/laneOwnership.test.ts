@@ -58,6 +58,12 @@ describe('why a lane waits (laneStatus)', () => {
     expect(laneStatus(rec, [lc(1, 'done'), lc(2, 'gone')], null, false, new Map())).toBeNull()
   })
 
+  it("a Done card's slot kept on its line by uncommitted changes holds the next card: the user is asked (HI-2014)", () => {
+    expect(laneStatus(rec, [lc(1, 'done'), lc(2, 'todo')], null, false, new Map([[1, ff({ stage: 'done', slotDirty: true })]]))).toEqual({ reason: 'you', card: 1, ask: 'decide' })
+    // Once clean (the question closed), the lane goes on.
+    expect(laneStatus(rec, [lc(1, 'done'), lc(2, 'todo')], null, false, new Map([[1, ff({ stage: 'done' })]]))).toBeNull()
+  })
+
   it('with rules off (no facts) says only a blocked or held card, as before 1.0', () => {
     expect(laneStatus(rec, [lc(1, 'passed'), lc(2, 'todo')], null, false, null)).toBeNull()
     expect(laneStatus(rec, [lc(1, 'review'), lc(2, 'todo')], 1, false, null)).toBeNull()

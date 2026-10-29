@@ -1,5 +1,6 @@
 import type { AgentBranchStatus, AgentDef, AppConfig, AppSettings, CompactionEvent, KeybindingOverrides, FileLockMode, PageLayout, PlanLimit, PlanUsage, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, SessionLayout, SessionRecord, SessionStatus, SessionView, WorkspaceConfig } from './types'
 import { CLAUDE_CODE } from './claude'
+import { MIGRATED_QUIT, migrateHiveCommands } from './commands'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from './agentLimits'
 import { DEFAULT_COLUMN_COLORS } from './tasks'
 import { formatDateTime } from './dates'
@@ -32,6 +33,7 @@ export const RETIRED_PERSONAS: Record<string, string> = { overseer: 'coordinator
 
 export const DEFAULT_SETTINGS: AppSettings = {
   keybindings: {},
+  commands: { list: [], onQuit: { run: [] } },
   updates: {
     checkAutomatically: true,
     downloadAutomatically: true,
@@ -52,8 +54,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     dateFormat: 'ymd',
     timeFormat: '24h',
     userName: 'User', // i18n-ignore: a stored default name, which agents' wake lines quote
-    language: 'auto',
-    onQuit: { command: '', onUpdate: false }
+    language: 'auto'
   },
   appearance: {
     theme: 'dark',
@@ -64,8 +65,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
     terminalCursorBlink: true
   },
   providers: Object.fromEntries(PROVIDERS.map((p) => [p.id, defaultProviderSettings(p)])),
-  // Automatic (#474): the first provider turned on and installed.
+  // Automatic (#474): the first provider turned on and installed, in the order below.
   defaultProvider: AUTO_PROVIDER,
+  // Hive's own order until the user reorders Settings → Providers (HI-1965).
+  providerOrder: [],
+  providerOrderRevision: 0,
   notifications: {
     chimeEnabled: true,
     chimeSound: 'chime',
@@ -563,6 +567,9 @@ const V1_LIMITS: Record<string, Pick<PlanLimit, 'id' | 'label' | 'windowMinutes'
 const OLD_ASSISTANT_DEFAULTS: Record<string, { model?: string; effort: string }> = { 'claude-code': { model: 'sonnet', effort: 'low' }, codex: { effort: 'low' } }
 
 export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppConfig {
+  // HI-1954: Hive's commands cleaned, and HI-1368's When Hive quits, run adopted as one of them (once; written next save).
+  cfg.settings.commands = migrateHiveCommands({ commands: raw?.settings?.commands, onQuit: raw?.settings?.general?.onQuit }, trNow(MIGRATED_QUIT))
+  delete cfg.settings.general.onQuit
   const g = cfg.settings.general
   const q = g.confirmOnQuit as unknown
   // 0.1 stored on/off; "on" asked whenever sessions ran, which maps to asking when an agent is working.
@@ -637,6 +644,12 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
   cfg.version = 8
   // Settings for providers this version doesn't know are kept (a newer Hive wrote them), but never used.
   if (!isDefaultProviderValue(cfg.settings.defaultProvider)) cfg.settings.defaultProvider = AUTO_PROVIDER
+  // The provider order (HI-1965): a list of ids, each once; ids this Hive doesn't know are kept (a newer Hive's).
+  const order: unknown = cfg.settings.providerOrder
+  cfg.settings.providerOrder = Array.isArray(order) ? [...new Set(order.filter((x): x is ProviderId => typeof x === 'string' && x.length > 0 && x.length <= 64))] : []
+  // Its revision, a whole number from 0 (main raises it, config.ts); anything else starts it again at 0.
+  const rev: unknown = cfg.settings.providerOrderRevision
+  cfg.settings.providerOrderRevision = typeof rev === 'number' && Number.isSafeInteger(rev) && rev >= 0 ? rev : 0
   return cfg
 }
 

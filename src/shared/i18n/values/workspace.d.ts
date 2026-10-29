@@ -130,6 +130,22 @@ interface HiveMessageValues {
   'workspace.closeCommand.skip': undefined
   'workspace.closeCommand.skipped': undefined
   'workspace.closeCommand.spawn': { kind: string }
+  'workspace.commands.dontWaitNote': { point: string }
+  'workspace.commands.exitCode': { code: string | number }
+  'workspace.commands.failedExit': { name: string | number; code: string | number }
+  'workspace.commands.folder': { name: string | number }
+  'workspace.commands.neededWarn': undefined
+  'workspace.commands.notRun': undefined
+  'workspace.commands.placeholder': { name: string | number; placeholders: string | number }
+  'workspace.commands.ranFor': { time: string | number }
+  'workspace.commands.rerun': undefined
+  'workspace.commands.running': { point: string; workspace: string | number }
+  'workspace.commands.skipContinue': undefined
+  'workspace.commands.skipped': undefined
+  'workspace.commands.spawn': { name: string | number }
+  'workspace.commands.steps': undefined
+  'workspace.commands.stopHere': undefined
+  'workspace.commands.waiting': undefined
   'workspace.docs.about': { app: string | number }
   'workspace.docs.api': undefined
   'workspace.docs.changelog': undefined

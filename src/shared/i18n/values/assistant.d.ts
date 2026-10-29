@@ -707,6 +707,7 @@ interface HiveMessageValues {
   'assistant.undo.why.declarePaths': undefined
   'assistant.undo.why.handOver': undefined
   'assistant.undo.why.laneEnded': undefined
+  'assistant.undo.why.laneReorderNow': undefined
   'assistant.undo.why.message': undefined
   'assistant.undo.why.nothing': undefined
   'assistant.undo.why.projectClosed': undefined

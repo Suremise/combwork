@@ -1,0 +1,43 @@
+{
+  "card": "HI-2004",
+  "recorded": "2026-10-29",
+  "how": "Each CLI started in a 120x40 pty (@lydell/node-pty, @xterm/headless) with Hive's session environment (TERM_PROGRAM=Hive, COLORTERM=truecolor, an allowlisted base, no WT_SESSION), once without TERM and once with TERM=xterm-256color; nothing sent. Claude Code in the signed-in test home, Codex in its test home (trust given per launch), Copilot offline in a new COPILOT_HOME (COPILOT_MODEL=gpt-4.1). Screens compared row by row; colours are the SGR codes it drew, counted.",
+  "claude-code 2.1.312": {
+    "screen": "one row differs: the trust question's pointer, '>' without TERM, '❯' with it (trust-noterm-/trust-term-claude-2.1.312.txt); its input box's mark likewise (input-ascii-claude-2.1.312.txt, input-claude-2.1.312.txt, HI-1979)",
+    "colours": {
+      "without": {
+        "truecolor": 4
+      },
+      "with": {
+        "truecolor": 4
+      }
+    },
+    "worse": "nothing seen"
+  },
+  "codex 0.164.0": {
+    "screen": "identical without and with TERM",
+    "colours": {
+      "without": {
+        "truecolor": 8
+      },
+      "with": {
+        "truecolor": 8
+      }
+    },
+    "worse": "nothing seen"
+  },
+  "copilot 1.0.105": {
+    "screen": "identical without and with TERM (its prompt already draws ❯ either way)",
+    "colours": {
+      "without": {
+        "truecolor": 1565,
+        "basic": 40
+      },
+      "with": {
+        "truecolor": 1565,
+        "basic": 40
+      }
+    },
+    "worse": "nothing seen"
+  }
+}

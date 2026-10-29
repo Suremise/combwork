@@ -10,9 +10,18 @@ import type { PresetAsked, ProjectWorkflow } from '../types'
 /** What a save sets: the platform in force, the preset the options started from, and the options the project sets. */
 export type WorkflowWrite = Pick<ProjectWorkflow, 'platform' | 'preset' | 'options'>
 
-/** `workflow` with its platform, preset and options set, and every other field of `current` kept. */
+/**
+ * `workflow` with its platform, preset and options set, and every other field of `current` kept. Git's commit message
+ * (G19, HI-1997) set to Hive's by this write, rather than left as it was, is marked chosen (`commitMessageChosen`); the
+ * mark stays while it is Hive's, and goes with it.
+ */
 export function writeWorkflow(current: ProjectWorkflow | null | undefined, next: WorkflowWrite): ProjectWorkflow {
-  return { ...current, platform: next.platform, preset: next.preset, options: next.options }
+  const { commitMessageChosen: was, ...rest } = current ?? {}
+  if (next.platform !== 'git') return { ...rest, ...(was ? { commitMessageChosen: was } : {}), platform: next.platform, preset: next.preset, options: next.options }
+  const before = current?.platform === 'git' ? current.options?.commitMessage : undefined
+  const hive = next.options.commitMessage === 'hive'
+  const chosen = hive && (was || before !== 'hive')
+  return { ...rest, ...(chosen ? { commitMessageChosen: true as const } : {}), platform: next.platform, preset: next.preset, options: next.options }
 }
 
 /** What a platform keeps while another is in force: its preset, options and answer (`kept`'s entries). */

@@ -3136,6 +3136,30 @@ p.hint {
 .close-command-note {
   margin: 8px 0 0;
 }
+/* A list of the user's commands (HI-1954): each step's state, the one running or failed with its command and output. */
+.close-command-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.close-command-step-line {
+  gap: 8px;
+  align-items: center;
+}
+.close-command-step[data-state='waiting'] .close-command-step-line,
+.close-command-step[data-state='skipped'] .close-command-step-line {
+  color: var(--fg-muted);
+}
+.close-command-step .close-command-text,
+.close-command-step .close-command-output {
+  margin-left: 24px;
+}
+.close-command-warn {
+  color: var(--warning);
+}
 /* Settings → When this workspace closes, run / When Hive quits, run (HI-1368). */
 .close-command-settings {
   display: flex;
@@ -7683,6 +7707,31 @@ button.agent-place:hover {
   opacity: 0.6;
 }
 .provider-row .small {
+  font-size: 12px;
+}
+/* Reordering the providers (HI-1965): by its grip (drag), its ⋯ menu, or Alt+Up and Alt+Down while it has the focus. */
+.provider-row[draggable='true'] {
+  cursor: grab;
+}
+.provider-row:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.provider-row.dragging {
+  opacity: 0.5;
+}
+.provider-row.drop-target {
+  border-color: var(--accent);
+}
+.provider-row .provider-grip {
+  margin-right: -4px;
+}
+.default-provider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.default-provider-order {
   font-size: 12px;
 }
 .provider-choice {

@@ -4,6 +4,7 @@
 //   wait:<file>     print a line every 100 ms until <file> exists, then check and write the marker
 //   chatty:<file>   print about 200 KB of output at a time until <file> exists, then check and write the marker
 //   fail            print two lines and exit 3 (no marker)
+//   flag:<file>     as fail until <file> exists, then as quick (the onopen suite's Rerun, HI-1954)
 // The check: hive.db copied, the copy opened with node:sqlite, its integrity_check and its cards' titles read, and
 // whether a -wal with anything in it was left beside the original (it shouldn't be, once Hive has closed the board).
 const fs = require('fs')
@@ -31,12 +32,12 @@ function check() {
   fs.writeFileSync(marker, JSON.stringify(out))
 }
 
-if (mode === 'fail') {
+if (mode === 'fail' || (mode.startsWith('flag:') && !fs.existsSync(mode.slice(5)))) {
   console.log('backing up…')
   console.error('the backup target is missing')
   process.exit(3)
 }
-if (mode === 'quick') {
+if (mode === 'quick' || mode.startsWith('flag:')) {
   check()
   process.exit(0)
 }

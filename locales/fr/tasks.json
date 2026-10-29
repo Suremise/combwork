@@ -104,6 +104,7 @@
   "tasks.history.context": "À lire d’abord : {refs}",
   "tasks.history.contextRemoved": "Sections de documents à lire d’abord retirées",
   "tasks.history.created": "Créée dans {column, select, hold {Suspendu} todo {À faire} doing {En cours} review {Relecture} passed {Validé} done {Terminé} other {{column}}}",
+  "tasks.history.startsWithout": "{card} a été déplacée vers Terminé sans que son travail soit dans la cible ({reason}) : cette carte peut démarrer sans lui.",
   "tasks.history.decision": "Décision notée : « {decision} »",
   "tasks.history.decisionChanged": "Décision changée en « {decision} » (avant : « {was} »)",
   "tasks.history.decisionRemoved": "Décision retirée : « {decision} »",

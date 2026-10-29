@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 98
+const FIXTURES_VERSION = 99
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -3408,6 +3408,29 @@ module.exports.SCENARIOS = [
       ["its answer names the lane's current card", new RegExp(`#?${c.cards.a}\\b`).test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)]
     ],
     fakeSkips: ["its answer names the lane's current card"]
+  },
+  {
+    id: 'assistant-lane-reorder-now',
+    title: "The Assistant asked to move a lane's card in flight to the end now (HI-1995): one hive_lane start with applyNow, never an abandon and a new lane",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'doing' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
+    },
+    prompt: (c) => `In alpha, Coder's lane is working on #${c.cards.a}, but the user wants #${c.cards.b} done first. Move #${c.cards.a} to the end of the lane now, not after it is finished.`,
+    fake: (c) => `skill run-lanes then hive hive_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.b, c.cards.a], applyNow: true })}`,
+    expect: (o, c) => {
+      const starts = called(o, 'hive_lane').map((x) => argsOf(x)).filter((x) => x.action === 'start')
+      return [
+        ['reordered the lane with hive_lane start and applyNow, the cards in the new order', starts.some((x) => x.applyNow === true && JSON.stringify((x.cards ?? []).map((n) => Number(String(n).replace(/\D/g, '')))) === JSON.stringify([c.cards.b, c.cards.a])), JSON.stringify(starts)],
+        ['abandoned or ended no lane', !called(o, 'hive_lane').some((x) => argsOf(x).action === 'end'), o.hiveCalls.map((x) => x.tool).join(',')],
+        [`#${c.cards.a} is back in Todo`, o.cards.a?.column === 'todo', o.cards.a?.column]
+      ]
+    },
+    observe: (o) => [['read the run-lanes or coordinate-agents skill', read(o, 'run-lanes') || read(o, 'coordinate-agents'), o.skillsRead.join(',')]]
   },
   {
     id: 'assistant-new-lane',

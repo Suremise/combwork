@@ -705,6 +705,7 @@
   "assistant.undo.why.declarePaths": "Os caminhos que ele declarou ficam com o cartão.",
   "assistant.undo.why.handOver": "Uma passagem de trabalho não pode ser desfeita: o trabalho foi para o outro agente.",
   "assistant.undo.why.laneEnded": "Uma raia encerrada continua encerrada: inicie-a de novo se ela deve continuar.",
+  "assistant.undo.why.laneReorderNow": "Um cartão devolvido por uma reordenação da raia aplicada na hora continua em A fazer: desfazer restaura só a ordem da raia.",
   "assistant.undo.why.message": "Uma mensagem enviada não pode ser retirada.",
   "assistant.undo.why.nothing": "Não alterou nada que desfazer restaure.",
   "assistant.undo.why.projectClosed": "Um projeto que ele fechou continua fechado: abra-o de novo se for desejado.",

@@ -1939,11 +1939,14 @@ route('POST', '/v1/lanes', async ({ body }) =>
     // refuses it (the rules have no pool, nobody but the builder reviews), and with a reviewer of its own.
     if (body?.pool !== undefined && typeof body.pool !== 'boolean') throw new HttpError(400, 'pool must be true or false')
     const pool = body?.pool === true
+    // A changed list applied now, its card in flight put back (HI-1995).
+    if (body?.applyNow !== undefined && typeof body.applyNow !== 'boolean') throw new HttpError(400, 'applyNow must be true or false')
+    const applyNow = body?.applyNow === true
     if (pool && a) throw new HttpError(403, "A lane reviewed by the pool is started by the Assistant or the user (Start Lane): an agent's own lane names its reviewer")
     if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, 'A lane reviewed by the pool has no reviewer of its own: leave reviewer out')
     if (pool) await checkLanePool(ws, p, builder)
     const start = async () => {
-      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy(), ...(pool ? { pool: true } : {}) })
+      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}) })
       // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
       const told = args.brief !== undefined ? await briefNote(ws, (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id) ?? { project: basename(p) }) : null
       if (args.brief !== undefined) await settleLaneBriefs(ws)
@@ -1968,7 +1971,9 @@ route('POST', '/v1/lanes', async ({ body }) =>
       const followed = !!w?.lanes && (w.lanes.includes('all') || w.lanes.includes(r.lane.id))
       const nudge = followed ? '' : 'No watch of yours follows this lane: watch the lanes (hive_wait_for_tasks with lanes ["all"], wake) to follow it to its end.'
       const result = nudge ? { ...r, note: [r.note, nudge].filter(Boolean).join(' ') } : r
-      return { done: `Lane ${r.lane.id} ${r.did} in ${basename(p)}: ${r.lane.builder.name} / ${r.lane.reviewer?.name ?? 'no reviewer'}, ${r.lane.cards.map((c) => cardRef(c.number)).join(', ')}`, act: laneAct(r.lane), result }
+      // A reorder applied now put a card back and gave the lane a card to start next (HI-1995): neither is undone.
+      const putBack = applyNow && (r.note ?? '').startsWith('Applied now: ')
+      return { done: `Lane ${r.lane.id} ${r.did} in ${basename(p)}: ${r.lane.builder.name} / ${r.lane.reviewer?.name ?? 'no reviewer'}, ${r.lane.cards.map((c) => cardRef(c.number)).join(', ')}${putBack ? ` (${r.note!.replace(/^Applied now: /, 'applied now: ')})` : ''}`, act: laneAct(r.lane), result, ...(putBack ? { stays: UNDO_FINAL.laneReorderNow } : {}) }
     })
   })
 )

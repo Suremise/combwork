@@ -714,6 +714,7 @@
   "assistant.undo.why.declarePaths": "The paths it declared stay with the card.",
   "assistant.undo.why.handOver": "A hand-over can't be undone: the work went to the other agent.",
   "assistant.undo.why.laneEnded": "A lane that ended stays ended: start it again if it should go on.",
+  "assistant.undo.why.laneReorderNow": "A card a lane reorder applied now put back stays in Todo: undo puts back only the lane's order.",
   "assistant.undo.why.message": "A message that was sent can't be taken back.",
   "assistant.undo.why.nothing": "It changed nothing undo puts back.",
   "assistant.undo.why.projectClosed": "A project it closed stays closed: open it again if it is wanted.",

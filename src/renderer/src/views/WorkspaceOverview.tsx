@@ -1,6 +1,6 @@
 import { Children, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { ProjectInfo, SessionListItem } from '@shared/types'
-import { PROVIDERS, isProviderEnabled } from '@shared/providers'
+import { isProviderEnabled, orderedProviders } from '@shared/providers'
 import { usesOwnPrices } from '@shared/prices'
 import { PERIODS, activeIn, costText, periodFrom, stackedDaily, sumUsage, totalTokens, type DayTotal, type UsageGroup } from '@shared/usageTotals'
 import { call, errorMessage } from '../api'
@@ -292,7 +292,7 @@ export function WorkspaceOverviewView() {
   const hosts: ProjectInfo[] = [...workspace.projects, ...(workspace.assistant ? [workspace.assistant] : [])]
   const running = hosts.flatMap((p) => p.agents.filter((a) => a.live && !a.live.settingUp).map((a) => ({ p, a })))
   const used = new Set([...inPeriod.map((i) => i.provider), ...running.map((r) => r.a.live!.provider)])
-  const providers = PROVIDERS.filter((p) => used.has(p.id) || isProviderEnabled(settings, p.id))
+  const providers = orderedProviders(settings).filter((p) => used.has(p.id) || isProviderEnabled(settings, p.id))
   const all$ = totalTokens(total)
 
   // By name first, so projects that used the same keep that order whichever column sorts them.

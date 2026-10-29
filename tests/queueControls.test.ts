@@ -109,6 +109,17 @@ async function drain(w: WS, repo: string, ok: boolean, logPath?: string) {
   return new MergeQueue(wf, { folder: join(repo, '..', 'queue'), runCheck: async () => ({ ok, output: ok ? '' : 'red: the check failed', ...(logPath ? { logPath } : {}) }) }).drain('main')
 }
 
+/**
+ * A drain whose merge check is red, which must return the queued card (HI-2019: under a full run's load one came out
+ * otherwise, and the test failed later, on what the return should have left). Failing, it says what the queue did
+ * instead: its outcomes and the pause it saved, with its reason and git's message.
+ */
+async function drainReturned(w: WS, repo: string): Promise<void> {
+  const drained = await drain(w, repo, false)
+  const wf = (await service.workflowFor(w, repo))!
+  expect({ drained, paused: wf.store.queuePause('main') }).toMatchObject({ drained: [{ outcome: 'returned', reason: 'checks' }], paused: null })
+}
+
 /** The error a change throws (its kind, or its refusal's rule), or null when it went through. */
 const refusedWith = async (p: Promise<unknown>): Promise<string | null> => {
   try {
@@ -208,7 +219,7 @@ describe("the Assistant's authority, checked again at each write (HR3's round 1 
     expect(host.kicked).toEqual([])
     // A returned card's Retry merge: not queued again.
     await wf.locked(() => wf.store.setQueuePause('main', null))
-    await drain(w, repo, false)
+    await drainReturned(w, repo)
     const requested = facts(w, card).filter((f) => f.kind === 'IntegrationRequested').length
     await pending((g) => queueCardChange(w, card, assistant, 'retryMerge', 'flaky', g))
     expect(facts(w, card).filter((f) => f.kind === 'IntegrationRequested')).toHaveLength(requested)
@@ -303,7 +314,7 @@ describe("the window's listing (#1356: which queues the panel can show)", () => 
   it('a return is marked seen once, for every reader; an entry that was not returned there is ignored; the Agent API never says it', async () => {
     const { w, wt, repo } = await workspace()
     const card = await approved(w, wt)
-    await drain(w, repo, false)
+    await drainReturned(w, repo)
     const [v0] = await inWorkspace(w, () => queueViews(w, repo, 'main', true))
     const entry = v0.recent[0].entry
     expect(v0.recent[0]).toMatchObject({ card, outcome: 'returned' })
@@ -335,7 +346,7 @@ describe("the returns policy (#1356, HR3's rounds 1 to 4): every unseen return r
   async function returned(count: number) {
     const { w, wt, repo } = await workspace()
     const card = await approved(w, wt)
-    await drain(w, repo, false)
+    await drainReturned(w, repo)
     const wf = (await service.workflowFor(w, repo))!
     const others: number[] = []
     for (let i = 0; i < count; i++) others.push(await addReturn(w, wf, `o${i}`))

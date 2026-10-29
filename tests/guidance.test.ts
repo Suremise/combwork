@@ -846,7 +846,8 @@ describe("the repository's AGENTS.md", () => {
   it("keeps this repository's own conventions", () => {
     for (const own of [
       /Design is settled before code/,
-      /Outside a card loop, \*\*commit only when the user asks\*\*/,
+      // K1 (HI-2009, HI-2013): outside card work, since a card's own tools commit it.
+      /Outside card work \(.*\), \*\*commit only when the user asks\*\*/,
       /\*\*Never run `prettier --write`\*\*/,
       /\*\*Line endings\*\*/,
       /\*\*Translations\*\*/,
@@ -956,7 +957,8 @@ describe("Hive's development skills", () => {
   // #1076: briefs capped load by hand after a load run took the machine to 95 °C (16 Oct). The repo's guidance says it.
   it('keep flake and load runs to modest, bounded load: a few spinner workers, never one per core', () => {
     const flake = readFileSync(join(ROOT, claude, 'investigate-flake', 'SKILL.md'), 'utf8')
-    expect(flake).toMatch(/Keep the load modest and bounded: at most a few CPU spinner workers \(two or three\) beside the normal run, never one per core\./)
-    expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/Load and flake runs add modest, bounded load: a few CPU spinner workers at most beside the run, never one per core/)
+    // K7 (HI-2009, HI-2013): one number, AGENTS.md's, which the skill points to.
+    expect(flake).toMatch(/Keep the load modest and bounded: AGENTS\.md's spinner cap \(\*\*The machine is shared\*\*\), never one per core\./)
+    expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/Added load is two or three CPU spinner workers at most beside a run, never one per core/)
   })
 })
