@@ -33,6 +33,14 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
+/** A check the rest of its part builds on (HI-2033): failed, the part stops there rather than carry a null on. */
+class Stopped extends Error {}
+const must = (name, ok, extra = '') => {
+  check(name, ok, extra)
+  if (!ok) throw new Stopped(name)
+}
+/** A part's exception, a check it stopped at already said. */
+const caught = (what, e) => (e instanceof Stopped ? console.log(`(${what} stopped at: ${e.message})`) : check(`${what}no exception`, false, e?.stack ?? String(e)))
 const until = (fn, ms) => lib.until(fn, ms, 250)
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
 const slash = (p) => p.replace(/\\/g, '/')
@@ -308,7 +316,8 @@ function helpers(h) {
       const f = await inv('workflow:form', alpha)
       return f?.preset === 'team' ? f.options : null
     }, HUNG_MS)
-    check('Team saved from the tab: Hive merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'hiveMerges' && opts.target === 'main' && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
+    // Its target main, or empty: the default branch, main, when git couldn't read it as the form was read (HI-2033).
+    must('Team saved from the tab: Hive merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'hiveMerges' && ['main', ''].includes(opts.target) && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
     await inv('project:updateConfig', alpha, { slots: { setup: `node "${path.join(fx.tools, 'setup.js')}"` } })
 
     // --- Two lanes from the window at once, each lent a slot, its builder started there in a new conversation.
@@ -342,9 +351,9 @@ function helpers(h) {
       return { ok, line, why: JSON.stringify({ s: s.body, branch: git(slot.folder, 'branch', '--show-current') }) }
     }
     const s1 = await startIn(b1, a1, slotA)
-    check(`${key}-B1's first card starts in slot-a on its own line from main's head`, s1.ok, s1.why)
+    must(`${key}-B1's first card starts in slot-a on its own line from main's head`, s1.ok, s1.why)
     const s3 = await startIn(b2, c1, slotB)
-    check(`${key}-B2's card starts in slot-b on its own line from main's head`, s3.ok && s3.line !== s1.line, s3.why)
+    must(`${key}-B2's card starts in slot-b on its own line from main's head`, s3.ok && s3.line !== s1.line, s3.why)
     Object.assign(kept, { line3: s3.line })
 
     // --- Lane 1's first card: counted checks in the slot, submitted.
@@ -356,15 +365,15 @@ function helpers(h) {
       return until(async () => ((await counted(n)).length >= 2 ? counted(n) : null), HUNG_MS)
     }
     const rev1 = commitIn(slotA.folder, { 'one.txt': 'one\n' }, 'Lane one: first')
-    check("the first card's two checks are counted, run in slot-a", !!(await checksIn(b1, a1)), JSON.stringify(await inv('tasks:work', a1)))
-    check('…submitted', (await x.intent(alpha, b1, a1, 'submit', { summary: 'first: ready' })).status === 200)
+    must("the first card's two checks are counted, run in slot-a", !!(await checksIn(b1, a1)), JSON.stringify(await inv('tasks:work', a1)))
+    must('…submitted', (await x.intent(alpha, b1, a1, 'submit', { summary: 'first: ready' })).status === 200)
 
     // --- Its reviewer, in the project folder, reviews in a review copy at the revision; its check there is of it.
     await inv('session:start', alpha, { agentId: r1.id }).catch(() => undefined)
     const rs = await until(() => x.live(alpha, r1.id), HUNG_MS)
     check(`${key}-R1 runs in the project folder`, same(rs?.cwd, alpha), JSON.stringify(rs))
     const { s: review, copy } = await x.startReview(alpha, r1, a1)
-    check(`…start review leases it a review copy at the revision (${rev1.slice(0, 7)})`, review.status === 200 && !!copy && fs.existsSync(copy) && git(copy, 'rev-parse', 'HEAD') === rev1, JSON.stringify(review.body))
+    must(`…start review leases it a review copy at the revision (${rev1.slice(0, 7)})`, review.status === 200 && !!copy && fs.existsSync(copy) && git(copy, 'rev-parse', 'HEAD') === rev1, JSON.stringify(review.body))
     check("…its session stays in the project folder", same((await x.live(alpha, r1.id))?.cwd, alpha))
     q.steer(fx, 'pass')
     const ran = await x.shell(alpha, r1, `cd /d "${copy}" && hive-progress --check typecheck`)
@@ -472,7 +481,7 @@ function helpers(h) {
     check(`${key}-B3's card starts in slot-a`, s4.ok, s4.why)
     Object.assign(kept, { d1, l3: l3?.id, ok: true })
   } catch (e) {
-    check('no exception', false, e?.stack ?? String(e))
+    caught('', e)
   } finally {
     await h.app.close().catch(() => undefined)
   }
@@ -507,23 +516,23 @@ function helpers(h) {
       check('…merged: Done, the lane ended', (await x.done(kept.c1)) && !!(await until(async () => !!(await x.lane(kept.l2))?.endedAt, HUNG_MS)))
     }
   } catch (e) {
-    check('restart: no exception', false, e?.stack ?? String(e))
+    caught('restart: ', e)
   }
   try {
     await pool(h)
   } catch (e) {
-    check('the pool: no exception', false, e?.stack ?? String(e))
+    caught('the pool: ', e)
   }
   try {
     await everyoneInTheFolder(h)
   } catch (e) {
-    check('everyone in the project folder: no exception', false, e?.stack ?? String(e))
+    caught('everyone in the project folder: ', e)
   }
   if (kept.ok)
     try {
       await gallery(h, kept)
     } catch (e) {
-      check('the gallery: no exception', false, e?.stack ?? String(e))
+      caught('the gallery: ', e)
     }
   await h.app.close().catch(() => undefined)
   console.log(`Screenshots: ${fx.shots}`)
@@ -592,11 +601,11 @@ async function pool(h) {
 
   // --- The first card, reviewed by both pooled reviewers (G1b = 2), while E1 builds: E1 is never given it.
   const one = await build(b1, l1.id, p1, 'p1.txt')
-  check(`${b1.name} builds and submits its card in its slot`, one.ok, one.why)
+  must(`${b1.name} builds and submits its card in its slot`, one.ok, one.why)
   const ra = await review(r1, p1, one.rev)
-  check(`${r1.name} reviews it in a review copy at its revision, from the project folder`, ra.ok, ra.why)
+  must(`${r1.name} reviews it in a review copy at its revision, from the project folder`, ra.ok, ra.why)
   const rb = await review(r2, p1, one.rev)
-  check(`…then ${r2.name}, the second reviewer`, rb.ok, rb.why)
+  must(`…then ${r2.name}, the second reviewer`, rb.ok, rb.why)
   check('…both pass it: merged, Done', await x.done(p1))
   check(`E1, building in its lane's slot, was given no review`, JSON.stringify(await assignedOf(x, p1)) === JSON.stringify([r1.id, r2.id]) && !!(await x.slotOfLane(beta, l3.id)), JSON.stringify(await assignedOf(x, p1)))
 
@@ -674,7 +683,7 @@ async function everyoneInTheFolder(h) {
     await until(async () => (await assignedOf(x, n)).includes(gr.id), HUNG_MS)
     await x.idle(gamma, gr.id)
     const { s: r, copy } = await x.startReview(gamma, gr, n)
-    check(`G-R1 reviews it from the pool in a review copy at ${rev.slice(0, 7)}`, r.status === 200 && !!copy && git(copy, 'rev-parse', 'HEAD') === rev && same((await x.live(gamma, gr.id))?.cwd, gamma), JSON.stringify(r.body))
+    must(`G-R1 reviews it from the pool in a review copy at ${rev.slice(0, 7)}`, r.status === 200 && !!copy && git(copy, 'rev-parse', 'HEAD') === rev && same((await x.live(gamma, gr.id))?.cwd, gamma), JSON.stringify(r.body))
     check('…passes it: Done (committed)', (await x.intent(gamma, gr, n, 'verdict', { pass: true, comment: 'passed' })).status === 200 && (await x.done(n)))
   }
   check('no slot was lent in gamma', (await x.slots(gamma)).length === 0, JSON.stringify(await x.slots(gamma)))
