@@ -294,7 +294,8 @@ const ancestor = (x, y) => {
     await shoot('1-laneA-started', 'lanes', async () => (await onBoard('Todo', c1)) && /B1 \/ R1/.test(await laneText(a?.id)))
 
     // --- One: merged by the queue at the approved revision; the next card waits for it.
-    const lentA = (await laneNow(a?.id))?.slot
+    // The lane's slot, once recorded: a lane takes it over from its builder's own as that lease lets go (HI-2027).
+    const lentA = await waitHung(async () => (await laneNow(a?.id))?.slot ?? null)
     const { s: s1, base: base1, line: line1 } = await start(c1)
     check("One starts in the lane's slot, on its line from main's head", s1.status === 200 && !!lentA && path.basename(wt ?? '') === lentA && base1 === head() && git(wt, 'rev-parse', 'HEAD') === base1, JSON.stringify({ lane: lentA, start: s1.body }))
     check('…B1 works there now', !!(await waitHung(async () => (await live(b1.id))?.cwd?.toLowerCase() === wt?.toLowerCase())), JSON.stringify(await live(b1.id)))
@@ -361,7 +362,8 @@ const ancestor = (x, y) => {
     const b = await startLane(laneB)
     check('lane B is started from the board with the squash options', !!b, JSON.stringify(await inv('lanes:list')))
     await retoken()
-    const lentB = (await laneNow(b?.id))?.slot
+    // Once recorded: lane A's end lets the slot go to lane B once its builder's turn and deliveries are over (HI-2027).
+    const lentB = await waitHung(async () => (await laneNow(b?.id))?.slot ?? null)
     const main3 = head()
     const s4 = await start(c4)
     check("Four starts in lane B's slot, on its line from main's head", s4.s.status === 200 && !!lentB && path.basename(wt ?? '') === lentB && s4.base === main3 && git(wt, 'rev-parse', 'HEAD') === main3, JSON.stringify({ lane: lentB, s4 }))
