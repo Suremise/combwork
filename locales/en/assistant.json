@@ -2815,6 +2815,10 @@
     "defaultMessage": "The paths it declared stay with the card.",
     "description": "What of the Assistant declaring a card's paths stays when it is undone."
   },
+  "assistant.undo.why.freshRetried": {
+    "defaultMessage": "A lane agent's new conversation tried again isn't stopped by undo: end the lane if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2034): it retried a lane agent's new conversation, which Hive had stopped trying to start. Glossary: lane, conversation."
+  },
   "assistant.undo.why.handOver": {
     "defaultMessage": "A hand-over can't be undone: the work went to the other agent.",
     "description": "Why a change of the Assistant's can't be undone: it handed an agent's work over to another."

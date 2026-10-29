@@ -1483,6 +1483,14 @@
     "defaultMessage": "Lanes: longest a lane's end waits for its builder",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"10 min\"). A lane is a card loop: a builder and a reviewer taking cards in turn."
   },
+  "settings.advanced.hive.lanes.freshStartWaitMinutes.desc": {
+    "defaultMessage": "A lane starts its agents in new conversations. One that is busy as the lane starts (in a turn, or reading a message Hive just gave it) is started once it is free, for up to this long. After that Hive stops trying: the lane's row says so, and you retry it there or end the lane. Hive never interrupts a turn for it, and never gives the lane's cards to the old conversation.",
+    "description": "What the advanced setting \"Lanes: longest Hive waits to start a busy agent afresh\" does (Settings → Advanced, under Hive). A lane is a card loop."
+  },
+  "settings.advanced.hive.lanes.freshStartWaitMinutes.title": {
+    "defaultMessage": "Lanes: longest Hive waits to start a busy agent afresh",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"10 min\"). A lane is a card loop: a builder and a reviewer taking cards in turn."
+  },
   "settings.advanced.hive.lanes.gentleEnd.desc": {
     "defaultMessage": "When a lane's last card merges (or the lane is abandoned), Hive waits for its builder's turn to end, tells it the lane is finished with each card's merge commit, then ends its CLI with the CLI's own exit command, killing it only if it doesn't exit. Its slot stays its until then. Turned off, Hive stops the builder's session as soon as it is first idle, as before.",
     "description": "What the advanced setting \"Lanes: let the builder finish when its lane ends\" does (Settings → Advanced, under Hive). A lane is a card loop; a slot is a worktree Hive lends to a card or a lane."

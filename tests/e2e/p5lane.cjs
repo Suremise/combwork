@@ -290,14 +290,19 @@ const ancestor = (x, y) => {
       await waitHung(async () => (await dialog.count()) === 1)
       await dialog.locator('#lane-start-builder').selectOption(b1.id)
       await dialog.locator('#lane-start-reviewer').selectOption(r1.id)
+      const was = (await live(b1.id))?.sessionId ?? null
       await dialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
       // Once lent its slot: a lane started just as the one before it ends waits for that lane's slot (its lease ends just
-      // after it), then the slot pass lends it and starts B1 with the brief (HI-2029). B1 may then be in a new
-      // conversation, with a new token (intent and reorderNow read it again on a 401).
+      // after it), then the slot pass lends it and starts B1 with the brief (HI-2029). B1 is then in a new conversation,
+      // with a new token (intent and reorderNow read it again on a 401): at once, or (HI-2034: lane A's end notice still
+      // being taken as lane B starts) once it is free, the lane owing it meanwhile.
       const lane = await waitHung(async () => {
         const l = (await inv('lanes:list')).find((x) => x.builder.id === b1.id && x.state !== 'ended' && JSON.stringify(x.cards.map((c) => c.number)) === JSON.stringify(cards))
-        return l?.slot ? l : null
+        return l?.slot && l.status?.why !== 'fresh' ? l : null
       })
+      // Never on in its old conversation (HI-2034): its new one, once the lane's start (or its owed launch) has given it.
+      const now = lane ? await waitHung(async () => { const id = (await live(b1.id))?.sessionId; return id && id !== was ? id : null }) : null
+      check(`…B1 works lane ${cards.join(', ')} in a new conversation (HI-2034)`, !!lane && !!now && now !== was, JSON.stringify({ was, now, status: lane?.status ?? null }))
       // Not started (HI-2027's lane C, once in five): what the window showed, said with the failure.
       if (!lane) {
         const shot = path.join(fx.shots, `lane-start-${cards.join('-')}-failed.png`)
@@ -363,7 +368,17 @@ const ancestor = (x, y) => {
     const [up] = await factsOf(c2, 'Updated')
     check('…brought up to date by the queue (strict): Updated, carried, from the reviewed revision', up?.data?.carried === true && up.data.from === two.rev, JSON.stringify(up))
     check("…merged with the user's commit kept, naming both revisions", git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Updated: ${up?.data?.to}`) && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Revision: ${two.rev}`) && ancestor(two.moved, 'main'))
-    check("…the slot untouched (its HEAD and status as they were)", untouched(two.was), JSON.stringify({ now: worktreeNow(), was: two.was }))
+    // The queue's update and merge leave the slot alone. Hive starts Three about a second after Two is Done (HI-1990), its
+    // line made in the slot: the slot may be exactly as Three's start prepared it by now (HR1's round 2: its own
+    // SlotPrepared, on the lease Three was started with: that line checked out at that revision, nothing changed), and
+    // nothing else.
+    const started3 = (await factsOf(c3, 'Started')).find((f) => f.actor === 'hive')?.data ?? null
+    const prep3 = (await factsOf(c3, 'SlotPrepared')).at(-1)?.data ?? null
+    const asThree = (now, branch) => !!started3 && !!prep3 && prep3.lease === started3.lease && now.head === prep3.revision && now.status === '' && branch === prep3.line
+    const branchNow = git(wt, 'branch', '--show-current')
+    // …and it refuses anything else: another HEAD, a dirty file, another branch.
+    if (prep3) check('…a slot not as Three was prepared is not taken for it', !asThree({ head: two.was.head, status: '' }, prep3.line) && !asThree({ head: prep3.revision, status: ' M a.txt' }, prep3.line) && !asThree({ head: prep3.revision, status: '' }, 'main'))
+    check("…the slot untouched by the merge (its HEAD and status as they were, or exactly as Three's start prepared it)", (untouched(two.was) || asThree(worktreeNow(), branchNow)) && !(await kinds(c2)).includes('LineMoved'), JSON.stringify({ now: worktreeNow(), branch: branchNow, was: two.was, started3, prep3, two: await kinds(c2) }))
 
     // --- Three: main changes the same line while it is in review: returned (notUpToDate); B1 resumes cleanly.
     const s3 = await start(c3)

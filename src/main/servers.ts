@@ -63,7 +63,7 @@ import { listMcp } from './mcp'
 import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, readNote, writeNote } from './notes'
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
-import { checkLanePool, launchRecordedLane, recordedLaneNote, resumeLaneBuilder } from './laneStart'
+import { checkLanePool, launchRecordedLane, recordedLaneNote, resumeLaneBuilder, retryFreshStart } from './laneStart'
 import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
@@ -637,6 +637,7 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'reorder-tasks': UNDO_FINAL.cardsOrder,
   'cancel-messages': UNDO_FINAL.withdrawn,
   'lane-end': UNDO_FINAL.laneEnded,
+  'lane-fresh-start': UNDO_FINAL.freshRetried,
   'queue-pause': UNDO_FINAL.queuePaused,
   'queue-resume': UNDO_FINAL.queueResumed,
   'release-slot': UNDO_FINAL.slotReleased
@@ -2022,6 +2023,24 @@ route('POST', '/v1/lanes/:id/end', async ({ params, body }) =>
     return assistantChange('agents', laneId ? `end lane ${laneId}` : 'end a lane', { kind: 'lane-end', ...(laneId ? { lane: laneId } : {}) }, async () => {
       const l = await end()
       return { done: `Lane ${l.id} in ${l.project}: ${l.state}`, act: laneAct(l), result: l }
+    })
+  })
+)
+
+// A lane agent's new conversation no more tried, tried again (HI-2034): the user's (the lane's row) and the Assistant's
+// within Settings → Assistant → Control, never a project agent's (it would restart another agent).
+route('POST', '/v1/lanes/:id/fresh-start', async ({ params }) =>
+  laneCall(async () => {
+    notAgents("retry a lane's new conversations")
+    const ws = requireWorkspace()
+    const id = decodeURIComponent(params[0])
+    const lane = (await lanes.rawLanes(ws)).find((l) => l.id === id)
+    if (!lane) throw new HttpError(404, `No lane ${id}`)
+    const retry = async () => ({ retried: await retryFreshStart(ws, id) })
+    if (!assistantCaller()) return retry()
+    return assistantChange('agents', `retry lane ${id}'s new conversations`, { kind: 'lane-fresh-start', lane: id, project: lane.project }, async () => {
+      const r = await retry()
+      return { done: r.retried ? `Lane ${id}: ${r.retried} new conversation${r.retried > 1 ? 's' : ''} tried again` : `Lane ${id}: no new conversation was waiting to be retried`, result: r }
     })
   })
 )

@@ -174,6 +174,8 @@ interface HiveMessageValues {
   'service.laneStart.sameAgent': undefined
   'service.laneStart.starting': { agent: string | number }
   'service.laneStart.unknownAgent': { agent: string | number; project: string | number }
+  'service.laneStarts.freshBlockedBody': { why: string; minutes: number; reason: string | number }
+  'service.laneStarts.freshBlockedTitle': { agent: string | number }
   'service.lanes.noWorkspace': undefined
   'service.lanes.unknown': { id: string | number }
   'service.metrics.badProvider': undefined

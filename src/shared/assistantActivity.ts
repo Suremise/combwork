@@ -26,6 +26,7 @@ export const ACTIVITY_KINDS = [
   'lane-start',
   'lane-join',
   'lane-end',
+  'lane-fresh-start',
   'queue-pause',
   'queue-resume',
   'release-slot',
@@ -141,6 +142,7 @@ export const UNDO_FINAL = {
   retriedMerge: "Its Retry merge stays in the card's work.",
   queuePaused: "A merge queue it paused stays paused: resume it if it should run.",
   queueResumed: "A merge queue it resumed isn't paused again: pause it if it shouldn't run.",
+  freshRetried: "A lane agent's new conversation tried again isn't stopped by undo: end the lane if it isn't wanted.",
   slotReleased: "A slot it released isn't kept or held again: the next work that needs a slot may take it.",
   templateCards: "The cards and lanes of the agents a template replaced stay as the load left them (cards put back, lanes ended): undo doesn't give them back."
 } as const

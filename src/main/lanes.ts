@@ -4,7 +4,7 @@ import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole } from '../shared/workflow/roles'
-import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneStartWait, type WaitStamp } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
@@ -496,6 +496,73 @@ export async function setLaneSlotWait(ws: WorkspaceService, id: string, wait: La
     if (wait) l.slotWait = wait
     else delete l.slotWait
   })
+}
+
+/**
+ * A lane agent's new conversation owed (HI-2034): its start found it not free. One per role (a later one replaces it);
+ * a lane not running, or whose agent in that role is another now, gets nothing.
+ */
+export async function oweFreshStart(ws: WorkspaceService, id: string, agent: string, role: 'builder' | 'reviewer', oldSession: string | null, note = ''): Promise<void> {
+  await mutate(ws, (lanes) => {
+    const l = lanes.find((x) => x.id === id)
+    if (!l || !running(l) || (role === 'builder' ? l.builder.id : l.reviewer?.id) !== agent) return
+    const entry: FreshStart = { id: randomBytes(6).toString('hex'), agent, role, since: new Date().toISOString(), oldSession, ...(note ? { note: note.slice(0, 4000) } : {}) }
+    l.freshStart = [...(l.freshStart ?? []).filter((f) => f.role !== role), entry]
+  })
+}
+
+/**
+ * Changes fresh start `entryId` of lane `id` under the lanes' lock (HI-2034): `fn` gets it while the lane runs with that
+ * agent in that role, and returns it changed, or null to drop it; the lane's others are left as they are. Whether it was
+ * there (and so changed): an obligation gone meanwhile is never acted on.
+ */
+export async function changeFreshStart(ws: WorkspaceService, id: string, entryId: string, fn: (f: FreshStart) => FreshStart | null): Promise<boolean> {
+  let found = false
+  await mutate(ws, (lanes) => {
+    found = false
+    const l = lanes.find((x) => x.id === id)
+    const f = l?.freshStart?.find((x) => x.id === entryId)
+    if (!l || !f) return
+    // Its lane ended or its agent in that role changed: the obligation is gone with it.
+    const owner = running(l) && (f.role === 'builder' ? l.builder.id : l.reviewer?.id) === f.agent
+    const next = owner ? fn(f) : null
+    found = owner
+    const rest = l.freshStart!.filter((x) => x.id !== entryId)
+    if (next) rest.push(next)
+    if (rest.length) l.freshStart = rest
+    else delete l.freshStart
+  })
+  return found
+}
+
+/**
+ * A lane's fresh starts no more tried, tried again (HI-2034: the user's Retry, from the lane's row or the Assistant's
+ * `POST /v1/lanes/{id}/fresh-start`): each of `ids` still blocked (the same obligation the caller cleaned up after)
+ * becomes a new one (new id, its wait from now), the same old conversation to leave and note. Which were.
+ */
+export async function retryFreshStarts(ws: WorkspaceService, id: string, ids: ReadonlySet<string>): Promise<FreshStart[]> {
+  let retried: FreshStart[] = []
+  await mutate(ws, (lanes) => {
+    retried = []
+    const l = lanes.find((x) => x.id === id)
+    if (!l || !running(l) || !l.freshStart) return
+    l.freshStart = l.freshStart.map((f) => {
+      if (!f.blocked || !ids.has(f.id)) return f
+      retried.push(f)
+      return { id: randomBytes(6).toString('hex'), agent: f.agent, role: f.role, since: new Date().toISOString(), oldSession: f.oldSession, ...(f.note ? { note: f.note } : {}) }
+    })
+  })
+  return retried
+}
+
+/**
+ * A running lane's fresh starts as kept, read synchronously (laneStarts.ts: as it decides, and just before a start): only
+ * those whose agent still has that role in it (one reassigned meanwhile is no longer owed).
+ */
+export function freshStartsNow(ws: WorkspaceService, id: string): FreshStart[] {
+  if (!ws.path) return []
+  const rec = readLanes({ version: 1, lanes: readTable(ws.path, 'lanes').docs as Record<string, unknown>[] }).find((l) => l.id === id)
+  return rec && running(rec) ? (rec.freshStart ?? []).filter((f) => (f.role === 'builder' ? rec.builder.id : rec.reviewer?.id) === f.agent) : []
 }
 
 /** The lanes as kept (#1438's slot passes: their state, cards and builders, without reading the board). */

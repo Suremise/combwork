@@ -353,6 +353,8 @@ export interface LaneOrderView {
   state?: string
   /** When the lane started, where known: its first card's stall counts from it (HI-2029). */
   startedAt?: string
+  /** Its agent's new conversation no more tried (HI-2034), as its status says it: its next card is stalled at once. */
+  freshBlocked?: string
   /** In the lane's order; `movedAt`: when it last came into its column (columnSince), where known. */
   cards: { number: number; column: string; key?: string; movedAt?: string | null }[]
 }

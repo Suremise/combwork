@@ -172,6 +172,8 @@
   "service.laneStart.sameAgent": "L’auteur ne peut pas être son propre relecteur.",
   "service.laneStart.starting": "Le couloir de l’agent {agent} est déjà en cours de démarrage.",
   "service.laneStart.unknownAgent": "{agent} ne fait pas partie des agents du projet {project}.",
+  "service.laneStarts.freshBlockedBody": "{why, select, timeout {Il n’a pas été libre en {minutes, plural, one {# minute} many {# minutes} other {# minutes}}.} uncertain {Hive s’est fermé pendant son démarrage : il n’a peut-être pas démarré.} other {{reason}}} Réessaie depuis la ligne du couloir dans le panneau Progression, ou termine le couloir. Ses cartes attendent jusque-là.",
+  "service.laneStarts.freshBlockedTitle": "La nouvelle conversation de {agent} n’a pas démarré",
   "service.lanes.noWorkspace": "Aucun espace de travail n’est ouvert",
   "service.lanes.unknown": "Couloir inconnu : {id}",
   "service.metrics.badProvider": "provider doit être un identifiant de fournisseur",

@@ -172,6 +172,8 @@
   "service.laneStart.sameAgent": "The builder can't be its own reviewer.",
   "service.laneStart.starting": "The lane of agent {agent} is being started already.",
   "service.laneStart.unknownAgent": "{agent} isn't one of {project}'s agents.",
+  "service.laneStarts.freshBlockedBody": "{why, select, timeout {It wasn’t free within {minutes, plural, one {# minute} other {# minutes}}.} uncertain {Hive closed while starting it, so it may not have started.} other {{reason}}} Retry it from the lane’s row in the Progress panel, or end the lane. Its cards wait until then.",
+  "service.laneStarts.freshBlockedTitle": "{agent}’s new conversation didn’t start",
   "service.lanes.noWorkspace": "No workspace is open",
   "service.lanes.unknown": "Unknown lane {id}",
   "service.metrics.badProvider": "provider must be a provider id",

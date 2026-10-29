@@ -172,6 +172,8 @@
   "service.laneStart.sameAgent": "ビルダーは自分のレビュアーにはなれません。",
   "service.laneStart.starting": "エージェント{agent}のレーンはすでに開始中です。",
   "service.laneStart.unknownAgent": "{agent}は{project}のエージェントではありません。",
+  "service.laneStarts.freshBlockedBody": "{why, select, timeout {{minutes, plural, other {#分}}以内に空きませんでした。} uncertain {開始中にHiveが終了したため、開始されていない可能性があります。} other {{reason}}} 進捗パネルのレーンの行から再試行するか、レーンを終了してください。それまでカードは待機します。",
+  "service.laneStarts.freshBlockedTitle": "{agent}の新しい会話は開始されませんでした",
   "service.lanes.noWorkspace": "ワークスペースが開かれていません",
   "service.lanes.unknown": "不明なレーン{id}",
   "service.metrics.badProvider": "providerにはプロバイダーのIDを指定してください",

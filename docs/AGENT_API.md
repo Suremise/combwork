@@ -559,6 +559,8 @@ A lane is `{ id, project, name, builder: { id, name }, reviewer, cards, current,
 
 `POST /v1/lanes/{id}/end` — `{ "abandoned": true }` stops it unfinished (the user's and the Assistant's), or `{}` ends it. A lane ends by itself once every card is Done, its `mergeCommit` the last card's result revision from its facts; an agent's `end` is refused until then (409) and its `mergeCommit` is ignored, the reply's `note` saying so (#1270); the Assistant's or a script's is kept where the cards' facts name no merge. Only its builder or reviewer ends it among agents. With workflow rules off, as before: an agent ends it, its `mergeCommit` recorded as given.
 
+`POST /v1/lanes/{id}/fresh-start` — `{}`: tries again the new conversation of a lane's agent that Hive stopped trying to start (HI-2034). A lane's start gives each of its agents a new conversation with the lane's brief; one busy then (in a turn, or with a prompt Hive just typed not taken yet) is started once it is free, within Settings → Advanced → *Lanes: longest Hive waits to start a busy agent afresh* (10 minutes). Past that, or after Hive closed while starting it (with no proof the new conversation began), Hive stops trying. The lane's `status` is then `startWait` with `why: "fresh"` and `freshBlocked` (`timeout`, `uncertain` or `failed`), and its cards wait: none goes to the old conversation. This retries each such agent, once it is free, with a new wait. Replies `{ retried }`, how many. The user's (the lane's row: **Retry New Conversation**) and the Assistant's, within Control (`lane-fresh-start`); a project agent is refused (403).
+
 `lane-ended` (the event stream, #1270): a lane ended with every card Done, once: `{ workspacePath, lane, project, results: [{ card, revision }] }` (`revision` null: Done with nothing merged).
 
 The event stream sends `lanes-changed` (`{ workspacePath }`: read the lanes again) when a lane changes, or one of its cards does.
@@ -832,6 +834,7 @@ Nothing private is added: no prompt or message text and no setting's value, the 
 | `lane-start` | Started (or changed) a lane | `{ "kind": "lane-start", "ok": true, "lane": "lane-0f89a0", "project": "hive", "cards": [713, 763], "agent": { "id": "a-745674db", "name": "HB3" } }` |
 | `lane-join` | Had a reviewer join a lane (`agent`: the reviewer) | `{ "kind": "lane-join", "ok": true, "lane": "lane-0f89a0", "project": "hive", "cards": [713, 763], "agent": { "id": "a-1d2e3f40", "name": "HR3" } }` |
 | `lane-end` | Ended a lane (merged or abandoned) | `{ "kind": "lane-end", "ok": true, "lane": "lane-0f89a0", "project": "hive", "cards": [713, 763], "agent": { "id": "a-745674db", "name": "HB3" } }` |
+| `lane-fresh-start` | Retried a lane agent's new conversation that Hive had stopped trying (HI-2034) | `{ "kind": "lane-fresh-start", "ok": true, "lane": "lane-0f89a0", "project": "hive" }` |
 | `queue-pause` | Paused a project's merge queue | `{ "kind": "queue-pause", "ok": true, "project": "alpha" }` |
 | `queue-resume` | Resumed a project's merge queue (`ok: true` also when it stayed paused for its cause) | `{ "kind": "queue-resume", "ok": true, "project": "alpha" }` |
 | `release-slot` | Released a slot: a carried slot, or a held writer once the user agreed (`agent`: whose it was) | `{ "kind": "release-slot", "ok": true, "project": "alpha", "agent": { "id": "a-7b21e4aa", "name": "B1" } }` |

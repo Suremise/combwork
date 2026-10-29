@@ -52,7 +52,7 @@ import { mergeSlots, recoverMergeSlots, workspaceSlots } from './mergeSlotHost'
 import { followNames } from './projectRename'
 import { slotBranch } from './mergeSlots'
 import { endLane, listLanes, stampLaneProjects } from './lanes'
-import { laneStartInfo, startLaneFromWindow } from './laneStart'
+import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } from './laneStart'
 import { sweepWorkspaceLeftovers } from './leftovers'
 import { AfterOpen, assertNotOpening, claimWindow, openProgress, openStep, releaseWindow, windowClaim } from './openProgress'
 import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, restoreBoardBackup, upgradeBoard } from './boardStore'
@@ -1388,6 +1388,15 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'lanes:end': (id, abandoned) => {
       if (typeof id !== 'string' || !id) throw hiveError(M.laneRequired, undefined, { kind: 'invalid' })
       return endLane(currentWorkspace(), id, { abandoned: abandoned === true })
+    },
+    'lanes:retryFresh': (id) => {
+      if (typeof id !== 'string' || !id) throw hiveError(M.laneRequired, undefined, { kind: 'invalid' })
+      return retryFreshStart(currentWorkspace(), id)
+    },
+    'lanes:test': async (op) => {
+      if (app.isPackaged) throw new Error('lanes:test is for test copies') // i18n-ignore: a test channel, never shown
+      if (op?.op !== 'oweFresh' || typeof op.lane !== 'string' || (op.role !== 'builder' && op.role !== 'reviewer')) throw new Error('lanes:test: { op: "oweFresh", lane, role, minutesAgo? }') // i18n-ignore: a test channel, never shown
+      return oweFreshForTest(currentWorkspace(), op.lane, op.role, typeof op.minutesAgo === 'number' ? op.minutesAgo : 0)
     },
     'lanes:start': (p, req) => {
       const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)

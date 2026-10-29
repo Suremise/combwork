@@ -13382,6 +13382,13 @@ button.progress-lane-why:focus-visible,
 .progress-lane-top > .tip-wrap:has(> .progress-lane-state) {
   flex-shrink: 0;
 }
+/* Retry an agent's new conversation (HI-2034): the reason's own place, kept whole (short: "⟳ Retry B1"); the project's name gives way. */
+button.progress-lane-retry {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .progress-lane-state.old-rules:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: 1px;

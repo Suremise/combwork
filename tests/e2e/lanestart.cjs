@@ -259,6 +259,36 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // Its start refused for the slot is tried again within laneStarts.ts's RETRY_MS (30 s, by its tick), so up to two of them.
     const byHiveF1 = await until(async () => (await facts(f1)).find((f) => f.kind === 'Started' && f.actor === 'hive') ?? null, 2 * 30000 + HUNG_MS)
     check("…its first card is started on B1 by Hive once the slot is free, and B1 is given it (HI-2029)", !!byHiveF1 && (await card(f1))?.agent === b1.id && !!(await until(async () => (await facts(f1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)), JSON.stringify({ byHiveF1, f1: await card(f1) }))
+
+    // --- HI-2034: B1 owed its new conversation past its wait (as a start over a busy B1 leaves it, 11 minutes on): no
+    // more tried, the lane's row says so with Retry New Conversation; Retry gives B1 its new conversation once free.
+    const owedLane = await apiLaneNow()
+    const before = await until(async () => (await live(b1.id))?.sessionId || null, HUNG_MS)
+    check('B1 owed its new conversation for 11 minutes (lanes:test)', (await inv('lanes:test', { op: 'oweFresh', lane: owedLane?.id, role: 'builder', minutesAgo: 11 })) === true)
+    const blocked = await until(async () => {
+      const st = (await apiLaneNow())?.status
+      return st?.why === 'fresh' && st.freshBlocked === 'timeout' ? st : null
+    }, 2 * 30000 + HUNG_MS)
+    check('…no more tried past its wait: the lane says so (startWait fresh, timeout)', !!blocked, JSON.stringify((await apiLaneNow())?.status ?? null))
+    await page.getByRole('button', { name: 'Task Board' }).click()
+    if (!(await panel.count())) await page.locator('.progress-rail').click().catch(() => undefined)
+    const owedRow = panel.locator(`.progress-tab-lanes .progress-lane[data-lane="${owedLane?.id}"]`)
+    const retry = owedRow.locator('[data-action="lane-retry-fresh"]')
+    check("…its row offers to retry B1's new conversation, saying why", !!(await until(async () => (await retry.count()) === 1 && /B1’s new conversation didn’t start \(it wasn’t free in time\)/.test((await retry.getAttribute('aria-label')) ?? ''), HUNG_MS)), await owedRow.innerText().catch(() => ''))
+    // In the panel as it opens (narrow): the reason's place is the Retry itself, "⟳ Retry B1", whole inside the header,
+    // its whole reason its tooltip and accessible name, in both themes (HR1's round 2).
+    const top = await owedRow.locator('.progress-lane-top').boundingBox()
+    const rb = await retry.boundingBox()
+    const whole = await retry.evaluate((e) => e.scrollWidth <= e.clientWidth)
+    const label = (await retry.getAttribute('aria-label')) ?? ''
+    check('…Retry fits the header whole, saying whose, with the whole reason on hover', !!top && !!rb && rb.x >= top.x && rb.x + rb.width <= top.x + top.width + 0.5 && whole && (await retry.innerText()).trim() === 'Retry B1' && /B1’s new conversation didn’t start \(it wasn’t free in time\)/.test(label) && label.endsWith('Retry New Conversation') && label === ((await retry.getAttribute('title')) ?? '').replace('\n', '. '), JSON.stringify({ top, rb, whole, label, text: await retry.innerText() }))
+    await shoot('lane-fresh-blocked', owedRow)
+    await retry.click()
+    const fresh = await until(async () => {
+      const id = (await live(b1.id))?.sessionId
+      return id && id !== before ? id : null
+    }, 2 * 30000 + HUNG_MS)
+    check('…Retry: B1 is given its new conversation once free, and the row no longer offers it', !!fresh && !!(await until(async () => (await retry.count()) === 0 && (await apiLaneNow())?.status?.why !== 'fresh', HUNG_MS)), JSON.stringify({ before, fresh, status: (await apiLaneNow())?.status ?? null }))
   } finally {
     await app.close().catch(() => undefined)
   }
