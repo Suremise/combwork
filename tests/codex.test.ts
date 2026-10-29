@@ -114,17 +114,21 @@ describe('Codex: when a person must act', () => {
       // Neither: Codex asks for its sandbox setup there.
       expect(await codex.connectionSetUp(conn)).toBe(false)
       // This PC's, which its launches are given. Each write of it given the same modification time, as two writes in one
-      // tick of the clock have (HI-2051): the second is read all the same.
+      // tick of the clock have (HI-2051): each is read all the same, of another size or the same.
       const pcConfig = (text: string): void => {
         writeFileSync(joinPath(pc, 'config.toml'), text)
         utimesSync(joinPath(pc, 'config.toml'), 1_800_000_000, 1_800_000_000)
+        expect(statSync(joinPath(pc, 'config.toml')).mtimeMs).toBe(1_800_000_000_000)
       }
+      const passedOn = (): string | undefined => launchConnectionArgs({ connectionHome: conn }).find((a) => a.startsWith('windows.sandbox='))
       pcConfig('[windows]\nsandbox = "elevated"\n')
       expect(sandboxed()).toBe(true)
       expect(await codex.connectionSetUp(conn)).toBe(true)
+      // Another of the same size.
+      pcConfig('[windows]\nsandbox = "readonly"\n')
+      expect(passedOn()).toBe('windows.sandbox="readonly"')
       // One the launches wouldn't pass on isn't counted.
       pcConfig('[windows]\nsandbox = "not a kind"\n')
-      expect(statSync(joinPath(pc, 'config.toml')).mtimeMs).toBe(1_800_000_000_000)
       expect(sandboxed()).toBe(false)
       expect(await codex.connectionSetUp(conn)).toBe(false)
       // Its own, as its Set Up writes it.
