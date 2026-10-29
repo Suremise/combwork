@@ -32,6 +32,7 @@ import { adoptHandovers } from './notes'
 import { noteFormerName } from './projectNames'
 import { adoptBenchmarkOwners, benchContext } from './benchmarks'
 import { carryPin, pinKeptAt } from './pin'
+import { carryProjectViewPrefs, carryViewPrefs, viewPrefsKeptAt } from './viewPrefs'
 import { carryWorkspaceRuns } from './closeCommand/closeCommands'
 import { emitTo } from './events'
 
@@ -664,7 +665,7 @@ export const movedSummary = (plan: MovePlan | null): WorkspaceMoved | null =>
 
 /**
  * What Hive's profile keeps by a workspace's folder follows it when it moves (HI-2007): its window's pin and its close
- * command's runs. The Assistant's old token file is left: it is written again at each launch, and deleting it could take
+ * command's runs, and its view preferences, each project's and its panes' (HI-2008, viewPrefs.ts). The Assistant's old token file is left: it is written again at each launch, and deleting it could take
  * a workspace's back there (HR2's round 2). Design HI-2007/s40 and s42:
  * - A move is recorded as the moved workspace opens (config.json's `profileMoves`, one per old folder) only when the
  *   old folder is gone (no .hive, not open): a copy's original keeps its own. Records about that old folder follow it
@@ -714,6 +715,8 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
       end()
       continue
     }
+    const views = carryViewPrefs(m.from, here, ok)
+    if (views) log.info(`${views} view preference(s) follow the workspace from ${userText(m.from)}`)
     if (carryPin(m.from, here, ok)) {
       const win = ws.window
       if (win && !win.isDestroyed() && !win.isAlwaysOnTop()) {
@@ -741,13 +744,35 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
       if (report) say(report, 'failed', tr(msg({ id: 'main.move.closeRunsFailed', defaultMessage: "Hive's records of the workspace's close command couldn't all follow it from the old folder ({why}). Hive tries again.", description: "A line of Repair's report, after a workspace moved to another folder: the output Hive keeps of the workspace's close command couldn't all be moved from the old folder's records. {why} is the system's message." }), { why }), { what: { kind: 'closeRuns' }, result: tr(R.failedWhy, { why }) })
       else log.warn(`carrying a close-command run from ${userText(m.from)}: ${userText(why)}`)
     }
-    if (!pinKeptAt(m.from) && !r.going.length && !r.stuck.length && !r.stopped) end()
+    if (!pinKeptAt(m.from) && !viewPrefsKeptAt(m.from) && !r.going.length && !r.stuck.length && !r.stopped) end()
     else {
       const failed = r.stuck[0]?.why
       config.update((c) => {
         c.profileMoves = (c.profileMoves ?? []).map((x) => (ofFrom(m.from)(x) ? { from: x.from, to: x.to, ...(failed ? { failed } : {}) } : x))
       })
     }
+  }
+  // Projects moved on their own into this workspace from another (HI-2008, HR2's round 1): their view preferences, before
+  // anything records where they are now. Only while the old project folder is gone (a copy's original keeps its own);
+  // one renamed or moved within this workspace is projectRename.ts's (two that swapped names keep their own).
+  if (!current()) return
+  // Its old folders: where it was last opened (lastPath, kept for Repair) and where its views were last brought
+  // (project.json's profileAt), so moved again before a Repair they are found where they went (HR2's round 2).
+  for (const h of (await movedHosts(ws)).hosts) {
+    if (h.assistant || h.pendingOnly || !current()) continue
+    const at = (await ws.projectConfig(h.path)).profileAt
+    const wasAt = [at, h.from].filter((p): p is string => !!p && !samePath(p, h.path) && !samePath(dirname(p), here))
+    let all = true
+    for (const from of wasAt.filter((p, i) => wasAt.findIndex((q) => samePath(p, q)) === i)) {
+      const ok = (): boolean => current() && !existsSync(join(from, PROJECT_FILE))
+      if (!ok()) {
+        all = false
+        continue
+      }
+      const n = carryProjectViewPrefs({ from, to: h.path }, { from: dirname(from), to: here }, ok)
+      if (n) log.info(`${n} view preference(s) follow ${userText(h.name)} from ${userText(from)}`)
+    }
+    if (all && current() && !samePath(at ?? '', h.path)) await ws.mutateProjectConfig(h.path, () => ({ profileAt: h.path }))
   }
   // All of it here now: the checkpoint says so, in the workspace's own settings (it travels with the folder, so a move
   // after this finds the records here, and a copy finds them still at the original's).
