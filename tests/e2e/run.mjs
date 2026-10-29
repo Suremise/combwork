@@ -50,7 +50,7 @@ import { devBuild, ensureBuild } from './build.mjs'
 import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, omittedLine, pruneRunDirsReleasing } from './logs.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from './lanes.mjs'
 import { endLeftCopies } from './leftCopies.mjs'
-import { preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from './slots.mjs'
+import { SIDE_E2E_JOBS, creditFor, preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from './slots.mjs'
 import { usesCodexHome, waitForCodexHome } from './codexHomeLock.mjs'
 import { autoClean, holdLane } from './clean.mjs'
 import { recycleBinCount, recycleBinLine } from './recycleBin.mjs'
@@ -70,7 +70,8 @@ if (opts.error) {
   console.error(opts.error.startsWith('Unknown suite') ? `${opts.error}. Suites: ${SUITES.map((s) => s.name).join(', ')}` : opts.error)
   process.exit(2)
 }
-const { jobs } = opts
+// At most SIDE_E2E_JOBS on the side slot (below).
+let { jobs } = opts
 
 if (opts.fingerprint) {
   console.log(fingerprint(root))
@@ -153,6 +154,11 @@ if (pool) {
   if (got.refused) {
     console.error(refusedLine(got.refused))
     process.exit(2)
+  }
+  // Beside two heavy runs, a side run's suites go at most two at once (HI-2070: four took the machine near full).
+  if (got.pool === 'side' && jobs > SIDE_E2E_JOBS) {
+    console.log(`On the side slot: ${SIDE_E2E_JOBS} suites at once, not ${jobs} (HI-2070).`)
+    jobs = SIDE_E2E_JOBS
   }
   if (said) {
     const after = `${Math.round(got.waitedMs / 1000)} s`
@@ -260,7 +266,7 @@ if (lane) console.log(`Lane ${lane.lane}: ports ${lane.first}–${lane.last}\n  
  * shell inside the suite's Hive (progressreport does) knows it is inside a suite, and which port to keep clear of.
  */
 const suiteEnv = (name, port, dir) => {
-  const env = runContext.suiteEnv({ name, port, work: dir, runDir: dir ?? lib.WORK, cliLog: dir ? join(dir, CLI_LOG) : null })
+  const env = runContext.suiteEnv({ name, port, work: dir, runDir: dir ?? lib.WORK, cliLog: dir ? join(dir, CLI_LOG) : null, slots: creditFor('cpu') })
   // --lang: the languages the i18n screenshot route photographs (it reads E2E_I18N_LANGS; the others are pinned to English).
   if (name === LANG_SUITE && opts.lang.length) env.E2E_I18N_LANGS = opts.lang.join(',')
   return env

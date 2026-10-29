@@ -177,6 +177,18 @@ export function buildLock(root, { dir = BUILD_LOCKS, owner = process.pid, alive 
 }
 
 /**
+ * Why the worktree's dev build isn't from its source as it is now, or null when it is; with the inputs it was read
+ * against. Also for a runner that must know before it builds (a model trial takes a CPU slot to build, HI-2070).
+ */
+export function buildWhy(root) {
+  const hasBuild = existsSync(join(root, 'out', 'main', 'index.js'))
+  const stamp = buildStamp(root)
+  const inputs = buildInputs(root)
+  const why = hasBuild && stamp === inputs ? null : !hasBuild ? 'there is no dev build' : !stamp ? "the dev build wasn't made with --build, so which code it holds is unknown" : 'the dev build was made from other source than this'
+  return { why, inputs }
+}
+
+/**
  * Makes sure the build is the source's, or says why not. { stale, built, waited, why }:
  * - fresh (the stamp matches the source): nothing to do;
  * - otherwise, with build: under the worktree's build lock, looks again (another runner may have just built it); still
@@ -188,13 +200,7 @@ export function buildLock(root, { dir = BUILD_LOCKS, owner = process.pid, alive 
  */
 export function ensureBuild({ root, build, runBuild, lock: lockOpts = {} }) {
   const lock = buildLock(root, lockOpts)
-  const look = () => {
-    const hasBuild = existsSync(join(root, 'out', 'main', 'index.js'))
-    const stamp = buildStamp(root)
-    const inputs = buildInputs(root)
-    const why = hasBuild && stamp === inputs ? null : !hasBuild ? 'there is no dev build' : !stamp ? "the dev build wasn't made with --build, so which code it holds is unknown" : 'the dev build was made from other source than this'
-    return { why, inputs }
-  }
+  const look = () => buildWhy(root)
   if (!build) {
     const waited = lock.waitFree()
     const { why } = look()

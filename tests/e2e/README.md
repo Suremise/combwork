@@ -231,7 +231,15 @@ no longer waits behind a full scenario set. Held side slots are `side-<k>.json`.
 any size, is network-bound, not CPU-bound: it takes no CPU slot (heavy or side), only one of the model trials' own
 (`modelTrials`, default 2, `model-<k>.json`), which bounds API spend and Codex's account-wide rate window (429s). It
 waits only for another model trial (`Waiting for a model-trial slot (2 real-model trials at once on this machine,
-modelTrials): held by …`). An e2e or unit run it starts is a run of its own and asks for its own slot.
+modelTrials): held by …`). Its build, when the dev build isn't from its source, is CPU work: the trial takes a small
+run's slot (the side slot, else a heavy one) for the build alone.
+**Runs inside runs** get credit only for the kind of slot their parent holds (HI-2070, `heldCredit`): each runner
+sets `E2E_RUN_SLOTS` (`cpu`, `model` or both) for what it starts, carried into a test Hive's sessions. An e2e suite
+gives its nested runs CPU credit, as before (#211: a nested run waiting for its parent's own slot would never end); a
+model trial gives model credit and passes on what it was given. So a heavy e2e or full unit run inside a model trial
+asks for a CPU slot, and a model trial inside an e2e suite for a model trial's. A suite of an older runner (no
+`E2E_RUN_SLOTS`) gives CPU credit. **On the side slot**, an e2e run runs at most two suites at once (`SIDE_E2E_JOBS`),
+whatever `--jobs` says: four beside two heavy runs took the machine near full load.
 **A pre-merge run goes first** (#558): one started in the session of the agent that holds its project's merge slot
 (the runner asks Hive's Agent API, with the session's `HIVE_API_URL`, token, `HIVE_PROJECT` and `HIVE_AGENT`, at its
 first look and every 30 s while it waits), or one with `--pre-merge` (either runner; for a merge's checks started

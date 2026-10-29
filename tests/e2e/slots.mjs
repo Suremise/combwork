@@ -5,14 +5,15 @@
 // A pre-merge run goes first (#558): one started by the agent holding its project's merge slot (holdsMergeSlot), or
 // with --pre-merge. It takes the next free slot before runs that asked earlier for other reasons (a merge shouldn't wait
 // behind flake-proof repeats while every other merge waits behind it), but never stops a run that holds one.
-// A run that isn't heavy (a few suites, a single scenario) never waits, nor does a runner started inside a suite, e2e or
-// scenarios (needsSlot): its parent's run holds a slot, and waiting behind it would never end (#211).
+// A run that isn't heavy (a few suites, a single scenario) never waits, nor does a runner started inside a run that
+// holds a slot of the kind it needs (heldCredit, E2E_RUN_SLOTS): waiting behind its parent would never end (#211).
 //
 // Small runs and model trials (HI-2070): a heavy run within the small-run bound (smallRun in config.json: a few suites
 // repeated a few times, a few fake scenario runs) is small. It takes the side slot (sideSlots, default 1) when that is
 // free, else a heavy slot, else it waits for whichever frees first; heavy runs never take the side slot. A scenario run
 // on a real model (claude-code, codex) is network-bound: it takes no CPU slot, only one of the model trials' own
 // (modelTrials, default 2), which bound API spend and Codex's account-wide rate window. slotPool says which a run takes.
+// On the side slot an e2e run runs at most SIDE_E2E_JOBS suites at once.
 //
 // Claims are files in a folder of the run context (runContext.HEAVY_DIR), as lanes are (lanes.mjs): `slot-<k>.json`
 // for a run holding a heavy slot, `side-<k>.json` and `model-<k>.json` for the others, and `wait-<pid>.json` for one
@@ -134,15 +135,39 @@ export function slotSettings(env = process.env, file = CONFIG_FILE, say = (line)
   return { side, models, small }
 }
 
+/** Suites an e2e run on the side slot runs at once, at most (HI-2070: beside two heavy runs, never the usual four). */
+export const SIDE_E2E_JOBS = 2
+
+/**
+ * The kinds of slot the run this one was started inside holds for it (HI-2070): 'cpu' (a heavy or side slot) and
+ * 'model' (a model trial's), from E2E_RUN_SLOTS, comma-separated, which the runners set for what they start and which
+ * is carried into a test Hive's sessions (runContext CARRIED). A run inside a suite marked without it (an older runner)
+ * has the CPU credit every nested run had before (#211); a run started outside any has none.
+ */
+export function heldCredit(env = process.env) {
+  if (env.E2E_RUN_SLOTS !== undefined) return new Set(env.E2E_RUN_SLOTS.split(',').filter((k) => k === 'cpu' || k === 'model'))
+  return new Set(parentSuite(env) ? ['cpu'] : [])
+}
+
+/** E2E_RUN_SLOTS for what a run starts: the credit it was given, and the kind of slot it holds now (a pool, or none). */
+export function creditFor(pool, env = process.env) {
+  const credit = heldCredit(env)
+  if (pool === 'model') credit.add('model')
+  else if (pool) credit.add('cpu')
+  return [...credit].sort().join(',')
+}
+
 /**
  * Which slot a run waits for (HI-2070): 'model' for a scenario run on a real model, whatever its size; 'small' for a
- * heavy run within the small-run bound; 'heavy' for any other heavy run; null for one that waits for none (not heavy,
- * or started inside a suite, whose parent holds a slot: needsSlot). kind: 'e2e' or 'scenarios'.
+ * heavy run within the small-run bound; 'heavy' for any other heavy run; null for one that waits for none: not heavy,
+ * or started inside a run that holds a slot of the kind it needs (heldCredit: waiting for the parent's own slot would
+ * never end, #211). Only matching credit counts: CPU work inside a model trial still asks for a CPU slot, and a model
+ * trial inside a CPU run for a model trial's. kind: 'e2e' or 'scenarios'.
  */
 export function slotPool({ kind, count, repeat = 1, provider = '' }, env = process.env, small = slotSettings(env).small) {
-  if (parentSuite(env)) return null
-  if (kind === 'scenarios' && MODEL_PROVIDERS.includes(provider)) return 'model'
-  if (!needsSlot({ count, repeat }, env)) return null
+  const credit = heldCredit(env)
+  if (kind === 'scenarios' && MODEL_PROVIDERS.includes(provider)) return credit.has('model') ? null : 'model'
+  if (credit.has('cpu') || !isHeavy({ count, repeat })) return null
   const within = kind === 'e2e' ? count <= small.e2eSuites && repeat <= small.e2eRepeat : count * repeat <= small.scenarioRuns
   return within ? 'small' : 'heavy'
 }

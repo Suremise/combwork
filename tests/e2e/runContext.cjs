@@ -82,10 +82,11 @@ const PASS_ENV = {
 /**
  * What the runner sets for each suite, carried from a suite into the test copies of Hive it starts: a runner started
  * inside a suite (progressreport runs one in its Hive's agent shell, which drops HIVE_ variables) knows from these that
- * it is nested, and which ports and folders to keep clear of (runner.mjs); and where those copies note the CLIs they
+ * it is nested, and which ports and folders to keep clear of (runner.mjs); which kinds of test slot its run holds for
+ * what runs inside it (E2E_RUN_SLOTS, slots.mjs heldCredit, HI-2070); and where those copies note the CLIs they
  * selected (HIVE_TEST_CLI_LOG, in the suite's folder: the run record's real CLIs, #365).
  */
-const CARRIED = ['E2E_RUN_SUITE', 'E2E_RUN_DIR', 'E2E_RUN_PORT', 'HIVE_TEST_CLI_LOG']
+const CARRIED = ['E2E_RUN_SUITE', 'E2E_RUN_DIR', 'E2E_RUN_PORT', 'E2E_RUN_SLOTS', 'HIVE_TEST_CLI_LOG']
 
 /** The variables of `parent` named in `names` (any case), under their own spelling. */
 function pick(parent, names) {
@@ -245,11 +246,13 @@ const isHiveEnv = (env) => !!env && built.has(env)
 /**
  * A suite's environment, from its runner: the allowlist, the PASS_ENV settings, and its run context: its folder
  * (HIVE_E2E_DIR, which WORK reads), its Agent API port (HIVE_E2E_PORT, lib.port()), and the same said without the
- * HIVE_ prefix (E2E_RUN_*), which survive into a test Hive's agent shells; and the file its test copies of Hive note
- * the CLIs they selected in (cliLog: HIVE_TEST_CLI_LOG, #365).
+ * HIVE_ prefix (E2E_RUN_*), which survive into a test Hive's agent shells; the kinds of test slot that cover what runs
+ * inside it (slots: E2E_RUN_SLOTS, HI-2070; a suite's nested runs always have CPU credit, #211); and the file its test
+ * copies of Hive note the CLIs they selected in (cliLog: HIVE_TEST_CLI_LOG, #365).
  */
-function suiteEnv({ name, port = null, work = null, runDir, cliLog = null }, parent = process.env) {
+function suiteEnv({ name, port = null, work = null, runDir, cliLog = null, slots = 'cpu' }, parent = process.env) {
   const env = apply(baseEnv(parent), pick(parent, Object.keys(PASS_ENV)))
+  env.E2E_RUN_SLOTS = slots
   if (work) env.HIVE_E2E_DIR = work
   if (cliLog) env.HIVE_TEST_CLI_LOG = cliLog
   if (port) {
