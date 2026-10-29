@@ -67,6 +67,7 @@ import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
 import { quitSlotCards, startSlotCards, stopSlotCards } from './slotCards'
+import { startFinishPath } from './finishPath'
 import { startLaneBriefs, stopLaneBriefs } from './laneBriefs'
 import { startSlotMigration, stopSlotMigration } from './slotMigration'
 import { startReviewerPool, stopReviewerPool } from './reviewerPool'
@@ -1109,6 +1110,7 @@ app.whenReady().then(async () => {
   })
   // Cards on slots (#1438): a start lends its builder a slot and makes its line there, Done or put back gives it back.
   startSlotCards()
+  startFinishPath()
   // Lanes' briefs outside slots, delivered once per revision (HI-1795).
   startLaneBriefs()
   // Agents' worktrees adopted as slots at the 1.0 upgrade (#1441): which projects are migrated, and their retired homes.

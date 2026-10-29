@@ -11,6 +11,7 @@
   "workflow.contradiction.subfolderTarget": "Ce projet se trouve dans un dépôt plus grand : nomme la branche dans laquelle son travail est fusionné.",
   "workflow.contradiction.upToDateNeedsSlots": "Les emplacements ne sont mis à jour que lorsque chaque carte a son propre dossier.",
   "workflow.forYou.decidedAfterMerge": "La carte {card} a reçu une décision après sa fusion : faut-il un suivi ?",
+  "workflow.forYou.slotDirty": "{card} est terminée, mais l’emplacement {slot} a des modifications non commitées : il reste donc sur {line}. Commite-les ou abandonne-les là-bas : Hive détache alors l’emplacement sur {target}, prêt pour sa prochaine carte.",
   "workflow.forYou.focusedSkip": "Des tests ciblés de la carte {card} ont été ignorés lors de sa fusion : {tests}. La fusionner avec ces tests ignorés ?",
   "workflow.forYou.lineAsk": "{line} contient encore le travail de la carte {card}, fusionné en squash dans {target} : approuve et Hive met la branche à jour une fois, ou refuse et fais-le toi-même avant le début de {next}.",
   "workflow.forYou.lineRefused": "Git n’a pas mis {line} à jour avec {target} : {reason}. {next} démarre une fois la branche à jour.",

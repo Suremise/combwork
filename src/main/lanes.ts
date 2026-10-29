@@ -17,7 +17,7 @@ import { openTable, readTable, saveTable } from './storeTables'
 import { boardOpen, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { onAction } from './workflow/actionWorker'
-import { foldCard, forYou } from '../shared/workflow/facts'
+import { foldCard, forYou, SLOT_DIRTY_GATE } from '../shared/workflow/facts'
 import { createDelivery, offerNow } from './deliveries'
 import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectName } from '../shared/projectIds'
 import { coalesced } from './coalesce'
@@ -398,7 +398,7 @@ async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
         const asks = forYou(s)
         // Who reviewed and reviews it (#1446: a pool lane's hover names them).
         const last = s.verdicts.at(-1)
-        const facts: LaneCardFacts = { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds, lastVerdict: last ? { reviewer: last.reviewer, pass: last.pass } : null, reviewing: reviewingNow(all, () => true)?.reviewing ?? null }
+        const facts: LaneCardFacts = { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds, lastVerdict: last ? { reviewer: last.reviewer, pass: last.pass } : null, reviewing: reviewingNow(all, () => true)?.reviewing ?? null, ...(s.requests.some((r) => r.gate === SLOT_DIRTY_GATE) ? { slotDirty: true } : {}) }
         kept.set(n, { key, facts })
         m.set(n, facts)
       }

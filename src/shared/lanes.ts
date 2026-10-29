@@ -208,6 +208,8 @@ export interface LaneCardFacts {
   lastVerdict?: { reviewer: string; pass: boolean } | null
   /** Who reviews its latest submission now (given or started, no verdict yet), by id (#1446). */
   reviewing?: string | null
+  /** A Done card whose slot stayed on its line with uncommitted changes (HI-2014): the lane's next card waits for it. */
+  slotDirty?: boolean
 }
 
 /** The reasons that pause a lane: it can't go on to its next card until they clear. */
@@ -233,6 +235,9 @@ export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: r
     return { reason: 'blocked', card: c.number, ...(c.blocked ? { blocked: c.blocked } : {}) }
   }
   if (!facts) return null
+  // A finished card's slot not safe to go on in (HI-2014: uncommitted changes kept it on its line): the user is asked.
+  const unsafe = cards.find((c) => c.column === 'done' && facts.get(c.number)?.slotDirty)
+  if (unsafe) return { reason: 'you', card: unsafe.number, ask: 'decide' }
   // The card the lane waits on: the first not Done when it has passed (merging next), else the one being worked.
   const focus = open[0].column === 'passed' ? open[0] : (open.find((c) => c.number === current) ?? open[0])
   const f = facts.get(focus.number)

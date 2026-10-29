@@ -2413,12 +2413,14 @@ export async function noteOnCard(n: number, what: string | StoredText, ws: Works
  * card. `still`: whether the card, as it is in the change, is still the one meant (its column, project and agent may
  * have changed since it was chosen). True when it was written. `said`: English text, or a message of the card history's
  * (shared/taskHistory.ts), kept as its English (`text`) and as data (`hiveText`, #846) for the window to show in its language.
+ * `key`: the comment's id, at most once on the card.
  */
-export async function commentAsHive(n: number, said: string | StoredText, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true): Promise<boolean> {
+export async function commentAsHive(n: number, said: string | StoredText, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string): Promise<boolean> {
   return boardLock(ws, async () => {
     const card = await getTask(n, ws)
-    if (card.archived || !still(card)) return false
-    addComment(card, BY.hive, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said)
+    // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing.
+    if (card.archived || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
+    addComment(card, BY.hive, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)
     await saveCard(ws, n, card)
     changed(ws)
     return true
@@ -2575,9 +2577,9 @@ function commentText(comment: string): string {
 }
 
 /** Adds a comment; one Hive writes itself can carry its text as data (`hiveText`) beside its English. */
-function addComment(c: TaskCard, by: string, t: string, hiveText?: StoredText): void {
+function addComment(c: TaskCard, by: string, t: string, hiveText?: StoredText, id?: string): void {
   const at = new Date().toISOString()
-  c.comments = [...c.comments, { at, by, text: t, ...(hiveText ? { hiveText } : {}), id: entryId() }].slice(-MAX_COMMENTS)
+  c.comments = [...c.comments, { at, by, text: t, ...(hiveText ? { hiveText } : {}), id: id ?? entryId() }].slice(-MAX_COMMENTS)
   c.updatedAt = at
 }
 

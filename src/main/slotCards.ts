@@ -26,7 +26,7 @@ import { projectAgents } from '../shared/defaults'
 import { taskPrompt } from '../shared/tasks'
 import { agentWorkflowRole, buildsWork, takesCards } from '../shared/workflow/roles'
 import { SLOT_NOTICES, workflowText } from '../shared/workflow/texts'
-import type { Fact, FactData, StartedData, StageId } from '../shared/workflow/facts'
+import { SLOT_DIRTY_GATE, type Fact, type FactData, type StartedData, type StageId } from '../shared/workflow/facts'
 import { SLOTS_DELETE_MERGED, SLOTS_RENAME_ADOPTED } from '../shared/advanced'
 import { basename } from 'path'
 import type { AgentDef, LaneSlotInfo, LiveSessionState } from '../shared/types'
@@ -94,7 +94,7 @@ function crashAt(point: 'afterAction' | 'inPrepare' | 'inPlacement' | 'inDeletio
 }
 
 /** The project folder of a card on a workspace's board, by its board name; null for none. */
-function projectOfCard(ws: WorkspaceService, card: number): string | null {
+export function projectOfCard(ws: WorkspaceService, card: number): string | null {
   const name = boardRead(ws, (db) => (db.prepare('SELECT project FROM cards WHERE number = ?').get(card) as { project: string } | undefined)?.project) // i18n-ignore: SQL
   if (!name) return null
   return ws.info()?.projects.find((p) => p.name.toLowerCase() === name.toLowerCase())?.path ?? null
@@ -696,6 +696,65 @@ export function settleSlotCards(ws: WorkspaceService, projectPath: string): Prom
 /** Projects whose pass waits for Repair (their folders moved): said once in the log. */
 const waitingForRepair = new Set<string>()
 
+/**
+ * Finished cards' slots (HI-2014, HI-1986): each Done card of a lease still open (a running lane's) or ended within
+ * DELETE_WITHIN_MS, whose slot is still on its card's line. Clean, a running lane's slot is detached at its target's
+ * head under the repository's lock (a released one is detached as the pool looks at it); with uncommitted changes, the
+ * user is asked once on the card (SLOT_DIRTY_GATE). That question closes once the slot is clean or on another line. Read
+ * from the slot each time, under the lock: never another card's checkout, never a slot an operation holds.
+ */
+async function finishedSlots(ws: WorkspaceService, projectPath: string, wf: Workflow, pool: SlotPool, lanes: Map<string, LaneRecord>): Promise<void> {
+  const since = new Date(Date.now() - DELETE_WITHIN_MS).toISOString()
+  for (const l of [...pool.openLeases(), ...pool.endedSince(since)]) {
+    if (ended(ws)) return
+    const lane = l.kind === 'lane' && l.lane ? lanes.get(l.lane) : undefined
+    const cards = l.kind === 'card' && l.card !== null ? [l.card] : (lane?.cards ?? [])
+    for (const n of cards) {
+      const card = cardOf(wf, n)
+      const s = card ? wf.state(card) : null
+      if (!card || !s?.finished || s.started?.lease !== l.id || !s.started.line) continue
+      const asked = s.requests.some((r) => r.gate === SLOT_DIRTY_GATE)
+      const slot = pool.slotOf(l)
+      // The slot is another lease's now: its own card's question, if any, no longer stands.
+      if (!slot || (l.to && pool.openLease(slot.name))) {
+        if (asked) await wf.closeSlotDirty(card)
+        continue
+      }
+      const line = s.started.line
+      const target = slot.target ?? s.started.target
+      if (!target) continue
+      const finish = s.finished.seq
+      await withRepoLock(
+        projectPath,
+        async () => {
+          const now = pool.slotOf(l)
+          if (!now || now.op || (l.to && pool.openLease(now.name))) return
+          const h = await G.heads(now.folder, target)
+          if (isUnknown(h.line)) return
+          if (h.line !== line) {
+            if (asked) await wf.closeSlotDirty(card)
+            return
+          }
+          const d = await G.dirty(now.folder)
+          if (isUnknown(d)) return
+          if (d.length) {
+            if (!asked) await wf.askSlotDirty(card, finish, { slot: now.name, line, target })
+            return
+          }
+          // Clean: a running lane's slot detached here; a released one is the pool's (it looks at it as it settles).
+          if (!l.to && !isUnknown(h.target) && h.target) {
+            const r = await git(now.folder, ['switch', '--detach', h.target])
+            if (r.ok) log.info(`${userText(now.name)} detached at ${userText(target)} after #${n} (lane ${userText(l.lane ?? '')})`)
+            else return void log.warn(`detaching ${userText(now.name)} at ${userText(target)}: ${userText(r.err)}`)
+          }
+          if (asked) await wf.closeSlotDirty(card)
+        },
+        { quiet: true, project: projectPath }
+      )
+    }
+  }
+}
+
 async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<void> {
   if (!ws.path || ended(ws)) return
   const wf = await workflowFor(ws, projectPath).catch(() => null)
@@ -764,6 +823,10 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   // A retirement waiting for its slot's operation or job: looked at again later; none: its tries forgotten.
   if (busy) retireLater(ws, projectPath)
   else retiredNow(ws, projectPath)
+  if (ended(ws)) return
+  // 1b. Finished cards' slots (HI-2014): one still on its card's line is detached at the target's head when clean (a
+  //     running lane's here; a released card's as the pool looks at it), else the user is asked once on the card.
+  await finishedSlots(ws, projectPath, wf, pool, lanes).catch((e) => failedStep("settling finished cards' slots", e)) // i18n-ignore: a log line (failedStep logs it)
   if (ended(ws)) return
   // With the rules off nothing is placed: no placement is pending, so none keeps anything (HI-1804).
   if (!workflowEnforced()) return void keepTracksOf(ws, projectPath, new Map())

@@ -11,6 +11,7 @@
   "workflow.contradiction.subfolderTarget": "此项目位于更大的仓库内：请指定其工作要合并到的分支。",
   "workflow.contradiction.upToDateNeedsSlots": "只有每张卡片都有自己的文件夹时，槽位才会更新。",
   "workflow.forYou.decidedAfterMerge": "{card} 合并后又做出了决定：需要后续跟进吗？",
+  "workflow.forYou.slotDirty": "{card} 已完成，但 {slot} 有未提交的更改，因此仍停在 {line} 上。请在那里提交或丢弃这些更改：之后 Hive 会将该槽位分离到 {target}，为下一张卡片做好准备。",
   "workflow.forYou.focusedSkip": "{card} 合并时跳过了部分针对性测试：{tests}。要在跳过它们的情况下合并吗？",
   "workflow.forYou.lineAsk": "{line} 上仍有 {card} 的工作，已以压缩合并方式合并到 {target}：批准则由 Hive 将分支更新一次，拒绝则请在 {next} 开始前自己处理。",
   "workflow.forYou.lineRefused": "Git 无法让 {line} 与 {target} 同步：{reason}。分支更新后 {next} 才会开始。",

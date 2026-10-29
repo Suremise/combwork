@@ -15,7 +15,7 @@ import { tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
 import { endTree } from '../progressReporters/wrapper'
-import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type FactData, type FocusedReturn, type QueueEntry } from '../../shared/workflow/facts'
+import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type Fact, type FactData, type FocusedReturn, type QueueEntry } from '../../shared/workflow/facts'
 import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, focusedCheckName, readResults, reviewProved, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
 import { FOCUSED_PICK, FOCUSED_RUN } from '../../shared/workflow/options'
 import { boundedRead, pathChanges, runPick } from './focusedRun'
@@ -1694,8 +1694,6 @@ export class MergeQueue {
       const f = w.tx.append(card.id, { kind: 'Integrated', actor: 'hive', source: 'recorded', dedupe: `cycle:${st.cycle}`, ...(w.ruleset ? { ruleset: w.ruleset.id } : {}), data: { entry: entry.id, revision, target, result, method, by } }) // i18n-ignore: a fact's kind and codes, not text
       w.written.push(f)
       w.move('done', 'derived')
-      w.action('releaseSlot', {})
-      w.action('endLaneIfDone', {})
       if (by === 'hive') this.owePush(w, entry.id, target, result)
       if (this.wf.store.facts(card.id).some((x) => x.kind === 'Decision' && x.seq > startedAt)) this.wf.askUser(w, 'decide', 'decision', workflowText(FOR_YOU.decidedAfterMerge, { card: card.key }))
     })
@@ -1748,9 +1746,9 @@ export class MergeQueue {
           const method = methodOf(requested?.style ?? this.wf.rulesetOf(card, s).options.style, s.started?.target, e.target)
           const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { entry: e.id, revision: e.revision, target: e.target, result, method, by: 'hive' } }) // i18n-ignore: a fact's kind and codes, not text
           if (!f) return
+          // Its finish reads what this write recorded (HI-2014): the merge, verified.
+          w.written.push(f as Fact)
           w.move('done', 'derived')
-          w.action('releaseSlot', {})
-          w.action('endLaneIfDone', {})
           // Hive's own merge, found done after a restart: its push owed as an advance's is (G18).
           this.owePush(w, e.id, e.target, result)
         })

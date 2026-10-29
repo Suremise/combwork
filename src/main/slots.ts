@@ -1329,7 +1329,20 @@ export class SlotPool {
     if (!s || s.op || s.writer || this.store.openLease(name)) return
     if (s.state === 'creating' || s.state === 'removing') return
     const to = await this.look(s)
+    // Clean, it waits for its next card detached at the target's head (HI-2014, HI-1986), before it is ready to lend: its
+    // card's line is no longer checked out (committed work stays on that line), so a merged one can be deleted.
+    if (to === 'ready' && s.state !== 'ready') await this.detach(s)
     if (to !== s.state) await this.store.look(name, s.state, to)
+  }
+
+  /** A clean slot on a line, switched to its target's head, detached; left as it is when that can't be read or done. */
+  private async detach(s: Slot): Promise<void> {
+    if (!s.target) return
+    const h = await G.heads(s.folder, s.target)
+    if (isUnknown(h.line) || !h.line || isUnknown(h.target) || !h.target) return
+    const r = await git(s.folder, ['switch', '--detach', h.target])
+    if (r.ok) log.info(`${userText(s.name)} detached at ${userText(s.target)} (it was on ${userText(h.line)})`)
+    else log.warn(`detaching ${userText(s.name)} at ${userText(s.target)}: ${userText(r.err.trim())}`)
   }
 
   /** What a slot is on disk now: gone (no folder, or git doesn't list it), dirty, or ready. */
