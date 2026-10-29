@@ -1485,9 +1485,10 @@ export class Workflow {
     }
     w.move('review', cause)
     w.action('prepareReviewCopy', { revision: g.revision })
-    // A lane reviewed by the pool (#1443, G17): the pool's pass gives the submission to a free pooled reviewer and wakes
-    // it, so no lane reviewer is woken here.
-    if (reviewerAgent(g.o.review) && g.card.reviewerPool) w.action('assignReviewer', { submission: sub.seq })
+    // A lane reviewed by the pool (#1443, G17), or a card no running lane holds (HI-2046: loose): the pool's pass gives
+    // the submission to a free reviewer and tells it, so no lane reviewer is woken here. A loose card's follow-up keeps
+    // the reviewer it has, woken below to start again.
+    if (reviewerAgent(g.o.review) && (g.card.reviewerPool || (!g.card.lane && !args.followUp))) w.action('assignReviewer', { submission: sub.seq })
     // A follow-up (HI-1832): the card stays in Review, so no arrival wakes its reviewer; told what to do, its words kept.
     else if (reviewerAgent(g.o.review) && args.followUp) this.wake(w, this.reviewerOf(g.card), `${g.card.key}: follow-up submitted for review at ${(g.revision ?? '').slice(0, 7)} (submission ${sub.seq}). Start your review again (hive_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused`, 'review') // i18n-ignore: a wake, agent-facing
     else if (reviewerAgent(g.o.review) && ahead) {
@@ -1559,8 +1560,9 @@ export class Workflow {
       // confirms; then it finishes with nothing to merge). HI-1449 sat in Approved for two days. Once only: not after a
       // proposal or a decision of its kind (`merged` was only read without either).
       if (nothingToMerge) w.fact('KindProposed', { kind: 'no-code' })
-      // A verdict frees its pooled reviewer for the next card, and with G1b = 2 a pass asks for the second (#1443).
-      if (card.reviewerPool) w.action('assignReviewer', { submission: subId! })
+      // A verdict frees its pooled reviewer for the next card, and with G1b = 2 a pass asks for the second (#1443); a loose
+      // card's too (HI-2046).
+      if (card.reviewerPool || !card.lane) w.action('assignReviewer', { submission: subId! })
       if (!args.pass) {
         w.move('active', 'intent')
         this.wake(w, st.started?.builder, `${card.key} failed review`) // i18n-ignore: a wake, agent-facing

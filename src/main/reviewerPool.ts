@@ -15,6 +15,10 @@
 // A verdict frees its reviewer for the next card. The pass runs when a submission or a verdict of a pool card asks
 // (`assignReviewer`), when an agent's turn ends, when lanes or the board change, as a workspace opens, when the rules are
 // switched, and hourly. With workflow rules off (Settings → Advanced) nothing is assigned or told.
+// A **loose** card (HI-2046) is given out the same way: one in Review under reviewer-agent rules that no running lane
+// holds (the runtime's own `card.lane`, lanes.ts's effective owner: no lane, or its lane ended), so a card started on its
+// builder alone is reviewed with no Assistant step. Its reviewer is whoever is free, a stopped one started for it, as a
+// pool's; a lane claiming it meanwhile (its reviewer reviews it then) gets it back, checked again in the write.
 
 import { basename } from 'path'
 import { projectAgents } from '../shared/defaults'
@@ -66,8 +70,14 @@ function cardOf(wf: Workflow, n: number): CardRecord | null {
   }
 }
 
-/** A lane card as the pool sees it: in Review under a reviewer agent's rules, with its latest submission's reviewers. */
-function poolCardOf(wf: Workflow, n: number, known: (id: string) => boolean): (PoolCard & { rec: CardRecord }) | null {
+/** A card the pass looks at: a pool lane's, or a loose one's (held by no running lane, HI-2046), and which. */
+type PassCard = PoolCard & { rec: CardRecord; loose: boolean }
+
+/**
+ * A card as the pass sees it: in Review under a reviewer agent's rules, with its latest submission's reviewers; given
+ * out (`pool`) when its lane is the pool's or it has no running lane (loose, HI-2046).
+ */
+function poolCardOf(wf: Workflow, n: number, known: (id: string) => boolean): PassCard | null {
   const rec = cardOf(wf, n)
   if (!rec) return null
   const s = wf.state(rec)
@@ -77,8 +87,12 @@ function poolCardOf(wf: Workflow, n: number, known: (id: string) => boolean): (P
   const facts = wf.store.facts(n)
   const sub = s.latest.id
   const { seen, reviewing } = submissionReviewers(facts, sub, known)
-  return { rec, card: n, submission: sub, submittedAt: facts.find((f) => f.seq === sub)?.at ?? '', pool: !!rec.reviewerPool, builders: s.builders, seen, reviewing, quorum: r.options.reviewers, passes: passingReviewers(s).length }
+  const loose = !rec.lane
+  return { rec, loose, card: n, submission: sub, submittedAt: facts.find((f) => f.seq === sub)?.at ?? '', pool: !!rec.reviewerPool || loose, builders: s.builders, seen, reviewing, quorum: r.options.reviewers, passes: passingReviewers(s).length }
 }
+
+/** Whether a card is still given out as it was when the pass read it: still the pool's, or still loose (held by no running lane). */
+const stillGivenOut = (rec: CardRecord, loose: boolean): boolean => (loose ? !rec.lane : !!rec.reviewerPool)
 
 // --- The pass.
 
@@ -111,7 +125,6 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   if (!ws.path || ws.lifetime.aborted || !workflowEnforced()) return
   const project = basename(projectPath)
   const lanes = (await rawLanes(ws)).filter((l) => running(l) && same(l.project, project))
-  if (!lanes.some((l) => l.pool)) return
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return
   const cfg = await ws.projectConfig(projectPath)
@@ -119,16 +132,26 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   const known = (id: string): boolean => agents.some((a) => a.id === id)
   // The slots' project id (slotsApp's poolFor), for the dispatch leases read with the board.
   const slotProject = cfg.id ?? project
-  // The pool lanes' cards waiting in Review: only they are given out.
-  const cards = new Map<number, PoolCard & { rec: CardRecord }>()
+  // The pool lanes' cards waiting in Review, and the loose ones (HI-2046: in Review, held by no running lane): only they
+  // are given out.
+  const cards = new Map<number, PassCard>()
   for (const l of lanes.filter((x) => x.pool))
     for (const n of [...l.cards, ...(l.pending ?? [])]) {
       if (cards.has(n)) continue
       const c = poolCardOf(wf, n, known)
       if (c?.pool) cards.set(n, c)
     }
+  for (const n of wf.store.cardsAt('review')) {
+    if (cards.has(n)) continue
+    const c = poolCardOf(wf, n, known)
+    if (c?.loose) cards.set(n, c)
+  }
+  if (!cards.size) return
   // Every agent's dispatch lease as hive.db has it; one that can't be read keeps that agent out (never assumed free).
-  const pool: PoolAgent[] = agents.map((a) => ({ id: a.id, role: agentWorkflowRole(a), leased: wf.store.dispatchLeased(slotProject, a.id) !== false, idle: idle(projectPath, a.id) }))
+  // Running ones first (HI-2046): a stopped reviewer is started only when no running one is free.
+  const pool: PoolAgent[] = agents
+    .map((a) => ({ id: a.id, role: agentWorkflowRole(a), leased: wf.store.dispatchLeased(slotProject, a.id) !== false, idle: idle(projectPath, a.id) }))
+    .sort((a, b) => Number(!sessions.liveFor(projectPath, a.id)) - Number(!sessions.liveFor(projectPath, b.id)))
   for (const a of poolAssignments([...cards.values()], pool, reviewersNow(wf, known))) {
     if (!workflowEnforced() || ws.lifetime.aborted) return
     const c = cards.get(a.card)!
@@ -138,6 +161,8 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
       // (whatever its lane: none, ended, another's) and of any dispatch lease.
       const s = w.state()
       if (s.stage !== 'review' || s.latest?.id !== a.submission) return false
+      // Still given out as read (HI-2046): a lane that claimed a loose card meanwhile reviews it itself.
+      if (!stillGivenOut(w.card, c.loose)) return false
       const now = submissionReviewers(w.tx.facts(a.card), a.submission, known)
       if (now.reviewing || now.seen.includes(a.reviewer) || passingReviewers(s).length >= c.quorum) return false
       if (wf.store.dispatchLeased(slotProject, a.reviewer) !== false || reviewersNow(wf, known, a.card).has(a.reviewer)) return false
@@ -145,7 +170,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
       return true
     })
     if (!given) continue
-    log.info(`#${a.card} (submission ${a.submission}) given to ${userText(agents.find((x) => x.id === a.reviewer)?.name ?? a.reviewer)} from the pool`)
+    log.info(`#${a.card} (submission ${a.submission}) given to ${userText(agents.find((x) => x.id === a.reviewer)?.name ?? a.reviewer)} ${c.loose ? 'outside a lane' : 'from the pool'}`)
     cards.set(a.card, { ...c, reviewing: a.reviewer, seen: [...c.seen, a.reviewer] })
   }
   // Each pool card's reviewer given it and not started on it yet: told, once.
@@ -179,7 +204,7 @@ function reviewersNow(wf: Workflow, known: (id: string) => boolean, except?: num
  * released from it (`ReviewerReleased`, in a write that finds it still given and not started) and the pass gives the
  * card again; one busy now, or whose lease can't be read, is told at a later pass.
  */
-async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slotProject: string, c: PoolCard & { rec: CardRecord }): Promise<void> {
+async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slotProject: string, c: PassCard): Promise<void> {
   const agents = projectAgents(await ws.projectConfig(projectPath))
   const id = c.reviewing!
   const agent = agents.find((a) => a.id === id)
@@ -200,15 +225,39 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
   }
   if (!idle(projectPath, agent.id)) return
   const builder = agents.find((a) => c.builders.includes(a.id))?.name
-  const body = withCardNames(ws, () => `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''} is in Review: you review it from the pool. Review its latest submission (hive_read_task, then hive_start_review and hive_verdict); your verdict frees you for the next card.`) // i18n-ignore: agent-facing
+  const body = withCardNames(ws, () => `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''} is in Review${c.loose ? ', outside a lane: you review it' : ': you review it from the pool'}. Review its latest submission (hive_read_task, then hive_start_review and hive_verdict); your verdict frees you for the next card.`) // i18n-ignore: agent-facing
   const nd = { agentId: agent.id, agentName: agent.name, kind: 'card-event' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: c.card, body, source: POOL_REVIEW, ref } // i18n-ignore: who a delivery is from, as agents read it
-  log.info(`Telling ${userText(agent.name)} of #${c.card} from the pool (${st ? 'typed' : 'started'})`)
-  const r = st ? await deliverNow(projectPath, { ...nd, need: 'free', conversation: st.sessionId || null }) : (await launchWith(projectPath, nd, (line) => sessions.start(projectPath, { agentId: agent.id, prompt: line, purpose: 'review' }))).record
+  // Still this assignment as it is given (HI-2046, HR1): the card still in Review on this submission, given out as read
+  // (a lane claiming a loose card meanwhile takes it), still given to this agent, and the agent holding no dispatch lease.
+  // Asked as the line is typed, and as a stopped one's launch spawns (sessions.start's `allowed`, after its awaits).
+  const still = (): boolean => {
+    const rec = cardOf(wf, c.card)
+    if (!rec || !stillGivenOut(rec, c.loose)) return false
+    const s = wf.state(rec)
+    if (s.stage !== 'review' || s.latest?.id !== c.submission) return false
+    return submissionReviewers(wf.store.facts(c.card), c.submission, (x) => agents.some((a) => a.id === x)).reviewing === agent.id && wf.store.dispatchLeased(slotProject, agent.id) === false
+  }
+  if (!still()) return
+  log.info(`Telling ${userText(agent.name)} of #${c.card} ${c.loose ? 'outside a lane' : 'from the pool'} (${st ? 'typed' : 'started'})`)
+  const r = st
+    ? await deliverNow(projectPath, { ...nd, need: 'free', conversation: st.sessionId || null }, still)
+    : (
+        await launchWith(projectPath, nd, (line) =>
+          sessions.start(projectPath, {
+            agentId: agent.id,
+            prompt: line,
+            purpose: 'review',
+            allowed: () => {
+              if (!still()) throw new Error(`${cardRef(c.card)}'s review is no longer ${agent.name}'s`) // i18n-ignore: for the log (the launch is refused)
+            }
+          })
+        ).catch((e) => (log.info(`${userText(agent.name)} not started for #${c.card}: ${userText((e as Error).message)}`), { record: null }))
+      ).record
   if (!r || NOT_GIVEN.has(r.state)) log.info(`#${c.card}'s pool delivery to ${userText(agent.name)} wasn't given (${r?.state ?? 'none made'}): told at the next pass`)
 }
 
 /** A pool's assignment given up (`ReviewerReleased`) while it is still the submission's and not started; the pass again. */
-async function release(ws: WorkspaceService, projectPath: string, wf: Workflow, c: PoolCard & { rec: CardRecord }, reviewer: string, why: FactData['ReviewerReleased']['why']): Promise<void> {
+async function release(ws: WorkspaceService, projectPath: string, wf: Workflow, c: PassCard, reviewer: string, why: FactData['ReviewerReleased']['why']): Promise<void> {
   const known = (): boolean => true
   const done = await wf.write(c.rec, null, 'hive', (w) => {
     const s = w.state()
@@ -231,12 +280,23 @@ function projectOfCard(ws: WorkspaceService, card: number): string | null {
   return ws.info()?.projects.find((p) => p.name.toLowerCase() === name.toLowerCase())?.path ?? null
 }
 
-/** Every open workspace's projects with a running pool lane: their passes. */
+/** Every open workspace's projects with a running pool lane, or a card in Review (a loose one may wait, HI-2046): their passes. */
 async function settleAll(): Promise<void> {
   for (const ws of openWorkspaces()) {
     if (!ws.path) continue
     const names = new Set((await rawLanes(ws).catch(() => [])).filter((l) => running(l) && l.pool).map((l) => l.project.toLowerCase()))
+    for (const p of inReview(ws)) names.add(p.toLowerCase())
     for (const p of ws.info()?.projects ?? []) if (names.has(p.name.toLowerCase())) await settleReviewerPool(ws, p.path)
+  }
+}
+
+/** The projects (board names) with a card in Review, on the board now: where a loose card may wait for a reviewer. */
+function inReview(ws: WorkspaceService): string[] {
+  try {
+    return boardRead(ws, (db) => (db.prepare("SELECT DISTINCT project FROM cards WHERE col = 'review' AND coalesce(archived, 0) = 0").all() as { project: string }[]).map((r) => r.project)) // i18n-ignore: SQL
+  } catch {
+    // A board still 0.9's, or closed: none.
+    return []
   }
 }
 

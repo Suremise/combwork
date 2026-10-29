@@ -27,7 +27,9 @@ const state = vi.hoisted(() => ({
   deliveries: [] as { id: string; agentId: string; source?: string; ref?: string; state: string; body: string }[],
   /** The next deliveries: given, or not (its agent got busy: cancelled). */
   next: [] as ('given' | 'notGiven')[],
-  calls: [] as string[]
+  calls: [] as string[],
+  /** Awaited as a stopped agent's launch prepares, before its `allowed` (HI-2046: a change landing meanwhile). */
+  beforeSpawn: null as null | (() => void | Promise<void>)
 }))
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: () => [], workflowFor: async () => state.wf }))
@@ -39,7 +41,10 @@ vi.mock('../src/main/sessions', async (orig) => {
   const stub = {
     liveFor: (_p: string, a: string) => (state.running.has(a) ? { status: 'ready', sessionId: `s-${a}`, cwd: '' } : null),
     agentNow: (_p: string, a: string) => (state.running.has(a) ? { status: state.busy.has(a) ? 'working' : 'ready', pending: false, backgroundTasks: 0 } : null),
-    start: async (_p: string, o: { agentId: string; prompt?: string; purpose?: string }) => {
+    // As the real one: its `allowed` just before it spawns, after its own awaits (HI-2046).
+    start: async (_p: string, o: { agentId: string; prompt?: string; purpose?: string; allowed?: () => void }) => {
+      await state.beforeSpawn?.()
+      o.allowed?.()
       state.calls.push(`start ${o.agentId} for ${o.purpose}`)
       state.running.add(o.agentId)
       return { runId: 'r' }
@@ -58,7 +63,9 @@ vi.mock('../src/main/deliveries', async (orig) => {
   return {
     ...actual,
     deliveriesOf: async (_h: string, a: string) => state.deliveries.filter((r) => r.agentId === a).map((r) => ({ ...r })),
-    deliverNow: async (_h: string, nd: { agentId: string; source?: string; ref?: string; body: string }) => {
+    // Its producer's check (`holds`) asked, as the real one asks it before each key (HI-2046).
+    deliverNow: async (_h: string, nd: { agentId: string; source?: string; ref?: string; body: string }, holds?: () => boolean) => {
+      if (holds && !holds()) return null
       state.calls.push(`typed to ${nd.agentId}`)
       return make(nd)
     },
@@ -74,7 +81,7 @@ let env: Env | null = null
 afterEach(() => {
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), deliveries: [], next: [], calls: [] })
+  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), deliveries: [], next: [], calls: [], beforeSpawn: null })
 })
 
 const E1 = agentActor('E1')
@@ -479,5 +486,118 @@ describe("the pool's pass (#1443)", { timeout: 60_000 }, () => {
     expect(assignedTo(e, a.id)).toEqual(['E1', 'E1'])
     expect(state.calls).toEqual(['typed to E1', told])
     expect(new Set(state.deliveries.map((d) => d.ref)).size).toBe(2)
+  })
+})
+
+describe('a card in Review outside a lane (HI-2046): given to a free reviewer by the same pass', { timeout: 60_000 }, () => {
+  const loose = (reviewers: 1 | 2 = 1, loopWakes = true) => {
+    const e = (env = setup({ ...optionsFor(reviewers, 'lane', 'project'), loopWakes, platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    return e
+  }
+
+  it('submitted with no lane: the pass is asked (no reviewer to wake), and gives it to a free reviewer, a running one first, told once that it is outside a lane', async () => {
+    const e = loose()
+    const a = e.wf.createCard({ title: 'Loose' })
+    await submitted(e, a, B1)
+    expect(pending(e).map((x) => x.kind)).toContain('assignReviewer')
+    expect(pending(e).filter((x) => x.kind === 'wake')).toEqual([])
+    // R2 runs, R1 doesn't: R2 is given it, though R1 comes first in the project's order.
+    state.running = new Set(['R2'])
+    await pass(e)
+    await pass(e)
+    expect(assignedTo(e, a.id)).toEqual(['R2'])
+    expect(state.calls).toEqual(['typed to R2'])
+    expect(state.deliveries.map((d) => d.body)).toEqual([expect.stringMatching(/is in Review, outside a lane: you review it/)])
+  })
+
+  it.each([true, false])('no reviewer running: a stopped one is started for its review, whatever Wake reviewers and builders says (loopWakes %s)', async (loopWakes) => {
+    const e = loose(1, loopWakes)
+    const a = e.wf.createCard({ title: `Stopped ${loopWakes}` })
+    await submitted(e, a, B1)
+    await pass(e)
+    expect(assignedTo(e, a.id)).toEqual(['R1'])
+    expect(state.calls).toEqual(['start R1 for review'])
+  })
+
+  it('never its builder; with G1b = 2, the second reviewer is another agent; oldest first, and a card nobody can take holds up none after it', async () => {
+    const e = loose(2)
+    const agents = [{ id: 'B1', name: 'B1', workflowRole: 'builder' }, { id: 'E1', name: 'E1', workflowRole: 'either' }, { id: 'R1', name: 'R1', workflowRole: 'reviewer' }, { id: 'R2', name: 'R2', workflowRole: 'reviewer' }] as AgentDef[]
+    const [mine, theirs] = ['Mine', 'Theirs'].map((t) => e.wf.createCard({ title: t }))
+    await submitted(e, mine, E1)
+    await submitted(e, theirs, B1)
+    await pass(e, agents.filter((x) => x.id !== 'R1' && x.id !== 'R2'))
+    // Only E1 reviews here, and it built Mine: Theirs (later) is given to it all the same.
+    expect([assignedTo(e, mine.id), assignedTo(e, theirs.id)]).toEqual([[], ['E1']])
+    moved(await e.wf.verdict(theirs.key, E1, { pass: true, comment: 'ok', startReview: true }))
+    await pass(e, agents)
+    // Oldest first: Mine (submitted first) takes R1; G1b = 2: Theirs' second is another agent, R2.
+    expect(assignedTo(e, mine.id)).toEqual(['R1'])
+    expect(assignedTo(e, theirs.id)).toEqual(['E1', 'R2'])
+  })
+
+  it("a running lane's card isn't taken (its lane's reviewer reviews it); one whose lane has ended is", async () => {
+    const e = loose()
+    const [held, after] = ['Held', 'After'].map((t) => e.wf.createCard({ title: t }))
+    lane(e, 'L1', [held.id], 'B1', 'R2')
+    await submitted(e, held, B1)
+    await pass(e)
+    expect(assignedTo(e, held.id)).toEqual([])
+    lane(e, 'L2', [after.id], 'B2', 'R2')
+    await submitted(e, after, B2)
+    state.lanes = state.lanes.filter((l) => l.id !== 'L2')
+    onDb(e, (db) => db.prepare("UPDATE lanes SET state = 'ended', ended_at = ? WHERE id = 'L2'").run(new Date().toISOString()))
+    await pass(e)
+    expect(assignedTo(e, after.id)).toEqual(['R1'])
+  })
+
+  it('with workflow rules off, nothing is given or told', async () => {
+    const e = loose()
+    const a = e.wf.createCard({ title: 'Off' })
+    await submitted(e, a, B1)
+    state.enforced = false
+    await pass(e)
+    expect([assignedTo(e, a.id), state.calls]).toEqual([[], []])
+  })
+
+  it("a lane claiming it between the pass's look and its write: not given (its lane's reviewer reviews it)", async () => {
+    const e = loose()
+    const a = e.wf.createCard({ title: 'Claimed' })
+    await submitted(e, a, B1)
+    state.wf = withBoundary(e, () => lane(e, 'L1', [a.id], 'B1', 'R2'))
+    await pass(e)
+    expect(assignedTo(e, a.id)).toEqual([])
+    expect(state.calls).toEqual([])
+  })
+
+  it("its reviewer taking a builder's lease, or a lane claiming the card, while its launch prepares: nothing spawned for it, and it is given again", async () => {
+    const e = loose()
+    const agents = [{ id: 'B1', name: 'B1', workflowRole: 'builder' }, { id: 'E1', name: 'E1', workflowRole: 'either' }, { id: 'R1', name: 'R1', workflowRole: 'reviewer' }] as AgentDef[]
+    const a = e.wf.createCard({ title: 'Launch raced' })
+    await submitted(e, a, B1)
+    // E1 (stopped, first in order) is given it; as its launch prepares it starts building in a slot.
+    state.beforeSpawn = () => lease(e, 'E1', true)
+    await pass(e, agents)
+    expect(assignedTo(e, a.id)[0]).toBe('E1')
+    expect(state.calls).toEqual([])
+    // The next pass releases E1 (leased) and gives the card to R1, launched for it.
+    state.beforeSpawn = null
+    await pass(e, agents)
+    await vi.waitFor(() => expect(assignedTo(e, a.id)).toEqual(['E1', 'R1']), { timeout: HUNG_MS })
+    await pass(e, agents)
+    expect(state.calls).toEqual(['start R1 for review'])
+  })
+
+  it("a lane claiming it while its stopped reviewer's launch prepares: nothing spawned, and nothing given again (the lane's reviewer has it)", async () => {
+    const e = loose()
+    const a = e.wf.createCard({ title: 'Claimed in launch' })
+    await submitted(e, a, B1)
+    state.beforeSpawn = () => lane(e, 'L1', [a.id], 'B1', 'R2')
+    await pass(e)
+    expect(assignedTo(e, a.id)).toEqual(['R1'])
+    expect(state.calls).toEqual([])
+    state.beforeSpawn = null
+    await pass(e)
+    expect(state.calls).toEqual([])
   })
 })
