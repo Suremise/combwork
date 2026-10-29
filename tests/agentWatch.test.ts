@@ -8,7 +8,8 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { agentBusy, agentEvent, agentLimitLine, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, type AgentNow } from '../src/shared/agentWatch'
 import { WAKE_MAX_BYTES, cardChange, cardWakeLine, readCondition, userNameOf, wakeAbout, type WatchCondition } from '../src/shared/watch'
-import { agentWatchText } from '../src/shared/toolReplies'
+import { agentWatchText, taskWaitText } from '../src/shared/toolReplies'
+import { LANE_DEFAULT_EVENTS } from '../src/shared/laneWatch'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 import { follow } from './followDoorbell'
@@ -147,6 +148,13 @@ describe('what an agent watch counts', () => {
     expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'], dropped: ['R6 (hive)'] })).toBe(`Already: B6 (hive) is idle: "Done.". Your watch on R6 (hive) has ended: watch again, passing every agent you're following.`)
     expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'], replaced: 'Waiting for #12 → Review' })).toBe('Already: B6 (hive) is idle: "Done.". Your card watch (waiting for #12 → Review) has ended.')
     expect(agentWatchText({ done: 'Cancelled your agent watch.' })).toBe('Cancelled your agent watch.')
+    // HI-1987: replacing a lane watch while its lanes run says what it drops, and the watch that keeps them.
+    expect(agentWatchText({ watching: 'Waiting for LB2 to finish', limitAt: 'x', replaced: 'Waiting on all running lanes', lanesLeft: ['LB1', 'LB2'] })).toMatch(/if none does\. Nothing runs meanwhile\. This replaces your lane watch: 2 running lanes \(LB1, LB2\) are no longer followed\. To follow them as well, watch them with this instead: hive_wait_for_tasks with lanes, and agents or cards\.$/)
+    expect(agentWatchText({ already: ['LB2 (tools) is idle'], lanesLeft: ['LB1'] })).toBe('Already: LB2 (tools) is idle. This replaces your lane watch: 1 running lane (LB1) is no longer followed. To follow them as well, watch them with this instead: hive_wait_for_tasks with lanes, and agents or cards.')
+    expect(taskWaitText({ watching: 'Waiting for #12', limitAt: 'x', lanesLeft: ['LB1'] })).toMatch(/Nothing runs meanwhile\. This replaces your lane watch: 1 running lane \(LB1\)/)
+    expect(taskWaitText({ watching: 'Waiting on all running lanes and LB2', limitAt: 'x', events: [...LANE_DEFAULT_EVENTS], agents: { now: ['LB2 (tools)'], already: ['LB3 (tools) is idle'] } })).toBe(
+      'Waiting on all running lanes and LB2. End your turn now: Hive types a line into this session on a lane event or LB2 (tools) finishing, waiting for the user or stopping, or at x if none comes. Not followed, not working now: LB3 (tools) is idle.'
+    )
   })
 })
 

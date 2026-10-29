@@ -1366,7 +1366,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
               defaultMessage: '{watch}: Hive types a line into it when {kind, select, agent {{n, plural, one {it finishes} other {one of them finishes}}, waits for you or stops} lane {a review fails, a card is blocked or stalled, or a lane is due to merge or ends} other {{n, plural, one {the card changes} other {one of them changes}}}}, or at {limit} if nothing does. Nothing runs meanwhile, and it takes no other work.',
               description: "Tooltip of a watching agent's status: what it waits for ({watch}: \"Waiting for #12 → Review\"), what wakes it (an agent watch: the agents finishing; a lane watch: lane events; a card watch: its cards changing; {n} is how many agents or cards), and when it is woken anyway ({limit}: a time)."
             }),
-            { watch: watchText(live.watch, tr, (l) => fmt.list(l, 'unit')), kind: live.watch.agents ? 'agent' : live.watch.lanes ? 'lane' : 'card', n: live.watch.agents ? live.watch.agents.length : live.watch.cards.length, limit: formatWhen(live.watch.limitAt) }
+            { watch: watchText(live.watch, tr, (l) => fmt.list(l, 'unit')), kind: live.watch.lanes ? 'lane' : live.watch.agents ? 'agent' : 'card', n: live.watch.agents && !live.watch.lanes ? live.watch.agents.length : live.watch.cards.length, limit: formatWhen(live.watch.limitAt) }
           )}
         >
           <span className="faint pane-status watching">

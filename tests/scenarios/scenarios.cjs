@@ -3869,6 +3869,23 @@ module.exports.SCENARIOS.push(
     fakeSkips: ['passed the question on to the user']
   },
   {
+    id: 'coordinator-build-beside-lanes',
+    title: "Coordinator mode with lanes running asked to say when an agent's work on no card is done (HI-1987): one lane watch that follows the agent too, never an agent watch in its place",
+    role: 'assistant',
+    control: 'agents',
+    mode: 'coordinator',
+    async setup(c) {
+      await twoLanes(c)
+      await busyCoder(c, 20, 300, c.agents.reviewer2)
+    },
+    prompt: "Two card loops are running in alpha: keep following them. Reviewer2 is also building a small script for me, with no card for it: tell me when it's done.",
+    fake: 'skill run-lanes then hive hive_wait_for_tasks {"lanes":["all"],"agents":[{"project":"alpha","agent":"Reviewer2"}],"wake":true,"limitMinutes":360}',
+    expect: (o) => [
+      ["ended its turn on a lane watch that also follows Reviewer2 (its live watch)", o.status === 'watching' && (o.watch?.lanes ?? []).length > 0 && (o.watch?.agents ?? []).includes('Reviewer2'), liveWatch(o)],
+      ['no agent watch left in place of the lanes', !(o.watch?.agents && !(o.watch?.lanes ?? []).length), liveWatch(o)]
+    ]
+  },
+  {
     id: 'coordinator-reassign',
     title: "Coordinator mode asked to move a card between running lanes (#402): reassigns it, its new lane has it, and the watch covers it",
     role: 'assistant',
