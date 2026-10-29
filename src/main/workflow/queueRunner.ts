@@ -29,7 +29,7 @@ import { createLogger, userText } from '../logger'
 import { endTree } from '../progressReporters/wrapper'
 import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
 import type { JobHost } from '../processSupervisor'
-import { clearJournal, endLeaseJob, journalOf, journalPath, launcherNotStarted, LeaseJob, queueHost, sealJournal, startLauncher, type Journalled } from './queueJobs'
+import { clearJournal, endLeaseJob, journalOf, journalPath, launcherNotStarted, launcherSignalled, LeaseJob, queueHost, sealJournal, SIGNALLED, startLauncher, type Journalled } from './queueJobs'
 import { defaultProbe, treeOf, type Listed, type ProcessProbe } from './queueProcs'
 import type { Workflow } from './runtime'
 
@@ -106,7 +106,16 @@ export interface RunResult {
    * nonce) that the command's own start failed. Code -1 then. Never set for a command that started, whatever its exit.
    */
   notRun?: string
+  /**
+   * HI-2042: the command (or its launcher) was ended by a signal, as Node saw it: its name. Code -1 then, never 1 (which
+   * git's reads take for "no"). Not set for a command that exited with a code of its own, nor one ended at its bound.
+   * On Windows a process ended from outside (TerminateProcess) exits with the code it was given: that is no signal.
+   */
+  signal?: string
 }
+
+/** HI-2042: what a run ended by a signal says when the command itself said nothing. */
+export const endedBy = (command: string, signal: string): string => `${command} was ended by a signal (${signal})` // i18n-ignore: the command's side of an error, in English as git's messages are
 
 /** HI-2020: a launcher that never started (no pid): the start's own error. Only `run` takes it for a result. */
 class NotStarted extends Error {
@@ -399,8 +408,13 @@ export class QueueRunner {
           endTree(child)
         }, timeoutMs)
       : undefined
+    // HI-2042: the launcher itself ended by a signal (no code) is kept as one, apart from its bound's.
+    let ended = null as string | null
     const code = await new Promise<number>((res) => {
-      child.once('close', (c) => res(c ?? 1))
+      child.once('close', (c, s) => {
+        ended = c === null ? (s ?? 'unknown') : null
+        res(c ?? 1)
+      })
       child.once('error', () => res(-1))
       // Ended at its bound: a descendant that got away may hold the output open, so its exit is enough.
       child.once('exit', (c) => {
@@ -413,6 +427,11 @@ export class QueueRunner {
     const nonce = this.nonces.get(child)
     const never = code === 127 && !timedOut && nonce ? launcherNotStarted(stderr, nonce) : null
     if (never) return { ok: false, code: -1, out: Buffer.concat(out).toString('utf8'), err: never.err, notRun: never.code }
+    // HI-2042: the command ended by a signal (the launcher's line, by its nonce), or the launcher itself: never code 1.
+    // Its bound comes first: a run it ended stays timed out, as before.
+    const killed = !timedOut && nonce && code === SIGNALLED ? launcherSignalled(stderr, nonce) : null
+    if (killed) return { ok: false, code: -1, out: Buffer.concat(out).toString('utf8'), err: killed.err || endedBy(command, killed.signal), signal: killed.signal }
+    if (ended && !timedOut) return { ok: false, code: -1, out: Buffer.concat(out).toString('utf8'), err: stderr || endedBy(command, ended), signal: ended }
     return { ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: stderr, ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}) }
   }
 
