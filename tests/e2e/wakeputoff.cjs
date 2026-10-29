@@ -3,8 +3,11 @@
 // and idle wakes are turned off meanwhile, so it is no longer wanted. What Hive typed is taken back whole: the input is
 // empty again (the fake Claude Code's Ctrl+U deletes one wrapped row, as Claude Code 2.1.312's does; LB1 kept a stopped
 // wake's first rows, and the next wake was sent after them). Idle wakes on again, the next wake is typed and sent alone.
-// Codex (and Copilot, wakepaste-copilot) clear the whole line with one Ctrl+U. Dev build only (the seam), throwaway
-// profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
+// Codex (and Copilot, wakepaste-copilot) clear the whole line with one Ctrl+U. Then a draft the user left in Claude
+// Code's input (HI-1979), which its Ctrl+U clears a row at a time: Hive types only once it reads the input box empty.
+// One taller than the screen, with line breaks, is cleared and the doorbell sent alone; with the fake's input not read
+// (fake-slow-input), nothing is typed until it reads again, then the same. Dev build only (the seam), throwaway profile,
+// workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const { execFile } = require('child_process')
@@ -45,6 +48,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   cfg.settings.providers.codex.executablePath = path.join(__dirname, 'fake-codex', 'fake-codex.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
+  // A short pause after the user types (HI-1979's drafts): Hive types nothing into a pane for this long after a key there.
+  cfg.settings.assistant = { ...cfg.settings.assistant, typingPause: 2, enterEndsPause: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
   // Both follow Hive's notices, as a model does: they read their inbox and ack what they listed.
@@ -135,6 +140,51 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
       check(`${a.name}: …alone: one doorbell, nothing typed before it`, sent.length === 1 && sent[0].startsWith('[Hive] New in your inbox') && (sent[0].match(/\[Hive\]/g) ?? []).length === 1, JSON.stringify(sent))
       check(`${a.name}: …it reads and acks the message`, !!(await until(async () => (await delivery(a, m))?.state === 'acked' && (await idle(a.id)), HUNG_MS)), JSON.stringify(await delivery(a, m)))
     }
+
+    // --- HI-1979: a draft the user left in Claude Code's input, which its Ctrl+U clears a row at a time. Hive types only
+    // once it reads the input box empty; a box it can't see cleared, it types nothing into.
+    const key = lib.ptyKey(alpha, claude.id)
+    const box = async () => (await screen(claude)).replace(/\s+/g, '')
+    /** Every prompt its CLI took, as its conversation has them (a doorbell sent after a draft would be one, not a doorbell). */
+    const prompts = async () => {
+      const s = await live(claude.id)
+      const items = s?.sessionId ? ((await inv('transcript:read', alpha, s.sessionId).catch(() => null))?.items ?? []) : []
+      return items.filter((i) => i.kind === 'user').map((i) => i.text)
+    }
+    // The user's own paste (through the pane, as typing): sixteen lines of fifty characters, two rows each at 40 columns,
+    // taller than the 30-row screen; no Enter.
+    const tall = Array.from({ length: 16 }, (_, i) => `draft line ${String(i).padStart(2, '0')} ${'d'.repeat(36)}`).join('\r')
+    let before = wakes(claude).length
+    let took = (await prompts()).length
+    await inv('pty:write', key, `\x1b[200~${tall}\x1b[201~`)
+    check('Claude: a draft of the user\'s, taller than the screen, in its input', !!(await until(async () => (await box()).includes('draftline15'), HUNG_MS)), await screen(claude))
+    let m = await leave(claude, 'Draft or not, read this.')
+    check('Claude: past the typing pause, the doorbell goes once the draft is cleared', !!(await until(() => wakes(claude).length > before, HUNG_MS)), JSON.stringify(wakes(claude).slice(before)))
+    let sent = wakes(claude).slice(before)
+    let taken = (await prompts()).slice(took)
+    check('Claude: …alone, with none of the draft before it: the one prompt it took is the doorbell', sent.length === 1 && taken.length === 1 && taken[0].startsWith('[Hive] New in your inbox') && !taken[0].includes('draft line'), JSON.stringify({ sent, taken }))
+    check('Claude: …it reads and acks the message', !!(await until(async () => (await delivery(claude, m))?.state === 'acked' && (await idle(claude.id)), HUNG_MS)), JSON.stringify(await delivery(claude, m)))
+
+    // Its input not read meanwhile (a busy CLI: fake-slow-input): a Ctrl+U it doesn't answer. Hive types nothing, puts the
+    // doorbell off, and once the CLI reads its input again, clears the draft and sends the doorbell alone.
+    const knob = path.join(claudeHome, `fake-slow-input-${claude.name}.txt`)
+    const paused = path.join(claudeHome, `fake-slow-input-${claude.name}.paused`)
+    await inv('pty:write', key, `a draft typed and left there, ${'long enough to wrap onto rows of its own, '.repeat(2)}end`)
+    check('Claude: a wrapped draft in its input', !!(await until(async () => (await box()).includes('end'), HUNG_MS)), await screen(claude))
+    fs.writeFileSync(knob, '')
+    check('Claude: its input reading stops', !!(await until(() => fs.existsSync(paused), HUNG_MS)))
+    before = wakes(claude).length
+    took = (await prompts()).length
+    const notSeen = logCount(/its input wasn't seen empty, so nothing is typed into it/)
+    const leftHeld = leave(claude, 'Read this once your input is clear.')
+    check('Claude: a Ctrl+U it doesn\'t answer: nothing is typed, the doorbell put off', !!(await until(() => logCount(/its input wasn't seen empty, so nothing is typed into it/) > notSeen, HUNG_MS)) && wakes(claude).length === before && (await prompts()).length === took)
+    fs.rmSync(knob, { force: true })
+    check('Claude: reading again, the draft is cleared and the doorbell goes', !!(await until(() => wakes(claude).length > before, HUNG_MS)), JSON.stringify(wakes(claude).slice(before)))
+    m = await leftHeld
+    sent = wakes(claude).slice(before)
+    taken = (await prompts()).slice(took)
+    check('Claude: …alone, with none of the draft before it: the one prompt it took is the doorbell', sent.length === 1 && taken.length === 1 && taken[0].startsWith('[Hive] New in your inbox') && !taken[0].includes('a draft typed'), JSON.stringify({ sent, taken }))
+    check('Claude: …it reads and acks the message', !!(await until(async () => (await delivery(claude, m))?.state === 'acked' && (await idle(claude.id)), HUNG_MS)), JSON.stringify(await delivery(claude, m)))
   } catch (e) {
     check('no error', false, e.stack)
   } finally {

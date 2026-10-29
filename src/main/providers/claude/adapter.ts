@@ -703,11 +703,15 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
    * setting claude-code.screen.input finds, its rows joined and whitespace squashed ('' when empty); null without one.
    */
   promptText(screen: string): string | null {
+    return this.promptBox(screen)?.replace(/\s+/g, ' ').trim() ?? null
+  }
+
+  /** promptText's box as drawn: the last one's first group, its rows kept (HI-1979). */
+  promptBox(screen: string): string | null {
     const re = advanced.pattern('claude-code.screen.input')
     let last: RegExpMatchArray | null = null
     for (const m of screen.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`))) last = m
-    if (!last) return null
-    return (last[1] ?? '').replace(/\s+/g, ' ').trim()
+    return last ? (last[1] ?? '') : null
   }
 
   startHint(text: string): StartHint | null {

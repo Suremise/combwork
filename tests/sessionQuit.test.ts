@@ -4,6 +4,7 @@
 // and before the kill; Stop and restarts don't use it.
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { claudeInput, type ClaudeInput } from './claudeInputStandIn'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -38,7 +39,11 @@ let n = 0
 function live(adapter: unknown = claudeCode) {
   const agentId = `b${++n}`
   const state = { provider: 'claude-code', runId: `run-${n}`, projectPath: P, agentId, agentName: `B${n}`, cwd: P, status: 'ready', startedAt: new Date().toISOString() }
-  const l: { state: typeof state; adapter: unknown; ending?: boolean; stopRequested?: boolean; stopCause?: string; prompts?: number } = { state, adapter }
+  // Its input box (claudeInputStandIn, fed what is typed into this agent: HI-1979, Hive types into it only once a key
+  // of its own shows it empty), bracketed paste off.
+  const input = claudeInput({ paste: false })
+  input.from(() => writes.filter((w) => w.key === `session:${P.toLowerCase()}#${agentId}`).map((w) => w.data))
+  const l: { state: typeof state; adapter: unknown; screen: ClaudeInput['screen']; ending?: boolean; stopRequested?: boolean; stopCause?: string; prompts?: number } = { state, adapter, screen: input.screen }
   priv.live.set(`${P.toLowerCase()}#${agentId}`, l)
   priv.runs.set(state.runId, `${P.toLowerCase()}#${agentId}`)
   const key = `session:${P.toLowerCase()}#${agentId}`

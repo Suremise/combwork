@@ -123,6 +123,8 @@
   "settings.advanced.claude-code.override.promptSnapshotOff.title": "以当前指令恢复助手",
   "settings.advanced.claude-code.override.statusLine.desc": "Hive 以自己的状态行启动 Claude Code，它把会话的模型、上下文、费用和套餐限额发给 Hive 用于智能体的页脚，并且在输入框下方不显示任何内容。关闭后，你的 Claude Code 设置中的状态行会再次显示：Hive 的命令仍会读取状态，然后用 Claude Code 给它的同样输入运行你的命令，并显示其输出。如果你没有自己的状态行，则没有变化。",
   "settings.advanced.claude-code.override.statusLine.title": "用 Hive 的状态行代替你的",
+  "settings.advanced.claude-code.prompt.clearKeySeconds.desc": "Claude Code 的 Ctrl+U 只会删除折行成多行的草稿中的一行，所以 Hive 在输入前会一次按一个 Ctrl+U，直到输入框（屏幕：输入框）显示为空。这是 Hive 等待 Claude Code 显示每次按键效果的时间。未能及时显示时，Hive 不输入任何内容，稍后再试：设得太短，Claude Code 忙碌时 Hive 会更频繁地推迟消息。",
+  "settings.advanced.claude-code.prompt.clearKeySeconds.title": "清除输入：每个按键的等待时间",
   "settings.advanced.claude-code.safeguard.note.desc": "Claude Code 的安全分类器拦截回复时在会话记录中写入的注记，以及它为模型添加的提示（#606）。若设置有误，Hive 会漏掉这类拦截：智能体窗格上不显示盾牌，“性能”也不会统计它们。",
   "settings.advanced.claude-code.safeguard.note.title": "安全拦截：会话记录注记",
   "settings.advanced.claude-code.safeguard.prompt.desc": "安全拦截后 Claude Code 询问是否切换模型的问题，根据它最后写出的几行中打开的对话框选项来识别。对话框打开期间，Hive 会显示智能体正在等你处理及原因；若设置有误，智能体只显示需要你的授权。",
