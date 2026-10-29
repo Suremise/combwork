@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
-import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
+import { B1, commit, GIT_HEAVY_MS, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { changedSince, chosenTests, choiceStands, parsePick, readResults, testsGiven, validTestId, type FocusedChoice, type FocusedNeed, type FocusedTest } from '../../src/shared/workflow/focused'
 import { parseRaw, pathChanges } from '../../src/main/workflow/focusedRun'
@@ -220,7 +220,8 @@ describe('run by the merge queue at the merged result', () => {
     expect(e.wf.state(card).checks.at(-1)).toMatchObject({ name: 'focused tests', revision: result, result: 'passed', counted: true })
   })
 
-  it('a failed test, or a test with no result, returns the card with its output', async () => {
+  // GIT_HEAVY_MS: two cards built, approved and drained through the queue, 94 git processes; past 20 s in HI-2025's baseline run.
+  it('a failed test, or a test with no result, returns the card with its output', { timeout: GIT_HEAVY_MS }, async () => {
     for (const want of [{ board: 'failed' }, { board: 'none' }] as const) {
       const e = team(picker([{ test: 'board', needs: ['fake'] }]), runner(want).command)
       const { card } = await built(e)
@@ -245,7 +246,9 @@ describe('run by the merge queue at the merged result', () => {
     expect(() => readFileSync(run.seen)).toThrow()
   })
 
-  it('realProof = review: a real-CLI test without its counted review run returns the card; with it, accepted and not run here', async () => {
+  // GIT_HEAVY_MS: a card through the queue twice (without its review run, then with it), 73 git processes; past 20 s in
+  // HI-2025's run beside three other full runs.
+  it('realProof = review: a real-CLI test without its counted review run returns the card; with it, accepted and not run here', { timeout: GIT_HEAVY_MS }, async () => {
     const run = runner()
     const e = team(picker([{ test: 'claude-real', needs: ['real'] }, { test: 'board', needs: ['fake'] }]), run.command)
     const { card, revision } = await built(e)
@@ -378,7 +381,9 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
     expect(e.wf.state(card).entries.at(-1)?.failure).toMatchObject({ focused: { why: 'newProof', tests: ['one'] } })
   })
 
-  it("5: the merge's pick is bracketed: one that writes in the folder proves nothing, even choosing no tests", async () => {
+  // GIT_HEAVY_MS: a card through the queue after the target moves, its pick bracketed by git reads of the folder, 93 git
+  // processes; past 20 s in HI-2025's baseline run and its run beside three other full runs.
+  it("5: the merge's pick is bracketed: one that writes in the folder proves nothing, even choosing no tests", { timeout: GIT_HEAVY_MS }, async () => {
     const p = steered()
     const e = team(p.command, runner().command)
     const { card } = await built(e, { 'README.md': 'card\n' + readFileSync(join(e.project, 'README.md'), 'utf8') })
@@ -390,7 +395,9 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
     expect(e.kinds(card.id)).not.toContain('Integrated')
   })
 
-  it("6: a runner that didn't exit 0 failed, whatever its results say: all passed, or only skips", async () => {
+  // GIT_HEAVY_MS: two cards built, approved and drained through the queue, 90 git processes; past 20 s in HI-2025's run
+  // beside three other full runs, and on HI-2001's loaded runs.
+  it("6: a runner that didn't exit 0 failed, whatever its results say: all passed, or only skips", { timeout: GIT_HEAVY_MS }, async () => {
     for (const results of [(ids: string[]) => ids.map((t) => ({ test: t, result: 'passed' })), (ids: string[]) => ids.map((t) => ({ test: t, result: 'skipped', why: 'x' }))]) {
       const e = team(picker([{ test: 'board', needs: ['fake'] }]), fixedRunner(results, 7))
       const { card } = await built(e)

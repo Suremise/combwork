@@ -59,6 +59,7 @@
   "content.skill.notClosed": "der Header ist nicht abgeschlossen (keine Zeile mit --- danach)",
   "content.skill.notClosedWithin": "der Header ist nicht innerhalb der ersten {kb} KB abgeschlossen",
   "content.skill.notFields": "der Header ist keine Liste von Feldern (`name: …`, `description: …`)",
+  "content.skill.notListed": "Dieser Ordner ist kein Skill, den Hive anzeigt.",
   "content.skill.notSkill": "Kein Skill-Ordner (keine SKILL.md)",
   "content.skill.yaml": "der Header ist kein gültiges YAML ({reason})",
   "content.skill.yamlAt": "der Header ist kein gültiges YAML (Zeile {line}: {reason})",

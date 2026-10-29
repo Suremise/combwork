@@ -245,6 +245,9 @@ export const RETIRED_ADVANCED: ReadonlySet<string> = new Set(['hive.accounts.pre
  */
 export const LEGACY_ADVANCED: ReadonlySet<string> = new Set(['hive.assistant.otherMcpServers', 'hive.agents.perProject'])
 
+/** Whether sessions are started with TERM=xterm-256color and no WT_SESSION (HI-2004): read by main's ptyHost. */
+export const TERMINAL_TYPE = 'hive.sessions.terminalType'
+
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
 export const COPIES_REVIEW = 'hive.copies.review'
 
@@ -375,6 +378,17 @@ const SOURCES: readonly AdvancedSource[] = [
     default: false,
     setting: 'advanced.showDeveloperFeatures',
     applies: 'now'
+  },
+  // HI-2004: a session's terminal named as what it is, xterm.js, whatever Hive was opened from (the Start menu gave the
+  // CLIs no TERM or WT_SESSION, Windows Terminal its WT_SESSION, so Claude Code drew ">" or "❯" by the launch path).
+  {
+    id: TERMINAL_TYPE,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.sessions.terminalType.title', defaultMessage: 'Sessions say their terminal is xterm-256color', description: "An advanced setting's title (Settings → Advanced), listed under Hive. xterm-256color is a terminal type's name and TERM an environment variable's: keep them." }),
+    desc: msg({ id: 'settings.advanced.hive.sessions.terminalType.desc', defaultMessage: "Hive starts each session with TERM=xterm-256color, as its terminal is, and without Windows Terminal's WT_SESSION, so the CLIs draw the same whether Hive was opened from the Start menu or a terminal (Claude Code draws ❯ rather than >). A TERM in your own environment or the session's is kept. Turned off, sessions get the environment Hive was opened with.", description: 'What the advanced setting "Sessions say their terminal is xterm-256color" does (Settings → Advanced). TERM, WT_SESSION and xterm-256color are names: keep them; ❯ and > are the characters Claude Code draws as its prompt mark.' }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions'
   },
   {
     id: 'hive.console.showText',
@@ -1278,7 +1292,12 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 'trust this folder', // i18n-ignore: a CLI's recorded text (#367)
     flags: 'i',
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/trust-claude-2.1.296.txt`, version: '2.1.296', text: 'Yes, I trust this folder' }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [
+      { from: `${FIX}/advanced/trust-claude-2.1.296.txt`, version: '2.1.296', text: 'Yes, I trust this folder' }, // i18n-ignore: a CLI's recorded text (#367)
+      // HI-2004: with TERM=xterm-256color (no WT_SESSION) its pointer is ❯; with neither, >. The question reads the same.
+      { from: `${FIX}/advanced/trust-term-claude-2.1.312.txt`, version: '2.1.312', text: '❯ No, exit\n   Yes, I trust this folder' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/trust-noterm-claude-2.1.312.txt`, version: '2.1.312', text: '> No, exit\n   Yes, I trust this folder' } // i18n-ignore: a CLI's recorded text (#367)
+    ] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'claude-code.signIn.stopError',

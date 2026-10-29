@@ -378,6 +378,8 @@ interface HiveMessageValues {
   'tips.projectTabsKeys.title': undefined
   'tips.projectTabsSettings.text': undefined
   'tips.projectTabsSettings.title': undefined
+  'tips.providerOrder.text': undefined
+  'tips.providerOrder.title': undefined
   'tips.quitWhenDone.text': undefined
   'tips.quitWhenDone.title': undefined
   'tips.recentWorkspaces.text': undefined
@@ -420,6 +422,8 @@ interface HiveMessageValues {
   'tips.signInExpired.title': undefined
   'tips.silentUnknown.text': undefined
   'tips.silentUnknown.title': undefined
+  'tips.skillFiles.text': undefined
+  'tips.skillFiles.title': undefined
   'tips.skillsDelivered.text': undefined
   'tips.skillsDelivered.title': undefined
   'tips.slotHeld.text': undefined

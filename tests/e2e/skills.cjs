@@ -125,6 +125,53 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => fs.existsSync(path.join(skillsDir, 'split-work', 'SKILL.md')) && (await page.locator('.skill-row.missing').count()) === 0, 10000)
   check('restored', fs.existsSync(path.join(skillsDir, 'split-work', 'SKILL.md')) && (await page.locator('.skill-row.missing').count()) === 0)
 
+  // HI-2011: a skill as a contents page. card-loop's page shows its files as tabs, a link in SKILL.md opens its file's
+  // tab, a reference file is edited and saved like SKILL.md (asking before it overwrites a change on disk), and
+  // Revert to default puts back the whole folder.
+  await page.locator('.skill-row', { has: page.locator('.row-name', { hasText: /^card-loop\s*$/ }) }).click()
+  const tabs = page.locator('.skill-files [role="tab"]')
+  const tabNames = () => tabs.allInnerTexts().catch(() => [])
+  const refFiles = fs.readdirSync(path.join(skillsDir, 'card-loop')).filter((f) => f !== 'SKILL.md').sort()
+  check("card-loop's page: its files as tabs, SKILL.md first", await becomes(async () => JSON.stringify(await tabNames()) === JSON.stringify(['SKILL.md', ...refFiles])), JSON.stringify(await tabNames()))
+  check('…SKILL.md shown', (await page.locator('.skill-files [role="tab"][aria-selected="true"]').innerText()) === 'SKILL.md')
+  await page.locator('.skill-detail .markdown a[href="builder.md"]').first().click()
+  check("a link to builder.md in SKILL.md's preview opens its tab", await becomes(async () => (await page.locator('.skill-files [role="tab"][aria-selected="true"]').innerText().catch(() => '')) === 'builder.md' && /Card loop: the builder/.test(await page.locator('.skill-detail .markdown').innerText().catch(() => ''))), await page.locator('.skill-detail .editor-toolbar').innerText().catch(() => ''))
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+    await page.locator('.skill-detail').screenshot({ path: path.join(lib.WORK, `skills-files-${theme}.png`) })
+  }
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  // Edited in the same editor, saved.
+  const builderFile = path.join(skillsDir, 'card-loop', 'builder.md')
+  await page.locator('.skill-detail .editor-toolbar button[aria-label="Edit"]').click()
+  await lib.until(async () => (await page.locator('.skill-detail .monaco .view-lines').count()) === 1, HUNG_MS)
+  await page.locator('.skill-detail .monaco').first().click({ position: { x: 300, y: 40 } })
+  await page.keyboard.press('Control+End')
+  await page.keyboard.type('\nMy builder note.\n')
+  await page.locator('.skill-detail .editor-toolbar .btn.primary', { hasText: 'Save' }).click()
+  check('builder.md edited and saved from its tab', await becomes(() => fs.readFileSync(builderFile, 'utf8').includes('My builder note.')))
+  check('…the skill is "changed"', await becomes(async () => (await inv('skills:workspace')).find((s) => s.name === 'card-loop')?.bundled === 'changed'))
+  // Changed on disk meanwhile: saving asks before it overwrites, and No keeps the change on disk.
+  // The page shows the skill afresh now it is "changed" (its editor too): back to builder.md's editor, typed into.
+  await lib.until(async () => (await page.locator('.skill-detail .editor-toolbar button[aria-label="Edit"]').count()) === 1 || (await page.locator('.skill-detail .monaco .view-lines').count()) === 1, HUNG_MS)
+  if ((await page.locator('.skill-detail .monaco .view-lines').count()) === 0) await page.locator('.skill-detail .editor-toolbar button[aria-label="Edit"]').click()
+  await lib.until(async () => (await page.locator('.skill-detail .monaco .view-lines').count()) === 1, HUNG_MS)
+  check('…still on its builder.md tab', (await page.locator('.skill-files [role="tab"][aria-selected="true"]').innerText()) === 'builder.md')
+  await page.locator('.skill-detail .monaco').first().click({ position: { x: 300, y: 40 } })
+  await page.keyboard.press('Control+End')
+  await page.keyboard.type('Mine again.\n')
+  await lib.until(async () => await page.locator('.skill-detail .editor-toolbar .btn.primary', { hasText: 'Save' }).isEnabled(), HUNG_MS)
+  fs.appendFileSync(builderFile, '\nChanged on disk.\n')
+  await page.locator('.skill-detail .editor-toolbar .btn.primary', { hasText: 'Save' }).click()
+  check('saving over a change on disk asks first', await becomes(async () => (await page.locator('.dialog', { hasText: 'Overwrite the changes on disk?' }).count()) === 1))
+  await page.locator('.dialog .btn', { hasText: 'Cancel' }).click()
+  check('…cancelled, the change on disk stays', await becomes(async () => (await page.locator('.dialog').count()) === 0) && fs.readFileSync(builderFile, 'utf8').includes('Changed on disk.') && !fs.readFileSync(builderFile, 'utf8').includes('Mine again.'))
+  // Revert to default: the whole folder as shipped, the note gone.
+  await page.getByText('Revert to default').click()
+  await lib.until(async () => (await page.locator('.dialog .btn.primary', { hasText: 'Revert' }).count()) === 1, HUNG_MS)
+  await page.locator('.dialog .btn.primary', { hasText: 'Revert' }).click()
+  check('Revert to default puts back the whole folder: builder.md as shipped', await becomes(async () => (await inv('skills:workspace')).find((s) => s.name === 'card-loop')?.bundled === 'same' && !fs.readFileSync(builderFile, 'utf8').includes('My builder note.')))
+
   // Adding from a .md (only that file) and a .zip (its folder, with the script).
   const fromMd = await inv('skills:addFromFile', path.join(dump, 'release-notes.md'), 'release-notes', [{ kind: 'hive' }])
   const mdDir = path.join(skillsDir, 'release-notes')

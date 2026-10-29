@@ -987,6 +987,38 @@ describe('watches (main/watches.ts)', async () => {
       await disposeWorkspaceService(w)
     })
 
+    it("HI-2016: a failed verdict's move back to Doing is its own, however slowly its lines are written: the wake says it failed", async () => {
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const [, b] = await twoInReview(w)
+      await watches.registerWatch(w, alpha, 'a1', { cards: [b], ...verdictOrDone })
+      // A loaded machine between the verdict's lines (the flake's cause): the clock moves on by a millisecond each read.
+      const RealDate = Date
+      let tick = 0
+      ;(globalThis as { Date: DateConstructor }).Date = class extends RealDate {
+        constructor(...args: unknown[]) {
+          if (args.length) super(...(args as [number]))
+          else super(RealDate.now() + tick++)
+        }
+        static now(): number {
+          return RealDate.now() + tick++
+        }
+      } as DateConstructor
+      try {
+        await verdict(w, b, 'failed')
+      } finally {
+        ;(globalThis as { Date: DateConstructor }).Date = RealDate
+      }
+      await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+      expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] #${b} is in Doing: Reviewer \\(alpha\\) failed it`))
+      // One change, one time: its lines share it, so its move is known as its own.
+      const card = await inWorkspace(w, () => tasks.getTask(b, w))
+      const failed = card.history.findLast((h) => h.what.startsWith('Review failed'))!
+      const moved = card.history.findLast((h) => h.what.startsWith('Moved to Doing'))!
+      expect(moved.at).toBe(failed.at)
+      await disposeWorkspaceService(w)
+    })
+
     it('a change between watches is news even in the same millisecond as the wake read the cards', async () => {
       const { w, alpha } = await open()
       const st = fake(alpha)

@@ -1507,6 +1507,14 @@
     "defaultMessage": "Project Settings from More ▾",
     "description": "A tip's title (HI-1840). More ▾ is the button's name with its arrow."
   },
+  "tips.providerOrder.text": {
+    "defaultMessage": "Reorder the list in Settings → Providers by dragging a provider, or with Move Up and Move Down in its ⋯ menu: Automatic gives new agents the first one in that order that is turned on and installed, say Codex before Claude Code.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.providerOrder.title": {
+    "defaultMessage": "Choose which coding agent Automatic tries first",
+    "description": "A tip's title."
+  },
   "tips.quitWhenDone.text": {
     "defaultMessage": "Quitting while an agent works offers Quit when agents finish: Hive hides and quits by itself once they're done. Conversations are always kept.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1674,6 +1682,14 @@
   "tips.silentUnknown.title": {
     "defaultMessage": "An agent silent with its state unknown",
     "description": "A tip's title."
+  },
+  "tips.skillFiles.text": {
+    "defaultMessage": "Agents read a skill's SKILL.md whenever they use it, and a file it links only when they need that part. A skill's page shows each of its files in a tab, to read and edit; a link to one opens its tab.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. SKILL.md is a file name: keep it in English."
+  },
+  "tips.skillFiles.title": {
+    "defaultMessage": "A skill can link files beside its SKILL.md",
+    "description": "A tip's title. SKILL.md is a file name: keep it in English."
   },
   "tips.skillsDelivered.text": {
     "defaultMessage": "The switch beside each Hive skill, in the Skills view or a project's Skills tab, says whether agents get it (Delivered to agents). Copies Hive puts in a folder for Codex and Copilot are removed once no agent works there, as Settings → Advanced says.",

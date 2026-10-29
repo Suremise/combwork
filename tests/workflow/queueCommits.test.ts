@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
+import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harness'
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { git } from '../../src/main/git'
 import { commitFailed, readCommitStream, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
@@ -144,7 +144,9 @@ describe("Hive's queue commits (#1350)", () => {
     cleanAt(e, before)
   })
 
-  it("squash: a pre-commit hook that fails returns the card with its output; one that passes, and the trailers are in the squash's commit", async () => {
+  // GIT_HEAVY_MS: a squash merge through the queue twice (the hook failing, then passing), 92 git processes; past 20 s in
+  // HI-2025's run beside three other full runs, and on HI-2001's loaded runs.
+  it("squash: a pre-commit hook that fails returns the card with its output; one that passes, and the trailers are in the squash's commit", { timeout: GIT_HEAVY_MS }, async () => {
     const e = team({ style: 'squash' })
     const card = await queued(e, 'Squashed')
     hook(e, 'pre-commit', 'echo "lint failed in src/c.txt"\nexit 1')

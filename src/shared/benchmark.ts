@@ -318,7 +318,7 @@ export interface Artifact {
 
 const COMPONENT_KEYS = ['coreBytes', 'customBytes', 'roleBytes', 'modeBytes', 'catalogBytes', 'coreChars', 'customChars', 'roleChars', 'modeChars', 'toolBytes', 'toolListBytes']
 const DERIVED = new Set(['contextBytes', 'guidanceBytes', 'guidanceChars', 'seconds'])
-const MEASURE_KEYS = new Set([...SCENARIO_MEASURES.map((m) => m.key).filter((k) => !DERIVED.has(k)), ...COMPONENT_KEYS, 'toolMs', 'launches', 'skillsDelivered', 'skillsUnmeasured', 'toolListStarts', 'skillTooLarge', 'dropped', 'skillsRead'])
+const MEASURE_KEYS = new Set([...SCENARIO_MEASURES.map((m) => m.key).filter((k) => !DERIVED.has(k)), ...COMPONENT_KEYS, 'toolMs', 'launches', 'skillsDelivered', 'skillsUnmeasured', 'toolListStarts', 'skillTooLarge', 'dropped', 'skillsRead', 'skillRefsRead'])
 const USAGE_KEYS = new Set([...USAGE_MEASURES.map((m) => m.key), 'contextTokens'])
 const EXPORT_KEYS = new Set(['requests', 'failed', 'responseBytes', 'requestBytes', 'toolCalls', 'toolChars', 'detailCalls', 'launches', 'guidanceBytes'])
 

@@ -665,6 +665,7 @@ async function runPrompt(text, enter = null) {
       for (const end = Date.now() + 120_000; !fs.existsSync(go) && Date.now() < end; ) await sleep(100)
     }
     for (const m of step.matchAll(/\bskill\s+([a-z0-9][\w-]*)/gi)) readSkill(m[1])
+    for (const m of step.matchAll(/\bskillref\s+([a-z0-9][\w-]*)\s+([\w.-]+\.md)/gi)) readSkillRef(m[1], m[2])
     const move = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step)
     if (move) await boardPatch(Number(move[1]), { column: move[2].toLowerCase() })
     const review = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(step)
@@ -801,6 +802,23 @@ function readSkill(name) {
   const text = opts['--plugin-dir'] && fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null
   write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'Skill', input: { skill: `hive:${name}` } }], usage: { input_tokens: 10, output_tokens: 5 } } })
   write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: text ?? `Unknown skill: hive:${name}`, is_error: text === null }] } })
+}
+
+/**
+ * Follows a skill's link to one of its reference files (HI-2011), as Claude Code does: the link found in the delivered
+ * SKILL.md, resolved against the skill's folder, and the file read with the Read tool (lines numbered, as Read shows
+ * them). A SKILL.md without that link reads nothing there: the read fails, as a link that isn't there would.
+ */
+function readSkillRef(name, file) {
+  const id = `toolu_ref_${randomUUID().slice(0, 8)}`
+  const dir = path.join(opts['--plugin-dir'] ?? '', 'skills', name)
+  const skill = opts['--plugin-dir'] && fs.existsSync(path.join(dir, 'SKILL.md')) ? fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8') : ''
+  const linked = skill.includes(`](${file})`) || skill.includes(`](./${file})`)
+  const target = linked ? path.resolve(dir, file) : path.join(dir, `no-link-to-${file}`)
+  const text = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null
+  write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'Read', input: { file_path: target } }], usage: { input_tokens: 10, output_tokens: 5 } } })
+  const numbered = text === null ? `File does not exist: ${target}` : text.split(/\r?\n/).map((l, i) => `${String(i + 1).padStart(6)}\t${l}`).join('\n')
+  write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: numbered, is_error: text === null }] } })
 }
 
 /** Calls a hive tool through the launch's own hive MCP server; the call and its reply go in the transcript. */

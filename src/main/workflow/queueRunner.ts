@@ -25,11 +25,12 @@ import { existsSync } from 'original-fs'
 import { basename, dirname, join } from 'path'
 import { removePath, samePlace } from '../fsutil'
 import { git, GIT_PREFIX } from '../git'
+import { onOutputSettled } from '../gitWorker'
 import { createLogger, userText } from '../logger'
 import { endTree } from '../progressReporters/wrapper'
 import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
 import type { JobHost } from '../processSupervisor'
-import { clearJournal, endLeaseJob, journalOf, journalPath, LeaseJob, queueHost, sealJournal, startLauncher, type Journalled } from './queueJobs'
+import { clearJournal, endLeaseJob, journalOf, journalPath, launcherNotStarted, launcherSignalled, LeaseJob, queueHost, sealJournal, SIGNALLED, startLauncher, type Journalled } from './queueJobs'
 import { defaultProbe, treeOf, type Listed, type ProcessProbe } from './queueProcs'
 import type { Workflow } from './runtime'
 
@@ -101,6 +102,27 @@ export interface RunResult {
   timedOut?: boolean
   /** Its stderr as far as it had come when the bound ended it (#1350: what was running then). */
   errAtTimeout?: string
+  /**
+   * HI-2020: the command never started, Node's code for why: its launcher couldn't start, or the launcher said (by its
+   * nonce) that the command's own start failed. Code -1 then. Never set for a command that started, whatever its exit.
+   */
+  notRun?: string
+  /**
+   * HI-2042: the command (or its launcher) was ended by a signal, as Node saw it: its name. Code -1 then, never 1 (which
+   * git's reads take for "no"). Not set for a command that exited with a code of its own, nor one ended at its bound.
+   * On Windows a process ended from outside (TerminateProcess) exits with the code it was given: that is no signal.
+   */
+  signal?: string
+}
+
+/** HI-2042: what a run ended by a signal says when the command itself said nothing. */
+export const endedBy = (command: string, signal: string): string => `${command} was ended by a signal (${signal})` // i18n-ignore: the command's side of an error, in English as git's messages are
+
+/** HI-2020: a launcher that never started (no pid): the start's own error. Only `run` takes it for a result. */
+class NotStarted extends Error {
+  constructor(readonly start: Error) {
+    super(start.message)
+  }
 }
 
 /** A queue's folder name: collision-safe for targets alike (`a/b`, `a-b`) and per lease, so a takeover never reuses one. */
@@ -281,8 +303,9 @@ export class QueueRunner {
    */
   async spawn(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'> & { input?: string } = {}): Promise<ChildProcess> {
     const { child, failed } = this.launch(what, command, args, opts)
-    // Not started: nothing to record or end; the start's own error (it is told on the next tick).
-    if (!child.pid) throw await failed
+    // Not started: nothing to record or end; the start's own error (it is told on the next tick), marked as a start that
+    // definitely failed (HI-2020), apart from the lease, the job or the record failing.
+    if (!child.pid) throw new NotStarted(await failed)
     await this.letGo(what, child, command, opts.input)
     return child
   }
@@ -302,7 +325,8 @@ export class QueueRunner {
   /** Starts a command's launcher, waiting for its go-ahead, with its errors handled from the start. */
   private launch(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'>): { child: ChildProcess; failed: Promise<Error>; after: number; before: number } {
     if (!this.job || this.released) throw new LeaseLost(this.target)
-    const { child, after, before } = startLauncher({ command, args, shell: !!opts.shell, verbatim: !!opts.windowsVerbatimArguments }, { cwd: opts.cwd as string | undefined, env: opts.env })
+    const { child, after, before, nonce } = startLauncher({ command, args, shell: !!opts.shell, verbatim: !!opts.windowsVerbatimArguments }, { cwd: opts.cwd as string | undefined, env: opts.env })
+    this.nonces.set(child, nonce)
     // Its errors are handled here from the start (a start that failed: a folder gone, no executable; a pipe that broke),
     // never left to the process's: the first is the start's error, later ones are logged.
     let startError: Error | null = null
@@ -319,6 +343,8 @@ export class QueueRunner {
 
   /** Clock readings around each launcher's start, until it is let go. */
   private readonly started = new WeakMap<ChildProcess, { after: number; before: number }>()
+  /** Each launcher's nonce (HI-2020: how it says its command never started). */
+  private readonly nonces = new WeakMap<ChildProcess, string>()
 
   /**
    * A launcher put in the job and recorded (a write that checks the lease), then told to run its command; one that can't
@@ -361,7 +387,15 @@ export class QueueRunner {
    */
   async run(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell'> & { input?: string; timeoutMs?: number } = {}): Promise<RunResult> {
     const { timeoutMs, ...spawnOpts } = opts
-    const child = await this.spawn(what, command, args, spawnOpts)
+    let child: ChildProcess
+    try {
+      child = await this.spawn(what, command, args, spawnOpts)
+    } catch (e) {
+      // HI-2020: a launcher that never started ran nothing: a result saying so. The lease lost, the job or the record
+      // failing, and anything else stay thrown, as before.
+      if (e instanceof NotStarted) return { ok: false, code: -1, out: '', err: e.start.message, notRun: String((e.start as NodeJS.ErrnoException).code ?? 'error') }
+      throw e
+    }
     const out: Buffer[] = []
     const err: Buffer[] = []
     child.stdout?.on('data', (d: Buffer) => out.push(d))
@@ -375,16 +409,30 @@ export class QueueRunner {
           endTree(child)
         }, timeoutMs)
       : undefined
+    // HI-2042: the launcher itself ended by a signal (no code) is kept as one, apart from its bound's.
+    let ended = null as string | null
     const code = await new Promise<number>((res) => {
-      child.once('close', (c) => res(c ?? 1))
-      child.once('error', () => res(-1))
-      // Ended at its bound: a descendant that got away may hold the output open, so its exit is enough.
-      child.once('exit', (c) => {
-        if (timedOut) setImmediate(() => res(c ?? 1))
+      // HI-2043: its output read whole, bounded once it has exited (its bound's end too: what it wrote meanwhile kept).
+      // Its bound is on the launcher, not its output: one that exited in time is never timed out by output still open.
+      child.once('exit', () => clearTimeout(timer))
+      onOutputSettled(child, (c, s) => {
+        ended = c === null ? (s ?? 'unknown') : null
+        res(c ?? 1)
       })
+      child.once('error', () => res(-1))
     })
     clearTimeout(timer)
-    return { ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}) }
+    const stderr = Buffer.concat(err).toString('utf8').trim()
+    // HI-2020: the launcher's own line (its nonce) when the command's start failed; a 127 without it is the command's.
+    const nonce = this.nonces.get(child)
+    const never = code === 127 && !timedOut && nonce ? launcherNotStarted(stderr, nonce) : null
+    if (never) return { ok: false, code: -1, out: Buffer.concat(out).toString('utf8'), err: never.err, notRun: never.code }
+    // HI-2042: the command ended by a signal (the launcher's line, by its nonce), or the launcher itself: never code 1.
+    // Its bound comes first: a run it ended stays timed out, as before.
+    const killed = !timedOut && nonce && code === SIGNALLED ? launcherSignalled(stderr, nonce) : null
+    if (killed) return { ok: false, code: -1, out: Buffer.concat(out).toString('utf8'), err: killed.err || endedBy(command, killed.signal), signal: killed.signal }
+    if (ended && !timedOut) return { ok: false, code: -1, out: Buffer.concat(out).toString('utf8'), err: stderr || endedBy(command, ended), signal: ended }
+    return { ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: stderr, ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}) }
   }
 
   /**

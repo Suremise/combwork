@@ -12,7 +12,7 @@ import { git } from '../git'
 import { refSync } from './repoRefs'
 import type { FileChange } from '../../shared/workflow/facts'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
-import { isUnknown, unknown, type Change, type Containment, type Maybe } from './types'
+import { isUnknown, unknown, withDetail, type Change, type Containment, type Maybe } from './types'
 
 /** A commit as attribution reads it: its id, author email and `Hive-Card` trailers. */
 export interface CommitInfo {
@@ -150,7 +150,7 @@ export function headSync(folder: string): { line: string | null; head: string } 
 /** The commit HEAD names in a folder. */
 export async function head(folder: string): Promise<Maybe<string>> {
   const r = await git(folder, ['rev-parse', '--verify', '-q', 'HEAD'])
-  return r.ok ? r.out.trim() : unknown(U.head, { where: folder })
+  return r.ok ? r.out.trim() : withDetail(unknown(U.head, { where: folder }), r.err)
 }
 
 /** The branch checked out in a folder, or null when HEAD is detached. */
@@ -158,7 +158,7 @@ export async function branch(folder: string): Promise<Maybe<string | null>> {
   const r = await git(folder, ['symbolic-ref', '-q', '--short', 'HEAD'])
   if (r.ok) return r.out.trim()
   if (r.code === 1) return null
-  return unknown(U.branch, { folder })
+  return withDetail(unknown(U.branch, { folder }), r.err)
 }
 
 /**
@@ -511,7 +511,7 @@ export async function messages(repo: string, range: string): Promise<Maybe<strin
 /** Where each branch is checked out: line → folder (`git worktree list`). */
 export async function checkouts(repo: string): Promise<Maybe<Record<string, string>>> {
   const r = await git(repo, ['worktree', 'list', '--porcelain'])
-  if (!r.ok) return unknown(U.worktrees, { folder: repo })
+  if (!r.ok) return withDetail(unknown(U.worktrees, { folder: repo }), r.err)
   const out: Record<string, string> = {}
   let folder = ''
   for (const l of lines(r.out)) {
@@ -631,8 +631,12 @@ export async function pin(repo: string, ref: string, rev: string): Promise<boole
 }
 
 /** The repository's configured commit identity, or null when none is set. */
-export async function identity(repo: string): Promise<{ name: string; email: string } | null> {
+export async function identity(repo: string): Promise<Maybe<{ name: string; email: string } | null>> {
   const n = await git(repo, ['config', 'user.name'])
   const e = await git(repo, ['config', 'user.email'])
+  // HI-2019: `git config <key>` exits 1 when the key isn't set; any other failure is a read git couldn't make, never "no
+  // identity" (the merge queue paused `identity` on one that failed for a moment).
+  const failed = [n, e].find((r) => !r.ok && r.code !== 1)
+  if (failed) return withDetail(unknown(U.state, { folder: repo }), failed.err)
   return n.ok && e.ok && n.out.trim() && e.out.trim() ? { name: n.out.trim(), email: e.out.trim() } : null
 }

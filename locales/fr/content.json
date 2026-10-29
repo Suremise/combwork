@@ -59,6 +59,7 @@
   "content.skill.notClosed": "son en-tête n’est pas fermé (aucune ligne --- après lui)",
   "content.skill.notClosedWithin": "son en-tête ne se ferme pas dans ses premiers {kb} Ko",
   "content.skill.notFields": "son en-tête n’est pas une liste de champs (`name: …`, `description: …`)",
+  "content.skill.notListed": "Ce dossier n’est pas un skill que Hive affiche.",
   "content.skill.notSkill": "Ce n’est pas un dossier de compétence (pas de SKILL.md)",
   "content.skill.yaml": "son en-tête n’est pas du YAML valide ({reason})",
   "content.skill.yamlAt": "son en-tête n’est pas du YAML valide (ligne {line} : {reason})",

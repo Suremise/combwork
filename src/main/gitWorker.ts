@@ -1,4 +1,4 @@
-import { execFile } from 'child_process'
+import { execFile, type ChildProcess } from 'child_process'
 import { existsSync } from 'original-fs'
 import { parentPort } from 'worker_threads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
@@ -94,6 +94,40 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Pr
     // What the command reads (update-ref --stdin's transaction).
     if (m.input !== undefined) child.stdin?.end(m.input)
   })
+}
+
+/**
+ * HI-2043: `settle` once a child's output has closed, all of it read (a hook's refusal is told by git's trace at its end,
+ * which can still be coming after the exit on a loaded machine). A descendant that got away may hold the output open:
+ * once the child has exited, an output quiet for EXITED_QUIET_MS is closed and what came is taken, as runGit
+ * does (HI-1854). Once; the exit's code and signal.
+ */
+export function onOutputSettled(child: ChildProcess, settle: (code: number | null, signal: NodeJS.Signals | null) => void, quietMs = EXITED_QUIET_MS): void {
+  let exited: [number | null, NodeJS.Signals | null] | null = null
+  let quiet: ReturnType<typeof setTimeout> | undefined
+  let settled = false
+  const once = (c: number | null, s: NodeJS.Signals | null): void => {
+    if (settled) return
+    settled = true
+    clearTimeout(quiet)
+    settle(c, s)
+  }
+  const waitQuiet = (): void => {
+    if (!exited || settled) return
+    clearTimeout(quiet)
+    quiet = setTimeout(() => {
+      child.stdout?.destroy()
+      child.stderr?.destroy()
+      once(...exited!)
+    }, quietMs)
+  }
+  child.stdout?.on('data', waitQuiet)
+  child.stderr?.on('data', waitQuiet)
+  child.once('exit', (c, s) => {
+    exited = [c, s]
+    waitQuiet()
+  })
+  child.once('close', (c, s) => once(...(exited ?? [c, s])))
 }
 
 const port = parentPort

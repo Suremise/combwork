@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { DEFAULT_PROJECT_CONFIG, ROLE_MAX, agentLimitText, effectiveModelLabel, mergeBlocked, projectAgents, transcriptWarnLimit } from '@shared/defaults'
 import { handOverNow, onRunningLane } from '@shared/handOver'
 import { useAgentLimit } from '../advanced'
-import { PROVIDERS, agentProvider, chosenDefaultProvider, defaultProviderPending, isProviderEnabled, modeCaveat, modeOption, offeredModes, projectDefaultProvider, projectProviderConfig, projectUse200k, providerDescriptor, providerName, providerSettings, shownText } from '@shared/providers'
+import { agentProvider, chosenDefaultProvider, defaultProviderPending, isProviderEnabled, modeCaveat, modeOption, offeredModes, orderedProviders, projectDefaultProvider, projectProviderConfig, projectUse200k, providerDescriptor, providerName, providerSettings, shownText } from '@shared/providers'
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import type { MergeBranch } from '@shared/types'
 import type { AgentBranchStatus, Connection, EffortLevel, MergeResult, PermissionMode, ProjectConfig, ProjectInfo, ProviderId } from '@shared/types'
@@ -57,7 +57,8 @@ export function ProviderChoice({ value, current, onChange }: { value: ProviderId
   useLanguage()
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
-  const shown = PROVIDERS.filter((p) => isProviderEnabled(settings, p.id) || p.id === value || p.id === current)
+  // In the user's order (HI-1965: Settings → Providers), the one Automatic picks first among them.
+  const shown = orderedProviders(settings).filter((p) => isProviderEnabled(settings, p.id) || p.id === value || p.id === current)
   if (!shown.length) {
     return (
       <div className="muted">

@@ -9,7 +9,7 @@ import { PRICES_CHECKED, SHIPPED_PRICES, listedPriceModels, priceRows } from '@s
 import { APP_SETTINGS_CATALOG, SETTINGS_SECTIONS, providerSection, settingDefault, settingPatch, settingValue, SETTINGS_TEXT, shownSetting, type SettingEntry, type SettingsSection, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { cliDefaultEffort, effortName, fallbackEfforts, fallbackModels, modelCaps, modelSource, modelSourceText, runsAsName } from '@shared/models'
 import type { SettingsPatch } from '@shared/api'
-import { AUTO_PROVIDER, PROVIDERS, defaultProviderLabel, enabledProviders, isProviderEnabled, installSourceText, offeredModes, permissionLabel, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
+import { AUTO_PROVIDER, PROVIDERS, defaultProviderLabel, enabledProviders, isProviderEnabled, installSourceText, inProviderOrder, offeredModes, orderedProviders, permissionLabel, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
 import { modeName, useModes } from '../components/Assistant'
 import { ModeCaveat } from '../components/AgentDialogs'
 import { EffortPicker, ModelPicker } from '../components/ModelPicker'
@@ -18,7 +18,7 @@ import { ProviderIcon } from '../components/ProviderIcon'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { playChime } from '../chime'
-import { Icon, IconButton, InfoTip, SearchInput, Switch, Tooltip, usePlaceholderClipped } from '../components/ui'
+import { Icon, IconButton, InfoTip, SearchInput, Switch, Tooltip, useContextMenu, usePlaceholderClipped, type MenuEntry } from '../components/ui'
 import { UpdateStatusRow } from '../components/Updates'
 import { KeybindingsEditor } from '../components/Keybindings'
 import { HiddenProjectsList } from '../components/ProjectRemoval'
@@ -33,7 +33,8 @@ import { TabPanel, Tabs } from '../components/Tabs'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
 import { LANGUAGE_TEXT } from '@shared/i18n/languageText'
-import { cx, timeAgo } from '../util'
+import { cx, formatKeybinding, timeAgo } from '../util'
+import { moveProvider, usePendingProviderOrder } from '../providerOrder'
 
 /** A settings section: a group of AppSettings, "providers" (turning them on), one provider's page ("provider:<id>"), or "advanced". */
 type Section = SettingsSection
@@ -528,18 +529,83 @@ function ProviderStatus({ provider }: { provider: ProviderId }) {
   )
 }
 
-/** Every provider with its on/off switch and install state. */
+const PROVIDER_ORDER_TEXT = {
+  moveUp: msg({ id: 'settings.provider.moveUp', defaultMessage: 'Move Up', description: "A provider row's menu in Settings → Providers: moves it one place up the list (Automatic picks from the list's order)." }),
+  moveDown: msg({ id: 'settings.provider.moveDown', defaultMessage: 'Move Down', description: "A provider row's menu in Settings → Providers: moves it one place down the list (Automatic picks from the list's order)." }),
+  more: msg({ id: 'settings.provider.more', defaultMessage: 'More for {provider}', description: "The ⋯ button of a provider's row in Settings → Providers, for screen readers and its tooltip: opens its menu (Move Up, Move Down). {provider} is its name." }),
+  row: msg({ id: 'settings.provider.rowLabel', defaultMessage: '{provider}, {position, number} of {count, number}. Drag, or Alt+Up and Alt+Down, to reorder.', description: "A provider's row in Settings → Providers, for screen readers: its place in the list, which Automatic picks from, and how to move it. {provider} is its name." })
+}
+
+/**
+ * Every provider with its on/off switch and install state, in the user's order (HI-1965): Automatic picks the first one
+ * turned on and installed. A row moves by dragging it, its ⋯ menu's Move Up and Move Down, or Alt+Up and Alt+Down.
+ */
 function ProvidersList() {
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
+  const menu = useContextMenu()
+  const [dragging, setDragging] = useState<ProviderId | null>(null)
+  const [over, setOver] = useState<ProviderId | null>(null)
+  // Its moves go through the window's one queue (providerOrder.ts, HR2's rounds 1 and 2): shown at once, sent one at a
+  // time, applied by main to the order as it is then; the list shows what they make until the store has caught up.
+  const pending = usePendingProviderOrder()
+  const list = orderedProviders(pending ? { providerOrder: pending } : settings)
+  /** Moves a provider `by` places from where it is shown, as a place in the list (what main applies). */
+  const move = (id: ProviderId, by: number): void => {
+    const from = list.findIndex((p) => p.id === id)
+    const to = Math.max(0, Math.min(list.length - 1, from + by))
+    if (from >= 0 && to !== from) moveProvider(id, to)
+  }
+  const menuItems = (id: ProviderId, i: number): MenuEntry[] => [
+    { label: tr(PROVIDER_ORDER_TEXT.moveUp), icon: 'arrow-up', keybinding: formatKeybinding('Alt+ArrowUp'), disabled: i === 0, onClick: () => move(id, -1) },
+    { label: tr(PROVIDER_ORDER_TEXT.moveDown), icon: 'arrow-down', keybinding: formatKeybinding('Alt+ArrowDown'), disabled: i === list.length - 1, onClick: () => move(id, 1) }
+  ]
   return (
-    <div className="provider-list">
-      {PROVIDERS.map((p) => {
+    <div className="provider-list" data-order={list.map((p) => p.id).join(',')} data-pending={pending ? 'true' : undefined}>
+      {menu.element}
+      {list.map((p, i) => {
         const info = providers[p.id]
         const on = isProviderEnabled(settings, p.id)
         const state = !info || info.checking ? tr(msg({ id: 'settings.provider.checking', defaultMessage: 'Checking…', description: "While Hive looks for a provider's CLI (Settings → <provider> → Installation)." })) : !info.found ? tr(msg({ id: 'settings.provider.notInstalledShort', defaultMessage: 'Not installed', description: "Under a provider in Settings → Providers: Hive didn't find its CLI." })) : (info.readiness?.find((r) => r.level === 'error')?.message ?? tr(msg({ id: 'settings.provider.installed', defaultMessage: 'Installed · {version}', description: 'Under a provider in Settings → Providers: its CLI is installed. {version} is its number.' }), { version: info.version ?? '' }))
         return (
-          <div key={p.id} className={cx('provider-row', !on && 'off')}>
+          <div
+            key={p.id}
+            className={cx('provider-row', !on && 'off', dragging === p.id && 'dragging', over === p.id && dragging !== p.id && 'drop-target')}
+            data-provider={p.id}
+            tabIndex={0}
+            role="group"
+            aria-label={tr(PROVIDER_ORDER_TEXT.row, { provider: p.name, position: i + 1, count: list.length })}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = 'move'
+              e.dataTransfer.setData('text/plain', p.id)
+              setDragging(p.id)
+            }}
+            onDragOver={(e) => {
+              if (!dragging) return
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              setOver(p.id)
+            }}
+            onDragLeave={() => setOver((o) => (o === p.id ? null : o))}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (dragging && dragging !== p.id) moveProvider(dragging, i)
+              setDragging(null)
+              setOver(null)
+            }}
+            onDragEnd={() => {
+              setDragging(null)
+              setOver(null)
+            }}
+            onKeyDown={(e) => {
+              if (e.target !== e.currentTarget || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+              e.preventDefault()
+              move(p.id, e.key === 'ArrowUp' ? -1 : 1)
+            }}
+            onContextMenu={(e) => menu.open(e, menuItems(p.id, i))}
+          >
+            <Icon name="gripper" className="provider-grip faint" />
             <ProviderIcon provider={p.id} />
             <div className="grow">
               <div>
@@ -551,6 +617,14 @@ function ProvidersList() {
               {tr(msg({ id: 'settings.provider.settings', defaultMessage: 'Settings', description: 'Button beside a provider in Settings → Providers: opens its page.' }))}
             </button>
             <Switch checked={on} label={tr(msg({ id: 'settings.provider.use', defaultMessage: 'Use {provider}', description: 'The switch that turns a provider on (Settings → Providers, and its own page). {provider} is its name.' }), { provider: p.name })} onChange={(v) => void setProviderEnabled(p.id, v)} />
+            <IconButton
+              icon="ellipsis"
+              title={tr(PROVIDER_ORDER_TEXT.more, { provider: p.name })}
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect()
+                menu.openAt(r.left, r.bottom + 2, menuItems(p.id, i), e.detail === 0)
+              }}
+            />
           </div>
         )
       })}
@@ -625,7 +699,7 @@ function AssistantProviderPicker() {
   return (
     <select className="select" value={current} onChange={(e) => void saveSettings({ assistant: { provider: e.target.value } })}>
       <option value="">{tr(msg({ id: 'settings.assistant.defaultProvider', defaultMessage: 'Default provider ({provider})', description: 'The first choice of Settings → Assistant → Provider: the default provider, and which one that is now.' }), { provider: defaultProviderLabel(settings, tr) })}</option>
-      {PROVIDERS.filter((p) => on.includes(p) || p.id === current).map((p) => (
+      {orderedProviders(settings).filter((p) => on.includes(p) || p.id === current).map((p) => (
         <option key={p.id} value={p.id}>
           {on.includes(p) ? p.name : tr(SETTINGS_TEXT.providerOff, { provider: p.name })}
         </option>
@@ -724,15 +798,24 @@ function DefaultProviderPicker() {
   const current = settings?.defaultProvider ?? ''
   // Automatic names what it picks now, which follows what's installed.
   useStore((s) => s.providers)
+  // Automatic's order as set (HI-1965): the turned-on providers, as the list above orders them.
+  const order = on.map((p) => p.name)
   return (
-    <select className="select" value={current} onChange={(e) => void update(def, e.target.value)}>
-      <option value={AUTO_PROVIDER}>{defaultProviderLabel(settings && { ...settings, defaultProvider: AUTO_PROVIDER }, tr)}</option>
-      {PROVIDERS.filter((p) => on.includes(p) || p.id === current).map((p) => (
-        <option key={p.id} value={p.id}>
-          {on.includes(p) ? p.name : tr(SETTINGS_TEXT.providerOff, { provider: p.name })}
-        </option>
-      ))}
-    </select>
+    <div className="default-provider">
+      <select className="select" value={current} onChange={(e) => void update(def, e.target.value)}>
+        <option value={AUTO_PROVIDER}>{defaultProviderLabel(settings && { ...settings, defaultProvider: AUTO_PROVIDER }, tr)}</option>
+        {orderedProviders(settings).filter((p) => on.includes(p) || p.id === current).map((p) => (
+          <option key={p.id} value={p.id}>
+            {on.includes(p) ? p.name : tr(SETTINGS_TEXT.providerOff, { provider: p.name })}
+          </option>
+        ))}
+      </select>
+      {current === AUTO_PROVIDER && order.length > 1 && (
+        <div className="faint small default-provider-order">
+          {tr(msg({ id: 'settings.providers.automaticOrder', defaultMessage: 'Automatic tries {order}, in that order.', description: "Under Settings → Providers → Default provider while it is Automatic: the providers that are turned on, in the list's order, which Automatic picks the first installed one of. {order} is their names joined as a list (\"Codex, Claude Code and GitHub Copilot\")." }), { order: fmt.list(order) })}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -1134,7 +1217,9 @@ export function SettingsView() {
   }, [query, section, settings, modifiedOnly, advanced, shownLanguage, workspaceName])
 
   if (!settings) return null
-  const grouped = SECTIONS.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
+  // Each provider's page in the user's order (HI-1965: Settings → Providers), the other sections where they are.
+  const sections = inProviderOrder(SECTIONS, (s) => s.provider, settings)
+  const grouped = sections.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
   // Shown in the user's language: a provider's page is its name.
   const sectionText = (s: (typeof SECTIONS)[number]): { label: string; desc: string } => ({ label: shownText(s.text.label), desc: shownText(s.text.desc) })
   const navIcon = (s: (typeof SECTIONS)[number]): React.ReactNode => (s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />)
@@ -1150,7 +1235,7 @@ export function SettingsView() {
       </div>
       <div className="settings-body">
         <div className="settings-nav">
-          {SECTIONS.map((s) => (
+          {sections.map((s) => (
             <div key={s.id} className={cx('row', !query && !modifiedOnly && section === s.id && 'selected')} data-section={s.id} onClick={() => {
                 set({ settingsSection: s.id, settingsQuery: '' })
                 setModifiedOnly(false)

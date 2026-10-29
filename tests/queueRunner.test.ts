@@ -4,6 +4,7 @@
 // runs, however many runners crash on the way; a folder of its own per lease; and every store write the queue makes
 // fenced by its lease. Hives are Node processes (tests/queueRunnerHost.ts) on one hive.db copy.
 import { spawn, type ChildProcess } from 'child_process'
+import { EventEmitter } from 'events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { basename, join } from 'path'
@@ -16,7 +17,7 @@ import { admitted } from './admitted'
 import { gitTestHooks } from '../src/main/git'
 import { FactStore, withoutWriteFence, withWriteFence } from '../src/main/workflow/factStore'
 import { fileTimeMs, parseJournal, queueHost, startLauncher } from '../src/main/workflow/queueJobs'
-import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunner } from '../src/main/workflow/queueRunner'
+import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunner, type RunResult } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed, type ProcessProbe } from '../src/main/workflow/queueProcs'
 import { commit, gitRepo, moved, R1, B1, setup, sh, type Env } from './workflow/harness'
 import { preset } from '../src/shared/workflow/options'
@@ -597,16 +598,157 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     expect(w.store.queueLease('retry')).toBeNull()
   })
 
-  it("HR4 r2 #3: a command whose folder is gone fails with its start's own error, nothing left recorded or unhandled; a missing executable fails as a run", async () => {
+  it("HR4 r2 #3: a command whose folder is gone never starts: a run saying so with its start's own error (HI-2020), nothing left recorded or unhandled; a missing executable never starts either", async () => {
     const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'gone', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
     const missing = join(tempDir('qr-gone-'), 'no-such-folder')
-    await expect(a.runner.run('check', process.execPath, ['-e', ''], { cwd: missing })).rejects.toThrow(/ENOENT/)
+    // The launcher itself can't start (its folder is gone): run's result says it never ran (HI-2020: was thrown).
+    const gone = await a.runner.run('check', process.execPath, ['-e', ''], { cwd: missing })
+    expect(gone).toMatchObject({ ok: false, code: -1, notRun: 'ENOENT', err: expect.stringMatching(/ENOENT/) })
     expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job'])
-    // The launcher starts and the command can't: its run fails (127), and its launcher's record goes with it.
-    expect(await a.runner.run('check', 'no-such-command-hive-1360', [])).toMatchObject({ ok: false, code: 127 })
+    // The launcher starts and the command can't: the launcher says so by its nonce, and its record goes with it.
+    const none = await a.runner.run('check', 'no-such-command-hive-1360', [])
+    expect(none).toMatchObject({ ok: false, code: -1, notRun: 'ENOENT', err: expect.stringMatching(/ENOENT/) })
+    expect(none.err).not.toMatch(/notStarted/)
     await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job']), { timeout: 30_000, interval: 100 })
     await a.runner.release()
     expect(w.store.queueProcs(null, 'gone')).toEqual([])
+  })
+
+  it("HI-2020: a command that ran and exited 127 is the command's 127, a look-alike line included; only the launcher's own nonce means never started", async () => {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'exit127', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    const plain = await a.runner.run('testMerge', process.execPath, ['-e', 'process.exit(127)'])
+    expect(plain).toMatchObject({ ok: false, code: 127 })
+    expect(plain.notRun).toBeUndefined()
+    // The command writes what the launcher's line looks like, with a nonce of its own: still its own exit.
+    const lookAlike = `process.stderr.write('\\n00000000-0000-4000-8000-000000000000:notStarted:ENOENT\\n'); process.exit(127)`
+    const fake = await a.runner.run('testMerge', process.execPath, ['-e', lookAlike])
+    expect(fake).toMatchObject({ ok: false, code: 127 })
+    expect(fake.notRun).toBeUndefined()
+    // Other exits are as they were.
+    for (const c of [0, 1, 128]) expect(await a.runner.run('testMerge', process.execPath, ['-e', `process.exit(${c})`])).toMatchObject({ ok: c === 0, code: c })
+    // A launcher that started but couldn't be recorded isn't "never started": that failure is thrown, as before.
+    const add = w.store.addQueueProc.bind(w.store)
+    w.store.addQueueProc = (p) => {
+      if (p.what === 'testMerge') throw new Error('disk full')
+      add(p)
+    }
+    try {
+      await expect(a.runner.run('testMerge', process.execPath, ['-e', ''])).rejects.toThrow('disk full')
+    } finally {
+      w.store.addQueueProc = add
+    }
+    await a.runner.release()
+  })
+
+  it("HI-2042: a command ended by a signal is never code 1 (git's \"no\"): the launcher says so by its nonce; a real exit 1, and a look-alike line, stay the command's", async () => {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'signal', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    // Released however the test ends (its job, and anything still in it, ended), so a failing check leaves nothing running.
+    try {
+      // The real launcher, whose command is ended by SIGTERM through the launcher's own handle (the fixture, in it only).
+      // NODE_OPTIONS reads a backslash as an escape: the path with forward slashes.
+      const preload = join(__dirname, 'fixtures', 'launcherSignal.cjs').replace(/\\/g, '/')
+      const env = { ...baseEnv(), NODE_OPTIONS: `--require "${preload}"` }
+      const killed = await a.runner.run('testMerge', process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { env })
+      expect(killed).toMatchObject({ ok: false, code: -1, signal: 'SIGTERM', err: expect.stringMatching(/ended by a signal \(SIGTERM\)/) })
+      expect(killed.err).not.toMatch(/:signal:/)
+      // The command writes what the launcher's line looks like, with a nonce of its own, and exits 1 or the launcher's own code.
+      const lookAlike = (c: number): string => `process.stderr.write('\\n00000000-0000-4000-8000-000000000000:signal:SIGTERM\\n'); process.exit(${c})`
+      for (const c of [1, 129]) {
+        const fake = await a.runner.run('testMerge', process.execPath, ['-e', lookAlike(c)])
+        expect(fake).toMatchObject({ ok: false, code: c })
+        expect(fake.signal).toBeUndefined()
+      }
+      const plain = await a.runner.run('testMerge', process.execPath, ['-e', `process.stderr.write('said'); process.exit(1)`])
+      expect(plain).toMatchObject({ ok: false, code: 1, err: 'said' })
+      expect(plain.signal).toBeUndefined()
+      await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job']), { timeout: 30_000, interval: 100 })
+    } finally {
+      await a.runner.release()
+    }
+  })
+
+  it('HI-2042: the launcher itself ended by a signal while the run waits: code -1 with the signal, never 1', async () => {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'signal2', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    // The launcher, and its command saying it runs (listened for as soon as the launcher is let go, before it can say it).
+    let launcher: ChildProcess | null = null
+    let ready = false
+    const spawnOf = a.runner.spawn.bind(a.runner)
+    vi.spyOn(a.runner, 'spawn').mockImplementation(async (...args) => {
+      launcher = await spawnOf(...args)
+      launcher.stdout!.once('data', () => (ready = true))
+      return launcher
+    })
+    // The command says it is running, then exits once its launcher has gone (it holds the launcher's output till then).
+    const command = `process.stdout.write('ready\\n'); setInterval(() => { try { process.kill(process.ppid, 0) } catch { process.exit(0) } }, 100)`
+    const run = a.runner.run('testMerge', process.execPath, ['-e', command])
+    // However the test ends (a command that never says it runs too: the wait is bounded, so it fails into finally):
+    // released (its job, the launcher and its command with it, ended), and the run settled.
+    try {
+      await vi.waitFor(() => expect(ready).toBe(true), { timeout: 30_000, interval: 50 })
+      launcher!.kill('SIGTERM')
+      const r = await run
+      expect(r).toMatchObject({ ok: false, code: -1, signal: 'SIGTERM', out: 'ready\n' })
+      expect(r.timedOut).toBeUndefined()
+    } finally {
+      await a.runner.release()
+      await run.catch(() => {})
+    }
+  })
+
+  /**
+   * HI-2043: a launcher standing in (no process: nothing to end), started through the runner's spawn and driven by `drive`;
+   * `kill` (its bound's end, through endTree) as `drive` sets it. The run's result, waited for within a bound inside the
+   * test's try (a run that never settles fails into its finally): released, closed and settled however it ends.
+   */
+  async function fakeLaunch(target: string, timeoutMs: number, drive: (cp: EventEmitter & { stdout: EventEmitter; stderr: EventEmitter; kill: () => void }) => void, check: (r: RunResult, cp: { kill: ReturnType<typeof vi.fn>; destroyed: () => number }) => void): Promise<void> {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target, root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    let destroyed = 0
+    const stream = () => Object.assign(new EventEmitter(), { destroy: () => void destroyed++ })
+    const fake = Object.assign(new EventEmitter(), { stdout: stream(), stderr: stream(), pid: undefined, exitCode: null, signalCode: null, kill: vi.fn() })
+    vi.spyOn(a.runner, 'spawn').mockImplementation(async () => {
+      setImmediate(() => drive(fake))
+      return fake as unknown as ChildProcess
+    })
+    let result: RunResult | null = null
+    const run = a.runner.run('testMerge', process.execPath, ['-e', ''], { timeoutMs }).then((r) => (result = r))
+    try {
+      await vi.waitFor(() => expect(result).not.toBeNull(), { timeout: 30_000, interval: 100 })
+      check(result!, { kill: fake.kill, destroyed: () => destroyed })
+    } finally {
+      await a.runner.release()
+      fake.emit('close', 0, null)
+      await run.catch(() => {})
+    }
+  }
+
+  it('HI-2043: a launcher that exits before its bound, its output held open past it (by another process): its code and what came, never timed out', async () => {
+    await fakeLaunch('held', 50, (cp) => {
+      cp.stdout.emit('data', Buffer.from('said'))
+      cp.stderr.emit('data', Buffer.from('told'))
+      cp.emit('exit', 0, null)
+    }, (r, cp) => {
+      expect(r).toMatchObject({ ok: true, code: 0, out: 'said', err: 'told' })
+      expect(r.timedOut).toBeUndefined()
+      // Nothing ended (its bound stopped at its exit), and its output closed once quiet, as runGit closes a held one.
+      expect(cp.kill).not.toHaveBeenCalled()
+      expect(cp.destroyed()).toBe(2)
+    })
+  })
+
+  it('HI-2043: a launcher its bound ends: timed out, with what it had said at the bound, and what came after it', async () => {
+    await fakeLaunch('bounded', 50, (cp) => {
+      cp.stderr.emit('data', Buffer.from('waiting for a passphrase'))
+      cp.kill = vi.fn(() => {
+        cp.emit('exit', null, 'SIGTERM')
+        setImmediate(() => {
+          cp.stderr.emit('data', Buffer.from('; ended'))
+          cp.emit('close', null, 'SIGTERM')
+        })
+      })
+    }, (r) => {
+      expect(r).toMatchObject({ ok: false, timedOut: true, errAtTimeout: 'waiting for a passphrase', err: 'waiting for a passphrase; ended' })
+      expect(r.signal).toBeUndefined()
+    })
   })
 
   it('#1350: a run past its bound (a signer waiting for a passphrase, under git) is ended with its whole tree, and says it timed out', async () => {

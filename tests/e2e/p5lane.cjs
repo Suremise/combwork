@@ -105,9 +105,17 @@ const ancestor = (x, y) => {
      * own, and the restart may come after the lane is listed: refused as unknown (401), the token is read again from the
      * agent's latest launch, once it has a new one, and the intent sent again (a few times at most).
      */
-    /** A call to the Agent API with an agent's token: its status and body. */
-    const api = async (method, route, body, token) => {
+    /**
+     * A call to the Agent API with an agent's token: its status and body. Refused as unknown (401) with B1's or R1's token
+     * held: an older launch's (HI-2027), so that agent's latest launch's token is read and the call made once more with it.
+     */
+    const api = async (method, route, body, token, again = true) => {
       const res = await fetch(`http://127.0.0.1:${h.port}${route}`, { method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
+      const who = token === tokens.b1 ? 'b1' : token === tokens.r1 ? 'r1' : null
+      if (res.status === 401 && again && who) {
+        tokens[who] = (await tokenOf(who === 'b1' ? b1.id : r1.id).catch(() => null)) ?? tokens[who]
+        if (tokens[who] !== token) return api(method, route, body, tokens[who], false)
+      }
       return { status: res.status, body: await res.json().catch(() => null) }
     }
     const intent = async (who, n, name, body = {}) => {
@@ -158,9 +166,15 @@ const ancestor = (x, y) => {
       const typed = await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), fx.claudeHome, 'B1', `shell: ${cmd}`, {
         ready: async () => {
           const state = await live(b1.id)
-          seen = { status: state?.status, composer: state?.runtime?.composer, pending: await lib.inboxPending(PORT, 'alpha', b1.name, tokens.b1) }
-          // Its inbox unreadable with the token it had: a launch of its since (a lane's start, its card placed in its slot) has its own.
-          if (seen.pending === null && state?.sessionId) tokens.b1 = (await tokenOf(b1.id).catch(() => null)) ?? tokens.b1
+          let pending = await lib.inboxPending(PORT, 'alpha', b1.name, tokens.b1)
+          // Its inbox unreadable by the token held: an older launch's (HI-2027, HI-1995). A lane start relaunches its agents,
+          // sometimes seconds after the lane is listed (once its slot is prepared), and retoken() may have read the token
+          // before; or not at all (its relaunch refused while a prompt waits). Its latest launch's token, read again.
+          if (pending === null && state?.sessionId) {
+            tokens.b1 = (await tokenOf(b1.id).catch(() => null)) ?? tokens.b1
+            pending = await lib.inboxPending(PORT, 'alpha', b1.name, tokens.b1)
+          }
+          seen = { status: state?.status, composer: state?.runtime?.composer, pending }
           return lib.agentQuiet(PORT, 'alpha', state, tokens.b1)
         },
         strict: true,
@@ -280,10 +294,18 @@ const ancestor = (x, y) => {
       // Once lent its slot: a lane started just as the one before it ends waits for that lane's slot (its lease ends just
       // after it), then the slot pass lends it and starts B1 with the brief (HI-2029). B1 may then be in a new
       // conversation, with a new token (intent and reorderNow read it again on a 401).
-      return waitHung(async () => {
-        const lane = (await inv('lanes:list')).find((l) => l.builder.id === b1.id && l.state !== 'ended' && JSON.stringify(l.cards.map((x) => x.number)) === JSON.stringify(cards))
-        return lane?.slot ? lane : null
+      const lane = await waitHung(async () => {
+        const l = (await inv('lanes:list')).find((x) => x.builder.id === b1.id && x.state !== 'ended' && JSON.stringify(x.cards.map((c) => c.number)) === JSON.stringify(cards))
+        return l?.slot ? l : null
       })
+      // Not started (HI-2027's lane C, once in five): what the window showed, said with the failure.
+      if (!lane) {
+        const shot = path.join(fx.shots, `lane-start-${cards.join('-')}-failed.png`)
+        await page.screenshot({ path: shot }).catch(() => undefined)
+        const said = { dialog: await dialog.innerText().catch(() => null), toasts: await page.locator('.toast').allInnerTexts().catch(() => []), todo: await column('Todo').locator('.task-card').count().catch(() => -1), lanes: await inv('lanes:list').catch(() => null), shot }
+        console.log(`lane start not seen: ${JSON.stringify(said)}`)
+      }
+      return lane
     }
     const laneNow = async (id) => (await inv('lanes:list')).find((l) => l.id === id)
     /** The lane ended verified: ended, its merge commit the last card's result (from the facts). */
@@ -302,7 +324,8 @@ const ancestor = (x, y) => {
     await shoot('1-laneA-started', 'lanes', async () => (await onBoard('Todo', c1)) && /B1 \/ R1/.test(await laneText(a?.id)))
 
     // --- One: merged by the queue at the approved revision; the next card waits for it.
-    const lentA = (await laneNow(a?.id))?.slot
+    // The lane's slot, once recorded: a lane takes it over from its builder's own as that lease lets go (HI-2027).
+    const lentA = await waitHung(async () => (await laneNow(a?.id))?.slot ?? null)
     const { s: s1, base: base1, line: line1 } = await start(c1)
     check("One starts in the lane's slot, on its line from main's head", s1.status === 200 && !!lentA && path.basename(wt ?? '') === lentA && base1 === head() && git(wt, 'rev-parse', 'HEAD') === base1, JSON.stringify({ lane: lentA, start: s1.body }))
     check('…B1 works there now', !!(await waitHung(async () => (await live(b1.id))?.cwd?.toLowerCase() === wt?.toLowerCase())), JSON.stringify(await live(b1.id)))
@@ -369,7 +392,8 @@ const ancestor = (x, y) => {
     const b = await startLane(laneB)
     check('lane B is started from the board with the squash options', !!b, JSON.stringify(await inv('lanes:list')))
     await retoken()
-    const lentB = (await laneNow(b?.id))?.slot
+    // Once recorded: lane A's end lets the slot go to lane B once its builder's turn and deliveries are over (HI-2027).
+    const lentB = await waitHung(async () => (await laneNow(b?.id))?.slot ?? null)
     const main3 = head()
     const s4 = await start(c4)
     check("Four starts in lane B's slot, on its line from main's head", s4.s.status === 200 && !!lentB && path.basename(wt ?? '') === lentB && s4.base === main3 && git(wt, 'rev-parse', 'HEAD') === main3, JSON.stringify({ lane: lentB, s4 }))
@@ -406,6 +430,8 @@ const ancestor = (x, y) => {
     const lc = await startLane(laneC)
     check('lane C is started from the board', !!lc, JSON.stringify(await inv('lanes:list')))
     await retoken()
+    // Once its slot is recorded, as lanes A and B: lane B's end lets the builder's slot go to it (HI-2027).
+    check("lane C's slot is recorded", !!(await waitHung(async () => (await laneNow(lc?.id))?.slot ?? null)), JSON.stringify(await laneNow(lc?.id)))
     const s6 = await start(c6)
     check("Six starts in lane C's slot, on its line", s6.s.status === 200 && !!s6.line, JSON.stringify(s6))
     const six = commit('six.txt')
@@ -414,7 +440,7 @@ const ancestor = (x, y) => {
       waitHung(async () => {
         const res = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.b1}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ cards: [c7, c6], applyNow: true }) })
         const body = await res.json().catch(() => null)
-        // B1 given a new conversation since its token was taken (its lane's start): read again, and tried again.
+        // Refused as unknown: its token is an older launch's (HI-2027; a lane's start gives B1 a new conversation, HI-2029): read again from its latest, and tried again.
         if (res.status === 401) {
           tokens.b1 = (await tokenOf(b1.id).catch(() => null)) ?? tokens.b1
           return null

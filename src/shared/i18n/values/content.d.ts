@@ -61,6 +61,7 @@ interface HiveMessageValues {
   'content.skill.notClosed': undefined
   'content.skill.notClosedWithin': { kb: string | number }
   'content.skill.notFields': undefined
+  'content.skill.notListed': undefined
   'content.skill.notSkill': undefined
   'content.skill.yaml': { reason: string | number }
   'content.skill.yamlAt': { line: string | number; reason: string | number }

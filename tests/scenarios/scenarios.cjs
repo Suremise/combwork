@@ -1869,6 +1869,23 @@ module.exports.SCENARIOS = [
     fakeSkips: ['followed the edit: labelled checked']
   },
   {
+    id: 'skill-reference-read',
+    title: "A builder in a card loop follows card-loop's link to its builder file (HI-2011: SKILL.md as a contents page, reference files one level deep), not the reviewer's",
+    async setup(c) {
+      await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder' })
+    },
+    prompt: (c) => `You'll work through #${c.cards.a} as the builder in a card loop, with Implementer reviewing. Before anything else, read how the builder's side of the loop works and list its steps for me in a few lines. Don't start the card or the lane yet.`,
+    fake: 'skill card-loop then skillref card-loop builder.md',
+    expect: (o) => {
+      const refs = o.skillRefsRead ?? []
+      return [
+        ['read the card-loop skill (its SKILL.md)', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ["read card-loop's builder.md, by SKILL.md's link, and the read worked", refs.includes('card-loop/builder.md'), refs.join(',') || 'none'],
+        ["didn't read the reviewer's file", !refs.includes('card-loop/reviewer.md'), refs.join(',')]
+      ]
+    }
+  },
+  {
     id: 'card-detail',
     title: "A card's details, exactly: the detail it asks for, read once, the board unchanged (a smaller reply missing them fails)",
     async setup(c) {
@@ -3263,17 +3280,15 @@ module.exports.SCENARIOS = [
     },
     prompt: "Coder is building something for me (there's no card for it). Tell me when it's done.",
     fake: 'skill coordinate-agents then hive hive_wait_for_agents {"agents":[{"project":"alpha","agent":"Coder"}],"wake":true}',
-    // Its turn ended with the watch running: watching, which a wait held in the call never shows.
-    during: (c, status) => {
-      if (status === 'watching') c.sawWatching = true
-    },
-    expect: (o, c) => {
+    // Its turn ended with the watch running: watching, which a wait held in the call never shows. Read from every status the
+    // session reported (HI-2022: sampled between looks, a watch that Coder's end cut short was often missed).
+    expect: (o) => {
       const waits = called(o, 'hive_wait_for_agents')
       const watched = waits.some((x) => x.ok && argsOf(x).wake === true)
       return [
         ['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')],
         ['watched Coder with an agent watch (hive_wait_for_agents with wake), which worked', watched, waits.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
-        ['ended its turn watching (status watching), not waiting in the call', !!c.sawWatching],
+        ['ended its turn watching (status watching), not waiting in the call', (o.statuses ?? []).includes('watching'), (o.statuses ?? []).join(' → ')],
         ['no polling: no wait held in the call', !waits.some((x) => argsOf(x).wake !== true && !argsOf(x).cancel), waits.map((x) => x.args).join(' | ')],
         ['woken when Coder finished: its watch has ended', watched && o.status !== 'watching', o.status]
       ]

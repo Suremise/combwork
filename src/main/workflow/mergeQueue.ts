@@ -10,10 +10,11 @@
 
 import { spawn, type ChildProcess } from 'child_process'
 import { createHash, randomUUID } from 'crypto'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'original-fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'original-fs'
 import { tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
+import { onOutputSettled } from '../gitWorker'
 import { endTree } from '../progressReporters/wrapper'
 import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type Fact, type FactData, type FocusedReturn, type QueueEntry } from '../../shared/workflow/facts'
 import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, focusedCheckName, readResults, reviewProved, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
@@ -26,9 +27,9 @@ import { hasStage } from '../../shared/workflow/compile'
 import type { CommitMessage } from '../../shared/workflow/options'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import * as G from '../platform/git'
-import { isUnknown } from '../platform/types'
+import { isUnknown, type Maybe, type Unknown } from '../platform/types'
 import { withWriteFence, type CardRecord } from './factStore'
-import { LeaseLost } from './queueRunner'
+import { endedBy, LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
 import { leftWake, returnedWake } from './queueState'
 import { readConflicts } from './conflictRead'
@@ -161,12 +162,13 @@ export interface QueueConfig {
    * Test seams: crash injection and races between the queue's steps. A checked-out target's journal (§16.9.2), in order:
    * `afterStarted` (IntegrationStarted written), `beforeFiles` (phase files written, before read-tree), `afterFiles`
    * (read-tree ran), `beforeRef` (phase ref written, before update-ref), `afterAdvance` (update-ref ran, before
-   * `Integrated`); a rollback's `inRollback` (phase rollback written, before its read-tree) and `afterRollback`.
+   * `Integrated`); a rollback's `inRollback` (phase rollback written, before its read-tree) and `afterRollback`; and
+   * `beforeRetry` (HI-2019: a failed read's wait is over, before the entry is admitted again).
    */
   hooks?: QueueHooks
 }
 
-export type QueueHook = 'afterTest' | 'afterChecks' | 'afterStarted' | 'beforeFiles' | 'afterFiles' | 'beforeRef' | 'afterAdvance' | 'inRollback' | 'afterRollback'
+export type QueueHook = 'afterTest' | 'afterChecks' | 'afterStarted' | 'beforeFiles' | 'afterFiles' | 'beforeRef' | 'afterAdvance' | 'inRollback' | 'afterRollback' | 'beforeRetry'
 export type QueueHooks = Partial<Record<QueueHook, (entry: string) => void | Promise<void>>>
 
 /** How the queue runs a git command that may run the repository's hooks or sign (#1350): its environment and bound. */
@@ -185,6 +187,13 @@ export interface QueueGitResult {
   timedOut?: boolean
   /** Its stderr as far as it had come when the bound ended it: what was running then. */
   errAtTimeout?: string
+  /** HI-2020: git never started (Node's code for why): nothing ran, so nothing to classify; the entry goes round again. */
+  notRun?: string
+  /**
+   * HI-2042: git was ended by a signal (its name), code -1: what it did is unknown, so nothing to classify (no conflict,
+   * no hook); put back, and the entry goes round again, as for notRun.
+   */
+  signal?: string
 }
 
 export type QueueOutcome =
@@ -285,13 +294,14 @@ function pushEnv(): NodeJS.ProcessEnv {
 const PUSH_REJECTED = /\[rejected\]|non-fast-forward|fetch first/i
 
 /** What an entry's steps read of the repository's config once (#1386): the identity Hive commits as, and signing. */
+/** What a pass of an entry reads once (HI-2019: made afresh for each pass, so a pass that goes round again reads again). */
 interface EntryReads {
-  identity?: Promise<{ name: string; email: string } | null>
+  identity?: Promise<Maybe<{ name: string; email: string } | null>>
   signs?: Promise<boolean>
 }
 
-/** What an advance came to (advanceRef, advanceCheckedOut). */
-type Advance = 'done' | 'moved' | 'denied' | 'held' | 'retest' | { pause: PauseReason; files?: string[]; message?: string; stuck?: QueueStuck } | { residue: QueueStuck } | { outcome: QueueOutcome }
+/** What an advance came to (advanceRef, advanceCheckedOut); `again` only before anything was touched. */
+type Advance = 'done' | 'moved' | 'denied' | 'held' | 'retest' | Again | { pause: PauseReason; files?: string[]; message?: string; stuck?: QueueStuck } | { residue: QueueStuck } | { outcome: QueueOutcome }
 
 /** The state a checked-out target's begun advance is found in (§16.9.2's recovery table), and what it calls for. */
 type Found = 'integrated' | 'residue' | 'rerun' | 'swap' | 'rollback' | 'requeue' | 'stuck'
@@ -474,9 +484,9 @@ function commitEnv(): NodeJS.ProcessEnv {
 /**
  * git as Hive runs it, with no input (no terminal to prompt on), in an environment and within a bound: at the bound its
  * whole tree (git, a hook, a signer) is ended, and the result says so. The queue's git when its config gives none (tests;
- * the app runs it through the runner's recorded spawn).
+ * the app runs it through the runner's recorded spawn). Exported for its tests (HI-2043: its bound against its output).
  */
-function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<QueueGitResult> {
+export function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<QueueGitResult> {
   return new Promise((res) => {
     const out: Buffer[] = []
     const err: Buffer[] = []
@@ -485,7 +495,8 @@ function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<Qu
     try {
       child = spawn('git', [...GIT_PREFIX, ...args], { cwd, env: opts.env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     } catch (e) {
-      return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1 })
+      // HI-2020: a start that failed at once ran nothing.
+      return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1, notRun: String((e as NodeJS.ErrnoException).code ?? 'error') })
     }
     let atTimeout: string | undefined
     const timer = opts.timeoutMs
@@ -498,18 +509,22 @@ function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<Qu
     child.stdout?.on('data', (d: Buffer) => out.push(d))
     child.stderr?.on('data', (d: Buffer) => err.push(d))
     let settled = false
-    const done = (code: number): void => {
+    const done = (code: number, notRun?: string, signal?: string): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}) })
+      res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim() || (signal ? endedBy('git', signal) : ''), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}), ...(notRun ? { notRun } : {}), ...(signal ? { signal } : {}) })
     }
     child.once('error', (e) => {
       err.push(Buffer.from(e.message))
-      done(-1)
+      // HI-2020: an error with no pid is a start that failed (EAGAIN on a loaded machine): nothing ran.
+      done(-1, child.pid ? undefined : String((e as NodeJS.ErrnoException).code ?? 'error'))
     })
-    // `exit`, not `close`: a descendant that got away may hold the output open.
-    child.once('exit', (c) => setImmediate(() => done(c ?? 1)))
+    // HI-2043: its output read whole before it is told (a hook's refusal by git's trace at its end), bounded once git has
+    // exited. HI-2042: ended by a signal (no code of its own) is -1, never 1 (git's "no"); one its bound ended stays timed out.
+    // Its bound is on git, not its output: a git that exited in time is never timed out by output still open after it.
+    child.once('exit', () => clearTimeout(timer))
+    onOutputSettled(child, (c, sig) => (c === null && !timedOut ? done(-1, undefined, sig ?? 'unknown') : done(c ?? 1)))
   })
 }
 
@@ -518,6 +533,30 @@ function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<Qu
  * counting (#1349), before it pauses.
  */
 export const MAX_RETESTS = 3
+
+/**
+ * HI-2019: how many times an entry goes round again after a git read failed before anything was touched (a lock held
+ * for a moment, git not starting on a loaded machine), each after READ_RETRY_MS × the try, before it pauses `needsYou`
+ * with git's text. A budget of its own: target moves and uncounted checks keep MAX_RETESTS.
+ */
+export const READ_RETRIES = 3
+const READ_RETRY_MS = 250
+/** After the advance, the folder's branch read again this often, this far apart, when git couldn't say. */
+const CONFIRM_TRIES = 3
+const CONFIRM_RETRY_MS = 100
+
+/**
+ * HI-2019: a git read that failed before anything was touched (no `IntegrationStarted`, no pause written): the entry
+ * goes round again, a fresh pass. `message` is what git said, for the pause once the budget is spent.
+ */
+interface Again {
+  again: { message?: string }
+}
+const again = (message?: string): Again => ({ again: message?.trim() ? { message: message.trim() } : {} })
+const isAgain = (v: unknown): v is Again => !!v && typeof v === 'object' && 'again' in v
+/** An unknown's own words for the pause: what git said, else what couldn't be read. */
+const gitSaid = (u: Unknown): string => u.detail ?? u.what
+const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 const refSafe = (id: string): string => id.replace(/[^A-Za-z0-9._-]/g, '-')
 
@@ -865,8 +904,24 @@ export class MergeQueue {
     const started = new Date().toISOString()
     let retests = 0
     let uncounted = 0
-    const reads: EntryReads = {}
+    let readRetries = 0
+    // HI-2019: a read git couldn't make before anything was touched (the lock and the fence released already): the entry
+    // goes round again after a wait, admitted afresh first (still approved, no pause saved meanwhile, the rules on, the
+    // lease held), so nothing more is merged or checked once one of those changed; past the budget, paused with git's text.
+    const readFailed = async (a: Again): Promise<QueueOutcome | null> => {
+      if (++readRetries > READ_RETRIES) return this.pause(target, card, entry, 'needsYou', undefined, a.again.message)
+      await wait(READ_RETRY_MS * readRetries)
+      await this.cfg.hooks?.beforeRetry?.(entry.id)
+      const now = this.stillApproved(card, entry)
+      if (!now.ok) return this.skip(card, entry, now.cancelled)
+      const held = this.paused(target)
+      if (held) return this.held(card, entry, held.reason)
+      if (this.cfg.enforced && !this.cfg.enforced()) return this.pause(target, card, entry, 'rulesOff')
+      this.stillHolds(target)
+      return null
+    }
     for (;;) {
+      const reads: EntryReads = {}
       const check = this.stillApproved(card, entry)
       if (!check.ok) return this.skip(card, entry, check.cancelled)
       const s = check.s
@@ -888,7 +943,12 @@ export class MergeQueue {
         step('testMerge', null)
         const base = s.approved?.base ?? s.latest?.base ?? s.started?.base ?? ''
         const head = await G.lineHeadAndTree(this.project, target)
-        if (isUnknown(head) || !head) return this.pause(target, card, entry, 'needsYou')
+        if (isUnknown(head)) {
+          const o = await readFailed(again(gitSaid(head)))
+          if (o) return o
+          continue
+        }
+        if (!head) return this.pause(target, card, entry, 'needsYou')
         // Already in the target (merged by hand meanwhile): observed, no empty merge. Asked of the head just read.
         const found = await G.contains(this.project, target, { base, revision, key: s.latest?.key }, head)
         if (!isUnknown(found) && found) {
@@ -904,11 +964,21 @@ export class MergeQueue {
         // Rebase and fast-forward (#1184) puts the change on top of the target in the test merge itself: no update first.
         if (this.wf.rulesetOf(card, s).options.strict && this.wf.rulesetOf(card, s).options.style !== 'rebase') {
           const up = await this.upToDate(card, s, entry, revision, base || (await this.mergeBaseOf(revision, expected)), expected, reads)
+          if (isAgain(up)) {
+            const o = await readFailed(up)
+            if (o) return o
+            continue
+          }
           if ('pause' in up) return this.pause(target, card, entry, up.pause, up.files, up.message)
           if ('fail' in up) return this.returnCard(card, entry, revision, target, up.fail === 'hook' ? 'hook' : 'notUpToDate', false, up.files, up.log, undefined, undefined, up.conflicts)
           updated = up.updated ?? undefined
         }
         const test = await this.testMerge(card, s, revision, expected, reads, updated, base)
+        if (isAgain(test)) {
+          const o = await readFailed(test)
+          if (o) return o
+          continue
+        }
         if ('pause' in test) return this.pause(target, card, entry, test.pause, test.files, test.message)
         if ('fail' in test) return this.returnCard(card, entry, revision, target, test.fail, false, test.files, test.log, undefined, undefined, test.conflicts)
         result = test.result
@@ -946,7 +1016,11 @@ export class MergeQueue {
       // in the write of `IntegrationStarted` (startAdvance), after the wait for the lock.
       if (this.cfg.enforced && !this.cfg.enforced()) return this.pause(target, card, entry, 'rulesOff')
       const where = await G.checkouts(this.project)
-      if (isUnknown(where)) return this.pause(target, card, entry, 'needsYou')
+      if (isUnknown(where)) {
+        const o = await readFailed(again(gitSaid(where)))
+        if (o) return o
+        continue
+      }
       // Checked out in a folder, as far as is known now (each advance looks again under the lock).
       const folder = where[target] ? resolve(where[target]) : null
       // Ask each time (OP-40): the user approves updating the folder, bound to this entry and its test merge. An early-out
@@ -957,6 +1031,12 @@ export class MergeQueue {
       const adv = folder ? await this.advanceCheckedOut(card, entry, target, expected, result, folder, integrate) : await this.advanceRef(card, entry, target, expected, result)
       // Settled in the lock: a pause, the terminal state, the ask.
       if (typeof adv === 'object' && 'outcome' in adv) return adv.outcome
+      // A read failed before anything was touched (no IntegrationStarted, nothing settled), the lock released: again.
+      if (isAgain(adv)) {
+        const o = await readFailed(adv)
+        if (o) return o
+        continue
+      }
       // Checked out (or not any more) while the queue waited for the lock, or the target moved before anything was
       // touched: looked at again, the right way.
       if (adv === 'retest') {
@@ -1020,7 +1100,8 @@ export class MergeQueue {
     return { card: card.key, entry: entry.id, outcome: 'skipped', why: cancelled ? 'cancelled' : 'notApproved' } // i18n-ignore: a reason's key, not text
   }
 
-  private async identity(reads: EntryReads): Promise<{ name: string; email: string } | null> {
+  /** The project's identity: null when git says it isn't set, unknown when git couldn't read it (HI-2019). */
+  private async identity(reads: EntryReads): Promise<Maybe<{ name: string; email: string } | null>> {
     return this.wf.cfg.options().identity ?? (await (reads.identity ??= G.identity(this.project)))
   }
 
@@ -1041,17 +1122,37 @@ export class MergeQueue {
     return r.ok ? r.out.trim() : ''
   }
 
-  /** The queue's own worktree, made or reused, detached and clean at `at`; a pause when git can't. */
-  private async folderAt(at: string): Promise<{ pause: PauseReason; message?: string } | null> {
+  /**
+   * The queue's own worktree, made or reused, detached and clean at `at`. Reused (forced to `at`, cleaned) only when this
+   * repository's worktree list names it (HI-2019: never because a folder is there); made when it is neither there nor
+   * listed, or there and empty. A git that failed (the listing, the add, the checkout, which may have done part of its
+   * work) is `again`: the next pass looks afresh. Nothing is ever removed or pruned: a folder there but not listed with
+   * something in it, or listed but gone, is left as it is and pauses, named.
+   */
+  private async folderAt(at: string): Promise<Again | { pause: PauseReason; files?: string[]; message?: string } | null> {
     const f = this.cfg.folder
-    if (!existsSync(f)) {
-      const add = await this.git(this.project, ['worktree', 'add', '--detach', f, at])
-      return add.ok ? null : { pause: 'needsYou', message: add.err }
+    const list = await this.git(this.project, ['worktree', 'list', '--porcelain'])
+    if (!list.ok) return again(list.err)
+    const key = (p: string): string => resolve(p).toLowerCase()
+    const listed = list.out.split('\n').some((l) => l.startsWith('worktree ') && key(l.slice(9).trim()) === key(f))
+    const there = existsSync(f)
+    if (listed && there) {
+      const co = await this.git(f, ['checkout', '--detach', '-f', at])
+      if (!co.ok) return again(co.err)
+      await this.git(f, ['clean', '-fdq'])
+      return null
     }
-    const co = await this.git(f, ['checkout', '--detach', '-f', at])
-    if (!co.ok) return { pause: 'needsYou', message: co.err }
-    await this.git(f, ['clean', '-fdq'])
-    return null
+    if (listed) return { pause: 'needsYou', files: [f], message: `The queue's worktree ${f} is registered with git but isn't there: left as it is.` } // i18n-ignore: git's side of a pause, in English as git's messages are
+    const empty = (): boolean => {
+      try {
+        return readdirSync(f).length === 0
+      } catch {
+        return false // a file, or unreadable: never taken for an empty folder
+      }
+    }
+    if (there && !empty()) return { pause: 'needsYou', files: [f], message: `${f} has files in it but isn't one of this repository's worktrees: left as it is.` } // i18n-ignore: git's side of a pause, in English as git's messages are
+    const add = await this.git(this.project, ['worktree', 'add', '--detach', f, at])
+    return add.ok ? null : again(add.err)
   }
 
   /**
@@ -1064,11 +1165,12 @@ export class MergeQueue {
    * merge merges it. Up to date already: nothing to do (`updated` null). Always from the reviewed revision, so a retest
    * after the target moved updates afresh, never on an earlier update.
    */
-  private async upToDate(card: CardRecord, s: CardState, entry: QueueEntry, revision: string, base: string, expected: string, reads: EntryReads): Promise<{ updated: string | null } | { fail: 'conflict' | 'notSame' | 'hook'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
+  private async upToDate(card: CardRecord, s: CardState, entry: QueueEntry, revision: string, base: string, expected: string, reads: EntryReads): Promise<Again | { updated: string | null } | { fail: 'conflict' | 'notSame' | 'hook'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
     const anc = await this.git(this.project, ['merge-base', '--is-ancestor', expected, revision])
     if (anc.code === 0) return { updated: null }
-    if (anc.code !== 1) return { pause: 'needsYou', message: anc.err }
+    if (anc.code !== 1) return again(anc.err)
     const id = await this.identity(reads)
+    if (isUnknown(id)) return again(gitSaid(id))
     if (!id) return { pause: 'identity', files: [this.project] }
     const at = await this.folderAt(revision)
     if (at) return at
@@ -1083,6 +1185,13 @@ export class MergeQueue {
     // 1: with the repository's `rebase.updateRefs` on, git would move the builder's branch, or a user's, to the update).
     // Overridden for this command only; the repository's config is left as it is.
     const u = rebase ? await this.git(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await this.git(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
+    // HI-2020: git never started (nothing ran), or HI-2042 a signal ended it (what it did unknown): the worktree put back as
+    // after any failure, and the entry goes round again.
+    if (u.notRun || u.signal) {
+      await this.git(f, rebase ? ['rebase', '--abort'] : ['merge', '--abort'])
+      await this.folderAt(expected)
+      return again(u.err)
+    }
     if (!u.ok) {
       const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
       const files = namesOf(c?.out)
@@ -1094,7 +1203,7 @@ export class MergeQueue {
       return commitFailed(u, signs)
     }
     const h = await G.head(f)
-    if (isUnknown(h)) return { pause: 'needsYou' }
+    if (isUnknown(h)) return again(gitSaid(h))
     // The same change as reviewed, replayed onto the target's head (the candidate key, then the tree)?
     if (!(await G.sameChange(this.project, { base, revision, key: s.latest?.key }, { base: expected, revision: h }))) {
       return { fail: 'notSame', log: `${card.key}: ${revision.slice(0, 7)} brought up to date with ${target} (${expected.slice(0, 7)}) isn't the same change as reviewed: bring it up to date yourself and submit it again.` } // i18n-ignore: the card's log, agent-facing
@@ -1106,8 +1215,9 @@ export class MergeQueue {
     return { updated: h }
   }
 
-  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string, reads: EntryReads, updated?: string, base = ''): Promise<{ result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
+  private async testMerge(card: CardRecord, s: CardState, revision: string, expected: string, reads: EntryReads, updated?: string, base = ''): Promise<Again | { result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
     const id = await this.identity(reads)
+    if (isUnknown(id)) return again(gitSaid(id))
     if (!id) return { pause: 'identity', files: [this.project] }
     const r = this.wf.rulesetOf(card, s)
     if (r.options.style === 'rebase') return this.rebaseOnto(card, s, revision, base || (await this.mergeBaseOf(revision, expected)), expected, id, reads)
@@ -1120,7 +1230,7 @@ export class MergeQueue {
     // G19 (HI-1697): Hive's, or the branch's own (its commits since it left the target, merges left out).
     const how = this.commitMessage()
     const own = how === 'branch' ? await G.messages(this.project, `${base || (await this.mergeBaseOf(revision, expected))}..${revision}`) : []
-    if (isUnknown(own)) return { pause: 'needsYou', message: `Hive couldn't read the messages of ${revision.slice(0, 7)}'s commits.` } // i18n-ignore: git's side of a pause, in English as git's messages are
+    if (isUnknown(own)) return again(`Hive couldn't read the messages of ${revision.slice(0, 7)}'s commits.`) // i18n-ignore: git's side of a pause, in English as git's messages are
     const message = mergeMessage(how, { card, revision, updated, reviewers, messages: own })
     revision = updated ?? revision
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
@@ -1136,6 +1246,12 @@ export class MergeQueue {
     }
     // Its output read with git's own trace in it (commitEnv), so a failure is told by who said what, never by words.
     const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
+    // HI-2020: git never started (nothing ran, so nothing to tell a hook or a conflict from), or HI-2042 a signal ended it
+    // (no answer of git's to tell them from): put back, and again.
+    if (m.notRun || m.signal) {
+      await clean()
+      return again(m.err)
+    }
     if (!m.ok) {
       const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
       const files = namesOf(u?.out)
@@ -1149,11 +1265,11 @@ export class MergeQueue {
       const c = await this.git(f, [...who, 'commit', '-q', '-m', message], opts)
       if (!c.ok) {
         await clean()
-        return commitFailed(c, signs)
+        return c.notRun || c.signal ? again(c.err) : commitFailed(c, signs)
       }
     }
     const h = await G.head(f)
-    if (isUnknown(h)) return { pause: 'needsYou' }
+    if (isUnknown(h)) return again(gitSaid(h))
     await this.git(this.project, ['update-ref', `refs/hive/queue/${refSafe(card.key)}`, h])
     return { result: h }
   }
@@ -1168,13 +1284,13 @@ export class MergeQueue {
    * linear, and the same change as reviewed, else the card is returned (`notUpToDate`, saying which); a conflict returns
    * it with its files; a read git couldn't answer pauses (never taken for a pass or a mismatch).
    */
-  private async rebaseOnto(card: CardRecord, s: CardState, revision: string, base: string, expected: string, id: { name: string; email: string }, reads: EntryReads): Promise<{ result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
+  private async rebaseOnto(card: CardRecord, s: CardState, revision: string, base: string, expected: string, id: { name: string; email: string }, reads: EntryReads): Promise<Again | { result: string } | { fail: 'conflict' | 'hook' | 'notUpToDate'; files?: string[]; log: string; conflicts?: ConflictsRecord } | { pause: PauseReason; files?: string[]; message?: string }> {
     const f = this.cfg.folder
     const merges = await this.git(this.project, ['rev-list', '--min-parents=2', `${base}..${revision}`])
-    if (!merges.ok) return { pause: 'needsYou', message: merges.err }
+    if (!merges.ok) return again(merges.err)
     const linear = !merges.out.trim()
     const onTop = await this.git(this.project, ['merge-base', '--is-ancestor', expected, revision])
-    if (onTop.code !== 0 && onTop.code !== 1) return { pause: 'needsYou', message: onTop.err }
+    if (onTop.code !== 0 && onTop.code !== 1) return again(onTop.err)
     // The queue's worktree at the reviewed revision whatever follows (HR2's #1184 round 1): a linear card already on top
     // lands as it is, and its merge checks still run there, on exactly that revision.
     const at = await this.folderAt(revision)
@@ -1185,6 +1301,12 @@ export class MergeQueue {
       const signs = await this.signs(reads, f)
       const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
       const u = await this.git(f, [...who, '-c', 'rebase.rebaseMerges=false', '-c', 'rebase.updateRefs=false', 'rebase', '--no-rebase-merges', '--no-update-refs', '--no-autostash', ...(linear ? [] : ['--force-rebase']), '--onto', expected, base], opts)
+      // HI-2020: git never started, or HI-2042 a signal ended it: put back, and again.
+      if (u.notRun || u.signal) {
+        await this.git(f, ['rebase', '--abort'])
+        await this.folderAt(expected)
+        return again(u.err)
+      }
       if (!u.ok) {
         const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
         const files = namesOf(c?.out)
@@ -1196,17 +1318,17 @@ export class MergeQueue {
         return commitFailed(u, signs)
       }
       const h = await G.head(f)
-      if (isUnknown(h)) return { pause: 'needsYou' }
+      if (isUnknown(h)) return again(gitSaid(h))
       result = h
     }
-    const said = (why: string): { fail: 'notUpToDate'; log: string } => ({ fail: 'notUpToDate', log: `${card.key}: ${revision.slice(0, 7)} rebased onto ${expected.slice(0, 7)} ${why}: rebase it onto the target yourself and submit it again.` }) // i18n-ignore: the card's log, agent-facing
+    const notUp = (why: string): { fail: 'notUpToDate'; log: string } => ({ fail: 'notUpToDate', log: `${card.key}: ${revision.slice(0, 7)} rebased onto ${expected.slice(0, 7)} ${why}: rebase it onto the target yourself and submit it again.` }) // i18n-ignore: the card's log, agent-facing
     const anc = await this.git(this.project, ['merge-base', '--is-ancestor', expected, result])
-    if (anc.code === 1) return said("isn't on top of the target") // i18n-ignore: the card's log, agent-facing
-    if (anc.code !== 0) return { pause: 'needsYou', message: anc.err }
+    if (anc.code === 1) return notUp("isn't on top of the target") // i18n-ignore: the card's log, agent-facing
+    if (anc.code !== 0) return again(anc.err)
     const twoParents = await this.git(this.project, ['rev-list', '--min-parents=2', `${expected}..${result}`])
-    if (!twoParents.ok) return { pause: 'needsYou', message: twoParents.err }
-    if (twoParents.out.trim()) return said('would land a merge commit (Rebase and fast-forward lands a linear history)') // i18n-ignore: the card's log, agent-facing
-    if (!(await G.sameChange(this.project, { base, revision, key: s.latest?.key }, { base: expected, revision: result }))) return said("isn't the same change as reviewed") // i18n-ignore: the card's log, agent-facing
+    if (!twoParents.ok) return again(twoParents.err)
+    if (twoParents.out.trim()) return notUp('would land a merge commit (Rebase and fast-forward lands a linear history)') // i18n-ignore: the card's log, agent-facing
+    if (!(await G.sameChange(this.project, { base, revision, key: s.latest?.key }, { base: expected, revision: result }))) return notUp("isn't the same change as reviewed") // i18n-ignore: the card's log, agent-facing
     await this.git(this.project, ['update-ref', `refs/hive/queue/${refSafe(card.key)}`, result])
     return { result }
   }
@@ -1471,7 +1593,8 @@ export class MergeQueue {
     // just before the swap.
     const r = await lock(async (): Promise<Advance> => {
       const where = await G.checkouts(this.project)
-      if (isUnknown(where)) return this.settle(card, entry, target, { pause: 'needsYou' })
+      // HI-2019: nothing touched yet, nothing written: out of the lock, and the entry goes round again.
+      if (isUnknown(where)) return again(gitSaid(where))
       if (where[target]) return 'retest'
       const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: null })
       if (started === 'rulesOff') return this.settle(card, entry, target, { pause: 'rulesOff' })
@@ -1492,7 +1615,8 @@ export class MergeQueue {
    * Hive's or another's, acts on the target between the finding and the pause; a residue is merged, then paused.
    */
   private async settle(card: CardRecord, entry: QueueEntry, target: string, adv: Advance, integrate?: () => Promise<void>): Promise<Advance> {
-    if (typeof adv !== 'object' || 'outcome' in adv) return adv
+    // `again` is never settled into a pause (HI-2019): it leaves the lock for the entry to go round.
+    if (typeof adv !== 'object' || 'outcome' in adv || isAgain(adv)) return adv
     if ('residue' in adv) {
       await integrate?.()
       return { outcome: await this.pause(target, card, entry, 'needsYou', undefined, undefined, adv.residue) }
@@ -1538,9 +1662,12 @@ export class MergeQueue {
     const r = await this.guarded(seen, async (): Promise<Advance> => {
       // Where the target is checked out now, under the lock: switched meanwhile, looked at again the right way.
       const now = await G.checkouts(this.project)
-      if (isUnknown(now)) return this.settle(card, entry, target, { pause: 'needsYou' })
+      // HI-2019: a read before anything is touched (and before IntegrationStarted) is never settled into a pause here: it
+      // leaves the lock and the fence as `again`, for the entry to go round once admitted afresh.
+      if (isUnknown(now)) return again(gitSaid(now))
       if (!now[target] || resolve(now[target]).toLowerCase() !== seen.toLowerCase()) return 'retest'
-      return this.settle(card, entry, target, await this.journal(card, entry, target, expected, result, seen), integrate)
+      const j = await this.journal(card, entry, target, expected, result, seen)
+      return isAgain(j) ? j : this.settle(card, entry, target, j, integrate)
     })
     if (r === 'done') await this.cfg.hooks?.afterAdvance?.(entry.id)
     return r
@@ -1552,18 +1679,21 @@ export class MergeQueue {
     // a file the merge changes (the user's other edits are left as they are).
     const busy = this.cfg.folderBusy?.(folder)
     if (busy) return { pause: 'folderBusy', files: busy.length ? busy : [folder] }
-    // The folder's branch and the target's head, in one git (#1386).
+    // The folder's branch and the target's head, in one git (#1386). A branch git couldn't read is a read that failed
+    // (HI-2019), never taken for the wrong branch; one it read, and isn't the target, is.
     const h = await G.heads(folder, target)
-    if (isUnknown(h.line) || h.line !== target) return { pause: 'wrongBranch', files: [folder] }
+    if (isUnknown(h.line)) return again(gitSaid(h.line))
+    if (h.line !== target) return { pause: 'wrongBranch', files: [folder] }
     if (h.target !== expected) return 'retest'
+    // HI-2019: until IntegrationStarted below, a read git couldn't make is `again` (nothing touched, nothing written).
     const staged = await this.git(folder, ['diff', '--cached', '--name-only', '-z', expected])
-    if (!staged.ok) return { pause: 'needsYou', message: staged.err }
+    if (!staged.ok) return again(staged.err)
     if (nulList(staged.out).length) return { pause: 'staged', files: nulList(staged.out) }
     const changed = await this.git(this.project, ['diff', '--name-only', '-z', '--no-renames', expected, result])
-    if (!changed.ok) return { pause: 'needsYou', message: changed.err }
+    if (!changed.ok) return again(changed.err)
     const files = nulList(changed.out)
     const edited = await this.editedOf(folder, files)
-    if (edited === null) return { pause: 'needsYou' }
+    if (!Array.isArray(edited)) return again(edited.err || `Hive couldn't read the status of ${folder}.`) // i18n-ignore: git's side of a pause, in English as git's messages are
     if (edited.length) return { pause: 'unstagedChanges', files: edited }
 
     const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, files, checkedOut: folder })
@@ -1586,7 +1716,7 @@ export class MergeQueue {
       if (sides && sides.every((f) => f.side === 'expected' || (f.side === 'other' && f.staged === 'expected'))) {
         const now = await this.editedOf(folder, files)
         await this.moved(card, entry, target)
-        return now?.length ? { pause: 'unstagedChanges', files: now } : 'moved'
+        return Array.isArray(now) && now.length ? { pause: 'unstagedChanges', files: now } : 'moved'
       }
       return { pause: 'needsYou', message: rt.err, stuck: await this.stuckOf(target, folder, expected, result, files, 'files') }
     }
@@ -1601,7 +1731,14 @@ export class MergeQueue {
 
     // HEAD no longer names the target (another client switched the folder in that instant: §16.9.2's "does not
     // guarantee"): merged, with the merged files in the other branch's working copy, listed to restore.
-    const after = await G.branch(folder)
+    // HI-2019: only a branch git couldn't read is read again (the advance is never redone), still in the lock and the
+    // fence, the lease checked again before what follows is acted on.
+    let after = await G.branch(folder)
+    for (let i = 0; isUnknown(after) && i < CONFIRM_TRIES; i++) {
+      await wait(CONFIRM_RETRY_MS)
+      after = await G.branch(folder)
+    }
+    this.stillHolds(target)
     if (isUnknown(after) || after !== target) return { residue: await this.stuckOf(target, folder, expected, result, files, 'done') }
     return 'done'
   }
@@ -1623,10 +1760,11 @@ export class MergeQueue {
    * rename; null when git can't say. The whole folder's status, then the listed files: a long list never makes a
    * command line too long.
    */
-  private async editedOf(folder: string, files: string[]): Promise<string[] | null> {
+  /** The listed files with a change in the folder's working copy or index; git's words when it couldn't say (HI-2019). */
+  private async editedOf(folder: string, files: string[]): Promise<string[] | { err: string }> {
     if (!files.length) return []
     const st = await this.git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--no-renames'])
-    if (!st.ok) return null
+    if (!st.ok) return { err: st.err }
     const listed = new Set(files)
     return [...new Set(statusPaths(st.out).filter((p) => listed.has(p)))]
   }

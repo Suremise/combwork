@@ -157,6 +157,99 @@ const check = (name, ok, extra = '') => {
   check('once an agent uses Claude Code, its banner shows', !!used, JSON.stringify(await two.page.locator('.providers-banner').allInnerTexts()))
   await two.page.screenshot({ path: path.join(lib.WORK, 'defprov-claude-used.png') })
   await two.app.close()
+
+  // --- 3. The providers' order (HI-1965): Claude Code and Codex both installed (the fakes), Automatic on Claude Code;
+  // reordering the list in Settings → Providers (by its ⋯ menu, Alt+Up and Alt+Down, and dragging) changes what Automatic
+  // picks and what the order line under it names, and the order survives a restart.
+  const userData3 = path.join(lib.WORK, 'defprov-profile-3')
+  const claudeHome3 = path.join(lib.WORK, 'defprov-claude-home-3')
+  fs.rmSync(userData3, { recursive: true, force: true })
+  lib.enableProviders(userData3, ['claude-code', 'codex'])
+  const claudeEnv = lib.fakeClaude(userData3, claudeHome3)
+  const cfg3 = JSON.parse(fs.readFileSync(path.join(userData3, 'config.json'), 'utf8'))
+  cfg3.settings.providers.codex.executablePath = path.join(__dirname, 'fake-codex', 'fake-codex.cmd')
+  cfg3.settings.general = { ...cfg3.settings.general, confirmOnQuit: 'never' }
+  fs.writeFileSync(path.join(userData3, 'config.json'), JSON.stringify(cfg3, null, 2))
+  const openProviders = async (run) => {
+    await lib.waitForProvider(run.inv, 'codex')
+    await lib.waitForProvider(run.inv, 'claude-code')
+    await run.page.keyboard.press('Control+,')
+    await run.page.locator('.settings-nav .row', { hasText: 'Providers' }).first().click()
+    await lib.until(async () => (await run.page.locator('.provider-list .provider-row').count()) === 3, 10000)
+  }
+  const orderOf = (run) => run.page.locator('.provider-list').getAttribute('data-order')
+  const automatic = (run) => run.page.locator('.setting', { hasText: 'Default provider' }).locator('select').first().evaluate((el) => el.selectedOptions[0]?.textContent ?? '')
+  const orderLine = (run) => run.page.locator('.default-provider-order').innerText().catch(() => '')
+  const three = await lib.launch({ userData: userData3, env: { ...claudeEnv, CODEX_HOME: codexHome }, viewport: { width: 1300, height: 820 } })
+  three.page.on('pageerror', (e) => check('no page errors', false, e.message))
+  await openProviders(three)
+  check("Hive's order at first, Automatic on Claude Code", (await orderOf(three)) === 'claude-code,codex,copilot' && (await automatic(three)) === 'Automatic (Claude Code)', `${await orderOf(three)} ${await automatic(three)}`)
+  check('…and the line under it names the order', (await orderLine(three)) === 'Automatic tries Claude Code and Codex, in that order.', await orderLine(three))
+  // Codex's ⋯ menu: Move Up.
+  const row = (id) => three.page.locator(`.provider-row[data-provider="${id}"]`)
+  await row('codex').getByRole('button', { name: 'More for Codex' }).click()
+  const menuUp = three.page.locator('.menu .menu-item', { hasText: 'Move Up' })
+  check("a row's ⋯ menu offers Move Up and Move Down", !!(await lib.until(async () => (await menuUp.count()) === 1, 5000)) && (await three.page.locator('.menu .menu-item', { hasText: 'Move Down' }).count()) === 1)
+  await menuUp.click()
+  const moved = await lib.until(async () => (await orderOf(three)) === 'codex,claude-code,copilot' && (await automatic(three)) === 'Automatic (Codex)', 10000)
+  check('Move Up puts Codex first: Automatic picks Codex', !!moved, `${await orderOf(three)} ${await automatic(three)}`)
+  check('…the order line follows', (await orderLine(three)) === 'Automatic tries Codex and Claude Code, in that order.', await orderLine(three))
+  check('…and Settings saves it', JSON.stringify((await three.inv('settings:get')).providerOrder) === JSON.stringify(['codex', 'claude-code', 'copilot']), JSON.stringify((await three.inv('settings:get')).providerOrder))
+  // Keys: Alt+Down on Codex's row takes it back down.
+  await row('codex').focus()
+  await three.page.keyboard.press('Alt+ArrowDown')
+  check('Alt+Down moves the focused row down: Automatic back on Claude Code', !!(await lib.until(async () => (await orderOf(three)) === 'claude-code,codex,copilot' && (await automatic(three)) === 'Automatic (Claude Code)', 10000)), `${await orderOf(three)} ${await automatic(three)}`)
+  // Dragging GitHub Copilot to the top.
+  await row('copilot').dragTo(row('claude-code'))
+  check('dragging a row onto another puts it there', !!(await lib.until(async () => (await orderOf(three)) === 'copilot,claude-code,codex', 10000)), await orderOf(three))
+  // Copilot is off: Automatic skips it. Codex above Claude Code again, for the restart.
+  await three.inv('settings:update', { providerOrder: ['copilot', 'codex', 'claude-code'] })
+  check('a provider turned off is skipped: Automatic on Codex', !!(await lib.until(async () => (await automatic(three)) === 'Automatic (Codex)', 10000)), await automatic(three))
+  for (const theme of ['dark', 'light']) {
+    await three.inv('settings:update', { appearance: { theme } })
+    await lib.until(async () => (await three.page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === theme, 5000)
+    await three.page.locator('.settings-content').first().screenshot({ path: path.join(lib.WORK, `defprov-order-${theme}.png`) }).catch(() => three.page.screenshot({ path: path.join(lib.WORK, `defprov-order-${theme}.png`) }))
+  }
+  await three.app.close()
+  // After a restart: the same order, and Automatic still on Codex. Its first three moves slow (HR2's rounds 1 and 2), for moves made
+  // faster than they save.
+  const again = await lib.launch({ userData: userData3, env: { ...claudeEnv, CODEX_HOME: codexHome, HIVE_TEST_SLOW_IPC: 'settings:moveProvider=1200*3' }, viewport: { width: 1300, height: 820 } })
+  again.page.on('pageerror', (e) => check('no page errors', false, e.message))
+  await openProviders(again)
+  check('after a restart: the same order, Automatic on Codex', (await orderOf(again)) === 'copilot,codex,claude-code' && (await automatic(again)) === 'Automatic (Codex)', `${await orderOf(again)} ${await automatic(again)}`)
+  // Settings' provider pages and Advanced's CLI tabs follow the order too (HR2's round 1), the other sections where they were.
+  const navOrder = () => again.page.locator('.settings-nav .row[data-section^="provider:"]').evaluateAll((els) => els.map((e) => e.dataset.section.replace('provider:', '')).join(','))
+  check("Settings' provider pages follow the order", (await navOrder()) === 'copilot,codex,claude-code', await navOrder())
+  await again.page.locator('.settings-nav .row', { hasText: 'Advanced' }).first().click()
+  const tabOrder = () => again.page.locator('.advanced-tabs [data-tab]').evaluateAll((els) => els.map((e) => e.dataset.tab).join(','))
+  const tabs = await lib.until(async () => ((await again.page.locator('.advanced-tabs [data-tab]').count()) > 1 ? tabOrder() : null), 10000)
+  const want = ['hive', 'copilot', 'codex', 'claude-code'].filter((g) => (tabs ?? '').split(',').includes(g)).join(',')
+  check("Advanced's CLI tabs follow it, Hive's first", !!tabs && tabs === want && tabs.startsWith('hive,'), String(tabs))
+  await again.page.locator('.settings-nav .row', { hasText: 'Providers' }).first().click()
+  await lib.until(async () => (await again.page.locator('.provider-list .provider-row').count()) === 3, 10000)
+  // The barrier for every check below: the list has no move under way and shows the order main has (data-pending is set
+  // while any move is queued, sent, or acknowledged and not in the window's settings yet).
+  const settled = () => lib.until(async () => (await again.page.locator('.provider-list:not([data-pending])').count()) === 1, 15000)
+  const savedOrder = async () => (await again.inv('settings:get')).providerOrder.join(',')
+  // Two moves before either save is back (the first three moves slowed by 1.2 s): both kept, shown at once and saved.
+  await again.page.locator('.provider-row[data-provider="copilot"]').focus()
+  await again.page.keyboard.press('Alt+ArrowDown')
+  await again.page.keyboard.press('Alt+ArrowDown')
+  check('two quick moves show at once, under way', !!(await lib.until(async () => (await orderOf(again)) === 'codex,claude-code,copilot' && (await again.page.locator('.provider-list[data-pending]').count()) === 1, 5000)), await orderOf(again))
+  check('…and once both are in, both are saved and shown', !!(await settled()) && (await savedOrder()) === 'codex,claude-code,copilot' && (await orderOf(again)) === 'codex,claude-code,copilot', `${await savedOrder()} ${await orderOf(again)}`)
+  // HR2's round 2: a move, then Settings → Advanced and back while its save is slow, then another move: neither lost.
+  await again.inv('settings:update', { providerOrder: ['claude-code', 'codex', 'copilot'] })
+  await lib.until(async () => (await orderOf(again)) === 'claude-code,codex,copilot', 10000)
+  await again.page.locator('.provider-row[data-provider="claude-code"]').focus()
+  await again.page.keyboard.press('Alt+ArrowDown')
+  await again.page.locator('.settings-nav .row', { hasText: 'Advanced' }).first().click()
+  await lib.until(async () => (await again.page.locator('.provider-list').count()) === 0, 10000)
+  await again.page.locator('.settings-nav .row', { hasText: 'Providers' }).first().click()
+  check('back on Providers while the move saves: it still shows, under way', !!(await lib.until(async () => (await orderOf(again)) === 'codex,claude-code,copilot' && (await again.page.locator('.provider-list[data-pending]').count()) === 1, 5000)), await orderOf(again))
+  await again.page.locator('.provider-row[data-provider="copilot"]').focus()
+  await again.page.keyboard.press('Alt+ArrowUp')
+  check('…and with the next move, once both are in: both saved and shown', !!(await settled()) && (await savedOrder()) === 'codex,copilot,claude-code' && (await orderOf(again)) === 'codex,copilot,claude-code', `${await savedOrder()} ${await orderOf(again)}`)
+  await again.app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)
 })().catch((e) => {

@@ -146,6 +146,19 @@ function helpers(h) {
     }
     return res
   }
+  /**
+   * Its start review: under load the copy's setup can outlast the first wait, answered "Waiting for a review copy" and
+   * told later (HI-2024, as lanesslots for HI-1955). Once a copy is leased to it for the card, starting again answers with
+   * its folder. The reply, and the copy's folder (or null).
+   */
+  const startReview = async (p, a, n) => {
+    let s = await intent(p, a, n, 'start-review')
+    if ((s.body?.data?.reviewCopy ?? '').startsWith('Waiting for a review copy')) {
+      await until(async () => (await inv('copies:list', p)).some((c) => c.state === 'leased' && c.lease?.kind === 'review' && c.lease.card === n && c.lease.agent === a.id && !c.lease.returned), HUNG_MS)
+      s = await intent(p, a, n, 'start-review')
+    }
+    return { s, copy: (s.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null }
+  }
   /** A line the agent's shell runs (the fakes' "shell:" step), typed until its CLI has taken it: its record, or null. */
   const shell = async (p, a, cmd) => {
     const file = path.join(a.provider === 'codex' ? codexHome : fx.claudeHome, 'fake-shell.jsonl')
@@ -237,7 +250,7 @@ function helpers(h) {
     await listed.click()
   }
   const command = (id) => h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args: [] })
-  return { live, idle, tokenOf, intent, shell, card, facts, kinds, fact, done, lane, slots, slotOfLane, create, runs, shoot, showBoard, startLane, panel, showTab, laneTop, text, toProject, command }
+  return { live, idle, tokenOf, intent, startReview, shell, card, facts, kinds, fact, done, lane, slots, slotOfLane, create, runs, shoot, showBoard, startLane, panel, showTab, laneTop, text, toProject, command }
 }
 
 ;(async () => {
@@ -350,8 +363,7 @@ function helpers(h) {
     await inv('session:start', alpha, { agentId: r1.id }).catch(() => undefined)
     const rs = await until(() => x.live(alpha, r1.id), HUNG_MS)
     check(`${key}-R1 runs in the project folder`, same(rs?.cwd, alpha), JSON.stringify(rs))
-    const review = await x.intent(alpha, r1, a1, 'start-review')
-    const copy = (review.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null
+    const { s: review, copy } = await x.startReview(alpha, r1, a1)
     check(`…start review leases it a review copy at the revision (${rev1.slice(0, 7)})`, review.status === 200 && !!copy && fs.existsSync(copy) && git(copy, 'rev-parse', 'HEAD') === rev1, JSON.stringify(review.body))
     check("…its session stays in the project folder", same((await x.live(alpha, r1.id))?.cwd, alpha))
     q.steer(fx, 'pass')
@@ -571,8 +583,7 @@ async function pool(h) {
   const review = async (r, n, rev, pass = true) => {
     await until(async () => (await assignedOf(x, n)).includes(r.id), HUNG_MS)
     await x.idle(beta, r.id)
-    const s = await x.intent(beta, r, n, 'start-review')
-    const copy = (s.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null
+    const { s, copy } = await x.startReview(beta, r, n)
     const atRev = !!copy && fs.existsSync(copy) && git(copy, 'rev-parse', 'HEAD') === rev
     const inFolder = same((await x.live(beta, r.id))?.cwd, beta)
     const v = pass ? await x.intent(beta, r, n, 'verdict', { pass: true, comment: `${r.name}: passed` }) : { status: 200 }
@@ -662,8 +673,7 @@ async function everyoneInTheFolder(h) {
     commitIn(gamma, { 'later.txt': `after ${key}\n` }, `after ${title}`)
     await until(async () => (await assignedOf(x, n)).includes(gr.id), HUNG_MS)
     await x.idle(gamma, gr.id)
-    const r = await x.intent(gamma, gr, n, 'start-review')
-    const copy = (r.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null
+    const { s: r, copy } = await x.startReview(gamma, gr, n)
     check(`G-R1 reviews it from the pool in a review copy at ${rev.slice(0, 7)}`, r.status === 200 && !!copy && git(copy, 'rev-parse', 'HEAD') === rev && same((await x.live(gamma, gr.id))?.cwd, gamma), JSON.stringify(r.body))
     check('…passes it: Done (committed)', (await x.intent(gamma, gr, n, 'verdict', { pass: true, comment: 'passed' })).status === 200 && (await x.done(n)))
   }

@@ -72,6 +72,50 @@ describe('skills read', () => {
   })
 })
 
+// HI-2011: SKILL.md as a contents page, its reference files read only when needed. A reference read is counted apart
+// from the skill's (skillsRead stays SKILL.md only), and only from a read that worked, of that one file, showing it.
+describe("a skill's reference files read (skillRefsRead)", () => {
+  const observe = observeTranscript as unknown as (items: unknown[], skills: string[], refs: Map<string, Map<string, string>>) => { skillsRead: string[]; skillRefsRead: string[] }
+  const HEAD = '# Card loop: the builder'
+  const REFS = new Map([['card-loop', new Map([['builder.md', HEAD], ['reviewer.md', '# Card loop: the reviewer']])]])
+  const BODY = `${HEAD}\n\n## Builder\n\nFor each card, in order:`
+  const NAMES = ['card-loop']
+
+  it("counts Claude Code's Read, Copilot's view, and a Codex script with the file escaped in its result: the reference, not the skill", () => {
+    const numbered = BODY.split('\n').map((l, i) => `${String(i + 1).padStart(6)}\t${l}`).join('\n')
+    const claude = observe([tool('Read', { file_path: 'C:\\p\\.hive\\launch-a\\plugin\\skills\\card-loop\\builder.md' }, numbered)], NAMES, REFS)
+    expect(claude).toMatchObject({ skillsRead: [], skillRefsRead: ['card-loop/builder.md'] })
+    const copilot = observe([tool('view', { path: '.agents/skills/hive-card-loop/builder.md' }, `1. ${HEAD}\n2.\n3. ## Builder`)], NAMES, REFS)
+    expect(copilot.skillRefsRead).toEqual(['card-loop/builder.md'])
+    const nested = tool('Script', 'text(await tools.exec_command({cmd:"Get-Content -Raw .agents/skills/hive-card-loop/builder.md"}))', JSON.stringify({ result: JSON.stringify({ output: BODY.replace(/\n/g, '\r\n') }) }))
+    expect(observe([nested], NAMES, REFS).skillRefsRead).toEqual(['card-loop/builder.md'])
+    // Both read: each counted where it belongs.
+    const both = observe([tool('Skill', { skill: 'hive:card-loop' }, 'Launching skill: hive:card-loop'), tool('Read', { file_path: '.agents/skills/hive-card-loop/builder.md' }, BODY)], NAMES, REFS)
+    expect(both).toMatchObject({ skillsRead: ['card-loop'], skillRefsRead: ['card-loop/builder.md'] })
+  })
+
+  it("doesn't count a listing, a search, a failed read, a write, a mention with other output, SKILL.md, or a call naming two files", () => {
+    const o = observe(
+      [
+        tool('Bash', { command: 'ls .agents/skills/hive-card-loop/builder.md' }, '.agents/skills/hive-card-loop/builder.md'),
+        tool('PowerShell', { command: 'Get-ChildItem .agents/skills/hive-card-loop' }, `builder.md reviewer.md ${HEAD}`),
+        tool('Grep', { pattern: 'Builder', path: '.agents/skills/hive-card-loop/builder.md' }, HEAD),
+        tool('Bash', { command: 'grep -n Builder .agents/skills/hive-card-loop/builder.md' }, `1:${HEAD}`),
+        tool('Read', { file_path: '.agents/skills/hive-card-loop/builder.md' }, 'File does not exist.', true),
+        tool('Write', { file_path: '.agents/skills/hive-card-loop/builder.md', content: BODY }, 'File created successfully'),
+        tool('Bash', { command: 'cat .agents/skills/hive-card-loop/builder.md' }, 'cat: permission denied'),
+        tool('Read', { file_path: '.agents/skills/hive-card-loop/SKILL.md' }, `---\nname: card-loop\n---\n- [builder.md](builder.md)`),
+        tool('Bash', { command: 'cat .agents/skills/hive-card-loop/builder.md .agents/skills/hive-card-loop/reviewer.md' }, `${HEAD}\n# Card loop: the reviewer`)
+      ],
+      NAMES,
+      REFS
+    )
+    expect(o.skillRefsRead).toEqual([])
+    // Reading SKILL.md is the skill's read, never a reference file's.
+    expect(o.skillsRead).toEqual(['card-loop'])
+  })
+})
+
 describe('hive tools named in a transcript are mentions, not calls', () => {
   it('lists names from direct calls and from scripts, including ones a script never reaches', () => {
     const o = observeTranscript(

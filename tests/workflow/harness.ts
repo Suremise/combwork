@@ -2,7 +2,7 @@
 // store in a file of its own, and a Workflow over them, with wakes and notifications captured. Scenarios (SPEC §16.18)
 // drive it as agents and the user would, and read the facts.
 import { execFileSync } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
+import { cpSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
 import { FactStore } from '../../src/main/workflow/factStore'
@@ -23,6 +23,16 @@ export const R1 = agentActor('R1')
 export const R2 = agentActor('R2')
 
 const ID = ['-c', 'user.name=Hive Test', '-c', 'user.email=test@hive.invalid']
+
+/**
+ * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Hive's own git per
+ * queue step, about 95% of its time; nothing in it waits for time). Alone they take 2 to 11 s. 15 such tests passed 20 s
+ * (the run's limit, vitest.config.ts) in HI-2025's runs of the workflow files under load: 5 in the baseline run, 13 in
+ * the run beside three other lanes' full unit runs (CPU at 80%), after git was made cheaper, and 1 in the first final
+ * set (some in more than one). A bound for a hung run, as that limit is, never a wait: three times it. Each test that
+ * takes it says why beside it; only those take it, and S27's second case, which shares its test.
+ */
+export const GIT_HEAVY_MS = 60_000
 
 /** git in a folder, as a person in a terminal would run it; its output. */
 export function sh(cwd: string, ...args: string[]): string {
@@ -45,14 +55,30 @@ export function commit(cwd: string, files: Record<string, string>, message: stri
   return sh(cwd, 'rev-parse', 'HEAD')
 }
 
-/** A repository on `main` with one commit, its own identity set (unit tests have no global git config). */
-export function gitRepo(dir: string): string {
+/** A repository on `main` with one commit, its own identity set (unit tests have no global git config), made by git. */
+export function freshGitRepo(dir: string): string {
   mkdirSync(dir, { recursive: true })
   execFileSync('git', ['init', '-q', '-b', 'main', dir])
   sh(dir, 'config', 'user.name', 'Hive Test')
   sh(dir, 'config', 'user.email', 'test@hive.invalid')
   sh(dir, 'config', 'core.autocrlf', 'false')
   commit(dir, { 'README.md': 'hello\n', 'src/a.txt': 'one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n' }, 'initial')
+  return dir
+}
+
+/**
+ * HI-2025: freshGitRepo's repository, made once per test file (Vitest isolates modules per file) in a temp folder of its
+ * own that the file's clean-up removes, and never handed out or changed after. Each gitRepo is a whole copy of it (no
+ * links, no shared .git): 1 git process instead of 7, where a queue test's time is its git processes.
+ */
+let template: string | null = null
+
+/** A repository on `main` with one commit, its own identity set: freshGitRepo's, as a copy of this file's template. */
+export function gitRepo(dir: string): string {
+  template ??= freshGitRepo(join(tempDir('wf-template-'), 'repo'))
+  cpSync(template, dir, { recursive: true })
+  // The copied files are newer than the index says: refreshed, so git sees them unchanged (diff-files doesn't refresh).
+  execFileSync('git', ['update-index', '-q', '--refresh'], { cwd: dir, stdio: 'pipe' })
   return dir
 }
 
