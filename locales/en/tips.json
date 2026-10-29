@@ -1507,6 +1507,14 @@
     "defaultMessage": "Project Settings from More ▾",
     "description": "A tip's title (HI-1840). More ▾ is the button's name with its arrow."
   },
+  "tips.providerOrder.text": {
+    "defaultMessage": "Reorder the list in Settings → Providers by dragging a provider, or with Move Up and Move Down in its ⋯ menu: Automatic gives new agents the first one in that order that is turned on and installed, say Codex before Claude Code.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.providerOrder.title": {
+    "defaultMessage": "Choose which coding agent Automatic tries first",
+    "description": "A tip's title."
+  },
   "tips.quitWhenDone.text": {
     "defaultMessage": "Quitting while an agent works offers Quit when agents finish: Hive hides and quits by itself once they're done. Conversations are always kept.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

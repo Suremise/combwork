@@ -2,7 +2,7 @@ import { existsSync } from 'original-fs'
 import { mkdir, readFile, readdir, stat } from 'original-fs/promises'
 import { basename, join, resolve } from 'path'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
-import { agentProvider, isKnownProvider, isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
+import { agentProvider, isKnownProvider, isProviderEnabled, orderedProviders, providerDescriptor } from '../shared/providers'
 import {
   exportable,
   exportFileName,
@@ -484,10 +484,10 @@ async function namesIn(projectPath: string, agents: readonly TemplateAgent[]): P
 
 /**
  * The provider one of Hive's own templates' agents runs instead of one that can't run here (#1436): the first provider,
- * in Hive's order (Claude Code first), that is on and installed; null when none is.
+ * in the user's order (Settings → Providers, HI-1965), that is on and installed; null when none is.
  */
 function standIn(): ProviderId | null {
-  return PROVIDERS.map((d) => d.id).find((id) => !providerProblem(id)) ?? null
+  return orderedProviders(config.settings).map((d) => d.id).find((id) => !providerProblem(id)) ?? null
 }
 
 /** Names another project's agents have, in a refusal: "B1, R1 are already agents in amberlight: … rename them" (and nothing changed, at the load's end). */

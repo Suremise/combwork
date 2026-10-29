@@ -13,7 +13,7 @@ import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUs
 import { contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
 import { useAdvancedValue, useAgentLimit } from '../advanced'
 import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } from '@shared/inboxSwitches'
-import { PROVIDERS, contextLines, defaultProviderLabel, isProviderEnabled, modeDescription, offeredModes, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
+import { PROVIDERS, contextLines, defaultProviderLabel, inProviderOrder, isProviderEnabled, modeDescription, offeredModes, orderedProviders, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
 import { instructionsStarter } from '@shared/projectTabs'
 import { EffortPicker, ModelPicker } from '../components/ModelPicker'
 import { effortText, runsAsName } from '@shared/models'
@@ -496,7 +496,7 @@ export function OverviewTab({ project }: { project: ProjectInfo }) {
   const total = sumUsage(inPeriod, from)
   const running = project.agents.filter((a) => a.live && !a.live.settingUp)
   const used = new Set([...inPeriod.map((i) => i.provider), ...running.map((a) => a.live!.provider)])
-  const providers = PROVIDERS.filter((p) => used.has(p.id) || isProviderEnabled(settings, p.id))
+  const providers = orderedProviders(settings).filter((p) => used.has(p.id) || isProviderEnabled(settings, p.id))
   const tokens = (t: Totals): number => t.input + t.cached + t.cacheWrite + t.output
   const costTip = tr(M.costTip)
 
@@ -1329,7 +1329,7 @@ export function MemoryTab({ project }: { project: ProjectInfo }) {
   // One pair of groups per provider the project uses (or, with none yet, every enabled provider).
   const settings = useStore((s) => s.settings)
   const used = new Set(project.agents.map((a) => agentProviderOf(project, a)))
-  const providers = PROVIDERS.filter((p) => used.has(p.id) || (isProviderEnabled(settings, p.id) && sources.some((s) => s.provider === p.id && s.exists)))
+  const providers = orderedProviders(settings).filter((p) => used.has(p.id) || (isProviderEnabled(settings, p.id) && sources.some((s) => s.provider === p.id && s.exists)))
   // With agents of more than one provider: one shared AGENTS.md instead of a file per CLI.
   const usedIds = [...used].sort()
   const [shared, setShared] = useState(true)
@@ -1449,7 +1449,7 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
   }, [project.path, loadScoped])
   useEffect(load, [load, version])
 
-  const providers = PROVIDERS.filter((p) => isProviderEnabled(settings, p.id))
+  const providers = orderedProviders(settings).filter((p) => isProviderEnabled(settings, p.id))
   const ids = providers.map((p) => p.id)
   // One provider's skills at a time (#118): the one last shown for this project, else the project's default provider,
   // else the first turned on.
@@ -1995,7 +1995,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       render: () => (
         <select className="select" value={cfg.defaultProvider} onChange={(e) => void update({ defaultProvider: e.target.value })}>
           <option value="inherit">{inherit(globalDefault)}</option>
-          {PROVIDERS.map((p) => (
+          {orderedProviders(settings).map((p) => (
             <option key={p.id} value={p.id}>
               {isProviderEnabled(settings, p.id) ? p.name : tr(S.off, { provider: p.name })}
             </option>
@@ -2003,7 +2003,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
         </select>
       )
     },
-    ...PROVIDERS.flatMap((p) => providerDefs(p.id)),
+    ...orderedProviders(settings).flatMap((p) => providerDefs(p.id)),
     {
       section: 'sessions',
       key: 'compactSuggestTokens',
@@ -2142,7 +2142,9 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
 
   const q = query.trim().toLowerCase()
   const visible = defs.filter((d) => (q ? `${d.title} ${d.desc} ${d.tip ?? ''} ${d.key}`.toLowerCase().includes(q) : d.section === section))
-  const groups = PROJECT_SECTIONS.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
+  // Each provider's sections in the user's order (HI-1965: Settings → Providers), the others where they are.
+  const sections = inProviderOrder(PROJECT_SECTIONS, (s) => s.provider, settings)
+  const groups = sections.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
 
   return (
     <div className="settings">
@@ -2162,7 +2164,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       <HiveVcsNotice project={project} />
       <div className="settings-body">
         <div className="settings-nav">
-          {PROJECT_SECTIONS.map((s) => (
+          {sections.map((s) => (
             <div
               key={s.id}
               className={cx('row', !q && section === s.id && 'selected')}

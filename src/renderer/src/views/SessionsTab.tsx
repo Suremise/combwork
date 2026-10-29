@@ -129,7 +129,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   const low = q.toLowerCase()
   const matches = (s: SessionListItem): boolean =>
     hitsById.has(s.id) || [sessionName(s), s.title ?? '', providerName(s.provider), s.lastActivity ? formatDateTime(s.lastActivity) : '', origin(s)?.label ?? '', s.sub?.kind ?? ''].some((t) => t.toLowerCase().includes(low))
-  const tree = buildSessionTree(shown, { agents: project.agents, byAgent: !assistant, showArchived, selectedId, match: q ? matches : null })
+  const tree = buildSessionTree(shown, { agents: project.agents, byAgent: !assistant, showArchived, selectedId, match: q ? matches : null, providerOrder: settings?.providerOrder })
   const treeNow = useRef(tree)
   treeNow.current = tree
 
