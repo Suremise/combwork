@@ -4,6 +4,7 @@
 // runs, however many runners crash on the way; a folder of its own per lease; and every store write the queue makes
 // fenced by its lease. Hives are Node processes (tests/queueRunnerHost.ts) on one hive.db copy.
 import { spawn, type ChildProcess } from 'child_process'
+import { EventEmitter } from 'events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { basename, join } from 'path'
@@ -16,7 +17,7 @@ import { admitted } from './admitted'
 import { gitTestHooks } from '../src/main/git'
 import { FactStore, withoutWriteFence, withWriteFence } from '../src/main/workflow/factStore'
 import { fileTimeMs, parseJournal, queueHost, startLauncher } from '../src/main/workflow/queueJobs'
-import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunner } from '../src/main/workflow/queueRunner'
+import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunner, type RunResult } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed, type ProcessProbe } from '../src/main/workflow/queueProcs'
 import { commit, gitRepo, moved, R1, B1, setup, sh, type Env } from './workflow/harness'
 import { preset } from '../src/shared/workflow/options'
@@ -690,6 +691,36 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
       expect(r.timedOut).toBeUndefined()
     } finally {
       await a.runner.release()
+      await run.catch(() => {})
+    }
+  })
+
+  it('HI-2043: a launcher whose output stays open after it exits (held by another process): settled with what came, its code', async () => {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'held', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    // A launcher standing in (no process: nothing to end): it writes, exits 0, and its output never closes.
+    const stream = () => Object.assign(new EventEmitter(), { destroy: vi.fn() })
+    const fake = Object.assign(new EventEmitter(), { stdout: stream(), stderr: stream(), pid: undefined })
+    vi.spyOn(a.runner, 'spawn').mockImplementation(async () => {
+      setImmediate(() => {
+        fake.stdout.emit('data', Buffer.from('said'))
+        fake.stderr.emit('data', Buffer.from('told'))
+        fake.emit('exit', 0, null)
+      })
+      return fake as unknown as ChildProcess
+    })
+    let result: RunResult | null = null
+    const run = a.runner.run('testMerge', process.execPath, ['-e', '']).then((r) => (result = r))
+    // However the test ends (a run that never settles too: the wait is bounded, so it fails into finally): released.
+    try {
+      await vi.waitFor(() => expect(result).not.toBeNull(), { timeout: 30_000, interval: 100 })
+      expect(result).toMatchObject({ ok: true, code: 0, out: 'said', err: 'told' })
+      expect(result!.timedOut).toBeUndefined()
+      // Its output closed once quiet, as runGit closes a held one.
+      expect(fake.stdout.destroy).toHaveBeenCalled()
+      expect(fake.stderr.destroy).toHaveBeenCalled()
+    } finally {
+      await a.runner.release()
+      fake.emit('close', 0, null)
       await run.catch(() => {})
     }
   })
