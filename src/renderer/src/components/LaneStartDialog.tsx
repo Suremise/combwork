@@ -74,6 +74,9 @@ const M = {
   startedText: msg({ id: 'board.laneStart.startedText', defaultMessage: '{n, plural, one {# card} other {# cards}}. Each agent starts in a new conversation with its brief.', description: "The text of the toast after a lane started: how many cards ({n}), and that both agents started fresh with their brief." }),
   notStarted: msg({ id: 'board.laneStart.notStarted', defaultMessage: "{agent} didn't start", description: "A toast's title: the lane was recorded, but one of its agents ({agent}) couldn't be started. The reason follows." }),
   notStartedText: msg({ id: 'board.laneStart.notStartedText', defaultMessage: '{why} The lane is recorded: start {agent} yourself, or end the lane from its row in the Progress panel.', description: "The text of the toast when a lane's agent ({agent}) didn't start: why ({why}, a sentence), and what the user can do." }),
+  applyNow: msg({ id: 'board.laneStart.applyNow', defaultMessage: 'Apply now', description: "A checkbox of the Start Lane dialog (HI-1995), off by default, shown when the builder's running lane has a card being worked: the new list applies at once instead of after that card is Done." }),
+  applyNowHint: msg({ id: 'board.laneStart.applyNowHint', defaultMessage: "{builder}'s lane is working on {card}: this list applies once {card} is Done. Apply now puts {card} back in Todo first (its work stays on its branch), so the new order applies at once, and tells {builder}.", description: "Under the Apply now checkbox of the Start Lane dialog (HI-1995): {builder} (an agent's name) has a running lane whose card {card} (its key) is in progress. Todo is a board column." }),
+  applyNowNot: msg({ id: 'board.laneStart.applyNowNot', defaultMessage: "{builder}'s lane is working on {card}, which is in {column, select, review {Review} other {Approved}}: this list applies once it is Done. It can't be put back now without losing its {column, select, review {review} other {approval and merge}}.", description: "In the Start Lane dialog (HI-1995), with Apply now unavailable: the builder's ({builder}) lane card {card} is already in the Review or Approved column (select; translate each)." }),
   show: msg({ id: 'board.laneStart.show', defaultMessage: 'Show', description: 'A button on the toast after a lane started: shows its builder.' })
 }
 
@@ -89,6 +92,8 @@ export function LaneStartDialog() {
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
   const [waiting, setWaiting] = useState(false)
+  const [applyNow, setApplyNow] = useState(false)
+  const lanes = useStore((s) => s.lanes)
   // What the project's rules offer (#1443): the reviewer pool, read for the project chosen.
   const [info, setInfo] = useState<{ path: string; info: LaneStartInfo } | null>(null)
   const action = useBusy()
@@ -109,6 +114,7 @@ export function LaneStartDialog() {
     setName('')
     setNote('')
     setWaiting(false)
+    setApplyNow(false)
     action.setError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [req])
@@ -136,11 +142,20 @@ export function LaneStartDialog() {
   const chosen = [agentOf(builder), reviewer && !pooled ? agentOf(reviewer) : undefined].filter((a): a is AgentInfo => !!a)
   const busyNow = chosen.filter(busy)
   const ready = !!project && !!agentOf(builder) && builder !== reviewer && (reviewer !== POOL || pooled) && cards.length > 0
+  // The builder's running lane with its own card in flight (HI-1995): this start edits that lane, its list queued until
+  // that card is Done unless applied now.
+  const running = project ? (lanes ?? []).find((l) => (l.state === 'active' || l.state === 'paused') && l.project.toLowerCase() === project.name.toLowerCase() && l.builder.id === builder) : undefined
+  const flying = running?.cards.find((c) => !c.elsewhere && (c.column === 'doing' || c.column === 'review' || c.column === 'passed'))
+  const keyOf = (n: number): string => {
+    const c = tasks.find((x) => x.number === n)
+    return c ? cardLabel(c) : `#${n}`
+  }
+  const canApplyNow = !!flying && flying.column === 'doing' && cards[0] !== flying.number
 
   const go = async (): Promise<void> => {
     // Only for the request still open: a dialog closed or opened again since starts nothing.
     if (!project || !ready || !req || get().laneStartFor !== req) return
-    const out = await action.run('start', () => call('lanes:start', project.path, { builder, reviewer: pooled || !reviewer ? null : reviewer, ...(pooled ? { pool: true } : {}), cards, note, name }))
+    const out = await action.run('start', () => call('lanes:start', project.path, { builder, reviewer: pooled || !reviewer ? null : reviewer, ...(pooled ? { pool: true } : {}), cards, note, name, ...(applyNow && canApplyNow ? { applyNow: true } : {}) }))
     if (!out) return setWaiting(false)
     const r = out.value
     const pair = r.lane.reviewer ? `${r.lane.builder.name} / ${r.lane.reviewer.name}` : r.lane.pool && pool ? `${r.lane.builder.name} / ${tr(M.pool, { agents: poolNames(builder) })}` : r.lane.builder.name
@@ -284,6 +299,16 @@ export function LaneStartDialog() {
           <label htmlFor="lane-start-note">{tr(M.note)}</label>
           <textarea id="lane-start-note" className={cx('input', 'lane-start-note')} rows={3} value={note} disabled={waiting} maxLength={4000} onChange={(e) => setNote(e.target.value)} />
         </div>
+        {flying && cards[0] !== flying.number && (
+          <div className="lane-start-apply-now" data-apply-now={canApplyNow ? 'can' : 'not'}>
+            {canApplyNow && (
+              <label className="checkbox">
+                <input type="checkbox" checked={applyNow} disabled={waiting} onChange={(e) => setApplyNow(e.target.checked)} /> {tr(M.applyNow)}
+              </label>
+            )}
+            <p className="faint">{canApplyNow ? tr(M.applyNowHint, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number) }) : tr(M.applyNowNot, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number), column: flying.column === 'review' ? 'review' : 'passed' })}</p>
+          </div>
+        )}
         {busyNow.length > 0 && <p className="lane-start-busy">{waiting ? tr(M.waiting, { agents: names }) : tr(M.busy, { agents: names, n: busyNow.length })}</p>}
       </div>
     </Modal>

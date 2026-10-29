@@ -995,6 +995,14 @@
     "defaultMessage": "Leave agents working, the PC stays awake",
     "description": "A tip's title."
   },
+  "tips.laneApplyNow.text": {
+    "defaultMessage": "In Start Lane for a lane's builder, Apply now changes the order at once: the card being worked goes back to Todo with its work kept on its branch, and the builder is told.",
+    "description": "A tip (HI-1995). Start Lane and Apply now are a dialog and its checkbox; Todo is a board column. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.laneApplyNow.title": {
+    "defaultMessage": "Reorder a running lane now",
+    "description": "A tip's title (HI-1995). A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
+  },
   "tips.laneBranchSquash.text": {
     "defaultMessage": "After an agent's card is squash-merged, Hive brings its branch up to date before its next card, so each review shows only that card's work. What it can't do safely it asks under For you; Settings → Advanced makes it ask every time.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."
@@ -1498,6 +1506,14 @@
   "tips.projectTabsSettings.title": {
     "defaultMessage": "Project Settings from More ▾",
     "description": "A tip's title (HI-1840). More ▾ is the button's name with its arrow."
+  },
+  "tips.providerOrder.text": {
+    "defaultMessage": "Reorder the list in Settings → Providers by dragging a provider, or with Move Up and Move Down in its ⋯ menu: Automatic gives new agents the first one in that order that is turned on and installed, say Codex before Claude Code.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.providerOrder.title": {
+    "defaultMessage": "Choose which coding agent Automatic tries first",
+    "description": "A tip's title."
   },
   "tips.quitWhenDone.text": {
     "defaultMessage": "Quitting while an agent works offers Quit when agents finish: Hive hides and quits by itself once they're done. Conversations are always kept.",

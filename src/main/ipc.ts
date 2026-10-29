@@ -123,6 +123,7 @@ import { adoptWorkspace } from './workflow/adoption'
 import { repairStages } from './workflow/stageRepair'
 import { attachableSource, attachToCard, cardAttachmentGroups, cardAttachments, previewCardAttachment, recoverCardAttachments, removeCardAttachment, stageDrafts } from './cardAttachments'
 import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
+import { settleCommitMessageDefault } from './workflow/commitMessageStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
 import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
@@ -392,6 +393,8 @@ function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): 
     'adoption, slots, repairs and what changed while closed', // i18n-ignore: a part of a log line's timing
     adoptWorkspace(ws)
       .then(() => settleSlotsUpToDate(ws))
+      // HI-1997: a commit message a preset stored as Hive's, switched once to the branch's own (a proven choice kept).
+      .then(() => settleCommitMessageDefault(ws))
       .then(() => step('slots'))
       .then(() => migrateSlots(ws))
       .then(() => repairStages(ws))
@@ -592,6 +595,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'settings:get': () => config.settings,
     // Show developer features is kept in advanced.json too: written there first, or refused (#367).
     'settings:update': (patch) => updateSettingsChecked(patch, (p) => config.updateSettings(p)),
+    'settings:moveProvider': (id, toIndex) => config.moveProvider(id, toIndex),
     'settings:setKeybinding': (id, key) => config.setKeybinding(id, key),
     'settings:setProviderPrices': (provider, prices, removed) => config.setProviderPrices(knownProvider(provider), prices, removed),
     'settings:setProviderFallback': (provider, kind, list) => config.setProviderFallback(knownProvider(provider), kind === 'efforts' ? 'efforts' : 'models', list),
@@ -1388,7 +1392,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)
       const cards = Array.isArray(r.cards) ? r.cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
       if (typeof r.builder !== 'string' || !r.builder) throw hiveError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
-      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null })
+      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}) })
     },
     'lanes:startInfo': (p) => laneStartInfo(currentWorkspace(), workspace.assertProject(p)),
     'costs:cards': (q) => {

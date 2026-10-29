@@ -29,6 +29,37 @@ unless `HIVE_TEST_STORE_PWSH=1` is set (#1027). Run from a Store PowerShell, whi
 end that shell and every other Store PowerShell on the PC, other agents' commands included; why is #1056. Opt in only
 where no one else's Store PowerShell runs (a Windows Sandbox, or a machine of your own with no Codex agents running).
 
+## Isolation: never alone, never the shell's (moved from AGENTS.md, HI-2013)
+
+Tests never assume they're alone on the machine or inherit their shell.
+- What a run uses of its own comes from the run context (`e2e/runContext.cjs`, `lanes.mjs`, `build.mjs`): environments
+  from an allowlist (`lib.hiveEnv()` for a test Hive, `lib.childEnv()` for the hive MCP server or `hive-progress`), a
+  lane's ports and folders, the CLI test homes, and the dev build under a lock per worktree.
+- Never build a child's environment from `process.env`. Give every child the runners, `lib.cjs` or the harness start
+  themselves an `env` (`runContext.baseEnv()` for git and the build), so a shell's `GIT_DIR` or `NODE_OPTIONS` can't
+  reach it (unit tests fail); a setting a run must pass on goes in `PASS_ENV`.
+- After changing the runner, `lib.cjs`, the run context or the scenario harness, run `npm run e2e:concurrency` (and
+  `-- --heavy` after changing `slots.mjs`).
+- At most two heavy runs (a full or `--repeat` e2e run, more than five scenarios, a full unit run) go at once on the
+  machine (`heavySlots` in `%LOCALAPPDATA%\hive-test\config.json` changes it, for the whole machine: e2e/README.md): a
+  third waits, not hung, printing who holds the slots ("e2e: waiting for a test slot" in Progress; `--no-wait` fails at
+  once).
+- Temp folders come from `tempDir()`, by long, real paths, in `%LOCALAPPDATA%\hive-test\tmp`, never under
+  `os.tmpdir()` (a unit test fails): CI's is the 8.3 form `C:\Users\RUNNER~1\…` and Hive compares real paths, so such
+  tests failed on CI only. Another name for a folder comes from `pathAliases.ts`: `junction()` works on any machine,
+  `shortPath()` only where the volume makes 8.3 names.
+- Unit tests run git with none of the shell's `GIT_*` variables (`cleanGitEnv.ts`) and no global config, as CI does
+  (`noGlobalGit.ts`): a test whose Hive code commits or merges sets its repository's own `user.name` and `user.email`.
+- e2e suites use `lib.cjs` and work under `%LOCALAPPDATA%\hive-test\e2e` (each runner's suites in its lane's
+  `lanes\<k>\<suite>`, so runners in different worktrees don't collide), never the real clipboard, profile or
+  `~/.codex`.
+- Probes of your own (scripts, screenshots, profiles outside a suite) and redirected output take a new folder each run,
+  from `lib.probeDir()` (in `hive-test\scratch`) or your scratchpad, never in the lanes or logs, the project, a worktree
+  or beside one (the worktrees' parent folder), or a project's `.codex`, `.claude` or `.agents` (a stray `.codex` with a
+  reviewer's probe stopped every Codex agent's commands, #509; logs left beside worktrees outlived them). The runners
+  prune what tests leave in `hive-test`, keeping what an open card cites by path (`npm run test:clean`, e2e/README.md
+  Housekeeping).
+
 ## Tests wait for conditions, never for time
 
 Every test, unit or end-to-end, new or changed, follows these rules. Each one was a flaky test in 0.6.0, failing on a

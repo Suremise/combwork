@@ -7666,6 +7666,31 @@ button.agent-place:hover {
 .provider-row .small {
   font-size: 12px;
 }
+/* Reordering the providers (HI-1965): by its grip (drag), its ⋯ menu, or Alt+Up and Alt+Down while it has the focus. */
+.provider-row[draggable='true'] {
+  cursor: grab;
+}
+.provider-row:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.provider-row.dragging {
+  opacity: 0.5;
+}
+.provider-row.drop-target {
+  border-color: var(--accent);
+}
+.provider-row .provider-grip {
+  margin-right: -4px;
+}
+.default-provider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.default-provider-order {
+  font-size: 12px;
+}
 .provider-choice {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

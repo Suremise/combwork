@@ -8,6 +8,7 @@ import { onHiveEvent } from './events'
 import { laneNow, lanesEnforced, listLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { withCardNames } from './projectKeys'
+import { waitingForRun } from './deliveries'
 import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
 import { startTask } from './taskStart'
@@ -46,9 +47,14 @@ const builderKey = (wsPath: string, project: string, agentId: string): string =>
  * there, no line being typed or waiting: a start whose card can't then be typed in is undone, and that undoing raced the
  * builder's own start, HR1's round 2 run), or not running and not starting.
  */
-function builderFree(projectPath: string, b: { id: string; name: string }): boolean {
+async function builderFree(projectPath: string, b: { id: string; name: string }): Promise<boolean> {
   const st = sessions.liveFor(projectPath, b.id)
-  if (st) return (st.status === 'ready' || st.status === 'finished') && whyNoLine(projectPath, b.id, 'free') === null
+  if (st) {
+    if (!(st.status === 'ready' || st.status === 'finished') || whyNoLine(projectPath, b.id, 'free') !== null) return false
+    // Nor while a line of Hive's is on its way to it (queued, not typed yet: the Done wake): it would start typing as the
+    // card's own does, and the start would be undone (HI-1995's linecarried run). One offered and not read doesn't hold it.
+    return !(await waitingForRun(projectPath, b.id, st.runId, st.sessionId || null)).some((r) => r.state === 'queued' || r.state === 'uncertain')
+  }
   const now = agentNowOf(projectPath, b.id, b.name)
   return !now.running && !now.failed
 }
@@ -85,7 +91,7 @@ export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
     if (!next) continue
     const projectPath = join(path, lane.project)
     waiting.set(builderKey(path, lane.project, lane.builder.id), next.number)
-    if (!builderFree(projectPath, lane.builder)) continue
+    if (!(await builderFree(projectPath, lane.builder))) continue
     const key = `${path.toLowerCase()}#${lane.id}#${next.number}`
     const last = tried.get(key)
     if (last && Date.now() - last.at < RETRY_MS) continue

@@ -252,6 +252,11 @@ export interface HiveRequests {
 
   'settings:get': () => AppSettings
   'settings:update': (patch: SettingsPatch) => AppSettings
+  /**
+   * Moves a provider to a place in Settings → Providers' order (HI-1965), from the order as it is now: the order and
+   * revision that move made, as its acknowledgement (the window takes the settings from settings-changed).
+   */
+  'settings:moveProvider': (id: ProviderId, toIndex: number) => { providerOrder: ProviderId[]; revision: number }
   'settings:reset': (section?: keyof AppSettings) => AppSettings
   /** Replaces a provider's price overrides (USD per million tokens, by model id). */
   /** Replaces a provider's price overrides, and (when given) which shipped prices are removed from its table. */

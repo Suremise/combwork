@@ -23,10 +23,19 @@ export interface GitResult {
   buf: Buffer
   /** Standard error, for messages to show when a command fails. */
   err: string
-  /** The exit code; -1 when git couldn't be started (`missing`), so no caller takes it for git's own "no" (exit 1). */
+  /**
+   * The exit code; -1 when git didn't run to an exit code of its own (not started: `missing`, or `notRun`), so no caller
+   * takes it for git's own "no" (exit 1: a config key not set, HEAD detached, not an ancestor).
+   */
   code: number
   /** Git couldn't be started: not installed, or not on Hive's PATH (#346). Never an answer about the repository. */
   missing?: boolean
+  /**
+   * HI-2019: git didn't run to an exit of its own for another reason, as Node or Hive's worker said it (`EAGAIN`, a
+   * busy machine; `ERR_GIT_WORKER`, the worker ended; the output bound; ended by a signal): a failure to try again, never
+   * git's answer, and never git missing.
+   */
+  notRun?: string
   /** Stopped at its `timeout` (GitRunOptions). */
   timedOut?: boolean
 }
@@ -59,11 +68,17 @@ export async function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1
   const errCode = err?.code
   // Git didn't start. Node says ENOENT for a missing working folder too: that one is a failure, not a missing git.
   const missing = (errCode === 'ENOENT' || errCode === 'EACCES' || errCode === 'EPERM' || errCode === 'UNKNOWN') && o.cwdExists
-  const code = err ? (typeof errCode === 'number' ? errCode : missing ? -1 : 1) : 0
+  // HI-2019: anything but git's own exit code (a start that failed, the worker ended, the output bound, a signal) is -1,
+  // never 1, which callers read as git's "no"; what happened is kept (`notRun`), and said when git itself said nothing.
+  const ranToExit = !err || typeof errCode === 'number'
+  const notRun = !ranToExit && !missing ? String(errCode ?? err?.signal ?? 'error') : undefined
+  const code = err ? (typeof errCode === 'number' ? errCode : -1) : 0
   if (missing) noteGitMissing()
   // Git ran (whatever it answered): not one that didn't start for another reason (no working folder, output too big).
-  else if (!err || typeof errCode === 'number') noteGitRan()
-  return { out: buf.toString('utf8'), ok: !err, buf, err: Buffer.from(o.stderr.buffer, o.stderr.byteOffset, o.stderr.byteLength).toString('utf8').trim(), code, ...(missing ? { missing } : {}), ...(err?.killed && opts.timeout ? { timedOut: true } : {}) }
+  else if (ranToExit) noteGitRan()
+  const stderr = Buffer.from(o.stderr.buffer, o.stderr.byteOffset, o.stderr.byteLength).toString('utf8').trim()
+  const said = stderr || (notRun ? `git ${args[0]} didn't run to an exit (${notRun})` : '') // i18n-ignore: git's side of an error, in English as git's messages are
+  return { out: buf.toString('utf8'), ok: !err, buf, err: said, code, ...(missing ? { missing } : {}), ...(notRun ? { notRun } : {}), ...(err?.killed && opts.timeout ? { timedOut: true } : {}) }
 }
 
 /**

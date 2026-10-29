@@ -1189,8 +1189,8 @@ const englishSaid = (s: StoredText): string => {
  * A line in the card's history: its English (`what`), and as data (`whatText`, #846) for the window to show in its
  * language. Text from elsewhere (an agent-facing note, noteOnCard) is kept in English only.
  */
-function note(card: TaskCard, by: string, said: StoredText | string): void {
-  const at = new Date().toISOString()
+/** Adds a line to a card's history, at `at` (a change's one time, HI-2016) or now. */
+function note(card: TaskCard, by: string, said: StoredText | string, at = new Date().toISOString()): void {
   card.history = [...card.history, entryOf(at, by, said)].slice(-MAX_HISTORY)
   card.updatedAt = at
 }
@@ -2278,7 +2278,10 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // What changed, in the history's words (English), for a caller that confirms it (the hive tools' short replies).
     opts.said?.push(...said.map(englishSaid))
     if (!said.length && !reordered && !reviewed && !comment) return card
-    for (const s of said) note(card, by, s)
+    // One change, one time (HI-2016): its lines share it, so what reads them as one change (a failed verdict's own move
+    // back to Doing, watch.ts wakeAbout) does so however slowly they are written.
+    const at = new Date().toISOString()
+    for (const s of said) note(card, by, s, at)
     if (comment) addComment(card, by, comment)
     // The last thing before the write, after every read above: a caller whose authority can change while those awaits run
     // (the Assistant's control and session) checks it here, so a revoked change saves nothing. Unlike `check`, it doesn't

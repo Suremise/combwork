@@ -500,7 +500,7 @@
   "workflow.value.style.merge": "Merge-Commit",
   "workflow.value.style.rebase": "Rebase und Fast-Forward",
   "workflow.value.style.squash": "Squash",
-  "workflow.why.commitMessage": "Der Kartenschlüssel in der Historie verknüpft jeden Merge mit seiner Karte; ein Projekt, das Kartennummern aus seiner Historie heraushält, nimmt die eigene des Branches.",
+  "workflow.why.commitMessage": "Kartentitel können Personen und Details nennen, die eine öffentliche Historie nicht behalten sollte; wähle die von Hive für den Kartenschlüssel, der jeden Merge mit seiner Karte verknüpft.",
   "workflow.why.dependenciesDone": "Es kostet wenig, und keine Karte baut auf Arbeit auf, die noch nicht drin ist.",
   "workflow.why.excluded": "Abhängigkeiten und Build-Ausgaben gehören nicht zu dem, was eine Karte liefert.",
   "workflow.why.finish": "Beim Merge über die Warteschlange von Hive erreicht rote Arbeit nie den Zielbranch; allein ist eine Karte erledigt, sobald sie committet ist.",
