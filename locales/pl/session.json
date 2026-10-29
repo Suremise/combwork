@@ -18,6 +18,7 @@
   "session.compact.already": "Ta sesja już jest kompaktowana.",
   "session.compact.busy": "Agent jest zajęty. Kompaktuj, gdy skończy.",
   "session.compact.stopped": "Agent zatrzymał się, zanim wysłano polecenie kompaktowania.",
+  "session.compact.userTyped": "Pisałeś w terminalu agenta, gdy Hive wysyłał Compact, więc nie został wysłany: to, co wpisałeś, zostaje.",
   "session.compact.waiting": "Agent czeka na Twoją odpowiedź. Kompaktuj, gdy skończy.",
   "session.error.agentGone": "Ten agent już nie istnieje.",
   "session.error.inUseElsewhere": "Inny program ma otwartą transkrypcję tej sesji. Zamknij go i spróbuj ponownie.",

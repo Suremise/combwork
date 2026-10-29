@@ -75,6 +75,10 @@
     "defaultMessage": "The agent stopped before Compact was sent.",
     "description": "Compact failed: the agent stopped or restarted while Hive typed the command."
   },
+  "session.compact.userTyped": {
+    "defaultMessage": "You typed in the agent's terminal while Hive was sending Compact, so it wasn't sent: what you typed stays.",
+    "description": "Compact failed: the user typed in the agent's terminal while Hive was clearing its input or typing the command, so Hive stopped."
+  },
   "session.compact.waiting": {
     "defaultMessage": "The agent is waiting for your answer. Compact after it has finished.",
     "description": "Compact is refused: the agent waits for the user."

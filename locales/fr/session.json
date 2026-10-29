@@ -18,6 +18,7 @@
   "session.compact.already": "Cette session est déjà en cours de compactage.",
   "session.compact.busy": "L’agent est occupé. Compacte une fois qu’il a terminé.",
   "session.compact.stopped": "L’agent s’est arrêté avant l’envoi du compactage.",
+  "session.compact.userTyped": "Tu as tapé dans le terminal de l’agent pendant que Hive envoyait Compact, il n’a donc pas été envoyé : ce que tu as tapé reste.",
   "session.compact.waiting": "L’agent attend ta réponse. Compacte une fois qu’il a terminé.",
   "session.error.agentGone": "Cet agent n’existe plus.",
   "session.error.inUseElsewhere": "Un autre programme a ouvert sa transcription. Ferme-le, puis réessaie.",

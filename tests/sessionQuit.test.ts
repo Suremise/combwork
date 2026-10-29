@@ -4,6 +4,7 @@
 // and before the kill; Stop and restarts don't use it.
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { claudeInput, type ClaudeInput } from './claudeInputStandIn'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
@@ -34,14 +35,15 @@ const P = join(base, 'alpha')
 type Priv = { live: Map<string, { state: Record<string, unknown>; adapter: unknown; ending?: boolean; stopRequested?: boolean; stopCause?: string }>; runs: Map<string, string>; noteUserInput: (key: string, data: string) => void; userInput: Map<string, unknown> }
 const priv = sessions as unknown as Priv
 let n = 0
-/** Claude Code's screen with its input box empty (HI-1979: Hive types into it only once it reads that), bracketed paste off. */
-const BOX = `${'─'.repeat(60)}\n❯ \n${'─'.repeat(60)}\n  ? for shortcuts`
-const emptyBox = { text: () => BOX, textWithoutDim: () => BOX, bracketedPaste: () => false }
 /** A live session of the agent (a stand-in for its launch), at its prompt. */
 function live(adapter: unknown = claudeCode) {
   const agentId = `b${++n}`
   const state = { provider: 'claude-code', runId: `run-${n}`, projectPath: P, agentId, agentName: `B${n}`, cwd: P, status: 'ready', startedAt: new Date().toISOString() }
-  const l: { state: typeof state; adapter: unknown; screen: typeof emptyBox; ending?: boolean; stopRequested?: boolean; stopCause?: string; prompts?: number } = { state, adapter, screen: emptyBox }
+  // Its input box (claudeInputStandIn, fed what is typed into this agent: HI-1979, Hive types into it only once a key
+  // of its own shows it empty), bracketed paste off.
+  const input = claudeInput({ paste: false })
+  input.from(() => writes.filter((w) => w.key === `session:${P.toLowerCase()}#${agentId}`).map((w) => w.data))
+  const l: { state: typeof state; adapter: unknown; screen: ClaudeInput['screen']; ending?: boolean; stopRequested?: boolean; stopCause?: string; prompts?: number } = { state, adapter, screen: input.screen }
   priv.live.set(`${P.toLowerCase()}#${agentId}`, l)
   priv.runs.set(state.runId, `${P.toLowerCase()}#${agentId}`)
   const key = `session:${P.toLowerCase()}#${agentId}`

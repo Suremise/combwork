@@ -20,6 +20,7 @@ interface HiveMessageValues {
   'session.compact.already': undefined
   'session.compact.busy': undefined
   'session.compact.stopped': undefined
+  'session.compact.userTyped': undefined
   'session.compact.waiting': undefined
   'session.error.agentGone': undefined
   'session.error.inUseElsewhere': undefined

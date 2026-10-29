@@ -5022,8 +5022,11 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
     rows in Claude Code's input, and the prompt went after them. For a `ctrlUClearsRow` CLI with an input-box reader
     (`adapter.promptBox`/`promptText`, the Advanced pattern "Screen: input box"), `clearInput` (sendPrompt and
     `/compact`) presses Ctrl+U a key at a time, each its own write, until the box reads empty. Rules:
-    - **Success is only an empty box read after a key.** A Ctrl+U never fills an empty box, so the first key is
-      pressed as before and an empty reading after it counts.
+    - **Success is only what a key of Hive's draws now, never a box already on the screen** (HR6's round 1: a redraw
+      can be late). A box read as empty gets a letter typed (`CLEAR_PROBE`, `x`: `/`, `?`, `!`, `#` and `@` each open
+      something in an empty Claude Code input). The letter must show alone, then the Backspace that takes it back
+      must leave the box empty. A draft drawn late shows the letter at its end instead, and is cleared with it. A
+      letter left by a try that stops is taken back, unless the user has typed since.
     - **Each key must be answered within "Clearing the input: wait for each key"** (Advanced, Claude Code, 2 s): the
       box reading differently (as drawn: a deleted line break's empty row counts), or, while the box can't be read
       (a draft taller than the screen, its top rule off it), the screen changing. That can only go on, never end it.
@@ -5032,7 +5035,9 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
       fails with the reason. The log names the cause.
     - **The guards run before every key:** the same run, and the caller's guard (wanted, idle, the user not typing,
       folder steady). The user typing mid-clear stops it, the rest of their draft theirs; nothing is taken back,
-      as nothing was written.
+      as nothing was written. `/compact`'s guard is its run and the user typing since it began, checked before
+      every key, before the command is typed and before its Enter: it fails with "You typed in the agent's
+      terminal…" (HR6's round 1).
     - Codex and Copilot keep one Ctrl+U.
     - **Tried on 2.1.312:** a typed draft of four rows took four Ctrl+U, then read empty
       (`tests/fixtures/advanced/input-clear-claude-2.1.312.txt`). A multi-line paste is one row there (`[Pasted text

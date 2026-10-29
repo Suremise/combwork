@@ -18,6 +18,7 @@
   "session.compact.already": "Diese Sitzung wird bereits komprimiert.",
   "session.compact.busy": "Der Agent ist beschäftigt. Komprimiere, sobald er fertig ist.",
   "session.compact.stopped": "Der Agent wurde gestoppt, bevor „Komprimieren“ gesendet wurde.",
+  "session.compact.userTyped": "Du hast im Terminal des Agenten getippt, während Hive Compact gesendet hat, deshalb wurde es nicht gesendet: Was du getippt hast, bleibt.",
   "session.compact.waiting": "Der Agent wartet auf deine Antwort. Komprimiere, sobald er fertig ist.",
   "session.error.agentGone": "Diesen Agenten gibt es nicht mehr.",
   "session.error.inUseElsewhere": "Ein anderes Programm hat das Transkript geöffnet. Schließe es und versuche es dann erneut.",

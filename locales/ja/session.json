@@ -18,6 +18,7 @@
   "session.compact.already": "このセッションはすでにコンパクト化中です。",
   "session.compact.busy": "エージェントは作業中です。終わってからコンパクト化してください。",
   "session.compact.stopped": "コンパクト化のコマンドを送る前にエージェントが停止しました。",
+  "session.compact.userTyped": "Hive が Compact を送信している間にエージェントのターミナルで入力したため、送信しませんでした。入力した内容はそのまま残ります。",
   "session.compact.waiting": "エージェントが回答を待っています。終わってからコンパクト化してください。",
   "session.error.agentGone": "そのエージェントはもう存在しません。",
   "session.error.inUseElsewhere": "別のプログラムがトランスクリプトを開いています。閉じてからもう一度お試しください。",
