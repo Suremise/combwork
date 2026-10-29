@@ -20,6 +20,7 @@ interface HiveMessageValues {
   'session.compact.already': undefined
   'session.compact.busy': undefined
   'session.compact.stopped': undefined
+  'session.compact.userTyped': undefined
   'session.compact.waiting': undefined
   'session.error.agentGone': undefined
   'session.error.inUseElsewhere': undefined
@@ -127,6 +128,7 @@ interface HiveMessageValues {
   'session.plan.noToggle': { provider: string | number }
   'session.plan.typing': undefined
   'session.prompt.cliAsks': undefined
+  'session.prompt.inputNotCleared': undefined
   'session.prompt.untaken': undefined
   'session.purge.changed': undefined
   'session.purge.cliBack': undefined

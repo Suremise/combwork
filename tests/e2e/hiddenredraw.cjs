@@ -55,7 +55,9 @@ const check = (name, ok, extra = '') => {
     const wordAt = () => page.evaluate(([k, w]) => window.__hiveTerminalTextAt(k, w), [key, WORD])
     const selected = await lib.until(async () => {
       if ((await selection()) === WORD && (await selectionDrawn()) > 0) return true
-      if (!(await wordAt())) await print(`\r\n${WORD}\r\n`)
+      // On a row of its own: the rest of the row erased (HI-1979: printed at the cursor in Claude Code's input box, the
+      // word landed on the box's rule, and a double-click took the rule's characters with it).
+      if (!(await wordAt())) await print(`\r\n${WORD}\x1b[K\r\n`)
       const at = await wordAt()
       if (at) await page.mouse.dblclick(at.x, at.y)
       return false

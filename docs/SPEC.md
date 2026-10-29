@@ -5018,6 +5018,40 @@ under Hive in Advanced (no CLI's recording to check it against), defaulting to w
     it part-way, and it is taken back. The suites `wakeputoff` (fake Claude Code and Codex) and `wakepaste-codex` /
     `wakepaste-copilot` (the real CLIs) hold a wrapped doorbell before its Enter (`HIVE_TEST_HOLD_TYPED`) and turn
     idle wakes off.
+  - **A wrapped draft before Hive types** (HI-1979; HR6's design s9, option (a)): one Ctrl+U left a wrapped draft's other
+    rows in Claude Code's input, and the prompt went after them. For a `ctrlUClearsRow` CLI with an input-box reader
+    (`adapter.promptBox`/`promptText`, the Advanced pattern "Screen: input box"), `clearInput` (sendPrompt and
+    `/compact`) presses Ctrl+U a key at a time, each its own write, until the box reads empty. Rules:
+    - **Success is only what a key of Hive's draws now, never a box already on the screen** (HR6's round 1: a redraw
+      can be late). A box read as empty gets a letter typed (`CLEAR_PROBE`, `x`: `/`, `?`, `!`, `#` and `@` each open
+      something in an empty Claude Code input). The letter must show alone, then the Backspace that takes it back
+      must leave the box empty. A draft drawn late shows the letter at its end instead, and is cleared with it. A
+      letter left by a try that stops is taken back, unless the user has typed since.
+    - **Each key must be answered within "Clearing the input: wait for each key"** (Advanced, Claude Code, 2 s): the
+      box reading differently (as drawn: a deleted line break's empty row counts), or, while the box can't be read
+      (a draft taller than the screen, its top rule off it), the screen changing. That can only go on, never end it.
+    - **Failure refuses what was to be typed, and nothing of it is written:** a key not answered, 200 keys
+      (`CLEAR_KEYS_MOST`), or a box it can't read at all. A wake is put off and tried again (retrySoon); `/compact`
+      fails with the reason. The log names the cause.
+    - **The guards run before every key:** the same run, and the caller's guard (wanted, idle, the user not typing,
+      folder steady). The user typing mid-clear stops it, the rest of their draft theirs; nothing is taken back,
+      as nothing was written. `/compact`'s guard is its run and the user typing since it began, checked before
+      every key, before the command is typed and before its Enter: it fails with "You typed in the agent's
+      terminal…" (HR6's round 1).
+    - Codex and Copilot keep one Ctrl+U.
+    - **Tried on 2.1.312:** a typed draft of four rows took four Ctrl+U, then read empty
+      (`tests/fixtures/advanced/input-clear-claude-2.1.312.txt`). A multi-line paste is one row there (`[Pasted text
+      #1 +44 lines]`), cleared by one.
+    - **The box read is the bottom one.** "Screen: input box"'s default takes its closing rule as a lookahead, so a
+      rule can close one box and open the next. A stray rule and prompt mark higher on the screen no longer swallow
+      the bottom box's top rule into a span of their own, which read an old prompt as the input.
+    - **The fake Claude Code draws 2.1.312's box by default** (Darren's decision on HI-1979; `fake-plain-prompt.txt`
+      for the old prompt), as the real CLI keeps it:
+      - only one, always at the bottom: what it prints while idle goes above the box, and a prompt sent or a turn
+        begun takes it away;
+      - empty under its spinner while it works (typing then goes after the busy lines, as before);
+      - redrawn whole after each change, top rule included, and replaced by its own question;
+      - the cursor moved back to the line's end relatively, as a line feed at the bottom scrolls.
 **Group E's rows 26, 27 and 30** (#1292; Darren's choices on #1120 point 5), each as Hive did by default, at once:
 - `hive.terminal.allKeysToCli` (off): on, every key in an agent's pane goes to its CLI but the command palette's
   shortcut (Show All Commands, as the user bound it), so every command stays in reach (`appTakesTerminalKey` in

@@ -1049,6 +1049,19 @@ const USER_REPLY_MS = 15_000
 /** How long a prompt Hive typed counts as pending (the agent just given a task) while its CLI hasn't taken it (#416). */
 const PENDING_MS = 30_000
 
+/** Settings → Advanced: how long a Ctrl+U clearing Claude Code's input has to be answered on its screen (HI-1979). */
+const CLEAR_KEY_WAIT = 'claude-code.prompt.clearKeySeconds'
+/**
+ * The most Ctrl+U clearing an input may press (HI-1979): one deletes a row of a draft, so this is a draft of as many
+ * rows; more ends the try, unseen empty.
+ */
+const CLEAR_KEYS_MOST = 200
+/**
+ * The letter Hive types into an input it reads as empty, and takes back (HI-1979, HR6's round 1): shown alone, the input
+ * was empty when it came. A plain letter: in an empty Claude Code input `/`, `?`, `!`, `#` and `@` each open something.
+ */
+const CLEAR_PROBE = 'x'
+
 /**
  * A launch's task on its CLI's command line not taken yet (#712): the CLI is ready at its SessionStart and takes the task
  * only after, so it is pending until its first prompt, at most PENDING_MS after it became ready. Ready shows as watching
@@ -2864,23 +2877,28 @@ class SessionManager {
     const runId = l.state.runId
     // The agent stopped or restarted meanwhile: the rest mustn't reach the new process.
     const same = (): boolean => this.live.get(id) === l && l.state.runId === runId && l.compacting === c
+    // The user typing in its pane meanwhile (HI-1979, HR6's round 1): nothing more is pressed or typed, what they typed
+    // theirs, and Compact isn't sent.
+    const since = Date.now()
+    const stillSame = (): void => {
+      if (!same()) throw hiveError(msg({ id: 'session.compact.stopped', defaultMessage: 'The agent stopped before Compact was sent.', description: 'Compact failed: the agent stopped or restarted while Hive typed the command.' }), undefined, { kind: 'conflict' })
+      if (this.userTypedAt(projectPath, agentId) >= since) throw hiveError(msg({ id: 'session.compact.userTyped', defaultMessage: "You typed in the agent's terminal while Hive was sending Compact, so it wasn't sent: what you typed stays.", description: "Compact failed: the user typed in the agent's terminal while Hive was clearing its input or typing the command, so Hive stopped." }), undefined, { kind: 'conflict' })
+    }
     const pause = async (ms: number): Promise<void> => {
       await new Promise((r) => setTimeout(r, ms))
-      if (!same()) throw hiveError(msg({ id: 'session.compact.stopped', defaultMessage: 'The agent stopped before Compact was sent.', description: 'Compact failed: the agent stopped or restarted while Hive typed the command.' }), undefined, { kind: 'conflict' })
+      stillSame()
     }
     try {
-      // Settings → Advanced can leave the CLI's draft in front of it (#1286).
-      if (advanced.get<boolean>(PROMPT_CLEAR_DRAFT)) {
-        writePty(key, '\x15')
-        await pause(150)
-      }
+      // Settings → Advanced can leave the CLI's draft in front of it (#1286); cleared as a prompt's is (HI-1979).
+      if (advanced.get<boolean>(PROMPT_CLEAR_DRAFT)) await this.clearInput(l, key, stillSame)
       // On one line, without control characters (HI-1920): typed key by key, one would press a key.
       const text = l.adapter.descriptor.capabilities.compactFocus ? promptInput((focus ?? '').replace(/\s+/g, ' ').trim(), false, false) : ''
       // Written in one go, a long line counts as a paste, and pasted input is sent as a message even when
       // it starts with "/compact". So type the command on its own, then the focus in small pieces.
+      stillSame()
       writePty(key, '/compact')
       await pause(150)
-      if (text) await typeInto(key, ` ${text}`, same)
+      if (text) await typeInto(key, ` ${text}`, () => (stillSame(), true))
       await pause(150)
       writePty(key, '\r')
       c.submitted()
@@ -3473,6 +3491,89 @@ class SessionManager {
     return [...this.locks.values()].filter((x) => inFolder(x.path, folder)).map((x) => x.path)
   }
 
+  /**
+   * Clears a CLI's input before Hive types into it (Settings → Advanced: Clear the CLI's draft before Hive types). One
+   * Ctrl+U where it clears the whole line, as before. Where it deletes only the row the cursor is on
+   * (capabilities.ctrlUClearsRow, HI-1979: Claude Code 2.1.312), Ctrl+U a key at a time while its input box
+   * (adapter.promptBox) holds anything. Empty is only ever what a key of Hive's draws now, never a box already on the
+   * screen (its redraw may be late, HR6's round 1): a letter typed (CLEAR_PROBE) must show alone in the box, then the
+   * Backspace that takes it back must leave the box empty; a draft left shows the letter at its end, and is cleared with
+   * it. Each key must be answered within Advanced's wait for each key, by the box drawn differently, or, while the box
+   * can't be read (a draft taller than the screen), by the screen changing, which can only go on, never end it. A key not
+   * answered, CLEAR_KEYS_MOST keys, or a box it can't read refuse what was to be typed: nothing of it is written, and
+   * the letter, if it is still there, is taken back unless the user has typed since. `check` runs before each key (the
+   * same run, the caller's guard: the user typing there stops it, their draft theirs).
+   */
+  private async clearInput(l: LiveSession | undefined, key: string, check: () => void): Promise<void> {
+    if (!l?.adapter?.descriptor.capabilities.ctrlUClearsRow) {
+      writePty(key, '\x15')
+      await new Promise((r) => setTimeout(r, 150))
+      check()
+      return
+    }
+    const screen = l.screen
+    const { projectPath, agentId, runId } = l.state
+    const since = Date.now()
+    // The box as drawn (adapter.promptBox): a key that deletes only an empty row (a line break's) changes it too. Empty
+    // is nothing but spacing in it.
+    const drawn = (): string | null => (screen && l.adapter.promptBox ? l.adapter.promptBox(screen.textWithoutDim()) : null)
+    const read = (): string | null => {
+      const box = drawn()
+      return box === null ? null : box.trim() ? box : ''
+    }
+    const words = (box: string | null): string => (box ?? '').replace(/\s+/g, ' ').trim()
+    const notCleared = (why: string): Error => {
+      log.info(`${userText(this.label(l.state))}: its input wasn't seen empty, so nothing is typed into it: ${why}`) // i18n-ignore: why, for the log
+      return hiveError(msg({ id: 'session.prompt.inputNotCleared', defaultMessage: "Its input couldn't be seen empty after Hive cleared it: nothing is typed into it until it can be.", description: "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Hive pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards." }), undefined, { kind: 'conflict' })
+    }
+    const waitMs = advanced.number(CLEAR_KEY_WAIT) * 1000
+    /** The box once the key just pressed is answered: drawn differently from `before`, or null while it can't be read and the screen changed. */
+    const answered = async (keyName: string, before: string | null, shown: string | null): Promise<string | null> => {
+      const t = Date.now()
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 25))
+        const box = read()
+        if (box !== before && box !== null) return box
+        if (before === null && box === null && shown !== null && screen!.text() !== shown) return null
+        if (Date.now() - t > waitMs) throw notCleared(before === null ? "its input box isn't on the screen" : `${keyName} wasn't answered within ${waitMs} ms (the box read "${userText(words(before).slice(0, 60))}")`) // i18n-ignore: why, for the log
+      }
+    }
+    /** Presses a key and waits for it to be answered, from the box and the screen as they were before it. */
+    const press = async (data: string, keyName: string, before: string | null): Promise<string | null> => {
+      const shown = screen?.text() ?? null
+      writePty(key, data)
+      return answered(keyName, before, shown)
+    }
+    let box = read()
+    // The letter typed and not taken back yet.
+    let probe = false
+    try {
+      for (let n = 0; ; n++) {
+        if (n >= CLEAR_KEYS_MOST) throw notCleared(`${CLEAR_KEYS_MOST} keys didn't empty it`) // i18n-ignore: why, for the log
+        check()
+        if (box === '') {
+          probe = true
+          box = await press(CLEAR_PROBE, 'A letter typed', box) // i18n-ignore: the key's name, for the log
+          if (words(box) !== CLEAR_PROBE) {
+            // A draft left (its redraw was late), the letter at its end: cleared with it.
+            probe = false
+            continue
+          }
+          check()
+          box = await press('\x7f', 'A Backspace', box)
+          probe = false
+          if (box !== '') throw notCleared(`the letter Hive typed and took back left "${userText(words(box).slice(0, 60))}"`) // i18n-ignore: why, for the log
+          check()
+          return
+        }
+        box = await press('\x15', 'A Ctrl+U', box)
+      }
+    } catch (e) {
+      if (probe && this.live.get(liveId(projectPath, agentId))?.state.runId === runId && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x7f')
+      throw e
+    }
+  }
+
   /** Types a message into an agent's terminal and sends it. */
   /** Agents Hive is typing a prompt into (one at a time each). */
   private delivering = new Set<string>()
@@ -3522,11 +3623,7 @@ class SessionManager {
     const asTyped = advanced.get<boolean>(PROMPT_AS_TYPED)
     try {
       check()
-      if (clearDraft) {
-        writePty(key, '\x15')
-        await new Promise((r) => setTimeout(r, 150))
-        check()
-      }
+      if (clearDraft) await this.clearInput(l, key, check)
       typed = true
       const line = asTyped ? text : text.replace(/\s+/g, ' ').trim()
       // A CLI busy for a moment reads what Hive typed in one go, Ctrl+U and Enter included: Claude Code takes such a

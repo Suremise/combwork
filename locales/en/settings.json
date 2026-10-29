@@ -495,6 +495,14 @@
     "defaultMessage": "Hive's status line in place of yours",
     "description": "An advanced setting's title (Settings → Advanced, under Claude Code): one of Hive's overrides of the CLI, on by default. The status line is the line Claude Code shows under its input."
   },
+  "settings.advanced.claude-code.prompt.clearKeySeconds.desc": {
+    "defaultMessage": "Claude Code's Ctrl+U deletes one row of a draft that wraps onto several, so before Hive types into it, it presses Ctrl+U a key at a time until the input box (Screen: input box) shows empty. This is how long Hive waits for Claude Code to show each key's effect. Not shown in time, Hive types nothing and tries again later: too short, and a busy Claude Code makes Hive put its messages off more often.",
+    "description": "What the advanced setting \"Clearing the input: wait for each key\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-1979). Ctrl+U names keys: use the key names your language uses. \"Screen: input box\" is another advanced setting's title: use its translation."
+  },
+  "settings.advanced.claude-code.prompt.clearKeySeconds.title": {
+    "defaultMessage": "Clearing the input: wait for each key",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.claude-code.retry.attemptField.desc": {
     "defaultMessage": "The field of that entry with which try it is (1, 2…). Wrong, a waiting agent just shows Working.",
     "description": "What the advanced setting \"Transcript: retry entry's try field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
