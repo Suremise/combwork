@@ -82,6 +82,8 @@ const beta = path.join(fx.ws, 'beta')
     // A second lane, its card still to do: started before the options change, it keeps the ruleset of then.
     const bx = await q.agent(fx, h, 'BX')
     const nx = (await inv('tasks:create', { title: 'Next card', project: 'alpha' })).number
+    // Held (blocked) until the options change: BX idle, Hive would start it at once (HI-2029), before the change.
+    await inv('tasks:update', nx, { blocked: 'Held until the options change' })
     const l2 = await startLane('alpha', 'BX', 'R1', 'next', [nx])
     check('the lanes are recorded with their rulesets, no old rules yet', !!l1 && !!l2 && (await laneNow(l1))?.oldRules === false && (await laneNow(l2))?.oldRules === false, JSON.stringify(await inv('lanes:list')))
 
@@ -160,10 +162,15 @@ const beta = path.join(fx.ws, 'beta')
 
     // The lane's next card, started after the change, keeps the lane's ruleset (§16.5.4): the one in force before it, as
     // the cards started then have.
-    const sx = await q.startCard(fx, h, bx, nx)
-    commitIn(bx.folder, 'nx.txt', 'Next card')
-    const started = (await h.facts(nx)).find((x) => x.kind === 'Started')
-    check("the lane's next card, started after the change, keeps the lane's ruleset: old rules", sx.status === 200 && !!started?.ruleset && started.ruleset === (await h.facts(m.n)).find((x) => x.kind === 'Started')?.ruleset && !!(await waitHung(async () => (await badge(nx))?.oldRules === true)), JSON.stringify({ sx: sx.body, started }))
+    // Unblocked, Hive starts it on BX, its lane's builder (HI-2029). The tag's hover left first: BX's lane then moves to the
+    // top, and a tooltip whose anchor moves from under the mouse stays up (HI-2052).
+    await page.mouse.move(5, 5)
+    await waitHung(async () => (await tips().count()) === 0)
+    await inv('tasks:update', nx, { blocked: null })
+    const started = await waitHung(async () => (await h.facts(nx)).find((x) => x.kind === 'Started') ?? null)
+    // Its slot prepared (BX placed there), the work committed in it.
+    if (started?.data?.folder && (await waitHung(async () => (await h.facts(nx)).some((x) => x.kind === 'BuilderPlaced')))) commitIn(started.data.folder, 'nx.txt', 'Next card')
+    check("the lane's next card, started after the change, keeps the lane's ruleset: old rules", started?.actor === 'hive' && started?.data?.builder === bx.id && !!started?.ruleset && started.ruleset === (await h.facts(m.n)).find((x) => x.kind === 'Started')?.ruleset && !!(await waitHung(async () => (await badge(nx))?.oldRules === true)), JSON.stringify({ started }))
 
     // Apply to cards in flight clears one card's mark (another change, given to the Review card).
     const third = { ...changed, okBefore: { mode: 'labels', labels: ['ui', 'design', 'docs'] } }

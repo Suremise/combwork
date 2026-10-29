@@ -3581,7 +3581,7 @@ export interface LaneInfo {
  * the lane has no slot yet (every one is lent), so its builder can't start; it pauses the lane until one is free.
  * `preparing` (#1446): its slot is being prepared (G15's warming: its setup or an install), which doesn't pause it.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait'
 
 /**
  * A running lane's slot as its row shows it (#1446): its name, whether the lane works in its builder's carried slot (a
@@ -3634,8 +3634,10 @@ export interface LaneStatus {
   blocked?: string
   /** you: what the user is asked for (the open request's kind, #1279). */
   ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
-  /** hooks: the agent whose hooks aren't arriving, by name. */
+  /** hooks: the agent whose hooks aren't arriving, by name; startWait: the builder. */
   agent?: string
+  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy). */
+  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused'
   /** preparing (#1446): the slot being prepared. */
   slot?: string
   /**

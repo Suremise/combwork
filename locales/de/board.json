@@ -536,6 +536,7 @@
   "board.lanes.waits": "{reason, select, blocked {{card} ist blockiert} hold {{card} ist geparkt} you {wartet auf dich ({ask, select, approve {Zustimmung} decide {eine Entscheidung} test {einen Test} signIn {eine Anmeldung} other {eine Antwort}}): {card}} roundLimit {wartet auf dich: {card} hat die Rundengrenze erreicht} notMerged {wartet: {card} nicht gemergt} merging {wartet: {card} wird gemergt} stale {veraltet: {card} muss erneut eingereicht werden} reviewer {wartet auf einen Reviewer für {card}} lineUpdate {wartet: der Branch des Bearbeiters wird vor {card} aktualisiert} hooks {pausiert: Hooks von {agent} kommen nicht an} checkCopy {wartet auf eine Check-Kopie für {card}} slot {wartet auf einen Slot} other {Änderungen an der Liste nach {card}}}",
   "board.lanes.waitsLink": "Zum Anzeigen klicken.",
   "board.lanes.waitsPreparing": "wartet: {slot} wird vorbereitet",
+  "board.lanes.waitsStart": "{card} wartet auf den Start: {why, select, watching {{agent} wartet auf andere Arbeit} queued {eine Zeile von Hive ist zu {agent} unterwegs} failed {der letzte Start von {agent} ist fehlgeschlagen} refused {der Start wurde vorerst abgelehnt, und Hive versucht es erneut} other {{agent} ist in einem Durchgang}}",
   "board.links.archivedTitle": "{card} {title} · Archiviert (aus {column}) · Strg+Klick zum Öffnen",
   "board.links.title": "{card} {title} · {column} · Strg+Klick zum Öffnen",
   "board.menu.delete": "Löschen…",

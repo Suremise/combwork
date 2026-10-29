@@ -4016,7 +4016,8 @@ module.exports.SCENARIOS.push(
       const d = c.cards.d
       return [
         ['gave the card to Coder', agentOf(o.cards.d) === c.agents.coder.id, agentOf(o.cards.d)],
-        ["Coder's lane has it after #" + c.cards.b + ', or Coder was told', (coderLane?.cards ?? []).map((x) => x.number).includes(d) || briefsTo(o, 'Coder').some((t) => names(t, d)), JSON.stringify(lanes.map((l) => [l.builder?.name, l.cards?.map((x) => x.number)]))],
+        // Its list, or its list queued after the card in flight (HI-2029: Hive starts the lane's first card on its idle builder).
+        ["Coder's lane has it after #" + c.cards.b + ', or Coder was told', (coderLane?.cards ?? []).map((x) => x.number).includes(d) || (coderLane?.queued ?? []).includes(d) || briefsTo(o, 'Coder').some((t) => names(t, d)), JSON.stringify(lanes.map((l) => [l.builder?.name, l.cards?.map((x) => x.number), l.queued]))],
         ["Builder2's lane no longer has it", !(otherLane?.cards ?? []).map((x) => x.number).includes(d), JSON.stringify(otherLane?.cards?.map((x) => x.number))],
         ["ended its turn watching both lanes' last cards, the moved card's new place (its live watch, waking on moves, comments and verdicts)", liveWatchCovers(o, [d, c.cards.c]), liveWatch(o)]
       ]

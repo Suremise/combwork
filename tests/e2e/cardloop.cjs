@@ -100,6 +100,12 @@ const check = (name, ok, extra = '') => {
   ])
   await start(reviewer.id)
   await start(builder.id)
+  // The builder busy on other work first (watching a card of its own): the lane the reviewer's join makes then waits to
+  // start c1, saying why, and the builder registers its lane and starts c1 itself (HI-2029: Hive starts a lane's first
+  // card on its builder once the builder is free).
+  const elsewhere = (await inv('tasks:create', { title: 'Elsewhere', project: 'alpha' })).number
+  await say(builder.id, wait(elsewhere, { column: 'done' }))
+  await until(async () => (await live(builder.id))?.status === 'watching', HUNG_MS)
 
   // The reviewer joins the builder's lane first (#483): Hive makes the lane, which the builder's own start then updates.
   // Then it waits for c1 to arrive in Review: watching, never idle.
@@ -179,6 +185,9 @@ const check = (name, ok, extra = '') => {
   const joined = (await api('GET', '/v1/lanes')).body?.[0]
   check('the reviewer joining made the lane (#483): the builder, the reviewer, the cards in order', joined?.builder?.name === 'Builder' && joined?.reviewer?.name === 'Reviewer' && joined?.cards?.map((c) => c.number).join() === `${c1},${c2}` && joined?.state === 'active' && joined?.current === c1, JSON.stringify(joined))
   check('…with the project’s own rounds and wait, as its workflow options resolve (HI-1766)', joined?.rounds === 7 && joined?.waitMinutes === 300, JSON.stringify({ rounds: joined?.rounds, waitMinutes: joined?.waitMinutes }))
+  // Its first card not started while its builder watches other work, and the lane says so (HI-2029).
+  const waitsStart = await until(async () => (await api('GET', '/v1/lanes')).body?.[0]?.status, HUNG_MS)
+  check('…its first card waits to start while the builder watches other work, the lane saying so (HI-2029)', waitsStart?.reason === 'startWait' && waitsStart?.why === 'watching' && waitsStart?.card === c1 && (await card(c1))?.column === 'todo', JSON.stringify({ waitsStart, c1: (await card(c1))?.column }))
   // The builder registers its lane (the same one, now with its rounds and wait), works c1, watching for its verdict
   // before moving it to Review; then the loop runs by itself.
   await say(builder.id, `${lane({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', rounds: 3, waitMinutes: 240, name: 'two cards' })} then ${built(c1)}`)

@@ -815,10 +815,14 @@ export class Workflow {
     // `reopen`: a Done card started again, or one On Hold never started (an agent's old move to Doing, #1268), back to
     // Todo and started in one write, its new cycle gathered and guarded as from Todo (§16.7.4, as the user's reopening).
     const reopening = !!opts.reopen && (s.stage === 'done' || (s.stage === 'hold' && !s.started))
-    // A lane's next card Hive has just started for this builder (HI-1990, laneStarts.ts): its own start, racing Hive's,
-    // is that start, not a refusal.
-    const forIt = s.stage === 'active' && !!s.started && !!agentOf(actor) && s.started.builder === agentOf(actor) && this.store.facts(card.id).find((f) => f.seq === s.started!.seq)?.actor === 'hive'
-    if (forIt) return this.ok(card, 'active', 'active', { folder: this.folderOf(s), line: s.started!.line, base: s.started!.base, target: s.started!.target }, [`Hive started ${card.key} for you, as your lane's next card: carry on with it.`]) // i18n-ignore: agent-facing, the start's reply
+    // A lane's card Hive has just started for this builder (HI-1990, laneStarts.ts): its own start, racing Hive's, is that
+    // start, not a refusal; Hive's landing between this start's checks and its write too (HI-2029's lanebrief run).
+    const forIt = (st: CardState): Reply | null =>
+      st.stage === 'active' && !!st.started && !!agentOf(actor) && st.started.builder === agentOf(actor) && this.store.facts(card.id).find((f) => f.seq === st.started!.seq)?.actor === 'hive'
+        ? this.ok(card, 'active', 'active', { folder: this.folderOf(st), line: st.started.line, base: st.started.base, target: st.started.target }, [`Hive started ${card.key} for you, as your lane's next card: carry on with it.`]) // i18n-ignore: agent-facing, the start's reply
+        : null
+    const hives = forIt(s)
+    if (hives) return hives
     if (s.stage !== 'todo' && !reopening) return this.notFrom(card, actor, s, 'start')
     const from: CardState = reopening ? { ...s, stage: 'todo' } : s
     // One card at a time (#1270, §16.11.2): a lane's card starts only once the cards before it in the lane are Done. The
@@ -876,7 +880,7 @@ export class Workflow {
         return null
       })
       if (out && laneMoved && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
-      if (out) return this.refuse(card, actor, 'start', out)
+      if (out) return (out.rule === 'move.notFromHere' ? forIt(this.state(this.store.card(card.id))) : null) ?? this.refuse(card, actor, 'start', out)
       return this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
     } finally {
       // A slot lent for it and not started with (refused, undone): given back (#1438).

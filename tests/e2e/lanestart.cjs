@@ -187,7 +187,11 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await until(async () => (await ask.count()) === 1, HUNG_MS)
     await ask.getByRole('button', { name: 'Abandon Lane' }).click()
     check('Abandon Lane, confirmed, abandons it', !!(await until(async () => (await inv('lanes:list')).find((l) => l.id === again?.id)?.state === 'abandoned', HUNG_MS)))
-    check('…its cards stay where they were', (await card(c.number))?.column === 'todo')
+    // B1 idle, Hive may have started C on it before the abandon (HI-2029): an abandon moves no card either way.
+    const cStarted = ((await inv('tasks:facts', c.number)) ?? []).some((f) => f.kind === 'Started' && f.actor === 'hive')
+    check('…its cards stay where they were', (await card(c.number))?.column === (cStarted ? 'doing' : 'todo'), JSON.stringify({ cStarted, c: await card(c.number) }))
+    // Back in Todo for what follows, as it was before Hive's start.
+    if (cStarted) await inv('tasks:move', c.number, 'todo', { confirm: true, reason: 'the e2e puts it back' })
 
     // --- HI-1995: Apply now. A lane of two, its first card started (B1 placed in the lane's slot); Start Lane for B1 with
     // the other card offers Apply now, which puts the first back in Todo and applies the new order.
@@ -201,9 +205,9 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check('a lane of two is started for B1', !!third, JSON.stringify(await lanes()))
     const quiet = async () => ['ready', 'finished'].includes((await live(b1.id))?.status) && (await api(`/v1/projects/alpha/agents/B1/deliveries?limit=20`)).deliveries?.every((x) => !['queued', 'uncertain'].includes(x.state))
     await until(quiet, HUNG_MS)
-    const moved = await inv('tasks:move', d1, 'doing', { confirm: true, agent: b1.id })
+    // HI-2029: nobody starts it: Hive gives the lane's first card to B1 once B1 is free (the lane started over it).
     const facts = async (n) => (await inv('tasks:facts', n)) ?? []
-    check('…its first card started', !moved?.refused && !!(await until(async () => (await facts(d1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)), JSON.stringify(moved))
+    check("…its first card started by Hive on B1, with no one starting it (HI-2029)", !!(await until(async () => (await facts(d1)).some((f) => f.kind === 'Started' && f.actor === 'hive') && (await facts(d1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)), JSON.stringify(await facts(d1)))
     await until(quiet, HUNG_MS)
     /** Start Lane from the Todo column with only card n left in its list (the other Todo cards taken out). */
     const openWithOnly = async (n) => {
@@ -220,10 +224,9 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await dialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
     check('…applied: the dialog closes', !!(await until(async () => (await dialog.count()) === 0, HUNG_MS)), await dialog.innerText().catch(() => ''))
     check('…the card being worked is back in Todo, the lane is the new list', !!(await until(async () => (await card(d1))?.column === 'todo' && JSON.stringify((await lanes()).find((l) => l.id === third?.id)?.cards.map((x) => x.number)) === JSON.stringify([d2]), HUNG_MS)), JSON.stringify({ d1: (await card(d1))?.column, lane: (await lanes()).find((l) => l.id === third?.id) }))
-    // The new first card is the builder's to start (none before it is Done): started here as the user does.
-    const d2start = await inv('tasks:move', d2, 'doing', { confirm: true, agent: b1.id })
-    const started2 = await until(async () => (await facts(d2)).find((f) => f.kind === 'Started') ?? null, HUNG_MS)
-    check('…and its new first card starts on B1', !d2start?.refused && !!started2 && (await card(d2))?.agent === b1.id, JSON.stringify({ started2, d2: await card(d2) }))
+    // The reordered lane's new first card: Hive starts it on B1 too, once B1 is free (HI-2029).
+    const started2 = await until(async () => (await facts(d2)).find((f) => f.kind === 'Started' && f.actor === 'hive') ?? null, HUNG_MS)
+    check('…and its new first card is started on B1 by Hive', !!started2 && (await card(d2))?.agent === b1.id, JSON.stringify({ started2, d2: await card(d2) }))
     // That card in Review (its work committed in the slot, moved as the user does): Apply now says why it can't.
     await until(async () => (await facts(d2)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)
     await until(quiet, HUNG_MS)
@@ -238,6 +241,24 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check("…then Start Lane for B1 says why it can't apply now, with no checkbox", !!(await until(async () => (await not.count()) === 1, HUNG_MS)) && (await not.locator('input').count()) === 0 && /which is in Review: this list applies once it is Done/.test(await not.innerText()), await dialog.innerText().catch(() => ''))
     await shoot('apply-now-review', dialog)
     await dialog.getByRole('button', { name: 'Cancel' }).click()
+
+    // --- HI-2029: a lane recorded through the Agent API (POST /v1/lanes, a script's) over a running, idle builder: Hive
+    // gives it the lane's first card at once, with nobody starting it (Legible's LE-259 sat in Todo for hours).
+    await inv('lanes:end', third.id, true)
+    const f1 = (await inv('tasks:create', { title: 'Retest installer', project: 'alpha' })).number
+    await until(quiet, HUNG_MS)
+    const viaApi = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', builder: 'B1', reviewer: 'R1', cards: [f1] }) })
+    const apiLane = await viaApi.json().catch(() => null)
+    check('a lane recorded through POST /v1/lanes over B1, running and idle', viaApi.status === 200, JSON.stringify(apiLane))
+    // B1's slot is d2's (in Review): the lane says why its card waits, never "active" with nothing said.
+    const apiLaneNow = async () => (await lanes()).find((l) => l.builder.id === b1.id && l.cards.some((x) => x.number === f1))
+    const waits = await until(async () => (await apiLaneNow())?.status ?? null, HUNG_MS)
+    check('…its card waiting for a slot, the lane says why', !!waits && (await card(f1))?.column === 'todo', JSON.stringify({ waits, lane: await apiLaneNow() }))
+    // d2 put back (its slot released): Hive starts f1 on B1 with nobody asking.
+    await inv('tasks:move', d2, 'todo', { confirm: true, reason: 'the e2e puts it back' })
+    // Its start refused for the slot is tried again within laneStarts.ts's RETRY_MS (30 s, by its tick), so up to two of them.
+    const byHiveF1 = await until(async () => (await facts(f1)).find((f) => f.kind === 'Started' && f.actor === 'hive') ?? null, 2 * 30000 + HUNG_MS)
+    check("…its first card is started on B1 by Hive once the slot is free, and B1 is given it (HI-2029)", !!byHiveF1 && (await card(f1))?.agent === b1.id && !!(await until(async () => (await facts(f1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)), JSON.stringify({ byHiveF1, f1: await card(f1) }))
   } finally {
     await app.close().catch(() => undefined)
   }

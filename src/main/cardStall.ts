@@ -96,14 +96,16 @@ export const LANE_NEXT_STALL_MS = 15 * 60_000
 export function laneNextWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column' | 'archived' | 'blocked'>, lane: LaneOrderView | null | undefined, builder: { name: string; status: string | null }, now = Date.now()): string | null {
   if (!lane || lane.state === 'paused' || c.archived || c.blocked || c.column !== 'todo') return null
   const at = lane.cards.findIndex((x) => x.number === c.number)
-  if (at < 1 || lane.cards.slice(0, at).some((x) => x.column !== 'done')) return null
+  if (at < 0 || lane.cards.slice(0, at).some((x) => x.column !== 'done')) return null
   if (builder.status !== null && !IDLE.includes(builder.status)) return null
-  const before = lane.cards[at - 1]
-  const since = Date.parse(before.movedAt ?? '')
+  // Its first card (HI-2029): since the lane started; a later one, since the card before it went Done.
+  const before = at > 0 ? lane.cards[at - 1] : null
+  const since = Date.parse((before ? before.movedAt : lane.startedAt) ?? '')
   if (!since || now - since < LANE_NEXT_STALL_MS) return null
   const min = Math.round((now - since) / 60_000)
   const name = (x: { number: number; key?: string }): string => x.key ?? `#${x.number}`
-  return `${name(c)} is the lane's next card: ${name(before)} went Done ${min} min ago, and ${builder.name} ${builder.status === null ? "isn't running" : builder.status === 'watching' ? 'is only watching' : 'is idle'} without starting it.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  const doing = `${builder.name} ${builder.status === null ? "isn't running" : builder.status === 'watching' ? 'is only watching' : 'is idle'} without starting it.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return before ? `${name(c)} is the lane's next card: ${name(before)} went Done ${min} min ago, and ${doing}` : `${name(c)} is the lane's first card: the lane started ${min} min ago, and ${doing}` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
 /** A workspace's live agents (by its folder): their names, projects, cards left with no watch, card watches (and since when), and how each is now. */
@@ -182,10 +184,11 @@ function laneNext(c: TaskCard, lane: LaneOrderView | null | undefined, live: Ret
 }
 
 /** A running lane as the stall check reads it (#1410), its cards' keys and last moves from the board's cards (`card`). */
-export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: string } | null; state?: string; cards: { number: number; column: string }[] }, card: (n: number) => Pick<TaskCard, 'key' | 'history'> | undefined): LaneOrderView => ({
+export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: string } | null; state?: string; startedAt?: string; cards: { number: number; column: string }[] }, card: (n: number) => Pick<TaskCard, 'key' | 'history'> | undefined): LaneOrderView => ({
   builder: l.builder.id,
   reviewer: l.reviewer?.id ?? null,
   ...(l.state ? { state: l.state } : {}),
+  ...(l.startedAt ? { startedAt: l.startedAt } : {}),
   cards: l.cards.map((c) => {
     const t = card(c.number)
     return { number: c.number, column: c.column, movedAt: t ? columnSince(t) : null, ...(t?.key ? { key: t.key } : {}) }

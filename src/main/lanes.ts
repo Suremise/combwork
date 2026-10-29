@@ -4,7 +4,7 @@ import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole } from '../shared/workflow/roles'
-import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord, type WaitStamp } from '../shared/lanes'
+import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
@@ -442,7 +442,7 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   // Each running lane's cards' owner lanes (HI-1821): a card given to no agent is the lane's that owns it.
   const owned = ws.path ? cardOwnersNow(ws, [...new Set(lanes.filter(running).flatMap((l) => l.cards))]) : new Map<number, { lane: string | null }>()
   const owners = new Map([...owned].map(([n, o]) => [n, o.lane]))
-  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners)))
+  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null)))
 }
 
 /**
@@ -1164,6 +1164,50 @@ const told = new Map<string, string>()
 const timers = new Map<string, NodeJS.Timeout>()
 /** A board change and the follow-up are read together: changes landing within this are one look. */
 const SETTLE_MS = 300
+
+/** What laneStarts.ts finds a lane's card waiting for to start (HI-2029), read into its status (set at its start). */
+let startWaits: (wsPath: string, lane: string) => LaneStartWait | null = () => null
+export function setLaneStartWaits(fn: typeof startWaits): void {
+  startWaits = fn
+}
+/** A lane's status changed outside the board (laneStarts.ts' start waits): the window and watches told, as for a board change. */
+export const laneViewsChanged = (ws: WorkspaceService): void => changed(ws)
+
+/** Builders whose lane's start is launching them ("<workspace>#<project>|<builder>" → how many starts), see holdLaneStart. */
+const launching = new Map<string, number>()
+const launchKey = (ws: WorkspaceService, project: string, builder: string): string => `${(ws.path ?? '').toLowerCase()}#${project.toLowerCase()}|${builder}`
+/**
+ * A lane's start launching its agents (Start Lane…, a lane the Assistant or a script records or updates), from before
+ * the lane's record until its slot is lent and its agents started: laneStarts.ts never starts the builder's lane card
+ * meanwhile (HI-2029: it found the builder not running yet and started the card itself, taking the slot the start was
+ * lending, or giving the builder a second conversation). By builder, as the lane isn't recorded yet as it is held. The
+ * release lets it look again.
+ */
+export function holdLaneStart(ws: WorkspaceService, project: string, builder: string): () => void {
+  const k = launchKey(ws, project, builder)
+  launching.set(k, (launching.get(k) ?? 0) + 1)
+  let done = false
+  return () => {
+    if (done) return
+    done = true
+    const n = (launching.get(k) ?? 1) - 1
+    if (n > 0) launching.set(k, n)
+    else launching.delete(k)
+    changed(ws)
+  }
+}
+/**
+ * Whether a running lane waits for a slot now, as kept (`slotWait`), read synchronously (laneStarts.ts, as it decides
+ * and again just before its start, HI-2029). The slot pass clears it only once it has lent the slot and launched the
+ * lane's agents (startWaitingLane), so it covers that deferred launch too, `stoppedOnly` or not.
+ */
+export function laneWaitsForSlot(ws: WorkspaceService, id: string): boolean {
+  if (!ws.path) return false
+  const rec = readLanes({ version: 1, lanes: readTable(ws.path, 'lanes').docs as Record<string, unknown>[] }).find((l) => l.id === id)
+  return !!rec && running(rec) && !!rec.slotWait
+}
+/** Whether a lane's start is launching this builder now (holdLaneStart). */
+export const laneStartHeld = (ws: WorkspaceService, project: string, builder: string): boolean => launching.has(launchKey(ws, project, builder))
 
 /** A workspace's lanes changed: look again soon. */
 function changed(ws: WorkspaceService): void {

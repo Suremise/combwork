@@ -102,6 +102,9 @@ async function settleOnce(ws: WorkspaceService): Promise<void> {
 /** Just before one is offered: still its lane's current brief (the lane running, this rev), else cancelled. */
 const source: DeliverySource = {
   refresh: async (r, host) => {
+    // A lane's start task (laneStart.ts, kind task, ref `<lane>:<role>`) shares this source's id and isn't a brief update:
+    // read as one, its role was no rev and it was cancelled as no longer current, leaving its builder idle (HI-2029).
+    if (r.kind === 'task') return null
     // The host's own workspace, by its folder's boundary (HR4's round 1: a prefix match took `ws` for `ws-other`'s).
     const ws = workspaceFor(host)
     const [id, rev] = (r.ref ?? '').split(':')

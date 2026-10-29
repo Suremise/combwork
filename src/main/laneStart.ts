@@ -9,7 +9,7 @@ import { legacyWorktree, slotsMigrated } from './agentFolders'
 import { lendLane } from './slotCards'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
 import { hiveError } from './hiveError'
-import { rawLanes, setLaneSlotWait, startLane } from './lanes'
+import { holdLaneStart, rawLanes, setLaneSlotWait, startLane } from './lanes'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { getTask } from './tasks'
@@ -85,6 +85,8 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   }
   const key = `${projectPath.toLowerCase()}|${builder.id}`
   if (starting.has(key)) throw hiveError(M.starting, { agent: builder.name }, { kind: 'conflict' })
+  // Hive's own start of the lane's card waits for this one to lend its slot and start its agents (HI-2029).
+  const release = holdLaneStart(ws, project, builder.id)
   starting.add(key)
   try {
     const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: 'the user', ...(req.applyNow ? { applyNow: true } : {}) }) // i18n-ignore: who started it, as the lane records it (agents read it)
@@ -105,6 +107,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
     return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief) }
   } finally {
     starting.delete(key)
+    release()
   }
 }
 
@@ -241,6 +244,12 @@ export interface RecordedLaneLaunch {
   waitingForSlot?: string
   /** The builder or reviewer running already (idle or busy): left as it is, the lane recorded for it; the caller tells it. */
   running: string[]
+  /**
+   * The lane's builder's name, and whether Hive gives a running one the lane's first card itself once it is free (the
+   * workflow rules on: laneStarts.ts, HI-2029): then the caller tells only the reviewer (HR1: a prompt would race it).
+   */
+  builder?: string
+  firstCardByHive?: boolean
 }
 
 /**
@@ -260,10 +269,12 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const builder = agents.find((a) => a.id === lane.builder.id)
   const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
   if (!builder) return null
+  // Who the reply names, and whether Hive starts a running builder's first card (the rules on, HI-2029).
+  const who = { builder: builder.name, firstCardByHive: workflowEnforced() }
   // Running now: left out of this start whatever they do meanwhile (its slot is decided from it), and named to the caller.
   const left = [builder, reviewer].filter((a): a is AgentDef => !!a && !!sessions.liveFor(projectPath, a.id))
   const running = left.map((a) => a.name)
-  if (left.length === (reviewer ? 2 : 1)) return { started: [], running }
+  if (left.length === (reviewer ? 2 : 1)) return { started: [], running, ...who }
   const only = { left: new Set(left.map((a) => a.id)) }
   // Those left out, and those found running at their launch (started meanwhile): the caller tells them.
   const runningOf = (started: LaneStartResult['started']): string[] => [builder, reviewer].filter((a): a is AgentDef => !!a && !started.some((x) => x.agentId === a.id) && (only.left.has(a.id) || !!sessions.liveFor(projectPath, a.id))).map((a) => a.name)
@@ -281,17 +292,17 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
     const got = await lendLane(ws, projectPath, laneId, builder.id, options?.target || null)
     if ('waiting' in got) {
       await setLaneSlotWait(ws, laneId, { since: new Date().toISOString(), note: '', stoppedOnly: true })
-      return { started: [], waitingForSlot: got.waiting, running }
+      return { started: [], waitingForSlot: got.waiting, running, ...who }
     }
     const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, where, got.slot, '')
     const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, undefined, only)
     log.info(`Lane ${laneId} lent ${userText(got.slot)}: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
-    return { started, slot: got.slot, running: runningOf(started) }
+    return { started, slot: got.slot, running: runningOf(started), ...who }
   }
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, where, null, '')
   const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, undefined, only)
   log.info(`Lane ${laneId} started: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
-  return { started, running: runningOf(started) }
+  return { started, running: runningOf(started), ...who }
 }
 
 /**
@@ -313,7 +324,14 @@ export async function resumeLaneBuilder(projectPath: string, lane: { id: string;
 /** What `launchRecordedLane` did, for the lane start's reply (agent-facing English: the Assistant and scripts read it). */
 export function recordedLaneNote(l: RecordedLaneLaunch | null): string {
   if (!l) return ''
-  const running = l.running.length ? `${l.running.join(' and ')} ${l.running.length > 1 ? 'are' : 'is'} running, so Hive left ${l.running.length > 1 ? 'them' : 'it'} as ${l.running.length > 1 ? 'they are' : 'it is'}: tell ${l.running.length > 1 ? 'them' : 'it'} about the lane.` : '' // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+  // A running builder, the rules on: Hive gives it the lane's first card once it is free (HI-2029), so the caller is told
+  // not to prompt it (that would race Hive's start); a running reviewer, or the builder with the rules off, it tells.
+  const byHive = l.firstCardByHive && l.builder && l.running.includes(l.builder) ? l.builder : null
+  const tell = l.running.filter((n) => n !== byHive)
+  const running = [
+    byHive ? `${byHive} is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.` : '', // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+    tell.length ? `${tell.join(' and ')} ${tell.length > 1 ? 'are' : 'is'} running, so Hive left ${tell.length > 1 ? 'them' : 'it'} as ${tell.length > 1 ? 'they are' : 'it is'}: tell ${tell.length > 1 ? 'them' : 'it'} about the lane.` : '' // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+  ].filter(Boolean).join(' ')
   if (l.waitingForSlot !== undefined) return [`No slot is free (${l.waitingForSlot}): the lane waits for one, and its stopped agents start once it is lent.`, running].filter(Boolean).join(' ') // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
   const ok = l.started.filter((s) => s.how !== 'failed').map((s) => s.name)
   const failed = l.started.filter((s) => s.how === 'failed').map((s) => `${s.name} didn't start (${s.why ?? 'unknown'})`) // i18n-ignore: the lane start's reply (the Assistant and scripts read it)

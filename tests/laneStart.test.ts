@@ -42,6 +42,7 @@ vi.mock('../src/main/lanes', () => ({
     // Its rounds as recorded (HI-1805: what its agents' briefs say, whatever today's default).
     return { lane: { id: 'lane-1', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, rounds: 3 }, did: 'started', replaced: null }
   },
+  holdLaneStart: () => () => undefined,
   rawLanes: async () => {
     await state.lanesHeld
     return state.lanes
@@ -291,7 +292,11 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     state.live.set('r1', { status: 'working', sessionId: 's-r1' })
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual([])
-    expect(recordedLaneNote(l)).toBe('B2 and R1 are running, so Hive left them as they are: tell them about the lane.')
+    // The rules on: Hive gives the builder its first card itself (HI-2029), so the caller tells only the reviewer (HR1).
+    expect(recordedLaneNote(l)).toBe("B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it. R1 is running, so Hive left it as it is: tell it about the lane.")
+    // The rules off: nothing starts the builder's card, so the caller tells both.
+    state.enforced = false
+    expect(recordedLaneNote(await launchRecordedLane(ws, ALPHA, 'lane-9'))).toBe('B2 and R1 are running, so Hive left them as they are: tell them about the lane.')
   })
 
   it('its builder running and its reviewer stopped: only the reviewer starts, with no slot lent for the builder', async () => {
@@ -301,7 +306,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual(['start r1'])
     expect(state.live.get('b2')?.sessionId).toBe('s-b2')
-    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: tell it about the lane.")
+    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.")
   })
 
   it('its builder stopped and its reviewer idle: the builder starts in its slot, the reviewer keeps its conversation', async () => {
@@ -330,7 +335,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     state.onGetTask = () => void state.live.delete('b2')
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual(['start r1'])
-    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: tell it about the lane.")
+    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.")
   })
 
   for (const status of ['working', 'watching']) {

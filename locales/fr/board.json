@@ -536,6 +536,7 @@
   "board.lanes.waits": "{reason, select, blocked {{card} est bloquée} hold {{card} est suspendue} you {t’attend ({ask, select, approve {approbation} decide {une décision} test {un test} signIn {une connexion} other {une réponse}}) : {card}} roundLimit {t’attend : {card} a atteint la limite de tours} notMerged {en attente : {card} pas encore fusionnée} merging {en attente : {card} en cours de fusion} stale {périmée : {card} doit être soumise à nouveau} reviewer {en attente d’un relecteur pour {card}} lineUpdate {en attente : mise à jour de la branche de l’auteur avant {card}} hooks {en pause : les hooks de l’agent {agent} n’arrivent pas} checkCopy {en attente d’une copie de vérification pour {card}} slot {en attente d’un emplacement} other {la liste change après {card}}}",
   "board.lanes.waitsLink": "Clique pour l’afficher.",
   "board.lanes.waitsPreparing": "en attente : préparation de {slot}",
+  "board.lanes.waitsStart": "{card} attend de démarrer : {why, select, watching {{agent} attend un autre travail} queued {une ligne de Hive est en route vers {agent}} failed {le dernier démarrage de {agent} a échoué} refused {son démarrage a été refusé pour l’instant, et Hive réessaie} other {{agent} est en plein tour}}",
   "board.links.archivedTitle": "{card} {title} · Archivée (colonne {column}) · Ctrl+clic pour ouvrir",
   "board.links.title": "{card} {title} · {column} · Ctrl+clic pour ouvrir",
   "board.menu.delete": "Supprimer…",

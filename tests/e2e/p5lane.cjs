@@ -241,7 +241,13 @@ const ancestor = (x, y) => {
     const integrated = async (n) => (await factsOf(n, 'Integrated')).at(-1)
     /** A card's start by B1: in the lane's slot (`wt` from then on), on its line once Hive has made it there. */
     const start = async (n) => {
-      const s = await intent('b1', n, 'start')
+      // A lane started just as the one before it ends may wait for its slot (the earlier lane's lease ends just after
+      // it): the slot pass lends it and starts B1 in a new conversation with the brief, and Hive may then start the
+      // card on B1 itself (HI-2029; B1's own start of it is that start). Refused for the slot meanwhile, tried again.
+      const s = (await waitHung(async () => {
+        const r = await intent('b1', n, 'start')
+        return r.status === 409 && r.body?.rule === 'start.slotAvailable' ? null : r
+      })) ?? { status: 0, body: 'still no slot' }
       const started = (await factsOf(n, 'Started')).at(-1)?.data
       if (s.status === 200 && s.body?.data?.folder) {
         wt = s.body.data.folder
@@ -285,12 +291,18 @@ const ancestor = (x, y) => {
       await dialog.locator('#lane-start-builder').selectOption(b1.id)
       await dialog.locator('#lane-start-reviewer').selectOption(r1.id)
       await dialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
-      const lane = await waitHung(async () => (await inv('lanes:list')).find((l) => l.builder.id === b1.id && l.state !== 'ended' && JSON.stringify(l.cards.map((x) => x.number)) === JSON.stringify(cards)))
+      // Once lent its slot: a lane started just as the one before it ends waits for that lane's slot (its lease ends just
+      // after it), then the slot pass lends it and starts B1 with the brief (HI-2029). B1 may then be in a new
+      // conversation, with a new token (intent and reorderNow read it again on a 401).
+      const lane = await waitHung(async () => {
+        const l = (await inv('lanes:list')).find((x) => x.builder.id === b1.id && x.state !== 'ended' && JSON.stringify(x.cards.map((c) => c.number)) === JSON.stringify(cards))
+        return l?.slot ? l : null
+      })
       // Not started (HI-2027's lane C, once in five): what the window showed, said with the failure.
       if (!lane) {
         const shot = path.join(fx.shots, `lane-start-${cards.join('-')}-failed.png`)
         await page.screenshot({ path: shot }).catch(() => undefined)
-        const said = { dialog: await dialog.innerText().catch(() => null), toasts: await page.locator('.toast').allInnerTexts().catch(() => []), todo: await column('Todo').locator('.task-card').count().catch(() => -1), shot }
+        const said = { dialog: await dialog.innerText().catch(() => null), toasts: await page.locator('.toast').allInnerTexts().catch(() => []), todo: await column('Todo').locator('.task-card').count().catch(() => -1), lanes: await inv('lanes:list').catch(() => null), shot }
         console.log(`lane start not seen: ${JSON.stringify(said)}`)
       }
       return lane
@@ -428,7 +440,7 @@ const ancestor = (x, y) => {
       waitHung(async () => {
         const res = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.b1}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ cards: [c7, c6], applyNow: true }) })
         const body = await res.json().catch(() => null)
-        // Refused as unknown: its token is an older launch's (HI-2027): read again from its latest, and tried again.
+        // Refused as unknown: its token is an older launch's (HI-2027; a lane's start gives B1 a new conversation, HI-2029): read again from its latest, and tried again.
         if (res.status === 401) {
           tokens.b1 = (await tokenOf(b1.id).catch(() => null)) ?? tokens.b1
           return null
