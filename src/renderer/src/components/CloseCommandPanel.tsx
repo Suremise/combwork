@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CloseCommandRun, CloseCommandStep } from '@shared/types'
 import { msg, tr } from '@shared/i18n'
 import { durationText } from '@shared/tasks'
 import { call } from '../api'
 import { useLanguage, useStore } from '../store'
 import { useNow } from '../usage'
-import { Icon, useBackdrop } from './ui'
+import { Icon, Tooltip, useBackdrop } from './ui'
 
 const M = {
   running: msg({ id: 'workspace.closeCommand.running', defaultMessage: '{kind, select, quit {Running your quit command…} other {Running your close command…}}', description: "The heading of the panel Hive shows while it runs the user's own command as a workspace closes (kind other: Settings → Workspace → When this workspace closes, run) or as Hive quits (kind quit: Settings → General → When Hive quits, run)." }),
@@ -130,6 +130,26 @@ function useKeyboardModal(card: React.RefObject<HTMLDivElement | null>, footer: 
   })
 }
 
+/**
+ * The command Hive runs (HI-2031): at most two lines, cut with an ellipsis, and the whole line in a tooltip on hover when
+ * it is cut. A screen reader reads it whole: only its look is cut.
+ */
+function CommandLine({ command }: { command: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [cut, setCut] = useState(false)
+  useLayoutEffect(() => {
+    const el = ref.current
+    setCut(!!el && el.scrollHeight > el.clientHeight + 1)
+  }, [command])
+  return (
+    <Tooltip content={cut ? command : null} block className="close-command-tip">
+      <div ref={ref} className="close-command-text close-command-line" aria-label={tr(M.command)} data-cut={cut || undefined}>
+        {command}
+      </div>
+    </Tooltip>
+  )
+}
+
 function StepRow({ step, current, command, now, lines }: { step: CloseCommandStep; current: boolean; command: string; now: number; lines: string[] }) {
   const started = step.startedAt ? Date.parse(step.startedAt) : NaN
   const ended = step.endedAt ? Date.parse(step.endedAt) : now
@@ -153,11 +173,7 @@ function StepRow({ step, current, command, now, lines }: { step: CloseCommandSte
       </div>
       {current && (command || step.detail || lines.length > 0) && (
         <>
-          {command && (
-            <div className="close-command-text" aria-label={tr(M.command)}>
-              {command}
-            </div>
-          )}
+          {command && <CommandLine command={command} />}
           {step.detail && <div className="close-command-text">{step.detail}</div>}
           {lines.length > 0 && (
             <pre className="close-command-output" aria-label={tr(M.output)}>
@@ -206,11 +222,7 @@ function Panel({ run }: { run: CloseCommandRun }) {
             </ol>
           ) : (
             <>
-              {run.command && (
-                <div className="close-command-text" aria-label={tr(M.command)}>
-                  {run.command}
-                </div>
-              )}
+              {run.command && <CommandLine command={run.command} />}
               {lines.length > 0 && (
                 <pre className="close-command-output" aria-label={tr(M.output)}>
                   {lines.join('\n')}
