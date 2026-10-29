@@ -669,7 +669,9 @@ export const movedSummary = (plan: MovePlan | null): WorkspaceMoved | null =>
  * - A move is recorded as the moved workspace opens (config.json's `profileMoves`, one per old folder) only when the
  *   old folder is gone (no .hive, not open): a copy's original keeps its own. Records about that old folder follow it
  *   on, keeping their own old folder (A→B becomes A→C), only when the folder they went to is gone too (a copy left
- *   there keeps them). Never evicted.
+ *   there keeps them). Never evicted. Its old folders are where it was last opened (lastPath) and where its records
+ *   were last all brought (workspace.json's `profileAt`, set once nothing is left to follow it), so a second move before
+ *   a Repair finds them.
  * - Tried at each open and Repair, whatever Repair's plan says, until nothing is left at the old folder (a pin there, a
  *   run under its prefixes): a run still going follows once it has ended.
  * - Every change rechecks, as it is made, that the workspace is still open here and the old folder still gone; a close
@@ -684,8 +686,10 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
   const current = (): boolean => !life.aborted && ws.path === here
   const gone = (p: string): boolean => !existsSync(join(p, HIVE_DIR)) && !workspaceFor(p)
   const ofFrom = (from: string) => (m: ProfileMove): boolean => samePath(m.from, from)
-  const from = ws.movedFrom
-  if (from && !samePath(from, here)) {
+  // Where it was last opened (lastPath, as Repair goes by), and where its records were last brought (profileAt): moved
+  // again before a Repair, lastPath is still the first old folder while the records went on with it (HR2's round 3).
+  const olds = [ws.movedFrom, ws.config.profileAt].filter((p): p is string => !!p && !samePath(p, here))
+  for (const from of olds.filter((p, i) => olds.findIndex((q) => samePath(p, q)) === i)) {
     config.update((c) => {
       if (!current() || !gone(from)) return
       // Records about the folder it came from (that folder's own, or one whose workspace went there) follow it on, when
@@ -745,6 +749,10 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
       })
     }
   }
+  // All of it here now: the checkpoint says so, in the workspace's own settings (it travels with the folder, so a move
+  // after this finds the records here, and a copy finds them still at the original's).
+  if (current() && !samePath(ws.config.profileAt ?? '', here) && !(config.get().profileMoves ?? []).some((x) => samePath(x.to, here)))
+    await ws.saveWorkspaceConfigWith(() => ({ profileAt: here }))
 }
 
 /** This workspace's records by an old folder that couldn't all follow it (HI-2007): Repair tries again. */

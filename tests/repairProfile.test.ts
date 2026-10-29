@@ -190,6 +190,21 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     expect(pinnedFor(to)).toBe(true)
   })
 
+  it('moved twice with no Repair between (A to B, all of it carried, then B to C): the pin and runs follow from B to C (HR2, round 3)', async () => {
+    const { ws, at: a, runs } = await pinnedWorkspace(join(base, 'twice-a'))
+    const aPrefix = prefixOf(ws)
+    const b = await moved(ws, a, join(base, 'twice-b'))
+    const bPrefix = prefixOf(ws)
+    // At B: all of it carried, no record left; Repair not run, so lastPath is still A.
+    expect([pinnedFor(b), record(a)]).toEqual([true, undefined])
+    expect(tail(runsNamed(bPrefix), bPrefix)).toEqual(tail(runs, aPrefix))
+    const c = await moved(ws, b, join(base, 'twice-c'))
+    expect([pinnedFor(c), pinnedFor(b)]).toEqual([true, false])
+    expect(runsNamed(bPrefix)).toEqual([])
+    expect(tail(runsNamed(prefixOf(ws)), prefixOf(ws))).toEqual(tail(runs, aPrefix))
+    expect(config.get().profileMoves ?? []).toEqual([])
+  })
+
   it('moved twice (A to B, then B to C): a run left at A follows to C', async () => {
     const { ws, at: a } = await pinnedWorkspace(join(base, 'chain-a'))
     const aPrefix = prefixOf(ws)

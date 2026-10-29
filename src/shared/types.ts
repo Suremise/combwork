@@ -801,6 +801,12 @@ export interface WorkspaceConfig {
   assistantConnection?: Partial<Record<ProviderId, string | null>>
   /** Where the workspace was last opened (#146): a different folder now means it was moved, and Repair… is offered. */
   lastPath?: string
+  /**
+   * The folder Hive's profile keeps this workspace's records by (HI-2007: its window's pin, its close command's runs),
+   * set once they have all followed it here. Apart from lastPath, which stays where Repair needs it until Repair is done:
+   * moved again before that, the records are found where they went.
+   */
+  profileAt?: string
   /** The last project rename (#514, `project-names.json`'s number) its hidden and removed projects follow. */
   renamesApplied?: number
   /**
