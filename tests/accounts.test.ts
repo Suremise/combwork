@@ -887,15 +887,23 @@ describe("a workspace's accounts", () => {
       let spy: ReturnType<typeof vi.spyOn>
       let a: Connection
       const row = () => run(() => accounts.accountsView()).connections.find((c) => c.id === a.id)!
+      // A project's config with one agent, and an id of its own: one written without is given its id by Hive whenever it
+      // next reads the ids, in temp files and a .bak beside it, and a folder removed while that lands is found not empty
+      // (HI-2060).
+      const writeProject = (i: number, agent: { provider: string; connection?: string }): void => {
+        mkdirSync(join(folders[i], '.hive'), { recursive: true })
+        writeFileSync(join(folders[i], '.hive', 'project.json'), JSON.stringify({ version: 2, id: `p-2060000000${i}`, agents: [{ id: `a-${i}`, name: `Agent ${i}`, ...agent }] }))
+      }
       // Each project with a Claude Code agent of its own (HI-1871: only projects the connection would be used in count).
       const projectsNow = async (n: number): Promise<void> => {
+        // No refresh under way as a folder goes: its ensureProject makes folders in .hive (HI-2060).
+        await w.refreshesSettled()
         for (const [i, f] of folders.entries()) {
           if (i >= n) {
             rmSync(f, { recursive: true, force: true })
             continue
           }
-          mkdirSync(join(f, '.hive'), { recursive: true })
-          writeFileSync(join(f, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${i}`, name: `Agent ${i}`, provider: 'claude-code' }] }))
+          writeProject(i, { provider: 'claude-code' })
         }
         const want = names.slice(0, n).join()
         await refreshedTo((info) => info.projects.filter((p) => p.agents.length).map((p) => p.name).sort().join() === want)
@@ -931,10 +939,7 @@ describe("a workspace's accounts", () => {
         await run(() => accounts.setAccountOn(other.id, true))
         // beta: a Codex agent; gamma: a Claude Code agent pinned to Other. Neither would use this connection.
         const agentsOf = [{ provider: 'claude-code' }, { provider: 'codex' }, { provider: 'claude-code', connection: other.id }]
-        for (const [i, f] of folders.entries()) {
-          mkdirSync(join(f, '.hive'), { recursive: true })
-          writeFileSync(join(f, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${i}`, name: `Agent ${i}`, ...agentsOf[i] }] }))
-        }
+        for (const i of folders.keys()) writeProject(i, agentsOf[i])
         await refreshedTo((info) => info.projects.filter((p) => p.agents.length).length === 3)
         await vi.waitFor(() => expect(row().trust?.checking).toBe(true), { timeout: HUNG_MS })
         // Its set unchanged by them: no read of them, and its answer, once in, names alpha alone.
@@ -959,7 +964,7 @@ describe("a workspace's accounts", () => {
         await vi.waitFor(() => expect(rowOf(other.id).trust?.checking).toBeUndefined(), { timeout: HUNG_MS })
         expect(others(other)).toHaveLength(0)
         // alpha's agent given Other as its own: alpha now counts for Other, and no longer for this one.
-        writeFileSync(join(folders[0], '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-0', name: 'Agent 0', provider: 'claude-code', connection: other.id }] }))
+        writeProject(0, { provider: 'claude-code', connection: other.id })
         await refreshedTo((info) => alphaConnection(info) === other.id)
         rowOf(other.id)
         await vi.waitFor(() => expect(others(other).map((h) => h.projects)).toEqual([1]), { timeout: HUNG_MS })
@@ -967,7 +972,7 @@ describe("a workspace's accounts", () => {
         for (const h of held) h.answer([true, true])
         // Back to no connection of its own, and Other moved to the top of the order: Other is the first on, so alpha
         // and the Assistant's home are Other's now, this one counts none.
-        writeFileSync(join(folders[0], '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-0', name: 'Agent 0', provider: 'claude-code' }] }))
+        writeProject(0, { provider: 'claude-code' })
         accounts.moveConnection(other.id, 0)
         await refreshedTo((info) => alphaConnection(info) === undefined)
         rowOf(other.id)
