@@ -7,7 +7,7 @@
  */
 import type { MergeSlotInfo, TaskCard, TaskColumn, TaskDecision } from './types'
 import { holderText, minutes, slotLine } from './mergeSlot'
-import { columnLabel } from './tasks'
+import { columnLabel, commentSummary } from './tasks'
 import { cardName, cardRef, namedBy, namesFrom, namesOf } from './projectKeys'
 import { shortDuration } from './progress'
 import { LANE_DEFAULT_EVENTS, type LaneEvent, type LaneWatchCards } from './laneWatch'
@@ -15,6 +15,30 @@ import type { StageId } from './workflow/facts'
 import type { NextStep } from './workflow/nextStep'
 import type { QueuePublic } from './workflow/queue'
 import { INBOX_SWITCHES, type InboxSwitch } from './inboxSwitches'
+
+/** A card's request waiting for the user, as agents read it (TaskView.forYou); `asker` absent: Hive asked. */
+export interface CardRequest {
+  request: string
+  kind: string
+  gate: string
+  text: string
+  /** With `summary=true`, the whole text's length when `text` is only its first line (as a comment's). */
+  length?: number
+  asker?: string
+  since: string
+}
+
+/**
+ * A card's open requests for its reader (HI-1992): whole, or with `summary` each one's text cut as a comment's summary is
+ * (#532). Absent when none waits, so a card with none reads as before.
+ */
+export function cardRequests(items: readonly { request: string; kind: string; gate: string; text: string; asker: string | null; since: string }[], summary = false): CardRequest[] | undefined {
+  if (!items.length) return undefined
+  return items.map((i) => {
+    const said = summary ? commentSummary({ text: i.text }) : { text: i.text }
+    return { request: i.request, kind: i.kind, gate: i.gate, ...said, ...(i.asker ? { asker: i.asker } : {}), since: i.since }
+  })
+}
 
 /** A card as the Agent API shows it: with what its agent is doing now, and why it is stalled. */
 export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'> {
@@ -32,10 +56,10 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   /** For a project agent: the cards in blockedBy and links that are another project's (it sees only their numbers). */
   elsewhere?: number[]
   /**
-   * Its requests waiting for the user (For you, HI-1932), oldest first: each one's id (what a decision's `answers` names),
-   * kind, gate, words and who asked. Absent when none waits.
+   * Its requests waiting for the user (For you, HI-1932), oldest first, just after its decisions (HI-1992): each one's id
+   * (what a decision's `answers` names), kind, gate, words, who asked and when. Absent when none waits.
    */
-  forYou?: { request: string; kind: string; gate: string; text: string; asker?: string }[]
+  forYou?: CardRequest[]
   /**
    * Files kept with the card (HI-1700), newest first: full path (open it with your tools), name, size, who added it and
    * when, and where it came (a comment's author and time, the description, a session). `missing`: its file is gone.

@@ -3303,6 +3303,37 @@ module.exports.SCENARIOS = [
       ]
     }
   })),
+  // HI-1992: an agent's question is in the card's For you, not its comments (another workspace's Assistant read the
+  // comments, found none, and called a paused lane a Hive bug). Reading the card, any form, it finds it at the top,
+  // without reading the card's history.
+  {
+    id: 'assistant-card-question',
+    title: "The Assistant asked why an agent's card waits (HI-1992): finds the agent's open question at the top of the card, not in its comments or history, and says it waits for the user",
+    role: 'assistant',
+    control: 'look',
+    async setup(c) {
+      const n = await c.card('q', { title: 'Friendlier greeting', description: 'Change greeting.txt to say something friendlier.', agent: 'coder', column: 'doing', comments: ['Started: reading greeting.txt.', 'Two wordings would work; checking with the user.'] })
+      await c.startAgent('coder')
+      const r = await c.as('coder', 'POST', `/v1/tasks/%23${n}/ask`, { kind: 'decide', text: 'Which greeting: "Hi there!" or "Hello, friend!"?' })
+      if (r.status !== 200) throw new Error(`ask: ${JSON.stringify(r.body)}`)
+      const card = await c.as('coder', 'GET', `/v1/tasks/%23${n}`)
+      // The premise: the question only in For you, never in a comment.
+      if (card.body?.forYou?.length !== 1 || (card.body?.comments ?? []).some((x) => x.text.includes('Hello, friend'))) throw new Error(`one open question, in no comment, expected: ${JSON.stringify({ forYou: card.body?.forYou, comments: card.body?.comments })}`)
+    },
+    prompt: (c) => `Coder has stopped on card #${c.cards.q} and isn't doing anything. Is that a Hive bug, or is it waiting for something? Don't change anything.`,
+    fake: (c) => `hive hive_read_task {"number":${c.cards.q},"latestComment":true}`,
+    expect: (o, c) => {
+      const reads = ran(o, 'hive_read_task').filter((x) => field(x.args, 'number', c.cards.q))
+      return [
+        ['read the card (hive_read_task)', reads.length > 0, o.hiveCalls.map((x) => x.tool).join(',')],
+        ["its reply had Coder's question", hiveReplies(o, 'hive_read_task').some((t) => t.result.includes('Hello, friend')), hiveReplies(o, 'hive_read_task').map((t) => t.result.slice(0, 160)).join(' | ')],
+        ["didn't read the card's history for it", !reads.some((x) => argsOf(x).history === true), reads.map((x) => x.args).join(' | ')],
+        ['said Coder waits for the user to answer which greeting', /Hello, friend|Hi there|which greeting|greeting/i.test(o.finalReply) && /(wait|answer|question|ask)/i.test(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
+        ['changed nothing', !ran(o, 'hive_update_task').length && !movesOf(o, c.cards.q).length && o.cards.q?.column === 'doing', o.cards.q?.column]
+      ]
+    },
+    fakeSkips: ['said Coder waits for the user to answer which greeting']
+  },
   {
     id: 'assistant-look-lanes',
     title: 'The Assistant at Look and advise asked which card loops are running (#500): lists the lanes, changes none',
