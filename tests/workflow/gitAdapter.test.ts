@@ -1,7 +1,7 @@
 // The Git adapter's answers on real repositories (#1118, SPEC §16.3.2): fixed endpoints, sameness by replay with the
 // candidate key only as a first test, containment of a merge, a fast-forward and a squash.
 import { execFileSync } from 'child_process'
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
@@ -170,7 +170,8 @@ describe('Git adapter', () => {
     const main = sh(repo, 'rev-parse', 'main')
     const one = await counted(() => G.heads(repo, 'side'))
     expect(one.value).toEqual({ line: 'main', head: main, target: side })
-    expect(one.ran).toHaveLength(1)
+    // HI-2050: all three from the `.git` files, with no git process (the files' cases: below).
+    expect(one.ran).toHaveLength(0)
     // Detached: no branch.
     sh(repo, 'checkout', '-q', '--detach', 'side')
     expect(await G.heads(repo, 'main')).toEqual({ line: null, head: side, target: main })
@@ -344,5 +345,216 @@ describe('Git adapter', () => {
     expect(() => sh(wt, 'rebase', '-q', 'main')).toThrow()
     expect((await G.dirty(wt)) as string[]).toContain('(rebase-merge)')
     expect((await G.dirty(repo)) as string[]).not.toContain('(rebase-merge)')
+  })
+})
+
+/**
+ * HI-2050: head and heads read from the `.git` files where those say exactly what git would, with no git process; git
+ * wherever they can't. Each answer checked against the git command it replaces, in the same repository.
+ */
+describe("head and heads from the .git files, as git answers them (HI-2050)", () => {
+  /** What git itself says HEAD's commit is (null: it can't), and a folder's branch and a line's head as heads' git asks. */
+  const gitHead = (folder: string): string | null => {
+    try {
+      return execFileSync('git', ['rev-parse', '--verify', '-q', 'HEAD'], { cwd: folder, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    } catch {
+      return null
+    }
+  }
+  // As heads' git reads it: HEAD's full name, else (no commit yet) the branch as `symbolic-ref` names it on its own.
+  const gitLine = (folder: string): string | null => {
+    try {
+      const full = execFileSync('git', ['rev-parse', '--symbolic-full-name', 'HEAD'], { cwd: folder, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+      return full === 'HEAD' ? null : full.replace(/^refs\/heads\//, '')
+    } catch {
+      try {
+        return execFileSync('git', ['symbolic-ref', '-q', '--short', 'HEAD'], { cwd: folder, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+      } catch {
+        return null
+      }
+    }
+  }
+  const gitTarget = (folder: string, line: string): string | null => {
+    try {
+      return execFileSync('git', ['rev-parse', '--verify', '-q', `refs/heads/${line}`], { cwd: folder, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    } catch {
+      return null
+    }
+  }
+  const common = (folder: string): string => sh(folder, 'rev-parse', '--path-format=absolute', '--git-common-dir')
+  const ownDir = (folder: string): string => sh(folder, 'rev-parse', '--path-format=absolute', '--git-dir')
+
+  /** head: git's commit, from the files (no git) or from git (`gives way`). */
+  async function sameHead(folder: string, givesWay: boolean): Promise<void> {
+    const r = await counted(() => G.head(folder))
+    const says = gitHead(folder)
+    if (says) expect(r.value).toBe(says)
+    else expect(isUnknown(r.value)).toBe(true)
+    expect(r.ran.length > 0).toBe(givesWay)
+  }
+  /** heads: git's branch, commit and the line's head, from the files or from git. */
+  async function sameHeads(folder: string, line: string, givesWay: boolean): Promise<void> {
+    const r = await counted(() => G.heads(folder, line))
+    const says = gitHead(folder)
+    expect(r.value.line).toBe(gitLine(folder))
+    if (says) expect(r.value.head).toBe(says)
+    else expect(isUnknown(r.value.head)).toBe(true)
+    expect(r.value.target).toBe(gitTarget(folder, line))
+    expect(r.ran.length > 0).toBe(givesWay)
+  }
+
+  it('a branch, detached, a packed ref and a linked worktree: from the files, with no git', async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const [, side] = branchWith('side', { 's.txt': 's\n' })
+    await sameHead(repo, false)
+    await sameHeads(repo, 'side', false)
+    // Detached (a known answer, line null): the files say it.
+    sh(repo, 'checkout', '-q', '--detach', 'side')
+    await sameHead(repo, false)
+    await sameHeads(repo, 'main', false)
+    sh(repo, 'checkout', '-q', 'main')
+    // Packed (no loose files): read from packed-refs, as git reads it.
+    sh(repo, 'pack-refs', '--all')
+    await sameHead(repo, false)
+    await sameHeads(repo, 'side', false)
+    // A linked worktree: its own HEAD in its own git dir, the line's head in the common one.
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'hive/card', wt, side)
+    await sameHead(wt, false)
+    await sameHeads(wt, 'main', false)
+    // A tag of the branch's name (HR3's case): heads names the branch as git's full name says it, never shortened.
+    sh(repo, 'tag', 'main', side)
+    await sameHeads(repo, 'main', false)
+  })
+
+  it('git where the files must not say: unborn, a symbolic branch ref, a short or malformed ref, a worktree ref, a non-plain name', async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const main = sh(repo, 'rev-parse', 'main')
+    // Read once: git can't find the repository while HEAD is broken below.
+    const own = ownDir(repo)
+    const refs = join(common(repo), 'refs', 'heads')
+    // A branch with no commit yet: head is git's unknown; heads asks git.
+    sh(repo, 'checkout', '-q', '--orphan', 'fresh')
+    await sameHead(repo, true)
+    await sameHeads(repo, 'main', true)
+    sh(repo, 'checkout', '-q', '-f', 'main')
+    // HEAD on a branch that is itself a symbolic ref (HR3's case: git follows it to main).
+    writeFileSync(join(refs, 'alias'), 'ref: refs/heads/main\n')
+    writeFileSync(join(own, 'HEAD'), 'ref: refs/heads/alias\n')
+    await sameHead(repo, true)
+    await sameHeads(repo, 'main', true)
+    writeFileSync(join(own, 'HEAD'), 'ref: refs/heads/main\n')
+    // The line asked about a symbolic ref: git's.
+    await sameHeads(repo, 'alias', true)
+    // A ref file that isn't a full id: short, not hex, empty.
+    for (const bad of [main.slice(0, 12), 'z'.repeat(40), '']) {
+      writeFileSync(join(refs, 'bad'), `${bad}\n`)
+      writeFileSync(join(own, 'HEAD'), 'ref: refs/heads/bad\n')
+      await sameHead(repo, true)
+    }
+    // A detached HEAD that isn't exactly a full id.
+    writeFileSync(join(own, 'HEAD'), `${main.slice(0, 39)}\n`)
+    await sameHead(repo, true)
+    // HEAD naming a worktree's own ref: never resolved in the common dir.
+    writeFileSync(join(own, 'HEAD'), 'ref: refs/worktree/mine\n')
+    await sameHead(repo, true)
+    writeFileSync(join(own, 'HEAD'), 'ref: refs/heads/main\n')
+    // A branch whose name the files aren't read by (not plain ASCII).
+    sh(repo, 'checkout', '-q', '-b', 'café')
+    await sameHead(repo, true)
+    await sameHeads(repo, 'main', true)
+  })
+
+  it('GIT_DIR or GIT_COMMON_DIR set: git, which reads them', async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    for (const name of ['GIT_DIR', 'GIT_COMMON_DIR']) {
+      const before = process.env[name]
+      process.env[name] = join(repo, '.git')
+      try {
+        await sameHead(repo, true)
+        await sameHeads(repo, 'main', true)
+      } finally {
+        if (before === undefined) delete process.env[name]
+        else process.env[name] = before
+      }
+    }
+  })
+
+  it('a reftable repository: git', async (t) => {
+    const r = join(tempDir('git-'), 'reftable')
+    try {
+      execFileSync('git', ['init', '-q', '-b', 'main', '--ref-format=reftable', r], { stdio: 'pipe' })
+    } catch {
+      t.skip("this git can't make a reftable repository (git 2.45 or later)")
+    }
+    commit(r, { 'a.txt': 'a\n' }, 'first')
+    await sameHead(r, true)
+    await sameHeads(r, 'main', true)
+  })
+})
+
+describe('identity in one git, as `git config <key>` answers each (HI-2050)', () => {
+  /** What `git config <key>` says (null: not set, exit 1). */
+  const key = (folder: string, k: string): string | null => {
+    try {
+      return execFileSync('git', ['config', k], { cwd: folder, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    } catch {
+      return null
+    }
+  }
+  /** identity, and what the two `git config` reads it replaces would make of the same repository. */
+  async function same(folder: string): Promise<void> {
+    const r = await counted(() => G.identity(folder))
+    const n = key(folder, 'user.name')
+    const e = key(folder, 'user.email')
+    expect(r.value).toEqual(n && e ? { name: n, email: e } : null)
+    expect(r.ran).toHaveLength(1)
+  }
+  const configFile = (folder: string): string => join(sh(folder, 'rev-parse', '--path-format=absolute', '--git-common-dir'), 'config')
+
+  it('set, repeated (the last), one or both missing, empty, a key with no value, a value with a newline', async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    await same(repo)
+    expect(await G.identity(repo)).toEqual({ name: 'Hive Test', email: 'test@hive.invalid' })
+    sh(repo, 'config', '--add', 'user.name', 'Second Name')
+    await same(repo)
+    expect(await G.identity(repo)).toMatchObject({ name: 'Second Name' })
+    sh(repo, 'config', '--unset-all', 'user.name')
+    await same(repo)
+    sh(repo, 'config', '--unset-all', 'user.email')
+    await same(repo)
+    sh(repo, 'config', 'user.name', '')
+    sh(repo, 'config', 'user.email', 'e@hive.invalid')
+    await same(repo)
+    // A key with no value, then a value with a newline in it (the config file's own escape).
+    const file = configFile(repo)
+    sh(repo, 'config', '--unset-all', 'user.name')
+    writeFileSync(file, `${readFileSync(file, 'utf8')}[user]\n\tname\n`)
+    await same(repo)
+    sh(repo, 'config', '--unset-all', 'user.name')
+    writeFileSync(file, `${readFileSync(file, 'utf8')}[user]\n\tname = "Two\\nLines"\n`)
+    await same(repo)
+    expect(await G.identity(repo)).toMatchObject({ name: 'Two\nLines' })
+  })
+
+  it("an include, and a worktree's own config, as git reads them; a config git can't read is unknown, never no identity", async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const inc = join(tempDir('git-'), 'identity.inc')
+    writeFileSync(inc, '[user]\n\tname = Included\n')
+    sh(repo, 'config', 'include.path', inc.replace(/\\/g, '/'))
+    await same(repo)
+    expect(await G.identity(repo)).toMatchObject({ name: 'Included' })
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'side', wt, 'main')
+    sh(repo, 'config', 'extensions.worktreeConfig', 'true')
+    sh(wt, 'config', '--worktree', 'user.name', 'Its Own')
+    await same(wt)
+    expect(await G.identity(wt)).toMatchObject({ name: 'Its Own' })
+    await same(repo)
+    const file = configFile(repo)
+    writeFileSync(file, `${readFileSync(file, 'utf8')}[user\n`)
+    const broken = await counted(() => G.identity(repo))
+    expect(isUnknown(broken.value)).toBe(true)
+    expect(broken.ran).toHaveLength(1)
   })
 })

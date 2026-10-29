@@ -147,8 +147,33 @@ export function headSync(folder: string): { line: string | null; head: string } 
   }
 }
 
-/** The commit HEAD names in a folder. */
+/**
+ * HI-2050: a folder's checkout from its `.git` files, as strictly as git answers it (for `head` and `heads`; headSync
+ * stays as its callers read it): HEAD exactly a full object id (detached, `line` null), or `ref: refs/heads/<name>` for
+ * a plain name, with its commit as branchRefSync reads it (null: git must say). Null whenever git must say anything:
+ * GIT_DIR or GIT_COMMON_DIR set, a `.git` that doesn't name its git dir, a reftable repository, a HEAD that can't be
+ * read or says anything else (a short or malformed id, a symbolic ref to anything but a plain branch, such as a
+ * worktree's own ref). Read again each time it is asked: nothing is kept.
+ */
+function checkoutSync(folder: string): { line: string | null; head: string | null; common: string } | null {
+  const own = gitDirSync(folder)
+  const common = own ? commonDirSync(folder) : null
+  if (!own || !common) return null
+  try {
+    if (existsSync(join(common, 'reftable')) || /^\s*refstorage\s*=/im.test(readFileSync(join(common, 'config'), 'utf8'))) return null
+    const v = readFileSync(join(own, 'HEAD'), 'utf8').trim()
+    if (SHA.test(v)) return { line: null, head: v, common }
+    const m = /^ref: refs\/heads\/(.+)$/.exec(v)
+    return m && plainBranch(m[1]) ? { line: m[1], head: branchRefSync(common, m[1]), common } : null
+  } catch {
+    return null
+  }
+}
+
+/** The commit HEAD names in a folder: from the `.git` files where they say it (HI-2050: checkoutSync), else git. */
 export async function head(folder: string): Promise<Maybe<string>> {
+  const known = checkoutSync(folder)?.head
+  if (known) return known
   const r = await git(folder, ['rev-parse', '--verify', '-q', 'HEAD'])
   return r.ok ? r.out.trim() : withDetail(unknown(U.head, { where: folder }), r.err)
 }
@@ -274,9 +299,13 @@ export function mergeBase(repo: string, a: string, b: string): Promise<Maybe<str
 /**
  * A folder's branch (null: detached), head, and a line's head (null: no such line), in one git (#1376): what
  * `branch`, `head` and `lineHead` answer, asked together. Where the one read can't say (no commit yet, no such line, a
- * HEAD that isn't a branch's), each is asked on its own.
+ * HEAD that isn't a branch's), each is asked on its own. HI-2050: all three from the `.git` files where they say each
+ * (checkoutSync, and the line's head as lineHead reads it), with no git process; else as before.
  */
 export async function heads(folder: string, target: string): Promise<{ line: Maybe<string | null>; head: Maybe<string>; target: Maybe<string | null> }> {
+  const c = checkoutSync(folder)
+  const known = c?.head && plainBranch(target) ? branchRefSync(c.common, target) : null
+  if (c?.head && known) return { line: c.line, head: c.head, target: known }
   const r = await git(folder, ['rev-parse', 'HEAD', `refs/heads/${target}`, '--symbolic-full-name', 'HEAD'])
   const out = r.ok ? lines(r.out).map((l) => l.trim()) : []
   if (out.length === 3 && SHA.test(out[0]) && SHA.test(out[1]) && (out[2] === 'HEAD' || out[2].startsWith('refs/heads/'))) {
@@ -630,13 +659,24 @@ export async function pin(repo: string, ref: string, rev: string): Promise<boole
   return (await git(repo, ['update-ref', ref, rev])).ok
 }
 
-/** The repository's configured commit identity, or null when none is set. */
+/**
+ * The repository's configured commit identity, or null when none is set. HI-2050: both keys in one git, as `git config
+ * <key>` answers each: NUL-separated records, a key split from its value at its first newline (none: a key with no
+ * value, ''), the last value of a key taken.
+ */
 export async function identity(repo: string): Promise<Maybe<{ name: string; email: string } | null>> {
-  const n = await git(repo, ['config', 'user.name'])
-  const e = await git(repo, ['config', 'user.email'])
-  // HI-2019: `git config <key>` exits 1 when the key isn't set; any other failure is a read git couldn't make, never "no
-  // identity" (the merge queue paused `identity` on one that failed for a moment).
-  const failed = [n, e].find((r) => !r.ok && r.code !== 1)
-  if (failed) return withDetail(unknown(U.state, { folder: repo }), failed.err)
-  return n.ok && e.ok && n.out.trim() && e.out.trim() ? { name: n.out.trim(), email: e.out.trim() } : null
+  const r = await git(repo, ['config', '--null', '--get-regexp', '^user\\.(name|email)$'])
+  // HI-2019: `git config` exits 1 when nothing it asks for is set; any other failure is a read git couldn't make, never
+  // "no identity" (the merge queue paused `identity` on one that failed for a moment).
+  if (!r.ok && r.code !== 1) return withDetail(unknown(U.state, { folder: repo }), r.err)
+  const set = new Map<string, string>()
+  if (r.ok)
+    for (const record of r.out.split('\0')) {
+      if (!record) continue
+      const nl = record.indexOf('\n')
+      set.set(nl < 0 ? record : record.slice(0, nl), nl < 0 ? '' : record.slice(nl + 1))
+    }
+  const name = set.get('user.name')?.trim()
+  const email = set.get('user.email')?.trim()
+  return name && email ? { name, email } : null
 }
