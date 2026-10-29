@@ -193,11 +193,17 @@ const check = (name, ok, extra = '') => {
     // use is refused too. Ask each time: the question shows the text; Don't Copy leaves the clipboard, Copy fills it.
     const POLICY = 'hive.terminal.osc52'
     const question = page.locator('.dialog', { hasText: 'Copy to the clipboard?' })
-    await inv('advanced:set', POLICY, 'block')
+    // A change reaches the window in its states' batch (HI-1938), after the call answers: a write before it meets the old
+    // policy, refused without a new log line (one per reason a minute).
+    const setPolicy = async (v) => {
+      await inv('advanced:set', POLICY, v)
+      await lib.until(() => page.evaluate(([id, want]) => window.__hiveAdvancedValue(id) === want, [POLICY, v]), HUNG_MS, 100)
+    }
+    await setPolicy('block')
     await clickBelow()
     await writeB64('blocked write')
     check('Block: a write from the pane in use is refused', !!(await lib.until(() => logged(/OSC 52 clipboard write refused \(blocked\)/), HUNG_MS, 100)) && JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click']), JSON.stringify(await copied()))
-    await inv('advanced:set', POLICY, 'ask')
+    await setPolicy('ask')
     await clickBelow()
     await writeB64('asked write')
     check('Ask each time: the question shows the text', !!(await lib.until(async () => (await question.count()) === 1 && (await question.innerText()).includes('asked write'), HUNG_MS, 100)), await question.innerText().catch(() => 'no question'))
@@ -212,7 +218,7 @@ const check = (name, ok, extra = '') => {
     check('…asked again for the next write', !!(await lib.until(async () => (await question.count()) === 1, HUNG_MS, 100)))
     await question.getByRole('button', { name: 'Copy', exact: true }).click()
     check('Copy puts the text on the clipboard', !!(await lib.until(async () => JSON.stringify(await copied()) === JSON.stringify([TEXT, 'after a click', 'copied when asked']), HUNG_MS, 100)), JSON.stringify(await copied()))
-    await inv('advanced:set', POLICY, 'allow')
+    await setPolicy('allow')
 
     // 5. Shift+drag: Hive's own selection, whatever Copilot does with the mouse; Ctrl+C copies it and Copilot never
     // sees the key (no new "copied to clipboard", no interrupt).
