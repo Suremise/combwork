@@ -50,7 +50,7 @@ const tracker = vi.hoisted(() => ({
    */
   keeper: new Map<string, { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: Proc[] }>(),
   keeperAsked: [] as string[],
-  bound: (_run: string, _helper: string) => true,
+  bound: (_run: string, _helper: string): boolean => true,
   reading: () => undefined as void,
   keeperForgotten: [] as string[]
 }))

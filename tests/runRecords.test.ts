@@ -284,9 +284,9 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       expect(await track(m, 'k-new')).toBe(true)
       expect(m.keeperStillBound('k-new', '4002:1')).toBe(true)
       await m.leftoversSaved()
-      const saved = JSON.parse(readFileSync(file, 'utf8')) as { revoked?: string[]; helpers?: Record<string, string> }
-      expect(saved.revoked).toEqual(['4001:1'])
-      expect(saved.helpers).toMatchObject({ 'k-old': '4001:1', 'k-new': '4002:1' })
+      const kept = JSON.parse(readFileSync(file, 'utf8')) as { revoked?: string[]; helpers?: Record<string, string> }
+      expect(kept.revoked).toEqual(['4001:1'])
+      expect(kept.helpers).toMatchObject({ 'k-old': '4001:1', 'k-new': '4002:1' })
       // After a restart too.
       expect(await (await restarted()).keeperState('k-old', HIVE)).toBeNull()
     })
