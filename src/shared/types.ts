@@ -207,6 +207,8 @@ export interface AppSettings {
    * (HI-1965: orderedProviders). Empty: Hive's own order. Providers it doesn't name follow, in Hive's order.
    */
   providerOrder: ProviderId[]
+  /** One more each time main changes providerOrder (HI-1965); only main sets it, so a window tells a newer order from an older one. */
+  providerOrderRevision: number
   notifications: {
     chimeEnabled: boolean
     chimeSound: ChimeSound

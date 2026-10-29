@@ -1,7 +1,7 @@
 import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
 import { QuitCommand, WorkspaceCloseCommand } from '../components/CloseCommandSettings'
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, McpServerInfo, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
 import { DEFAULT_MODE } from '@shared/assistant'
@@ -9,7 +9,7 @@ import { PRICES_CHECKED, SHIPPED_PRICES, listedPriceModels, priceRows } from '@s
 import { APP_SETTINGS_CATALOG, SETTINGS_SECTIONS, providerSection, settingDefault, settingPatch, settingValue, SETTINGS_TEXT, shownSetting, type SettingEntry, type SettingsSection, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { cliDefaultEffort, effortName, fallbackEfforts, fallbackModels, modelCaps, modelSource, modelSourceText, runsAsName } from '@shared/models'
 import type { SettingsPatch } from '@shared/api'
-import { AUTO_PROVIDER, PROVIDERS, defaultProviderLabel, enabledProviders, isProviderEnabled, installSourceText, inProviderOrder, movedProviderOrder, offeredModes, orderedProviders, permissionLabel, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
+import { AUTO_PROVIDER, PROVIDERS, defaultProviderLabel, enabledProviders, isProviderEnabled, installSourceText, inProviderOrder, offeredModes, orderedProviders, permissionLabel, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
 import { modeName, useModes } from '../components/Assistant'
 import { ModeCaveat } from '../components/AgentDialogs'
 import { EffortPicker, ModelPicker } from '../components/ModelPicker'
@@ -34,6 +34,7 @@ import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
 import { LANGUAGE_TEXT } from '@shared/i18n/languageText'
 import { cx, formatKeybinding, timeAgo } from '../util'
+import { moveProvider, usePendingProviderOrder } from '../providerOrder'
 
 /** A settings section: a group of AppSettings, "providers" (turning them on), one provider's page ("provider:<id>"), or "advanced". */
 type Section = SettingsSection
@@ -529,8 +530,7 @@ const PROVIDER_ORDER_TEXT = {
   moveUp: msg({ id: 'settings.provider.moveUp', defaultMessage: 'Move Up', description: "A provider row's menu in Settings → Providers: moves it one place up the list (Automatic picks from the list's order)." }),
   moveDown: msg({ id: 'settings.provider.moveDown', defaultMessage: 'Move Down', description: "A provider row's menu in Settings → Providers: moves it one place down the list (Automatic picks from the list's order)." }),
   more: msg({ id: 'settings.provider.more', defaultMessage: 'More for {provider}', description: "The ⋯ button of a provider's row in Settings → Providers, for screen readers and its tooltip: opens its menu (Move Up, Move Down). {provider} is its name." }),
-  row: msg({ id: 'settings.provider.rowLabel', defaultMessage: '{provider}, {position, number} of {count, number}. Drag, or Alt+Up and Alt+Down, to reorder.', description: "A provider's row in Settings → Providers, for screen readers: its place in the list, which Automatic picks from, and how to move it. {provider} is its name." }),
-  failed: msg({ id: 'settings.provider.reorderFailed', defaultMessage: "Couldn't save the providers' order", description: "An error's title: saving the order of Settings → Providers' list failed." })
+  row: msg({ id: 'settings.provider.rowLabel', defaultMessage: '{provider}, {position, number} of {count, number}. Drag, or Alt+Up and Alt+Down, to reorder.', description: "A provider's row in Settings → Providers, for screen readers: its place in the list, which Automatic picks from, and how to move it. {provider} is its name." })
 }
 
 /**
@@ -543,32 +543,22 @@ function ProvidersList() {
   const menu = useContextMenu()
   const [dragging, setDragging] = useState<ProviderId | null>(null)
   const [over, setOver] = useState<ProviderId | null>(null)
-  // Moves made faster than they save (HR2's round 1): the order as the user last made it, shown and moved from until its
-  // save is in, and the saves one at a time, each the whole order as it was then. A save that fails says so; a later one
-  // still saves every move before it, and with none after it the list goes back to what was saved.
-  const [pending, setPending] = useState<ProviderId[] | null>(null)
-  const latest = useRef<ProviderId[] | null>(null)
-  const saving = useRef<Promise<void>>(Promise.resolve())
+  // Its moves go through the window's one queue (providerOrder.ts, HR2's rounds 1 and 2): shown at once, sent one at a
+  // time, applied by main to the order as it is then; the list shows what they make until the store has caught up.
+  const pending = usePendingProviderOrder()
   const list = orderedProviders(pending ? { providerOrder: pending } : settings)
-  const moveProvider = (id: ProviderId, by: number): void => {
-    if (!by) return
-    const next = movedProviderOrder(latest.current ? { providerOrder: latest.current } : settings, id, by)
-    latest.current = next
-    setPending(next)
-    saving.current = saving.current.then(async () => {
-      const saved = await actions.attempt(tr(PROVIDER_ORDER_TEXT.failed), () => call('settings:update', { providerOrder: next }))
-      if (latest.current !== next) return
-      latest.current = null
-      if (saved) set({ settings: saved })
-      setPending(null)
-    })
+  /** Moves a provider `by` places from where it is shown, as a place in the list (what main applies). */
+  const move = (id: ProviderId, by: number): void => {
+    const from = list.findIndex((p) => p.id === id)
+    const to = Math.max(0, Math.min(list.length - 1, from + by))
+    if (from >= 0 && to !== from) moveProvider(id, to)
   }
   const menuItems = (id: ProviderId, i: number): MenuEntry[] => [
-    { label: tr(PROVIDER_ORDER_TEXT.moveUp), icon: 'arrow-up', keybinding: formatKeybinding('Alt+ArrowUp'), disabled: i === 0, onClick: () => moveProvider(id, -1) },
-    { label: tr(PROVIDER_ORDER_TEXT.moveDown), icon: 'arrow-down', keybinding: formatKeybinding('Alt+ArrowDown'), disabled: i === list.length - 1, onClick: () => moveProvider(id, 1) }
+    { label: tr(PROVIDER_ORDER_TEXT.moveUp), icon: 'arrow-up', keybinding: formatKeybinding('Alt+ArrowUp'), disabled: i === 0, onClick: () => move(id, -1) },
+    { label: tr(PROVIDER_ORDER_TEXT.moveDown), icon: 'arrow-down', keybinding: formatKeybinding('Alt+ArrowDown'), disabled: i === list.length - 1, onClick: () => move(id, 1) }
   ]
   return (
-    <div className="provider-list" data-order={list.map((p) => p.id).join(',')}>
+    <div className="provider-list" data-order={list.map((p) => p.id).join(',')} data-pending={pending ? 'true' : undefined}>
       {menu.element}
       {list.map((p, i) => {
         const info = providers[p.id]
@@ -597,7 +587,7 @@ function ProvidersList() {
             onDragLeave={() => setOver((o) => (o === p.id ? null : o))}
             onDrop={(e) => {
               e.preventDefault()
-              if (dragging) moveProvider(dragging, i - list.findIndex((x) => x.id === dragging))
+              if (dragging && dragging !== p.id) moveProvider(dragging, i)
               setDragging(null)
               setOver(null)
             }}
@@ -608,7 +598,7 @@ function ProvidersList() {
             onKeyDown={(e) => {
               if (e.target !== e.currentTarget || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
               e.preventDefault()
-              moveProvider(p.id, e.key === 'ArrowUp' ? -1 : 1)
+              move(p.id, e.key === 'ArrowUp' ? -1 : 1)
             }}
             onContextMenu={(e) => menu.open(e, menuItems(p.id, i))}
           >

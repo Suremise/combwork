@@ -2,7 +2,7 @@
 // turned on and installed, a default the user chose wins, and a project with no agents warns only about a provider
 // the user chose, or when nothing is installed.
 import { afterEach, describe, expect, it } from 'vitest'
-import { AUTO_PROVIDER, agentProvider, autoProvider, autoProviderPending, chosenDefaultProvider, defaultProviderPending, defaultProviderLabel, defaultProviderWarning, inProviderOrder, movedProviderOrder, orderedProviders, projectDefaultProvider, providerWarnings, providersInUse, setInstalledCheck } from '../src/shared/providers'
+import { AUTO_PROVIDER, agentProvider, autoProvider, autoProviderPending, chosenDefaultProvider, defaultProviderPending, defaultProviderLabel, defaultProviderWarning, inProviderOrder, orderedProviders, providerOrderWith, projectDefaultProvider, providerWarnings, providersInUse, setInstalledCheck } from '../src/shared/providers'
 import { DEFAULT_APP_CONFIG, DEFAULT_SETTINGS, mergeDefaults, migrateConfig } from '../src/shared/defaults'
 import type { AppSettings, ProviderId } from '../src/shared/types'
 
@@ -212,14 +212,14 @@ describe("the providers' order (HI-1965)", () => {
     expect(ordered(inOrder(['gemini', 'codex']))).toEqual(['codex', 'claude-code', 'copilot'])
   })
 
-  it('moves one up or down, saving the whole order; nothing at either end; a newer Hive’s ids kept at the end', () => {
-    expect(movedProviderOrder(settings(ALL), 'copilot', -1)).toEqual(['claude-code', 'copilot', 'codex'])
-    expect(movedProviderOrder(settings(ALL), 'claude-code', 1)).toEqual(['codex', 'claude-code', 'copilot'])
-    expect(movedProviderOrder(settings(ALL), 'claude-code', -1)).toEqual(ALL)
-    expect(movedProviderOrder(settings(ALL), 'copilot', 1)).toEqual(ALL)
+  it('moves one to a place, saving the whole order; nothing past either end; a newer Hive’s ids kept at the end', () => {
+    expect(providerOrderWith(settings(ALL), 'copilot', 1)).toEqual(['claude-code', 'copilot', 'codex'])
+    expect(providerOrderWith(settings(ALL), 'claude-code', 1)).toEqual(['codex', 'claude-code', 'copilot'])
+    expect(providerOrderWith(settings(ALL), 'claude-code', -1)).toEqual(ALL)
+    expect(providerOrderWith(settings(ALL), 'copilot', 9)).toEqual(ALL)
     // A drop two places away (drag).
-    expect(movedProviderOrder(settings(ALL), 'copilot', -2)).toEqual(['copilot', 'claude-code', 'codex'])
-    expect(movedProviderOrder(inOrder(['gemini', 'codex']), 'copilot', -2)).toEqual(['copilot', 'codex', 'claude-code', 'gemini'])
+    expect(providerOrderWith(settings(ALL), 'copilot', 0)).toEqual(['copilot', 'claude-code', 'codex'])
+    expect(providerOrderWith(inOrder(['gemini', 'codex']), 'copilot', 0)).toEqual(['copilot', 'codex', 'claude-code', 'gemini'])
   })
 
   it("a list's provider entries follow it, each run in its own places; the rest stay (Settings' and Project Settings' sections, Advanced's tabs)", () => {

@@ -492,13 +492,14 @@ export function inProviderOrder<T>(items: readonly T[], providerOf: (t: T) => Pr
 }
 
 /**
- * The order after moving one provider `by` places (-1 up, +1 down), as `providerOrder` saves it: every known provider,
- * in order, with ids of providers this Hive doesn't know kept at the end. Unchanged at either end.
+ * The order with one provider moved to place `toIndex` (0 first; past the end: last), as `providerOrder` saves it:
+ * every known provider, in order, with ids of providers this Hive doesn't know kept at the end. A move names where the
+ * user put it, so main applies it to the order as it is when the move comes (HI-1965, HR2's round 2).
  */
-export function movedProviderOrder(settings: Partial<Pick<AppSettings, 'providerOrder'>> | null | undefined, id: ProviderId, by: number): ProviderId[] {
+export function providerOrderWith(settings: Partial<Pick<AppSettings, 'providerOrder'>> | null | undefined, id: ProviderId, toIndex: number): ProviderId[] {
   const ids = orderedProviders(settings).map((p) => p.id)
   const from = ids.indexOf(id)
-  const to = Math.max(0, Math.min(ids.length - 1, from + by))
+  const to = Math.max(0, Math.min(ids.length - 1, toIndex))
   if (from >= 0 && to !== from) ids.splice(to, 0, ...ids.splice(from, 1))
   const unknown = (Array.isArray(settings?.providerOrder) ? settings.providerOrder : []).filter((x) => !isKnownProvider(x))
   return [...ids, ...unknown]

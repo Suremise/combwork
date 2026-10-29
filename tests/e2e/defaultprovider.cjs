@@ -211,9 +211,9 @@ const check = (name, ok, extra = '') => {
     await three.page.locator('.settings-content').first().screenshot({ path: path.join(lib.WORK, `defprov-order-${theme}.png`) }).catch(() => three.page.screenshot({ path: path.join(lib.WORK, `defprov-order-${theme}.png`) }))
   }
   await three.app.close()
-  // After a restart: the same order, and Automatic still on Codex. Its first two saves slow (HR2's round 1), for moves made
+  // After a restart: the same order, and Automatic still on Codex. Its first three moves slow (HR2's rounds 1 and 2), for moves made
   // faster than they save.
-  const again = await lib.launch({ userData: userData3, env: { ...claudeEnv, CODEX_HOME: codexHome, HIVE_TEST_SLOW_IPC: 'settings:update=1200*2' }, viewport: { width: 1300, height: 820 } })
+  const again = await lib.launch({ userData: userData3, env: { ...claudeEnv, CODEX_HOME: codexHome, HIVE_TEST_SLOW_IPC: 'settings:moveProvider=1200*3' }, viewport: { width: 1300, height: 820 } })
   again.page.on('pageerror', (e) => check('no page errors', false, e.message))
   await openProviders(again)
   check('after a restart: the same order, Automatic on Codex', (await orderOf(again)) === 'copilot,codex,claude-code' && (await automatic(again)) === 'Automatic (Codex)', `${await orderOf(again)} ${await automatic(again)}`)
@@ -227,13 +227,28 @@ const check = (name, ok, extra = '') => {
   check("Advanced's CLI tabs follow it, Hive's first", !!tabs && tabs === want && tabs.startsWith('hive,'), String(tabs))
   await again.page.locator('.settings-nav .row', { hasText: 'Providers' }).first().click()
   await lib.until(async () => (await again.page.locator('.provider-list .provider-row').count()) === 3, 10000)
-  // Two moves before either save is back: both kept, shown at once and saved in the end.
+  // The barrier for every check below: the list has no move under way and shows the order main has (data-pending is set
+  // while any move is queued, sent, or acknowledged and not in the window's settings yet).
+  const settled = () => lib.until(async () => (await again.page.locator('.provider-list:not([data-pending])').count()) === 1, 15000)
+  const savedOrder = async () => (await again.inv('settings:get')).providerOrder.join(',')
+  // Two moves before either save is back (the first three moves slowed by 1.2 s): both kept, shown at once and saved.
   await again.page.locator('.provider-row[data-provider="copilot"]').focus()
   await again.page.keyboard.press('Alt+ArrowDown')
   await again.page.keyboard.press('Alt+ArrowDown')
-  check('two quick moves show at once', !!(await lib.until(async () => (await orderOf(again)) === 'codex,claude-code,copilot', 5000)), await orderOf(again))
-  const savedOrder = async () => JSON.stringify((await again.inv('settings:get')).providerOrder)
-  check('…and both are saved, in order, though the saves are slow', !!(await lib.until(async () => (await savedOrder()) === JSON.stringify(['codex', 'claude-code', 'copilot']) && (await orderOf(again)) === 'codex,claude-code,copilot', 15000)), `${await savedOrder()} ${await orderOf(again)}`)
+  check('two quick moves show at once, under way', !!(await lib.until(async () => (await orderOf(again)) === 'codex,claude-code,copilot' && (await again.page.locator('.provider-list[data-pending]').count()) === 1, 5000)), await orderOf(again))
+  check('…and once both are in, both are saved and shown', !!(await settled()) && (await savedOrder()) === 'codex,claude-code,copilot' && (await orderOf(again)) === 'codex,claude-code,copilot', `${await savedOrder()} ${await orderOf(again)}`)
+  // HR2's round 2: a move, then Settings → Advanced and back while its save is slow, then another move: neither lost.
+  await again.inv('settings:update', { providerOrder: ['claude-code', 'codex', 'copilot'] })
+  await lib.until(async () => (await orderOf(again)) === 'claude-code,codex,copilot', 10000)
+  await again.page.locator('.provider-row[data-provider="claude-code"]').focus()
+  await again.page.keyboard.press('Alt+ArrowDown')
+  await again.page.locator('.settings-nav .row', { hasText: 'Advanced' }).first().click()
+  await lib.until(async () => (await again.page.locator('.provider-list').count()) === 0, 10000)
+  await again.page.locator('.settings-nav .row', { hasText: 'Providers' }).first().click()
+  check('back on Providers while the move saves: it still shows, under way', !!(await lib.until(async () => (await orderOf(again)) === 'codex,claude-code,copilot' && (await again.page.locator('.provider-list[data-pending]').count()) === 1, 5000)), await orderOf(again))
+  await again.page.locator('.provider-row[data-provider="copilot"]').focus()
+  await again.page.keyboard.press('Alt+ArrowUp')
+  check('…and with the next move, once both are in: both saved and shown', !!(await settled()) && (await savedOrder()) === 'codex,copilot,claude-code' && (await orderOf(again)) === 'codex,copilot,claude-code', `${await savedOrder()} ${await orderOf(again)}`)
   await again.app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)
