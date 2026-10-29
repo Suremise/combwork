@@ -4,7 +4,8 @@ import { columnLabel } from './tasks'
 import { brief, cardPart, WAKE_MAX_BYTES, WATCH_CHANGES, WATCH_MAX_CARDS, type CardChange, type WatchChange } from './watch'
 import { cardRef } from './projectKeys'
 import { HISTORY } from './taskHistory'
-import { agentPart, type AgentEvent, type AgentNow, type WatchedAgent } from './agentWatch'
+// Types only: agentWatch loads the translations, which hive-mcp (toolReplies imports this) never does.
+import type { AgentEvent, WatchedAgent } from './agentWatch'
 
 /**
  * Lane watches (#531): a watch on whole lanes (main/lanes.ts), not cards. On 10 Oct the Assistant, with seven lanes and
@@ -262,12 +263,11 @@ const waitPart = (w: WaitHit, detail: number): string => `${w.name} (${w.project
 const tailOf = (waits: boolean, cards: boolean, agents: boolean): string =>
   ` Your lane watch has ended: read the cards named (hive_read_task), act on them, ${waits ? 'tell the user what an agent waits for (hive_notify) and never answer it for them, ' : ''}then watch the lanes again (hive_wait_for_tasks with lanes${cards || agents ? `; your ${cards && agents ? 'cards and agents' : cards ? 'cards' : 'agents'} stay unless you pass ${cards && agents ? 'them' : cards ? 'cards' : 'agents'}${agents ? ', less the agents told here' : ''}` : ''}).`
 
-/** An agent a lane watch follows (HI-1987), as its line tells it: what it did (agentWatch's agentPart). */
+/** An agent a lane watch follows (HI-1987), as its line tells it: what it did, its reply cut to `max` (agentWatch's agentPart). */
 export interface LaneAgentHit {
   agent: Pick<WatchedAgent, 'name' | 'project'>
   event: AgentEvent
-  now: AgentNow
-  again?: boolean
+  text: (max: number) => string
 }
 
 /**
@@ -287,7 +287,7 @@ export function laneWakeLine(hits: readonly LaneHit[], more: { cards?: readonly 
   const join = (lanes: string[], cs: string[], ws: string[], as: string[]): string => [...lanes, cs.join('; '), ws.join('; '), as.join('; ')].filter(Boolean).join(' | ')
   for (const detail of [120, 50, 0]) {
     for (const short of [false, true]) {
-      const line = `[Hive] ${join(hits.map((h) => `Lane ${short ? h.id : h.label}: ${h.parts.map((p) => part(p, detail)).join('; ')}`), cards.map((c) => cardPart(c, detail)), waits.map((w) => waitPart(w, detail)), agents.map((a) => agentPart(a.agent, a.event, a.now, detail, false, a.again)))}.${TAIL}`
+      const line = `[Hive] ${join(hits.map((h) => `Lane ${short ? h.id : h.label}: ${h.parts.map((p) => part(p, detail)).join('; ')}`), cards.map((c) => cardPart(c, detail)), waits.map((w) => waitPart(w, detail)), agents.map((a) => a.text(detail)))}.${TAIL}`
       if (jsonBytes(line) <= WAKE_MAX_BYTES) return line
     }
   }

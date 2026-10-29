@@ -1222,7 +1222,7 @@ function agentHits(rec: WatchRecord): AgentHit[] {
 }
 
 /** A lane watch's agent hits as its line tells them (HI-1987): those with an event (a lane watch tells no replies). */
-const laneAgentsOf = (hits: readonly AgentHit[]): LaneAgentHit[] => hits.flatMap((h) => (h.event ? [{ agent: h.agent, event: h.event, now: h.now, again: h.again }] : []))
+const laneAgentsOf = (hits: readonly AgentHit[]): LaneAgentHit[] => hits.flatMap((h) => (h.event ? [{ agent: h.agent, event: h.event, text: (max: number) => agentPart(h.agent, h.event!, h.now, max, false, h.again) }] : []))
 
 /** Records what a wake (or an answer at once) told an agent about the agents it watched: its next watch starts there. */
 function noteToldAgents(store: Store, watcher: string, told: Map<string, number>): void {
