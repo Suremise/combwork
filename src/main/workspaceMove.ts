@@ -756,11 +756,23 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
   // anything records where they are now. Only while the old project folder is gone (a copy's original keeps its own);
   // one renamed or moved within this workspace is projectRename.ts's (two that swapped names keep their own).
   if (!current()) return
+  // Its old folders: where it was last opened (lastPath, kept for Repair) and where its views were last brought
+  // (project.json's profileAt), so moved again before a Repair they are found where they went (HR2's round 2).
   for (const h of (await movedHosts(ws)).hosts) {
-    if (h.assistant || h.pendingOnly || samePath(dirname(h.from), here)) continue
-    const ok = (): boolean => current() && !existsSync(join(h.from, PROJECT_FILE))
-    const n = carryProjectViewPrefs({ from: h.from, to: h.path }, { from: dirname(h.from), to: here }, ok)
-    if (n) log.info(`${n} view preference(s) follow ${userText(h.name)} from ${userText(h.from)}`)
+    if (h.assistant || h.pendingOnly || !current()) continue
+    const at = (await ws.projectConfig(h.path)).profileAt
+    const wasAt = [at, h.from].filter((p): p is string => !!p && !samePath(p, h.path) && !samePath(dirname(p), here))
+    let all = true
+    for (const from of wasAt.filter((p, i) => wasAt.findIndex((q) => samePath(p, q)) === i)) {
+      const ok = (): boolean => current() && !existsSync(join(from, PROJECT_FILE))
+      if (!ok()) {
+        all = false
+        continue
+      }
+      const n = carryProjectViewPrefs({ from, to: h.path }, { from: dirname(from), to: here }, ok)
+      if (n) log.info(`${n} view preference(s) follow ${userText(h.name)} from ${userText(from)}`)
+    }
+    if (all && current() && !samePath(at ?? '', h.path)) await ws.mutateProjectConfig(h.path, () => ({ profileAt: h.path }))
   }
   // All of it here now: the checkpoint says so, in the workspace's own settings (it travels with the folder, so a move
   // after this finds the records here, and a copy finds them still at the original's).

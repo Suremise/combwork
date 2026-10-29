@@ -1428,6 +1428,11 @@ export interface ProjectConfig {
   /** Where the project folder was last opened (#146), as workspace.json's lastPath. */
   lastPath?: string
   /**
+   * The folder Hive's profile keeps this project's view preferences by (HI-2008), set once they have followed it here:
+   * apart from lastPath, which stays where Repair needs it until Repair is done, as workspace.json's profileAt.
+   */
+  profileAt?: string
+  /**
    * Folders that moved (an agent's worktree repaired or recreated at a new place) whose CLI data (copyPathData) isn't
    * all copied yet (#146): kept until a copy works, so Repair tries again, after a restart too.
    */

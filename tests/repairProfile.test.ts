@@ -337,6 +337,31 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     expect(config.get().ui.skillsProvider?.[alphaB]).toBe('codex')
   })
 
+  it('a project moved twice (A to B to C) with Repair still to do at B: its views follow from where they went, B (HI-2008, HR2 round 2)', async () => {
+    const { ws, at: a } = await twoProjects(join(base, 'hop-a'))
+    // An agent's worktree recorded and not there: Repair has work left, so its lastPath stays A.
+    const cfgFile = join(a, 'alpha', '.hive', 'project.json')
+    const cfg = JSON.parse(readFileSync(cfgFile, 'utf8'))
+    cfg.agents = [{ id: 'b1', name: 'B1', provider: 'claude-code', worktree: { path: join(base, 'hop-gone', 'hb1'), branch: 'hive/hb1', base: 'main' } }]
+    writeFileSync(cfgFile, JSON.stringify(cfg))
+    const b = emptyWorkspace(join(base, 'hop-b'))
+    const c = emptyWorkspace(join(base, 'hop-c'))
+    const alpha = (w: string): string => join(w, 'alpha').toLowerCase()
+    renameSync(join(a, 'alpha'), join(b, 'alpha'))
+    await openAt(ws, b)
+    expect(config.get().ui.skillsProvider?.[alpha(b)]).toBe('codex')
+    const lastPath = (w: string): string | undefined => JSON.parse(readFileSync(join(w, 'alpha', '.hive', 'project.json'), 'utf8')).lastPath
+    expect(lastPath(b)?.toLowerCase()).toBe(alpha(a))
+    await ws.close()
+    renameSync(join(b, 'alpha'), join(c, 'alpha'))
+    await openAt(ws, c)
+    const ui = config.get().ui
+    expect([ui.skillsProvider?.[alpha(c)], ui.skillsProvider?.[alpha(b)]]).toEqual(['codex', undefined])
+    expect([ui.assistantFold?.[`${c.toLowerCase()}|${alpha(c)}`], ui.assistantFold?.[`${b.toLowerCase()}|${alpha(b)}`]]).toEqual([true, undefined])
+    // Repair still has A to go by.
+    expect(lastPath(c)?.toLowerCase()).toBe(alpha(a))
+  })
+
   it('a project copied into another workspace (its folder still there): the original keeps its views (HI-2008, HR2)', async () => {
     const { ws, at: a } = await twoProjects(join(base, 'solo-copy-a'))
     const b = emptyWorkspace(join(base, 'solo-copy-b'))
