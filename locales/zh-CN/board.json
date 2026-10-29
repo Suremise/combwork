@@ -536,6 +536,7 @@
   "board.lanes.waits": "{reason, select, blocked {{card} 受阻} hold {{card} 已搁置} you {等待你（{ask, select, approve {批准} decide {决定} test {测试} signIn {登录} other {回复}}）：{card}} roundLimit {等待你：{card} 已达到轮次上限} notMerged {等待中：{card} 尚未合并} merging {等待中：{card} 正在合并} stale {已失效：{card} 需要重新提交} reviewer {等待评审者评审 {card}} lineUpdate {等待中：在 {card} 之前更新构建者的分支} hooks {已暂停：未收到 {agent} 的钩子} checkCopy {正在等待 {card} 的检查副本} slot {等待槽位} other {列表更改将在 {card} 之后生效}}",
   "board.lanes.waitsLink": "点击显示。",
   "board.lanes.waitsPreparing": "等待中：正在准备 {slot}",
+  "board.lanes.waitsStart": "{card} 等待开始：{why, select, watching {{agent} 正在等待其他工作} queued {Hive 的一行内容正在发往 {agent}} failed {{agent} 上次启动失败} refused {其启动暂时被拒绝，Hive 会再试} other {{agent} 正处于一个轮次中}}",
   "board.links.archivedTitle": "{card} {title} · 已归档（来自“{column}”）· Ctrl+单击打开",
   "board.links.title": "{card} {title} · {column} · Ctrl+单击打开",
   "board.menu.delete": "删除…",

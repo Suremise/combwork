@@ -538,6 +538,7 @@ interface HiveMessageValues {
   'board.lanes.waits': { reason: string; card: string | number; ask: string; agent: string | number }
   'board.lanes.waitsLink': undefined
   'board.lanes.waitsPreparing': { slot: string | number }
+  'board.lanes.waitsStart': { card: string | number; why: string; agent: string | number }
   'board.links.archivedTitle': { card: string | number; title: string | number; column: string | number }
   'board.links.title': { card: string | number; title: string | number; column: string | number }
   'board.menu.delete': undefined

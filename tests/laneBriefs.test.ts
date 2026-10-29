@@ -136,6 +136,13 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
     expect(await at(4)).toEqual({ cancel: expect.stringMatching(/no longer current/) })
   })
 
+  it("a lane's start task, which shares the source's id (laneStart.ts: ref <lane>:<role>), is never cancelled as a brief (HI-2029: Legible's and HB5's lanes)", async () => {
+    const a = await make('Start task a')
+    const l = (await start([a], 'Its brief.')).lane
+    for (const role of ['builder', 'reviewer']) expect(await laneBriefRefreshForTests({ source: LANE_BRIEF_SOURCE, kind: 'task', ref: `${l.id}:${role}` } as never, project)).toBeNull()
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
   it("two open workspaces whose folders share a prefix (ws, ws-other): each one's current brief stays valid, found in its own workspace (HR4's round 1)", async () => {
     const otherPath = `${wsPath}-other`
     const otherProject = join(otherPath, 'alpha')

@@ -27,11 +27,12 @@ describe('loop wake lines (#405)', () => {
 
 describe("a lane's next card, after a Done one (HI-1990)", () => {
   const lc = (number: number, column: LaneCard['column'], more: Partial<LaneCard> = {}): LaneCard => ({ number, title: `Card ${number}`, column, blocked: null, round: 1, reviewing: false, ...more })
-  it('is due for Hive to start only after a Done card, in Todo, not blocked, in an active lane', () => {
+  it('is due for Hive to start as the first open card, in Todo, not blocked, in an active lane (its first card too, HI-2029)', () => {
     expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(2, 'todo')] })?.number).toBe(2)
     // Another lane's card before it doesn't hold it up; one Done before that does count.
     expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(3, 'doing', { elsewhere: 'x' }), lc(2, 'todo')] })?.number).toBe(2)
-    expect(laneStartDue({ state: 'active', cards: [lc(1, 'todo'), lc(2, 'todo')] })).toBeNull()
+    // Its first card too (HI-2029).
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'todo'), lc(2, 'todo')] })?.number).toBe(1)
     expect(laneStartDue({ state: 'active', cards: [lc(1, 'passed'), lc(2, 'todo')] })).toBeNull()
     expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(2, 'todo', { blocked: 'Which icon?' })] })).toBeNull()
     expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(2, 'doing')] })).toBeNull()

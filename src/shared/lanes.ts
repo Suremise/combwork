@@ -122,17 +122,30 @@ const finished = (c: LaneCard): boolean => c.column === 'passed' || c.column ===
 export const ownOpen = (c: LaneCard): boolean => c.column !== 'done' && c.column !== 'gone' && c.column !== 'unrecorded' && !c.elsewhere
 
 /**
- * A running lane's next card for Hive to start on its builder (HI-1990), or null: the first of its own open cards, in
- * Todo and not blocked, once the card before it is Done (every card before it Done or another lane's, one of them Done).
- * A lane's first card is its builder's to start.
+ * A running lane's card for Hive to start on its builder (HI-1990), or null: the first of its own open cards, in Todo
+ * and not blocked, in an active lane (every card before it Done or another lane's). Its first card too (HI-2029: a lane
+ * started over a running builder never had it started, and read "active" for hours); a builder starting it itself, in
+ * the turn it registers its lane, is never free in between, and its own start of one Hive started is that start.
  */
 export function laneStartDue(lane: Pick<LaneInfo, 'state' | 'cards'>): LaneCard | null {
   if (lane.state !== 'active') return null
   const at = lane.cards.findIndex(ownOpen)
-  if (at < 1) return null
+  if (at < 0) return null
   const c = lane.cards[at]
-  if (c.column !== 'todo' || c.blocked) return null
-  return lane.cards.slice(0, at).some((x) => x.column === 'done') ? c : null
+  return c.column === 'todo' && !c.blocked ? c : null
+}
+
+/**
+ * Why a lane's card due to start (laneStartDue) isn't started yet (HI-2029), as laneStarts.ts finds it: its builder in a
+ * turn or starting (`busy`), waiting on a watch of other work (`watching`), a line of Hive's on its way to it (`queued`),
+ * its last start failed (`failed`), or Hive's start refused for now and tried again (`refused`).
+ */
+export type LaneStartWhy = 'busy' | 'watching' | 'queued' | 'failed' | 'refused'
+/** A lane's card waiting to be started, why, and its builder's name (LaneStatus `startWait`). */
+export interface LaneStartWait {
+  card: number
+  why: LaneStartWhy
+  agent: string
 }
 
 /** Whether a lane reads its cards as it left them (ended or abandoned, with its snapshot) rather than from the board. */
@@ -152,7 +165,7 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * (currentCard); an ended lane without its record has none. A card held elsewhere (HI-1821: another agent's, or, given
  * to none, another lane's: `owners`, main's owner lane by card) is never its current card nor why it waits.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null } | null, owners?: ReadonlyMap<number, string | null>): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null, { lane: rec.id, builder: rec.builder.id, owner: owners?.get(n) }), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
@@ -171,7 +184,10 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   const noSlot = running(rec) && !unrecorded && slot?.waiting && !(found && USERS.has(found.reason)) ? { reason: 'slot' as const, card: current } : null
   // Its slot being prepared (#1446: G15's warming, its setup or an install): said when nothing else is, never pausing.
   const preparing = running(rec) && !unrecorded && slot?.info?.state === 'preparing' ? { reason: 'preparing' as const, card: current, slot: slot.info.name } : null
-  const status = running(rec) ? (hooks ?? noSlot ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null) ?? preparing) : null
+  // Its card due to start and not started yet (HI-2029, laneStarts.ts: `startWait`), only while that card is the current
+  // one and nothing else says why the lane waits: never "active" with its card untouched and nothing said. Not a pause.
+  const waitsStart = running(rec) && !unrecorded && startWait && startWait.card === current && list.find((c) => c.number === current)?.column === 'todo' ? { reason: 'startWait' as const, card: startWait.card, why: startWait.why, agent: startWait.agent } : null
+  const status = running(rec) ? (hooks ?? noSlot ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null) ?? waitsStart ?? preparing) : null
   // Reviewed by the pool (#1443): who gave its current card's last verdict, and who reviews it now (#1446), by name.
   const now = rec.pool && running(rec) && current !== null ? facts?.get(current) : undefined
   const agentName = (id: string): string => names?.get(id) ?? (rec.builder.id === id ? rec.builder.name : id)
@@ -321,6 +337,8 @@ export function laneStatusText(s: LaneStatus): string {
       return 'waiting for a slot'
     case 'preparing':
       return `waiting: preparing ${s.slot ?? 'its slot'}`
+    case 'startWait':
+      return `${card} waits to start: ${s.why === 'watching' ? `${s.agent ?? 'its builder'} is waiting on other work` : s.why === 'queued' ? `a line of Hive's is on its way to ${s.agent ?? 'its builder'}` : s.why === 'failed' ? `${s.agent ?? 'its builder'}'s last start failed` : s.why === 'refused' ? 'its start was refused for now; Hive tries again' : `${s.agent ?? 'its builder'} is in a turn`}`
   }
 }
 

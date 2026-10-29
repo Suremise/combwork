@@ -2147,6 +2147,10 @@
     "defaultMessage": "waiting: preparing {slot}",
     "description": "Why a lane waits, in its header in the Progress panel, lower case: Hive is preparing its slot (a working folder it lends to the lane: its setup command or a dependency install before the next card). {slot} is the slot's name, such as slot-b: keep it as it is. The lane isn't paused."
   },
+  "board.lanes.waitsStart": {
+    "defaultMessage": "{card} waits to start: {why, select, watching {{agent} is waiting on other work} queued {a line of Hive’s is on its way to {agent}} failed {{agent}’s last start failed} refused {its start was refused for now, and Hive tries again} other {{agent} is in a turn}}",
+    "description": "Why a lane waits, in its header in the Progress panel (HI-2029): its card {card} (its key, such as HI-12) is due to start but isn't started yet. why (select): its builder {agent} (an agent's name) is waiting on other work (a card watch); a line Hive types (a message or a wake) is about to reach it; its last start failed; Hive's start was refused for now and is tried again; or (other) it is in a turn (working, starting, waiting for the user). Translate each. The lane isn't paused."
+  },
   "board.links.archivedTitle": {
     "defaultMessage": "{card} {title} · Archived (from {column}) · Ctrl+click to open",
     "description": "The hover of a card number (#12) in a terminal, for an archived card: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words), the column it was archived from ({column}), and how to open it."

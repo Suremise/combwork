@@ -69,6 +69,26 @@ describe('lanes', () => {
     refusedBy(await e.wf.start(c3.key, B2), 'move.notFromHere')
   })
 
+  it("HI-2029: Hive's start of a lane's first card landing between its builder's own start's checks and its write is that start too", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'agentMerges', preChecks: [], mergeChecks: [] }))
+    const [c1, c2] = [1, 2].map((n) => e.wf.createCard({ title: `Card ${n}` }))
+    e.wf.startLane('L', [c1.id, c2.id], 'R1')
+    const hive: { start?: Awaited<ReturnType<typeof e.wf.start>> } = {}
+    e.wf.cfg.hooks = {
+      beforeWrite: async (move) => {
+        if (move !== 'start') return
+        e.wf.cfg.hooks = {}
+        hive.start = await e.wf.start(c1.key, 'hive', { builder: 'B1' })
+      }
+    }
+    const own = await e.wf.start(c1.key, B1)
+    moved(hive.start!)
+    moved(own)
+    expect(own.data).toEqual(hive.start!.data)
+    expect(own.warnings).toEqual([`Hive started ${c1.key} for you, as your lane's next card: carry on with it.`])
+    expect(e.store.facts(c1.id).filter((f) => f.kind === 'Started')).toHaveLength(1)
+  })
+
   it('S19: options changed while a lane runs → its cards keep the lane\'s ruleset ("old rules"); a card started after the lane ends uses the new one', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), finish: 'agentMerges', preChecks: [], mergeChecks: [] }))
     const [c1, c2] = [1, 2].map((n) => e.wf.createCard({ title: `Card ${n}` }))

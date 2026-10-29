@@ -321,6 +321,13 @@ describe("a running lane's next card its builder hasn't started (HI-1741's laneN
     // When the card before it went Done isn't known: no stall.
     expect(laneNextWaitReason(c, { ...lane, cards: [{ ...lane.cards[0], movedAt: null }, ...lane.cards.slice(1)] }, idle, late)).toBeNull()
   })
+  it("its first card too (HI-2029): stalled 15 min after the lane started, its builder idle without starting it", () => {
+    const first = { ...lane, startedAt: at, cards: [{ number: 1729, key: 'HI-1727', column: 'todo', movedAt: null }, ...lane.cards.slice(1)] }
+    const card1 = { ...c, number: 1729, key: 'HI-1727' }
+    expect(laneNextWaitReason(card1, first, { name: 'LB1', status: 'finished' }, t + LANE_NEXT_STALL_MS)).toBe("HI-1727 is the lane's first card: the lane started 15 min ago, and LB1 is idle without starting it.")
+    expect(laneNextWaitReason(card1, first, { name: 'LB1', status: 'finished' }, t + LANE_NEXT_STALL_MS - 1000)).toBeNull()
+    expect(laneNextWaitReason(card1, first, { name: 'LB1', status: 'working' }, t + 2 * LANE_NEXT_STALL_MS)).toBeNull()
+  })
 })
 
 describe('lane watches (main/watches.ts, #531)', async () => {
