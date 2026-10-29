@@ -1803,6 +1803,14 @@
     "defaultMessage": "Retry wait: tell the Assistant after",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again."
   },
+  "settings.advanced.hive.sessions.terminalType.desc": {
+    "defaultMessage": "Hive starts each session with TERM=xterm-256color, as its terminal is, and without Windows Terminal's WT_SESSION, so the CLIs draw the same whether Hive was opened from the Start menu or a terminal (Claude Code draws ❯ rather than >). A TERM in your own environment or the session's is kept. Turned off, sessions get the environment Hive was opened with.",
+    "description": "What the advanced setting \"Sessions say their terminal is xterm-256color\" does (Settings → Advanced). TERM, WT_SESSION and xterm-256color are names: keep them; ❯ and > are the characters Claude Code draws as its prompt mark."
+  },
+  "settings.advanced.hive.sessions.terminalType.title": {
+    "defaultMessage": "Sessions say their terminal is xterm-256color",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. xterm-256color is a terminal type's name and TERM an environment variable's: keep them."
+  },
   "settings.advanced.hive.showDeveloperFeatures.desc": {
     "defaultMessage": "Show Help → Developer Console (Ctrl+Alt+J): what each CLI sends Hive, next to what Hive made of it.",
     "description": "What the advanced setting \"Show developer features\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

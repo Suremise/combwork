@@ -24,6 +24,7 @@
   "workflow.forYou.queueStuck": "{card}'s merge into {target} stopped part way in {folder}, with {files, plural, one {# file} other {# files}} left between the two, and Hive changes nothing more there. The card's Work section lists each file and its side, and the commands to copy. {how, select, both {To finish it, run {finish} (PowerShell) in {project}; to undo it, run {undo} (PowerShell) in {folder}.} finish {To finish it, run {finish} (PowerShell) in {folder}.} undo {To undo it, run {undo} (PowerShell) in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
   "workflow.forYou.review": "{card} waits for your review",
   "workflow.forYou.roundLimit": "{card} failed {rounds, plural, one {# review} other {# reviews}}: carry on with more rounds, split it, accept it with follow-ups, or take it over?",
+  "workflow.forYou.slotDirty": "{card} is Done, but {slot} has uncommitted changes, so it stays on {line}. Commit or discard them there: Hive then detaches the slot at {target}, ready for its next card.",
   "workflow.forYouKind": "{kind, select, approve {Approve} decide {Decide} test {Test} signIn {Sign in} other {Other}}",
   "workflow.form.addCheck": "Add Check",
   "workflow.form.allOff": "All off",

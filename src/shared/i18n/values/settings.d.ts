@@ -452,6 +452,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.restart.resumeReadySeconds.title': undefined
   'settings.advanced.hive.retry.tellAssistantAfterSeconds.desc': undefined
   'settings.advanced.hive.retry.tellAssistantAfterSeconds.title': undefined
+  'settings.advanced.hive.sessions.terminalType.desc': undefined
+  'settings.advanced.hive.sessions.terminalType.title': undefined
   'settings.advanced.hive.showDeveloperFeatures.desc': undefined
   'settings.advanced.hive.showDeveloperFeatures.title': undefined
   'settings.advanced.hive.skills.removeIdleCopies.desc': undefined
