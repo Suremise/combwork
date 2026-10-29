@@ -605,6 +605,26 @@ export class Workflow {
   }
 
   /**
+   * A finish's loop wake (HI-2014): its builder told the card is Done, once for the move that finished it, whatever made
+   * it. A board move's recorder already wrote it (the same move's `wake` action): nothing more. Only while the card is in
+   * a loop (it was reviewed by an agent, or its lane runs) and `finish` is still the card's. True when it was written.
+   */
+  async finishWake(card: CardRecord, finish: number): Promise<boolean> {
+    return this.write(card, null, 'hive', (w) => {
+      const s = w.state()
+      if (s.finished?.seq !== finish || !s.started) return false
+      const facts = w.tx.facts(card.id)
+      const moved = facts.findLast((f) => f.kind === 'Moved' && f.seq < finish && (f.data as FactData['Moved']).to === 'done')
+      if (!moved || w.tx.hasAction(card.id, 'wake', moved.seq)) return false
+      const lane = card.lane ? this.store.lane(card.lane) : null
+      const loop = facts.some((f) => f.kind === 'ReviewStarted') || (!!lane && !lane.ended)
+      if (!loop) return false
+      w.action('wake', { agent: 'builder', about: 'done', by: moved.actor }, moved.seq)
+      return true
+    })
+  }
+
+  /**
    * A finished card's slot that couldn't be detached for uncommitted changes (HI-2014): asked of the user once (For you,
    * SLOT_DIRTY_GATE), while that finish is the card's. False when it wasn't asked (asked already, or the finish is over).
    */

@@ -381,7 +381,7 @@ export interface FactData {
 /** How a card reached Done (HI-2014): the queue, a builder's merge report (checked or not), accepted, an override, a board move. */
 export type FinishHow = 'queue' | 'reported' | 'unchecked' | 'accepted' | 'override' | 'board'
 /** The steps of a finish (HI-2014) a fact records as done: the board's own effects, each once. */
-export type FinishStepId = 'requests' | 'dependents' | 'lane'
+export type FinishStepId = 'requests' | 'dependents' | 'lane' | 'wake' | 'journal'
 
 export type FactKind = keyof FactData
 

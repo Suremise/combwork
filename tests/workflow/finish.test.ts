@@ -103,6 +103,53 @@ describe('every route into Done records one finish', () => {
   })
 })
 
+describe("each route's consequences (HR2's round 1 finding 2)", () => {
+  // Each route's Done for a reviewed card: its finish, then the consequences the runtime owns, each once: the builder's
+  // Done wake (the queue's route too, which no board write records), the requests step, the lane step.
+  const routes: { name: string; opts: Partial<typeof pairOpts>; done: (e: Env, key: string) => Promise<void>; how: string }[] = [
+    { name: 'the merge queue', opts: { finish: 'hiveMerges' }, done: async (e) => void (await e.queue().drain('main')), how: 'queue' },
+    {
+      name: 'a checked merge report',
+      opts: { finish: 'agentMerges' },
+      done: async (e, key) => {
+        const a = e.store.cardByKey(key)!
+        sh(e.project, 'merge', '-q', '--no-ff', '-m', 'A', e.wf.state(a).latest!.revision!)
+        moved(await e.wf.reportMerge(key, B1))
+      },
+      how: 'reported'
+    },
+    { name: 'a Not checked report', opts: { finish: 'notChecked' }, done: async (e, key) => void moved(await e.wf.reportMerge(key, B1, { result: 'abc' })), how: 'unchecked' },
+    { name: "the user's override", opts: { finish: 'agentMerges' }, done: async (e, key) => void moved(await e.wf.move(key, 'done', 'user', { confirm: true, reason: 'r' })), how: 'override' },
+    { name: "the Assistant's override", opts: { finish: 'agentMerges' }, done: async (e, key) => void moved(await e.wf.move(key, 'done', 'assistant', { reason: 'r' })), how: 'override' }
+  ]
+  for (const r of routes)
+    it(`${r.name}: its finish; the builder told it is Done, once; its requests and lane steps once`, async () => {
+      const e = (env = setup({ ...pairOpts, ...r.opts, target: 'main' }))
+      const a = await passed(e, 'A', 'a.txt')
+      await r.done(e, a.key)
+      const s = e.wf.state(a)
+      expect(s.stage).toBe('done')
+      expect(s.finished?.how).toBe(r.how)
+      const f = s.finished!.seq
+      expect(await e.wf.finishWake(a, f)).toBe(true)
+      expect(await e.wf.finishWake(a, f)).toBe(false)
+      expect(actions(e, a.id).filter((k) => k === 'wake').length).toBeGreaterThanOrEqual(1)
+      for (const step of ['requests', 'lane'] as const) {
+        expect(await e.wf.finishStep(a, f, step)).toBe('done')
+        expect(await e.wf.finishStep(a, f, step)).toBe('already')
+      }
+      expect(e.wf.state(a).finished!.steps).toEqual(['requests', 'lane'])
+    })
+
+  it('a card never reviewed by an agent and in no lane: no loop, no wake', async () => {
+    const e = (env = setup({ ...pairOpts, finish: 'agentMerges', target: 'main' }))
+    const c = e.wf.createCard({ title: 'Solo' })
+    moved(await e.wf.start(c.key, B1))
+    moved(await e.wf.move(c.key, 'done', 'user', { confirm: true, reason: 'r' }))
+    expect(await e.wf.finishWake(c, e.wf.state(c).finished!.seq)).toBe(false)
+  })
+})
+
 describe('what a finish counts for', () => {
   it('an override’s Done unblocks its dependents (option A); an unchecked report’s waits for its work in the target', async () => {
     const e = (env = setup({ ...pairOpts, finish: 'agentMerges', target: 'main' }))

@@ -10,8 +10,10 @@
 // A step whose finish is over (the card left Done, or finished again) is marked superseded and does nothing. A run cut
 // short (a close, a crash) is run again as its workspace opens: each step finds what was done.
 
+import { basename } from 'path'
 import { cancelDeliveries } from './deliveries'
 import { onHiveEvent } from './events'
+import { journalFact } from './journalService'
 import { refresh as refreshLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { projectOfCard, settleSlotCards } from './slotCards'
@@ -21,13 +23,17 @@ import { onAction } from './workflow/actionWorker'
 import { finishAccepts } from './workflow/finish'
 import type { Workflow } from './workflow/runtime'
 import { workflowFor } from './workflow/service'
+import { cardRef } from '../shared/projectKeys'
 import { HISTORY, storedText } from '../shared/taskHistory'
-import type { FinishStepId } from '../shared/workflow/facts'
+import type { FinishHow, FinishStepId } from '../shared/workflow/facts'
 
 const log = createLogger('finish')
 
 /** The steps a finish records once each: one not recorded yet is owed. */
-const STEPS: readonly FinishStepId[] = ['requests', 'dependents', 'lane']
+const STEPS: readonly FinishStepId[] = ['requests', 'dependents', 'lane', 'wake', 'journal']
+
+/** How a card reached Done, as the journal says it (agent-facing English). */
+const HOW: Record<FinishHow, string> = { queue: 'merged by the merge queue', reported: 'merged, reported by its builder', unchecked: 'reported merged by its builder, not checked', accepted: 'accepted', override: 'moved there by an override', board: 'moved there on the board' } // i18n-ignore: the journal's English
 
 /** The comment's id on a dependent for a finish (HI-2014): one per parent finish, so a retry finds it. */
 export const dependentNoteId = (key: string, finish: number): string => `finish-${key}-${finish}`
@@ -39,6 +45,11 @@ export const dependentNoteId = (key: string, finish: number): string => `finish-
 export async function runFinish(ws: WorkspaceService, wf: Workflow, projectPath: string, n: number, finish: number): Promise<void> {
   const card = wf.store.cardByKey(`#${n}`)
   if (!card) return
+  // This finish, still the card's, in the workspace it began in: checked inside each effect's own write too (HR2's
+  // round 1 finding 1), so a card reopened or finished again while one waits gets nothing of an old finish.
+  const life = ws.lifetime
+  const current = (): boolean => !life.aborted && ws.lifetime === life && wf.state(card).stage === 'done' && wf.state(card).finished?.seq === finish
+  const at = wf.store.facts(n).find((f) => f.seq === finish)?.at ?? new Date().toISOString()
   const step = async (id: FinishStepId, fn: () => Promise<void>): Promise<void> => {
     try {
       const s = wf.state(card)
@@ -51,7 +62,7 @@ export async function runFinish(ws: WorkspaceService, wf: Workflow, projectPath:
   }
   await step('requests', async () => {
     if (!ws.assistantHome) return
-    await cancelDeliveries(ws.assistantHome, 'assistant', 'its card reaching Done', undefined, (r) => r.source === 'assistant-ask' && r.card === n) // i18n-ignore: a delivery's cancel reason (agent-facing)
+    await cancelDeliveries(ws.assistantHome, 'assistant', 'its card reaching Done', undefined, (r) => r.source === 'assistant-ask' && r.card === n && r.created <= at && current()) // i18n-ignore: a delivery's cancel reason (agent-facing)
   })
   await step('dependents', async () => {
     const f = wf.state(card).finished
@@ -59,12 +70,21 @@ export async function runFinish(ws: WorkspaceService, wf: Workflow, projectPath:
     const key = card.key
     for (const dep of wf.store.cards()) {
       if (!dep.blockedBy.includes(n) || dep.stage === 'done' || wf.store.isArchived(dep.id)) continue
-      await commentAsHive(dep.id, storedText(HISTORY.startsWithout, { card: key, reason: f.reason ?? '' }), ws, (c) => c.column !== 'done', dependentNoteId(key, finish))
+      await commentAsHive(dep.id, storedText(HISTORY.startsWithout, { card: key, reason: f.reason ?? '' }), ws, (c) => c.column !== 'done' && current(), dependentNoteId(key, finish))
     }
   })
   // The lane first: it ends as its last card is Done, never later for its slot (its next card waits on the slot itself,
   // laneStatus). Then the slot and its line, decided by the pass from what is there.
   await step('lane', () => refreshLanes(ws))
+  // Its builder told it is Done (a loop's wake, once for its move: the queue's Done too, HR2's round 1 finding 2), and
+  // the journal's fact of it, once for this finish (its link and detail: the finish).
+  await step('wake', async () => void (await wf.finishWake(card, finish)))
+  await step('journal', async () => {
+    const f = wf.state(card).finished
+    if (!f || !current()) return
+    const by = wf.store.facts(n).find((x) => x.seq === finish)?.actor ?? 'hive'
+    journalFact(ws, { summary: `${cardRef(n)} "${card.title}" is Done (${HOW[f.how]}), by ${by === 'user' ? 'You' : by}`, detail: `finish ${finish}`, project: basename(projectPath), links: [{ type: 'card', ref: String(n) }], tags: ['done'] }, { type: 'card', ref: String(n) }) // i18n-ignore: a journal fact (the Assistant's, English)
+  })
   await settleSlotCards(ws, projectPath).catch((e) => log.warn(`#${n}'s finish: its slot`, e))
 }
 

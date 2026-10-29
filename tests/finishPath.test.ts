@@ -20,6 +20,7 @@ const { FactStore } = await import('../src/main/workflow/factStore')
 const { advanced } = await import('../src/main/advanced')
 const { ENFORCE, workflowFor } = await import('../src/main/workflow/service')
 const { dependentNoteId, runFinish } = await import('../src/main/finishPath')
+const { HISTORY, storedText } = await import('../src/shared/taskHistory')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -78,11 +79,31 @@ describe("a finish's handler (HI-2014)", () => {
     await runFinish(w, wf, repo, parent, finish)
     await runFinish(w, wf, repo, parent, finish)
     const card = await inWorkspace(w, () => tasks.getTask(dependent))
-    const notes = card.comments.filter((c) => c.id === dependentNoteId(`P-${parent}`, finish) || c.hiveText?.id === 'tasks.history.startsWithout')
+    const notes = card.comments.filter((c) => c.hiveText?.id === 'tasks.history.startsWithout')
     expect(notes).toHaveLength(1)
     expect(notes[0].hiveText).toMatchObject({ id: 'tasks.history.startsWithout', values: { reason: 'merged elsewhere' } })
     const steps = facts(w).facts(parent).filter((f) => f.kind === 'FinishStep').map((f) => (f.data as { step: string }).step)
-    expect(steps.sort()).toEqual(['dependents', 'lane', 'requests'])
+    expect(steps.sort()).toEqual(['dependents', 'journal', 'lane', 'requests', 'wake'])
+  })
+
+  // HR2's round 1: an effect made and Hive ending before its step is recorded. Each effect is found where it was made
+  // (the comment by its id, the wake by its move's action), so the run after the restart makes none again.
+  it("a crash after the dependent's comment and the builder's wake, before their steps were recorded: run again, each once", async () => {
+    const { w, repo } = await workspace()
+    const wf = (await workflowFor(w, repo))!
+    const { parent, dependent, finish } = await overridden(w)
+    // The effects as the first run made them, then the crash: no FinishStep written.
+    const key = wf.store.cardByKey(`#${parent}`)!.key
+    await inWorkspace(w, () => tasks.commentAsHive(dependent, storedText(HISTORY.startsWithout, { card: key, reason: 'merged elsewhere' }), w, () => true, dependentNoteId(key, finish)))
+    expect(facts(w).facts(parent).some((f) => f.kind === 'FinishStep')).toBe(false)
+    await runFinish(w, wf, repo, parent, finish)
+    const notes = (await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.hiveText?.id === 'tasks.history.startsWithout')
+    expect(notes).toHaveLength(1)
+    // Run once more (a second restart): still one, every step recorded once.
+    await runFinish(w, wf, repo, parent, finish)
+    expect((await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.hiveText?.id === 'tasks.history.startsWithout')).toHaveLength(1)
+    const steps = facts(w).facts(parent).filter((f) => f.kind === 'FinishStep').map((f) => (f.data as { step: string }).step)
+    expect(steps.sort()).toEqual(['dependents', 'journal', 'lane', 'requests', 'wake'])
   })
 
   it('a board move into Done tells no dependent', async () => {
