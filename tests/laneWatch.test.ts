@@ -29,7 +29,7 @@ const card = (over: Partial<LaneMark['cards'][string]> = {}) => ({ c: 'doing' as
 describe('what a lane watch counts (#531)', () => {
   it('the condition: lane ids or "all", and events (default: all but passed and moved)', () => {
     expect(readLaneCondition({ lanes: ['all'] })).toEqual({ ids: 'all', events: LANE_DEFAULT_EVENTS })
-    expect(readLaneCondition({ lanes: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed'] })).toEqual({ ids: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed'] })
+    expect(readLaneCondition({ lanes: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed'] })).toEqual({ ids: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed', 'paused-user'] })
     expect(readLaneCondition({ lanes: [] })).toMatch(/lanes must be/)
     expect(readLaneCondition({ lanes: ['a b'] })).toMatch(/lanes must be/)
     expect(readLaneCondition({ lanes: ['all'], events: ['merged'] })).toMatch(/events must be/)
@@ -79,6 +79,43 @@ describe('what a lane watch counts (#531)', () => {
     expect(readSavedLaneMark(JSON.parse(JSON.stringify(news)))).toEqual(news)
     expect(readSavedLaneMark(JSON.parse(JSON.stringify(was)))!.cards[1].r).toBe(t1)
     expect(readSavedLaneMark({ ...was, cards: { 1: { ...card(), r: 'soon' } } })).toBeNull()
+  })
+
+  // HI-1991: a builder's hive_ask_user sat under For you for 20 minutes: its builder wasn't waiting at a prompt, and the
+  // Assistant had dropped `paused`, which also fired on every merge.
+  it('a question for the user on a lane card is always told (paused-user), whatever the events; a merge pause is paused-merge, and paused still reads as it', () => {
+    const t0 = '2026-10-29T00:00:00.000Z'
+    const t1 = '2026-10-29T00:10:00.000Z'
+    const t2 = '2026-10-29T00:20:00.000Z'
+    expect(LANE_DEFAULT_EVENTS).toContain('paused-user')
+    expect(LANE_DEFAULT_EVENTS).not.toContain('paused-merge')
+    expect(readLaneCondition({ lanes: ['all'], events: ['failed'] })).toEqual({ ids: 'all', events: ['failed', 'paused-user'] })
+    expect(readLaneCondition({ lanes: ['all'], events: ['paused', 'failed'] })).toEqual({ ids: 'all', events: ['paused-merge', 'failed', 'paused-user'] })
+    expect(readLaneCondition({ lanes: ['all'], events: ['paused-merge', 'paused-user'] })).toEqual({ ids: 'all', events: ['paused-merge', 'paused-user'] })
+    const now = (q: string, asked: LaneNow['cards'][number]['asked'] = null): LaneNow => ({ id: 'lane-1', label: 'B1 / R1', mark: { state: 'active', mergeDue: false, cards: { 1: card({ q }) } }, cards: [{ number: 1, blocked: null, stalled: null, failedBy: null, passedBy: null, asked }] })
+    const was: LaneMark = { state: 'active', mergeDue: false, cards: { 1: card({ q: '' }) } }
+    const ask = { since: t1, by: 'HB6', text: 'Push the tag now?\nIt is v1.0.0.' }
+    expect(laneHits(was, now(t1, ask), ['failed', 'paused-user'])!.parts).toEqual([{ n: 1, event: 'paused-user', text: '#1 waits for the user (HB6 asks)', detail: 'Push the tag now?' }])
+    // Hive's own request (no asker), a second question after the first, none new, one answered: told, told, quiet, quiet.
+    expect(laneHits(was, now(t1, { since: t1, by: null, text: 'Approve the merge?' }), ['paused-user'])!.parts[0].text).toBe('#1 waits for the user (Hive asks)')
+    expect(laneHits(now(t1).mark, now(t2, { ...ask, since: t2 }), ['paused-user'])).not.toBeNull()
+    expect(laneHits(now(t1).mark, now(t1, ask), ['paused-user'])).toBeNull()
+    expect(laneHits(now(t1).mark, now(''), ['paused-user'])).toBeNull()
+    // Not asked for (a lane notice's own events): not told. A mark from before (no q) never fires it.
+    expect(laneHits(was, now(t1, ask), ['failed'])).toBeNull()
+    expect(laneHits({ ...was, cards: { 1: card() } }, now(t1, ask), ['paused-user'])).toBeNull()
+    // A card new to the lane: a question since the watch began is told, one before it isn't.
+    expect(laneHits({ ...was, cards: {} }, now(t1, ask), ['paused-user'], t0)).not.toBeNull()
+    expect(laneHits({ ...was, cards: {} }, now(t0, { ...ask, since: t0 }), ['paused-user'], t1)).toBeNull()
+    // Its line says to tell the user, never answer for them; the mark keeps q.
+    expect(laneWakeLine([laneHits(was, now(t1, ask), ['paused-user'])!])).toBe('[Hive] Lane B1 / R1: #1 waits for the user (HB6 asks): "Push the tag now?". Your lane watch has ended: read the cards named (hive_read_task), act on them, tell the user what an agent waits for (hive_notify) and never answer it for them, then watch the lanes again (hive_wait_for_tasks with lanes).')
+    expect(readSavedLaneMark(JSON.parse(JSON.stringify(now(t1).mark)))!.cards[1].q).toBe(t1)
+    expect(readSavedLaneMark({ ...was, cards: { 1: { ...card(), q: 'soon' } } })).toBeNull()
+    // The merge pause, its own event and line; a pause for the user isn't one.
+    const paused = (status: LaneNow['status']): LaneNow => ({ ...now(''), mark: { state: 'paused', mergeDue: false, cards: { 1: card({ c: 'passed', q: '' }) } }, status })
+    expect(laneHits(was, paused({ reason: 'merging', card: 1 }), ['paused-merge'])!.parts).toEqual([{ n: 1, event: 'paused-merge', text: 'paused for a merge: waiting: #1 merging', detail: 'merging' }])
+    expect(laneHits(was, paused({ reason: 'you', card: 1 }), ['paused-merge'])).toBeNull()
+    expect(laneHits(was, paused({ reason: 'merging', card: 1 }), ['paused-user'])).toBeNull()
   })
 
   it('a block lifted is told by default (#922, #1272); a lane ended with its merge commit names it (#1270), else as before', () => {
@@ -406,6 +443,29 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
     expect(st.told[0]).toContain(`${key} is blocked: "Screenshots for your OK"`)
     expect(st.told[0]).not.toContain(`#${a}`)
+    await disposeWorkspaceService(w)
+  })
+
+  it("HI-1991: a builder's question for the user (hive_ask_user) wakes a lane watch that dropped paused, naming the card and its first line; once only", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const { workflowFor } = await import('../src/main/workflow/service')
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    // The Legible Assistant's filter: no paused, no waiting (B1 isn't at a prompt anyway).
+    await watchAll(w, home, st, ['failed', 'blocked', 'merge-due', 'ended'])
+    const wf = (await workflowFor(w, alpha))!
+    await inWorkspace(w, () => wf.askTheUser(`#${a}`, 'agent:b1', { kind: 'decide', text: 'Keep the old setting name?\nIt is in three docs.' }))
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] Lane B1 / R1: #${a} waits for the user \\(b1 asks\\): "Keep the old setting name\\?"\\. Your lane watch has ended: .*tell the user what an agent waits for`))
+    expect((await lanes.listLanes(w, { project: 'alpha' }))[0]).toMatchObject({ state: 'paused', status: { reason: 'you', card: a } })
+    // Watched again with the question still open: nothing new to tell.
+    await watchAll(w, home, st, ['failed'])
+    await inWorkspace(w, () => tasks.updateTask(a, { column: 'review' }, agent('b1')).catch(() => undefined))
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(st.told).toHaveLength(1)
     await disposeWorkspaceService(w)
   })
 

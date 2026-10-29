@@ -17,7 +17,7 @@ import { dbGenerationAt, onDbReplaced } from './boardStore'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { listLanes } from './lanes'
-import { LANE_CARD_CHANGES, laneCardMark, laneHits, laneLimitLine, laneWakeLine, laneWatchLabel, mergeDue, mergeStallReason, newLaneBase, readSavedLaneCondition, readSavedLaneMark, verdictsOf, type LaneHit, type LaneMark, type LaneNow, type LaneWatchCards, type LaneWatchCondition, type WaitHit } from '../shared/laneWatch'
+import { LANE_ALWAYS_EVENTS, LANE_CARD_CHANGES, laneCardMark, laneHits, laneLimitLine, laneWakeLine, laneWatchLabel, mergeDue, mergeStallReason, newLaneBase, readSavedLaneCondition, readSavedLaneMark, verdictsOf, type LaneAsked, type LaneHit, type LaneMark, type LaneNow, type LaneWatchCards, type LaneWatchCondition, type WaitHit } from '../shared/laneWatch'
 import { cardStallIn, laneOrderView } from './cardStall'
 import { noteLoopWatch } from './loopCheck'
 import { isResuming } from './restartResume'
@@ -32,6 +32,8 @@ import { readyFor } from './readiness'
 import { cardNamesOf, withCardNames } from './projectKeys'
 import { namedBy } from '../shared/projectKeys'
 import { projectPreferences } from './workflow/preferences'
+import { forYouOfCards } from './workflow/cardWork'
+import type { ForYouItem } from '../shared/workflow/workView'
 
 /**
  * Wake-on-change watches (#128): an agent registers what it waits for on the board (hive_wait_for_tasks with wake), ends
@@ -1348,6 +1350,8 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
   const held = new Set(inView.filter(running).flatMap((l) => l.cards.map((c) => c.number)))
   const cardsOf = (l: (typeof inView)[number]) => (running(l) ? l.cards : l.cards.filter((c) => !held.has(c.number)))
   const byNumber = await board.byNumber(chosen.flatMap((l) => cardsOf(l).map((c) => c.number)))
+  // Their open requests for the user (HI-1991): a question an agent asked on one wakes the watch.
+  const asks = board.asks(chosen.filter(running).flatMap((l) => l.cards.map((c) => c.number)))
   const agents = new Map()
   const out: LaneNow[] = []
   for (const l of chosen) {
@@ -1361,10 +1365,12 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
       // A card moved to another project is gone from the lane.
       const card = found && same(found.project, l.project) ? found : null
       const stalled = card && !card.archived ? await cardStallIn(ws, card, agents, order) : null
-      marks[lc.number] = laneCardMark(card, stalled)
+      // An ended lane's cards are another lane's or nobody's: no requests of theirs are told for it.
+      const asked = running(l) && asks ? newestAsk(asks.get(lc.number)) : undefined
+      marks[lc.number] = laneCardMark(card, stalled, asked)
       changed.push({ mark: marks[lc.number], updatedAt: card?.updatedAt })
       const v = card ? verdictsOf(card) : null
-      cards.push({ number: lc.number, blocked: card?.blocked ?? null, stalled, failedBy: v?.failed?.by ?? null, passedBy: v?.passed?.by ?? null })
+      cards.push({ number: lc.number, blocked: card?.blocked ?? null, stalled, failedBy: v?.failed?.by ?? null, passedBy: v?.passed?.by ?? null, ...(asked ? { asked } : {}) })
     }
     const label = `${l.builder.name}${l.reviewer ? ` / ${l.reviewer.name}` : ''}${l.name ? ` (${l.name})` : ''}`
     // #869: a merge due with its builder idle and no merge slot claimed (a step it stopped on for the user) is a stall.
@@ -1385,12 +1391,37 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
 interface LaneBoard {
   byNumber(numbers: readonly number[]): Promise<Map<number, TaskCard>>
   live(): Promise<TaskCard[]>
+  /** These cards' open requests for the user (HI-1991), by card: none for a card with none; null: they couldn't be read. */
+  asks(numbers: readonly number[]): Map<number, ForYouItem[]> | null
+}
+
+/** A card's newest open request for the user (HI-1991), as a lane watch tells it; null for none. */
+function newestAsk(items: readonly ForYouItem[] | undefined): LaneAsked | null {
+  const i = items?.reduce<ForYouItem | null>((a, b) => (!a || b.since > a.since ? b : a), null)
+  return i ? { since: i.since, by: i.asker, text: i.text } : null
 }
 
 function laneBoard(ws: WorkspaceService): LaneBoard {
   const reads = new Map<number, Promise<TaskCard | null>>()
   let live: Promise<TaskCard[]> | null = null
+  const asked = new Map<number, ForYouItem[]>()
+  const askRead = new Set<number>()
   return {
+    asks(numbers) {
+      const missing = [...new Set(numbers)].filter((n) => !askRead.has(n))
+      if (missing.length) {
+        // Kept by their facts' head, as For you keeps them (cardWork.ts): a round reads only what changed.
+        try {
+          for (const [n, items] of forYouOfCards(ws, missing)) asked.set(n, items)
+        } catch (e) {
+          // Not known this round: their marks have no `q`, so nothing is told from a guess.
+          log.warn("reading lane cards' requests for the user", e)
+          return null
+        }
+        for (const n of missing) askRead.add(n)
+      }
+      return new Map(numbers.flatMap((n): [number, ForYouItem[]][] => (asked.has(n) ? [[n, asked.get(n)!]] : [])))
+    },
     async byNumber(numbers) {
       const missing = [...new Set(numbers)].filter((n) => !reads.has(n))
       if (missing.length) {
@@ -1536,7 +1567,9 @@ export type LaneWatchResult = { watching: TaskWatchInfo; replaced?: string; card
  * out, the last lane watch's cards are kept (the one it replaces, or the one whose wake was read), less those since done
  * or gone; [] drops them. The reply says which (`cards`).
  */
-export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, cond: LaneWatchCondition, limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES, extra: { cards?: number[]; changes?: WatchChange[] } = {}): Promise<LaneWatchResult> {
+export async function registerLaneWatch(ws: WorkspaceService, projectPath: string, agentId: string, asked: LaneWatchCondition, limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES, extra: { cards?: number[]; changes?: WatchChange[] } = {}): Promise<LaneWatchResult> {
+  // A question for the user always counts (HI-1991), whoever made the condition.
+  const cond: LaneWatchCondition = { ...asked, events: [...new Set([...asked.events, ...LANE_ALWAYS_EVENTS])] }
   // Waits for the user are new from here (#726 round 1 finding): taken before anything waits, so one that begins while
   // the lanes and cards are read is told, not taken as its baseline.
   const waitsFrom = latestWaitSeq()

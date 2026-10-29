@@ -96,6 +96,7 @@ Hive 1.0 adds a workflow layer: your project's options decide how a card goes fr
 - **A fold button on its panel** (Ctrl+Alt+I), as the Progress panel has (#1330).
 - **It sets a team up from a template.** Ask the Assistant to load a template into a project (*"load Team 3×3 into web, and call the first builder Coder"*): it shows who goes and who comes, names another project already uses (with free ones), and what the template's workflow would change, then loads it as Load template does and saves its workflow options, never setting up Git for you. **Undo** puts the project's agents, layout and options back (HI-1502).
 - **The Assistant's notifications open what they're about** (HI-1961): a notification about one agent or one card ("HB4 needs an Enter in its pane") opens that agent's pane or the card when you click it, in the corner or in the Notifications panel. If the agent or card is gone by then, Hive says so. Agents and scripts give it with `hive_notify`'s new `target`.
+- **An agent's question for you always wakes the Assistant** (HI-1991): a builder or reviewer asking you something on a lane's card (it shows under For you) now wakes the Assistant's lane watch, naming the card and the question's first line, even when the Assistant had stopped following lane pauses. A lane pausing for a merge is now an event of its own (`paused-merge`), so the Assistant can leave out merge noise without missing your questions.
 
 ### Connections
 
