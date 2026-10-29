@@ -2191,7 +2191,7 @@ export interface LiveSessionState {
    * The model and effort this launch gave its CLI (HI-1996), after the agent's, project's, provider's and connection's
    * choices; null: none given, so its CLI's own default. What the CLI reports once it runs is `modelId` and `effort`.
    */
-  launchedWith?: { model: string | null; effort: string | null }
+  launchedWith?: { model: string | null; effort: string | null; /** The model was the agent's own choice, not a default. */ own?: true }
   /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */
   switchPending?: boolean
   /** Its conversation ran only on servers on this PC (HI-1772): free, its cost a known $0, shown as "free (local)". */

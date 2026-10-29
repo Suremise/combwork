@@ -494,6 +494,26 @@ export function agentModelShown(provider: ProviderId, chosen: string | undefined
   return { label: own ? name : trNow(msg({ id: 'agents.model.inherited', defaultMessage: '{model} (default)', description: "An agent's model when the agent didn't choose it (it comes from the project or Settings): {model} is its name (\"Opus 5.5\")." }), { model: name }), chosenAs: picked && picked !== name ? picked : null }
 }
 
+/**
+ * What a pane's footer resolves its model and effort from (HI-1996): a running session's own launch (`launchedWith`:
+ * the model and effort it was given, after the connection's defaults and HI-1770's dropped effort), never the settings
+ * as they are now; a new session's, the agent's, project's and Settings' choices. The CLI's reports come first either way.
+ * `modelGlobal` is a model the agent didn't choose itself (shown "(default)"); empty, with no model, its CLI's default.
+ */
+export function footerChoices(
+  a: { model?: string; effort?: string },
+  project: { model?: string; effort?: string },
+  global: { defaultModel?: string; defaultEffort?: string },
+  live: { launchedWith?: { model: string | null; effort: string | null; own?: true } } | null | undefined
+): { model: string | undefined; modelGlobal: string; effort: string | undefined; effortGlobal: string | undefined } {
+  const launched = live?.launchedWith
+  if (launched) {
+    const own = !!launched.model && !!launched.own
+    return { model: own ? launched.model! : undefined, modelGlobal: own ? '' : (launched.model ?? ''), effort: launched.effort ?? undefined, effortGlobal: undefined }
+  }
+  return { model: a.model || project.model, modelGlobal: global.defaultModel ?? '', effort: a.effort ?? project.effort, effortGlobal: global.defaultEffort }
+}
+
 /** agentModelShown's label for new sessions (no running model). */
 export function effectiveModelLabel(provider: ProviderId, chosen: string | undefined, globalModel: string, info: ModelInfo): string {
   return agentModelShown(provider, chosen, globalModel, info).label

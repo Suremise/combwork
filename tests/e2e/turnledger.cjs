@@ -203,6 +203,23 @@ const check = (name, ok, extra = '') => {
   const cOver = await is(claude, 'finished', 'over')
   check("Claude Code: its retry going through clears it: the turn ends as usual", !!cOver && !cOver.retryWait, JSON.stringify(cOver?.retryWait))
 
+  // HI-1996 (HR1's round 1): a running session's footer shows its own launch's model and effort, not the settings changed
+  // since (the fake reports neither). A stopped agent changed the same way shows the change: that is when the window has it.
+  const idle = await lib.addAgent(inv, proj, { name: 'Idle' })
+  await page.locator('.layout-switch button[aria-label="Three columns"]').click()
+  const footModel = (name) => page.locator('.agent-pane', { has: page.locator('.pane-header-bar .agent-name', { hasText: new RegExp(`^${name}$`) }) }).locator('.foot-model')
+  const footText = async (name) => (await footModel(name).innerText().catch(() => '')).trim()
+  const launched = await until(async () => (await footText('Claude')) || null, HUNG_MS)
+  const claudeLaunch = (await live(claude))?.launchedWith
+  check('the launch kept the model and effort it gave its CLI', !!claudeLaunch && claudeLaunch.model === null && claudeLaunch.effort === null, JSON.stringify(claudeLaunch))
+  await inv('agents:update', proj, claude.id, { model: 'haiku', effort: 'low' })
+  await inv('agents:update', proj, idle.id, { model: 'haiku', effort: 'low' })
+  const idleChanged = await until(async () => /Haiku/.test(await footText('Idle')) && /Low/.test(await footText('Idle')), HUNG_MS)
+  check("a stopped agent's footer shows its new settings (for new sessions)", !!idleChanged, await footText('Idle'))
+  check("the running agent's footer still shows what it launched with, not Haiku at Low", (await footText('Claude')) === launched && !/Haiku|Low/.test(launched ?? ''), JSON.stringify({ launched, now: await footText('Claude') }))
+  await page.screenshot({ path: path.join(lib.WORK, 'turnledger-footer-launch.png') })
+  await inv('agents:update', proj, claude.id, { model: '', effort: '' })
+
   // Codex 0.164 compacting by itself, then running its turn under that compaction's id (HI-1916: HR5's "no hooks" on 27
   // Oct): heard as a turn, and finished at its Stop, with nothing of it stale.
   check("Codex: a turn under the id of a compaction it began itself is heard working", !!(await turn(codex, 'selfcompact then work 1')))
