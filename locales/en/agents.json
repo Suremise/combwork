@@ -681,15 +681,15 @@
   },
   "agents.limit.many": {
     "defaultMessage": "More than {limit} agents: each runs its own copy of its CLI, roughly 200–500 MB of memory each; this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.",
-    "description": "Settings → Advanced, under Agents per project once it is over the default ({limit}): what more agents cost. {total} and {free} are the computer's memory (\"16.0 GB\")."
+    "description": "Version Control → Workflow, under Maximum agents once it is over the default ({limit}): what more agents cost. {total} and {free} are the computer's memory (\"16.0 GB\")."
   },
   "agents.limit.manyMeasured": {
     "defaultMessage": "More than {limit} agents: each runs its own copy of its CLI. {running, plural, one {Your # running agent takes} other {Your # running agents take}} {used} now (about {each} each); this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.",
-    "description": "Settings → Advanced, under Agents per project once it is over the default ({limit}): what more agents cost. {running} agents run now and take {used} of memory ({each} each); {total} and {free} are the computer's memory (\"16.0 GB\")."
+    "description": "Version Control → Workflow, under Maximum agents once it is over the default ({limit}): what more agents cost. {running} agents run now and take {used} of memory ({each} each); {total} and {free} are the computer's memory (\"16.0 GB\")."
   },
-  "agents.limit.reached": {
-    "defaultMessage": "A project can have up to {limit} agents (Settings → Advanced → Agents per project).",
-    "description": "Why another agent can't be added to a project. {limit} is a number; \"Settings → Advanced → Agents per project\" is where the setting is: use its translated names."
+  "agents.limit.most": {
+    "defaultMessage": "A project can have up to {most, number} agents.",
+    "description": "Why another agent can't be added to a project: it has as many as Hive allows ({most}, 24)."
   },
   "agents.mcp.all": {
     "defaultMessage": "All of the project's",

@@ -2,7 +2,8 @@
 // recoverable error hook for each try (pushed: the wait kept from try to try, its first try's time and the tries counted,
 // never a retry time or a total it doesn't say), Claude Code's transcript read by its adapter while its turn is quiet
 // (a read that comes back after a hook loses to it), and the Assistant told once a turn when a wait goes on past
-// Settings → Advanced's while (a wait that ends sooner tells nothing; a later turn's is told again).
+// Settings → Advanced's while (a wait that ends sooner tells nothing; a later turn's is told again). Each wait that ends
+// is kept in the launch's tally (HI-1996), which hive_agent_activity reads.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -22,6 +23,7 @@ const { newLedger } = await import('../src/main/turnLedger')
 const { runtimeLabel } = await import('../src/shared/runtime')
 const { advanced } = await import('../src/main/advanced')
 const { retryNoticeLine } = await import('../src/main/retryNotice')
+const { retryWaitsView } = await import('../src/shared/toolReplies')
 
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
 const HUNG_MS = 15_000
@@ -237,6 +239,34 @@ describe("other CLIs' retry waits (HI-1973)", () => {
     expect(st.retryWait).toBeDefined()
     await hook(st, { hook_event_name: 'Stop' })
     expect(st.retryWait).toBeUndefined()
+  })
+
+  it('HI-1996: each wait that ends, on progress or with its turn, is kept in the launch’s tally that hive_agent_activity reads', async () => {
+    const { st } = agent('tally', copilot, 'copilot')
+    const tally = () => (st as unknown as { retryWaited?: { waits: number; ms: number; latest: { since: string; ended: string; tries: number; status: number | null } } }).retryWaited
+    await hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'go' })
+    await hook(st, copilotRetry('429 Too Many Requests'))
+    await hook(st, copilotRetry('429 Too Many Requests'))
+    const first = st.retryWait!
+    expect(tally()).toBeUndefined()
+    // Under way: counted to now, the latest, ongoing.
+    const now = Date.parse(first.since) + 30_000
+    expect(retryWaitsView(st as never, now)).toEqual({ waits: 1, seconds: 30, latest: { since: first.since, seconds: 30, tries: 2, status: 429, ongoing: true } })
+    await hook(st, { hook_event_name: 'PreToolUse', tool_name: 'view', tool_input: { path: 'a.txt' } })
+    expect(st.retryWait).toBeUndefined()
+    expect(tally()).toMatchObject({ waits: 1, latest: { since: first.since, tries: 2, status: 429 } })
+    expect(Date.parse(tally()!.latest.ended)).toBeGreaterThanOrEqual(Date.parse(first.since))
+    const firstMs = tally()!.ms
+    // A second wait, ended by its turn's end: two, their time together, it the latest.
+    await hook(st, copilotRetry(REFUSED))
+    const second = st.retryWait!
+    await hook(st, { hook_event_name: 'Stop' })
+    expect(st.retryWait).toBeUndefined()
+    expect(tally()).toMatchObject({ waits: 2, latest: { since: second.since, tries: 1, status: null, network: true } })
+    expect(tally()!.ms).toBeGreaterThanOrEqual(firstMs)
+    const view = retryWaitsView(st as never)!
+    expect(view).toMatchObject({ waits: 2, latest: { since: second.since, tries: 1, status: null, network: true } })
+    expect(view.latest.ongoing).toBeUndefined()
   })
 
   it('tells nobody at 0', async () => {

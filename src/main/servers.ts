@@ -28,8 +28,9 @@ import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, iso
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
-import { newestComments, progressLabel, taskRow, withoutHistory, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
+import { cardRequests, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
+import { STOP_ASK_MS } from './mcp/agentApiCall'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
 import { settingChangeTexts, settingPath, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { addAgent, updateAgent } from './projectAgents'
@@ -1297,7 +1298,7 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
   })
 })
 
-route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body }) => {
+route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body, signal }) => {
   const p = projectByName(params[0])
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
@@ -1305,17 +1306,24 @@ route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body }) 
   return assistantChange('agents', `stop ${a.name} in ${basename(p)}`, { kind: 'stop-agent', project: basename(p), agent: actAgent(a) }, async () => {
     const st = sessions.liveFor(p, agentId)
     if (!st) return { done: `${a.name} in ${basename(p)} wasn't running`, result: { ok: true, wasRunning: false } }
-    // Stopping an agent in the middle of something is the user's call: also one watching cards (its card loop stops).
+    // Stopping an agent in the middle of something is the user's call; one only watching is idle (HI-1994).
     if (stopAsksUser(st.status) && ws) {
       const said = typeof body?.reason === 'string' ? clip(body.reason.trim(), 300) : ''
       const reason = said ? ` Its reason: ${said}${/[.!?]$/.test(said) ? '' : '.'}` : ''
-      const yes = await assistant.ask(ws, {
-        title: `Stop ${a.name} in ${basename(p)}?`,
-        message: `The Assistant wants to stop ${a.name}, which is ${st.status === 'watching' && st.watch ? `${st.watch.label.replace(/^Waiting/, 'waiting')} (${st.watch.agents ? 'an agent watch' : 'a card watch: its card loop pauses until it is resumed'})` : (STATUS_WORDS[st.status] ?? st.status)}.${reason} Its conversation is kept and can be resumed.`,
-        yes: 'Stop',
-        no: "Don't stop"
-      })
-      if (!yes) throw new HttpError(409, `The user chose not to stop ${a.name}. Leave it running.`)
+      const how = await assistant.ask(
+        ws,
+        {
+          title: `Stop ${a.name} in ${basename(p)}?`,
+          message: `The Assistant wants to stop ${a.name}, which is ${STATUS_WORDS[st.status] ?? st.status}.${reason} Its conversation is kept and can be resumed.`,
+          yes: 'Stop',
+          no: "Don't stop"
+        },
+        { timeoutMs: STOP_ASK_MS, signal }
+      )
+      // Its question closed, whatever ended it: never left open in the panel with nobody waiting on it (HI-1994).
+      if (how === 'timedOut') throw new HttpError(408, `Your request to stop ${a.name} timed out: the user didn't answer in ${STOP_ASK_MS / 1000} seconds, and it was withdrawn. ${a.name} keeps running; ask the user in chat if it should still stop.`)
+      if (how === 'gone') throw new HttpError(409, `Your request to stop ${a.name} was withdrawn: you stopped waiting for the user's answer. ${a.name} keeps running.`)
+      if (how === 'no') throw new HttpError(409, `The user chose not to stop ${a.name}. Leave it running.`)
       // The answer can come minutes later: only the run the user was asked about, and only if Control still allows it.
       if (sessions.liveFor(p, agentId)?.runId !== st.runId) return { done: `${a.name} in ${basename(p)} had already stopped`, result: { ok: true, wasRunning: false } }
       if (!assistant.allows('agents')) throw new HttpError(403, `The user's settings (Settings → Assistant → Control: ${assistant.LEVEL_NAME[assistant.controlLevel()]}) no longer let you stop agents.`)
@@ -1342,7 +1350,7 @@ route('POST', '/v1/projects/:name/agents/:agent/prompt', async ({ params, body }
     if (st.status === 'waiting') throw new HttpError(409, `${a.name} is waiting for the user${st.statusMessage ? ` (${st.statusMessage})` : ''}. Tell the user; don't answer for them.`)
     if (st.status === 'working') throw new HttpError(409, `${a.name} is working. Wait until it's idle (hive_wait_for_agents), then give it the task, or leave it a message it gets when it is (hive_message_agent).`)
     if (st.status === 'signin') throw new HttpError(409, `${a.name}'s CLI needs the user to sign in again (its sign-in expired). Tell the user; nothing it is given runs until then.`)
-    if (st.status === 'watching') throw new HttpError(409, `${a.name} is ${st.watch?.label.replace(/^Waiting/, 'waiting') ?? 'waiting on cards'} (${st.watch?.agents ? 'an agent watch' : 'a card watch'}): it takes no new task until it is woken or the user cancels the watch. To tell it something for the work it is waiting on, leave it a message (hive_message_agent): it is woken by it and its watch carries on.`)
+    if (st.status === 'watching') throw new HttpError(409, `${a.name} is ${st.watch?.label.replace(/^Waiting/, 'waiting') ?? 'waiting on cards'} (${st.watch?.agents && !st.watch.lanes ? 'an agent watch' : 'a card watch'}): it takes no new task until it is woken or the user cancels the watch. To tell it something for the work it is waiting on, leave it a message (hive_message_agent): it is woken by it and its watch carries on.`)
     if (st.status === 'background') {
       throw new HttpError(409, `${a.name} is waiting on ${tasksWord(st.backgroundTasks ?? 0)} it started (such as a test run) and carries on by itself when they end. Wait for it (hive_wait_for_agents), then give it the task, or leave it a message it gets when it is idle (hive_message_agent). If it seems stuck, tell the user.`)
     }
@@ -1599,13 +1607,19 @@ async function agentActivity(p: string, agentId: string, detail = false) {
   const provider = st?.provider ?? agentProvider(a, info.config, config.settings)
   // What was left for it (#530, #647): unread and overdue, and its latest deliveries with their states and times.
   const inbox = await deliveryView(p, agentId, detail ? 20 : 5)
+  // The model and effort it runs with, and its time waiting for its CLI to retry a throttled or failed request (HI-1996):
+  // a slow round told from a throttled one.
+  const inUse = modelInUse(st)
+  const retryWaits = retryWaitsView(st)
   return {
     project: info.name,
     agent: a.name,
     id: a.id,
     provider,
+    ...inUse,
     status: st?.status ?? 'stopped',
     statusMessage: statusMessageOf(st),
+    ...(retryWaits ? { retryWaits } : {}),
     ...(watchingOf(st) ? { watching: watchingOf(st) } : {}),
     ...(progressOf(p, a.id) ? { progress: progressOf(p, a.id) } : {}),
     reviewing: st?.review ?? null,
@@ -1669,7 +1683,8 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
   const who = me ? { projectPath: me.projectPath, agentId: me.agentId } : home ? { projectPath: home, agentId: 'assistant' } : null
   if (body?.cancel === true) {
     if (!who) throw new HttpError(400, 'Only an agent or the Assistant has a watch to cancel.')
-    const kind = sessions.watchFor(who.projectPath, who.agentId)?.agents ? 'agent' : 'card'
+    const w = sessions.watchFor(who.projectPath, who.agentId)
+    const kind = w?.lanes ? 'lane' : w?.agents ? 'agent' : 'card'
     const had = await cancelWatch(requireWorkspace(), who.projectPath, who.agentId)
     return { done: had ? `Cancelled your ${kind} watch.` : 'You had no watch.' }
   }
@@ -1703,7 +1718,7 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
     const agents: WatchedAgent[] = []
     for (const t of unique) agents.push({ projectPath: t.p, agentId: t.id, name: (await agentDefOf(t.p, t.id)).name, project: basename(t.p) })
     const r = await registerAgentWatch(requireWorkspace(), who.projectPath, who.agentId, { agents, ignoreBackground: !throughBackground }, limit)
-    const ended = { ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.dropped ? { dropped: r.dropped } : {}) }
+    const ended = { ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.dropped ? { dropped: r.dropped } : {}), ...(r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}) }
     if ('already' in r) return { already: r.already, ...ended }
     return { watching: r.watching.label, limitAt: r.watching.limitAt, ...ended }
   }
@@ -2356,7 +2371,27 @@ async function queueLineFor(project: string, n: number): Promise<string | null> 
   }
 }
 
-async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>(), waitingOf?: ReadonlyMap<number, ForYouItem[]>): Promise<TaskView> {
+/**
+ * A card's open requests as agents read them (HI-1992): each asker by its name in the card's project, as For you shows it
+ * (its id once the agent is gone). `agents` as taskView's, so a listing reads each project.json once.
+ */
+async function requestsFor(items: readonly ForYouItem[], agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>(), summary = false): Promise<CardRequest[] | undefined> {
+  const project = items.find((i) => i.asker)?.project
+  let defs: ReturnType<typeof projectAgents> = []
+  if (project) {
+    try {
+      const p = projectByName(project)
+      const key = p.toLowerCase()
+      if (!agents.has(key)) agents.set(key, workspace.projectConfig(p).then(projectAgents))
+      defs = await agents.get(key)!
+    } catch {
+      // Its project gone: the asker's id.
+    }
+  }
+  return cardRequests(items.map((i) => (i.asker ? { ...i, asker: defs.find((a) => a.id === i.asker)?.name ?? i.asker } : i)), summary)
+}
+
+async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<typeof projectAgents>>>(), waitingOf?: ReadonlyMap<number, ForYouItem[]>): Promise<TaskView> {
   let agent: { id: string; name: string; status: string; backgroundTasks: number } | null = null
   let now: StallAgent | null = null
   if (c.agent && c.project) {
@@ -2383,10 +2418,15 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   // Its attachments (HI-1700): full paths, and its text's links to them as those paths (agents open them by path).
   const files = await cardAttachments(workspace, c.number)
   const paths = (t: string): string => withAttachmentPaths(t, files)
+  // Its requests waiting for the user (HI-1932), just after its decisions (HI-1992: an Assistant reading the card looks
+  // there first, not in its history): their ids, for a decision that answers them. A listing reads them once for all its
+  // cards (`waitingOf`), never the whole board per card.
+  const forYou = await requestsFor((waitingOf ?? forYouOfCards(workspace, [c.number])).get(c.number) ?? [], agents)
   const view: Omit<TaskView, 'stage'> = {
     number,
     title,
     ...(decisions?.length ? { decisions: decisions.map(tasks.withoutId) } : {}),
+    ...(forYou ? { forYou } : {}),
     ...rest,
     ...(files.length ? { description: paths(c.description) } : {}),
     comments: c.comments.map(entryForAgents).map((e) => (files.length ? { ...e, text: paths(e.text) } : e)),
@@ -2396,10 +2436,6 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
     // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
     stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c))
   }
-  // Its requests waiting for the user (HI-1932): their ids, for a decision that answers them. A listing reads them once
-  // for all its cards (`waitingOf`), never the whole board per card.
-  const waiting = (waitingOf ?? forYouOfCards(workspace, [c.number])).get(c.number) ?? []
-  if (waiting.length) view.forYou = waiting.map((i) => ({ request: i.request, kind: i.kind, gate: i.gate, text: i.text, ...(i.asker ? { asker: i.asker } : {}) }))
   // A review whose reviewer has gone or isn't running (Hive ends those, but one can show while that happens).
   if (c.review && c.project) {
     try {
@@ -2622,8 +2658,9 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   const n = raw === null ? null : Number(raw)
   if (n !== null && (!Number.isInteger(n) || n < 1)) throw new HttpError(400, `comments must be a whole number from 1: "${raw}"`)
   const lean = n === null ? view : newestComments(view, n)
-  // summary=true (#532): each comment as its first line, with the whole comment's length when there is more.
-  const told = query.get('summary') === 'true' ? { ...lean, comments: lean.comments.map(commentSummary) } : lean
+  // summary=true (#532): each comment as its first line, with the whole comment's length when there is more; its open
+  // requests' words too (HI-1992).
+  const told = query.get('summary') === 'true' ? { ...lean, ...(lean.forYou ? { forYou: lean.forYou.map(commentSummary) } : {}), comments: lean.comments.map(commentSummary) } : lean
   return query.get('history') === 'false' ? withoutHistory(told) : told
 })
 
@@ -2843,7 +2880,11 @@ route('GET', '/v1/tasks/:n/comments/latest', async ({ params, query }) => {
   requireWorkspace()
   const r = await tasks.latestComment(taskNumber(params[0]), await taskActor())
   // summary=true (#532): its first line, with its whole length when there is more.
-  return query.get('summary') === 'true' && r.comment ? { ...r, comment: commentSummary(r.comment) } : r
+  const summary = query.get('summary') === 'true'
+  // Its open requests first (HI-1992): "check the latest comment" is where an Assistant looks for a question, and an
+  // agent's question is in For you, not its comments.
+  const forYou = await requestsFor(forYouOfCards(workspace, [r.number]).get(r.number) ?? [], undefined, summary)
+  return { number: r.number, ...(forYou ? { forYou } : {}), comment: summary && r.comment ? commentSummary(r.comment) : r.comment }
 })
 
 // A card's facts (#1223, SPEC §16.4): a short row each (seq, kind, time, actor and a few words, revisions as its project's
@@ -2912,7 +2953,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     if (!who) throw new HttpError(400, 'Only an agent or the Assistant has a card watch to cancel.')
     const w = sessions.watchFor(who.projectPath, who.agentId)
     const had = await cancelWatch(ws, who.projectPath, who.agentId)
-    return { done: had ? `Cancelled your ${w?.agents ? 'agent' : w?.lanes ? 'lane' : 'card'} watch.` : 'You had no card watch.' }
+    return { done: had ? `Cancelled your ${w?.lanes ? 'lane' : w?.agents ? 'agent' : 'card'} watch.` : 'You had no card watch.' }
   }
   // A lane watch (#531): whole lanes; always one that wakes. With cards beside them (#726): `cards` and their `changes`.
   if (body?.lanes !== undefined) {
@@ -2922,6 +2963,20 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const extra = readLaneCards(body)
     if (typeof extra === 'string') throw new HttpError(400, extra)
     if (body.wake !== true || !who) throw new HttpError(400, 'A lane watch wakes you (wake: true), for an agent or the Assistant: a script waits on cards.')
+    // Agents beside the lanes (HI-1987): each { project, agent }; left out, the last lane watch's are kept, [] drops them.
+    let laneAgents: WatchedAgent[] | undefined
+    if (body.agents !== undefined) {
+      if (!Array.isArray(body.agents)) throw new HttpError(400, 'agents must be a list of { project, agent }')
+      if (body.agents.length > AGENT_WATCH_MAX_AGENTS) throw new HttpError(400, `at most ${AGENT_WATCH_MAX_AGENTS} agents in one watch`)
+      laneAgents = []
+      for (const x of body.agents as { project?: unknown; agent?: unknown }[]) {
+        if (!x || typeof x !== 'object' || typeof x.project !== 'string') throw new HttpError(400, 'agents must be a list of { project, agent }')
+        const p = projectByName(x.project)
+        const id = await agentParam(p, x.agent as string | undefined)
+        if (!laneAgents.some((a) => resolvePath(a.projectPath).toLowerCase() === resolvePath(p).toLowerCase() && a.agentId === id)) laneAgents.push({ projectPath: p, agentId: id, name: (await agentDefOf(p, id)).name, project: basename(p) })
+      }
+      stillOpen()
+    }
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
     if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, `limitMinutes must be from 1 to ${WATCH_MAX_LIMIT_MINUTES}`)
     // Each card named must be one the caller may see, as for a card watch.
@@ -2930,11 +2985,12 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
       for (const n of extra.cards) await tasks.readTask(n, actor)
       stillOpen()
     }
-    const r = await registerLaneWatch(ws, who.projectPath, who.agentId, lc, limit, extra).catch((e: Error) => {
-      throw e instanceof HttpError ? e : new HttpError(/^(No such lane|Unknown task)/.test(e.message) ? 404 : 409, e.message)
+    const r = await registerLaneWatch(ws, who.projectPath, who.agentId, lc, limit, { ...extra, ...(laneAgents ? { agents: { agents: laneAgents, ignoreBackground: false } } : {}) }).catch((e: Error) => {
+      throw e instanceof HttpError ? e : new HttpError(/^(No such lane|Unknown task)/.test(e.message) ? 404 : /^(You can't watch yourself|Not a project)/.test(e.message) ? 400 : 409, e.message)
     })
-    return { watching: r.watching.label, limitAt: r.watching.limitAt, events: lc.events, ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}) }
+    return { watching: r.watching.label, limitAt: r.watching.limitAt, events: lc.events, ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
   }
+  if (body?.agents !== undefined) throw new HttpError(400, 'agents goes with lanes (a lane watch, HI-1987): to watch agents alone, use hive_wait_for_agents (POST /v1/agents/wait)')
   const cond = readCondition(body ?? {})
   if (typeof cond === 'string') throw new HttpError(400, cond)
   // Each card must be one the caller may see (a project agent: its project's; others are unknown to it), and stays so:
@@ -2948,8 +3004,9 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
     if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, `limitMinutes must be from 1 to ${WATCH_MAX_LIMIT_MINUTES}`)
     const r = await registerWatch(ws, who.projectPath, who.agentId, cond, limit)
-    if ('already' in r) return { already: r.already, ...withNames([r.already.number]) }
-    return { watching: r.watching.label, limitAt: r.watching.limitAt }
+    const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
+    if ('already' in r) return { already: r.already, ...left, ...withNames([r.already.number]) }
+    return { watching: r.watching.label, limitAt: r.watching.limitAt, ...left }
   }
   const seconds = body?.timeoutSeconds === undefined ? 300 : Number(body.timeoutSeconds)
   // The longest is Settings → Advanced's (#367), under Codex's timeout for hive's tools.

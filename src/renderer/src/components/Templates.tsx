@@ -109,7 +109,7 @@ const M = {
   layoutLabel: msg({ id: 'assistant.templates.layoutLabel', defaultMessage: 'Layout', description: "The template editor: the layout's label." }),
   automaticOption: msg({ id: 'assistant.templates.automaticOption', defaultMessage: 'Automatic (shows all the agents, up to six)', description: "The template editor's layouts: the one that fits the agents." }),
   agentsHeading: msg({ id: 'assistant.templates.agentsHeading', defaultMessage: 'Agents', description: "The template editor: the heading over its agents (a count follows)." }),
-  fullTip: msg({ id: 'assistant.templates.fullTip', defaultMessage: 'A template can have up to {limit} agents, as many as a project (Settings → Advanced → Agents per project)', description: 'Tooltip on Add Agent when the template is full. Keep the setting\'s path as Settings shows it.' }),
+  fullTip: msg({ id: 'assistant.templates.fullTip', defaultMessage: 'A template can have up to {limit, number} agents, the most a project can have', description: 'Tooltip on Add Agent when the template is full: {limit} is the most agents a project can have (24).' }),
   addTip: msg({ id: 'assistant.templates.addTip', defaultMessage: 'Add an agent, in the Agent Settings dialog', description: 'Tooltip on Add Agent in the template editor.' }),
   addAgent: msg({ id: 'assistant.templates.addAgent', defaultMessage: 'Add Agent…', description: "A button in the template editor: adds an agent in the Agent Settings dialog." }),
   colAgent: msg({ id: 'assistant.templates.colAgent', defaultMessage: 'Agent', description: "A template's table: the agents' names." }),

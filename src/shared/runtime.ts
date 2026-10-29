@@ -3,7 +3,7 @@ import { formatTime } from './dates'
 import { msg, tr as trNow } from './i18n'
 import { providerDescriptor } from './providers'
 import type { Tr } from './tasks'
-import type { LiveSessionState, RetryWait, RuntimeFacts } from './types'
+import type { LiveSessionState, RetryWait, RetryWaited, RuntimeFacts } from './types'
 
 /**
  * An agent's runtime as separate facts (#648), rather than one word standing for several. Each is stored where Hive
@@ -64,6 +64,22 @@ export function retryWaitCurrent(w: RetryWait, now = Date.now()): boolean {
   if (w.retryAt === null) return true
   const end = Date.parse(w.retryAt)
   return Number.isFinite(end) && end + RETRY_GRACE_MS > now
+}
+
+/**
+ * When a retry wait ended (HI-1996): now, or its `retryAt` when that passed before Hive noticed (its loop looks every few
+ * seconds), never before the wait began.
+ */
+export function retryWaitEnd(w: RetryWait, now = Date.now()): number {
+  const at = w.retryAt === null ? NaN : Date.parse(w.retryAt)
+  return Math.max(Date.parse(w.since) || now, Number.isFinite(at) && at < now ? at : now)
+}
+
+/** A launch's finished retry waits with one more (HI-1996): counted, its time added, and it the latest. */
+export function addRetryWaited(done: RetryWaited | undefined, w: RetryWait, now = Date.now()): RetryWaited {
+  const end = retryWaitEnd(w, now)
+  const ms = Math.max(0, end - (Date.parse(w.since) || end))
+  return { waits: (done?.waits ?? 0) + 1, ms: (done?.ms ?? 0) + ms, latest: { since: w.since, ended: new Date(end).toISOString(), tries: w.attempt, status: w.status, ...(w.network ? { network: true as const } : {}) } }
 }
 
 const RETRY_TEXT = msg({

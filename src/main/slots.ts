@@ -964,7 +964,7 @@ export interface PoolDeps {
   options: () => Promise<SlotOptionsNow>
   /** How many builders the project has (setBuilderCount's, for this project). */
   builders: () => number | Promise<number>
-  /** The project's agent cap (Settings → Advanced, Agents per project). */
+  /** The project's Maximum agents (its workflow, HI-2001; before, Settings → Advanced's Agents per project). */
   cap: () => number
   runner: SlotRunner
   /** Ends a recorded job and what it followed: true once none of its processes runs. */

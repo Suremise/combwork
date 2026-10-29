@@ -108,7 +108,8 @@ describe("P4's and P5's presets (#1278, #1355, §16.19.1)", () => {
       mergeChecks: ['typecheck', 'lint', 'test'],
       mergeInstall: 'always',
       okBefore: { mode: 'labels', labels: ['ui', 'release'] },
-      commands: { typecheck: 'npm run typecheck', lint: 'npm run lint', test: 'npm test' }
+      commands: { typecheck: 'npm run typecheck', lint: 'npm run lint', test: 'npm test' },
+      maxAgents: 12
     })
     expect(t).toMatchObject({ review: 'agent', reviewers: 1, finish: 'hiveMerges', target: 'trunk', strict: false, folder: 'slots', slotsUpToDate: true, reviewerMode: 'lane', identity: { name: 'Pat', email: 'p@e' } })
     expect(checkOptions('git', { project: t }).problems).toEqual([])

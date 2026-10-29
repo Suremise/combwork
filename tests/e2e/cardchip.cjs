@@ -124,6 +124,28 @@ const check = (name, ok, extra = '') => {
   const runningChip = page.locator('.running-row', { hasText: 'Coder' }).locator('.card-chip')
   check('the Workspace Overview shows it on the running agent', !!(await until(async () => (await runningChip.count()) === 1, 8000)))
   await page.screenshot({ path: path.join(lib.WORK, 'cardchip-3-overview.png') })
+  // HI-2000: with a long title the chip keeps its key whole on one line; only the title is cut. In both themes.
+  const long = 'Attention inbox: every request for the user in one place, sorted by who waits longest, with a reply box'
+  await inv('tasks:update', card.number, { title: long })
+  await until(async () => ((await runningChip.innerText().catch(() => '')) ?? '').includes('Attention inbox:'), 8000)
+  // A narrow window, so the row squeezes the chip.
+  await lib.fitWindow(app, page, { width: 640, height: 900 })
+  await until(async () => runningChip.evaluate((chip) => { const t = chip.querySelector('.card-chip-title'); return !!t && t.scrollWidth > t.clientWidth }).catch(() => false), 8000)
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+    const k = await runningChip.evaluate((chip) => {
+      const key = chip.querySelector('.card-chip-number')
+      const title = chip.querySelector('.card-chip-title')
+      const range = document.createRange()
+      if (key) range.selectNodeContents(key)
+      return { lines: key ? new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size : 0, cut: !!title && title.scrollWidth > title.clientWidth }
+    })
+    check(`…a long title: its key on one line, its title cut (${theme})`, k.lines === 1 && k.cut, JSON.stringify(k))
+    await page.locator('.running-row', { hasText: 'Coder' }).screenshot({ path: path.join(lib.WORK, `cardchip-running-long-${theme}.png`) })
+  }
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  await lib.fitWindow(app, page, { width: 1500, height: 900 })
+  await inv('tasks:update', card.number, { title: 'Attention inbox' })
   await page.locator('.activity-btn[aria-label="Projects"]').click()
   await page.locator('.project-row', { hasText: 'alpha' }).click()
 

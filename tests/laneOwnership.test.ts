@@ -78,8 +78,8 @@ describe('why a lane waits (laneStatus)', () => {
   it('a lane paused for a merge is a lane event of its own; one paused for a block is told as the block', () => {
     const now = (status: LaneNow['status']): LaneNow => ({ id: 'l', label: 'B1 / R1', mark: { state: 'paused', mergeDue: false, cards: { 1: { c: 'passed', b: false, s: false, f: '', p: '' } } }, cards: [{ number: 1, blocked: null, stalled: null, failedBy: null, passedBy: null }], status })
     const before = { state: 'active' as const, mergeDue: false, cards: { 1: { c: 'passed' as const, b: false, s: false, f: '', p: '' } } }
-    expect(laneHits(before, now({ reason: 'notMerged', card: 1 }), ['paused'])?.parts).toEqual([{ n: 1, event: 'paused', text: 'paused: waiting: #1 not merged', detail: 'notMerged' }])
-    expect(laneHits(before, now({ reason: 'blocked', card: 1 }), ['paused'])).toBeNull()
+    expect(laneHits(before, now({ reason: 'notMerged', card: 1 }), ['paused-merge'])?.parts).toEqual([{ n: 1, event: 'paused-merge', text: 'paused for a merge: waiting: #1 not merged', detail: 'notMerged' }])
+    expect(laneHits(before, now({ reason: 'blocked', card: 1 }), ['paused-merge'])).toBeNull()
   })
 })
 

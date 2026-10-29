@@ -184,7 +184,7 @@ async function theForm(page, app, inv) {
     await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
 
     // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.
-    check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'review', 'checks', 'merging', 'where', 'slots', 'loops', 'stages']), JSON.stringify(await groups()))
+    check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'merging', 'where', 'slots', 'loops', 'stages']), JSON.stringify(await groups()))
     const inGroup = async (g) => section.locator(`.workflow-group[data-group="${g}"] .workflow-option`).evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
     const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), loops: await inGroup('loops'), stages: await inGroup('stages') }
     check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Hive; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'], loops: ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes'], stages: ['stageNames'] }), JSON.stringify(layout))
@@ -446,7 +446,7 @@ async function theForm(page, app, inv) {
     await page.getByText('notes', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     await workflowTab.click()
-    check('None’s groups, in order', !!(await lib.until(async () => JSON.stringify(await groups()) === JSON.stringify(['presets', 'review', 'checks', 'work', 'loops', 'stages']), HUNG_MS)), JSON.stringify(await groups()))
+    check('None’s groups, in order', !!(await lib.until(async () => JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'work', 'loops', 'stages']), HUNG_MS)), JSON.stringify(await groups()))
     const noneLayout = { review: await inGroup('review'), checks: await inGroup('checks'), work: await inGroup('work') }
     check('…N1, N2 in Review, N3 in Checks, N4, N6 and N7 (File locks) in The work', JSON.stringify(noneLayout) === JSON.stringify({ review: ['review', 'noSelfReview'], checks: ['preChecks'], work: ['excluded', 'dependenciesDone', 'fileLocks'] }), JSON.stringify(noneLayout))
     check('…and Card loops, as Git’s', JSON.stringify(await inGroup('loops')) === JSON.stringify(['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes']))

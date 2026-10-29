@@ -1,6 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react'
-import { ADVANCED_DEFS, AGENTS_PER_PROJECT, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
-import { AGENT_LIMIT_DEFAULT, manyAgentsNote } from '@shared/defaults'
+import { ADVANCED_DEFS, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
 import { msg, tr, tRich } from '@shared/i18n'
 import { INBOX_SWITCH_ID } from '@shared/inboxSwitches'
 import type { ProviderId } from '@shared/types'
@@ -230,7 +229,6 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
           </div>
         )}
         {def.id === INBOX_SWITCH_ID.checkpoints && <InboxAvailableNote />}
-        {def.id === AGENTS_PER_PROJECT && [row.value, shownValue(def, row.override, null), shownValue(def, row.workspaceValue, null)].some((v) => typeof v === 'number' && v > AGENT_LIMIT_DEFAULT) && <ManyAgentsNote />}
         {error && <div className="field-error">{error}</div>}
       </div>
       <div className="s-control advanced-control">
@@ -268,26 +266,6 @@ function InboxAvailableNote() {
       <button className="btn small subtle" data-action="open-agent-api" onClick={() => set({ settingsSection: 'agentApi', settingsQuery: '' })}>
         {tr(msg({ id: 'settings.advancedList.inboxAvailableOpen', defaultMessage: 'Open Agent API Settings', description: 'Button in the note on whether agents can read their inbox (Settings → Advanced): shows Settings → Agent API.' }))}
       </button>
-    </div>
-  )
-}
-
-/** Agents per project over the default (#562): what more agents cost, in this machine's figures, measured as it shows. */
-function ManyAgentsNote() {
-  const [text, setText] = useState<string | null>(null)
-  useEffect(() => {
-    let live = true
-    void call('agents:memory')
-      .then((m) => live && setText(manyAgentsNote(m)))
-      .catch(() => undefined)
-    return () => {
-      live = false
-    }
-  }, [])
-  if (!text) return null
-  return (
-    <div className="advanced-note" data-note="many-agents">
-      <Icon name="info" /> {text}
     </div>
   )
 }

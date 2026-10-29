@@ -191,7 +191,6 @@ const setting = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0
 
 // Why a template file can't be used: shown in the Templates view and the dialogs that read one (window text).
 const M = {
-  tooMany: msg({ id: 'assistant.template.tooManyHere', defaultMessage: 'It has {count} agents, and this project can have up to {limit} (Settings → Advanced → Agents per project).', description: "Why a template can't be loaded into this project: it has more agents than the project allows. Keep the setting's path as Settings shows it." }),
   notTemplate: msg({ id: 'assistant.template.notTemplate', defaultMessage: "It isn't a Hive agent template.", description: "Why a template file can't be used: it isn't one." }),
   noVersion: msg({ id: 'assistant.template.noVersion', defaultMessage: "It isn't a Hive agent template (no version).", description: "Why a template file can't be used: it has no format version." }),
   newer: msg({ id: 'assistant.template.newer', defaultMessage: 'It was made by a newer version of Hive: update Hive to use it.', description: "Why a template file can't be used: a newer Hive made it." }),
@@ -212,7 +211,12 @@ const M = {
 }
 
 /** Why a template of `count` agents can't be loaded into a project that can have `limit` (#562), as text (#870). */
-export const templateLimitText = (count: number, limit: number): Text => withValues(M.tooMany, { count, limit })
+/**
+ * Why the Assistant can't load a template into a project (HI-2001): more agents than its Maximum agents. Only the
+ * Assistant's loads keep to it (the user's go past it), so it stays English.
+ */
+export const templateLimitText = (count: number, max: number): string =>
+  `It has ${count} agents, and this project's workflow allows ${max} (Maximum agents, the user's team size, in Version Control → Workflow). The user can load it themselves, or raise Maximum agents first.` // i18n-ignore: English for the Assistant (agents read it)
 
 /** Why a listed template can't be used, in the language Hive shows now (call it when rendering); undefined when it can be. */
 export const shownProblem = (t: Pick<TemplateEntry, 'problem' | 'problemText'>): string | undefined => (t.problemText ? shownText(t.problemText) : t.problem)

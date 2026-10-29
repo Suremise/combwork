@@ -34,6 +34,25 @@ export function projectPrefValue<P extends ProjectPref>(pref: P, value: unknown)
   return Object.fromEntries(branches.slice(-MAX_TREE_PREFS)) as ProjectPrefValue<P>
 }
 
+/**
+ * A view preference's key with a moved folder's old path put as its new one (HI-2008), or null when it doesn't name
+ * that folder: a project's path (`c:\work\alpha`), the Assistant's `<workspace>|<project>`, a pane's `<what>:<workspace>`.
+ * Keys are lower-cased paths; a path counts only whole (`c:\work\a` isn't in `c:\work\ab`).
+ */
+export function movedPrefKey(key: string, from: string, to: string): string | null {
+  const trim = (p: string): string => p.replace(/[\\/]+$/, '').toLowerCase()
+  const old = trim(from)
+  const now = trim(to)
+  if (!old) return null
+  const esc = old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  let hit = false
+  const next = key.replace(new RegExp(`(^|[|:])${esc}(?=$|[\\\\/|])`, 'g'), (_m, lead: string) => {
+    hit = true
+    return lead + now
+  })
+  return hit ? next : null
+}
+
 /** The map with the project's value set as the newest (null removes it), keeping the newest MAX_PREF_PROJECTS. */
 export function withProjectPref<T>(map: Record<string, T> | undefined, project: string, value: T | null): Record<string, T> {
   const next = { ...map }

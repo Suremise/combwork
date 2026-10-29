@@ -2,7 +2,9 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { cardChange, loopWakeLine, readCondition, wakeAbout, type WatchCondition } from '../src/shared/watch'
+import { cardChange, laneNextWords, loopWakeLine, readCondition, wakeAbout, type WatchCondition } from '../src/shared/watch'
+import { laneStartDue } from '../src/shared/lanes'
+import type { LaneCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
 
@@ -20,6 +22,27 @@ describe('loop wake lines (#405)', () => {
     expect(loopWakeLine({ ...cardChange(12, card, ['verdict']), about: wakeAbout(card, ['verdict'], 'b1') }, 'verdict')).toBe(
       '[Hive] #12 is in Review: R1 (alpha) failed it; latest comment by R1 (alpha): "Round 1: FAILED. 1. No delay.". This is your card in its loop: carry on (hive_read_task with latestComment for the comment in full).'
     )
+  })
+})
+
+describe("a lane's next card, after a Done one (HI-1990)", () => {
+  const lc = (number: number, column: LaneCard['column'], more: Partial<LaneCard> = {}): LaneCard => ({ number, title: `Card ${number}`, column, blocked: null, round: 1, reviewing: false, ...more })
+  it('is due for Hive to start only after a Done card, in Todo, not blocked, in an active lane', () => {
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(2, 'todo')] })?.number).toBe(2)
+    // Another lane's card before it doesn't hold it up; one Done before that does count.
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(3, 'doing', { elsewhere: 'x' }), lc(2, 'todo')] })?.number).toBe(2)
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'todo'), lc(2, 'todo')] })).toBeNull()
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'passed'), lc(2, 'todo')] })).toBeNull()
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(2, 'todo', { blocked: 'Which icon?' })] })).toBeNull()
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'done'), lc(2, 'doing')] })).toBeNull()
+    expect(laneStartDue({ state: 'paused', cards: [lc(1, 'done'), lc(2, 'todo')] })).toBeNull()
+    expect(laneStartDue({ state: 'active', cards: [lc(1, 'done')] })).toBeNull()
+  })
+  it("words what comes next in the builder's Done wake", () => {
+    expect(laneNextWords({ card: 7, title: 'Show progress', is: 'started' })).toBe(`Your lane's next card, #7 ("Show progress"), is under way: carry on with it`)
+    expect(laneNextWords({ card: 7, title: 'x'.repeat(80), is: 'waits' })).toBe(`Your lane's next card is #7 ("${'x'.repeat(59)}…"): hive_lane next says when it can start`)
+    expect(laneNextWords('last')).toBe("That was your lane's last card: the lane ends by itself, so end your turn unless you have other work")
+    expect(laneNextWords('paused')).toBe('Your lane is paused: hive_lane next says why')
   })
 })
 
@@ -969,5 +992,29 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     expect(st.typed).toEqual([])
     expect((await history(w, c)).some((h) => h.includes('Asked the builder'))).toBe(false)
     await disposeWorkspaceService(w)
+  })
+
+  it("a builder's Done wake in its lane names the lane's next card: Hive starts it with the rules on, the builder with them off (HI-1990)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    const next = (await inWorkspace(w, () => tasks.createTask({ title: 'Show progress', project: 'alpha', agent: 'b1' }, user))).number
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c, next], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'done' }, user))
+    await typedUntil(st, 1)
+    expect(st.typed).toEqual([{ agent: 'b1', text: `[Hive] #${c} is in Done. Your lane's next card is #${next} ("Show progress"): Hive starts it for you once your turn ends, so end your turn now (hive_read_task with latestComment for the comment in full).` }])
+    await disposeWorkspaceService(w)
+    // With the rules off the lane is the builder's to carry on: it starts the next card itself, whatever its card's prompt said.
+    await rulesOff()
+    const off = await open()
+    const st2 = fake(off.alpha)
+    const c2 = await newCard(off.w)
+    const next2 = (await inWorkspace(off.w, () => tasks.createTask({ title: 'Show progress', project: 'alpha', agent: 'b1' }, user))).number
+    await lanes.startLane(off.w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c2, next2], by: 'B1 (alpha)' })
+    await inWorkspace(off.w, () => tasks.updateTask(c2, { column: 'done' }, user))
+    await typedUntil(st2, 1)
+    expect(st2.typed[0].text).toBe(`[Hive] #${c2} is in Done. Your lane's next card is #${next2} ("Show progress"): start it now (hive_lane next, then hive_start_card); this card's own prompt doesn't narrow the lane (hive_read_task with latestComment for the comment in full).`)
+    await disposeWorkspaceService(off.w)
   })
 })

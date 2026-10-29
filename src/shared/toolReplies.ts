@@ -5,16 +5,77 @@
  * returns a short row per item, and full detail comes on request. No imports beyond shared code without side
  * effects: hive-mcp.js runs outside the app bundle.
  */
-import type { MergeSlotInfo, TaskCard, TaskColumn, TaskDecision } from './types'
+import type { LiveSessionState, MergeSlotInfo, TaskCard, TaskColumn, TaskDecision } from './types'
 import { holderText, minutes, slotLine } from './mergeSlot'
-import { columnLabel } from './tasks'
+import { columnLabel, commentSummary } from './tasks'
 import { cardName, cardRef, namedBy, namesFrom, namesOf } from './projectKeys'
 import { shortDuration } from './progress'
-import { LANE_DEFAULT_EVENTS, type LaneEvent, type LaneWatchCards } from './laneWatch'
+import { LANE_DEFAULT_EVENTS, type LaneEvent, type LaneWatchAgents, type LaneWatchCards } from './laneWatch'
 import type { StageId } from './workflow/facts'
 import type { NextStep } from './workflow/nextStep'
 import type { QueuePublic } from './workflow/queue'
 import { INBOX_SWITCHES, type InboxSwitch } from './inboxSwitches'
+
+/** A running agent's CLI's own default, where its launch gave none and it hasn't said (HI-1996). */
+export const CLI_DEFAULT = 'default'
+
+/**
+ * The model and effort a running agent uses (HI-1996, hive_agent_activity): what its CLI reports, else what its launch
+ * gave it (after the agent's, project's and connection's choices), else its CLI's default. Null: not running.
+ */
+export function modelInUse(st: Pick<LiveSessionState, 'modelId' | 'modelName' | 'effort' | 'launchedWith'> | null | undefined): { model: string; effort: string } | null {
+  if (!st) return null
+  return { model: st.modelId || st.modelName || st.launchedWith?.model || CLI_DEFAULT, effort: st.effort || st.launchedWith?.effort || CLI_DEFAULT }
+}
+
+/** A launch's retry waits as hive_agent_activity gives them (HI-1996); `latest.ongoing`: it waits now. */
+export interface RetryWaitsView {
+  waits: number
+  seconds: number
+  latest: { since: string; seconds: number; tries: number; status: number | null; network?: true; ongoing?: true; retryAt?: string }
+}
+
+/**
+ * A launch's time waiting for its CLI to retry a model request (HI-1996): its finished waits, with the one under way
+ * counted to now and the latest. Absent when it has had none, so a reply stays as it was.
+ */
+export function retryWaitsView(st: Pick<LiveSessionState, 'retryWait' | 'retryWaited'> | null | undefined, now = Date.now()): RetryWaitsView | undefined {
+  const done = st?.retryWaited
+  const w = st?.retryWait
+  if (!done && !w) return undefined
+  const secs = (ms: number): number => Math.max(0, Math.round(ms / 1000))
+  const doneSeconds = done ? secs(done.ms) : 0
+  if (!w) {
+    const l = done!.latest
+    return { waits: done!.waits, seconds: doneSeconds, latest: { since: l.since, seconds: secs(Date.parse(l.ended) - Date.parse(l.since)), tries: l.tries, status: l.status, ...(l.network ? { network: true as const } : {}) } }
+  }
+  const so = secs(now - (Date.parse(w.since) || now))
+  return { waits: (done?.waits ?? 0) + 1, seconds: doneSeconds + so, latest: { since: w.since, seconds: so, tries: w.attempt, status: w.status, ...(w.network ? { network: true as const } : {}), ongoing: true, ...(w.retryAt ? { retryAt: w.retryAt } : {}) } }
+}
+
+/** A card's request waiting for the user, as agents read it (TaskView.forYou); `asker` absent: Hive asked. */
+export interface CardRequest {
+  request: string
+  kind: string
+  gate: string
+  text: string
+  /** With `summary=true`, the whole text's length when `text` is only its first line (as a comment's). */
+  length?: number
+  asker?: string
+  since: string
+}
+
+/**
+ * A card's open requests for its reader (HI-1992): whole, or with `summary` each one's text cut as a comment's summary is
+ * (#532). Absent when none waits, so a card with none reads as before.
+ */
+export function cardRequests(items: readonly { request: string; kind: string; gate: string; text: string; asker: string | null; since: string }[], summary = false): CardRequest[] | undefined {
+  if (!items.length) return undefined
+  return items.map((i) => {
+    const said = summary ? commentSummary({ text: i.text }) : { text: i.text }
+    return { request: i.request, kind: i.kind, gate: i.gate, ...said, ...(i.asker ? { asker: i.asker } : {}), since: i.since }
+  })
+}
 
 /** A card as the Agent API shows it: with what its agent is doing now, and why it is stalled. */
 export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'> {
@@ -32,10 +93,10 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   /** For a project agent: the cards in blockedBy and links that are another project's (it sees only their numbers). */
   elsewhere?: number[]
   /**
-   * Its requests waiting for the user (For you, HI-1932), oldest first: each one's id (what a decision's `answers` names),
-   * kind, gate, words and who asked. Absent when none waits.
+   * Its requests waiting for the user (For you, HI-1932), oldest first, just after its decisions (HI-1992): each one's id
+   * (what a decision's `answers` names), kind, gate, words, who asked and when. Absent when none waits.
    */
-  forYou?: { request: string; kind: string; gate: string; text: string; asker?: string }[]
+  forYou?: CardRequest[]
   /**
    * Files kept with the card (HI-1700), newest first: full path (open it with your tools), name, size, who added it and
    * when, and where it came (a comment's author and time, the description, a session). `missing`: its file is gone.
@@ -533,7 +594,14 @@ export interface WaitChange {
  * card, where it is now, who changed it, the latest comment's author and first line), or no change; with `since` for the
  * next wait. Short: the full comment is hive_read_task with latestComment.
  */
-type WaitReply = { done?: string; watching?: string; limitAt?: string; already?: WaitChange; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; names?: Record<string, string> }
+type WaitReply = { done?: string; watching?: string; limitAt?: string; already?: WaitChange; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
+
+/**
+ * HI-1987: a card or agent watch that replaces a lane watch while its lanes run says what it drops, and how to keep them
+ * (the lane watch takes cards and agents beside its lanes).
+ */
+const lanesLeftText = (lanes: readonly string[] | undefined): string =>
+  lanes?.length ? ` This replaces your lane watch: ${lanes.length === 1 ? `1 running lane (${lanes[0]}) is` : `${lanes.length} running lanes (${lanes.join(', ')}) are`} no longer followed. To follow them as well, watch them with this instead: hive_wait_for_tasks with lanes, and agents or cards.` : ''
 export function taskWaitText(r: WaitReply): string {
   return namedBy(namesFrom(r.names), () => waitText(r))
 }
@@ -547,12 +615,16 @@ function waitText(r: WaitReply): string {
     const c = r.cards
     const list = (ns: number[]): string => ns.map((n) => `${cardRef(n)}`).join(', ')
     const cards = c ? `${c.kept && c.now.length ? ` It kept ${list(c.now)} from your last lane watch (cards: [] for none).` : ''}${c.replaced?.length ? (c.now.length ? ` Its cards replace ${list(c.replaced)}.` : ` It no longer watches ${list(c.replaced)}.`) : ''}${c.dropped?.length ? ` ${list(c.dropped)} left it (done or gone).` : ''}${c.inLanes?.length ? ` Warning: ${list(c.inLanes)} ${c.inLanes.length === 1 ? 'is a card' : 'are cards'} of the lanes you watch: listed too, ${c.inLanes.length === 1 ? 'it wakes' : 'they wake'} you on every move. For a lane, pass lanes only.` : ''}` : ''
-    return `${r.watching}${own ? ` (${r.events.join(', ')})` : ''}. End your turn now: Hive types a line into this session on a lane event${c?.now.length ? ` or a change to ${list(c.now)}` : ''}, or at ${r.limitAt ?? 'the limit'} if none comes.${r.replaced ? ` It replaces your watch (${r.replaced.replace(/^Waiting/, 'waiting')}).` : ''}${cards}`
+    // Its agents beside the lanes (HI-1987): kept from the last lane watch, and those not followed for not working now.
+    const a = r.agents
+    const agents = a ? `${a.kept && a.now.length ? ` It kept ${a.now.join(', ')} from your last lane watch (agents: [] for none).` : ''}${a.already?.length ? ` Not followed, not working now: ${a.already.join('; ')}.` : ''}` : ''
+    const also = [...(c?.now.length ? [`a change to ${list(c.now)}`] : []), ...(a?.now.length ? [`${a.now.join(', ')} finishing, waiting for the user or stopping`] : [])]
+    return `${r.watching}${own ? ` (${r.events.join(', ')})` : ''}. End your turn now: Hive types a line into this session on a lane event${also.length ? ` or ${also.join(' or ')}` : ''}, or at ${r.limitAt ?? 'the limit'} if none comes.${r.replaced ? ` It replaces your watch (${r.replaced.replace(/^Waiting/, 'waiting')}).` : ''}${cards}${agents}`
   }
   const line = (c: WaitChange): string =>
     `${cardRef(c.number)} ${c.changes === 'gone' ? (c.archived ? 'was archived' : 'was archived or deleted') : `is in ${c.column[0].toUpperCase()}${c.column.slice(1)} (${c.changes.join(', ')}${c.by ? `, by ${c.by}` : ''})`}${c.comment ? `; latest comment by ${c.comment.by}: "${c.comment.firstLine}"` : ''}`
-  if (r.watching) return `${r.watching}. End your turn now: Hive types a line into this session when it changes, or at ${r.limitAt ?? 'the limit'} if nothing does. Nothing runs meanwhile.`
-  if (r.already) return `Already: ${line(r.already)}.`
+  if (r.watching) return `${r.watching}. End your turn now: Hive types a line into this session when it changes, or at ${r.limitAt ?? 'the limit'} if nothing does. Nothing runs meanwhile.${lanesLeftText(r.lanesLeft)}`
+  if (r.already) return `Already: ${line(r.already)}.${lanesLeftText(r.lanesLeft)}`
   const since = r.since ? `\nsince: ${r.since}` : ''
   if (r.timedOut || !r.changes?.length) return `No change.${since}`
   return `${r.changes.map(line).join('\n')}${since}`
@@ -562,12 +634,12 @@ function waitText(r: WaitReply): string {
  * hive_wait_for_agents with wake or cancel (#416), as the model gets it: an agent watch begun (end the turn, and the card
  * watch it replaced), agents not working already (each and its state), or the cancel. The bounded wait replies as JSON.
  */
-export function agentWatchText(r: { done?: string; watching?: string; limitAt?: string; replaced?: string; dropped?: string[]; already?: string[] }): string {
+export function agentWatchText(r: { done?: string; watching?: string; limitAt?: string; replaced?: string; dropped?: string[]; already?: string[]; lanesLeft?: string[] }): string {
   if (r.done) return r.done
-  const replaced = r.replaced ? ` It replaces your card watch (${r.replaced.replace(/^Waiting/, 'waiting')}).` : ''
+  const replaced = r.lanesLeft?.length ? lanesLeftText(r.lanesLeft) : r.replaced ? ` It replaces your card watch (${r.replaced.replace(/^Waiting/, 'waiting')}).` : ''
   // #1346 item 6: the agents your earlier agent watch followed and this call doesn't; an answer at once ends it too.
   const dropped = r.dropped?.length ? ` It replaces your watch on ${r.dropped.join(', ')}: pass every agent you're following.` : ''
-  if (r.already) return `Already: ${r.already.join('; ')}.${r.replaced ? ` Your card watch (${r.replaced.replace(/^Waiting/, 'waiting')}) has ended.` : ''}${r.dropped?.length ? ` Your watch on ${r.dropped.join(', ')} has ended: watch again, passing every agent you're following.` : ''}`
+  if (r.already) return `Already: ${r.already.join('; ')}.${r.lanesLeft?.length ? lanesLeftText(r.lanesLeft) : r.replaced ? ` Your card watch (${r.replaced.replace(/^Waiting/, 'waiting')}) has ended.` : ''}${r.dropped?.length ? ` Your watch on ${r.dropped.join(', ')} has ended: watch again, passing every agent you're following.` : ''}`
   return `${r.watching}. End your turn now: Hive types a line into this session when one finishes, waits for the user or stops, or at ${r.limitAt ?? 'the limit'} if none does. Nothing runs meanwhile.${replaced}${dropped}`
 }
 

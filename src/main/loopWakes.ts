@@ -1,12 +1,13 @@
 import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { pendingStep } from '../shared/tasks'
-import type { TaskCard, TaskHistoryEntry } from '../shared/types'
+import type { LaneInfo, TaskCard, TaskHistoryEntry } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
-import { ANSWER_MAX, cardChange, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
+import { ANSWER_MAX, cardChange, LOOP_WAKE_KINDS, laneNextWords, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
 import { boardRead } from './boardStore'
 import { onHiveEvent } from './events'
-import { onLanesWritten } from './lanes'
+import { laneNow, onLanesWritten } from './lanes'
+import { laneStartDue, ownOpen } from '../shared/lanes'
 import { loopReviewerOf, poolCard } from './loopReviewer'
 import { createLogger, userText } from './logger'
 import { getTask, noteOnCard } from './tasks'
@@ -20,6 +21,7 @@ import { workspaceFor, type WorkspaceService } from './workspace'
 import { scopeOfHost, withCardNames } from './projectKeys'
 import { queueReturnOf } from './queueReturn'
 import { projectPreferences } from './workflow/preferences'
+import { rulesEnforced } from './workflow/recorder'
 
 /**
  * Hive's loop wakes (#405): a card loop's routine handoffs, delivered by Hive whether or not the agent set a card watch.
@@ -164,6 +166,30 @@ const isStep = (kind: LoopWakeKind): boolean => kind === 'step' || kind === 'ste
 const toReviewer = (kind: LoopWakeKind): boolean => kind === 'step' || kind === 'stepNotice'
 const covered = (projectPath: string, agentId: string, card: TaskCard, kind: LoopWakeKind): boolean =>
   kind !== 'note' && kind !== 'answer' && watchCovers(projectPath, agentId, card.number, kind === 'review' ? 'review' : kind === 'verdict' ? 'verdict' : kind === 'request' || isStep(kind) ? 'request' : 'moved', card.column)
+
+/**
+ * What a builder's Done wake says comes next in its lane (HI-1990), when its running lane holds the card: the lane's next
+ * card, which Hive starts for it once its turn ends (rules on: laneStarts.ts) or which it starts itself (rules off),
+ * one under way, or none left. Undefined: not a Done wake, or no lane of its holds the card. Read from the board without
+ * waiting, as the rest of the wake is decided (an await here let the builder's own watch tell the Done first): a card
+ * given to another agent is another lane's, and a paused lane says so (laneNow: the lane view's own reading).
+ */
+function laneNextOf(ws: WorkspaceService, card: TaskCard, agentId: string, kind: LoopWakeKind): string | undefined {
+  if (kind !== 'done' || card.column !== 'done') return undefined
+  let lane: LaneInfo | null
+  try {
+    lane = laneNow(ws, { card: card.number, builder: agentId })
+  } catch {
+    return undefined
+  }
+  if (!lane) return undefined
+  const cards = lane.cards
+  if (lane.state === 'paused') return laneNextWords('paused')
+  const next = cards.find(ownOpen)
+  if (!next) return laneNextWords('last')
+  const is = next.column === 'doing' || next.column === 'review' || next.column === 'passed' ? 'started' : next.column !== 'todo' || next.blocked ? 'waits' : !rulesEnforced() ? 'start' : laneStartDue(lane)?.number === next.number ? 'hiveStarts' : 'waits'
+  return laneNextWords({ card: next.number, title: next.title, is })
+}
 
 /**
  * Queues a wake for an agent (the latest per agent and card: a newer handoff of the same card replaces one still
@@ -368,7 +394,7 @@ registerSource('loop', {
     madeFrom.set(madeKey(host, r.id, v), { seq, column: card.column, key })
     if (madeFrom.size > 1000) madeFrom.delete(madeFrom.keys().next().value!)
     const kinds = kindsOf(p.kind)
-    return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: wakeAbout(card, kinds, r.agentId) }, p.kind, p.text), meta: { ...r.meta, v } }
+    return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: wakeAbout(card, kinds, r.agentId) }, p.kind, p.text, laneNextOf(ws, card, r.agentId, p.kind)), meta: { ...r.meta, v } }
   },
   // Its version made, its watch not telling it, and what it was decided from as it was: for a line being typed, also
   // nothing on the board or lanes changed (#578 round 2: it stops at once); for a hand-out (hive_inbox, and the notices

@@ -71,6 +71,18 @@ const check = (name, ok, extra = '') => {
     check("A's focus view: the strip of all six, in the panes' order", !!(await lib.until(async () => (await inFocus('A')) && (await stripNames()).join() === order(NAMES), HUNG_MS)), `${await paneName()} ${(await stripNames()).join()}`)
     check('…every row drags (Same as panes)', (await page.locator('.tile-strip-item[draggable="true"]').count()) === 6)
     check("…C's row has its card's chip", !!(await lib.until(async () => (await row('C').locator('.tile-strip-chip .card-chip').count()) === 1, HUNG_MS)))
+    // HI-2000: its key whole on one line (a chip's key broke at its hyphen where it was squeezed), in both themes.
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      const lines = await row('C').locator('.tile-strip-chip .card-chip-number').evaluate((key) => {
+        const range = document.createRange()
+        range.selectNodeContents(key)
+        return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size
+      })
+      check(`…its key on one line (${theme})`, lines === 1, String(lines))
+      await row('C').screenshot({ path: path.join(lib.WORK, `tilestrip-chip-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
 
     // A native drag with the mouse, as tilesview drags: press, nudge until the page's dragstart, over each stop in turn
     // (until the strip shows the line where the stop says), release, then wait for the drag's end.

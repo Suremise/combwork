@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 97
+const FIXTURES_VERSION = 98
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2418,6 +2418,44 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'card-loop-lane-next',
+    title: "A card loop builder whose lane's first card goes Done while it reads the wake (HI-1990): once its turn ends, Hive starts the lane's next card on it, with no prompt from the user or the Assistant",
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'doing' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
+    },
+    // The first card Done (merged, as the user moves it) while the builder is in its turn: Hive waits for the turn's end.
+    async during(c, status) {
+      if (c.doneAt || status !== 'working') return
+      const r = await c.inv('tasks:move', c.cards.a, 'done', { confirm: true, reason: 'merged by hand (the scenario)' })
+      if (r?.refused || r?.stopped) throw new Error(`moving #${c.cards.a} to Done: ${JSON.stringify(r)}`)
+      c.doneAt = Date.now()
+    },
+    // Hive's start comes after the turn: waited for (at most a minute), until its task's doorbell is in the builder's pane.
+    async keepWaiting(c) {
+      if (!c.doneAt || Date.now() - c.doneAt > 60000) return false
+      const pane = await c.inv('pty:buffer', require('../e2e/lib.cjs').ptyKey(c.alpha, c.agents.coder.id)).catch(() => '')
+      c.given ||= String(pane).includes('New in your inbox: 1 task')
+      return !c.given
+    },
+    prompt: (c) =>
+      `[Hive] #${c.cards.a} (Coder's card) is in Done. Your lane's next card is #${c.cards.b} ("greet() trims the name"): Hive starts it for you once your turn ends, so end your turn now (hive_read_task with latestComment for the comment in full).`,
+    fake: 'skill card-loop',
+    expect: (o, c) => {
+      const b = o.cards.b
+      const started = (b?.history ?? []).find((h) => /^Moved to (the (top|bottom) of )?Doing\b/.test(h.what))
+      return [
+        [`#${c.cards.b} is started on Coder (in Doing, its agent)`, b?.column === 'doing' && (b?.agent?.id ?? b?.agent) === c.agents.coder.id, `${b?.column} / ${JSON.stringify(b?.agent)}`],
+        [`Coder is given #${c.cards.b} (its task's doorbell in its pane)`, !!c.given, String(c.given)],
+        ['started by Hive or by Coder itself, nobody else', !!started && /^(Hive|Coder)/.test(started.by), JSON.stringify(started ?? null)],
+        ["didn't ask the user (no hive_notify, no question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    observe: (o) => [['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')]]
+  },
+  {
     id: 'card-loop-already-in-review',
     title: "A card loop reviewer whose next card is already in Review: the watch answers Already, and it reviews the card at once rather than retrying or asking the user (#376)",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
@@ -3303,6 +3341,37 @@ module.exports.SCENARIOS = [
       ]
     }
   })),
+  // HI-1992: an agent's question is in the card's For you, not its comments (another workspace's Assistant read the
+  // comments, found none, and called a paused lane a Hive bug). Reading the card, any form, it finds it at the top,
+  // without reading the card's history.
+  {
+    id: 'assistant-card-question',
+    title: "The Assistant asked why an agent's card waits (HI-1992): finds the agent's open question at the top of the card, not in its comments or history, and says it waits for the user",
+    role: 'assistant',
+    control: 'look',
+    async setup(c) {
+      const n = await c.card('q', { title: 'Friendlier greeting', description: 'Change greeting.txt to say something friendlier.', agent: 'coder', column: 'doing', comments: ['Started: reading greeting.txt.', 'Two wordings would work; checking with the user.'] })
+      await c.startAgent('coder')
+      const r = await c.as('coder', 'POST', `/v1/tasks/%23${n}/ask`, { kind: 'decide', text: 'Which greeting: "Hi there!" or "Hello, friend!"?' })
+      if (r.status !== 200) throw new Error(`ask: ${JSON.stringify(r.body)}`)
+      const card = await c.as('coder', 'GET', `/v1/tasks/%23${n}`)
+      // The premise: the question only in For you, never in a comment.
+      if (card.body?.forYou?.length !== 1 || (card.body?.comments ?? []).some((x) => x.text.includes('Hello, friend'))) throw new Error(`one open question, in no comment, expected: ${JSON.stringify({ forYou: card.body?.forYou, comments: card.body?.comments })}`)
+    },
+    prompt: (c) => `Coder has stopped on card #${c.cards.q} and isn't doing anything. Is that a Hive bug, or is it waiting for something? Don't change anything.`,
+    fake: (c) => `hive hive_read_task {"number":${c.cards.q},"latestComment":true}`,
+    expect: (o, c) => {
+      const reads = ran(o, 'hive_read_task').filter((x) => field(x.args, 'number', c.cards.q))
+      return [
+        ['read the card (hive_read_task)', reads.length > 0, o.hiveCalls.map((x) => x.tool).join(',')],
+        ["its reply had Coder's question", hiveReplies(o, 'hive_read_task').some((t) => t.result.includes('Hello, friend')), hiveReplies(o, 'hive_read_task').map((t) => t.result.slice(0, 160)).join(' | ')],
+        ["didn't read the card's history for it", !reads.some((x) => argsOf(x).history === true), reads.map((x) => x.args).join(' | ')],
+        ['said Coder waits for the user to answer which greeting', /Hello, friend|Hi there|which greeting|greeting/i.test(o.finalReply) && /(wait|answer|question|ask)/i.test(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
+        ['changed nothing', !ran(o, 'hive_update_task').length && !movesOf(o, c.cards.q).length && o.cards.q?.column === 'doing', o.cards.q?.column]
+      ]
+    },
+    fakeSkips: ['said Coder waits for the user to answer which greeting']
+  },
   {
     id: 'assistant-look-lanes',
     title: 'The Assistant at Look and advise asked which card loops are running (#500): lists the lanes, changes none',
@@ -3867,6 +3936,23 @@ module.exports.SCENARIOS.push(
       ]
     },
     fakeSkips: ['passed the question on to the user']
+  },
+  {
+    id: 'coordinator-build-beside-lanes',
+    title: "Coordinator mode with lanes running asked to say when an agent's work on no card is done (HI-1987): one lane watch that follows the agent too, never an agent watch in its place",
+    role: 'assistant',
+    control: 'agents',
+    mode: 'coordinator',
+    async setup(c) {
+      await twoLanes(c)
+      await busyCoder(c, 20, 300, c.agents.reviewer2)
+    },
+    prompt: "Two card loops are running in alpha: keep following them. Reviewer2 is also building a small script for me, with no card for it: tell me when it's done.",
+    fake: 'skill run-lanes then hive hive_wait_for_tasks {"lanes":["all"],"agents":[{"project":"alpha","agent":"Reviewer2"}],"wake":true,"limitMinutes":360}',
+    expect: (o) => [
+      ["ended its turn on a lane watch that also follows Reviewer2 (its live watch)", o.status === 'watching' && (o.watch?.lanes ?? []).length > 0 && (o.watch?.agents ?? []).includes('Reviewer2'), liveWatch(o)],
+      ['no agent watch left in place of the lanes', !(o.watch?.agents && !(o.watch?.lanes ?? []).length), liveWatch(o)]
+    ]
   },
   {
     id: 'coordinator-reassign',

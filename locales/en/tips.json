@@ -1003,6 +1003,14 @@
     "defaultMessage": "See why a lane isn’t moving",
     "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
   },
+  "tips.laneNext.text": {
+    "defaultMessage": "With workflow rules on, once a lane's card is Done Hive gives the next one to its builder as soon as the builder's turn is over, so the lane goes on without a prompt from you or the Assistant.",
+    "description": "A tip (HI-1990). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.laneNext.title": {
+    "defaultMessage": "Hive starts a lane's next card",
+    "description": "A tip's title (HI-1990). A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
+  },
   "tips.laneNotices.text": {
     "defaultMessage": "Hive notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
@@ -1098,6 +1106,14 @@
   "tips.mainProcessStalls.title": {
     "defaultMessage": "See why Hive felt slow",
     "description": "A tip's title."
+  },
+  "tips.maxAgents.text": {
+    "defaultMessage": "Maximum agents in Version Control → Workflow is how many agents the Assistant adds to a project, so it never brings in agents you didn’t plan for. Each preset sets its team: Solo one agent, Pair a builder and a reviewer. You can always add more yourself.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Maximum agents is a workflow option (HI-2001); Solo and Pair are presets."
+  },
+  "tips.maxAgents.title": {
+    "defaultMessage": "Your team size",
+    "description": "A tip's title (HI-2001): the workflow option Maximum agents, how many agents a project has."
   },
   "tips.mcpFromFile.text": {
     "defaultMessage": "Got a server as a .json definition or a .zip of its folder? Add MCP Server from File in the MCP view shows what it runs and adds it turned off: switch it on there to choose its projects.",
@@ -1228,8 +1244,8 @@
     "description": "A tip's title."
   },
   "tips.moreAgents.text": {
-    "defaultMessage": "Need more than {usual, plural, one {# agent} other {# agents}} in a project? Raise Agents per project in Settings → Advanced, up to {most, number}, for every workspace or just this one. Above {usual, number} it shows what they cost on your computer: the memory your running agents take, and how much is free.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {usual} is how many agents a project can have by default (12), {most} the most it can be raised to (24)."
+    "defaultMessage": "Need more than {usual, plural, one {# agent} other {# agents}} in a project? Add them yourself, up to {most, number}, and raise Maximum agents in Version Control → Workflow so the Assistant can too. Above {usual, number} it shows what they cost: the memory your running agents take, and how much is free.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {usual} is how many agents a project has by default (12), {most} the most it can have (24). Maximum agents is a workflow option (HI-2001)."
   },
   "tips.moreAgents.title": {
     "defaultMessage": "More than {usual, plural, one {# agent} other {# agents}}",

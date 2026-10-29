@@ -59,6 +59,7 @@
   "panes.footer.handOverWhen": "{when, select, now {Passe le relais à une nouvelle conversation : clique pour Passer le relais à…, et choisis l’agent lui-même.} other {Il peut passer le relais à une nouvelle conversation une fois qu’il a terminé : pas pendant qu’il travaille, fusionne ou est sur une carte d’une boucle de cartes.}}",
   "panes.footer.modelTip": "{chosenAs, select, none {} other {{model} · choisi comme {chosenAs}. }}{effort, select, yes {Modèle et effort} other {Modèle}} {provider} {live, select, yes {de cette session} other {pour les nouvelles sessions}}{reported, select, yes { (effort tel que la session l’indique)} other {}}. Modifie-les dans {where}.",
   "panes.footer.reading": "Lecture de l’utilisation de cette conversation…",
+  "panes.footer.retryWaited": "Cette session a attendu {minutes, plural, =0 {moins d’une minute} one {# minute} other {# minutes}} au total que {provider} relance des requêtes limitées ou en échec ({waits, plural, one {# attente} other {# attentes}}, la dernière depuis {time}{ongoing, select, yes {, toujours en attente} other {}}) : du temps non consacré à son travail.",
   "panes.footer.settingsName": "Paramètres de l’agent ou paramètres du projet",
   "panes.footer.stale": "Impossible de la relire à l’instant : ces chiffres sont peut-être en retard.",
   "panes.footer.tasks": "{n, plural, one {# tâche en arrière-plan} many {# tâches en arrière-plan} other {# tâches en arrière-plan}}",

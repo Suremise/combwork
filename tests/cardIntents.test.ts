@@ -289,6 +289,50 @@ describe('a card by intent (#1267)', () => {
     for (const a of ['a1', 'a2']) await watches.cancelWatch(w, repo, a)
   })
 
+  // HI-2015: LB1 watched its card, submitted, and was woken by its own move into Review ("Just the move into Review").
+  it("a builder's own submission never wakes its watch, the checks gate on; its reviewer's does, and the verdict wakes the builder", async () => {
+    const { w, repo, wt } = await workspace({ ...PAIR, preChecks: ['lint'], commands: { lint: 'npm run lint' } })
+    const card = await inLane(w)
+    const { readCondition } = await import('../src/shared/watch')
+    const { runCheck } = await import('../src/main/workflow/checks')
+    const { sessions } = await import('../src/main/sessions')
+    const deliveries = await import('../src/main/deliveries')
+    // Both agents watching and ready for a wake; each wake Hive makes is recorded.
+    const liveFor = sessions.liveFor
+    Object.assign(sessions, { liveFor: (p: string, id: string) => (id === 'a1' || id === 'a2' ? ({ projectPath: repo, agentId: id, status: 'watching', runId: `r-${id}` } as never) : liveFor.call(sessions, p, id)) })
+    const made = vi.spyOn(deliveries, 'createDelivery')
+    const wakes = (id: string): string[] => made.mock.calls.filter((c) => c[1].agentId === id && c[1].source === 'watch').map((c) => c[1].body)
+    const settle = watches.testHooks.settleMs
+    watches.testHooks.settleMs = 0
+    try {
+      // The builder watches first (card-loop's order), counting any column move; the reviewer waits for it in Review.
+      await watches.registerWatch(w, repo, 'a1', readCondition({ cards: [card], changes: ['verdict', 'column', 'comment'] }) as never)
+      await watches.registerWatch(w, repo, 'a2', readCondition({ cards: [card], column: 'review' }) as never)
+      const rev = commit(wt, 'w.txt')
+      const wf = (await service.workflowFor(w, repo))!
+      expect(await inWorkspace(w, () => runCheck(wf, { card: wf.store.card(card), name: 'lint', by: 'a1', revision: rev, exec: async () => ({ ok: true }) }))).toMatchObject({ result: 'passed', counted: true })
+      const sub = await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+      expect(sub.card.column).toBe('review')
+      expect(sub.card.history.at(-1)).toMatchObject({ by: 'Builder (p)', what: 'Moved to Review' })
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(wakes('a2')).toHaveLength(1), { timeout: 10_000 })
+      await watches.settled()
+      expect(wakes('a1')).toEqual([])
+      // A real verdict still wakes it.
+      await act(w, card, reviewer, { kind: 'startReview' })
+      await act(w, card, reviewer, { kind: 'verdict', pass: false, comment: 'Round 1: FAILED. 1. Add a test.' })
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(wakes('a1')).toHaveLength(1), { timeout: 10_000 })
+      // The verdict's wake (its wording under load is HI-2016's: told as the comment, or as the failure).
+      expect(wakes('a1')[0]).toMatch(/Round 1: FAILED|failed it/)
+    } finally {
+      made.mockRestore()
+      Object.assign(sessions, { liveFor })
+      watches.testHooks.settleMs = settle
+      for (const a of ['a1', 'a2']) await watches.cancelWatch(w, repo, a)
+    }
+  })
+
   it('no lane, or not its part in it: nothing armed (#1639)', async () => {
     const { w, repo, wt } = await workspace()
     const card = await create(w)

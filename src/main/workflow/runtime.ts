@@ -815,6 +815,10 @@ export class Workflow {
     // `reopen`: a Done card started again, or one On Hold never started (an agent's old move to Doing, #1268), back to
     // Todo and started in one write, its new cycle gathered and guarded as from Todo (§16.7.4, as the user's reopening).
     const reopening = !!opts.reopen && (s.stage === 'done' || (s.stage === 'hold' && !s.started))
+    // A lane's next card Hive has just started for this builder (HI-1990, laneStarts.ts): its own start, racing Hive's,
+    // is that start, not a refusal.
+    const forIt = s.stage === 'active' && !!s.started && !!agentOf(actor) && s.started.builder === agentOf(actor) && this.store.facts(card.id).find((f) => f.seq === s.started!.seq)?.actor === 'hive'
+    if (forIt) return this.ok(card, 'active', 'active', { folder: this.folderOf(s), line: s.started!.line, base: s.started!.base, target: s.started!.target }, [`Hive started ${card.key} for you, as your lane's next card: carry on with it.`]) // i18n-ignore: agent-facing, the start's reply
     if (s.stage !== 'todo' && !reopening) return this.notFrom(card, actor, s, 'start')
     const from: CardState = reopening ? { ...s, stage: 'todo' } : s
     // One card at a time (#1270, §16.11.2): a lane's card starts only once the cards before it in the lane are Done. The

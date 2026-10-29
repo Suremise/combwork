@@ -7,7 +7,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, blockNewsAt, laneHits, laneWakeLine, mergeStallReason, readLaneCards, readLaneCondition, readSavedLaneMark, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
+import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, blockNewsAt, keepAsked, laneHits, laneWakeLine, mergeStallReason, readLaneCards, readLaneCondition, readSavedLaneMark, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
 import { WAKE_MAX_BYTES, type CardChange } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
 import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
@@ -30,7 +30,7 @@ const card = (over: Partial<LaneMark['cards'][string]> = {}) => ({ c: 'doing' as
 describe('what a lane watch counts (#531)', () => {
   it('the condition: lane ids or "all", and events (default: all but passed and moved)', () => {
     expect(readLaneCondition({ lanes: ['all'] })).toEqual({ ids: 'all', events: LANE_DEFAULT_EVENTS })
-    expect(readLaneCondition({ lanes: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed'] })).toEqual({ ids: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed'] })
+    expect(readLaneCondition({ lanes: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed'] })).toEqual({ ids: ['lane-1a2b3c', 'lane-4d5e6f'], events: ['failed', 'passed', 'paused-user'] })
     expect(readLaneCondition({ lanes: [] })).toMatch(/lanes must be/)
     expect(readLaneCondition({ lanes: ['a b'] })).toMatch(/lanes must be/)
     expect(readLaneCondition({ lanes: ['all'], events: ['merged'] })).toMatch(/events must be/)
@@ -80,6 +80,60 @@ describe('what a lane watch counts (#531)', () => {
     expect(readSavedLaneMark(JSON.parse(JSON.stringify(news)))).toEqual(news)
     expect(readSavedLaneMark(JSON.parse(JSON.stringify(was)))!.cards[1].r).toBe(t1)
     expect(readSavedLaneMark({ ...was, cards: { 1: { ...card(), r: 'soon' } } })).toBeNull()
+  })
+
+  // HI-1991: a builder's hive_ask_user sat under For you for 20 minutes: its builder wasn't waiting at a prompt, and the
+  // Assistant had dropped `paused`, which also fired on every merge.
+  it('a question for the user on a lane card is always told (paused-user), whatever the events; a merge pause is paused-merge, and paused still reads as it', () => {
+    const t0 = '2026-10-29T00:00:00.000Z'
+    const t1 = '2026-10-29T00:10:00.000Z'
+    const t2 = '2026-10-29T00:20:00.000Z'
+    expect(LANE_DEFAULT_EVENTS).toContain('paused-user')
+    expect(LANE_DEFAULT_EVENTS).not.toContain('paused-merge')
+    expect(readLaneCondition({ lanes: ['all'], events: ['failed'] })).toEqual({ ids: 'all', events: ['failed', 'paused-user'] })
+    expect(readLaneCondition({ lanes: ['all'], events: ['paused', 'failed'] })).toEqual({ ids: 'all', events: ['paused-merge', 'failed', 'paused-user'] })
+    expect(readLaneCondition({ lanes: ['all'], events: ['paused-merge', 'paused-user'] })).toEqual({ ids: 'all', events: ['paused-merge', 'paused-user'] })
+    const now = (q: string, asked: LaneNow['cards'][number]['asked'] = null): LaneNow => ({ id: 'lane-1', label: 'B1 / R1', mark: { state: 'active', mergeDue: false, cards: { 1: card({ q }) } }, cards: [{ number: 1, blocked: null, stalled: null, failedBy: null, passedBy: null, asked }] })
+    const was: LaneMark = { state: 'active', mergeDue: false, cards: { 1: card({ q: '' }) } }
+    const ask = { since: t1, by: 'HB6', text: 'Push the tag now?\nIt is v1.0.0.' }
+    expect(laneHits(was, now(t1, ask), ['failed', 'paused-user'])!.parts).toEqual([{ n: 1, event: 'paused-user', text: '#1 waits for the user (HB6 asks)', detail: 'Push the tag now?' }])
+    // Hive's own request (no asker), a second question after the first, none new, one answered: told, told, quiet, quiet.
+    expect(laneHits(was, now(t1, { since: t1, by: null, text: 'Approve the merge?' }), ['paused-user'])!.parts[0].text).toBe('#1 waits for the user (Hive asks)')
+    expect(laneHits(now(t1).mark, now(t2, { ...ask, since: t2 }), ['paused-user'])).not.toBeNull()
+    expect(laneHits(now(t1).mark, now(t1, ask), ['paused-user'])).toBeNull()
+    expect(laneHits(now(t1).mark, now(''), ['paused-user'])).toBeNull()
+    // Not asked for (a lane notice's own events): not told. A mark from before (no q) never fires it.
+    expect(laneHits(was, now(t1, ask), ['failed'])).toBeNull()
+    expect(laneHits({ ...was, cards: { 1: card() } }, now(t1, ask), ['paused-user'])).toBeNull()
+    // A card new to the lane: a question since the watch began is told, one before it isn't.
+    expect(laneHits({ ...was, cards: {} }, now(t1, ask), ['paused-user'], t0)).not.toBeNull()
+    expect(laneHits({ ...was, cards: {} }, now(t0, { ...ask, since: t0 }), ['paused-user'], t1)).toBeNull()
+    // Its line says to tell the user, never answer for them; the mark keeps q.
+    expect(laneWakeLine([laneHits(was, now(t1, ask), ['paused-user'])!])).toBe('[Hive] Lane B1 / R1: #1 waits for the user (HB6 asks): "Push the tag now?". Your lane watch has ended: read the cards named (hive_read_task), act on them, tell the user what an agent waits for (hive_notify) and never answer it for them, then watch the lanes again (hive_wait_for_tasks with lanes).')
+    expect(readSavedLaneMark(JSON.parse(JSON.stringify(now(t1).mark)))!.cards[1].q).toBe(t1)
+    expect(readSavedLaneMark({ ...was, cards: { 1: { ...card(), q: 'soon' } } })).toBeNull()
+    // The merge pause, its own event and line; a pause for the user isn't one.
+    const paused = (status: LaneNow['status']): LaneNow => ({ ...now(''), mark: { state: 'paused', mergeDue: false, cards: { 1: card({ c: 'passed', q: '' }) } }, status })
+    expect(laneHits(was, paused({ reason: 'merging', card: 1 }), ['paused-merge'])!.parts).toEqual([{ n: 1, event: 'paused-merge', text: 'paused for a merge: waiting: #1 merging', detail: 'merging' }])
+    expect(laneHits(was, paused({ reason: 'you', card: 1 }), ['paused-merge'])).toBeNull()
+    expect(laneHits(was, paused({ reason: 'merging', card: 1 }), ['paused-user'])).toBeNull()
+  })
+
+  // HI-1991 round 1 finding: a round that couldn't read the requests saved marks without q, and the question asked
+  // meanwhile was then taken as the baseline, never told.
+  it("requests that couldn't be read keep the last mark's q (or the watch's start, for a card new to it), so a question asked meanwhile is told once read", () => {
+    const t0 = '2026-10-29T00:00:00.000Z'
+    const t1 = '2026-10-29T00:10:00.000Z'
+    const unread: LaneMark = { state: 'active', mergeDue: false, cards: { 1: card(), 2: card() } }
+    const kept = keepAsked({ state: 'active', mergeDue: false, cards: { 1: card({ q: '' }) } }, unread, t0)
+    expect(kept.cards[1].q).toBe('')
+    expect(kept.cards[2].q).toBe(t0)
+    // Read again: the question since is told.
+    const now: LaneNow = { id: 'lane-1', label: 'B1 / R1', mark: { ...unread, cards: { 1: card({ q: t1 }), 2: card({ q: '' }) } }, cards: [{ number: 1, blocked: null, stalled: null, failedBy: null, passedBy: null, asked: { since: t1, by: 'HB6', text: 'Go on?' } }, { number: 2, blocked: null, stalled: null, failedBy: null, passedBy: null, asked: null }] }
+    expect(laneHits(kept, now, ['paused-user'])!.parts.map((p) => p.n)).toEqual([1])
+    // Read marks are kept as they are; a card whose last mark is from before (no q) stays without one.
+    expect(keepAsked(null, now.mark, t0)).toBe(now.mark)
+    expect(keepAsked({ ...unread, cards: { 1: card() } }, unread, t0).cards[1].q).toBeUndefined()
   })
 
   it('a block lifted is told by default (#922, #1272); a lane ended with its merge commit names it (#1270), else as before', () => {
@@ -407,6 +461,122 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
     expect(st.told[0]).toContain(`${key} is blocked: "Screenshots for your OK"`)
     expect(st.told[0]).not.toContain(`#${a}`)
+    await disposeWorkspaceService(w)
+  })
+
+  it("HI-1991: a builder's question for the user (hive_ask_user) wakes a lane watch that dropped paused, naming the card and its first line; once only", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const { workflowFor } = await import('../src/main/workflow/service')
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    // The Legible Assistant's filter: no paused, no waiting (B1 isn't at a prompt anyway).
+    await watchAll(w, home, st, ['failed', 'blocked', 'merge-due', 'ended'])
+    const wf = (await workflowFor(w, alpha))!
+    await inWorkspace(w, () => wf.askTheUser(`#${a}`, 'agent:b1', { kind: 'decide', text: 'Keep the old setting name?\nIt is in three docs.' }))
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(new RegExp(`^\\[Hive\\] Lane B1 / R1: #${a} waits for the user \\(b1 asks\\): "Keep the old setting name\\?"\\. Your lane watch has ended: .*tell the user what an agent waits for`))
+    expect((await lanes.listLanes(w, { project: 'alpha' }))[0]).toMatchObject({ state: 'paused', status: { reason: 'you', card: a } })
+    // Watched again with the question still open: nothing new to tell.
+    await watchAll(w, home, st, ['failed'])
+    await inWorkspace(w, () => tasks.updateTask(a, { column: 'review' }, agent('b1')).catch(() => undefined))
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(st.told).toHaveLength(1)
+    await disposeWorkspaceService(w)
+  })
+
+  it("HI-1991 round 1 finding: a question asked while the cards' requests can't be read wakes the lane watch once they can, once", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const { workflowFor } = await import('../src/main/workflow/service')
+    const cardWork = await import('../src/main/workflow/cardWork')
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    await watchAll(w, home, st, ['failed'])
+    const failing = vi.spyOn(cardWork, 'forYouOfCards').mockImplementation(() => {
+      throw new Error('board busy')
+    })
+    try {
+      // A quiet round with the requests unread saves its marks; the question comes while they still can't be read.
+      await watches.evaluateWatches(w)
+      const wf = (await workflowFor(w, alpha))!
+      await inWorkspace(w, () => wf.askTheUser(`#${a}`, 'agent:b1', { kind: 'decide', text: 'Rename the event?' }))
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(failing).toHaveBeenCalled()
+      expect(st.told).toEqual([])
+    } finally {
+      failing.mockRestore()
+    }
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toContain(`#${a} waits for the user (b1 asks): "Rename the event?"`)
+    await watchAll(w, home, st, ['failed'])
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(st.told).toHaveLength(1)
+    await disposeWorkspaceService(w)
+  })
+
+  // HI-1987: the Tools Assistant swapped its lane watch for an agent watch on LB2's build (on no card), and nothing told it
+  // of LB1's lane meanwhile.
+  it('HI-1987: a lane watch follows agents beside its lanes, each until a wake tells it; one not working is its state; replacing it with an agent watch names the lanes dropped', async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    Object.assign(sessions, { agentNow: (p: string, id: string) => (p.toLowerCase() === alpha.toLowerCase() ? { status: st.agents[id] ?? 'working', runId: id, prompts: 1, pending: false, statusMessage: null, backgroundTasks: 0, reply: st.agents[id] === 'ready' ? `${id} done.` : null } : null) })
+    const of = (id: string) => ({ projectPath: alpha, agentId: id, name: id.toUpperCase(), project: 'alpha' })
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    st.agents.b3 = 'ready'
+    st.status = 'watching'
+    const r = await watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { agents: { agents: [of('b2'), of('b3')], ignoreBackground: false } })
+    expect(r.watching.label).toBe('Waiting on all running lanes and B2')
+    expect(r.agents).toEqual({ now: ['B2 (alpha)'], already: ['B3 (alpha) is idle: "b3 done."'] })
+    // B2's turn ends: the lane watch wakes, with its own line; watched again, B2 (told) has left it.
+    status(alpha, st, 'b2', 'working')
+    status(alpha, st, 'b2', 'ready')
+    await watches.evaluateAgentWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toBe('[Hive] B2 (alpha) finished: "b2 done.". Your lane watch has ended: read the cards named (hive_read_task), act on them, then watch the lanes again (hive_wait_for_tasks with lanes; your agents stay unless you pass agents, less the agents told here).')
+    await watches.settled()
+    const again = await watchAll(w, home, st)
+    expect(again.agents).toBeUndefined()
+    expect(again.watching.label).toBe('Waiting on all running lanes')
+    // Two followed, one told: the other stays with the next lane watch; agents: [] drops it.
+    st.agents.b2 = 'working'
+    st.agents.b3 = 'working'
+    await watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { agents: { agents: [of('b2'), of('b3')], ignoreBackground: false } })
+    status(alpha, st, 'b3', 'working')
+    status(alpha, st, 'b3', 'ready')
+    await watches.evaluateAgentWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
+    expect(st.told[1]).toMatch(/^\[Hive\] B3 \(alpha\) finished/)
+    await watches.settled()
+    const kept = await watchAll(w, home, st)
+    expect(kept.agents).toEqual({ now: ['B2 (alpha)'], kept: true })
+    expect((await watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { agents: { agents: [], ignoreBackground: false } })).agents).toBeUndefined()
+    // A lane event and an agent together: one line.
+    await watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { agents: { agents: [of('b2')], ignoreBackground: false } })
+    await inWorkspace(w, () => tasks.updateTask(a, { column: 'review' }, agent('b1')))
+    await fail(w, a, 'r1')
+    status(alpha, st, 'b2', 'working')
+    status(alpha, st, 'b2', 'ready')
+    st.status = 'working'
+    await watches.evaluateWatches(w)
+    await watches.evaluateAgentWatches(w)
+    st.status = 'watching'
+    await watches.tick()
+    await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
+    expect(st.told[2]).toMatch(new RegExp(`^\\[Hive\\] Lane B1 / R1: #${a} failed review \\(R1 \\(alpha\\)\\) \\| B2 \\(alpha\\) finished: "b2 done\\."\\. Your lane watch has ended`))
+    await watches.settled()
+    // An agent watch after that lane wake, with the lane still running: the reply says the lane is no longer followed.
+    st.agents.b2 = 'working'
+    const swapped = await watches.registerAgentWatch(w, home, 'assistant', { agents: [of('b2')], ignoreBackground: false })
+    expect(swapped.lanesLeft).toEqual(['B1'])
+    // A lane watch replaced by another says nothing of the kind.
+    expect('lanesLeft' in (await watchAll(w, home, st))).toBe(false)
     await disposeWorkspaceService(w)
   })
 

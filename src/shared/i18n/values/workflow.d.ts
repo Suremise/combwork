@@ -99,6 +99,7 @@ interface HiveMessageValues {
   'workflow.form.off': undefined
   'workflow.form.on': undefined
   'workflow.form.openAdvanced': undefined
+  'workflow.form.overMax': { count: number; max: number }
   'workflow.form.paste': undefined
   'workflow.form.pasteApply': undefined
   'workflow.form.pasteBad': undefined
@@ -129,6 +130,7 @@ interface HiveMessageValues {
   'workflow.group.merging': undefined
   'workflow.group.review': undefined
   'workflow.group.stages': undefined
+  'workflow.group.team': undefined
   'workflow.group.where': undefined
   'workflow.group.work': undefined
   'workflow.mergeChoice.answer': { styleTitle: string | number; style: string | number; messageTitle: string | number; message: string | number }
@@ -171,6 +173,8 @@ interface HiveMessageValues {
   'workflow.option.loopWaitHours.title': undefined
   'workflow.option.loopWakes.desc': undefined
   'workflow.option.loopWakes.title': undefined
+  'workflow.option.maxAgents.desc': undefined
+  'workflow.option.maxAgents.title': undefined
   'workflow.option.mergeChecks.desc': undefined
   'workflow.option.mergeChecks.title': undefined
   'workflow.option.mergeInstall.desc': undefined
@@ -505,6 +509,7 @@ interface HiveMessageValues {
   'workflow.why.focusedTests': undefined
   'workflow.why.folder': undefined
   'workflow.why.identity': undefined
+  'workflow.why.maxAgents': undefined
   'workflow.why.mergeChecks': undefined
   'workflow.why.mergeInstall': undefined
   'workflow.why.noSelfReview': undefined

@@ -302,6 +302,18 @@ const prose = (seed, n) => {
   // A long card's latest feedback without its whole thread; the board a page at a time.
   const newest = JSON.parse(measure('hive_read_task (comments: 2)', tool('hive_read_task', { number: target, comments: 2 })))
   check('comments=2: the description and the newest two, with a count of the rest', newest.description.length > 1000 && newest.comments.length === 2 && newest.commentsOmitted === read.comments.length + 2 - 2 && newest.comments.at(-1).text === 'Done: see the branch.', JSON.stringify({ n: newest.comments?.length, omitted: newest.commentsOmitted }))
+  // A card with a question waiting for the user (HI-1992): it comes just after the decisions (here after the title), with
+  // who asked and when, in the latest comment's form too; with summary, its words cut as a comment's.
+  // One of alpha's cards in Doing (the Todo counts below stay), given to the coder.
+  const asking = numbers[52]
+  await inv('tasks:update', asking, { agent: coder.id })
+  const question = `Which greeting: "Hi" or "Hello"?\n\n${prose(300, 1200)}`.trim()
+  check('the coder asks the user on its card', !tool('hive_ask_user', { card: `#${asking}`, kind: 'decide', text: question }, 'own').isError)
+  const asked = JSON.parse(measure('hive_read_task (an open question)', tool('hive_read_task', { number: asking })))
+  const askedKeys = Object.keys(asked)
+  check('…the read has it at the top: id, who asked, the question, when', askedKeys.indexOf('forYou') === askedKeys.indexOf('title') + 1 && asked.forYou?.length === 1 && /\/r\d+$/.test(asked.forYou[0].request) && asked.forYou[0].asker === 'Coder' && asked.forYou[0].text === question && !Number.isNaN(Date.parse(asked.forYou[0].since)), JSON.stringify(asked.forYou))
+  const askedLatest = JSON.parse(measure('hive_read_task (latestComment, an open question)', tool('hive_read_task', { number: asking, latestComment: true, summary: true }), 1000))
+  check('…the latest comment with summary: it first, cut to its first line', JSON.stringify(Object.keys(askedLatest)) === '["number","forYou","comment"]' && askedLatest.forYou[0].text === 'Which greeting: "Hi" or "Hello"?' && askedLatest.forYou[0].length === asked.forYou[0].text.length && askedLatest.forYou[0].asker === 'Coder',JSON.stringify(askedLatest).slice(0, 400))
   // Waiting on cards: lean replies (a bounded wait with nothing new; a column already reached; a watch begun and
   // cancelled, as the Assistant: a script has nobody to wake).
   const waited = measure('hive_wait_for_tasks (no change)', tool('hive_wait_for_tasks', { cards: [target], timeoutSeconds: 1 }), 300)
@@ -442,7 +454,9 @@ const prose = (seed, n) => {
   const longReply = prose(8, 7000)
   entry({ type: 'assistant', requestId: 'req_long_end', message: { model: 'claude-fake', content: [{ type: 'text', text: longReply }], usage: { input_tokens: 1, output_tokens: 1 } } })
   await lib.sleep(500)
-  const activity = JSON.parse(measure('hive_agent_activity', tool('hive_agent_activity', { project: 'alpha', agent: 'Coder' }, 'assistant'), 1800))
+  // 1900 (HI-1996): its model and effort added, a slow round told from a throttled one.
+  const activity = JSON.parse(measure('hive_agent_activity', tool('hive_agent_activity', { project: 'alpha', agent: 'Coder' }, 'assistant'), 1900))
+  check('activity: the model and effort it runs with (the fake reports neither: its CLI’s default)', activity.model === 'default' && activity.effort === 'default' && !('retryWaits' in activity), JSON.stringify({ model: activity.model, effort: activity.effort, retryWaits: activity.retryWaits }))
   const detail = JSON.parse(measure('hive_agent_activity (detail)', tool('hive_agent_activity', { project: 'alpha', agent: 'Coder', detail: true }, 'assistant'), 8500))
   const shortOk = activity.toolCalls === 12 && activity.recentTools.length === 3 && activity.currentTask.length <= 301 && activity.latestReply.length <= 501 && activity.recentTools.every((t) => t.summary.length <= 101)
   check('activity: the short form is clipped as described (300, 500, last 3 calls at 100)', shortOk, JSON.stringify({ calls: activity.toolCalls, tools: activity.recentTools?.length, task: activity.currentTask?.length, reply: activity.latestReply?.length }))

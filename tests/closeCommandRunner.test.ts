@@ -9,7 +9,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { runJob, TailRing, TAIL_BYTES, WRITE_MS, type RunnerDeps } from '../src/main/closeCommand/runner'
-import { planRun, pruneRuns, runFolderName, runPrefix, runsCloseCommands, startRun, tailLines, READ_TAIL_BYTES, PANEL_LINES, LINE_CHARS } from '../src/main/closeCommand/runs'
+import { carryRuns, planRun, pruneRuns, runFolderName, runPrefix, runsCloseCommands, startRun, tailLines, READ_TAIL_BYTES, PANEL_LINES, LINE_CHARS } from '../src/main/closeCommand/runs'
 import { fillCloseCommand } from '../src/shared/closeCommand'
 
 const base = tempDir('hive-close-runner-')
@@ -189,6 +189,47 @@ describe('the runs kept', () => {
     mkdirSync(join(root, quit))
     await pruneRuns(root, runPrefix('workspace', A))
     expect(readdirSync(root).sort()).toEqual([running, ...old.slice(2), ...other, quit].sort())
+  })
+
+  it('a moved workspace (HI-2007): its ended runs take its new place, the newest five of all kept; one still running stays', async () => {
+    const root = folder()
+    const made = (place: string, i: number, status: object): string => {
+      const f = `${runFolderName(runPrefix('workspace', place), new Date(Date.UTC(2026, 9, 28, 12, 0, i)))}-0000000${i}`
+      mkdirSync(join(root, f), { recursive: true })
+      writeFileSync(join(root, f, 'status.json'), JSON.stringify(status))
+      return f
+    }
+    const ended = { state: 'exited', runnerPid: 1 }
+    const running = made(A, 0, { state: 'running', runnerPid: process.pid })
+    Array.from({ length: 4 }, (_, i) => made(A, i + 1, ended))
+    // Already at the new place: two runs since the move.
+    Array.from({ length: 2 }, (_, i) => made(B, i + 10, ended))
+    const C = 'd:/three/work'
+    const other = made(C, 1, ended)
+    // The one still going is left, for the caller to carry once it has ended.
+    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toEqual({ moved: 4, going: [running], stuck: [], stopped: false })
+    const left = readdirSync(root)
+    // Under the old place: only the run still going. Under the new: the newest five (two of its own, three carried).
+    expect(left.filter((f) => f.startsWith(runPrefix('workspace', A)))).toEqual([running])
+    const now = left.filter((f) => f.startsWith(runPrefix('workspace', B))).sort()
+    expect(now.map((f) => f.slice(runPrefix('workspace', B).length))).toEqual([2, 3, 4, 10, 11].map((i) => `${new Date(Date.UTC(2026, 9, 28, 12, 0, i)).toISOString().replace(/[:.]/g, '-')}-0000000${i}`))
+    expect(left).toContain(other)
+    // Again: nothing more to move.
+    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toEqual({ moved: 0, going: [running], stuck: [], stopped: false })
+  })
+
+  it('a moved run whose name is already taken at the new place is stuck, with why; `proceed` false stops before a rename', async () => {
+    const root = folder()
+    const at = runFolderName(runPrefix('workspace', A), new Date(Date.UTC(2026, 9, 28, 12, 0, 1)))
+    const there = runPrefix('workspace', B) + at.slice(runPrefix('workspace', A).length)
+    for (const f of [at, there]) {
+      mkdirSync(join(root, f))
+      writeFileSync(join(root, f, 'status.json'), JSON.stringify({ state: 'exited', runnerPid: 1 }))
+    }
+    const r = await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))
+    expect(r).toMatchObject({ moved: 0, going: [], stopped: false, stuck: [{ name: at, why: expect.stringMatching(/^EEXIST/) }] })
+    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B), () => false)).toEqual({ moved: 0, going: [], stuck: [], stopped: true })
+    expect(readdirSync(root).sort()).toEqual([at, there].sort())
   })
 
   it('two workspaces of the same name: their runs apart, by their real places', () => {

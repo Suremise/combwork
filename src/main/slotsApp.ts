@@ -21,7 +21,6 @@ import { agentReadsInbox, cancelFromSource, createDelivery, deliveriesOf, fromSo
 import { containsPlace } from './fsutil'
 import { getLane } from './lanes'
 import { createLogger, userText } from './logger'
-import { agentLimit } from './projectAgents'
 import { progress, progressGate } from './progressService'
 import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
@@ -38,6 +37,7 @@ import { endLeaseJob, journalPath, LeaseJob, leaseJobGone, retireSeal, startLaun
 import { defaultProbe } from './workflow/queueProcs'
 import { workflowFor } from './workflow/service'
 import { projectAgents } from '../shared/defaults'
+import { agentMax } from './projectAgents'
 import { openEntry } from '../shared/workflow/facts'
 import { LANES_END_WAIT_MINUTES, LANES_GENTLE_END, SLOTS_REMOVE_IDLE, SLOTS_SETUP_MINUTES } from '../shared/advanced'
 import type { SlotTestOp, SlotView } from '../shared/types'
@@ -252,7 +252,7 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       root,
       options: async () => slotOptionsOf(await ws.projectConfig(projectPath), slotLevelsOf(config.settings, ws)),
       builders: () => builderCountOf(projectPath, async () => projectAgents(await ws.projectConfig(projectPath)).length),
-      cap: () => agentLimit(projectPath),
+      cap: () => agentMax(projectPath),
       runner: appRunner(ws, projectPath, root),
       settle: async (job) => {
         const ok = await appSettle(root)(job)

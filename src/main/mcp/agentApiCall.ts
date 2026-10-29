@@ -17,6 +17,12 @@ export interface ApiReply {
 /** How long a call that isn't a wait may take, as fetch allowed before. */
 export const REPLY_MS = 300_000
 
+/**
+ * How long a stop waits for the user's answer (HI-1994): less than a call may take (REPLY_MS), so the caller hears it
+ * timed out, rather than "Hive didn't reply" with the question left open.
+ */
+export const STOP_ASK_MS = REPLY_MS - 30_000
+
 /** Sends a request and reads the whole reply; rejects if it hasn't all come within `replyMs`, or can't be sent. */
 export function agentApiCall(url: string, method: string, headers: Record<string, string>, body: string | undefined, replyMs = REPLY_MS): Promise<ApiReply> {
   return new Promise((resolve, reject) => {

@@ -572,6 +572,12 @@ export interface AppConfig {
   /** Always on Top: the workspaces (lowercased paths) whose window was left pinned. This machine's, never in .hive. */
   alwaysOnTop?: Record<string, true>
   /**
+   * Moved workspaces whose records here by folder (the window's pin, the close command's runs) are still to follow them
+   * (HI-2007): one per old folder, `to` where the workspace is now, kept until nothing is left at `from`, tried at each
+   * open and Repair (workspaceMove.ts carryProfile). `failed`: why the last try left something it could have moved.
+   */
+  profileMoves?: ProfileMove[]
+  /**
    * Antivirus scanning (#316), this machine's: the exclusions Hive added (resolved paths), Defender's list as last read
    * with administrator rights, and per workspace (lowercased path) the last suggestion (its folders, when and how many
    * times; a plain string is #316's form, the folders only) and "Don't ask again".
@@ -795,6 +801,12 @@ export interface WorkspaceConfig {
   assistantConnection?: Partial<Record<ProviderId, string | null>>
   /** Where the workspace was last opened (#146): a different folder now means it was moved, and Repair… is offered. */
   lastPath?: string
+  /**
+   * The folder Hive's profile keeps this workspace's records by (HI-2007: its window's pin, its close command's runs),
+   * set once they have all followed it here. Apart from lastPath, which stays where Repair needs it until Repair is done:
+   * moved again before that, the records are found where they went.
+   */
+  profileAt?: string
   /** The last project rename (#514, `project-names.json`'s number) its hidden and removed projects follow. */
   renamesApplied?: number
   /**
@@ -1416,6 +1428,11 @@ export interface ProjectConfig {
   /** Where the project folder was last opened (#146), as workspace.json's lastPath. */
   lastPath?: string
   /**
+   * The folder Hive's profile keeps this project's view preferences by (HI-2008), set once they have followed it here:
+   * apart from lastPath, which stays where Repair needs it until Repair is done, as workspace.json's profileAt.
+   */
+  profileAt?: string
+  /**
    * Folders that moved (an agent's worktree repaired or recreated at a new place) whose CLI data (copyPathData) isn't
    * all copied yet (#146): kept until a copy works, so Repair tries again, after a restart too.
    */
@@ -1544,7 +1561,7 @@ export interface ProjectProviderConfig {
   use200kContext: Inherit<'on' | 'off'>
 }
 
-/** One of a project's agents (up to Agents per project, #562). Settings left undefined follow the project's. */
+/** One of a project's agents (up to 24, #562; the Assistant's up to Maximum agents, HI-2001). Settings left undefined follow the project's. */
 export interface AgentDef {
   /** Random and never reused, so session records of removed agents don't attach to new ones. */
   id: string
@@ -1628,6 +1645,11 @@ export interface TemplateLoadPlan {
   blocked: string[]
   /** Its workflow (HI-1910) as it meets this project's: null when it has none. */
   workflow: TemplateLoadWorkflow | null
+  /**
+   * More agents than the project's Maximum agents (HI-2001): `now` is it, `needs` the template's agents. The user's load
+   * goes ahead, and its dialog offers to raise the maximum; the Assistant's is refused (`blocked`). Null when they fit.
+   */
+  maxAgents: { now: number; needs: number } | null
 }
 
 /**
@@ -2083,6 +2105,16 @@ export interface RetryWait {
   network?: true
 }
 
+/**
+ * The retry waits this launch has finished (HI-1996): how many, their time together (ms), and the latest one (from its
+ * first try, `since`, to when it ended, as RetryWait says), for telling a throttled round from a slow one afterwards.
+ */
+export interface RetryWaited {
+  waits: number
+  ms: number
+  latest: { since: string; ended: string; tries: number; status: number | null; network?: true }
+}
+
 export interface LiveSessionState {
   provider: ProviderId
   /** This launch, until the process exits; hooks name it so they reach the right agent. */
@@ -2135,6 +2167,8 @@ export interface LiveSessionState {
    * With no `retryAt` (HI-1973: Copilot doesn't say), it stands until one of those.
    */
   retryWait?: RetryWait
+  /** The retry waits this launch has finished (HI-1996); absent until one has. retryWait is the one under way. */
+  retryWaited?: RetryWaited
   /**
    * Facts of its runtime besides its turn and background tasks, each set where Hive learns it, never read back from the
    * status word (#648; shared/runtime.ts agentRuntime() gathers them all, and the labels are projected from them).
@@ -2175,6 +2209,11 @@ export interface LiveSessionState {
     /** A server connection's (HI-1772): its models as launched, so the footer shows the real model and what it stands in for, and whether it runs only on this PC (its server is, and none of its models runs elsewhere: HI-1773). */
     server?: { models: ServerModel[]; local?: boolean }
   }
+  /**
+   * The model and effort this launch gave its CLI (HI-1996), after the agent's, project's, provider's and connection's
+   * choices; null: none given, so its CLI's own default. What the CLI reports once it runs is `modelId` and `effort`.
+   */
+  launchedWith?: { model: string | null; effort: string | null; /** The model was the agent's own choice, not a default. */ own?: true }
   /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */
   switchPending?: boolean
   /** Its conversation ran only on servers on this PC (HI-1772): free, its cost a known $0, shown as "free (local)". */
@@ -2307,9 +2346,21 @@ export interface WorkspaceInfo {
 }
 
 /** What moved (#146): the workspace (from its old folder), or only some of its projects. */
+/** A moved workspace's records by folder still to follow it (HI-2007, config.json's `profileMoves`). */
+export interface ProfileMove {
+  from: string
+  to: string
+  failed?: string
+}
+
 export interface WorkspaceMoved {
   /** The workspace's old folder; null when only projects moved (renamed or moved in from elsewhere). */
   from: string | null
+  /**
+   * Old folders whose records by folder (the close command's runs) the last try couldn't all bring here (HI-2007), and
+   * why: Repair tries again. A run still going there isn't one: it follows once it has ended. Absent when there are none.
+   */
+  profile?: { from: string; failed: string }[]
   /** The projects that moved, by name. */
   projects: string[]
   /** Projects that didn't move but have a worktree's sessions or data still to follow it to a new folder (#146). */
@@ -2467,7 +2518,7 @@ export type MoveReportWhat =
   | { kind: 'sessions' }
   | { kind: 'copy'; provider: ProviderId }
   | { kind: 'board'; from: string }
-  | { kind: 'saved' | 'recent' | 'working' | 'defender' }
+  | { kind: 'saved' | 'recent' | 'working' | 'defender' | 'closeRuns' }
 
 /** A step of Repair's report as a table row (#1313): what, where it was and is, and how it went in a few words. */
 export interface MoveReportRow {
@@ -3277,6 +3328,8 @@ export type HiveEvent =
   | { type: 'advanced-changed' }
   /** One project's view preference saved (ui:setProjectPref): every window's store follows. */
   | { type: 'ui-pref-changed'; pref: ProjectPref; project: string; value: unknown }
+  /** Panes' sizes and states moved to other keys (HI-2008: a moved workspace's): every window's store follows; null removes one. */
+  | { type: 'ui-panes-changed'; panes: Record<string, number | null> }
   /** What the tips know changed (ui:changeTips): every window's store follows. */
   | { type: 'tips-changed'; tips: TipsState }
   | { type: 'provider-install'; provider: ProviderId; info: AgentInstallInfo }

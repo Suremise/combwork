@@ -130,6 +130,7 @@ interface HiveMessageValues {
   'main.move.branchUnrecorded': { host: string | number; agent: string | number; to: string | number; why: string | number }
   'main.move.cards': { n: number; from: string | number; to: string | number }
   'main.move.cardsNotMoved': { host: string | number; agent: string | number; path: string | number; why: string | number }
+  'main.move.closeRunsFailed': { why: string | number }
   'main.move.copied': { n: number; owner: string; host: string | number; provider: string | number; agent: string | number; of: string | number }
   'main.move.copyFailed': { n: number; owner: string; host: string | number; provider: string | number; folder: string | number; files: string | number; agent: string | number; of: string | number }
   'main.move.copyKept': { n: number; owner: string; host: string | number; provider: string | number; folder: string | number; files: string | number; agent: string | number; of: string | number }

@@ -226,8 +226,12 @@ export function changesSince(card: TaskCard | null, base: Baseline & { since: st
   const out: WatchChange[] = []
   // Any move into the column counts, also for a watch that waits only to see it there (#521): a starting mark carried
   // over from a wake can say the card was there when it has left and come back since (told in Review, then Doing).
-  const moved = !!cond.column && h.some((e) => intoColumn(e.what) === cond.column)
-  if (kinds.has('column') && (now.column !== base.mark.column || moved) && (!cond.column || now.column === cond.column)) out.push('column')
+  // The watcher's own moves aren't news (HI-2015: a builder's submission moving its card into Review woke its watch):
+  // a column changed only by its moves since doesn't count, nor a move into the column of its own.
+  const moves = h.filter((e) => intoColumn(e.what))
+  const ownMoves = !!base.watcher && moves.length > 0 && moves.every((e) => e.by === base.watcher)
+  const moved = !!cond.column && h.some((e) => intoColumn(e.what) === cond.column && e.by !== base.watcher)
+  if (kinds.has('column') && ((now.column !== base.mark.column && !ownMoves) || moved) && (!cond.column || now.column === cond.column)) out.push('column')
   if (kinds.has('comment') && c.length) out.push('comment')
   if (kinds.has('verdict') && h.some((e) => VERDICT.test(e.what))) out.push('verdict')
   if (kinds.has('agent') && now.agent !== base.mark.agent) out.push('agent')
@@ -459,9 +463,13 @@ const NOTE_MAX = 600
 /** And of the user's answer (#1626): its reply whole, up to this; the card's comment has it in full. */
 export const ANSWER_MAX = 4000
 
-export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string): string {
+/**
+ * `next`: for a builder's card Done in its lane (HI-1990), what comes next in the lane, in its words (laneNextWords),
+ * told in place of carrying on with the card.
+ */
+export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string, next?: string): string {
   const who =
-    kind === 'review' ? 'You review this card in its loop: carry on with it' : kind === 'step'
+    kind === 'done' && next ? next : kind === 'review' ? 'You review this card in its loop: carry on with it' : kind === 'step'
         ? "You review this card in its loop: check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)"
         : kind === 'stepNotice'
           ? 'Nothing to answer: carry on with your loop'
@@ -473,6 +481,28 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
   const whose = kind === 'request' ? 'The reviewer asks' : kind === 'step' || kind === 'stepNotice' ? 'The builder' : kind === 'stepAnswer' ? 'The reviewer' : 'Hive'
   const what = !said.length ? '' : `. ${whose}: "${said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('')}"`
   return lineOf(change, `${what}. ${who} (hive_read_task with latestComment for the comment in full).`)
+}
+
+/**
+ * What comes next in a builder's lane, as its Done wake says it (HI-1990; English, agent-facing): its next card, which
+ * Hive starts for it once its turn ends (`hiveStarts`, rules on), for it to start (`start`, rules off), already under way
+ * (`started`) or not yet startable (`waits`); the lane paused; or none left.
+ */
+export function laneNextWords(next: { card: number; title: string; is: 'hiveStarts' | 'start' | 'started' | 'waits' } | 'paused' | 'last'): string {
+  if (next === 'paused') return 'Your lane is paused: hive_lane next says why'
+  if (next === 'last') return "That was your lane's last card: the lane ends by itself, so end your turn unless you have other work"
+  const title = [...next.title.trim()]
+  const card = `${cardRef(next.card)} ("${title.length > 60 ? `${title.slice(0, 59).join('')}…` : title.join('')}")`
+  switch (next.is) {
+    case 'hiveStarts':
+      return `Your lane's next card is ${card}: Hive starts it for you once your turn ends, so end your turn now`
+    case 'start':
+      return `Your lane's next card is ${card}: start it now (hive_lane next, then hive_start_card); this card's own prompt doesn't narrow the lane`
+    case 'started':
+      return `Your lane's next card, ${card}, is under way: carry on with it`
+    case 'waits':
+      return `Your lane's next card is ${card}: hive_lane next says when it can start`
+  }
 }
 
 /**

@@ -12,7 +12,8 @@ import { stageNameProblems } from './stages'
  * The options a template carries (Darren, 28 Oct ~01:25): the rules of review, checks (by name), carrying a pass over,
  * merging, your OK, where cards are built, the identity's on/off, agents' runs, dependencies, card loops and the stage
  * names; and G16 and file locks, how agents share a folder (HR5's OK on the design). G20, each card's focused tests
- * (HI-1367), is a rule too: its runner and picker are commands, the loading project's own (HR4's OK, HI-1949).
+ * (HI-1367), is a rule too: its runner and picker are commands, the loading project's own (HR4's OK, HI-1949). Maximum
+ * agents (HI-2001): the team the template is for.
  */
 export const TEMPLATE_CARRIED = [
   'review',
@@ -39,7 +40,8 @@ export const TEMPLATE_CARRIED = [
   'loopRounds',
   'loopWaitHours',
   'loopStepWaitMinutes',
-  'stageNames'
+  'stageNames',
+  'maxAgents'
 ] as const satisfies readonly OptionKey[]
 
 /**

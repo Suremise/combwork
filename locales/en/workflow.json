@@ -391,6 +391,10 @@
     "defaultMessage": "Open Advanced",
     "description": "A button beside the note that workflow rules aren’t enforced: opens Settings → Advanced."
   },
+  "workflow.form.overMax": {
+    "defaultMessage": "This project has {count, plural, one {# agent} other {# agents}}: none is removed, but the Assistant can’t add another until it has fewer than {max, number}.",
+    "description": "Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max})."
+  },
   "workflow.form.paste": {
     "defaultMessage": "Paste JSON…",
     "description": "The button pasting workflow options copied from another project."
@@ -510,6 +514,10 @@
   "workflow.group.stages": {
     "defaultMessage": "Stages",
     "description": "A heading of the Workflow section: the names of the board’s stages (glossary 2.2: stage)."
+  },
+  "workflow.group.team": {
+    "defaultMessage": "Team",
+    "description": "A heading of the Workflow section: how many agents the project has (its team, HI-2001)."
   },
   "workflow.group.where": {
     "defaultMessage": "Where cards are built",
@@ -678,6 +686,14 @@
   "workflow.option.loopWakes.title": {
     "defaultMessage": "Wake reviewers and builders",
     "description": "A workflow option, under Card loops: Hive wakes the agents of a card loop for its handoffs (glossary: card loop)."
+  },
+  "workflow.option.maxAgents.desc": {
+    "defaultMessage": "Your team size: the most agents the Assistant (and programs using the Agent API) add to this project, though you can add more yourself and lowering it removes none.",
+    "description": "What the workflow option “Maximum agents” does. Agent API is the name of a Hive feature."
+  },
+  "workflow.option.maxAgents.title": {
+    "defaultMessage": "Maximum agents",
+    "description": "A workflow option (HI-2001): the most agents the project has, its team size. The Hive Assistant adds agents only up to it."
   },
   "workflow.option.mergeChecks.desc": {
     "defaultMessage": "Hive’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.",
@@ -2014,6 +2030,10 @@
   "workflow.why.identity": {
     "defaultMessage": "Commits name the project’s identity, whoever’s computer made them.",
     "description": "Why Pair and Team turn on “Commits use the project’s identity”."
+  },
+  "workflow.why.maxAgents": {
+    "defaultMessage": "Each preset is for a team of its size (one agent solo, a builder and a reviewer as a pair), so the Assistant never adds agents you didn’t plan for.",
+    "description": "Why the presets set “Maximum agents” as they do (Solo: 1; Pair: 2; Team: 12)."
   },
   "workflow.why.mergeChecks": {
     "defaultMessage": "The checks run on the work as it will be once merged, not only as it was built.",

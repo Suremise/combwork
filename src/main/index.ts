@@ -2,6 +2,7 @@
 import './threadPool'
 import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watches'
 import { initLoopWakes } from './loopWakes'
+import { migrateAgentsPerProject } from './workflow/preferences'
 import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
 import { initReviewsOnOpen } from './reviewsOnOpen'
@@ -112,6 +113,7 @@ import { agentTokenFile } from './agentTokens'
 import { progress, setTaskbarTestHook, startProgress } from './progressService'
 import { startMergeSlots } from './mergeSlotHost'
 import { startLanes } from './lanes'
+import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
 import { checkInstallDir } from './installDir'
 import { exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
@@ -882,6 +884,8 @@ app.whenReady().then(async () => {
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
+  // Agents per project from before HI-2001: Maximum agents in Hive's workflow defaults now.
+  await migrateAgentsPerProject()
   // Show developer features is one of them too, kept under its settings key: the file and the setting stay one value.
   bindAdvancedSettings(config)
   // The developer console's flight recorder (#698): its triggers are advanced settings, followed as they change.
@@ -1181,6 +1185,8 @@ app.whenReady().then(async () => {
   startProgress()
   startMergeSlots()
   startLanes()
+  // A lane's next card, started on its builder once the card before it is Done (HI-1990).
+  startLaneStarts()
   startHandOverCheck()
   // Test builds can record the taskbar's progress calls, which the page can't see.
   if (!app.isPackaged && process.env.HIVE_TEST_TASKBAR_LOG) {

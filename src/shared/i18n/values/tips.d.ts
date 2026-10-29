@@ -252,6 +252,8 @@ interface HiveMessageValues {
   'tips.laneBranchSquash.title': undefined
   'tips.laneGates.text': undefined
   'tips.laneGates.title': undefined
+  'tips.laneNext.text': undefined
+  'tips.laneNext.title': undefined
   'tips.laneNotices.text': undefined
   'tips.laneNotices.title': undefined
   'tips.laneSlots.text': undefined
@@ -276,6 +278,8 @@ interface HiveMessageValues {
   'tips.loopWakes.title': undefined
   'tips.mainProcessStalls.text': undefined
   'tips.mainProcessStalls.title': undefined
+  'tips.maxAgents.text': undefined
+  'tips.maxAgents.title': undefined
   'tips.mcpFromFile.text': undefined
   'tips.mcpFromFile.title': undefined
   'tips.mcpPerAgent.text': undefined

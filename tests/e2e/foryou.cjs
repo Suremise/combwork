@@ -442,6 +442,14 @@ const check = (name, ok, extra = '') => {
     const read = await asAssistant('GET', `/v1/tasks/${t}`)
     const waiting = read.json?.forYou ?? []
     check("hive_read_task lists the card's open requests with their ids", read.status === 200 && waiting.length === 3 && waiting.every((x) => /\/r\d+$/.test(x.request)) && waiting[0].text === 'First: which icon?', JSON.stringify(read.json?.forYou))
+    // HI-1992: at the top, just after its decisions (it has none yet: after its title), each with who asked and when; in
+    // every form of hive_read_task, the latest comment's too.
+    const keys = Object.keys(read.json ?? {})
+    check('…at the top, after its title, each saying who asked and when', keys.indexOf('forYou') === keys.indexOf('title') + 1 && waiting.every((x) => x.asker === 'Maker' && !Number.isNaN(Date.parse(x.since))), JSON.stringify({ keys: keys.slice(0, 4), waiting }))
+    const forms = { comments: `/v1/tasks/${t}?comments=1&history=false`, summary: `/v1/tasks/${t}?summary=true&history=false`, latest: `/v1/tasks/${t}/comments/latest`, latestSummary: `/v1/tasks/${t}/comments/latest?summary=true` }
+    const inForms = {}
+    for (const [name, route] of Object.entries(forms)) inForms[name] = (await asAssistant('GET', route)).json?.forYou?.map((x) => x.text)
+    check('…in every form: newest comments, summary, latest comment', Object.values(inForms).every((x) => JSON.stringify(x) === JSON.stringify(waiting.map((w) => w.text))), JSON.stringify(inForms))
     const [first, second, third] = waiting.map((x) => x.request)
     // The listing reads them for all its cards at once (HR1 r1); its short rows carry none.
     const listed = await asAssistant('GET', '/v1/tasks?project=beta')

@@ -39,7 +39,7 @@ import { workflowForm } from './workflow/optionsForm'
 import { config } from './config'
 import { placeKey, readKeptJson, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
-import { addAgent, agentLimit, agentsGone, prepareAgent } from './projectAgents'
+import { addAgent, agentMax, agentsGone, prepareAgent, type AddedBy } from './projectAgents'
 import { assertConnectionHere, connectionProblem, getAccount } from './accounts'
 import { projectKeyOf } from './projectKeys'
 import { providerService } from './providerService'
@@ -507,17 +507,24 @@ const busy = (projectPath: string, agentId: string): boolean => !!sessions.liveF
  * Hive's own templates' agents whose provider can't run here runs one that can (`swaps`), said on its row.
  */
 export async function templatePlan(projectPath: string, scope: TemplateScope, file: string, from?: string, names?: string[], reads?: wt.RepoReads): Promise<TemplateLoadPlan> {
-  return (await planFor(projectPath, scope, file, from, names, reads)).plan
+  return (await planFor(projectPath, scope, file, from, names, reads, 'user')).plan
 }
 
-/** The plan with what stops it in English (HI-1502: the Agent API's), where `blocked` says it in the window's language. */
+/**
+ * The plan with what stops it in English (HI-1502: the Agent API's, the Assistant's), where `blocked` says it in the
+ * window's language. Its agents keep to the project's Maximum agents (HI-2001).
+ */
 export async function templatePlanEnglish(projectPath: string, scope: TemplateScope, file: string, from?: string, names?: string[]): Promise<{ plan: TemplateLoadPlan; why: string[] }> {
-  const { plan, why } = await planFor(projectPath, scope, file, from, names)
+  const { plan, why } = await planFor(projectPath, scope, file, from, names, undefined, 'agent')
   return { plan, why: why.map((w) => englishText(w)) }
 }
 
-/** The plan, with what stops it as text (`why`, which `blocked` says in the window's language): a load refuses with it. */
-async function planFor(projectPath: string, scope: TemplateScope, file: string, from?: string, names?: string[], reads?: wt.RepoReads): Promise<{ plan: TemplateLoadPlan; why: TextPart[] }> {
+/**
+ * The plan, with what stops it as text (`why`, which `blocked` says in the window's language): a load refuses with it.
+ * `by` (HI-2001): the user's load goes past the project's Maximum agents (the plan says so, for its dialog to offer to
+ * raise it); an agent's is refused there.
+ */
+async function planFor(projectPath: string, scope: TemplateScope, file: string, from: string | undefined, names: string[] | undefined, reads: wt.RepoReads | undefined, by: AddedBy): Promise<{ plan: TemplateLoadPlan; why: TextPart[] }> {
   projectPath = workspace.assertProject(projectPath)
   const repo = reads ?? new wt.RepoReads(projectPath)
   const status = statusReads(projectPath, repo)
@@ -567,9 +574,11 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
       blocked.push(withValues(M.neededBy, { ...why, agents: listOf(agents) }))
     }
   }
-  // It replaces the project's agents: all of them have to fit (#562).
-  const limit = agentLimit(projectPath)
-  if (create.length > limit) blocked.push(templateLimitText(create.length, limit))
+  // It replaces the project's agents: an agent's load keeps to Maximum agents (HI-2001); the user's goes past it, offered
+  // to raise it. A template never has more than any project can (`readTemplate`).
+  const max = agentMax(projectPath, cfg)
+  const maxAgents = create.length > max ? { now: max, needs: create.length } : null
+  if (maxAgents && by === 'agent') blocked.push(templateLimitText(create.length, max))
   // Names another project's agent has (#702): this project's own don't count, as the load replaces them.
   const others = (await workspaceAgents(projectPath)).filter((a) => a.project.toLowerCase() !== basename(projectPath).toLowerCase())
   const takenNames = create.flatMap((a) => {
@@ -588,7 +597,7 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
     return a.connection && problem ? [{ index, id: a.connection, ...(name ? { name } : {}), problem }] : []
   })
   const workflow = await planWorkflow(projectPath, original)
-  const plan: TemplateLoadPlan = { scope: t.scope, file: t.file, name: t.name, layout: t.layout, remove, create, templateNames: expanded, taken: takenNames, pairs, swaps, suggestedPreset, reviewerMode: original.reviewerMode ?? null, missing, connections, blocked: blocked.map(shownText), workflow }
+  const plan: TemplateLoadPlan = { scope: t.scope, file: t.file, name: t.name, layout: t.layout, remove, create, templateNames: expanded, taken: takenNames, pairs, swaps, suggestedPreset, reviewerMode: original.reviewerMode ?? null, missing, connections, blocked: blocked.map(shownText), workflow, maxAgents }
   return { plan, why: blocked }
 }
 
@@ -597,7 +606,7 @@ async function planFor(projectPath: string, scope: TemplateScope, file: string, 
  * they are now, or why none applies (a Git-only template in a None project needs Git first). Hive's own carry their
  * preset's, made here as the project's form offers it (its suggested checks, its identity), with their reviewer mode.
  */
-async function planWorkflow(projectPath: string, t: Pick<TemplateEntry, 'scope' | 'workflow' | 'workflowDropped' | 'suggestedPreset' | 'reviewerMode'>): Promise<TemplateLoadWorkflow | null> {
+async function planWorkflow(projectPath: string, t: Pick<TemplateEntry, 'scope' | 'workflow' | 'workflowDropped' | 'suggestedPreset' | 'reviewerMode' | 'agents'>): Promise<TemplateLoadWorkflow | null> {
   if (!hasWorkflow(t.workflow) && !t.workflowDropped?.length) return null
   const form = await workflowForm(workspaceOf(projectPath), projectPath)
   const sections = TEMPLATE_PLATFORMS.filter((p) => !!t.workflow?.[p])
@@ -605,7 +614,8 @@ async function planWorkflow(projectPath: string, t: Pick<TemplateEntry, 'scope' 
   if (section && t.scope === 'hive' && t.suggestedPreset) {
     const offered = form.presets.find((p) => p.id === t.suggestedPreset)?.options
     // Read again as any section is: what Hive makes goes through the same whitelist.
-    if (offered) section = readTemplateWorkflow(templateWorkflowOf({ ...offered, ...(form.platform === 'git' && t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}) }, t.suggestedPreset), form.platform) ?? section
+    // Their size as their Maximum agents (HI-2001): the team the template is.
+    if (offered) section = readTemplateWorkflow(templateWorkflowOf({ ...offered, ...(form.platform === 'git' && t.reviewerMode ? { reviewerMode: t.reviewerMode } : {}), maxAgents: t.agents.length }, t.suggestedPreset), form.platform) ?? section
   }
   return {
     platform: form.platform,
@@ -681,7 +691,7 @@ export interface TemplateLoaded {
  *   so is its workflow (HI-1910): returned as this load read it, for the window to fill in the Workflow form with.
  */
 export async function loadTemplate(projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>): Promise<{ created: string[]; removed: string[]; workflow: TemplateWorkflow | null }> {
-  const r = await loadTemplateWith(projectPath, scope, file, expected, { from, names, connections })
+  const r = await loadTemplateWith(projectPath, scope, file, expected, { from, names, connections, by: 'user' })
   return { created: r.created, removed: r.removed, workflow: r.workflow }
 }
 
@@ -693,12 +703,13 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
  * plan or at the names lock (the window's words without it); the result has the agents and layout before and after, for
  * undo.
  */
-export async function loadTemplateWith(projectPath: string, scope: TemplateScope, file: string, expected: string[], o: { from?: string; names?: string[]; connections?: Record<number, string | null>; check?: (plan: TemplateLoadPlan) => Promise<void>; guard?: () => void; taken?: Taken } = {}): Promise<TemplateLoaded> {
+export async function loadTemplateWith(projectPath: string, scope: TemplateScope, file: string, expected: string[], o: { from?: string; names?: string[]; connections?: Record<number, string | null>; check?: (plan: TemplateLoadPlan) => Promise<void>; guard?: () => void; taken?: Taken; by?: AddedBy } = {}): Promise<TemplateLoaded> {
+  const by = o.by ?? 'agent'
   projectPath = workspace.assertProject(projectPath)
   return whileReplacing(projectPath, M.fenced, async () => {
     // The plan's reads of the repository, which staging goes on using (#732).
     const reads = new wt.RepoReads(projectPath)
-    const { plan, why } = await planFor(projectPath, scope, file, o.from, o.names, reads)
+    const { plan, why } = await planFor(projectPath, scope, file, o.from, o.names, reads, by)
     if (why.length) throw new TemplateError({ lines: [msg({ id: 'content.templates.cantLoad', defaultMessage: "The template can't be loaded yet:", description: "An error loading a template, above the list of what stops it (each line a reason)." }), ...why.map((item) => withValues(msg({ id: 'content.templates.bullet', defaultMessage: '• {item}', description: 'A line of a list of reasons: a bullet, then the reason {item}.' }), { item }))] })
     const changed = (ids: string[]): boolean => !Array.isArray(expected) || ids.length !== expected.length || ids.some((id, i) => id !== expected[i])
     if (changed(plan.remove.map((a) => a.id))) throw refusal(msg({ id: 'content.templates.changedSince', defaultMessage: "The project's agents changed since you looked: open the template again.", description: "An error loading a template: the project's agents changed after the Load template dialog showed them." }), undefined, 'conflict')
@@ -731,6 +742,7 @@ export async function loadTemplateWith(projectPath: string, scope: TemplateScope
       before = await replaceProjectAgents(projectPath, {
         next: staged.map((s) => s.def),
         layout: plan.layout,
+        by,
         check: (list) => {
           // The caller's guard (the Assistant's control and launch, HI-1502) at the write itself, under the lock.
           try {
@@ -779,11 +791,11 @@ async function whileReplacing<T>(projectPath: string, fenceWhy: Msg, fn: () => P
  * names checked against the other projects' agents holding the workspace's names lock (#702: another project may have
  * taken one meanwhile; `taken` words the refusal, never a name made up), then one write under the project file's lock,
  * only if `check` passes on the agents as they are now (the caller's: those it expects), none of them runs or is
- * starting, the new ones fit Agents per project as it is now and each one's connection can be used here (HI-1769). A
+ * starting, an agent's load fits Maximum agents as it is now (HI-2001) and each one's connection can be used here (HI-1769). A
  * removed agent's worktree whose setup never ran is remembered for the next agent given it (#289). Returns the agents and
  * layout it replaced; what follows a removal (`agentsGone`) is the caller's, once it is published.
  */
-async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; layout: PageLayout; check: (list: AgentDef[], now: ProjectConfig) => void; taken: Taken }): Promise<{ agents: AgentDef[]; layout: PageLayout }> {
+async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; layout: PageLayout; by: AddedBy; check: (list: AgentDef[], now: ProjectConfig) => void; taken: Taken }): Promise<{ agents: AgentDef[]; layout: PageLayout }> {
   let before: { agents: AgentDef[]; layout: PageLayout } | null = null
   await withAgentNames(projectPath, async () => {
     const others = (await workspaceAgents(projectPath)).filter((a) => a.project.toLowerCase() !== basename(projectPath).toLowerCase())
@@ -796,9 +808,9 @@ async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; 
       const list = projectAgents(now)
       r.check(list, now)
       if (list.some((a) => busy(projectPath, a.id))) throw refusal(msg({ id: 'content.templates.started', defaultMessage: 'An agent started meanwhile: nothing was changed. Stop it first.', description: "An error loading a template: one of the project's agents started while it loaded, so nothing changed." }), undefined, 'conflict')
-      // The limit as it is now: Settings may have lowered it since the plan.
-      const limit = agentLimit(projectPath)
-      if (r.next.length > limit) throw refusal(M.nothing, { problem: templateLimitText(r.next.length, limit) })
+      // Maximum agents as it is now, for an agent's load (HI-2001): the workflow may have lowered it since the plan.
+      const max = agentMax(projectPath, now)
+      if (r.by === 'agent' && r.next.length > max) throw refusal(M.nothing, { problem: templateLimitText(r.next.length, max) })
       // Each one's connection as it is now (HI-1769): one turned off or removed while they were prepared stops it.
       for (const def of r.next) if (def.connection) assertConnectionHere(def.connection, def.provider!, projectPath, def.name)
       // The layout as kept (auto when none was chosen), so undo puts back exactly what was there.
@@ -819,7 +831,8 @@ async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; 
 export async function restoreProjectAgents(projectPath: string, back: { agents: AgentDef[]; layout: PageLayout }, check: (list: AgentDef[], now: ProjectConfig) => void, taken: Taken): Promise<void> {
   projectPath = workspace.assertProject(projectPath)
   await whileReplacing(projectPath, M.restoring, async () => {
-    const was = await replaceProjectAgents(projectPath, { next: back.agents, layout: back.layout, check, taken })
+    // What was there before: put back whatever Maximum agents is now (HI-2001), as the user's own agents were.
+    const was = await replaceProjectAgents(projectPath, { next: back.agents, layout: back.layout, by: 'user', check, taken })
     const kept = new Set(back.agents.map((a) => a.id))
     await agentsGone(projectPath, was.agents.filter((a) => !kept.has(a.id)).map((a) => a.id))
   })
@@ -848,7 +861,7 @@ function connectionsFor(projectPath: string, plan: TemplateLoadPlan, answers: Re
  * agent of the workspace has it), else its pattern made with the project's key, a name already taken numbered
  * ("Builder 2").
  */
-export async function addAgentFromTemplate(projectPath: string, scope: TemplateScope, file: string, index: number, from?: string, chosen?: string): Promise<AgentDef & { connectionFallback?: { name: string; problem: ConnectionProblem } }> {
+export async function addAgentFromTemplate(projectPath: string, scope: TemplateScope, file: string, index: number, from?: string, chosen?: string, by: AddedBy = 'agent'): Promise<AgentDef & { connectionFallback?: { name: string; problem: ConnectionProblem } }> {
   projectPath = workspace.assertProject(projectPath)
   const t = await usable(refFor(projectPath, scope, file, from))
   const a = Number.isInteger(index) ? t.agents[index] : undefined
@@ -860,6 +873,6 @@ export async function addAgentFromTemplate(projectPath: string, scope: TemplateS
   const name = typeof chosen === 'string' && chosen.trim() ? withNames([{ ...a, name: own }], [chosen])[0].name : uniqueName(own, (await workspaceAgents(projectPath)).map((x) => x.name))
   // Its connection where it can be used here (HI-1769); else the workspace's default, which the reply says.
   const problem = a.connection ? connectionProblem(a.connection, a.provider, projectPath) : null
-  const def = await addAgent(projectPath, { name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, connection: problem ? undefined : a.connection, location: 'project' })
+  const def = await addAgent(projectPath, { name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, connection: problem ? undefined : a.connection, location: 'project' }, by)
   return problem ? { ...def, connectionFallback: { name: getAccount(a.connection!)?.name ?? a.connectionName ?? a.connection!, problem } } : def
 }

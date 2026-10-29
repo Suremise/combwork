@@ -6,7 +6,7 @@
 //    from the target's head; reviewed, passed, Hive's queue merges it, and the lane keeps slot-a;
 // 2. card 2 starts in slot-a from the new target, installed again first (card 1 changed the lock file), and card 1's
 //    line, merged, is deleted (LineDeleted on card 1);
-// 3. with one slot (Agents per project: 1), a second lane waits ("waiting for a slot", paused) and starts in slot-a once
+// 3. with one slot (Maximum agents: 1), a second lane waits ("waiting for a slot", paused) and starts in slot-a once
 //    the first ends, its builder there; the first's builder is stopped;
 // 4. HI-2014 (Legible's LE-249): the second lane's card 3, committed and not merged, moved to Done by the user's override:
 //    slot-a leaves its line (detached at the target's head), the line kept; card 4, which depends on it, is told it
@@ -103,8 +103,8 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
     const b2 = await lib.addAgent(inv, alpha, { name: 'B2', workflowRole: 'builder' })
     const r2 = await lib.addAgent(inv, alpha, { name: 'R2', workflowRole: 'reviewer' })
-    // One slot for the project: its pool is its builders, at most Agents per project.
-    await inv('advanced:set', 'hive.agents.perProject', 1)
+    // One slot for the project: its pool is its builders, at most its Maximum agents (HI-2001).
+    await lib.setMaxAgents(inv, 1)
     const live = async (id) => (await inv('session:live')).find((s) => same(s.projectPath, alpha) && s.agentId === id) ?? null
     const launches = () => {
       const f = path.join(home, 'fake-launches.jsonl')

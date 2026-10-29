@@ -5,7 +5,7 @@
 // valid in advanced.json listed as such, an override made for another CLI version flagged with Keep), changing a value
 // (marked modified, its default beside it, written to advanced.json, Reset), a value refused, advanced.json edited by
 // hand (the list follows; a number written as text read as the number), the developer switch and advanced.json as one
-// value, a workspace's own value (workspace.json), Agents per project's note above 12 (#562), Settings' search and Modified only (Settings' and the list's), Copy
+// value, a workspace's own value (workspace.json), Agents per project gone (HI-2001), Settings' search and Modified only (Settings' and the list's), Copy
 // Diagnostics, and Reset all settings clearing advanced.json. The fake Claude Code (2.1.999) is the installed CLI; no
 // agent runs. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -160,24 +160,8 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     check('the window uses it', state.workspace?.['hive.progress.lanesShown'] === 2, JSON.stringify(state.workspace))
     check("Settings' own value stays beside it", (await lanes.getByLabel('Hive: Progress panel: lanes shown', { exact: true }).inputValue()) === '6')
 
-    // --- Agents per project (#562): above 12, a note on what more agents cost, in this computer's figures.
-    const agentsRow = row('hive.agents.perProject')
-    const note = agentsRow.locator('[data-note="many-agents"]')
-    check('Agents per project: 12, and no note', (await agentsRow.getByLabel('Hive: Agents per project', { exact: true }).inputValue()) === '12' && (await note.count()) === 0)
-    const agentsOwn = agentsRow.getByLabel('Agents per project, this workspace', { exact: false })
-    await agentsOwn.fill('20')
-    await agentsOwn.press('Enter')
-    const noteText = async () => ((await note.count()) ? await note.innerText() : '')
-    check("this workspace at 20: a note on memory and the plans' limits, with this computer's figures", !!(await lib.until(async () => /this computer has \d+\.\d GB of memory, \d+(\.\d)? [GM]B free\. They all share your plans' usage limits/.test(await noteText()), HUNG_MS)), await noteText())
-    check('…in workspace.json, the limit Hive uses here', !!(await lib.until(async () => (await inv('advanced:state')).workspace?.['hive.agents.perProject'] === 20, HUNG_MS)))
-    await agentsRow.scrollIntoViewIfNeeded()
-    await page.screenshot({ path: path.join(lib.WORK, 'advanced-4-agents.png') })
-    await agentsOwn.fill('25')
-    await agentsOwn.press('Enter')
-    check('25 is refused: 24 at the most', !!(await lib.until(async () => /24/.test(await agentsRow.locator('.field-error').innerText().catch(() => '')), HUNG_MS)), await agentsRow.innerText())
-    await agentsOwn.fill('')
-    await agentsOwn.press('Enter')
-    check('emptied: Settings\' 12 again, and no note', !!(await lib.until(async () => (await inv('advanced:state')).workspace?.['hive.agents.perProject'] === undefined && (await note.count()) === 0, HUNG_MS)))
+    // Agents per project and its note moved to Version Control → Workflow (HI-2001): maxagents and agents24.
+    check('Agents per project is no longer listed', (await page.locator('.advanced-row[data-advanced="hive.agents.perProject"]').count()) === 0)
 
     // --- Remembered (HI-1839): Codex chosen, Settings reopened on it.
     await tab('codex').click()
