@@ -480,6 +480,46 @@ describe("head and heads from the .git files, as git answers them (HI-2050)", ()
     }
   })
 
+  // HR3's round 1: a config git refuses, or might, is git's to answer: unknown where git can't read the repository.
+  const configs: [string, (repo: string) => void, boolean][] = [
+    ['a malformed config', (r) => writeFileSync(join(r, '.git', 'config'), `${readFileSync(join(r, '.git', 'config'), 'utf8')}[broken\n`), true],
+    ['an unsupported format version', (r) => sh(r, 'config', 'core.repositoryformatversion', '999'), true],
+    ['an unknown extension', (r) => (sh(r, 'config', 'core.repositoryformatversion', '1'), sh(r, 'config', 'extensions.hi2050unknown', 'true')), true],
+    ['an include (git reads its file)', (r) => (writeFileSync(join(r, '..', 'inc'), '[broken\n'), sh(r, 'config', 'include.path', join(r, '..', 'inc').replace(/\\/g, '/'))), true],
+    ['a continued line', (r) => writeFileSync(join(r, '.git', 'config'), `${readFileSync(join(r, '.git', 'config'), 'utf8')}[hi2050]\n\tlong = one \\\n two\n`), false]
+  ]
+  for (const [what, make, refused] of configs)
+    it(`${what}: git, as before${refused ? ' (unknown, as git refuses it)' : ''}`, async () => {
+      repo = gitRepo(join(tempDir('git-'), 'r'))
+      sh(repo, 'branch', 'side')
+      make(repo)
+      expect(gitHead(repo) === null).toBe(refused)
+      await sameHead(repo, true)
+      const h = await counted(() => G.heads(repo, 'side'))
+      expect(h.ran.length).toBeGreaterThan(0)
+      if (refused) {
+        expect(isUnknown(h.value.head)).toBe(true)
+        expect(isUnknown(h.value.line)).toBe(true)
+      } else expect(h.value).toEqual({ line: 'main', head: gitHead(repo), target: gitTarget(repo, 'side') })
+    })
+
+  it("a linked worktree's own config (worktreeConfig on): plain, from the files; one git refuses: git, unknown", async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'side', wt, 'main')
+    sh(repo, 'config', 'extensions.worktreeConfig', 'true')
+    sh(wt, 'config', '--worktree', 'hi2050.own', 'yes')
+    await sameHead(wt, false)
+    await sameHeads(wt, 'main', false)
+    const own = join(sh(wt, 'rev-parse', '--path-format=absolute', '--git-dir'), 'config.worktree')
+    writeFileSync(own, `${readFileSync(own, 'utf8')}[broken\n`)
+    expect(gitHead(wt)).toBeNull()
+    await sameHead(wt, true)
+    const h = await counted(() => G.heads(wt, 'main'))
+    expect(isUnknown(h.value.head)).toBe(true)
+    expect(h.ran.length).toBeGreaterThan(0)
+  })
+
   it('a reftable repository: git', async (t) => {
     const r = join(tempDir('git-'), 'reftable')
     try {
