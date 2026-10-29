@@ -17,6 +17,10 @@ vi.mock('../src/main/processSupervisor', () => ({
   JobHost: class {
     usable = true
     pid = 1
+    instance = 1
+    async ensure() {
+      return true
+    }
     async request(cmd: string, runId?: string) {
       if (cmd === 'list') return host.listing.has(runId!) ? host.listing.get(runId!) : null
       if (cmd === 'kill') {

@@ -42,7 +42,17 @@ const tracker = vi.hoisted(() => ({
   endedRuns: new Set<string>(),
   forgotten: [] as string[],
   /** Which of the processes asked about still run (by default every one). */
-  stillRunning: null as null | ((list: Proc[]) => Proc[] | null)
+  stillRunning: null as null | ((list: Proc[]) => Proc[] | null),
+  /**
+   * HI-2055: each run's keeper state as `keeperState` would take it (null: none, or not one it takes), the Hive it was
+   * asked for, whether a helper is still bound (`bound`, by default yes), what is done while it is read (`reading`), and
+   * the keepers' states forgotten once their writers were cleared.
+   */
+  keeper: new Map<string, { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: Proc[] }>(),
+  keeperAsked: [] as string[],
+  bound: (_run: string, _helper: string) => true,
+  reading: () => undefined as void,
+  keeperForgotten: [] as string[]
 }))
 vi.mock('../src/main/agentProcesses', async (orig) => ({
   ...((await orig()) as object),
@@ -56,7 +66,14 @@ vi.mock('../src/main/agentProcesses', async (orig) => ({
   stillRunningOf: async (list: Proc[]) => (tracker.stillRunning ? tracker.stillRunning(list) : list),
   endedEarlier: async (run: string) => tracker.endedRuns.has(run),
   forgetEarlierRun: (run: string) => void tracker.forgotten.push(run),
-  endProcessesExactly: async (list: Proc[]) => (tracker.endedExactly.push({ list, at: tracker.writerAt() }), tracker.endWorks)
+  endProcessesExactly: async (list: Proc[]) => (tracker.endedExactly.push({ list, at: tracker.writerAt() }), tracker.endWorks),
+  keeperState: async (run: string, hive: string) => {
+    tracker.keeperAsked.push(hive)
+    tracker.reading()
+    return tracker.keeper.get(run) ?? null
+  },
+  keeperStillBound: (run: string, helper: string) => tracker.bound(run, helper),
+  forgetKeeperRun: (run: string) => void tracker.keeperForgotten.push(run)
 }))
 vi.mock('../src/main/lastRun', async (orig) => ({ ...((await orig()) as object), lastUnexpectedClose: () => (tracker.restart.length ? { processes: tracker.restart } : null) }))
 
@@ -65,7 +82,7 @@ const base = tempDir('slotwriters-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { boardFile, onBoardCommitted } = await import('../src/main/boardStore')
 const { SlotPool, SlotStore, fileSlotConn } = await import('../src/main/slots')
-const { goneWriterCleared, goneWriterSettles, heldSlots, heldWriter, releaseHeldWriter, setWriterHost, writerOver } = await import('../src/main/agentFolders')
+const { goneWriterCleared, goneWriterSettles, goneWriterStill, heldSlots, heldWriter, releaseHeldWriter, setWriterHost, writerOver } = await import('../src/main/agentFolders')
 const { releasableSlots, releaseSlot, SlotReleaseRefused } = await import('../src/main/slotRelease')
 const { settleRunForTests } = await import('../src/main/agentProcesses')
 const { sessions } = await import('../src/main/sessions')
@@ -150,7 +167,7 @@ afterAll(async () => {
  * another Hive (a writer's holder) still runs, as the probe says it (null: can't be told).
  */
 function hostOn(others: boolean | null = true): void {
-  pool = new SlotPool({ store, project, root: base, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 2, runner: async () => ({ ok: true, exitCode: 0, settled: true, logPath: null }), settle: async () => true, holder: { self: async () => me, alive: async () => others, live }, writerOver: (w) => writerOver(w), writerGone: { settles: (w) => goneWriterSettles(project, w), cleared: goneWriterCleared } })
+  pool = new SlotPool({ store, project, root: base, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 2, runner: async () => ({ ok: true, exitCode: 0, settled: true, logPath: null }), settle: async () => true, holder: { self: async () => me, alive: async () => others, live }, writerOver: (w) => writerOver(w), writerGone: { settles: (w) => goneWriterSettles(project, w), cleared: goneWriterCleared, still: goneWriterStill } })
   setWriterHost({ self: async () => me, alive: async (pid) => (pid === me.pid ? true : others), live, track: async () => pool.trackWriter(), drained: async (_p, slot) => pool.drained(slot) })
 }
 const start = () => inWorkspace(ws, () => sessions.start(project, { agentId: 'b1' }))
@@ -571,6 +588,11 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
     tracker.stillRunning = null
     tracker.ended.length = 0
     tracker.writerAt = () => null
+    tracker.keeper.clear()
+    tracker.keeperAsked.length = 0
+    tracker.bound = () => true
+    tracker.reading = () => undefined
+    tracker.keeperForgotten.length = 0
   })
   const node = { pid: 5150, name: 'node.exe', label: 'node serve.js', created: '133900000000000000' }
   const claude = { pid: 6160, name: 'claude.exe', label: 'claude', created: '133900000000000001' }
@@ -605,6 +627,72 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
     const state = await start()
     expect(writer()?.run).toBe(state.runId)
     expect(tracker.forgotten).toEqual(['r-own'])
+  })
+
+  describe("its keeper's state (HI-2055: the helper that held its job, kept past its Hive)", () => {
+    const helper = '4242:133900000000000099'
+    const hive = () => `${me.pid + 1}:5`
+
+    it('"ended" from the helper its run is bound to: freed at the slot sweep, asked for its own Hive, its state then forgotten', async () => {
+      hostOn(false)
+      await plant('r-kept', { ended: true })
+      tracker.keeper.set('r-kept', { state: 'ended', helper })
+      await pool.settleGoneWriters()
+      expect(writer()).toBeNull()
+      expect(tracker.keeperAsked).toEqual([hive()])
+      expect(tracker.keeperForgotten).toEqual(['r-kept'])
+      expect(tracker.endedExactly).toEqual([])
+    })
+
+    it('"ended": its own agent\'s start (a restart\'s resume) takes the slot back', async () => {
+      hostOn(false)
+      await plant('r-kept-own')
+      tracker.keeper.set('r-kept-own', { state: 'ended', helper })
+      const state = await start()
+      expect(writer()?.run).toBe(state.runId)
+      expect(tracker.keeperForgotten).toEqual(['r-kept-own'])
+    })
+
+    it('its helper revoked while the state is read: the clear is refused inside its write, held, and the state kept', async () => {
+      hostOn(false)
+      await plant('r-revoked', { ended: true })
+      tracker.keeper.set('r-revoked', { state: 'ended', helper })
+      tracker.reading = () => {
+        tracker.bound = () => false
+      }
+      await pool.settleGoneWriters()
+      expect(writer()?.run).toBe('r-revoked')
+      expect(tracker.keeperForgotten).toEqual([])
+      expect(await startRefusal()).toMatch(/still has another session in it/)
+      expect(writer()?.run).toBe('r-revoked')
+      await store.clearWriterRun('r-revoked')
+    })
+
+    it('"live": held, its members still running (checked again by id and start time) listed, nothing ended', async () => {
+      hostOn(false)
+      await plant('r-live', { ended: true })
+      tracker.keeper.set('r-live', { state: 'live', helper, members: [node, claude] })
+      tracker.stillRunning = (list) => list.filter((p) => p.pid === node.pid)
+      await pool.settleGoneWriters()
+      expect(writer()?.run).toBe('r-live')
+      expect((await heldWriter(project, 'slot-a'))?.processes).toEqual({ list: [node], more: 0, from: 'restart' })
+      // None of them can be confirmed still running: held all the same, with nothing listed as running.
+      tracker.stillRunning = () => null
+      expect((await heldWriter(project, 'slot-a'))?.processes).toBeNull()
+      await pool.settleGoneWriters()
+      expect(writer()?.run).toBe('r-live')
+      expect(tracker.endedExactly).toEqual([])
+      await store.clearWriterRun('r-live')
+    })
+
+    it("none taken (missing, not its own, malformed: keeperState's null): held, as before", async () => {
+      hostOn(false)
+      await plant('r-none', { ended: true })
+      await pool.settleGoneWriters()
+      expect(writer()?.run).toBe('r-none')
+      expect((await heldWriter(project, 'slot-a'))?.processes).toBeNull()
+      await store.clearWriterRun('r-none')
+    })
   })
 
   it("a list of its processes taken earlier never frees it (HR2's round 1): none of them running, or one still running, it stays held and nothing is ended", async () => {

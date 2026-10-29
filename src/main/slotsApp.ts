@@ -31,7 +31,7 @@ import { onHiveEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
-import { goneWriterCleared, goneWriterSettles, setRetiredHomes, setWriterHost, writerHeld, writerOver } from './agentFolders'
+import { goneWriterCleared, goneWriterSettles, goneWriterStill, setRetiredHomes, setWriterHost, writerHeld, writerOver } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
 import { endLeaseJob, journalPath, LeaseJob, leaseJobGone, retireSeal, startLauncher, sweepSeals } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
@@ -278,6 +278,7 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       writerOver: (w) => writerOver(w),
       writerGone: {
         settles: (w) => goneWriterSettles(projectPath, w),
+        still: (run) => goneWriterStill(run),
         cleared: (run) => {
           goneWriterCleared(run)
           // Free now: a lane waiting for a slot may get it (#1438).

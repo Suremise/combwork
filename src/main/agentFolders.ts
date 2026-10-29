@@ -14,7 +14,7 @@ import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
-import { endedEarlier, endProcessesExactly, forgetEarlierRun, keepRunEnded, leftoversOfRun, onRunOutcome, runOutcome, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
+import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperState, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, setHiveIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
 import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n'
 import { SlotStore, type SlotConn } from './slots'
@@ -62,6 +62,11 @@ let writerHost: WriterHost = standIn()
 export function setWriterHost(h: WriterHost | null): void {
   writerHost = h ?? standIn()
 }
+// The keeper's receipts name this Hive as its slot writers do (HI-2055): whichever host is set when it is asked.
+setHiveIdentity(async () => {
+  const me = await writerHost.self()
+  return `${me.pid}:${me.started}`
+})
 
 // An agent's 0.9 worktree (shared/agentFolders.ts's: workspace.ts reads it too, which this module can't be imported by).
 export { legacyWorktree }
@@ -488,21 +493,44 @@ const runLeftovers = (run: string): ReturnType<typeof leftoversOfRun> => leftove
 /**
  * A slot writer of a Hive that has gone, settled by itself (HI-1886: after a restart, builders' slots stayed held by
  * their own ended runs): true when it may be cleared. Only when this profile kept that its run's processes were seen to
- * end (its job seen empty, the proof a release needs; `endedEarlier`). A list of its processes taken earlier (the last
- * run's marker) never is: what they started since isn't in it (HR2's round 1). Nothing kept, or its Hive still running
- * or not known to have gone: it stays held for the user's Release Slot….
+ * end (its job seen empty, the proof a release needs; `endedEarlier`), or, its Hive gone first, the helper that held its
+ * job saw it empty after (HI-2055: its keeper's "ended", from the helper this run was bound to, unrevoked, `keeperState`).
+ * A list of its processes taken earlier (the last run's marker) never is: what they started since isn't in it (HR2's
+ * round 1). Nothing kept, or its Hive still running or not known to have gone: it stays held for the user's Release Slot….
  */
 export async function goneWriterSettles(projectPath: string, w: { run: string; agent: string; pid: number; started: number }): Promise<boolean> {
   const me = await writerHost.self()
   if ((w.pid === me.pid && w.started === me.started) || (await writerHost.alive(w.pid, w.started)) !== false) return false
-  if (!(await endedEarlier(w.run))) return false
-  log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} of a Hive that has gone (process ${w.pid}) settled: its processes were seen to end`)
+  settledBy.delete(w.run)
+  if (await endedEarlier(w.run)) {
+    log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} of a Hive that has gone (process ${w.pid}) settled: its processes were seen to end`)
+    return true
+  }
+  const kept = await keeperState(w.run, `${w.pid}:${w.started}`)
+  if (kept?.state !== 'ended') return false
+  settledBy.set(w.run, kept.helper)
+  log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run left nothing running (its Hive, process ${w.pid}, gone; seen by its helper ${kept.helper})`)
   return true
 }
 
-/** A gone Hive's writer cleared (HI-1886): its run's kept record is no longer needed. */
+/** The helper whose keeper's receipt settled a run's writer (HI-2055), for the clear's guard. */
+const settledBy = new Map<string, string>()
+
+/**
+ * Checked inside the write that clears a settled writer (HI-2055): one settled by its keeper's receipt is cleared only if
+ * that helper is still the one its run is bound to, unrevoked (a revocation during the read refuses the clear).
+ */
+export function goneWriterStill(run: string): () => void {
+  const helper = settledBy.get(run)
+  return () => {
+    if (helper && !keeperStillBound(run, helper)) throw new Error(`the slot writer ${run}'s helper ${helper} was revoked`)
+  }
+}
+
+/** A gone Hive's writer cleared (HI-1886): its run's kept record is no longer needed, nor its keeper's (HI-2055). */
 export function goneWriterCleared(run: string): void {
   forgetEarlierRun(run)
+  if (settledBy.delete(run)) forgetKeeperRun(run)
 }
 
 /**
@@ -513,7 +541,7 @@ async function settleGoneWriterOf(projectPath: string, store: SlotStore, slot: s
   const w = store.slot(slot)?.writer
   if (!w || w.run === run) return
   if (!(await goneWriterSettles(projectPath, w))) return
-  if (!(await store.clearWriter(slot, w.run))) return
+  if (!(await store.clearWriter(slot, w.run, goneWriterStill(w.run)).catch(() => false))) return
   goneWriterCleared(w.run)
   await writerHost.drained(projectPath, slot)
 }
@@ -524,7 +552,14 @@ async function settleGoneWriterOf(projectPath: string, store: SlotStore, slot: s
  * that still run now, each by id and start time. Another launch of the same agent's, a marker of another Hive's, or one
  * from before launches named their run, is never this run's: null then, as when none still runs or it can't be told.
  */
-async function restartList(projectPath: string, w: { run: string; agent: string }): Promise<HeldWriter['processes']> {
+async function restartList(projectPath: string, w: { run: string; agent: string; pid: number; started: number }): Promise<HeldWriter['processes']> {
+  // Its keeper's members first (HI-2055: what the helper holding its job last saw there), each checked again by id and
+  // start time: one that can't be is never listed as running.
+  const keeper = await keeperState(w.run, `${w.pid}:${w.started}`)
+  if (keeper?.state === 'live') {
+    const running = await stillRunningOf(keeper.members)
+    return running?.length ? { list: running, more: 0, from: 'restart' } : null
+  }
   const { lastUnexpectedClose } = await import('./lastRun')
   const kept = (lastUnexpectedClose()?.processes ?? []).filter((l) => l.runId === w.run && l.agentId === w.agent && samePlace(l.projectPath, projectPath)).flatMap((l) => l.processes)
   const running = kept.length ? await stillRunningOf(kept) : null

@@ -2,7 +2,7 @@
 // runs whose processes it saw end (their jobs seen empty), also those whose releases couldn't be written. Read back by
 // the next start (a new module, as a restarted Hive), kept forward until settled, and never offered as leftovers. No job
 // host: no launch is running, so nothing is listed (the quit's look at running launches is agentProcesses.test.ts's).
-import { readFileSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
@@ -39,6 +39,8 @@ vi.mock('../src/main/processSupervisor', async (orig) => {
       return true
     }
     async ensure(): Promise<boolean> {
+      // As a request, it starts a helper when none runs.
+      if (jobs.instance === null) jobs.instance = 2
       return true
     }
     close(): Promise<void> {
@@ -50,6 +52,8 @@ vi.mock('../src/main/processSupervisor', async (orig) => {
       if (cmd === 'add') return 'ok'
       // Asked to end its processes: only asked (they end when the test says, `members`).
       if (cmd === 'kill' || cmd === 'forget') return true
+      // Configured as a keeper (HI-2055): each helper its own identity.
+      if (cmd === 'keeper') return `${4000 + jobs.instance}:1`
       if (cmd !== 'list') return null
       jobs.listed.push(run!)
       jobs.onList(run!)
@@ -199,6 +203,114 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       expect(m.runOutcome('c-lost')).toBe('unknown')
       await m.leftoversSaved()
       expect(await (await restarted()).endedEarlier('c-lost')).toBe(false)
+    })
+  })
+
+  /**
+   * HI-2055: a run bound to the helper that holds its job, kept in the profile, so the next start takes that helper's
+   * keeper's state (keeper-<run>.json) for it, and nothing else: whole, its own run and Hive, a helper bound and not
+   * revoked. A lost helper is revoked before its replacement is given a launch, kept before it is.
+   */
+  describe("a keeper's state (HI-2055)", () => {
+    const HIVE = '100:5'
+    const keeperFile = (run: string) => join(profile.dir, 'keeper', `keeper-${run}.json`)
+    const state = (run: string, o: Record<string, unknown> = {}) => ({ v: 1, run, helper: '4001:1', hive: HIVE, state: 'ended', observed: 'complete', total: 0, members: [], at: 1, ...o })
+    const plantState = (run: string, data: unknown) => {
+      mkdirSync(join(profile.dir, 'keeper'), { recursive: true })
+      writeFileSync(keeperFile(run), typeof data === 'string' ? data : JSON.stringify(data))
+    }
+    /** A Hive started now, tracking with the first helper (4001:1). */
+    async function tracking(): Promise<typeof import('../src/main/agentProcesses')> {
+      writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))
+      jobs.instance = 1
+      jobs.onList = () => undefined
+      const m = await restarted()
+      m.setHiveIdentity(async () => HIVE)
+      return m
+    }
+    const track = async (m: typeof import('../src/main/agentProcesses'), runId: string) => (await m.trackLaunch({ runId, projectPath: profile.dir, agentId: runId, agentName: runId }, 100)).tracked
+
+    it.runIf(process.platform === 'win32')('its binding outlives a crash: the next start takes its "ended", and lists its "live" members', async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-run')).toBe(true)
+      await m.leftoversSaved()
+      // Hive gone without quitting: a new start reads the binding back.
+      const next = await restarted()
+      plantState('k-run', state('k-run'))
+      expect(await next.keeperState('k-run', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
+      plantState('k-run', state('k-run', { state: 'live', total: 2, members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] }))
+      expect(await next.keeperState('k-run', HIVE)).toMatchObject({ state: 'live', helper: '4001:1', members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] })
+    })
+
+    it.runIf(process.platform === 'win32')("none taken unless whole and its own: another helper, Hive or run, a version, an incomplete or non-empty \"ended\", a bad member, malformed or too large", async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-bad')).toBe(true)
+      const bad: unknown[] = [
+        state('k-bad', { helper: '4999:1' }),
+        state('k-bad', { hive: '100:6' }),
+        state('k-bad', { run: 'k-other' }),
+        state('k-bad', { v: 2 }),
+        state('k-bad', { observed: undefined }),
+        state('k-bad', { total: 1 }),
+        state('k-bad', { members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] }),
+        state('k-bad', { state: 'gone' }),
+        state('k-bad', { state: 'live', total: 1, members: [{ pid: 7001, created: '0', name: 'node' }] }),
+        state('k-bad', { state: 'live', total: 0, members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] }),
+        '{"v":1,"run":"k-bad",',
+        state('k-bad', { pad: 'x'.repeat(70 * 1024) })
+      ]
+      for (const b of bad) {
+        plantState('k-bad', b)
+        expect(await m.keeperState('k-bad', HIVE), JSON.stringify(b).slice(0, 120)).toBeNull()
+      }
+      // A run never bound (tracked before this change, or by no keeper): none.
+      plantState('k-unbound', state('k-unbound'))
+      expect(await m.keeperState('k-unbound', HIVE)).toBeNull()
+      // The good one, for contrast.
+      plantState('k-bad', state('k-bad'))
+      expect(await m.keeperState('k-bad', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
+    })
+
+    it.runIf(process.platform === 'win32')('a lost helper is revoked at once, and kept before its replacement is given a launch; a receipt it writes later frees nothing', async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-old')).toBe(true)
+      plantState('k-old', state('k-old'))
+      expect(m.keeperStillBound('k-old', '4001:1')).toBe(true)
+      jobs.lose()
+      // Known at once (a clear's guard reads it), before anything is written.
+      expect(m.keeperStillBound('k-old', '4001:1')).toBe(false)
+      expect(await m.keeperState('k-old', HIVE)).toBeNull()
+      // The next launch goes to the new helper, bound to it, once the revocation is kept.
+      expect(await track(m, 'k-new')).toBe(true)
+      expect(m.keeperStillBound('k-new', '4002:1')).toBe(true)
+      await m.leftoversSaved()
+      const saved = JSON.parse(readFileSync(file, 'utf8')) as { revoked?: string[]; helpers?: Record<string, string> }
+      expect(saved.revoked).toEqual(['4001:1'])
+      expect(saved.helpers).toMatchObject({ 'k-old': '4001:1', 'k-new': '4002:1' })
+      // After a restart too.
+      expect(await (await restarted()).keeperState('k-old', HIVE)).toBeNull()
+    })
+
+    it.runIf(process.platform === 'win32')("the revocation can't be kept: no launch is given to the new helper (untracked, said), until it can", async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-first')).toBe(true)
+      await m.leftoversSaved()
+      m.testHooks.write = async () => {
+        throw new Error('disk full (test)')
+      }
+      try {
+        jobs.lose()
+        const refused = await m.trackLaunch({ runId: 'k-refused', projectPath: profile.dir, agentId: 'k', agentName: 'k' }, 100)
+        expect(refused).toMatchObject({ tracked: false })
+        expect(m.runOutcome('k-refused')).toBeNull()
+      } finally {
+        m.testHooks.write = null
+      }
+      // Kept now: the next launch is tracked, by the new helper.
+      expect(await track(m, 'k-later')).toBe(true)
+      expect(m.keeperStillBound('k-later', '4002:1')).toBe(true)
+      await m.leftoversSaved()
+      expect((JSON.parse(readFileSync(file, 'utf8')) as { revoked?: string[] }).revoked).toEqual(['4001:1'])
     })
   })
 })

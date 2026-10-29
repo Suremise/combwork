@@ -190,10 +190,24 @@ export type TrackResult = { tracked: true } | { tracked: false; reason: string; 
  */
 export async function trackLaunch(launch: Launch, pid: number, cancelled?: AbortSignal): Promise<TrackResult> {
   if (process.platform !== 'win32') return { tracked: false, reason: englishText(TRACKER.windowsOnly), text: TRACKER.windowsOnly }
+  // A lost helper's revocation is written before any launch is given to the one that replaces it (HI-2055).
+  if (!(await revocationsWritten())) {
+    log.warn(`could not track the processes of ${userText(launch.agentName)}: a lost helper's revocation couldn't be kept`)
+    problem = TRACKER.noStart
+    return { tracked: false, reason: englishText(TRACKER.noStart), text: TRACKER.noStart }
+  }
   running.set(launch.runId, { ...launch, gate: pid })
+  const keeper = await keeperHelper()
   const r = await host.request('add', launch.runId, pid)
   if (r === 'ok' && !cancelled?.aborted) {
     if (host.usable) problem = null
+    // Bound to the helper that holds its job, only when that is the one configured (none since: replaced meanwhile).
+    if (keeper && keeper.instance === host.instance) {
+      runHelpers.delete(launch.runId)
+      runHelpers.set(launch.runId, keeper.helper)
+      while (runHelpers.size > MAX_RUN_RECORDS) runHelpers.delete(runHelpers.keys().next().value!)
+      persist()
+    }
     return { tracked: true }
   }
   if (r === 'ok') {
@@ -206,6 +220,130 @@ export async function trackLaunch(launch: Launch, pid: number, cancelled?: Abort
   log.warn(`could not track the processes of ${userText(launch.agentName)}: ${reason}`)
   problem = text
   return { tracked: false, reason, text }
+}
+
+/**
+ * This Hive's identity as its slot writers name it, "pid:started" (HI-2055: agentFolders gives it), for the keeper's
+ * receipts: a receipt frees only a writer of the Hive that started its helper.
+ */
+let hiveIdentity: (() => Promise<string>) | null = null
+export function setHiveIdentity(fn: (() => Promise<string>) | null): void {
+  hiveIdentity = fn
+}
+
+/** Where the keepers write their runs' states (HI-2055): Hive's profile. */
+export const keeperDir = (): string => join(app.getPath('userData'), 'keeper')
+
+/** The keeper configured on the helper running now (its instance), and that helper's identity. */
+let keeperOf: { instance: number; helper: string } | null = null
+
+/**
+ * The helper running now, configured as a keeper (HI-2055): its instance and identity, or null when it can't be (no
+ * helper, no identity of this Hive yet, an answer that isn't one). A launch then goes on tracked, with no binding: its
+ * writer is never freed by a receipt.
+ */
+async function keeperHelper(): Promise<{ instance: number; helper: string } | null> {
+  if (!(await host.ensure())) return null
+  const instance = host.instance
+  if (instance === null) return null
+  if (keeperOf?.instance === instance) return keeperOf
+  const who = await hiveIdentity?.().catch(() => null)
+  if (!who || !/^\d+:\d+$/.test(who)) return null
+  const r = await host.request('keeper', who, Buffer.from(keeperDir(), 'utf8').toString('base64url'))
+  if (typeof r !== 'string' || !HELPER_ID.test(r) || host.instance !== instance) return null
+  keeperOf = { instance, helper: r }
+  return keeperOf
+}
+
+/** A lost helper's revocation being kept (HI-2055): false while it couldn't be written (tried again at the next launch). */
+let revocation: Promise<boolean> = Promise.resolve(true)
+
+/**
+ * Revokes the helper that was lost (HI-2055): kept before any launch goes to its replacement, so a receipt it writes
+ * later (it may still run: ended without our seeing it exit) frees nothing. Known at once in this Hive (the clear's guard
+ * reads it), durable once written.
+ */
+function revokeHelper(helper: string): void {
+  if (!revokedHelpers.includes(helper)) revokedHelpers = [...revokedHelpers, helper].slice(-MAX_REVOKED)
+  revocation = readRecords().then(() => persistChecked())
+}
+
+/** Whether every revocation is kept: one that failed is written again now. */
+async function revocationsWritten(): Promise<boolean> {
+  if (await revocation) return true
+  revocation = persistChecked()
+  return revocation
+}
+
+/** Whether a receipt's helper is still the one a run is bound to, unrevoked (HI-2055). Synchronous: a clear's guard. */
+export function keeperStillBound(run: string, helper: string): boolean {
+  return runHelpers.get(run) === helper && !revokedHelpers.includes(helper)
+}
+
+/** A keeper's state of a run, as the next Hive reads it (HI-2055). */
+export type KeeperState = { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: AgentProcess[] }
+
+const KEEPER_FILE = /^keeper-([A-Za-z0-9_-]{1,64})\.json$/
+const MAX_KEEPER_BYTES = 64 * 1024
+
+/**
+ * A run's state as its keeper wrote it, taken only when whole and its own (HI-2055): the file named after the run, at
+ * most MAX_KEEPER_BYTES, version 1, the run, its Hive (`hive`, the writer's "pid:started"), a helper this profile bound
+ * that run to and hasn't revoked, `observed: complete`, and a state: "ended" with no member and total 0, or "live" with
+ * its members by id, start time and name. Anything else, null: its writer stays held.
+ */
+export async function keeperState(run: string, hive: string): Promise<KeeperState | null> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(run)) return null
+  await readRecords()
+  const file = join(keeperDir(), `keeper-${run}.json`)
+  let s: Record<string, unknown>
+  try {
+    const { readFile, stat } = await import('original-fs/promises')
+    if ((await stat(file)).size > MAX_KEEPER_BYTES) return null
+    s = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>
+  } catch {
+    return null
+  }
+  if (!s || typeof s !== 'object' || s.v !== 1 || s.run !== run || s.hive !== hive || s.observed !== 'complete') return null
+  const helper = s.helper
+  if (typeof helper !== 'string' || !HELPER_ID.test(helper) || !keeperStillBound(run, helper)) return null
+  const total = s.total
+  if (typeof total !== 'number' || !Number.isSafeInteger(total) || total < 0 || !Array.isArray(s.members) || s.members.length > MAX_LISTED) return null
+  if (s.state === 'ended') return total === 0 && s.members.length === 0 ? { state: 'ended', helper } : null
+  if (s.state !== 'live') return null
+  const members: AgentProcess[] = []
+  for (const m of s.members as unknown[]) {
+    const e = m as { pid?: unknown; created?: unknown; name?: unknown }
+    if (typeof e?.pid !== 'number' || !Number.isSafeInteger(e.pid) || e.pid <= 0 || typeof e.created !== 'string' || !/^\d{1,20}$/.test(e.created) || e.created === '0' || typeof e.name !== 'string' || e.name.length > 260) return null
+    members.push({ pid: e.pid, name: e.name, label: processLabel(e.name, ''), created: e.created })
+  }
+  if (total < members.length) return null
+  // A console window's host ends with the process it serves: counted (the job isn't empty), never listed (listJob's way).
+  return { state: 'live', helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)) }
+}
+
+/** A run's writer settled (HI-2055): its keeper's state and its binding go. */
+export function forgetKeeperRun(run: string): void {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(run)) return
+  void import('original-fs/promises').then(({ unlink }) => unlink(join(keeperDir(), `keeper-${run}.json`))).catch(() => undefined)
+  void readRecords().then(() => {
+    if (!runHelpers.delete(run)) return
+    persist()
+  })
+}
+
+/** Keepers' states older than this are let go at the start (HI-2055): their writers stay held (Release Slot…). */
+const KEEPER_STALE_MS = 7 * 24 * 60 * 60 * 1000
+
+/** Removes keepers' states left long ago (HI-2055), at most 500 looked at, all through the async file system. */
+export async function pruneKeeperStates(now = Date.now()): Promise<void> {
+  const { readdir, stat, unlink } = await import('original-fs/promises')
+  const names = (await readdir(keeperDir()).catch(() => [] as string[])).filter((n) => KEEPER_FILE.test(n) || (n.startsWith('keeper-') && n.endsWith('.tmp'))).slice(0, 500)
+  for (const n of names) {
+    const f = join(keeperDir(), n)
+    const s = await stat(f).catch(() => null)
+    if (s && now - s.mtimeMs > KEEPER_STALE_MS) await unlink(f).catch(() => undefined)
+  }
 }
 
 /**
@@ -599,6 +737,11 @@ export function closeProcessTracking(): Promise<void> {
  * host (started by the next request) lists and ends exactly it, as after a restart; the rest can't be, and go.
  */
 function jobsLost(why: string): void {
+  // No receipt of the lost helper's frees anything from now on (HI-2055): revoked before its replacement is given a launch.
+  if (keeperOf) {
+    revokeHelper(keeperOf.helper)
+    keeperOf = null
+  }
   // It held nothing (started early, #1155, or every launch long settled): nothing is lost, and the next request starts
   // a new one.
   if (!running.size && !confirming.size && ![...left.values()].some((l) => !l.restored)) {
@@ -685,6 +828,13 @@ interface SavedLeftovers {
    * says nothing of those they started since.
    */
   ended?: string[]
+  /**
+   * Each tracked run's helper (HI-2055), "pid:created", as it was given its job: the only one whose keeper's "ended" frees
+   * that run's slot writer after this Hive has gone.
+   */
+  helpers?: Record<string, string>
+  /** Helpers lost while this Hive ran (HI-2055): no receipt of theirs frees anything. */
+  revoked?: string[]
 }
 
 /** The latest write of the kept list (writes go one after another, the newest last). */
@@ -696,13 +846,24 @@ let keptAny = false
 const MAX_RUN_RECORDS = 100
 /** Those read at this start (kept forward until settled) and this run's own, read once before any write. */
 let endedRuns: string[] = []
+/** Runs' helpers (HI-2055), the newest last, at most MAX_RUN_RECORDS, read at the start and this run's own. */
+let runHelpers = new Map<string, string>()
+/** Lost helpers (HI-2055), at most MAX_REVOKED. */
+let revokedHelpers: string[] = []
+const MAX_REVOKED = 50
+/** A helper's identity as the keeper gives it: "pid:created". */
+const HELPER_ID = /^\d{1,10}:\d{1,20}$/
 let recordsRead: Promise<void> | null = null
 function readRecords(): Promise<void> {
   recordsRead ??= readJson<Partial<SavedLeftovers> | null>(savedFile(), null).then(
     (saved) => {
       const ended = Array.isArray(saved?.ended) ? saved.ended.filter((r): r is string => typeof r === 'string' && r.length <= 100) : []
       endedRuns = [...new Set([...ended, ...endedRuns])].slice(-MAX_RUN_RECORDS)
-      if (endedRuns.length) keptAny = true
+      const helpers = saved?.helpers && typeof saved.helpers === 'object' ? Object.entries(saved.helpers).filter(([r, h]) => r.length <= 100 && typeof h === 'string' && HELPER_ID.test(h)) : []
+      runHelpers = new Map([...helpers, ...runHelpers].slice(-MAX_RUN_RECORDS))
+      const revoked = Array.isArray(saved?.revoked) ? saved.revoked.filter((h): h is string => typeof h === 'string' && HELPER_ID.test(h)) : []
+      revokedHelpers = [...new Set([...revoked, ...revokedHelpers])].slice(-MAX_REVOKED)
+      if (endedRuns.length || runHelpers.size || revokedHelpers.length) keptAny = true
     },
     () => undefined
   )
@@ -715,23 +876,43 @@ function readRecords(): Promise<void> {
  * with its id, so it isn't kept). The runs seen ended (HI-1886) go with it, read first so none is lost.
  */
 function persist(): void {
+  void persistChecked()
+}
+
+/** persist(), resolving with whether its write succeeded (or had nothing to write): a revocation waits on it (HI-2055). */
+function persistChecked(): Promise<boolean> {
   const launches: SavedLaunch[] = []
   for (const l of left.values()) {
     const processes = l.processes.filter((p) => p.created)
     if (processes.length) launches.push({ runId: l.runId, projectPath: l.projectPath, agentId: l.agentId, agentName: l.agentName, since: l.since, processes })
   }
-  saving = saving
+  const done = saving
     .then(() => readRecords())
-    .then(() => {
-      const any = launches.length > 0 || endedRuns.length > 0
+    .then(async () => {
+      const any = launches.length > 0 || endedRuns.length > 0 || runHelpers.size > 0 || revokedHelpers.length > 0
       // A Hive whose agents never left anything writes no file.
-      if (!any && !keptAny) return
+      if (!any && !keptAny) return true
       keptAny = any
-      const data: SavedLeftovers = { version: 1, launches, ...(endedRuns.length ? { ended: endedRuns } : {}) }
-      return writeJsonAtomic(savedFile(), data)
+      const data: SavedLeftovers = {
+        version: 1,
+        launches,
+        ...(endedRuns.length ? { ended: endedRuns } : {}),
+        ...(runHelpers.size ? { helpers: Object.fromEntries(runHelpers) } : {}),
+        ...(revokedHelpers.length ? { revoked: revokedHelpers } : {})
+      }
+      await (testHooks.write ?? writeJsonAtomic)(savedFile(), data)
+      return true
     })
-    .catch((e) => log.warn('could not keep the list of processes agents left running', e))
+    .catch((e) => {
+      log.warn('could not keep the list of processes agents left running', e)
+      return false
+    })
+  saving = done.then(() => undefined)
+  return done
 }
+
+/** Test seams (HI-2055): the kept list's write, to make it fail. */
+export const testHooks: { write: ((path: string, data: unknown) => Promise<void>) | null } = { write: null }
 
 /**
  * A run whose processes Hive saw end but whose slot writer couldn't be released (HI-1886: its workspace closed first):
@@ -872,6 +1053,7 @@ let restoring: Promise<AgentLeftovers[]> | null = null
  * stays kept for the next start. Once a start.
  */
 export function restoreLeftovers(): Promise<AgentLeftovers[]> {
+  if (!restoring) void pruneKeeperStates().catch((e) => log.warn('removing old keepers’ states', e))
   restoring ??= restore()
   return restoring
 }
