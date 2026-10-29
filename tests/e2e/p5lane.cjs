@@ -285,7 +285,15 @@ const ancestor = (x, y) => {
       await dialog.locator('#lane-start-builder').selectOption(b1.id)
       await dialog.locator('#lane-start-reviewer').selectOption(r1.id)
       await dialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
-      return waitHung(async () => (await inv('lanes:list')).find((l) => l.builder.id === b1.id && l.state !== 'ended' && JSON.stringify(l.cards.map((x) => x.number)) === JSON.stringify(cards)))
+      const lane = await waitHung(async () => (await inv('lanes:list')).find((l) => l.builder.id === b1.id && l.state !== 'ended' && JSON.stringify(l.cards.map((x) => x.number)) === JSON.stringify(cards)))
+      // Not started (HI-2027's lane C, once in five): what the window showed, said with the failure.
+      if (!lane) {
+        const shot = path.join(fx.shots, `lane-start-${cards.join('-')}-failed.png`)
+        await page.screenshot({ path: shot }).catch(() => undefined)
+        const said = { dialog: await dialog.innerText().catch(() => null), toasts: await page.locator('.toast').allInnerTexts().catch(() => []), todo: await column('Todo').locator('.task-card').count().catch(() => -1), shot }
+        console.log(`lane start not seen: ${JSON.stringify(said)}`)
+      }
+      return lane
     }
     const laneNow = async (id) => (await inv('lanes:list')).find((l) => l.id === id)
     /** The lane ended verified: ended, its merge commit the last card's result (from the facts). */
