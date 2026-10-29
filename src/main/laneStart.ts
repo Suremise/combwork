@@ -9,7 +9,7 @@ import { legacyWorktree, slotsMigrated } from './agentFolders'
 import { lendLane } from './slotCards'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
 import { hiveError } from './hiveError'
-import { rawLanes, setLaneSlotWait, startLane } from './lanes'
+import { holdLaneStart, rawLanes, setLaneSlotWait, startLane } from './lanes'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { getTask } from './tasks'
@@ -85,6 +85,8 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   }
   const key = `${projectPath.toLowerCase()}|${builder.id}`
   if (starting.has(key)) throw hiveError(M.starting, { agent: builder.name }, { kind: 'conflict' })
+  // Hive's own start of the lane's card waits for this one to lend its slot and start its agents (HI-2029).
+  const release = holdLaneStart(ws, project, builder.id)
   starting.add(key)
   try {
     const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: 'the user', ...(req.applyNow ? { applyNow: true } : {}) }) // i18n-ignore: who started it, as the lane records it (agents read it)
@@ -105,6 +107,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
     return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief) }
   } finally {
     starting.delete(key)
+    release()
   }
 }
 

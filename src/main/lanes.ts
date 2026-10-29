@@ -1173,6 +1173,32 @@ export function setLaneStartWaits(fn: typeof startWaits): void {
 /** A lane's status changed outside the board (laneStarts.ts' start waits): the window and watches told, as for a board change. */
 export const laneViewsChanged = (ws: WorkspaceService): void => changed(ws)
 
+/** Builders whose lane's start is launching them ("<workspace>#<project>|<builder>" → how many starts), see holdLaneStart. */
+const launching = new Map<string, number>()
+const launchKey = (ws: WorkspaceService, project: string, builder: string): string => `${(ws.path ?? '').toLowerCase()}#${project.toLowerCase()}|${builder}`
+/**
+ * A lane's start launching its agents (Start Lane…, a lane the Assistant or a script records or updates), from before
+ * the lane's record until its slot is lent and its agents started: laneStarts.ts never starts the builder's lane card
+ * meanwhile (HI-2029: it found the builder not running yet and started the card itself, taking the slot the start was
+ * lending, or giving the builder a second conversation). By builder, as the lane isn't recorded yet as it is held. The
+ * release lets it look again.
+ */
+export function holdLaneStart(ws: WorkspaceService, project: string, builder: string): () => void {
+  const k = launchKey(ws, project, builder)
+  launching.set(k, (launching.get(k) ?? 0) + 1)
+  let done = false
+  return () => {
+    if (done) return
+    done = true
+    const n = (launching.get(k) ?? 1) - 1
+    if (n > 0) launching.set(k, n)
+    else launching.delete(k)
+    changed(ws)
+  }
+}
+/** Whether a lane's start is launching this builder now (holdLaneStart). */
+export const laneStartHeld = (ws: WorkspaceService, project: string, builder: string): boolean => launching.has(launchKey(ws, project, builder))
+
 /** A workspace's lanes changed: look again soon. */
 function changed(ws: WorkspaceService): void {
   const k = ws.path?.toLowerCase()

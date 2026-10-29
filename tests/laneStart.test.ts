@@ -42,6 +42,7 @@ vi.mock('../src/main/lanes', () => ({
     // Its rounds as recorded (HI-1805: what its agents' briefs say, whatever today's default).
     return { lane: { id: 'lane-1', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, rounds: 3 }, did: 'started', replaced: null }
   },
+  holdLaneStart: () => () => undefined,
   rawLanes: async () => {
     await state.lanesHeld
     return state.lanes

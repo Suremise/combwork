@@ -1,6 +1,6 @@
 // Hive starts a lane's next card on its builder (HI-1990): once the card before it is Done and the builder's turn is
-// over, as the Assistant's Start gives one (its doorbell typed into the idle builder); never the lane's first card, never
-// into a turn, and not with the workflow rules off.
+// over, as the Assistant's Start gives one (its doorbell typed into the idle builder); its first card too (HI-2029), never
+// while the lane's own start launches its agents, never into a turn, and not with the workflow rules off.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -66,7 +66,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.hive'), { recursive: true })
     mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -101,6 +101,47 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     expect(started.history.some((h) => h.by === 'Hive' && /^Moved to (the (top|bottom) of )?Doing\b/.test(h.what))).toBe(true)
     expect(rung()).toBe(true)
     expect((await lanes.getLane(w, lane.id)).status?.reason).not.toBe('startWait')
+    await lanes.endLane(w, lane.id, { abandoned: true })
+  })
+
+  it("a lane's first card isn't started while the lane's own start launches its agents (HI-2029: slotswitches' slot taken, p5lane's builder given a second conversation); once it is over, it is", async () => {
+    const first = await card('Retry the export', 'e4')
+    // Held from before the lane is recorded, as Start Lane… and POST /v1/lanes hold it, with its builder not running yet.
+    const release = lanes.holdLaneStart(w, 'alpha', 'e4')
+    let lane: { id: string }
+    try {
+      lane = (await lanes.startLane(w, { project: 'alpha', builder: 'e4', reviewer: 'r1', cards: [first], by: 'the user' })).lane
+      await checkLaneStarts(w)
+      expect(await columnOf(first)).toBe('todo')
+      expect((await lanes.getLane(w, lane.id)).status).toMatchObject({ reason: 'startWait', card: first, why: 'busy' })
+    } finally {
+      release()
+    }
+    // A second release is nothing (the start's finally after an early one).
+    release()
+    expect(lanes.laneStartHeld(w, 'alpha', 'e4')).toBe(false)
+    builder('ready', 'e4')
+    await checkLaneStarts(w)
+    expect(await columnOf(first)).toBe('doing')
+    expect(rung()).toBe(true)
+    await lanes.endLane(w, lane!.id, { abandoned: true })
+  })
+
+  it("a start decided as the lane's own start begins is dropped where it is checked again (HI-2029)", async () => {
+    const first = await card('Retry the import', 'e5')
+    const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'e5', reviewer: 'r1', cards: [first], by: 'the user' })).lane
+    builder('ready', 'e5')
+    let release: (() => void) | null = null
+    laneStartsTestHooks.beforeStart = async () => {
+      release = lanes.holdLaneStart(w, 'alpha', 'e5')
+    }
+    await checkLaneStarts(w)
+    expect(await columnOf(first)).toBe('todo')
+    expect(rung()).toBe(false)
+    laneStartsTestHooks.beforeStart = null
+    release!()
+    await checkLaneStarts(w)
+    expect(await columnOf(first)).toBe('doing')
     await lanes.endLane(w, lane.id, { abandoned: true })
   })
 
@@ -167,9 +208,17 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     const b = builder('working', 'e3')
     const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'e3', reviewer: 'r1', cards: [first], by: 'the Assistant', brief: 'Polish first.' })).lane
     const task = await createDelivery(p, { agentId: 'e3', agentName: 'E3', kind: 'task', from: { kind: 'user', name: 'the user' }, body: 'You are the builder of a lane: start its card.', source: 'lane-brief', ref: `${lane.id}:builder` })
+    // Its reviewer's too (the mcp project's MR1, m23 on rc.11: started in a new conversation, cancelled 13 s later).
+    const r = builder('working', 'r1')
+    const review = await createDelivery(p, { agentId: 'r1', agentName: 'R1', kind: 'task', from: { kind: 'user', name: 'the user' }, body: 'You are the reviewer of a lane: join it.', source: 'lane-brief', ref: `${lane.id}:reviewer` })
     b.status = 'ready'
     await offerNow(p, 'e3')
     expect(['offered', 'received', 'acked']).toContain(deliveryNow(p, task.id)?.state)
+    expect(pty.typed.join('')).toContain('New in your inbox: 1 task')
+    pty.typed.length = 0
+    r.status = 'ready'
+    await offerNow(p, 'r1')
+    expect(['offered', 'received', 'acked']).toContain(deliveryNow(p, review.id)?.state)
     expect(pty.typed.join('')).toContain('New in your inbox: 1 task')
     await lanes.endLane(w, lane.id, { abandoned: true })
   })

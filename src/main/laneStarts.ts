@@ -5,7 +5,7 @@ import { cardRef } from '../shared/projectKeys'
 import { agentNowOf } from './cardStall'
 import { coalesced } from './coalesce'
 import { onHiveEvent } from './events'
-import { laneNow, lanesEnforced, laneViewsChanged, listLanes, setLaneStartWaits } from './lanes'
+import { laneNow, lanesEnforced, laneStartHeld, lanesWaitingForSlot, laneViewsChanged, listLanes, setLaneStartWaits } from './lanes'
 import { createLogger, userText } from './logger'
 import { withCardNames } from './projectKeys'
 import { offerNow, waitingForRun } from './deliveries'
@@ -21,9 +21,10 @@ import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from
  * before it Done or another lane's) is started on the lane's builder as the Assistant's Start gives one (`startTask`,
  * through the start's rules): its slot lent and the builder placed there, typed into it idle, or started with it when
  * it isn't running. A builder in a turn (reading the Done wake, finishing a follow-up) is waited for until its turn
- * ends; one waiting on a watch, or whose last start failed, is left to the lane-next stall (HI-1741). The lane's first
- * card stays its builder's to start (the card-loop skill). LE-250's builder read its Done and went idle, and the lane
- * sat until the Assistant started LE-246 by hand.
+ * ends; one waiting on a watch, or whose last start failed, is left to the lane-next stall (HI-1741). LE-250's builder
+ * read its Done and went idle, and the lane sat until the Assistant started LE-246 by hand. The lane's first card too
+ * (HI-2029), once the lane's own start has launched its agents (holdLaneStart) and its builder is free: a lane started
+ * over a running builder sat "active" for hours with its first card in Todo.
  */
 
 const log = createLogger('laneStarts')
@@ -85,10 +86,11 @@ class LaneChanged extends Error {}
 /**
  * Whether the lane still asks for card n now (HR1's rounds 1 and 2): as `laneNow` reads it, the lane view's own reading
  * (its effective pause for the user, a block or a merge, its cards' owners, a queued list), still running in the same
- * workspace with the same builder, and n still its next card due. `now`: the card as the start's write sees it.
+ * workspace with the same builder, and n still its next card due, with no lane start launching the builder meanwhile
+ * (HI-2029). `now`: the card as the start's write sees it.
  */
-function stillDue(ws: WorkspaceService, path: string, lane: { id: string; builder: { id: string } }, n: number, now?: TaskCard): boolean {
-  if (!ws.path || ws.path.toLowerCase() !== path.toLowerCase()) return false
+function stillDue(ws: WorkspaceService, path: string, lane: { id: string; project: string; builder: { id: string } }, n: number, now?: TaskCard): boolean {
+  if (!ws.path || ws.path.toLowerCase() !== path.toLowerCase() || laneStartHeld(ws, lane.project, lane.builder.id)) return false
   const v = laneNow(ws, { lane: lane.id }, now)
   return !!v && v.builder.id === lane.builder.id && laneStartDue(v)?.number === n
 }
@@ -116,13 +118,17 @@ export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
 }
 
 async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
+  // A lane waiting for a slot (Start Lane… found none free) has its stopped agents started once one is lent (slotCards'
+  // pass), its card with them: its status says it waits for a slot.
+  const forSlot = new Set((await lanesWaitingForSlot(ws)).filter((l) => !l.slotWait?.stoppedOnly).map((l) => l.id))
   for (const lane of await listLanes(ws)) {
     const next = laneStartDue(lane)
-    if (!next) continue
+    if (!next || forSlot.has(lane.id)) continue
     const projectPath = join(path, lane.project)
     waiting.set(builderKey(path, lane.project, lane.builder.id), next.number)
     const wait = (why: LaneStartWhy): void => void waits.set(waitKey(path, lane.id), { card: next.number, why, agent: lane.builder.name })
-    const holds = await builderWait(projectPath, lane.builder)
+    // Its start launching its agents (HI-2029): never started under it, as the builder's status then says (starting).
+    const holds = laneStartHeld(ws, lane.project, lane.builder.id) ? 'busy' : await builderWait(projectPath, lane.builder)
     if (holds) {
       wait(holds)
       continue

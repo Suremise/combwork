@@ -227,7 +227,13 @@ const ancestor = (x, y) => {
     const integrated = async (n) => (await factsOf(n, 'Integrated')).at(-1)
     /** A card's start by B1: in the lane's slot (`wt` from then on), on its line once Hive has made it there. */
     const start = async (n) => {
-      const s = await intent('b1', n, 'start')
+      // A lane started just as the one before it ends may wait for its slot (the earlier lane's lease ends just after
+      // it): the slot pass lends it and starts B1 in a new conversation with the brief, and Hive may then start the
+      // card on B1 itself (HI-2029; B1's own start of it is that start). Refused for the slot meanwhile, tried again.
+      const s = (await waitHung(async () => {
+        const r = await intent('b1', n, 'start')
+        return r.status === 409 && r.body?.rule === 'start.slotAvailable' ? null : r
+      })) ?? { status: 0, body: 'still no slot' }
       const started = (await factsOf(n, 'Started')).at(-1)?.data
       if (s.status === 200 && s.body?.data?.folder) {
         wt = s.body.data.folder
@@ -271,7 +277,13 @@ const ancestor = (x, y) => {
       await dialog.locator('#lane-start-builder').selectOption(b1.id)
       await dialog.locator('#lane-start-reviewer').selectOption(r1.id)
       await dialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
-      return waitHung(async () => (await inv('lanes:list')).find((l) => l.builder.id === b1.id && l.state !== 'ended' && JSON.stringify(l.cards.map((x) => x.number)) === JSON.stringify(cards)))
+      // Once lent its slot: a lane started just as the one before it ends waits for that lane's slot (its lease ends just
+      // after it), then the slot pass lends it and starts B1 with the brief (HI-2029). B1 may then be in a new
+      // conversation, with a new token (intent and reorderNow read it again on a 401).
+      return waitHung(async () => {
+        const lane = (await inv('lanes:list')).find((l) => l.builder.id === b1.id && l.state !== 'ended' && JSON.stringify(l.cards.map((x) => x.number)) === JSON.stringify(cards))
+        return lane?.slot ? lane : null
+      })
     }
     const laneNow = async (id) => (await inv('lanes:list')).find((l) => l.id === id)
     /** The lane ended verified: ended, its merge commit the last card's result (from the facts). */
@@ -402,6 +414,11 @@ const ancestor = (x, y) => {
       waitHung(async () => {
         const res = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.b1}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ cards: [c7, c6], applyNow: true }) })
         const body = await res.json().catch(() => null)
+        // B1 given a new conversation since its token was taken (its lane's start): read again, and tried again.
+        if (res.status === 401) {
+          tokens.b1 = (await tokenOf(b1.id).catch(() => null)) ?? tokens.b1
+          return null
+        }
         return res.status === 409 && /in a turn|is working|is starting|waiting for the user|background tasks/.test(JSON.stringify(body)) ? null : { status: res.status, body }
       })
     const re = await reorderNow()
