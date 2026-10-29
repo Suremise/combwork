@@ -342,6 +342,11 @@ export function isolatedPollDelay(waitedMs: number, lastMs: number, firstMs = IS
 /** How often at most a command's output tells Hive its run still goes (HI-1993): well within a quiet run's grace (STALE_GRACE_MS). */
 export const KEEPALIVE_MS = 60_000
 
+/** Whether output at `now` tells Hive the run still goes: once `every` ms have passed since it last did (or since its start or last step). */
+export function keepAliveDue(lastAlive: number, now: number, every = KEEPALIVE_MS): boolean {
+  return now - lastAlive >= every
+}
+
 /**
  * The command's run as reported: it starts at the first step line that gives the total, or after `waitMs`, so steps
  * the command announces at once show as steps from the start. A run started without a total takes the first one given
@@ -384,7 +389,7 @@ class WrappedRun {
    * no step lines (a stress loop) isn't taken for one that stopped reporting. One silent for long still is.
    */
   output(now = Date.now()): void {
-    if (!this.run || now - this.lastAlive < (this.opts.keepAliveMs ?? KEEPALIVE_MS)) return
+    if (!this.run || !keepAliveDue(this.lastAlive, now, this.opts.keepAliveMs)) return
     this.lastAlive = now
     this.run.update({})
   }
