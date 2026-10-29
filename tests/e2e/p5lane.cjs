@@ -103,6 +103,11 @@ const ancestor = (x, y) => {
      * own, and the restart may come after the lane is listed: refused as unknown (401), the token is read again from the
      * agent's latest launch, once it has a new one, and the intent sent again (a few times at most).
      */
+    /** A call to the Agent API with an agent's token: its status and body. */
+    const api = async (method, route, body, token) => {
+      const res = await fetch(`http://127.0.0.1:${h.port}${route}`, { method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
+      return { status: res.status, body: await res.json().catch(() => null) }
+    }
     const intent = async (who, n, name, body = {}) => {
       let r = await q.intent(h, { token: tokens[who] }, n, name, body)
       for (let tries = 0; r.status === 401 && tries < 3; tries++) {
@@ -190,9 +195,15 @@ const ancestor = (x, y) => {
      * A card's round in B1's worktree: committed (`file`), its quick check counted, submitted; `meanwhile` runs while it
      * is in review (main moving); the reviewer passes it. The merge check is steered to `merge` as the verdict comes.
      */
-    const round = async (n, file, { text, meanwhile, merge = 'pass', commitIt = true } = {}) => {
+    const round = async (n, file, { text, meanwhile, merge = 'pass', commitIt = true, watched = false } = {}) => {
       const rev = commitIt ? commit(file, text) : git(wt, 'rev-parse', 'HEAD')
       check(`${await keyOf(n)}'s quick check through hive-progress --check is counted`, await quickCheck(n))
+      // HI-2015: B1 watching its card before it submits (card-loop's order), its column moves too, isn't woken by its own
+      // submission's move into Review (the checks gate on): its first wake is the reviewer's verdict.
+      if (watched) {
+        const w = await api('POST', '/v1/tasks/wait', { cards: [n], changes: ['verdict', 'column', 'comment'], wake: true }, tokens.b1)
+        check(`B1 watches ${await keyOf(n)} before it submits`, w.status === 200 && !!w.body?.watching, JSON.stringify(w.body))
+      }
       const sub = await intent('b1', n, 'submit', { summary: `${file} ready` })
       check(`${await keyOf(n)} submitted: Review`, sub.status === 200 && (await card(n)).column === 'review', JSON.stringify(sub.body))
       const moved = meanwhile ? meanwhile() : null
@@ -201,6 +212,11 @@ const ancestor = (x, y) => {
       q.steer(fx, merge)
       const pass = await intent('r1', n, 'verdict', { pass: true, comment: `${file}: PASSED` })
       check(`the reviewer passes ${await keyOf(n)}`, pass.status === 200, JSON.stringify(pass.body))
+      if (watched) {
+        const wakes = async () => ((await api('GET', `/v1/projects/alpha/agents/${encodeURIComponent(b1.name)}/deliveries?limit=200`, undefined, tokens.b1)).body?.deliveries ?? []).filter((d) => d.kind === 'card-event' && String(d.text ?? '').startsWith('[Hive] '))
+        const first = await waitHung(async () => (await wakes())[0])
+        check(`…B1's first wake on ${await keyOf(n)} is the verdict, not its own move into Review`, !!first && /passed it|is in Passed/.test(first.text) && !/is in Review/.test(first.text), JSON.stringify(await wakes()))
+      }
       return { rev, moved, was }
     }
     const done = async (n) => !!(await waitHung(async () => (await card(n)).column === 'done'))
@@ -276,7 +292,7 @@ const ancestor = (x, y) => {
     check('…B1 works there now', !!(await waitHung(async () => (await live(b1.id))?.cwd?.toLowerCase() === wt?.toLowerCase())), JSON.stringify(await live(b1.id)))
     const early = await intent('b1', c2, 'start')
     check('…the next card waits for it (one card at a time)', early.status === 409 && early.body?.rule === 'lane.oneAtATime', JSON.stringify(early.body))
-    const one = await round(c1, 'one.txt', { merge: 'wait' })
+    const one = await round(c1, 'one.txt', { merge: 'wait', watched: true })
     check("the queue tests One's merge (its check is running)", !!(await waitHung(() => fs.existsSync(fx.started))))
     const k1 = await keyOf(c1)
     await shoot('2-one-testing', 'merges', async () => (await queueText()).includes(`${k1} + main`) && (await onBoard('Merging', c1)))
