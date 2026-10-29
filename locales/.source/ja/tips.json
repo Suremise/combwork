@@ -176,6 +176,8 @@
   "tips.copyDiagnostics.title": "Found a bug? Copy Diagnostics",
   "tips.ctrlCvToCli.text": "In an agent's pane Ctrl+C copies a selection and Ctrl+V pastes. Turn on Settings → Advanced → Ctrl+C and Ctrl+V go to the CLI to send both keys to the CLI instead, as in any other terminal; right-click still copies and pastes.",
   "tips.ctrlCvToCli.title": "Give Ctrl+C and Ctrl+V to the agent's CLI",
+  "tips.customCommands.text": "Name a command once in Settings → Commands and run it from the command palette (Run Command), or pick it for when a workspace opens or closes: a local server or a database your agents need, say. As a workspace opens, its agents start once they are done.",
+  "tips.customCommands.title": "Your own commands, one click away",
   "tips.dateFormat.text": "Hive shows dates as {date} and times as {time}. Settings → General → Date format and Time format change them everywhere, sessions named by when they started too.",
   "tips.dateFormat.title": "Dates your way",
   "tips.defaultProvider.text": "Default provider is Automatic unless you choose one: new agents use the first coding agent that is turned on and installed, so Codex or GitHub Copilot alone works without Claude Code. Choose one in Settings → Providers to always use it.",

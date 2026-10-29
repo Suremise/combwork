@@ -159,6 +159,7 @@
   "session.start.couldNot": "Não foi possível iniciar o agente {agent}",
   "session.start.fenced": "{why}, então os agentes do projeto não podem iniciar agora.",
   "session.start.moveFailed": "O Hive não conseguiu mover as configurações de modelo de {project} para seus agentes: {error}. Inicie-o de novo.",
+  "session.start.openCommands": "Os comandos de abertura deste espaço de trabalho ainda estão rodando: os agentes iniciam quando eles terminarem ou quando você seguir em frente.",
   "session.start.openIn": "Esta conversa já está aberta em {agent}. Um agente só pode retomar uma sessão que nenhum outro agente esteja executando.",
   "session.start.otherFolder": "Esta sessão foi executada em {folder}. Retome-a com o agente que trabalha nessa pasta.",
   "session.start.projectRunning": "Já há uma sessão em execução para este projeto. Pare-a primeiro.",

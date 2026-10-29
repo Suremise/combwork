@@ -176,6 +176,8 @@
   "tips.copyDiagnostics.title": "Un bug ? Copier les diagnostics",
   "tips.ctrlCvToCli.text": "Dans le volet d’un agent, Ctrl+C copie une sélection et Ctrl+V colle. Active Paramètres → Avancé → Ctrl+C et Ctrl+V vont à la CLI pour envoyer plutôt les deux touches à la CLI, comme dans n’importe quel autre terminal ; le clic droit copie et colle toujours.",
   "tips.ctrlCvToCli.title": "Donne Ctrl+C et Ctrl+V à la CLI de l’agent",
+  "tips.customCommands.text": "Nomme une commande une fois dans Paramètres → Commandes et exécute-la depuis la palette de commandes (Exécuter la commande), ou choisis-la pour l’ouverture ou la fermeture d’un espace de travail : un serveur local ou une base de données dont tes agents ont besoin, par exemple. À l’ouverture d’un espace de travail, ses agents démarrent quand les commandes ont fini.",
+  "tips.customCommands.title": "Tes propres commandes, à portée de clic",
   "tips.dateFormat.text": "Hive affiche les dates sous la forme {date} et les heures sous la forme {time}. Paramètres → Général → Format de date et Format de l’heure les changent partout, y compris dans les noms des sessions nommées d’après leur début.",
   "tips.dateFormat.title": "Les dates à ta façon",
   "tips.defaultProvider.text": "Fournisseur par défaut est sur Automatique sauf si tu en choisis un : les nouveaux agents utilisent le premier agent de code activé et installé, donc Codex ou GitHub Copilot seul fonctionne sans Claude Code. Choisis-en un dans Paramètres → Fournisseurs pour toujours l’utiliser.",

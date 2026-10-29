@@ -265,6 +265,7 @@
   "shell.palette.openCard": "Ouvrir la carte : {card} {title}",
   "shell.palette.placeholder": "Tape une commande ou un nom de projet",
   "shell.palette.projectsPlaceholder": "Aller au projet",
+  "shell.palette.runCommand": "Exécuter la commande : {name}",
   "shell.path.copied": "Chemin copié",
   "shell.path.copy": "Copier le chemin",
   "shell.path.copyFailed": "Impossible de copier le chemin",

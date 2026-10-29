@@ -265,6 +265,7 @@
   "shell.palette.openCard": "Otwórz kartę: {card} {title}",
   "shell.palette.placeholder": "Wpisz polecenie lub nazwę projektu",
   "shell.palette.projectsPlaceholder": "Przejdź do projektu",
+  "shell.palette.runCommand": "Uruchom polecenie: {name}",
   "shell.path.copied": "Skopiowano ścieżkę",
   "shell.path.copy": "Kopiuj ścieżkę",
   "shell.path.copyFailed": "Nie udało się skopiować ścieżki",

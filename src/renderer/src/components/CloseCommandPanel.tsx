@@ -130,7 +130,7 @@ function useKeyboardModal(card: React.RefObject<HTMLDivElement | null>, footer: 
   })
 }
 
-function StepRow({ step, current, now, lines }: { step: CloseCommandStep; current: boolean; now: number; lines: string[] }) {
+function StepRow({ step, current, command, now, lines }: { step: CloseCommandStep; current: boolean; command: string; now: number; lines: string[] }) {
   const started = step.startedAt ? Date.parse(step.startedAt) : NaN
   const ended = step.endedAt ? Date.parse(step.endedAt) : now
   const time = Number.isFinite(started) ? tr(M.ranFor, { time: durationText(ended - started, tr) }) : ''
@@ -151,8 +151,13 @@ function StepRow({ step, current, now, lines }: { step: CloseCommandStep; curren
         <span className="grow">{step.name}</span>
         <span className="faint">{said}</span>
       </div>
-      {current && (step.detail || lines.length > 0) && (
+      {current && (command || step.detail || lines.length > 0) && (
         <>
+          {command && (
+            <div className="close-command-text" aria-label={tr(M.command)}>
+              {command}
+            </div>
+          )}
           {step.detail && <div className="close-command-text">{step.detail}</div>}
           {lines.length > 0 && (
             <pre className="close-command-output" aria-label={tr(M.output)}>
@@ -196,7 +201,7 @@ function Panel({ run }: { run: CloseCommandRun }) {
           {steps ? (
             <ol className="close-command-steps" aria-label={tr(M.steps)}>
               {steps.map((s, i) => (
-                <StepRow key={i} step={s} current={i === currentStep} now={now} lines={i === currentStep ? lines : []} />
+                <StepRow key={i} step={s} current={i === currentStep} command={i === currentStep ? run.command : ''} now={now} lines={i === currentStep ? lines : []} />
               ))}
             </ol>
           ) : (
