@@ -709,50 +709,73 @@ async function finishedSlots(ws: WorkspaceService, projectPath: string, wf: Work
     if (ended(ws)) return
     const lane = l.kind === 'lane' && l.lane ? lanes.get(l.lane) : undefined
     const cards = l.kind === 'card' && l.card !== null ? [l.card] : (lane?.cards ?? [])
+    // The slot as the lease still has it: null once another lease holds it (or it is gone).
+    const slotNow = (): FinishedSlotView | null => {
+      const now = pool.slotOf(l)
+      return now && !(l.to && pool.openLease(now.name)) ? { name: now.name, folder: now.folder, target: now.target, busy: !!now.op, open: !l.to } : null
+    }
     for (const n of cards) {
-      const card = cardOf(wf, n)
-      const s = card ? wf.state(card) : null
-      if (!card || !s?.finished || s.started?.lease !== l.id || !s.started.line) continue
-      const asked = s.requests.some((r) => r.gate === SLOT_DIRTY_GATE)
-      const slot = pool.slotOf(l)
-      // The slot is another lease's now: its own card's question, if any, no longer stands.
-      if (!slot || (l.to && pool.openLease(slot.name))) {
-        if (asked) await wf.closeSlotDirty(card)
-        continue
-      }
-      const line = s.started.line
-      const target = slot.target ?? s.started.target
-      if (!target) continue
-      const finish = s.finished.seq
-      await withRepoLock(
-        projectPath,
-        async () => {
-          const now = pool.slotOf(l)
-          if (!now || now.op || (l.to && pool.openLease(now.name))) return
-          const h = await G.heads(now.folder, target)
-          if (isUnknown(h.line)) return
-          if (h.line !== line) {
-            if (asked) await wf.closeSlotDirty(card)
-            return
-          }
-          const d = await G.dirty(now.folder)
-          if (isUnknown(d)) return
-          if (d.length) {
-            if (!asked) await wf.askSlotDirty(card, finish, { slot: now.name, line, target })
-            return
-          }
-          // Clean: a running lane's slot detached here; a released one is the pool's (it looks at it as it settles).
-          if (!l.to && !isUnknown(h.target) && h.target) {
-            const r = await git(now.folder, ['switch', '--detach', h.target])
-            if (r.ok) log.info(`${userText(now.name)} detached at ${userText(target)} after #${n} (lane ${userText(l.lane ?? '')})`)
-            else return void log.warn(`detaching ${userText(now.name)} at ${userText(target)}: ${userText(r.err)}`)
-          }
-          if (asked) await wf.closeSlotDirty(card)
-        },
-        { quiet: true, project: projectPath }
-      )
+      if (ended(ws)) return
+      await finishedSlot(projectPath, wf, n, l.id, slotNow, l.lane)
     }
   }
+}
+
+/** A finished card's slot as its lease still has it (HI-2014): `busy`, an operation holds it; `open`, its lease (a lane's) is. */
+export interface FinishedSlotView {
+  name: string
+  folder: string
+  target: string | null
+  busy: boolean
+  open: boolean
+}
+
+/**
+ * One finished card's slot (finishedSlots): nothing unless the card is Done in a cycle started with `lease`. The slot
+ * read again under the repository's lock: another lease's now, or on another line, its question closes; dirty, asked
+ * once; clean, an open lease's slot detached at the target's head (a released one is the pool's), its question closed.
+ */
+export async function finishedSlot(projectPath: string, wf: Workflow, n: number, lease: string, slotNow: () => FinishedSlotView | null, lane: string | null = null): Promise<void> {
+  const card = cardOf(wf, n)
+  const s = card ? wf.state(card) : null
+  if (!card || !s?.finished || s.started?.lease !== lease || !s.started.line) return
+  const asked = s.requests.some((r) => r.gate === SLOT_DIRTY_GATE)
+  const slot = slotNow()
+  if (!slot) {
+    if (asked) await wf.closeSlotDirty(card)
+    return
+  }
+  const line = s.started.line
+  const target = slot.target ?? s.started.target
+  if (!target) return
+  const finish = s.finished.seq
+  await withRepoLock(
+    projectPath,
+    async () => {
+      const now = slotNow()
+      if (!now || now.busy) return
+      const h = await G.heads(now.folder, target)
+      if (isUnknown(h.line)) return
+      if (h.line !== line) {
+        if (asked) await wf.closeSlotDirty(card)
+        return
+      }
+      const d = await G.dirty(now.folder)
+      if (isUnknown(d)) return
+      if (d.length) {
+        if (!asked) await wf.askSlotDirty(card, finish, { slot: now.name, line, target })
+        return
+      }
+      // Clean: a running lane's slot detached here; a released one is the pool's (it looks at it as it settles).
+      if (now.open && !isUnknown(h.target) && h.target) {
+        const r = await git(now.folder, ['switch', '--detach', h.target])
+        if (r.ok) log.info(`${userText(now.name)} detached at ${userText(target)} after #${n}${lane ? ` (lane ${userText(lane)})` : ''}`)
+        else return void log.warn(`detaching ${userText(now.name)} at ${userText(target)}: ${userText(r.err)}`)
+      }
+      if (asked) await wf.closeSlotDirty(card)
+    },
+    { quiet: true, project: projectPath }
+  )
 }
 
 async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<void> {

@@ -18,7 +18,7 @@ import { lineName } from '../src/main/workflow/runtime'
 import type { Fact } from '../src/shared/workflow/facts'
 import { DatabaseSync } from 'node:sqlite'
 import { boardFile } from '../src/main/boardStore'
-import { readFileSync } from 'fs'
+import { readFileSync, rmSync, writeFileSync } from 'fs'
 
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
 const HUNG_MS = 30_000
@@ -201,7 +201,7 @@ vi.mock('../src/main/deliveries', async (orig) => {
 const { tellListeners } = await import('../src/main/events')
 const { withWriteFence } = await import('../src/main/workflow/factStore')
 const { LeaseLost } = await import('../src/main/workflow/queueRunner')
-const { cycleIn, deleteMergedLine, expectStartPrompt, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { cycleIn, deleteMergedLine, expectStartPrompt, finishedSlot, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 const { resetAgentStartsForTests, startBegun, startNow } = await import('../src/main/agentStarts')
 
 let env: Env | null = null
@@ -332,6 +332,59 @@ describe("a Done card's merged line (#1438)", { timeout: 60_000 }, () => {
     expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
     expect(hasLine(e, line)).toBe(true)
     expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual([])
+  })
+})
+
+describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () => {
+  const view = (slot: string, open = true) => () => ({ name: 'slot-a', folder: slot, target: 'main', busy: false, open })
+  const branch = (slot: string): string => sh(slot, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
+  const asked = (e: Env, n: number): number => e.wf.state(e.store.cardByKey(`#${n}`)!).requests.filter((r) => r.gate === 'slotDirty').length
+
+  it("a running lane's slot, clean: detached at the target's head, so its merged line can go", async () => {
+    const { e, n, line, slot } = await doneInSlot('Lane card')
+    await finishedSlot(e.project, e.wf, n, 'l-1', view(slot))
+    expect(branch(slot)).toBe('HEAD')
+    expect(sh(slot, 'rev-parse', 'HEAD').trim()).toBe(sh(e.project, 'rev-parse', 'main').trim())
+    expect(asked(e, n)).toBe(0)
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(true)
+    expect(hasLine(e, line)).toBe(false)
+  })
+
+  it('uncommitted changes: left on its line, the user asked once; once clean, detached and the question closed', async () => {
+    const { e, n, line, slot } = await doneInSlot('Dirty card')
+    writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
+    await finishedSlot(e.project, e.wf, n, 'l-1', view(slot))
+    await finishedSlot(e.project, e.wf, n, 'l-1', view(slot))
+    expect(branch(slot)).toBe(line)
+    expect(asked(e, n)).toBe(1)
+    rmSync(join(slot, 'wip.txt'))
+    await finishedSlot(e.project, e.wf, n, 'l-1', view(slot))
+    expect(branch(slot)).toBe('HEAD')
+    expect(asked(e, n)).toBe(0)
+  })
+
+  it("another lease's now (reused), or the card back out of Done: its checkout left alone", async () => {
+    const { e, n, line, slot } = await doneInSlot('Reused')
+    writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
+    await finishedSlot(e.project, e.wf, n, 'l-1', view(slot))
+    expect(asked(e, n)).toBe(1)
+    // Reused by another lease: the question closes, the slot untouched.
+    rmSync(join(slot, 'wip.txt'))
+    await finishedSlot(e.project, e.wf, n, 'l-1', () => null)
+    expect(asked(e, n)).toBe(0)
+    expect(branch(slot)).toBe(line)
+    // Another lease's id, or the card reopened: nothing done.
+    await finishedSlot(e.project, e.wf, n, 'l-2', view(slot))
+    expect(branch(slot)).toBe(line)
+    moved(await e.wf.move(e.store.cardByKey(`#${n}`)!.key, 'todo', 'user', { confirm: true, reason: 'reopened' }))
+    await finishedSlot(e.project, e.wf, n, 'l-1', view(slot))
+    expect(branch(slot)).toBe(line)
+  })
+
+  it("a released card's slot isn't switched here (the pool detaches it as it looks at it)", async () => {
+    const { e, n, line, slot } = await doneInSlot('Released')
+    await finishedSlot(e.project, e.wf, n, 'l-1', view(slot, false))
+    expect(branch(slot)).toBe(line)
   })
 })
 
