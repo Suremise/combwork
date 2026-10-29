@@ -131,7 +131,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     // --- A preset's preview shows the Maximum agents it sets, with the value now (HR3's round 1).
     await page.locator('.vc-view .workflow-choice[data-choice="team"]').click()
     const previewRow = page.locator('.vc-view .workflow-preview li[data-option="maxAgents"]')
-    check("Team's preview lists Maximum agents: 12, a change from 2 now", !!(await until(async () => (await previewRow.count()) === 1 && /Maximum agents: 12/.test(await text(previewRow)) && /Now: 2/.test(await text(previewRow)) && /changes/.test((await previewRow.getAttribute('class')) ?? ''))), await text(page.locator('.vc-view .workflow-preview')))
+    check("Team's preview lists Maximum agents: 12, a change from 2 now", !!(await until(async () => (await previewRow.count()) === 1 && /Maximum agents: 12/.test(await text(previewRow)) && /Now: 2/.test(await text(previewRow)) && /\bchanges\b/.test((await previewRow.getAttribute('class')) ?? ''))), await text(page.locator('.vc-view .workflow-preview')))
     await shoot('4-preview', () => page.locator('.vc-view .workflow-preview'))
   } catch (e) {
     check('the suite threw', false, e.stack)
