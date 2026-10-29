@@ -3039,6 +3039,18 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
      commit) returns the card with its own text, then git's (`IntegrationFailed`, reason `hook`).
    - **Other failures:** anything else (an index lock, a broken repository, a worktree it couldn't check out) pauses
      `needsYou` with git's own lines, never a return.
+   - **A read that fails for a moment** (HI-2019): before anything is touched (no `IntegrationStarted`), a git read or
+     worktree step that fails (the identity, the target's head, the queue worktree's listing, add or checkout, the test
+     merge's head, strict's and Rebase's ancestry reads, the checked-out folder's branch, staged files, status and the
+     merge's files) isn't a pause yet: the entry goes round again, the lock and fence released, after 250 ms × the try,
+     up to 3 times (a budget of its own, apart from a target that moves). Before it goes round it is admitted afresh: still
+     approved (a decision or Remove from queue meanwhile takes it out), no pause saved meanwhile (the user's stands, and
+     the entry waits, open), the rules on, the lease held; so nothing more is merged or checked once one of those changed.
+     Only a read that keeps failing pauses, `needsYou` with git's own words. A commit identity git couldn't read is that,
+     never "no identity" (`identity` pauses only when git says the name or email isn't set). The queue's worktree is
+     reused only when this repository's worktree list names it; a folder there that git doesn't list is used only if
+     empty, else left as it is and paused, named; nothing of it is ever removed or pruned. After the advance, only the
+     folder's branch is read again (3 times, 100 ms apart, in the lock): the advance is never redone.
    - **No trace** (a git older than 2.24): only git's own "Not committing merge" is a hook, and signing is never read
      from text.
    - **Signing:** the repository's config (never overridden). Hive's commits run with no terminal: no input,

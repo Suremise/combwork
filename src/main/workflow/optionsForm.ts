@@ -86,7 +86,12 @@ export async function presetInputs(projectPath: string, platform: PlatformId): P
   const commands = Object.fromEntries([...quick.map((n) => [n, `npm run ${n}`]), ...tests.map((n) => [n, 'npm test'])]) // i18n-ignore: commands, run as written
   if (platform !== 'git') return { quick, tests, commands, identity: null }
   const target = await G.defaultBranch(projectPath).catch(() => null)
-  return { quick, tests, commands, identity: await G.identity(projectPath).catch(() => null), ...(typeof target === 'string' ? { target } : {}) }
+  // HI-2019: a read git couldn't make is asked once more; still unread, the form shows no identity (it has no state for
+  // "couldn't read", and the queue reads it again itself before a merge).
+  const read = () => G.identity(projectPath).catch(() => null)
+  const first = await read()
+  const id = isUnknown(first) ? await read() : first
+  return { quick, tests, commands, identity: isUnknown(id) ? null : id, ...(typeof target === 'string' ? { target } : {}) }
 }
 
 /** The project's options as the Workflow section shows them. */
