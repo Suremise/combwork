@@ -668,6 +668,22 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
       await store.clearWriterRun('r-revoked')
     })
 
+    it("two settlements of one run at once: each clear carries its own evidence, so a revocation after the first still refuses its clear (HR2's round 1)", async () => {
+      hostOn(false)
+      await plant('r-twice', { ended: true })
+      tracker.keeper.set('r-twice', { state: 'ended', helper })
+      const w = store.slot('slot-a')!.writer!
+      const first = await goneWriterSettles(project, w)
+      expect(first).toEqual({ run: 'r-twice', helper })
+      // A second check of the same run under way, then the helper revoked, before the first attempt's clear.
+      const second = goneWriterSettles(project, w)
+      tracker.bound = () => false
+      await second
+      await expect(store.clearWriter('slot-a', 'r-twice', goneWriterStill(first as Exclude<typeof first, false>))).rejects.toThrow(/revoked/)
+      expect(writer()?.run).toBe('r-twice')
+      await store.clearWriterRun('r-twice')
+    })
+
     it('"live": held, its members still running (checked again by id and start time) listed, nothing ended', async () => {
       hostOn(false)
       await plant('r-live', { ended: true })

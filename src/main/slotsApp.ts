@@ -278,9 +278,9 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       writerOver: (w) => writerOver(w),
       writerGone: {
         settles: (w) => goneWriterSettles(projectPath, w),
-        still: (run) => goneWriterStill(run),
-        cleared: (run) => {
-          goneWriterCleared(run)
+        still: (evidence) => goneWriterStill(evidence),
+        cleared: (run, evidence) => {
+          goneWriterCleared(run, evidence)
           // Free now: a lane waiting for a slot may get it (#1438).
           slotFreed?.(ws, projectPath)
         }

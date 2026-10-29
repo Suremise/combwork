@@ -498,39 +498,43 @@ const runLeftovers = (run: string): ReturnType<typeof leftoversOfRun> => leftove
  * A list of its processes taken earlier (the last run's marker) never is: what they started since isn't in it (HR2's
  * round 1). Nothing kept, or its Hive still running or not known to have gone: it stays held for the user's Release Slot….
  */
-export async function goneWriterSettles(projectPath: string, w: { run: string; agent: string; pid: number; started: number }): Promise<boolean> {
+export async function goneWriterSettles(projectPath: string, w: { run: string; agent: string; pid: number; started: number }): Promise<GoneEvidence | false> {
   const me = await writerHost.self()
   if ((w.pid === me.pid && w.started === me.started) || (await writerHost.alive(w.pid, w.started)) !== false) return false
-  settledBy.delete(w.run)
   if (await endedEarlier(w.run)) {
     log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} of a Hive that has gone (process ${w.pid}) settled: its processes were seen to end`)
-    return true
+    return Object.freeze({ run: w.run, helper: null })
   }
   const kept = await keeperState(w.run, `${w.pid}:${w.started}`)
   if (kept?.state !== 'ended') return false
-  settledBy.set(w.run, kept.helper)
   log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run left nothing running (its Hive, process ${w.pid}, gone; seen by its helper ${kept.helper})`)
-  return true
+  return Object.freeze({ run: w.run, helper: kept.helper })
 }
 
-/** The helper whose keeper's receipt settled a run's writer (HI-2055), for the clear's guard. */
-const settledBy = new Map<string, string>()
+/**
+ * What settled a gone Hive's writer, for that one attempt's clear (HR2's round 1: never shared between attempts): its run,
+ * and the helper whose keeper's receipt it was (null: this profile kept its run as seen ended).
+ */
+export interface GoneEvidence {
+  readonly run: string
+  readonly helper: string | null
+}
 
 /**
- * Checked inside the write that clears a settled writer (HI-2055): one settled by its keeper's receipt is cleared only if
+ * Checked inside the write that clears a settled writer (HI-2055): settled by its keeper's receipt, it is cleared only if
  * that helper is still the one its run is bound to, unrevoked (a revocation during the read refuses the clear).
  */
-export function goneWriterStill(run: string): () => void {
-  const helper = settledBy.get(run)
+export function goneWriterStill(evidence: GoneEvidence): () => void {
+  const { run, helper } = evidence
   return () => {
-    if (helper && !keeperStillBound(run, helper)) throw new Error(`the slot writer ${run}'s helper ${helper} was revoked`)
+    if (helper !== null && !keeperStillBound(run, helper)) throw new Error(`the slot writer ${run}'s helper ${helper} was revoked`)
   }
 }
 
 /** A gone Hive's writer cleared (HI-1886): its run's kept record is no longer needed, nor its keeper's (HI-2055). */
-export function goneWriterCleared(run: string): void {
+export function goneWriterCleared(run: string, evidence?: GoneEvidence): void {
   forgetEarlierRun(run)
-  if (settledBy.delete(run)) forgetKeeperRun(run)
+  if (evidence?.helper) forgetKeeperRun(run)
 }
 
 /**
@@ -540,9 +544,10 @@ export function goneWriterCleared(run: string): void {
 async function settleGoneWriterOf(projectPath: string, store: SlotStore, slot: string, run: string): Promise<void> {
   const w = store.slot(slot)?.writer
   if (!w || w.run === run) return
-  if (!(await goneWriterSettles(projectPath, w))) return
-  if (!(await store.clearWriter(slot, w.run, goneWriterStill(w.run)).catch(() => false))) return
-  goneWriterCleared(w.run)
+  const evidence = await goneWriterSettles(projectPath, w)
+  if (!evidence) return
+  if (!(await store.clearWriter(slot, w.run, goneWriterStill(evidence)).catch(() => false))) return
+  goneWriterCleared(w.run, evidence)
   await writerHost.drained(projectPath, slot)
 }
 

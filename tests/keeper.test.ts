@@ -4,16 +4,30 @@
 // Driven here through the helper's C# (HOST_SOURCE) in a PowerShell of the test's own, with processes of the test's
 // own (node sleepers), each ended by the test; the keeper is what its Hive's end would leave running.
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'child_process'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { HOST_SOURCE } from '../src/main/processSupervisor'
+import { HOST_SOURCE, JobHost } from '../src/main/processSupervisor'
 import { tempDir } from './tempDir'
+
+// Every child gets the run context's allowlisted environment (tests/e2e/runContext.cjs), never this shell's; the
+// grandchild below is given its parent's, which is that.
+const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
+
+// The next Hive's side (agentProcesses.ts) reads its profile: a folder of the test's own.
+const profile = vi.hoisted(() => ({ dir: '' }))
+vi.mock('electron', async (importOriginal) => {
+  const stub = await importOriginal<typeof import('./electron-stub')>()
+  return { ...stub, app: { ...stub.app, getPath: () => profile.dir } }
+})
+vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined }))
 
 /** A hung run's bound: every step here waits for a condition, never for time. */
 const HUNG_MS = 30_000
 const POWERSHELL = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 const dir = tempDir('hive-keeper-')
+profile.dir = join(dir, 'profile')
 const src = join(dir, 'host.cs')
 writeFileSync(src, HOST_SOURCE)
 /**
@@ -32,6 +46,7 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
   if ($a[0] -eq 'keep') { break }
   if ($a[0] -eq 'add') { [Console]::Out.WriteLine('added ' + [HiveJobs]::Add($a[1], [int]$a[2])) }
   if ($a[0] -eq 'follow') { [Console]::Out.WriteLine('followed ' + [HiveJobs]::Follow($a[1], [int]$a[2], 0x0001 -bor 0x100000)) }
+  if ($a[0] -eq 'failsnap') { [HiveJobs]::FailSnapshotsWhile = $a[1]; [Console]::Out.WriteLine('failsnap set') }
 }
 [HiveJobs]::Keep()
 `
@@ -54,7 +69,7 @@ const alive = (pid: number): boolean => {
 
 /** A process that waits, the test's own. */
 function sleeper(): ChildProcess {
-  const c = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { stdio: 'ignore', windowsHide: true })
+  const c = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { stdio: 'ignore', windowsHide: true, env: baseEnv() })
   started.push(c)
   return c
 }
@@ -62,7 +77,7 @@ function sleeper(): ChildProcess {
 /** A keeper of the test's own, its states written to a folder of its own. */
 function keeper(name: string): { proc: ChildProcessWithoutNullStreams; out: string[]; states: string; state: (job: string) => Record<string, unknown> | null; say: (line: string) => void } {
   const states = join(dir, name)
-  const proc = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, src, states], { windowsHide: true, stdio: 'pipe' })
+  const proc = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, src, states], { windowsHide: true, stdio: 'pipe', env: baseEnv() })
   started.push(proc)
   const out: string[] = []
   let buf = ''
@@ -135,7 +150,7 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     const k = keeper('grandchild')
     const pidFile = join(dir, 'grandchild.pid')
     // The middle process starts a detached child once it is in the job, says its id, and exits.
-    const middle = spawn(process.execPath, ['-e', `process.stdin.once('data', () => { const c = require('child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { detached: true, stdio: 'ignore', windowsHide: true }); require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(c.pid)); c.unref(); process.exit(0) })`], { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true })
+    const middle = spawn(process.execPath, ['-e', `process.stdin.once('data', () => { const c = require('child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { detached: true, stdio: 'ignore', windowsHide: true, env: process.env }); require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(c.pid)); c.unref(); process.exit(0) })`], { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true, env: baseEnv() })
     started.push(middle)
     k.say(`add j4 ${middle.pid}`)
     await waitFor(() => expect(k.out).toContain('added ok'))
@@ -154,6 +169,30 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     expect(k.state('j4')).toMatchObject({ state: 'ended', total: 0 })
   }, 60_000)
 
+  it("while its sweeps can't be sure (a snapshot Windows refuses), an empty job is never \"ended\": it waits, and writes it once they can", async () => {
+    const k = keeper('unsure')
+    const s = sleeper()
+    const fail = join(dir, 'unsure.fail')
+    writeFileSync(fail, '')
+    k.say(`add j6 ${s.pid}`)
+    await waitFor(() => expect(k.out).toContain('added ok'))
+    k.say(`failsnap ${fail}`)
+    await waitFor(() => expect(k.out).toContain('failsnap set'))
+    // Its job empties while every sweep fails: an escaped child a failed sweep didn't take could still run.
+    s.kill()
+    await exited(s)
+    const failed = () => (existsSync(`${fail}.failed`) ? readFileSync(`${fail}.failed`, 'utf8').length : 0)
+    const before = failed()
+    k.say('keep')
+    await waitFor(() => expect(failed()).toBeGreaterThanOrEqual(before + 3))
+    expect(k.state('j6')?.state).not.toBe('ended')
+    expect(k.proc.exitCode).toBeNull()
+    // Sure again: ended, and it exits.
+    rmSync(fail)
+    await exited(k.proc)
+    expect(k.state('j6')).toMatchObject({ state: 'ended', total: 0 })
+  }, 60_000)
+
   it('a keeper ended before its job empties leaves "live", never "ended"', async () => {
     const k = keeper('killed')
     const s = sleeper()
@@ -167,6 +206,50 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     await exited(s)
     expect(k.state('j5')).toMatchObject({ state: 'live', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid })]) })
   }, 60_000)
+
+  /**
+   * The boundary whole: a Hive's real job host (its transport and script) configured as a keeper, a launch's process in
+   * its job and the run bound to it in the profile (as trackLaunch keeps it); the Hive goes (quits, or crashes: its
+   * pipe cut); the next Hive's agentProcesses, reading the same profile, takes the keeper's "live", then its "ended".
+   */
+  for (const how of ['quits', 'crashes'] as const) {
+    it(`a Hive that ${how} with a launch's process running: the next one reads "live", then "ended" once it ends`, async () => {
+      profile.dir = join(dir, `profile-${how}`)
+      mkdirSync(profile.dir, { recursive: true })
+      const { keeperDir } = await import('../src/main/agentProcesses')
+      let helperProc: ChildProcessWithoutNullStreams | null = null
+      const host = new JobHost({
+        waitMs: () => HUNG_MS,
+        testMode: () => '',
+        log: { warn: () => undefined },
+        onJoined: () => undefined,
+        onLost: () => undefined,
+        onFailed: () => undefined,
+        launch: (file, args) => {
+          helperProc = spawn(file, args, { windowsHide: true, stdio: 'pipe', env: baseEnv(), cwd: dir })
+          started.push(helperProc)
+          return helperProc
+        }
+      })
+      expect(await host.ensure()).toBe(true)
+      const helper = await host.request('keeper', '100:5', Buffer.from(keeperDir(), 'utf8').toString('base64url'))
+      expect(helper).toMatch(/^\d+:\d+$/)
+      const s = sleeper()
+      expect(await host.request('add', 'boundary-run', s.pid)).toBe('ok')
+      writeFileSync(join(profile.dir, 'leftovers.json'), JSON.stringify({ version: 1, launches: [], helpers: { 'boundary-run': helper } }))
+      // Gone: a quit closes its input and stops waiting at "keeping"; a crash cuts the pipe.
+      if (how === 'quits') await host.close()
+      else helperProc!.stdin.destroy()
+      vi.resetModules()
+      const next = await import('../src/main/agentProcesses')
+      await waitFor(async () => expect(await next.keeperState('boundary-run', '100:5')).toMatchObject({ state: 'live', helper, members: expect.arrayContaining([expect.objectContaining({ pid: s.pid })]) }))
+      // Another Hive's, or a run never bound: none.
+      expect(await next.keeperState('boundary-run', '100:6')).toBeNull()
+      s.kill()
+      await exited(helperProc!)
+      expect(await next.keeperState('boundary-run', '100:5')).toEqual({ state: 'ended', helper })
+    }, 60_000)
+  }
 
   it('not configured (no folder), or holding no job: it exits at the end of its input, writing nothing', async () => {
     const k = keeper('nothing')

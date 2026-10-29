@@ -190,19 +190,33 @@ export type TrackResult = { tracked: true } | { tracked: false; reason: string; 
  */
 export async function trackLaunch(launch: Launch, pid: number, cancelled?: AbortSignal): Promise<TrackResult> {
   if (process.platform !== 'win32') return { tracked: false, reason: englishText(TRACKER.windowsOnly), text: TRACKER.windowsOnly }
-  // A lost helper's revocation is written before any launch is given to the one that replaces it (HI-2055).
-  if (!(await revocationsWritten())) {
+  // A lost helper's revocation is written before any launch is given to the one that replaces it (HI-2055), however
+  // late the loss: before this launch, while its helper is made ready, or while its job is made (HR2's round 1).
+  const unrevoked = (): TrackResult => {
     log.warn(`could not track the processes of ${userText(launch.agentName)}: a lost helper's revocation couldn't be kept`)
     problem = TRACKER.noStart
     return { tracked: false, reason: englishText(TRACKER.noStart), text: TRACKER.noStart }
   }
-  running.set(launch.runId, { ...launch, gate: pid })
+  if (!(await revocationsWritten())) return unrevoked()
+  let seen = losses
   const keeper = await keeperHelper()
+  if (losses !== seen) {
+    if (!(await revocationsWritten())) return unrevoked()
+    seen = losses
+  }
+  running.set(launch.runId, { ...launch, gate: pid })
+  const instance = host.instance
   const r = await host.request('add', launch.runId, pid)
+  if (r === 'ok' && losses !== seen && !(await revocationsWritten())) {
+    // Its job went to a helper started after a loss whose revocation isn't kept: let go, untracked.
+    running.delete(launch.runId)
+    void host.request('forget', launch.runId)
+    return unrevoked()
+  }
   if (r === 'ok' && !cancelled?.aborted) {
     if (host.usable) problem = null
-    // Bound to the helper that holds its job, only when that is the one configured (none since: replaced meanwhile).
-    if (keeper && keeper.instance === host.instance) {
+    // Bound only to the very helper configured as its keeper, which made its job, no loss between (HI-2055).
+    if (keeper && keeper.instance === instance && host.instance === instance && losses === seen) {
       runHelpers.delete(launch.runId)
       runHelpers.set(launch.runId, keeper.helper)
       while (runHelpers.size > MAX_RUN_RECORDS) runHelpers.delete(runHelpers.keys().next().value!)
@@ -255,6 +269,9 @@ async function keeperHelper(): Promise<{ instance: number; helper: string } | nu
   return keeperOf
 }
 
+/** How many helpers were lost in this run (HI-2055): a launch made across one waits for its revocation to be kept. */
+let losses = 0
+
 /** A lost helper's revocation being kept (HI-2055): false while it couldn't be written (tried again at the next launch). */
 let revocation: Promise<boolean> = Promise.resolve(true)
 
@@ -264,8 +281,21 @@ let revocation: Promise<boolean> = Promise.resolve(true)
  * reads it), durable once written.
  */
 function revokeHelper(helper: string): void {
+  dropRevoked(helper)
+  // Read first (the bindings kept from before this start are its too), then dropped again over them, then written.
+  revocation = readRecords().then(() => {
+    dropRevoked(helper)
+    return persistChecked()
+  })
+}
+
+/**
+ * A revoked helper's bindings go with its revocation (HR2's round 1): authority is the binding, and the list of revoked
+ * helpers is bounded, so a helper falling off that list must have nothing left to free.
+ */
+function dropRevoked(helper: string): void {
   if (!revokedHelpers.includes(helper)) revokedHelpers = [...revokedHelpers, helper].slice(-MAX_REVOKED)
-  revocation = readRecords().then(() => persistChecked())
+  for (const [run, h] of [...runHelpers]) if (h === helper) runHelpers.delete(run)
 }
 
 /** Whether every revocation is kept: one that failed is written again now. */
@@ -737,6 +767,7 @@ export function closeProcessTracking(): Promise<void> {
  * host (started by the next request) lists and ends exactly it, as after a restart; the rest can't be, and go.
  */
 function jobsLost(why: string): void {
+  losses++
   // No receipt of the lost helper's frees anything from now on (HI-2055): revoked before its replacement is given a launch.
   if (keeperOf) {
     revokeHelper(keeperOf.helper)
@@ -859,10 +890,12 @@ function readRecords(): Promise<void> {
     (saved) => {
       const ended = Array.isArray(saved?.ended) ? saved.ended.filter((r): r is string => typeof r === 'string' && r.length <= 100) : []
       endedRuns = [...new Set([...ended, ...endedRuns])].slice(-MAX_RUN_RECORDS)
-      const helpers = saved?.helpers && typeof saved.helpers === 'object' ? Object.entries(saved.helpers).filter(([r, h]) => r.length <= 100 && typeof h === 'string' && HELPER_ID.test(h)) : []
-      runHelpers = new Map([...helpers, ...runHelpers].slice(-MAX_RUN_RECORDS))
       const revoked = Array.isArray(saved?.revoked) ? saved.revoked.filter((h): h is string => typeof h === 'string' && HELPER_ID.test(h)) : []
-      revokedHelpers = [...new Set([...revoked, ...revokedHelpers])].slice(-MAX_REVOKED)
+      // Every revocation, kept or this run's, before the bounds: no binding to a revoked helper is taken back.
+      const allRevoked = new Set([...revoked, ...revokedHelpers])
+      revokedHelpers = [...allRevoked].slice(-MAX_REVOKED)
+      const helpers = saved?.helpers && typeof saved.helpers === 'object' ? Object.entries(saved.helpers).filter(([r, h]) => r.length <= 100 && typeof h === 'string' && HELPER_ID.test(h) && !allRevoked.has(h)) : []
+      runHelpers = new Map([...helpers, ...runHelpers].filter(([, h]) => !allRevoked.has(h)).slice(-MAX_RUN_RECORDS))
       if (endedRuns.length || runHelpers.size || revokedHelpers.length) keptAny = true
     },
     () => undefined

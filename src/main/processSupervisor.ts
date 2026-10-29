@@ -190,6 +190,19 @@ public static class HiveJobs {
    * Swept as each process of a job ends (so a shell that starts something and exits at once is caught), before listing
    * or ending a job, and every ${SWEEP_MS} ms (for an escaped child's own children).
    */
+  /**
+   * What sweeps couldn't be sure of (HI-2055): a snapshot or a job's listing that failed, or a process of a job's whose
+   * escaped child it couldn't check (a call Windows refused, not one that says the child has gone or isn't one). The
+   * keeper counts a job empty only after a sweep with none: an escaped child neither adopted nor followed would be missed.
+   */
+  public static int uncertain = 0;
+  /** The unit tests: while this file exists, every sweep's snapshot fails, as Windows refusing one would, each noted in <file>.failed. */
+  public static string FailSnapshotsWhile = null;
+  static bool SnapshotFailsForTests() {
+    if (FailSnapshotsWhile == null || !System.IO.File.Exists(FailSnapshotsWhile)) return false;
+    try { System.IO.File.AppendAllText(FailSnapshotsWhile + ".failed", "x"); } catch { }
+    return true;
+  }
   public static int Sweep() {
     lock (turn) {
       if (jobs.Count == 0) return 0;
@@ -197,14 +210,18 @@ public static class HiveJobs {
       // Taken before the snapshot: a process created after it can't be one the snapshot saw.
       long at; GetSystemTimeAsFileTime(out at);
       // TH32CS_SNAPPROCESS
-      IntPtr snap = CreateToolhelp32Snapshot(2, 0);
-      if (snap == IntPtr.Zero || snap == new IntPtr(-1)) return 0;
+      IntPtr snap = SnapshotFailsForTests() ? IntPtr.Zero : CreateToolhelp32Snapshot(2, 0);
+      if (snap == IntPtr.Zero || snap == new IntPtr(-1)) { uncertain++; return 0; }
       try {
         var e = new ProcessEntry(); e.size = (uint)Marshal.SizeOf(typeof(ProcessEntry));
         for (bool more = Process32FirstW(snap, ref e); more; more = Process32NextW(snap, ref e)) if (e.pid != 0) parents[(int)e.pid] = (int)e.parent;
       } finally { CloseHandle(snap); }
       var owner = new Dictionary<int, string>();
-      foreach (var j in jobs) foreach (int pid in List(j.Key)) owner[pid] = j.Key;
+      foreach (var j in jobs) {
+        int[] listed = ListChecked(j.Key);
+        if (listed == null) { uncertain++; continue; }
+        foreach (int pid in listed) owner[pid] = j.Key;
+      }
       foreach (var h in held) if (jobs.ContainsKey(h.Value.job)) owner[h.Key] = h.Value.job;
       foreach (var f in followed) if (jobs.ContainsKey(f.Value.job)) owner[f.Key] = f.Value.job;
       var tried = new HashSet<int>();
@@ -245,22 +262,28 @@ public static class HiveJobs {
       if (!jobs.TryGetValue(id, out job)) return false;
       // PROCESS_TERMINATE | PROCESS_SET_QUOTA | PROCESS_QUERY_LIMITED_INFORMATION
       IntPtr c = OpenProcess(0x0001 | 0x0100 | 0x1000, false, pid);
-      if (c == IntPtr.Zero) return false;
+      // ERROR_INVALID_PARAMETER: no such process (gone). Anything else (access denied): it may be one, unchecked.
+      if (c == IntPtr.Zero) { if (Marshal.GetLastWin32Error() != 87) uncertain++; return false; }
       bool keep = false;
       try {
         bool inJob, inAny; uint code; long cc, pc, x, k, u;
-        if (!IsProcessInJob(c, job, out inJob) || inJob) return false;
-        if (!GetExitCodeProcess(c, out code) || code != 259) return false;
-        if (!GetProcessTimes(c, out cc, out x, out k, out u) || cc > at) return false;
-        if (!Started(parent, at, out pc) || pc > cc) return false;
+        if (!IsProcessInJob(c, job, out inJob)) { uncertain++; return false; }
+        if (inJob) return false;
+        if (!GetExitCodeProcess(c, out code)) { uncertain++; return false; }
+        if (code != 259) return false;
+        if (!GetProcessTimes(c, out cc, out x, out k, out u)) { uncertain++; return false; }
+        if (cc > at) return false;
+        bool sure;
+        if (!Started(parent, at, out pc, out sure)) { if (!sure) uncertain++; return false; }
+        if (pc > cc) return false;
         // Only a process in no job joins: one in another job is followed (#659). Windows would nest the jobs: the Store's
         // PowerShell's is its package's, which every Store PowerShell started later joins, and when it had no parent it
         // became this launch's, so the next ones (any agent's or app's) were listed and ended with this launch. A packaged
         // app's process is followed even in no job: Windows puts it in its package's job only once it has started (a few
         // ms, more under load), and one assigned before then nests that job in this one just the same (#678).
-        if (!IsProcessInJob(c, IntPtr.Zero, out inAny)) return false;
+        if (!IsProcessInJob(c, IntPtr.Zero, out inAny)) { uncertain++; return false; }
         if (!inAny && !Packaged(c) && AssignProcessToJobObject(job, c)) return true;
-        if (!FollowHeld(id, pid, c, cc)) return false;
+        if (!FollowHeld(id, pid, c, cc)) { uncertain++; return false; }
         keep = true;
         return true;
       } finally { if (!keep) CloseHandle(c); }
@@ -273,14 +296,20 @@ public static class HiveJobs {
     return GetPackageFullName(proc, ref len, null) != 15700;
   }
   /** When a job's process started: held (its id kept), or looked up now, if created before "at". */
-  static bool Started(int pid, long at, out long created) {
+  static bool Started(int pid, long at, out long created) { bool sure; return Started(pid, at, out created, out sure); }
+  /** sure: false when it couldn't be told (the parent couldn't be opened or read), true when the answer is Windows'. */
+  static bool Started(int pid, long at, out long created, out bool sure) {
     Held h;
+    sure = true;
     if (held.TryGetValue(pid, out h) || followed.TryGetValue(pid, out h)) { created = h.created; return true; }
     created = 0;
     IntPtr p = OpenProcess(0x1000, false, pid);
-    if (p == IntPtr.Zero) return false;
+    if (p == IntPtr.Zero) { sure = false; return false; }
     long x, k, u;
-    try { return GetProcessTimes(p, out created, out x, out k, out u) && created <= at; } finally { CloseHandle(p); }
+    try {
+      if (!GetProcessTimes(p, out created, out x, out k, out u)) { sure = false; return false; }
+      return created <= at;
+    } finally { CloseHandle(p); }
   }
   /**
    * Holds a process the port says joined job id, if it is in that job: a notification read late may carry an id that
@@ -716,7 +745,12 @@ public static class HiveJobs {
     while (mine.Count > 0) {
       foreach (var id in new List<string>(mine)) {
         int[] m;
-        lock (turn) { try { Sweep(); } catch { } m = MembersChecked(id); }
+        // Its membership only after a sweep that was sure of everything (a failed one could miss an escaped child).
+        lock (turn) {
+          uncertain = 0;
+          try { Sweep(); } catch { uncertain++; }
+          m = uncertain == 0 ? MembersChecked(id) : null;
+        }
         if (m == null) continue;
         if (m.Length == 0) {
           for (int tries = 0; tries < 3 && !WriteState(id, "ended", m); tries++) System.Threading.Thread.Sleep(200);
