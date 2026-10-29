@@ -3320,7 +3320,7 @@
     "description": "What the setting \"Commands\" does, under its title (Settings → General, HI-1954). When Hive quits, run is another setting's title: use its translation."
   },
   "settings.general.commands.tip": {
-    "defaultMessage": "Saved in Hive's own settings, never in a workspace, so a repository you clone brings none that run by themselves. Only you can save them: the Assistant can suggest one for you to confirm.",
+    "defaultMessage": "Saved in Hive's own settings, never in a workspace, so a repository you clone brings none that run by themselves. Only you can set them: the Assistant can't change them.",
     "description": "The info tip of the setting \"Commands\" (Settings → General, HI-1954)."
   },
   "settings.general.commands.title": {
@@ -5448,7 +5448,7 @@
     "description": "What the setting \"Commands\" does, under its title (Settings → Workspace, HI-1954)."
   },
   "settings.workspace.commands.tip": {
-    "defaultMessage": "Saved in the workspace's .hive/workspace.json, which Hive keeps out of version control. Only you can save them: the Assistant can suggest one for you to confirm.",
+    "defaultMessage": "Saved in the workspace's .hive/workspace.json, which Hive keeps out of version control. Only you can set them: the Assistant can't change them.",
     "description": "The info tip of the setting \"Commands\" (Settings → Workspace, HI-1954). Keep the file path as it is."
   },
   "settings.workspace.commands.title": {

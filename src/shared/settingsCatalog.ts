@@ -263,7 +263,7 @@ const APP_ROWS: Row[] = [
     desc: msg({ id: 'settings.general.commands.desc', defaultMessage: "Your own commands for Hive as a whole: run one by hand (here, or Run Command in the command palette), or pick them for When Hive quits, run, or for any workspace's open and close.", description: 'What the setting "Commands" does, under its title (Settings → General, HI-1954). When Hive quits, run is another setting\'s title: use its translation.' }),
     tip: msg({
       id: 'settings.general.commands.tip',
-      defaultMessage: "Saved in Hive's own settings, never in a workspace, so a repository you clone brings none that run by themselves. Only you can save them: the Assistant can suggest one for you to confirm.",
+      defaultMessage: "Saved in Hive's own settings, never in a workspace, so a repository you clone brings none that run by themselves. Only you can set them: the Assistant can't change them.",
       description: 'The info tip of the setting "Commands" (Settings → General, HI-1954).'
     }),
     type: 'custom',
@@ -390,7 +390,7 @@ const APP_ROWS: Row[] = [
     desc: msg({ id: 'settings.workspace.commands.desc', defaultMessage: "This workspace's own commands: run one by hand (here, or Run Command in the command palette), or pick it, or one of Hive's, for when this workspace opens or closes.", description: 'What the setting "Commands" does, under its title (Settings → Workspace, HI-1954).' }),
     tip: msg({
       id: 'settings.workspace.commands.tip',
-      defaultMessage: "Saved in the workspace's .hive/workspace.json, which Hive keeps out of version control. Only you can save them: the Assistant can suggest one for you to confirm.",
+      defaultMessage: "Saved in the workspace's .hive/workspace.json, which Hive keeps out of version control. Only you can set them: the Assistant can't change them.",
       description: 'The info tip of the setting "Commands" (Settings → Workspace, HI-1954). Keep the file path as it is.'
     }),
     type: 'custom',

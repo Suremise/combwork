@@ -1932,7 +1932,7 @@ Name a command once and run it by hand, or pick it for when a workspace opens or
 - **A command** has a name, the command line (`cmd.exe` runs it), a folder to run in (empty: the workspace's folder) and a tick, **The commands after this need it**.
 - **By hand.** **Run it now** beside it in Settings, or **Run Command: <name>** in the command palette. Hive shows it running in the same dialog as the points below.
 - **Placeholders.** `{workspace}` is the workspace's folder, `{name}` its folder name, `{reason}` why it runs (`open`, `window`, `switch`, `quit`, `update` or `manual`) and `{project:api}` the folder of the project `api`; quote them where a path may hold spaces: `replica run hive --workspace "{workspace}"`. One that can't be filled where it runs (`{workspace}` as Hive quits, a project that isn't there) means that command doesn't run: Hive says so rather than run it half-filled. Settings shows what each will run, and warns beside a point's command that can't be filled there.
-- **Yours alone.** Only you save them. The Hive Assistant can list and explain them and run one when you ask, and it can suggest a new one or a change, which you confirm before anything is saved.
+- **Yours alone.** Only you set them: the Hive Assistant can't change them.
 
 #### When a workspace opens or closes, or Hive quits <a id="close-commands"></a>
 
