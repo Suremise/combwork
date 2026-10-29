@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_ROWS,
+  cardRequests,
   messageQueuedText,
   notifiedText,
   changedText,
@@ -121,6 +122,30 @@ describe('task changes', () => {
     expect(v.historyEntries).toBe(1)
     expect(v.description).toBe(LONG)
     expect(v.comments).toHaveLength(1)
+  })
+})
+
+describe("a card's open requests (HI-1992)", () => {
+  const asked = { card: 7, project: 'p', request: 'HI-7/r15', kind: 'decide', gate: 'ask', text: `Which icon: the bee or the hive cell?\n\n${LONG}`, asker: 'Coder', since: '2026-10-29T01:00:00.000Z', for: 'user' as const }
+  const gate = { ...asked, request: 'HI-7/r16', kind: 'approve', gate: 'okBefore', text: 'Approve the merge.', asker: null, since: '2026-10-29T02:00:00.000Z' }
+
+  it('none: absent, so a card with none reads as before', () => {
+    expect(cardRequests([])).toBeUndefined()
+    expect(cardRequests([], true)).toBeUndefined()
+  })
+
+  it('each with its id, who asked, its words and when; Hive asked: no asker', () => {
+    expect(cardRequests([asked, gate])).toEqual([
+      { request: 'HI-7/r15', kind: 'decide', gate: 'ask', text: asked.text, asker: 'Coder', since: asked.since },
+      { request: 'HI-7/r16', kind: 'approve', gate: 'okBefore', text: 'Approve the merge.', since: gate.since }
+    ])
+  })
+
+  it("summary: its words cut as a comment's summary, with the whole length when cut", () => {
+    const [q, g] = cardRequests([asked, gate], true)!
+    expect(q).toMatchObject({ text: 'Which icon: the bee or the hive cell?', length: asked.text.length, asker: 'Coder', since: asked.since })
+    expect(g.text).toBe('Approve the merge.')
+    expect('length' in g).toBe(false)
   })
 })
 

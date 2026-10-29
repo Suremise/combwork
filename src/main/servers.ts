@@ -28,7 +28,7 @@ import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, iso
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
-import { newestComments, progressLabel, taskRow, withoutHistory, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
+import { cardRequests, newestComments, progressLabel, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
 import { settingChangeTexts, settingPath, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
@@ -2356,7 +2356,27 @@ async function queueLineFor(project: string, n: number): Promise<string | null> 
   }
 }
 
-async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>(), waitingOf?: ReadonlyMap<number, ForYouItem[]>): Promise<TaskView> {
+/**
+ * A card's open requests as agents read them (HI-1992): each asker by its name in the card's project, as For you shows it
+ * (its id once the agent is gone). `agents` as taskView's, so a listing reads each project.json once.
+ */
+async function requestsFor(items: readonly ForYouItem[], agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>(), summary = false): Promise<CardRequest[] | undefined> {
+  const project = items.find((i) => i.asker)?.project
+  let defs: ReturnType<typeof projectAgents> = []
+  if (project) {
+    try {
+      const p = projectByName(project)
+      const key = p.toLowerCase()
+      if (!agents.has(key)) agents.set(key, workspace.projectConfig(p).then(projectAgents))
+      defs = await agents.get(key)!
+    } catch {
+      // Its project gone: the asker's id.
+    }
+  }
+  return cardRequests(items.map((i) => (i.asker ? { ...i, asker: defs.find((a) => a.id === i.asker)?.name ?? i.asker } : i)), summary)
+}
+
+async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<typeof projectAgents>>>(), waitingOf?: ReadonlyMap<number, ForYouItem[]>): Promise<TaskView> {
   let agent: { id: string; name: string; status: string; backgroundTasks: number } | null = null
   let now: StallAgent | null = null
   if (c.agent && c.project) {
@@ -2383,10 +2403,15 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
   // Its attachments (HI-1700): full paths, and its text's links to them as those paths (agents open them by path).
   const files = await cardAttachments(workspace, c.number)
   const paths = (t: string): string => withAttachmentPaths(t, files)
+  // Its requests waiting for the user (HI-1932), just after its decisions (HI-1992: an Assistant reading the card looks
+  // there first, not in its history): their ids, for a decision that answers them. A listing reads them once for all its
+  // cards (`waitingOf`), never the whole board per card.
+  const forYou = await requestsFor((waitingOf ?? forYouOfCards(workspace, [c.number])).get(c.number) ?? [], agents)
   const view: Omit<TaskView, 'stage'> = {
     number,
     title,
     ...(decisions?.length ? { decisions: decisions.map(tasks.withoutId) } : {}),
+    ...(forYou ? { forYou } : {}),
     ...rest,
     ...(files.length ? { description: paths(c.description) } : {}),
     comments: c.comments.map(entryForAgents).map((e) => (files.length ? { ...e, text: paths(e.text) } : e)),
@@ -2396,10 +2421,6 @@ async function taskView(c: TaskCard, agents = new Map<string, Promise<ReturnType
     // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
     stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c))
   }
-  // Its requests waiting for the user (HI-1932): their ids, for a decision that answers them. A listing reads them once
-  // for all its cards (`waitingOf`), never the whole board per card.
-  const waiting = (waitingOf ?? forYouOfCards(workspace, [c.number])).get(c.number) ?? []
-  if (waiting.length) view.forYou = waiting.map((i) => ({ request: i.request, kind: i.kind, gate: i.gate, text: i.text, ...(i.asker ? { asker: i.asker } : {}) }))
   // A review whose reviewer has gone or isn't running (Hive ends those, but one can show while that happens).
   if (c.review && c.project) {
     try {
@@ -2622,8 +2643,9 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   const n = raw === null ? null : Number(raw)
   if (n !== null && (!Number.isInteger(n) || n < 1)) throw new HttpError(400, `comments must be a whole number from 1: "${raw}"`)
   const lean = n === null ? view : newestComments(view, n)
-  // summary=true (#532): each comment as its first line, with the whole comment's length when there is more.
-  const told = query.get('summary') === 'true' ? { ...lean, comments: lean.comments.map(commentSummary) } : lean
+  // summary=true (#532): each comment as its first line, with the whole comment's length when there is more; its open
+  // requests' words too (HI-1992).
+  const told = query.get('summary') === 'true' ? { ...lean, ...(lean.forYou ? { forYou: lean.forYou.map(commentSummary) } : {}), comments: lean.comments.map(commentSummary) } : lean
   return query.get('history') === 'false' ? withoutHistory(told) : told
 })
 
@@ -2843,7 +2865,11 @@ route('GET', '/v1/tasks/:n/comments/latest', async ({ params, query }) => {
   requireWorkspace()
   const r = await tasks.latestComment(taskNumber(params[0]), await taskActor())
   // summary=true (#532): its first line, with its whole length when there is more.
-  return query.get('summary') === 'true' && r.comment ? { ...r, comment: commentSummary(r.comment) } : r
+  const summary = query.get('summary') === 'true'
+  // Its open requests first (HI-1992): "check the latest comment" is where an Assistant looks for a question, and an
+  // agent's question is in For you, not its comments.
+  const forYou = await requestsFor(forYouOfCards(workspace, [r.number]).get(r.number) ?? [], undefined, summary)
+  return { number: r.number, ...(forYou ? { forYou } : {}), comment: summary && r.comment ? commentSummary(r.comment) : r.comment }
 })
 
 // A card's facts (#1223, SPEC §16.4): a short row each (seq, kind, time, actor and a few words, revisions as its project's

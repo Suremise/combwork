@@ -2733,7 +2733,10 @@ comes back from On Hold to the stage whose gate is still unmet [P2].
 **A decision that answers requests (HI-1932, Darren's decision of 28 Oct).** The user's answer given in a chat with the
 Assistant, recorded by it as a decision in the user's words, may name the card's open requests it answers
 (`hive_update_task` / `PATCH /v1/tasks/{n}`: `decision` with `answers`, up to 20 ids, as `hive_read_task`'s `forYou`
-lists them); Hive closes them with it. Only the user and the Assistant (never a project agent, so none closes its own
+lists them); Hive closes them with it. `forYou` comes just after the card's decisions in every form of
+`hive_read_task` (`GET /v1/tasks/{n}`, with `comments`, `summary`, and the latest comment's), each request with its id,
+who asked, its words and when (HI-1992: an Assistant reading only comments missed a question asked there); answered and
+closed ones are only in the card's history. Only the user and the Assistant (never a project agent, so none closes its own
 request); only a question (`decisionAnswers`: not an approval, Hive's own gates, the round limit's choice or the merge
 queue's merge choice); never without the decision. Checked in `tasks.ts` and again under the write
 (`Workflow.answerByDecision`): every request still open and answerable, or none is answered and nothing is written, the
