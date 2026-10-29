@@ -95,7 +95,7 @@ export function WorkspaceCloseCommand() {
 
 /** Settings → General → When Hive quits, run: Hive's settings (general.onQuit). */
 export function QuitCommand() {
-  const value = useStore((s) => s.settings?.general.onQuit ?? DEFAULT_SETTINGS.general.onQuit)
+  const value = useStore((s) => s.settings?.general.onQuit ?? NO_SETTING)
   // Every window gets settings-changed with what was saved: no reply written here, which could be an older save's.
   const save = (next: CloseCommandSetting): Promise<unknown> => actions.attempt(tr(M.saveFailed), () => call('settings:update', { general: { onQuit: next } }))
   return <CloseCommandControl value={value} values={{ reason: 'quit' }} onSave={save} /> // i18n-ignore: {reason}'s value, as main fills it in

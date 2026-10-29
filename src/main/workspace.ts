@@ -16,6 +16,7 @@ import { migratedProjectMcp, migratedWorkspaceMcp } from '../shared/agentMcp'
 import { ASSISTANT_OTHER_MCP, advancedDef, checkAdvanced } from '../shared/advanced'
 import { advanced } from './advanced'
 import { fmt, msg, tr } from '../shared/i18n'
+import { MIGRATED_CLOSE, migrateWorkspaceCommands } from '../shared/commands'
 import { HiveError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
 import { config } from './config'
@@ -38,6 +39,17 @@ import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, typ
 import { migrateProjectPreferences } from '../shared/workflow/preferences'
 
 const log = createLogger('workspace')
+
+/**
+ * workspace.json as read: Hive's defaults under it, and its older forms brought up to date (HI-1954: HI-1368's close
+ * command adopted into its commands, the old field dropped; written with its next save, and the same again until then).
+ */
+function loadedConfig(raw: unknown): WorkspaceConfig {
+  const c = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), migrateWorkspacePreferences(withoutSkillSwitches(raw as Record<string, unknown>)))
+  c.commands = migrateWorkspaceCommands(c, tr(MIGRATED_CLOSE))
+  delete c.onClose
+  return c
+}
 
 /** Where this user's view of a project is kept (AppConfig.ui.projectViews, HI-1749): by its id, which a rename or a move keeps, else by its folder. */
 export const projectViewKey = (cfg: Pick<ProjectConfig, 'id'>, projectPath: string): string => (cfg.id ? `id:${cfg.id}` : `path:${resolve(projectPath).toLowerCase()}`)
@@ -392,7 +404,7 @@ export class WorkspaceService {
     }
     const fresh = !existsSync(join(abs, HIVE_DIR))
     await this.ensureWorkspaceStructure()
-    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), migrateWorkspacePreferences(withoutSkillSwitches(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}))))
+    this.wsConfig = loadedConfig(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}))
     const last = this.wsConfig.lastPath
     this.movedFrom = last && resolve(last).toLowerCase() !== abs.toLowerCase() ? resolve(last) : null
     config.update((c) => {
@@ -800,7 +812,7 @@ export class WorkspaceService {
     const text = await readFile(file, 'utf8').catch(() => '')
     // Hive's own save, or a save started meanwhile (its settings are newer), or another workspace opened since.
     if (text === this.configWritten || this.configSaves || generation !== this.generation) return
-    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), migrateWorkspacePreferences(withoutSkillSwitches(await readKeptJson(file, {}))))
+    this.wsConfig = loadedConfig(await readKeptJson(file, {}))
     this.emit({ type: 'skills-changed' })
     this.scheduleRefresh()
   }
