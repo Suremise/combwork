@@ -520,6 +520,66 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  // HI-1987: the Tools Assistant swapped its lane watch for an agent watch on LB2's build (on no card), and nothing told it
+  // of LB1's lane meanwhile.
+  it('HI-1987: a lane watch follows agents beside its lanes, each until a wake tells it; one not working is its state; replacing it with an agent watch names the lanes dropped', async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    Object.assign(sessions, { agentNow: (p: string, id: string) => (p.toLowerCase() === alpha.toLowerCase() ? { status: st.agents[id] ?? 'working', runId: id, prompts: 1, pending: false, statusMessage: null, backgroundTasks: 0, reply: st.agents[id] === 'ready' ? `${id} done.` : null } : null) })
+    const of = (id: string) => ({ projectPath: alpha, agentId: id, name: id.toUpperCase(), project: 'alpha' })
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    st.agents.b3 = 'ready'
+    st.status = 'watching'
+    const r = await watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { agents: { agents: [of('b2'), of('b3')], ignoreBackground: false } })
+    expect(r.watching.label).toBe('Waiting on all running lanes and B2')
+    expect(r.agents).toEqual({ now: ['B2 (alpha)'], already: ['B3 (alpha) is idle: "b3 done."'] })
+    // B2's turn ends: the lane watch wakes, with its own line; watched again, B2 (told) has left it.
+    status(alpha, st, 'b2', 'working')
+    status(alpha, st, 'b2', 'ready')
+    await watches.evaluateAgentWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toBe('[Hive] B2 (alpha) finished: "b2 done.". Your lane watch has ended: read the cards named (hive_read_task), act on them, then watch the lanes again (hive_wait_for_tasks with lanes; your agents stay unless you pass agents, less the agents told here).')
+    await watches.settled()
+    const again = await watchAll(w, home, st)
+    expect(again.agents).toBeUndefined()
+    expect(again.watching.label).toBe('Waiting on all running lanes')
+    // Two followed, one told: the other stays with the next lane watch; agents: [] drops it.
+    st.agents.b2 = 'working'
+    st.agents.b3 = 'working'
+    await watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { agents: { agents: [of('b2'), of('b3')], ignoreBackground: false } })
+    status(alpha, st, 'b3', 'working')
+    status(alpha, st, 'b3', 'ready')
+    await watches.evaluateAgentWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
+    expect(st.told[1]).toMatch(/^\[Hive\] B3 \(alpha\) finished/)
+    await watches.settled()
+    const kept = await watchAll(w, home, st)
+    expect(kept.agents).toEqual({ now: ['B2 (alpha)'], kept: true })
+    expect((await watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { agents: { agents: [], ignoreBackground: false } })).agents).toBeUndefined()
+    // A lane event and an agent together: one line.
+    await watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { agents: { agents: [of('b2')], ignoreBackground: false } })
+    await inWorkspace(w, () => tasks.updateTask(a, { column: 'review' }, agent('b1')))
+    await fail(w, a, 'r1')
+    status(alpha, st, 'b2', 'working')
+    status(alpha, st, 'b2', 'ready')
+    st.status = 'working'
+    await watches.evaluateWatches(w)
+    await watches.evaluateAgentWatches(w)
+    st.status = 'watching'
+    await watches.tick()
+    await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
+    expect(st.told[2]).toMatch(new RegExp(`^\\[Hive\\] Lane B1 / R1: #${a} failed review \\(R1 \\(alpha\\)\\) \\| B2 \\(alpha\\) finished: "b2 done\\."\\. Your lane watch has ended`))
+    await watches.settled()
+    // An agent watch after that lane wake, with the lane still running: the reply says the lane is no longer followed.
+    st.agents.b2 = 'working'
+    const swapped = await watches.registerAgentWatch(w, home, 'assistant', { agents: [of('b2')], ignoreBackground: false })
+    expect(swapped.lanesLeft).toEqual(['B1'])
+    // A lane watch replaced by another says nothing of the kind.
+    expect('lanesLeft' in (await watchAll(w, home, st))).toBe(false)
+    await disposeWorkspaceService(w)
+  })
+
   // #922: HB3's push was refused, the Assistant asked the user to OK it in HB3's pane, the user did and HB3 cleared the
   // block, and the Assistant's lane watch heard of neither.
   it("#922: a pane reply to a lane's builder reaches the Assistant with its first line while its lane watch goes on; the block lifted wakes the lane watch; the lane's end names its merge commit", async () => {

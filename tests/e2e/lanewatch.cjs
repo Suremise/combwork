@@ -127,6 +127,17 @@ const check = (name, ok, extra = '') => {
   check('an agent showing a permission prompt wakes it, naming the agent, its card and what it asks', !!(await until(async () => !!waitLine(), 30000)) && waitLine().includes(`on #${rel}: "Claude needs your permission to use Bash"`) && waitLine().includes('never answer it for them'), JSON.stringify(wakes().slice(asked)))
   await until(() => idle(alpha, builder2.id), 40000)
 
+  // HI-1987: the same watch follows Builder2's work on no card (hive_wait_for_tasks with lanes and agents): its turn's
+  // end wakes it, with the lane watch's own line.
+  await until(async () => ['ready', 'finished'].includes((await live(home, 'assistant'))?.status), 20000)
+  await say(alpha, builder2.id, 'work 8')
+  await until(async () => (await live(alpha, builder2.id))?.status === 'working', 15000)
+  const built = wakes().length
+  await say(home, 'assistant', 'hive hive_wait_for_tasks {"lanes":["all"],"agents":[{"project":"alpha","agent":"Builder2"}],"wake":true,"limitMinutes":360}')
+  check(`the lane watch takes an agent: "Waiting on all running lanes and ${relKey}, Builder2"`, !!(await until(async () => (await live(home, 'assistant'))?.watch?.label === `Waiting on all running lanes and ${relKey}, Builder2`, 15000)), JSON.stringify((await live(home, 'assistant'))?.watch))
+  const builtLine = () => wakes().slice(built).find((t) => t.startsWith('[Hive] Builder2 (alpha) finished'))
+  check("an agent's turn ending wakes the lane watch", !!(await until(async () => !!builtLine(), 30000)) && builtLine().includes('Your lane watch has ended') && builtLine().includes('less the agents told here'), JSON.stringify(wakes().slice(built)))
+
   // A lane started after its next watch began is followed too.
   await watchAgain()
   const c = await newCard('README usage', builder2.id)
