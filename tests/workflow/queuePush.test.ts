@@ -260,6 +260,62 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
     })
   }
 
+  // HI-2054: where to push, read by git, is taken only from git's own answer (a value, or exit 1: not set). A git that
+  // couldn't answer (never started, ended by a signal, ended at a bound whatever its code and partial output, or git's
+  // own error) is unreadable: paused in Hive's own words, still owed, nothing pushed; never "no remote", nor a guessed ref.
+  const notAnswers: [string, Partial<QueueGitResult>][] = [
+    ['never started', { code: -1, notRun: 'EAGAIN', err: 'spawn git EAGAIN' }],
+    ["git's own error", { code: 128, err: 'fatal: bad config line 3 in file .git/config' }],
+    ['ended by a signal', { code: -1, signal: 'SIGTERM', err: 'git was ended by a signal (SIGTERM)' }],
+    ['ended at a bound, its code 1, part of an answer out', { code: 1, timedOut: true, out: 'refs/heads/elsewhere\n' }]
+  ]
+  const reads: [string, (args: string[]) => boolean, boolean][] = [
+    ['its upstream remote', (a) => a[0] === 'config' && a.includes('branch.main.remote'), true],
+    ['its upstream branch, after its remote was read', (a) => a[0] === 'config' && a.includes('branch.main.merge'), true],
+    ['the remotes (no upstream)', (a) => a.length === 1 && a[0] === 'remote', false]
+  ]
+  for (const [read, matches, upstream] of reads)
+    for (const [how, failed] of notAnswers)
+      it(`HI-2054: owed, and ${read} read by a git that ${how}: paused pushUnreadable, still owed, nothing pushed; Resume pushes`, async () => {
+        const { e, bare } = pushing()
+        if (!upstream) sh(e.project, 'branch', '-q', '--unset-upstream', 'main')
+        const before = remoteMain(bare)
+        const a = await queued(e, 'A', 'a.txt')
+        const b = await queued(e, 'B', 'b.txt')
+        let pushed = false
+        let asked = 0
+        const git1 = withPush(async (run) => {
+          pushed = true
+          return run()
+        })
+        await e
+          .queue({
+            git: async (cwd, args, opts) => {
+              if (!matches(args)) return git1(cwd, args, opts)
+              asked++
+              return { ok: false, out: '', err: '', ...failed } as QueueGitResult
+            }
+          })
+          .drain('main')
+        expect(asked).toBe(1)
+        expect(pushed).toBe(false)
+        expect(remoteMain(bare)).toBe(before)
+        expect(e.wf.state(a).stage).toBe('done')
+        // The next card waits for the owed push.
+        expect(e.wf.state(b).stage).toBe('merging')
+        expect(owed(e)).not.toBeNull()
+        expect(pending(e).map((p) => p.entry)).toEqual([entryOf(e, a)])
+        // In Hive's own words, as the other unreadable reads: no English stored with it.
+        expect(e.store.queuePause('main')).toMatchObject({ reason: 'pushUnreadable', card: a.key })
+        expect(e.store.queuePause('main')?.message).toBeFalsy()
+        e.queue().resume('main')
+        expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+        expect(e.wf.state(b).stage).toBe('done')
+        expect(remoteMain(bare)).toBe(localMain(e))
+        expect(owed(e)).toBeNull()
+        expect(e.store.queuePause('main')).toBeNull()
+      })
+
   it('turned off while the push is being prepared (its remote read): no push begins, and the queue carries on (HR2 r1 f2)', async () => {
     const { e, bare } = pushing()
     const before = remoteMain(bare)

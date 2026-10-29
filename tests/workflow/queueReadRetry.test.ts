@@ -11,7 +11,7 @@ import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
-import { gitTree, READ_RETRIES, type QueueConfig } from '../../src/main/workflow/mergeQueue'
+import { gitTree, READ_RETRIES, type QueueConfig, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
 import { git } from '../../src/main/git'
 import * as G from '../../src/main/platform/git'
 import { isUnknown } from '../../src/main/platform/types'
@@ -508,6 +508,67 @@ describe("the test merge's commit, its git never started (HI-2020): put back, an
     expect(spawnFail.seen.filter((l) => l.includes('merge --no-ff'))).toHaveLength(1 + READ_RETRIES)
     expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
     expect(count(e, card.id, 'CheckRan')).toBe(0)
+    expect(e.wf.state(card).stage).toBe('merging')
+  })
+})
+
+describe("whether the repository signs, read by a git that couldn't answer (HI-2054): again, never taken for unsigned", () => {
+  const SIGNS = 'config --type=bool --get commit.gpgsign'
+  /**
+   * The queue's git (its config's seam, above src/main/git's normalisation): the signing read answered `failed` its first
+   * `times` times; each command's line in order. Everything else as the queue runs it.
+   */
+  const reading = (failed: Partial<QueueGitResult>, times: number, lines: string[]): Partial<QueueConfig> => ({
+    git: async (cwd, args, opts) => {
+      const line = args.slice(args.indexOf('core.quotepath=off') + 1).join(' ')
+      lines.push(line)
+      if (line.includes(SIGNS) && times-- > 0) return { ok: false, out: '', err: '', ...failed } as QueueGitResult
+      return opts ? gitTree(cwd, args, opts) : git(cwd, args)
+    }
+  })
+  const notAnswers: [string, Partial<QueueGitResult>][] = [
+    ['never started', { code: -1, notRun: 'EAGAIN', err: 'spawn git EAGAIN' }],
+    ["git's own error", { code: 128, err: "fatal: bad boolean config value 'maybe' for 'commit.gpgsign'" }],
+    ['ended by a signal', { code: -1, signal: 'SIGTERM', err: 'git was ended by a signal (SIGTERM)' }],
+    ["ended at a bound, its code 1, 'false' out", { code: 1, timedOut: true, out: 'false\n' }]
+  ]
+  // Each caller of the read, and the command it would have gone on to.
+  const callers: [string, Partial<WorkflowOptions>, string][] = [
+    ['the merge', {}, 'merge --no-ff'],
+    ["a squash's merge", { style: 'squash' }, 'merge --squash'],
+    ["strict's update of the card", { strict: true }, 'merge --no-ff --no-edit'],
+    ["Rebase and fast-forward's rebase", { style: 'rebase' }, 'rebase --no-rebase-merges']
+  ]
+  for (const [what, o, next] of callers)
+    for (const [how, failed] of notAnswers)
+      it(`${what}, the read by a git that ${how} once: again before it goes on, read again, merged once`, async () => {
+        const e = project(o)
+        const card = await queued(e)
+        if (o.strict || o.style === 'rebase') commit(e.project, { 'other.txt': 'meanwhile\n' }, 'meanwhile')
+        const lines: string[] = []
+        expect(await e.queue(reading(failed, 1, lines)).drain('main')).toMatchObject([{ outcome: 'integrated' }])
+        // Read again in the next round, and nothing the read decides ran before it was answered.
+        const reads = lines.flatMap((l, i) => (l.includes(SIGNS) ? [i] : []))
+        expect(reads.length).toBeGreaterThanOrEqual(2)
+        expect(lines.slice(0, reads[1]).some((l) => l.includes(next))).toBe(false)
+        expect(lines.slice(reads[1]).some((l) => l.includes(next))).toBe(true)
+        expect(e.store.queuePause('main')).toBeNull()
+        expect(e.wf.state(card).stage).toBe('done')
+        expect(count(e, card.id, 'IntegrationFailed')).toBe(0)
+        expect(count(e, card.id, 'Integrated')).toBe(1)
+      })
+
+  it("failing every time: needsYou with git's words after 1 + READ_RETRIES reads; nothing merged", async () => {
+    const e = project()
+    const card = await queued(e)
+    const before = sh(e.project, 'rev-parse', 'main')
+    const lines: string[] = []
+    const failed = notAnswers[1][1]
+    expect(await e.queue({ ...red, ...reading(failed, Infinity, lines) }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: failed.err }])
+    expect(lines.filter((l) => l.includes(SIGNS))).toHaveLength(1 + READ_RETRIES)
+    expect(lines.some((l) => l.includes('merge --no-ff'))).toBe(false)
+    expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
+    expect(count(e, card.id, 'IntegrationFailed')).toBe(0)
     expect(e.wf.state(card).stage).toBe('merging')
   })
 })
