@@ -1144,6 +1144,12 @@ export class WorkspaceService {
   /** Creates <project>/.hive with defaults and excludes it from git. Idempotent. */
   async ensureProject(projectPath: string): Promise<void> {
     const h = join(projectPath, HIVE_DIR)
+    // Never the project's own folder (HI-2045): one deleted or moved out meanwhile, as when a refresh that listed it
+    // before reads it after, fails with ENOENT rather than coming back as a bare `.hive`. The Assistant's home is Hive's.
+    if (this.isAssistantHome(projectPath)) await mkdir(projectPath, { recursive: true })
+    await mkdir(h).catch((e: NodeJS.ErrnoException) => {
+      if (e.code !== 'EEXIST') throw e
+    })
     // Its folders and its exclusion from git at once (HI-1705).
     await whenAll([
       this.ensureGitExclude(projectPath),

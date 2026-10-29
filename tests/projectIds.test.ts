@@ -2,7 +2,7 @@
 // in its own project.json. The pure rules (which copy keeps an id, whose cards are left under an old name), then a
 // workspace: ids given once, cards stamped once, a rename followed, a copied folder given a new id, and Repair giving
 // cards saved before ids (under a project's old name) to the project they belong to now.
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -527,6 +527,40 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       }
     })
   }
+
+  // HI-2045: a refresh that listed a project before it was deleted (the root watcher's, 250 ms after its folder appeared)
+  // found no project.json when it read it, and made the project again (`.hive` with its sessions and archive folders).
+  it("a refresh that listed a project before it was deleted doesn't make its folder again", async () => {
+    const wsPath = join(base, 'ws-deleted-in-refresh')
+    project(wsPath, 'keep')
+    const gone = project(wsPath, 'gone')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      // The refresh is held once it has listed the folders, `gone` among them.
+      let release!: () => void
+      const held = new Promise<void>((r) => (release = r))
+      const list = w.listProjectPaths.bind(w)
+      let reached = false
+      w.listProjectPaths = (async (o?: { hidden?: boolean }) => {
+        const paths = await list(o)
+        if (!reached && paths.some((p) => p.toLowerCase() === gone.toLowerCase())) {
+          reached = true
+          await held
+        }
+        return paths
+      }) as typeof w.listProjectPaths
+      const refresh = w.refresh()
+      await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
+      rmSync(gone, { recursive: true, force: true })
+      release()
+      await refresh
+      expect(existsSync(gone)).toBe(false)
+    } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
 
   /**
    * A workspace whose folder listings the test sets (`folders`), with every read of `gone`'s project.json held until
