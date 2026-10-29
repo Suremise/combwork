@@ -189,20 +189,32 @@ export function questions(workspacePath: string): AssistantQuestion[] {
   return [...stateOf(workspacePath).pending.values()].map((p) => p.question)
 }
 
-/** Asks the user in the Assistant's panel; resolves with their answer, or false after `timeoutMs`. */
-export function ask(workspacePath: string, q: Omit<AssistantQuestion, 'id'>, timeoutMs = 10 * 60_000): Promise<boolean> {
+/** How a question in the Assistant's panel ended: the user's answer, its time up, or its caller gone (HI-1994). */
+export type AskOutcome = 'yes' | 'no' | 'timedOut' | 'gone'
+
+/**
+ * Asks the user in the Assistant's panel; resolves with their answer, or `timedOut` after `timeoutMs`, or `gone` once
+ * `signal` aborts (its caller stopped waiting). Whichever comes first closes the question, so none is left open that no
+ * one waits on, and an answer after it is nothing (HI-1994).
+ */
+export function ask(workspacePath: string, q: Omit<AssistantQuestion, 'id'>, opts: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<AskOutcome> {
   const s = stateOf(workspacePath)
   const id = randomUUID()
   return new Promise((resolve) => {
-    const done = (yes: boolean): void => {
+    const gone = (): void => done('gone')
+    const done = (how: AskOutcome): void => {
       const p = s.pending.get(id)
       if (!p) return
       clearTimeout(p.timer)
+      opts.signal?.removeEventListener('abort', gone)
       s.pending.delete(id)
       emitQuestions(workspacePath)
-      resolve(yes)
+      if (how === 'timedOut' || how === 'gone') log.info(`The question "${userText(q.title)}" was withdrawn: ${how === 'gone' ? 'its caller stopped waiting' : 'no answer in time'}`)
+      resolve(how)
     }
-    s.pending.set(id, { question: { ...q, id }, resolve: done, timer: setTimeout(() => done(false), timeoutMs) })
+    if (opts.signal?.aborted) return resolve('gone')
+    s.pending.set(id, { question: { ...q, id }, resolve: (yes) => done(yes ? 'yes' : 'no'), timer: setTimeout(() => done('timedOut'), opts.timeoutMs ?? 10 * 60_000) })
+    opts.signal?.addEventListener('abort', gone, { once: true })
     emitQuestions(workspacePath)
   })
 }

@@ -194,6 +194,14 @@ const check = (name, ok, extra = '') => {
   const qs = await inv('assistant:questions')
   await inv('assistant:answer', qs[0]?.id, true)
   check('and a yes stops it', (await stopping2).status === 200 && !!(await until(async () => !(await live(alpha, fixer)), HUNG_MS)))
+  // HI-1994: an agent only watching a card (its turn over, a card watch running) is idle: stopped with no question.
+  const watched = (await api('POST', '/v1/tasks', { title: 'Watched card', project: 'alpha' })).body?.number
+  await api('POST', '/v1/projects/alpha/agents/Fixer/start', {})
+  await until(async () => (await live(alpha, fixer))?.status === 'ready', HUNG_MS)
+  await api('POST', '/v1/projects/alpha/agents/Fixer/prompt', { text: `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${watched}`], column: 'done', wake: true })}` })
+  check('Fixer watches a card', !!(await until(async () => (await live(alpha, fixer))?.status === 'watching', HUNG_MS)), (await live(alpha, fixer))?.status)
+  const quiet = await api('POST', '/v1/projects/alpha/agents/Fixer/stop', { reason: 'testing' })
+  check('stopping an agent that only watches asks nothing: it stops at once', quiet.status === 200 && quiet.body?.wasRunning === true && (await inv('assistant:questions')).length === 0 && !!(await until(async () => !(await live(alpha, fixer)), HUNG_MS)), JSON.stringify(quiet.body))
   const stoppedFresh = await api('POST', '/v1/projects/alpha/agents/Fixer/prompt', { text: 'work 1', newConversation: true })
   check('a stopped agent gets no new conversation: start it instead', stoppedFresh.status === 409 && /isn't running/.test(stoppedFresh.body?.error) && !(await live(alpha, fixer)), JSON.stringify(stoppedFresh.body))
 

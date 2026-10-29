@@ -17,7 +17,7 @@ import { COLUMN_IDS } from '../../shared/tasks'
 import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
-import { REPLY_MS, agentApiCall } from './agentApiCall'
+import { REPLY_MS, STOP_ASK_MS, agentApiCall } from './agentApiCall'
 import { MAX_ROWS, templateListText, templatePlanText, templateLoadedText, type TemplatePlanPublic, type TemplateLoadPublic, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
@@ -488,7 +488,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_stop_agent',
-    description: 'Stop a running agent; its conversation is kept. If it is busy, Hive asks the user first and this waits for their answer: give a reason.',
+    description: `Stop a running agent; its conversation is kept. One only watching is stopped at once. If it is busy (working, waiting on background tasks or the user), Hive asks the user first and this waits for their answer, up to ${STOP_ASK_MS / 1000} s: give a reason. Unanswered, the question is withdrawn and it keeps running.`,
     inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, reason: { type: 'string' } }, required: ['project', 'agent'] },
     run: (a) => api('POST', `${agentPath(a)}/stop`, { reason: a.reason })
   },
