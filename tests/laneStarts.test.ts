@@ -62,7 +62,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.hive'), { recursive: true })
     mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -174,5 +174,33 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     expect([c.column, c.agent]).toEqual(['todo', 'b6'])
     expect(c.history.some((h) => /Doing/.test(h.what))).toBe(false)
     expect(pty.typed.join('')).not.toContain('New in your inbox')
+  })
+
+  // Last: it gives the project a workflow (no version control), so a card can carry a request for the user.
+  it("a lane paused for the user meanwhile (a request on its next card) gets nothing until it is answered (HR1's round 2)", async () => {
+    await w.mutateProjectConfig(p, () => ({ workflow: { platform: 'none', preset: null, options: { review: 'agent', noSelfReview: true } } }))
+    const { workflowFor } = await import('../src/main/workflow/service')
+    const wf = (await workflowFor(w, p))!
+    const { forYou, foldCard } = await import('../src/shared/workflow/facts')
+    const { a2, b2, l1, l2 } = await twoDue('b7', 'b8')
+    // While the first lane's start is decided, an agent asks the user something on the other lane's next card.
+    laneStartsTestHooks.beforeStart = async (lane) => {
+      if (lane !== l1.id) return
+      await wf.askTheUser(`#${b2}`, 'user', { kind: 'decide', text: 'Should this card go ahead?' })
+      expect((await lanes.getLane(w, l2.id)).state).toBe('paused')
+    }
+    await checkLaneStarts(w)
+    expect(await columnOf(a2)).toBe('doing')
+    expect(await columnOf(b2)).toBe('todo')
+    expect(pty.typed.join('').split('New in your inbox: 1 task').length - 1).toBe(1)
+    // Answered: the lane goes on, and its next card starts.
+    laneStartsTestHooks.beforeStart = null
+    const asked = forYou(foldCard(wf.store.facts(b2)))[0]
+    expect(asked).toBeTruthy()
+    const answered = await wf.answer(`#${b2}`, asked.request, 'answered', { note: 'Yes, go ahead.' })
+    expect('ok' in answered && answered.ok).toBe(true)
+    expect((await lanes.getLane(w, l2.id)).state).toBe('active')
+    await checkLaneStarts(w)
+    expect(await columnOf(b2)).toBe('doing')
   })
 })

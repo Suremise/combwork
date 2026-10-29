@@ -393,12 +393,7 @@ async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
           m.set(n, was.facts)
           continue
         }
-        const all = store.facts(n)
-        const s = foldCard(all)
-        const asks = forYou(s)
-        // Who reviewed and reviews it (#1446: a pool lane's hover names them).
-        const last = s.verdicts.at(-1)
-        const facts: LaneCardFacts = { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds, lastVerdict: last ? { reviewer: last.reviewer, pass: last.pass } : null, reviewing: reviewingNow(all, () => true)?.reviewing ?? null }
+        const facts = cardFactsOf(store, n)
         kept.set(n, { key, facts })
         m.set(n, facts)
       }
@@ -409,6 +404,16 @@ async function factsOf(ws: WorkspaceService, lanes: readonly LaneRecord[]): Prom
     }
   }
   return out
+}
+
+/** What a lane reads of one card's facts (factsOf, laneNow): its fold's stage, an open request for you, a stale pass, its rounds. */
+function cardFactsOf(store: FactStore, n: number): LaneCardFacts {
+  const all = store.facts(n)
+  const s = foldCard(all)
+  const asks = forYou(s)
+  // Who reviewed and reviews it (#1446: a pool lane's hover names them).
+  const last = s.verdicts.at(-1)
+  return { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds, lastVerdict: last ? { reviewer: last.reviewer, pass: last.pass } : null, reviewing: reviewingNow(all, () => true)?.reviewing ?? null }
 }
 
 /** Each workspace's lane cards' facts as factsOf read them, with their facts' head then; a workspace opened again starts afresh. */
@@ -996,23 +1001,38 @@ export async function laneNext(ws: WorkspaceService, project: string, agentId: s
 }
 
 /**
- * A builder's running lane as the board has it now, read without waiting (HI-1990): by its id, or the one holding `card`;
- * its cards in order, its queued list when there is one (it applies once the card in flight is Done), each as the board's
- * row tells it (a card given to another agent is held elsewhere; archived or gone, gone). Null: no such running lane.
- * Read inside a write's transaction it is what that write sees, so a check there can't be undone by a lane change.
+ * A running lane as it reads now, without waiting (HI-1990): `laneView` itself, the window's and `hive_lane`'s reading,
+ * from the same inputs read synchronously (its record, its cards' rows, their facts while the rules are enforced, the
+ * round limit, its agents' hooks, its slot, its line, the cards' owners), so it pauses for what the lane view pauses for
+ * (a request for the user, a block, a merge, a slot…). Only the names it shows aren't read (agents' new names, the old
+ * rules mark): nothing that decides whether it waits. With a list change queued, its cards are that list, which applies
+ * once no card is in flight. Read inside a write's transaction it is what that write sees, so a check there can't be
+ * undone by a lane or card change. By its id, or the builder's lane holding `card`. `as`: a card as the caller has it
+ * (a start's write moves its card in the same transaction: the lane is read as it stood for that start). Null: no such
+ * running lane.
  */
-export function builderLaneNow(ws: WorkspaceService, builder: string, by: { lane: string } | { card: number }): { id: string; cards: LaneCard[] } | null {
-  return boardRead(ws, (db) => {
-    const lane = ('lane' in by
-      ? db.prepare("SELECT id FROM lanes WHERE id = ? AND state = 'active' AND builder_id = ?").get(by.lane, builder) // i18n-ignore: SQL, not text
-      : db.prepare("SELECT l.id FROM lane_cards c JOIN lanes l ON l.id = c.lane WHERE c.card = ? AND l.state = 'active' AND l.builder_id = ? LIMIT 1").get(by.card, builder)) as { id: string } | undefined // i18n-ignore: SQL, not text
-    if (!lane) return null
-    const list = db.prepare('SELECT 1 FROM lane_pending WHERE lane = ? LIMIT 1').get(lane.id) ? 'lane_pending' : 'lane_cards' // i18n-ignore: SQL, not text
+export function laneNow(ws: WorkspaceService, by: { lane: string } | { card: number; builder: string }, as?: TaskCard): LaneInfo | null {
+  if (!ws.path) return null
+  const recs = readLanes({ version: 1, lanes: readTable(ws.path, 'lanes').docs as Record<string, unknown>[] }).filter(running)
+  const rec = 'lane' in by ? recs.find((l) => l.id === by.lane) : recs.find((l) => l.builder.id === by.builder && (l.cards.includes(by.card) || !!l.pending?.includes(by.card)))
+  if (!rec) return null
+  const l: LaneRecord = rec.pending?.length ? { ...rec, cards: rec.pending } : rec
+  const on = rulesEnforced()
+  const cards = boardRead(ws, (db) => {
     // i18n-ignore: SQL, not text
-    const rows = db.prepare(`SELECT c.card AS number, k.col AS col, k.agent AS agent, k.archived AS archived, k.title AS title, k.blocked AS blocked FROM ${list} c LEFT JOIN cards k ON k.number = c.card WHERE c.lane = ? ORDER BY c.ord`).all(lane.id) as { number: number; col: string | null; agent: string | null; archived: number | null; title: string | null; blocked: string | null }[]
-    const cards = rows.map((r): LaneCard => ({ number: r.number, title: r.title ?? '', column: !r.col || r.archived ? 'gone' : (r.col as LaneCard['column']), blocked: r.blocked || null, round: 1, reviewing: false, ...(r.agent && r.agent !== builder ? { elsewhere: r.agent } : {}) }))
-    return { id: lane.id, cards }
+    const rows = db.prepare(`SELECT number, title, project, col, agent, blocked, archived, review_agent FROM cards WHERE number IN (${l.cards.map(() => '?').join(',')})`).all(...l.cards) as { number: number; title: string; project: string; col: TaskCard['column']; agent: string | null; blocked: string | null; archived: number; review_agent: string | null }[]
+    // As cardsOf has them: archived or another project's, gone. Only what laneCard reads of a card (its rounds aside).
+    return new Map(l.cards.map((n) => {
+      if (as?.number === n) return [n, !as.archived && inScope(as, l.project) ? as : null]
+      const r = rows.find((x) => x.number === n)
+      return [n, r && !r.archived && inScope({ project: r.project }, l.project) ? ({ number: n, title: r.title, project: r.project, column: r.col, agent: r.agent, blocked: r.blocked, review: r.review_agent ? { agent: r.review_agent } : null, history: [] } as unknown as TaskCard) : null]
+    }))
   })
+  const facts = on ? new Map(l.cards.map((n) => [n, cardFactsOf(FactStore.forBoard(ws, { project: l.project, key: l.project }), n)])) : null
+  const atLimit = on ? roundLimitCards(ws, l.cards) : new Set<number>()
+  const deaf = new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && hooksMissingFor(join(ws.path!, l.project), a.id)).map((a) => a.id))
+  const owners = new Map([...cardOwnersNow(ws, l.cards)].map(([n, o]) => [n, o.lane]))
+  return laneView(l, cards, undefined, facts, atLimit, on ? lineWaiting(ws, l.id) : null, deaf, undefined, null, slotView(ws, l), owners)
 }
 
 /** The running lane of a project agent (as builder, else as reviewer), or null. */

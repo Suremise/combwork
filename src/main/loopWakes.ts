@@ -1,12 +1,12 @@
 import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { pendingStep } from '../shared/tasks'
-import type { LaneCard, TaskCard, TaskHistoryEntry } from '../shared/types'
+import type { LaneInfo, TaskCard, TaskHistoryEntry } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
 import { ANSWER_MAX, cardChange, LOOP_WAKE_KINDS, laneNextWords, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
 import { boardRead } from './boardStore'
 import { onHiveEvent } from './events'
-import { builderLaneNow, onLanesWritten } from './lanes'
+import { laneNow, onLanesWritten } from './lanes'
 import { laneStartDue, ownOpen } from '../shared/lanes'
 import { loopReviewerOf, poolCard } from './loopReviewer'
 import { createLogger, userText } from './logger'
@@ -172,20 +172,22 @@ const covered = (projectPath: string, agentId: string, card: TaskCard, kind: Loo
  * card, which Hive starts for it once its turn ends (rules on: laneStarts.ts) or which it starts itself (rules off),
  * one under way, or none left. Undefined: not a Done wake, or no lane of its holds the card. Read from the board without
  * waiting, as the rest of the wake is decided (an await here let the builder's own watch tell the Done first): a card
- * given to another agent is another lane's (builderLaneNow).
+ * given to another agent is another lane's, and a paused lane says so (laneNow: the lane view's own reading).
  */
 function laneNextOf(ws: WorkspaceService, card: TaskCard, agentId: string, kind: LoopWakeKind): string | undefined {
   if (kind !== 'done' || card.column !== 'done') return undefined
-  let cards: LaneCard[] | undefined
+  let lane: LaneInfo | null
   try {
-    cards = builderLaneNow(ws, agentId, { card: card.number })?.cards
+    lane = laneNow(ws, { card: card.number, builder: agentId })
   } catch {
     return undefined
   }
-  if (!cards?.some((c) => c.number === card.number)) return undefined
+  if (!lane) return undefined
+  const cards = lane.cards
+  if (lane.state === 'paused') return laneNextWords('paused')
   const next = cards.find(ownOpen)
   if (!next) return laneNextWords('last')
-  const is = next.column === 'doing' || next.column === 'review' || next.column === 'passed' ? 'started' : next.column !== 'todo' || next.blocked ? 'waits' : !rulesEnforced() ? 'start' : laneStartDue({ state: 'active', cards })?.number === next.number ? 'hiveStarts' : 'waits'
+  const is = next.column === 'doing' || next.column === 'review' || next.column === 'passed' ? 'started' : next.column !== 'todo' || next.blocked ? 'waits' : !rulesEnforced() ? 'start' : laneStartDue(lane)?.number === next.number ? 'hiveStarts' : 'waits'
   return laneNextWords({ card: next.number, title: next.title, is })
 }
 

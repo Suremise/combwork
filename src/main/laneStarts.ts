@@ -5,7 +5,7 @@ import { cardRef } from '../shared/projectKeys'
 import { agentNowOf } from './cardStall'
 import { coalesced } from './coalesce'
 import { onHiveEvent } from './events'
-import { builderLaneNow, lanesEnforced, listLanes } from './lanes'
+import { laneNow, lanesEnforced, listLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { withCardNames } from './projectKeys'
 import { whyNoLine } from './lineWriter'
@@ -57,15 +57,14 @@ function builderFree(projectPath: string, b: { id: string; name: string }): bool
 class LaneChanged extends Error {}
 
 /**
- * Whether the lane still asks for card n now, as the board has it (builderLaneNow): still running in the same workspace,
- * still the builder's, and n still its next card due (the card itself as the start's write sees it, `now`).
+ * Whether the lane still asks for card n now (HR1's rounds 1 and 2): as `laneNow` reads it, the lane view's own reading
+ * (its effective pause for the user, a block or a merge, its cards' owners, a queued list), still running in the same
+ * workspace with the same builder, and n still its next card due. `now`: the card as the start's write sees it.
  */
 function stillDue(ws: WorkspaceService, path: string, lane: { id: string; builder: { id: string } }, n: number, now?: TaskCard): boolean {
   if (!ws.path || ws.path.toLowerCase() !== path.toLowerCase()) return false
-  const l = builderLaneNow(ws, lane.builder.id, { lane: lane.id })
-  if (!l) return false
-  const cards = now ? l.cards.map((c) => (c.number === n ? { ...c, column: now.archived ? ('gone' as const) : now.column, blocked: now.blocked || null, ...(now.agent && now.agent !== lane.builder.id ? { elsewhere: now.agent } : {}) } : c)) : l.cards
-  return laneStartDue({ state: 'active', cards })?.number === n
+  const v = laneNow(ws, { lane: lane.id }, now)
+  return !!v && v.builder.id === lane.builder.id && laneStartDue(v)?.number === n
 }
 
 /** For tests: awaited just before each start, once it is decided (a lane changing while a start is on its way). */
