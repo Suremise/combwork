@@ -250,6 +250,8 @@
   "tips.laneBranchSquash.title": "O branch de um agente em dia entre cartões",
   "tips.laneGates.text": "No painel Progresso, uma raia diz no cabeçalho o que está aguardando, e um entalhe vermelho no segmento de um cartão significa que o último pedido dele foi recusado: passe o mouse para ver o motivo e o próximo passo.",
   "tips.laneGates.title": "Veja por que uma raia não avança",
+  "tips.laneNext.text": "Com as regras do fluxo de trabalho aplicadas, quando um cartão de uma raia está concluído, o Hive entrega o próximo ao executor assim que o turno dele termina, e a raia segue sem que você ou o Assistente precisem pedir.",
+  "tips.laneNext.title": "O Hive começa o próximo cartão de uma raia",
   "tips.laneNotices.text": "O Hive avisa quando a revisão de uma raia é reprovada, um cartão fica bloqueado ou travado, ou todos os cartões tiveram revisão bem-sucedida e é hora do merge, com um aviso por raia. Configurações → Notificações define onde eles aparecem.",
   "tips.laneNotices.title": "Saiba como vai uma raia, sem o Assistente",
   "tips.laneSlots.text": "No painel Progresso, uma raia mostra seu slot depois dos agentes (· slot-b): passe o ponteiro para ver o branch construído ali e se o slot está pronto, ou clique para abrir Branches e remotes.",

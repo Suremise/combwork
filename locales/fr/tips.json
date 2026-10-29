@@ -250,6 +250,8 @@
   "tips.laneBranchSquash.title": "La branche d’un agent à jour entre les cartes",
   "tips.laneGates.text": "Dans le panneau Progression, un couloir dit dans son en-tête ce qu’il attend, et une encoche rouge sur le segment d’une carte signifie que sa dernière demande a été refusée : survole-la pour voir pourquoi et quoi faire ensuite.",
   "tips.laneGates.title": "Vois pourquoi un couloir n’avance pas",
+  "tips.laneNext.text": "Quand les règles du flux de travail sont appliquées, dès qu’une carte d’un couloir est terminée, Hive donne la suivante à son auteur dès la fin de son tour : le couloir continue sans que toi ni l’Assistant ayez à le relancer.",
+  "tips.laneNext.title": "Hive lance la carte suivante d’un couloir",
   "tips.laneNotices.text": "Hive te prévient quand une relecture d’un couloir est refusée, qu’une carte est bloquée ou à l’arrêt, ou que toutes les cartes sont validées et que la fusion peut commencer, avec une notification par couloir. Paramètres → Notifications décide où elles s’affichent.",
   "tips.laneNotices.title": "Suis un couloir, même sans l’Assistant",
   "tips.laneSlots.text": "Dans le panneau Progression, un couloir indique son emplacement après ses agents (· slot-b) : survole-le pour voir la branche qui y est construite et si l’emplacement est prêt, ou clique pour ouvrir Branches et dépôts distants.",

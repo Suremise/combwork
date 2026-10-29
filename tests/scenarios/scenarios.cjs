@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 97
+const FIXTURES_VERSION = 98
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2416,6 +2416,44 @@ module.exports.SCENARIOS = [
         ['changed no files', o.gitStatus.trim() === '', o.gitStatus]
       ]
     }
+  },
+  {
+    id: 'card-loop-lane-next',
+    title: "A card loop builder whose lane's first card goes Done while it reads the wake (HI-1990): once its turn ends, Hive starts the lane's next card on it, with no prompt from the user or the Assistant",
+    async setup(c) {
+      await reviewedPair(c)
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'doing' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
+    },
+    // The first card Done (merged, as the user moves it) while the builder is in its turn: Hive waits for the turn's end.
+    async during(c, status) {
+      if (c.doneAt || status !== 'working') return
+      const r = await c.inv('tasks:move', c.cards.a, 'done', { confirm: true, reason: 'merged by hand (the scenario)' })
+      if (r?.refused || r?.stopped) throw new Error(`moving #${c.cards.a} to Done: ${JSON.stringify(r)}`)
+      c.doneAt = Date.now()
+    },
+    // Hive's start comes after the turn: waited for (at most a minute), until its task's doorbell is in the builder's pane.
+    async keepWaiting(c) {
+      if (!c.doneAt || Date.now() - c.doneAt > 60000) return false
+      const pane = await c.inv('pty:buffer', require('../e2e/lib.cjs').ptyKey(c.alpha, c.agents.coder.id)).catch(() => '')
+      c.given ||= String(pane).includes('New in your inbox: 1 task')
+      return !c.given
+    },
+    prompt: (c) =>
+      `[Hive] #${c.cards.a} (Coder's card) is in Done. Your lane's next card is #${c.cards.b} ("greet() trims the name"): Hive starts it for you once your turn ends, so end your turn now (hive_read_task with latestComment for the comment in full).`,
+    fake: 'skill card-loop',
+    expect: (o, c) => {
+      const b = o.cards.b
+      const started = (b?.history ?? []).find((h) => /^Moved to (the (top|bottom) of )?Doing\b/.test(h.what))
+      return [
+        [`#${c.cards.b} is started on Coder (in Doing, its agent)`, b?.column === 'doing' && (b?.agent?.id ?? b?.agent) === c.agents.coder.id, `${b?.column} / ${JSON.stringify(b?.agent)}`],
+        [`Coder is given #${c.cards.b} (its task's doorbell in its pane)`, !!c.given, String(c.given)],
+        ['started by Hive or by Coder itself, nobody else', !!started && /^(Hive|Coder)/.test(started.by), JSON.stringify(started ?? null)],
+        ["didn't ask the user (no hive_notify, no question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
+      ]
+    },
+    observe: (o) => [['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')]]
   },
   {
     id: 'card-loop-already-in-review',

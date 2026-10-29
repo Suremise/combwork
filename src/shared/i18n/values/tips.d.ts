@@ -252,6 +252,8 @@ interface HiveMessageValues {
   'tips.laneBranchSquash.title': undefined
   'tips.laneGates.text': undefined
   'tips.laneGates.title': undefined
+  'tips.laneNext.text': undefined
+  'tips.laneNext.title': undefined
   'tips.laneNotices.text': undefined
   'tips.laneNotices.title': undefined
   'tips.laneSlots.text': undefined

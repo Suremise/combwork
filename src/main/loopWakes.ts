@@ -1,12 +1,13 @@
 import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { pendingStep } from '../shared/tasks'
-import type { TaskCard, TaskHistoryEntry } from '../shared/types'
+import type { LaneCard, TaskCard, TaskHistoryEntry } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
-import { ANSWER_MAX, cardChange, LOOP_WAKE_KINDS, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
+import { ANSWER_MAX, cardChange, LOOP_WAKE_KINDS, laneNextWords, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
 import { boardRead } from './boardStore'
 import { onHiveEvent } from './events'
 import { onLanesWritten } from './lanes'
+import { laneStartDue, ownOpen } from '../shared/lanes'
 import { loopReviewerOf, poolCard } from './loopReviewer'
 import { createLogger, userText } from './logger'
 import { getTask, noteOnCard } from './tasks'
@@ -20,6 +21,7 @@ import { workspaceFor, type WorkspaceService } from './workspace'
 import { scopeOfHost, withCardNames } from './projectKeys'
 import { queueReturnOf } from './queueReturn'
 import { projectPreferences } from './workflow/preferences'
+import { rulesEnforced } from './workflow/recorder'
 
 /**
  * Hive's loop wakes (#405): a card loop's routine handoffs, delivered by Hive whether or not the agent set a card watch.
@@ -164,6 +166,37 @@ const isStep = (kind: LoopWakeKind): boolean => kind === 'step' || kind === 'ste
 const toReviewer = (kind: LoopWakeKind): boolean => kind === 'step' || kind === 'stepNotice'
 const covered = (projectPath: string, agentId: string, card: TaskCard, kind: LoopWakeKind): boolean =>
   kind !== 'note' && kind !== 'answer' && watchCovers(projectPath, agentId, card.number, kind === 'review' ? 'review' : kind === 'verdict' ? 'verdict' : kind === 'request' || isStep(kind) ? 'request' : 'moved', card.column)
+
+/**
+ * What a builder's Done wake says comes next in its lane (HI-1990), when its running lane holds the card: the lane's next
+ * card, which Hive starts for it once its turn ends (rules on: laneStarts.ts) or which it starts itself (rules off),
+ * one under way, or none left. Undefined: not a Done wake, or no lane of its holds the card. Read from the board without
+ * waiting, as the rest of the wake is decided (an await here let the builder's own watch tell the Done first): a card
+ * given to another agent is another lane's (laneView's `elsewhere`, as far as the board's row tells it).
+ */
+function laneNextOf(ws: WorkspaceService, card: TaskCard, agentId: string, kind: LoopWakeKind): string | undefined {
+  if (kind !== 'done' || card.column !== 'done') return undefined
+  let cards: LaneCard[] | null
+  try {
+    cards = boardRead(ws, (db) => {
+      // i18n-ignore: SQL, not text
+      const lane = db.prepare("SELECT l.id FROM lane_cards c JOIN lanes l ON l.id = c.lane WHERE c.card = ? AND l.state = 'active' AND l.builder_id = ? LIMIT 1").get(card.number, agentId) as { id: string } | undefined
+      if (!lane) return null
+      // Its list as it is once this card is Done: a change queued while the card was in flight applies then (#1270).
+      const list = db.prepare('SELECT 1 FROM lane_pending WHERE lane = ? LIMIT 1').get(lane.id) ? 'lane_pending' : 'lane_cards' // i18n-ignore: SQL, not text
+      // i18n-ignore: SQL, not text
+      const rows = db.prepare(`SELECT c.card AS number, k.col AS col, k.agent AS agent, k.archived AS archived, k.title AS title, k.blocked AS blocked FROM ${list} c LEFT JOIN cards k ON k.number = c.card WHERE c.lane = ? ORDER BY c.ord`).all(lane.id) as { number: number; col: string | null; agent: string | null; archived: number | null; title: string | null; blocked: string | null }[]
+      return rows.map((r): LaneCard => ({ number: r.number, title: r.title ?? '', column: !r.col || r.archived ? 'gone' : (r.col as LaneCard['column']), blocked: r.blocked || null, round: 1, reviewing: false, ...(r.agent && r.agent !== agentId ? { elsewhere: r.agent } : {}) }))
+    })
+  } catch {
+    return undefined
+  }
+  if (!cards?.some((c) => c.number === card.number)) return undefined
+  const next = cards.find(ownOpen)
+  if (!next) return laneNextWords('last')
+  const is = next.column === 'doing' || next.column === 'review' || next.column === 'passed' ? 'started' : next.column !== 'todo' || next.blocked ? 'waits' : !rulesEnforced() ? 'start' : laneStartDue({ state: 'active', cards })?.number === next.number ? 'hiveStarts' : 'waits'
+  return laneNextWords({ card: next.number, title: next.title, is })
+}
 
 /**
  * Queues a wake for an agent (the latest per agent and card: a newer handoff of the same card replaces one still
@@ -368,7 +401,7 @@ registerSource('loop', {
     madeFrom.set(madeKey(host, r.id, v), { seq, column: card.column, key })
     if (madeFrom.size > 1000) madeFrom.delete(madeFrom.keys().next().value!)
     const kinds = kindsOf(p.kind)
-    return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: wakeAbout(card, kinds, r.agentId) }, p.kind, p.text), meta: { ...r.meta, v } }
+    return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: wakeAbout(card, kinds, r.agentId) }, p.kind, p.text, laneNextOf(ws, card, r.agentId, p.kind)), meta: { ...r.meta, v } }
   },
   // Its version made, its watch not telling it, and what it was decided from as it was: for a line being typed, also
   // nothing on the board or lanes changed (#578 round 2: it stops at once); for a hand-out (hive_inbox, and the notices

@@ -78,6 +78,9 @@ const ERR = {
  */
 export type TaskActor = { kind: 'user' } | { kind: 'assistant' } | { kind: 'agent'; name: string; self?: { project: string; agentId: string }; scope?: string }
 
+/** Hive itself starting a lane's next card on its builder (HI-1990, laneStarts.ts): its start goes through the card's rules. */
+export const HIVE_LANE_START: TaskActor = { kind: 'agent', name: 'Hive' } // i18n-ignore: who did it, as cards' history and agents name Hive
+
 /** The project an actor is confined to on the board (a project agent's own), or null for the whole workspace. */
 export const scopeOf = (a: TaskActor): string | null => (a.kind === 'agent' && a.scope !== undefined ? a.scope : null)
 
@@ -1431,7 +1434,11 @@ interface AgentGate {
  * workspace's token).
  */
 async function agentGateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: TaskActor): Promise<AgentGate | null> {
-  if (actor.kind !== 'agent' || !actor.self) return null
+  // Hive starting a lane's next card on its builder (HI-1990, laneStarts.ts): its start for that agent, as an agent's move
+  // giving a card to another is, and the put back undoing it; nothing else of Hive's.
+  const laneStart = actor === HIVE_LANE_START
+  if (actor.kind !== 'agent' || (!actor.self && !laneStart)) return null
+  if (laneStart && (patch.review !== undefined || (patch.column === 'doing' ? !patch.agent : patch.column !== 'todo'))) return null
   const review = patch.review === 'start' || patch.review === 'passed' || patch.review === 'failed' ? patch.review : undefined
   // A review's start with a move or an agent is refused by P3's checks (a review starts on its own); one of another value too.
   if (patch.review !== undefined && (!review || (review === 'start' && (patch.column !== undefined || patch.agent !== undefined)))) return null
@@ -1444,7 +1451,7 @@ async function agentGateOf(ws: WorkspaceService, n: number, patch: TaskPatch, ac
   const head = cardHeads(ws, [n])[0]
   if (!head || typeof head.project !== 'string' || !head.project || !inScope({ project: head.project }, scopeOf(actor))) return null
   // Another agent's card in Doing, moved on: refused by P3's check, as before (its work is in progress).
-  if (!review && column !== 'doing' && column !== 'todo' && head.column === 'doing' && typeof head.agent === 'string' && head.agent && head.agent !== actor.self.agentId) return null
+  if (!review && column !== 'doing' && column !== 'todo' && head.column === 'doing' && typeof head.agent === 'string' && head.agent && head.agent !== actor.self?.agentId) return null
   const wf = await workflowFor(ws, join(ws.path, head.project)).catch(() => null)
   if (!wf) return null
   const rec = (() => {

@@ -121,6 +121,20 @@ const finished = (c: LaneCard): boolean => c.column === 'passed' || c.column ===
 /** Whether a lane's card is the lane's own work now: open and not held by another agent (HI-1821). */
 export const ownOpen = (c: LaneCard): boolean => c.column !== 'done' && c.column !== 'gone' && c.column !== 'unrecorded' && !c.elsewhere
 
+/**
+ * A running lane's next card for Hive to start on its builder (HI-1990), or null: the first of its own open cards, in
+ * Todo and not blocked, once the card before it is Done (every card before it Done or another lane's, one of them Done).
+ * A lane's first card is its builder's to start.
+ */
+export function laneStartDue(lane: Pick<LaneInfo, 'state' | 'cards'>): LaneCard | null {
+  if (lane.state !== 'active') return null
+  const at = lane.cards.findIndex(ownOpen)
+  if (at < 1) return null
+  const c = lane.cards[at]
+  if (c.column !== 'todo' || c.blocked) return null
+  return lane.cards.slice(0, at).some((x) => x.column === 'done') ? c : null
+}
+
 /** Whether a lane reads its cards as it left them (ended or abandoned, with its snapshot) rather than from the board. */
 export const isFrozen = (rec: Pick<LaneRecord, 'state' | 'frozen'>): boolean => !running(rec) && !!rec.frozen
 

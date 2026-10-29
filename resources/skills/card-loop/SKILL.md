@@ -11,7 +11,7 @@ Two agents take the same cards in turn: the **builder** does each card, commits 
 
 ## Inputs
 
-From the request: your **role** (`builder` or `reviewer`) and the **cards**, in order. Ask if either isn't clear. Rounds and wait come from the request or else the project's workflow options (Card loops): the lane's reply says them.
+From the request: your **role** (`builder` or `reviewer`) and the **cards**, in order. Ask if unclear. Rounds and wait: the request's, else the project's workflow options (the lane's reply says them).
 
 ## The lane
 
@@ -23,7 +23,7 @@ The lane's list is Hive's. `hive_lane` `next` names your next card, or why the l
 
 ## Waiting
 
-Wait with `hive_wait_for_tasks`, `wake: true`, `limitMinutes` the lane's wait. **After a submission or a failed verdict in your lane, Hive watches the card for you**: the reply says so ("Hive watches HI-12 for you…"), so end your turn. Where it says your own watch stays, or nothing of a watch, or you are woken with nothing to do yet, start it yourself:
+Wait with `hive_wait_for_tasks`, `wake: true`, `limitMinutes` the lane's wait. **After a submission or a failed verdict in your lane, Hive watches the card for you**: the reply says so, so end your turn. Where it says your own watch stays, or nothing of a watch, or you are woken with nothing to do yet, start it yourself:
 - builder, its card in Review: the card, `changes: ["verdict", "column", "comment"]`, `column: "passed"` (a verdict, the card moved on, or a comment such as the reviewer asking for something);
 - reviewer, a new card: the card, `column: "review"` (at once if it's already there);
 - reviewer, a card it failed: the card, `column: "review"`, `fresh: true` (its next submission brings it back);
@@ -31,9 +31,9 @@ Wait with `hive_wait_for_tasks`, `wake: true`, `limitMinutes` the lane's wait. *
 
 **Start the watch before the other steps that let the other side act** (a request, a design, a follow-up, a reply), so a quick answer isn't missed; your own step doesn't wake you. Then check the watch's reply: "Waiting for…" is live, so finish that step and **end your turn**, saying what you wait for; "Already: …" has happened, so carry on now. Anything else: start it again once, and if it still says neither, `hive_notify` the user. **Never end a turn in a loop without a watch or a loop wake to come**, unless the loop is over or you're asking the user, and never poll or sleep instead. Hive also wakes a loop's agents itself (a card arriving in Review, a verdict, a request, a design); act on that as on your own watch's wake.
 
-**A loop wake to come:** while you wait on the other side's move, loop wakes bring it with no watch: as builder, the verdict on your card in Review (no request of the reviewer's left to answer) or your design's or follow-up's answer; as reviewer, the next submission. Only while the project's loop wakes are on (its workflow option **Wake reviewers and builders**, under Card loops in Version Control → Workflow) and you have your hive tools: then a watch a notice or its limit ended needs no restarting, and its limit is no question for the user. Otherwise, or for what a loop wake doesn't bring (a comment you asked for, another card, a dependency), start the watch as above. A design's or follow-up's own `until` still holds.
+**A loop wake to come:** while you wait on the other side's move, loop wakes bring it with no watch: as builder, the verdict on your card in Review (no request of the reviewer's left to answer) or your design's or follow-up's answer; as reviewer, the next submission. Only while the project's loop wakes are on (its workflow option **Wake reviewers and builders**) and you have your hive tools: then a watch a notice or its limit ended needs no restarting, and its limit is no question for the user. Otherwise, or for what a loop wake doesn't bring (a comment you asked for, another card, a dependency), start the watch as above. A design's or follow-up's own `until` still holds.
 
-**When woken**, `hive_inbox` first: it says what changed and what else came, each with its sender (work-on-card, Your inbox: act, then ack). Read only what you need: `hive_read_task` with `latestComment: true` (`summary: true` gives just first lines; read in full to act on findings). A reviewer whose card is back reads it with `comments: 1`: its decisions, listed first, may have changed. Woken by several watched cards: check each one's column and verdict, and watch them all again in one watch. Woken with nothing to do yet: start the same watch again. If a wake isn't possible (the tool says so), wait in the call instead (`timeoutSeconds` up to 840, passing the reply's `since` on).
+**When woken**, `hive_inbox` first: it says what changed and what else came, each with its sender (work-on-card, Your inbox: act, then ack). Read only what you need: `hive_read_task` with `latestComment: true` (`summary: true`: first lines only; read in full to act on findings). A reviewer whose card is back reads it with `comments: 1`: its decisions, listed first, may have changed. Woken by several watched cards: check each one's column and verdict, and watch them all again in one watch. Woken with nothing to do yet: start the same watch again. If a wake isn't possible (the tool says so), wait in the call instead (`timeoutSeconds` up to 840, passing the reply's `since` on).
 
 **Another agent's card** that yours depends on: its event tells you that card changed, not yours; Passed means reviewed, not merged. **A card that left your watch** (reassigned, reviewed by another): drop it and carry on, without asking. **A blocked card** is paused, not gone: it stays on your list, and the next card waits for it.
 
@@ -42,7 +42,7 @@ Wait with `hive_wait_for_tasks`, `wake: true`, `limitMinutes` the lane's wait. *
 For each card, in order:
 1. Do its work with the **work-on-card** skill (`hive_start_card` first). The reviewer reviews what you submit (work-on-card, Finish): for a code card in Git, commit each round's work and name the commit in its summary; a no-code card has nothing to commit. `hive_submit`, and end your turn (Waiting, above).
 2. **A change asked of the card in Review**: make it (for a code card in Git, commit it), then `hive_submit` with `followUp: true` before you wait: until then nothing is handed over. A run asked for: reply naming it, then watch again.
-3. **Passed**: its finish is the project's, and the card says what's next (work-on-card, Finish). Then `hive_lane` `next`.
+3. **Passed**: its finish is the project's, and the card says what's next (work-on-card, Finish). **Done**: the lane goes on, whatever the card's own prompt named: with the rules on Hive starts the next card for you (end your turn), else take it unprompted (`hive_lane` `next`) until none is left.
 4. **Failed**: the verdict sent it back to Doing. Fix the **blocking** findings (committed, for a code card in Git), and submit again with what changed (naming the commit, for a code card in Git): the next round. Suggestions that aren't blocking become follow-up cards (`hive_create_task`).
 
 **Checks in a round:** each submission carries a run record (work-on-card). After a round's fixes rerun the checks they affect, but the card's full checks must have run on its final code before it can pass.
@@ -51,7 +51,7 @@ For each card, in order:
 
 **A follow-up** (a change asked of the card, for its reviewer to check): in Review, step 2 (no round). In Passed, make it (committed, for a code card in Git), start the watch (`changes: ["comment", "column", "verdict"]`), post it with `hive_loop_step` (`step: "followUp"`, saying what changed: for a code card in Git, its commit), and end your turn: a comment alone wakes nobody. `ok`: carry on; `gaps`: fix and post again. No answer by the wait: ask the user.
 
-**The lane's end:** once every card is Done, the lane ends by itself. A merge step that needs the user (a commit or merge your CLI or a permission check refuses, a conflict you can't settle) is `hive_cannot_within_rules` on that card (the rule, and why): their answer comes to your inbox; then finish the merge.
+**The lane's end:** a merge step that needs the user (a commit or merge your CLI or a permission check refuses, a conflict you can't settle) is `hive_cannot_within_rules` on that card (the rule, and why): their answer comes to your inbox; then finish the merge.
 
 ## Reviewer
 
