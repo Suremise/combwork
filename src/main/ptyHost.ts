@@ -159,10 +159,16 @@ export function childEnv(extra: Record<string, string> = {}): Record<string, str
  * WT_SESSION inherited from a Windows Terminal Hive was opened from. So the CLIs draw the same however Hive was opened.
  * Off, the environment as given.
  */
-export function withTerminalType(env: Record<string, string>, on = advanced.get<boolean>(TERMINAL_TYPE)): Record<string, string> {
+export function withTerminalType(env: Record<string, string>, on = advanced.get<boolean>(TERMINAL_TYPE), platform: NodeJS.Platform = process.platform): Record<string, string> {
   if (!on) return env
-  const { WT_SESSION: _wt, ...rest } = env
-  return rest.TERM ? rest : { ...rest, TERM: 'xterm-256color' }
+  // Windows' names are case-insensitive (HR3's round 1): a `Term` or `wt_session` is the same variable, as PATH is (freshPath.ts).
+  const same = (k: string, name: string): boolean => (platform === 'win32' ? k.toUpperCase() === name : k === name)
+  const rest = Object.fromEntries(Object.entries(env).filter(([k]) => !same(k, 'WT_SESSION')))
+  const terms = Object.keys(rest).filter((k) => same(k, 'TERM'))
+  if (!terms.length) return { ...rest, TERM: 'xterm-256color' }
+  // One TERM, the last given: a session's or connection's own is spread over the one inherited, whatever its case.
+  for (const k of terms.slice(0, -1)) delete rest[k]
+  return rest
 }
 
 /** An argument as logged: bearer tokens hidden (Codex's hooks carry one), long values shortened. */
