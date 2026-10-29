@@ -203,6 +203,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **A tooltip closes when what it describes moves away.** A tooltip stayed up after the row under the mouse moved (the Progress panel's lanes reordering as one went active), even once the mouse moved on, and the next tooltip opened beside it. It now closes as soon as the mouse is over anything else, and only one tooltip shows at a time (HI-2052).
 - **A deleted project stays deleted.** Deleting a project (or moving its folder out) just after Hive had started looking over the workspace's folders could bring its folder back, holding only an empty `.hive`, so it showed in the project list again. Hive no longer makes a project's folder when it finds the project gone (HI-2045).
 - **A preset you choose right after loading a template stays chosen.** Loading a template opens Version Control → Workflow and fills in the template's options once Hive has read the project's. When that read was slow and you chose a preset (Team, say) before it came back, the template's options replaced your choice under the same preset name, without the target branch or the checks' commands, and Save… saved them that way: the checks then never counted. A choice made meanwhile now stays, as it does when the options change elsewhere (HI-2033).
 - **A long command takes two lines in the commands dialog.** A command running or failed showed its whole command line, which could fill six lines; it now shows the first two, ending in an ellipsis, and pointing at it shows the whole line.
