@@ -187,7 +187,9 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   r.head = take('head', await G.head(folder))
   r.target = tree?.base ?? take('target', await G.defaultBranch(folder))
   if (p.why === 'start') {
-    const targetHead = r.target ? take('base', await G.lineHead(folder, r.target)) : null
+    // No head, no base: the target isn't read, so the base's reason is the head's (HI-2044: a folder that can't be read
+    // fails the target's read too, which would name the target instead).
+    const targetHead = r.target && r.head ? take('base', await G.lineHead(folder, r.target)) : null
     r.base = r.head && targetHead ? take('base', await G.mergeBase(folder, r.head, targetHead)) : null
     // Not read: why (its head or target couldn't be read, or there is no target to start from).
     if (!r.base && !r.unknown.base) {
