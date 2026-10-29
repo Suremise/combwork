@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 99
+const FIXTURES_VERSION = 100
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2064,7 +2064,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'card-loop-rounds',
-    title: 'A card loop at its round limit: the builder asks the user (blocks the card, hive_notify) instead of another round',
+    title: 'A card loop at its round limit: the builder asks the user (a request under For you) instead of another round',
     async setup(c) {
       await c.card('w', {
         title: 'Retry the sync',
@@ -2080,12 +2080,13 @@ module.exports.SCENARIOS = [
       })
     },
     prompt: (c) => `Work through card #${c.cards.w} as its builder (rounds: 2). Round 1 (the first build and its review) and round 2 (the fix and its review) have both failed review; round 2's review is its last comment.`,
-    fake: (c) => `skill card-loop hive hive_update_task {"number":${c.cards.w},"blocked":"At its round limit: carry on, split, accept with follow-ups, or take over?"} then hive hive_notify {"title":"#${c.cards.w} at its round limit","message":"Round 1: no delay (fixed). Round 2: the delay is never awaited (the same finding came back). Carry on, split, accept with follow-ups, or take over?"}`,
+    fake: (c) => `skill card-loop hive hive_ask_user {"card":"#${c.cards.w}","kind":"decide","text":"#${c.cards.w} is at its round limit. Round 1: no delay (fixed). Round 2: the delay is never awaited (the same finding came back). Carry on, split, accept with follow-ups, or take over?"}`,
     expect: (o, c) => [
       ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
-      ['asked the user (hive_notify)', ran(o, 'hive_notify').length >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
-      // A lane watch wakes on a card becoming blocked, never on a notification alone (#840).
-      ['blocked the card with its question', !!o.cards.w?.blocked, o.cards.w?.blocked ?? 'not blocked'],
+      // card-loop (rounds.md): a question for the user is a request under For you (hive_ask_user), which wakes whoever
+      // watches the lane; where Hive's own round limit already asked the user (rules enforced), that request is the one
+      // (HI-2035). A block or a notification alone is no longer the way to ask.
+      ['asked the user: a request under For you (its hive_ask_user, or the round limit Hive asked)', (o.cards.w?.forYou ?? []).length >= 1, `${o.hiveCalls.map((x) => x.tool).join(',')} | forYou: ${JSON.stringify(o.cards.w?.forYou ?? [])}`],
       // Back in Doing from round 2's failed review: no round three sent (no move to Review, no submission of its own).
       ["didn't send it round three (not back to Review, no submission of its own, not Done)", movedInto(o.cards.w, 'Review') < 0 && !submissionsOf(o, c, 'w').length && o.cards.w?.column === 'doing', history(o.cards.w).join(' | ')]
     ]
