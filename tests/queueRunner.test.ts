@@ -641,25 +641,29 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
 
   it("HI-2042: a command ended by a signal is never code 1 (git's \"no\"): the launcher says so by its nonce; a real exit 1, and a look-alike line, stay the command's", async () => {
     const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'signal', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
-    // The real launcher, whose command is ended by SIGTERM through the launcher's own handle (the fixture, in it only).
-    // NODE_OPTIONS reads a backslash as an escape: the path with forward slashes.
-    const preload = join(__dirname, 'fixtures', 'launcherSignal.cjs').replace(/\\/g, '/')
-    const env = { ...baseEnv(), NODE_OPTIONS: `--require "${preload}"` }
-    const killed = await a.runner.run('testMerge', process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { env })
-    expect(killed).toMatchObject({ ok: false, code: -1, signal: 'SIGTERM', err: expect.stringMatching(/ended by a signal \(SIGTERM\)/) })
-    expect(killed.err).not.toMatch(/:signal:/)
-    // The command writes what the launcher's line looks like, with a nonce of its own, and exits 1 or the launcher's own code.
-    const lookAlike = (c: number): string => `process.stderr.write('\\n00000000-0000-4000-8000-000000000000:signal:SIGTERM\\n'); process.exit(${c})`
-    for (const c of [1, 129]) {
-      const fake = await a.runner.run('testMerge', process.execPath, ['-e', lookAlike(c)])
-      expect(fake).toMatchObject({ ok: false, code: c })
-      expect(fake.signal).toBeUndefined()
+    // Released however the test ends (its job, and anything still in it, ended), so a failing check leaves nothing running.
+    try {
+      // The real launcher, whose command is ended by SIGTERM through the launcher's own handle (the fixture, in it only).
+      // NODE_OPTIONS reads a backslash as an escape: the path with forward slashes.
+      const preload = join(__dirname, 'fixtures', 'launcherSignal.cjs').replace(/\\/g, '/')
+      const env = { ...baseEnv(), NODE_OPTIONS: `--require "${preload}"` }
+      const killed = await a.runner.run('testMerge', process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { env })
+      expect(killed).toMatchObject({ ok: false, code: -1, signal: 'SIGTERM', err: expect.stringMatching(/ended by a signal \(SIGTERM\)/) })
+      expect(killed.err).not.toMatch(/:signal:/)
+      // The command writes what the launcher's line looks like, with a nonce of its own, and exits 1 or the launcher's own code.
+      const lookAlike = (c: number): string => `process.stderr.write('\\n00000000-0000-4000-8000-000000000000:signal:SIGTERM\\n'); process.exit(${c})`
+      for (const c of [1, 129]) {
+        const fake = await a.runner.run('testMerge', process.execPath, ['-e', lookAlike(c)])
+        expect(fake).toMatchObject({ ok: false, code: c })
+        expect(fake.signal).toBeUndefined()
+      }
+      const plain = await a.runner.run('testMerge', process.execPath, ['-e', `process.stderr.write('said'); process.exit(1)`])
+      expect(plain).toMatchObject({ ok: false, code: 1, err: 'said' })
+      expect(plain.signal).toBeUndefined()
+      await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job']), { timeout: 30_000, interval: 100 })
+    } finally {
+      await a.runner.release()
     }
-    const plain = await a.runner.run('testMerge', process.execPath, ['-e', `process.stderr.write('said'); process.exit(1)`])
-    expect(plain).toMatchObject({ ok: false, code: 1, err: 'said' })
-    expect(plain.signal).toBeUndefined()
-    await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job']), { timeout: 30_000, interval: 100 })
-    await a.runner.release()
   })
 
   it('HI-2042: the launcher itself ended by a signal while the run waits: code -1 with the signal, never 1', async () => {
@@ -676,13 +680,18 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     // The command says it is running, then exits once its launcher has gone (it holds the launcher's output till then).
     const command = `process.stdout.write('ready\\n'); setInterval(() => { try { process.kill(process.ppid, 0) } catch { process.exit(0) } }, 100)`
     const run = a.runner.run('testMerge', process.execPath, ['-e', command])
-    await vi.waitFor(() => expect(ready).not.toBeNull(), { timeout: 30_000, interval: 50 })
-    await ready
-    launcher!.kill('SIGTERM')
-    const r = await run
-    expect(r).toMatchObject({ ok: false, code: -1, signal: 'SIGTERM', out: 'ready\n' })
-    expect(r.timedOut).toBeUndefined()
-    await a.runner.release()
+    // However the test ends: released (its job, the launcher and its command with it, ended), and the run settled.
+    try {
+      await vi.waitFor(() => expect(ready).not.toBeNull(), { timeout: 30_000, interval: 50 })
+      await ready
+      launcher!.kill('SIGTERM')
+      const r = await run
+      expect(r).toMatchObject({ ok: false, code: -1, signal: 'SIGTERM', out: 'ready\n' })
+      expect(r.timedOut).toBeUndefined()
+    } finally {
+      await a.runner.release()
+      await run.catch(() => {})
+    }
   })
 
   it('#1350: a run past its bound (a signer waiting for a passphrase, under git) is ended with its whole tree, and says it timed out', async () => {
