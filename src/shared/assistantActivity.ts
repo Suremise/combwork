@@ -122,7 +122,7 @@ export const UNDO_FINAL = {
   cardsOrder: "The cards' order isn't put back.",
   withdrawn: "Messages it withdrew aren't sent again.",
   laneEnded: 'A lane that ended stays ended: start it again if it should go on.',
-  laneReorderNow: "A lane reordered now isn't undone: its card put back stays in Todo and its next card starts. Reorder it again, or move the card.",
+  laneReorderNow: "A card a lane reorder applied now put back stays in Todo: undo puts back only the lane's order.",
   decision: 'A decision it recorded stays: only the user changes or removes decisions.',
   cardPlace: "The card's place in its column isn't put back.",
   context: 'The doc sections to read first stay as set.',

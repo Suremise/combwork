@@ -702,7 +702,7 @@
   "assistant.undo.why.declarePaths": "Les chemins qu’il a déclarés restent avec la carte.",
   "assistant.undo.why.handOver": "Une passation ne peut pas être annulée : le travail est passé à l’autre agent.",
   "assistant.undo.why.laneEnded": "Un couloir terminé reste terminé : redémarre-le s’il doit continuer.",
-  "assistant.undo.why.laneReorderNow": "Un couloir réordonné tout de suite n’est pas annulé : sa carte remise reste dans À faire et sa carte suivante démarre. Réordonne-le à nouveau, ou déplace la carte.",
+  "assistant.undo.why.laneReorderNow": "Une carte qu’un réordonnancement de couloir appliqué tout de suite a remise reste dans À faire : l’annulation ne rétablit que l’ordre du couloir.",
   "assistant.undo.why.message": "Un message envoyé ne peut pas être repris.",
   "assistant.undo.why.nothing": "Il n’a rien modifié que l’annulation rétablisse.",
   "assistant.undo.why.projectClosed": "Un projet qu’il a fermé reste fermé : rouvre-le si tu le veux.",

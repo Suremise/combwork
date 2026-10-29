@@ -988,7 +988,7 @@
     "description": "A tip's title."
   },
   "tips.laneApplyNow.text": {
-    "defaultMessage": "In Start Lane for a lane's builder, Apply now changes the order at once: the card being worked goes back to Todo with its work kept on its branch, and the new first card starts once the builder's turn is over.",
+    "defaultMessage": "In Start Lane for a lane's builder, Apply now changes the order at once: the card being worked goes back to Todo with its work kept on its branch, and the builder is told.",
     "description": "A tip (HI-1995). Start Lane and Apply now are a dialog and its checkbox; Todo is a board column. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.laneApplyNow.title": {

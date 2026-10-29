@@ -909,16 +909,12 @@ export function onWatchStarted(fn: (ws: WorkspaceService, projectPath: string, a
   return () => watchStarted.delete(fn)
 }
 
-/**
- * Ends an agent's watch (the agent itself, or the user's Cancel), also one being typed. Whether it had one. `only`: ends
- * it only if its condition is one this says (HI-1995: a lane reordered now ends a watch on the card it put back, never a
- * watch of other work begun meanwhile), decided under the watches' lock.
- */
-export async function cancelWatch(ws: WorkspaceService, projectPath: string, agentId: string, only?: (cond: WatchCondition) => boolean): Promise<boolean> {
+/** Ends an agent's watch (the agent itself, or the user's Cancel), also one being typed. Whether it had one. */
+export async function cancelWatch(ws: WorkspaceService, projectPath: string, agentId: string): Promise<boolean> {
   const store = await load(ws)
   const had = await locked(store, async () => {
     const rec = recordOf(store, projectPath, agentId)
-    if (!rec || (only && !only(rec.cond))) return false
+    if (!rec) return false
     const before = store.list
     store.list = store.list.filter((x) => x !== rec)
     try {

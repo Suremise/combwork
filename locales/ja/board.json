@@ -452,7 +452,7 @@
   "board.laneStart.addCard": "未着手からカードを追加…",
   "board.laneStart.agentState": "{agent}（{status}）",
   "board.laneStart.applyNow": "今すぐ適用",
-  "board.laneStart.applyNowHint": "{builder}のレーンは{card}を作業中です。このリストは{card}が完了してから適用されます。「今すぐ適用」にすると{card}を「未着手」に戻し（作業はそのブランチに残ります）、{next, select, none {レーンには開始するカードが残りません} other {{builder}のターンが終わりスロットの準備ができたら{next}を開始します}}。",
+  "board.laneStart.applyNowHint": "{builder}のレーンは{card}を作業中です。このリストは{card}が完了してから適用されます。「今すぐ適用」にすると、まず{card}を「未着手」に戻し（作業はそのブランチに残ります）、新しい順序をすぐに適用して{builder}に伝えます。",
   "board.laneStart.applyNowNot": "{builder}のレーンは{card}を作業中で、このカードは{column, select, review {「レビュー」} other {「承認済み」}}にあります。このリストは完了後に適用されます。今戻すと{column, select, review {レビュー} other {承認とマージ}}が失われるため、戻せません。",
   "board.laneStart.builder": "ビルダー",
   "board.laneStart.busyNow": "{agents}は現在作業中です。「待って開始」は、{n, plural, other {アイドルになる}}のを待ってからレーンを開始します。",

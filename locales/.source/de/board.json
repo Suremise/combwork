@@ -452,7 +452,7 @@
   "board.laneStart.addCard": "Add a card from Todo…",
   "board.laneStart.agentState": "{agent} ({status})",
   "board.laneStart.applyNow": "Apply now",
-  "board.laneStart.applyNowHint": "{builder}'s lane is working on {card}: this list applies once {card} is Done. Apply now puts {card} back in Todo (its work stays on its branch), and {next, select, none {the lane has nothing left to start} other {{next} starts once {builder}'s turn is over and its slot is ready}}.",
+  "board.laneStart.applyNowHint": "{builder}'s lane is working on {card}: this list applies once {card} is Done. Apply now puts {card} back in Todo first (its work stays on its branch), so the new order applies at once, and tells {builder}.",
   "board.laneStart.applyNowNot": "{builder}'s lane is working on {card}, which is in {column, select, review {Review} other {Approved}}: this list applies once it is Done. It can't be put back now without losing its {column, select, review {review} other {approval and merge}}.",
   "board.laneStart.builder": "Builder",
   "board.laneStart.busyNow": "{agents} {n, plural, one {is busy} other {are busy}} now: Wait and Start waits until {n, plural, one {it is} other {they are}} idle, then starts the lane.",

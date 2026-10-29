@@ -452,7 +452,7 @@
   "board.laneStart.addCard": "Adicionar um cartão de A fazer…",
   "board.laneStart.agentState": "{agent} ({status})",
   "board.laneStart.applyNow": "Aplicar agora",
-  "board.laneStart.applyNowHint": "A raia de {builder} está trabalhando em {card}: esta lista vale quando {card} estiver concluído. Aplicar agora devolve {card} para A fazer (o trabalho fica no branch dele), e {next, select, none {a raia não tem mais nada para iniciar} other {{next} começa quando o turno de {builder} terminar e o slot dele estiver pronto}}.",
+  "board.laneStart.applyNowHint": "A raia de {builder} está trabalhando em {card}: esta lista vale quando {card} estiver concluído. Aplicar agora primeiro devolve {card} para A fazer (o trabalho fica no branch dele), para a nova ordem valer na hora, e avisa {builder}.",
   "board.laneStart.applyNowNot": "A raia de {builder} está trabalhando em {card}, que está em {column, select, review {Revisão} other {Aprovado}}: esta lista vale quando ele estiver concluído. Ele não pode ser devolvido agora sem perder {column, select, review {a revisão} other {a aprovação e o merge}}.",
   "board.laneStart.builder": "Executor",
   "board.laneStart.busyNow": "{n, plural, one {O agente {agents} está ocupado agora} other {Os agentes {agents} estão ocupados agora}}: Esperar e iniciar aguarda até {n, plural, one {ele ficar ocioso} other {eles ficarem ociosos}} e então inicia a raia.",

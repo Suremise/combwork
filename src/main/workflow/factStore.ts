@@ -23,7 +23,6 @@ import { CATEGORY_STAGE, STAGE_CATEGORY } from '../../shared/workflow/facts'
 import type { Ruleset } from '../../shared/workflow/compile'
 import { loadRuleset } from '../../shared/workflow/compile'
 import { newLane, type LaneList } from '../../shared/workflow/laneList'
-import type { LaneStartNext } from '../../shared/lanes'
 import { LOOP_ROUNDS, LOOP_WAIT_HOURS } from '../../shared/lanes'
 import { shellLine, type QueueCommand, type QueueFileSide, type QueuePauseLogged, type QueueStuck } from '../../shared/workflow/queue'
 import { pauseLogged, pauseLogKey, pauseLogOf } from './queueLogs'
@@ -621,28 +620,6 @@ export class FactStore {
       writeLane(db, newLane(id, cards, ruleset), at)
     })
     return this.lane(id)!
-  }
-
-  /** The card a lane of this project starts next after a reorder applied now (HI-1995: LaneRecord's `startNext`), or null. */
-  laneStartNext(id: string): LaneStartNext | null {
-    return this.conn.read((db) => {
-      const row = db.prepare("SELECT json_extract(extra, '$.startNext') AS v FROM lanes WHERE id = ? AND project = ? COLLATE NOCASE").get(id, this.scope.project) as { v: string | null } | undefined
-      if (!row?.v) return null
-      try {
-        const v = JSON.parse(row.v) as Partial<LaneStartNext>
-        return Number.isInteger(v.card) && v.by === 'applyNow' && typeof v.at === 'string' ? { card: v.card!, by: 'applyNow', at: v.at } : null
-      } catch {
-        return null
-      }
-    })
-  }
-
-  /** Sets (or clears, null) a lane's card to start next (HI-1995), in the caller's write when it has one open. */
-  setLaneStartNext(id: string, mark: LaneStartNext | null): void {
-    this.conn.write((db) => {
-      if (mark) db.prepare("UPDATE lanes SET extra = json_set(COALESCE(extra, '{}'), '$.startNext', json(?)) WHERE id = ? AND project = ? COLLATE NOCASE").run(JSON.stringify(mark), id, this.scope.project)
-      else db.prepare("UPDATE lanes SET extra = CASE WHEN json_remove(extra, '$.startNext') = '{}' THEN NULL ELSE json_remove(extra, '$.startNext') END WHERE id = ? AND project = ? COLLATE NOCASE AND json_extract(extra, '$.startNext') IS NOT NULL").run(id, this.scope.project)
-    })
   }
 
   /** Saves the runtime's part of one of this project's lanes: its list, its end, the card in flight, a queued change. */

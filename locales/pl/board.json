@@ -452,7 +452,7 @@
   "board.laneStart.addCard": "Dodaj kartę z kolumny Do zrobienia…",
   "board.laneStart.agentState": "{agent} ({status})",
   "board.laneStart.applyNow": "Zastosuj teraz",
-  "board.laneStart.applyNowHint": "Tor {builder} pracuje nad {card}: ta lista zacznie obowiązywać, gdy {card} będzie gotowa. Zastosuj teraz przenosi {card} z powrotem do Do zrobienia (praca zostaje na jej gałęzi), a {next, select, none {tor nie ma już nic do rozpoczęcia} other {{next} zacznie się, gdy tura {builder} się skończy, a jego slot będzie gotowy}}.",
+  "board.laneStart.applyNowHint": "Tor {builder} pracuje nad {card}: ta lista zacznie obowiązywać, gdy {card} będzie gotowa. Zastosuj teraz najpierw przenosi {card} z powrotem do Do zrobienia (praca zostaje na jej gałęzi), żeby nowa kolejność obowiązywała od razu, i informuje {builder}.",
   "board.laneStart.applyNowNot": "Tor {builder} pracuje nad {card}, która jest w kolumnie {column, select, review {Recenzja} other {Zatwierdzone}}: ta lista zacznie obowiązywać, gdy będzie gotowa. Nie można jej teraz cofnąć bez utraty {column, select, review {recenzji} other {zatwierdzenia i scalenia}}.",
   "board.laneStart.builder": "Wykonawca",
   "board.laneStart.busyNow": "{n, plural, one {Agent {agents} jest teraz zajęty} few {Agenci {agents} są teraz zajęci} many {Agenci {agents} są teraz zajęci} other {Agenci {agents} są teraz zajęci}}: Czekaj i uruchom poczeka, aż {n, plural, one {będzie wolny} few {będą wolni} many {będą wolni} other {będą wolni}}, a potem uruchomi tor.",

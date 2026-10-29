@@ -368,7 +368,7 @@ const ancestor = (x, y) => {
     await shoot('8-laneB-ended', 'lanes', async () => (await onBoard('Done', c5)) && !!(await laneNow(b?.id))?.state)
 
     // ===== Lane C (HI-1995): reordered now. Six is started and committed; B1's own reorder with applyNow puts it back
-    // (its work kept on its line) and Hive starts Seven next, on a line of its own from main without Six's work. Once
+    // (its work kept on its line) and applies the new order; B1 starts Seven on a line of its own from main without Six's work. Once
     // Seven is merged, Hive starts Six again, on its own line with its work.
     const laneC = []
     for (const title of ['Six', 'Seven']) laneC.push((await inv('tasks:create', { title, project: 'alpha' })).number)
@@ -387,10 +387,8 @@ const ancestor = (x, y) => {
         return res.status === 409 && /in a turn|is working|is starting|waiting for the user|background tasks/.test(JSON.stringify(body)) ? null : { status: res.status, body }
       })
     const re = await reorderNow()
-    check('the lane reordered now: Six put back to Todo, Seven to start next', re?.status === 200 && (re.body?.note ?? '').startsWith('Applied now: ') && (await card(c6)).column === 'todo', JSON.stringify(re))
+    check('the lane reordered now: Six put back to Todo, the new order applied', re?.status === 200 && (re.body?.note ?? '').startsWith('Applied now: ') && (await card(c6)).column === 'todo', JSON.stringify(re))
     check("…Six's line kept, with its work", git(alpha, 'rev-parse', s6.line) === six)
-    const byHive7 = await waitHung(async () => (await factsOf(c7, 'Started')).find((f) => f.actor === 'hive') ?? null)
-    check('Hive starts Seven on B1 once its turn is over, with no prompt from anyone', !!byHive7 && (await card(c7))?.agent === b1.id, JSON.stringify({ byHive7, card: await card(c7) }))
     const s7 = await start(c7)
     check("Seven's line is its own, from main's head, without Six's work", s7.s.status === 200 && s7.base === head() && s7.line !== s6.line && git(wt, 'rev-parse', 'HEAD') === s7.base && !ancestor(six, s7.base), JSON.stringify(s7))
     await round(c7, 'seven.txt')

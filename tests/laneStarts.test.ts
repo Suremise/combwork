@@ -209,83 +209,23 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
   })
 
   describe('a lane reordered now (HI-1995; the project with a workflow, as the case above left it)', () => {
-    /** A lane of two on `b`: its first card Active (started by its builder), its builder idle. */
-    async function inFlight(b: string) {
-      const [x1, x2] = [await card('X one', b), await card('X two', b)]
-      const lane = (await lanes.startLane(w, { project: 'alpha', builder: b, reviewer: 'r1', cards: [x1, x2], by: 'B (alpha)' })).lane
-      await run(() => tasks.updateTask(x1, { column: 'doing', agent: b }, user))
+    /** A lane on builder `b` of `titles`, its first card Active (started by its builder), its builder idle. */
+    async function inFlight(b: string, titles: string[]) {
+      const cards: number[] = []
+      for (const t of titles) cards.push(await card(t, b))
+      const lane = (await lanes.startLane(w, { project: 'alpha', builder: b, reviewer: 'r1', cards, by: 'B (alpha)' })).lane
+      await run(() => tasks.updateTask(cards[0], { column: 'doing', agent: b }, user))
       const st = builder('ready', b)
-      return { x1, x2, lane, st }
+      return { cards, lane, st }
     }
-
-    it('puts the card in flight back and Hive starts the new first card once its builder is free; the reply and the builder say so', async () => {
-      const { x1, x2, lane } = await inFlight('b9')
-      const r = await lanes.startLane(w, { project: 'alpha', builder: 'b9', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })
-      expect(r.note).toContain('Applied now: ')
-      expect(r.note).toContain(`${x1} is back in Todo`)
-      expect(r.note).toContain(`${x2} starts next, once B9's turn is over and its slot is ready`)
-      expect(await columnOf(x1)).toBe('todo')
-      expect(r.lane.cards.map((c) => c.number)).toEqual([x2, x1])
-      expect(r.lane.startNext).toBe(x2)
-      await checkLaneStarts(w)
-      expect(await columnOf(x2)).toBe('doing')
-      expect((await lanes.getLane(w, lane.id)).startNext).toBeUndefined()
-    })
-
-    it("refuses while its builder is in a turn or waits on a watch of other work, changing nothing; a watch on that card alone doesn't stop it", async () => {
-      const { x1, x2, st } = await inFlight('d1')
-      st.status = 'working'
-      await expect(lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })).rejects.toThrow(/D1 is working: a reorder applied now never puts its card back under it/)
-      const live = s.live.get(`${p.toLowerCase()}#d1`) as { state: Record<string, unknown> }
-      st.status = 'watching'
-      live.state.watch = { cards: [x2], changes: ['column'] }
-      await expect(lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })).rejects.toThrow(/waiting on a watch of other work/)
-      expect(await columnOf(x1)).toBe('doing')
-      expect((await lanes.laneOf(w, 'alpha', 'd1'))!.cards.map((c) => c.number)).toEqual([x1, x2])
-      // Watching only the card it puts back: that wait is obsolete, so the reorder goes ahead.
-      live.state.watch = { cards: [x1], changes: ['column'] }
-      const r = await lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })
-      expect(r.note).toMatch(/^Applied now/)
-      expect(await columnOf(x1)).toBe('todo')
-    })
-
-    it("a newer list saved just after the reorder's own write stays: the reorder never writes its list again (HR1's round 1)", async () => {
-      const [one, two, three] = [await card('Z one', 'd3'), await card('Z two', 'd3'), await card('Z three', 'd3')]
-      const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'd3', reviewer: 'r1', cards: [one, two, three], by: 'B (alpha)' })).lane
-      await run(() => tasks.updateTask(one, { column: 'doing', agent: 'd3' }, user))
-      builder('ready', 'd3')
+    const runningOf = async (b: string) => (await lanes.listLanes(w)).filter((l) => l.builder.id === b && (l.state === 'active' || l.state === 'paused'))
+    /** After the put back's own write, `then` runs (another decision on the lane), once: the seam between the two steps. */
+    async function afterPutBack(then: () => Promise<void>) {
       const { Workflow } = await import('../src/main/workflow/runtime')
-      const original = Workflow.prototype.reorderLaneNow
-      let newer = false
-      const spy = vi.spyOn(Workflow.prototype, 'reorderLaneNow').mockImplementation(async function (this: InstanceType<typeof Workflow>, id, cards, o) {
-        const reply = await original.call(this, id, cards, o)
-        // Its write committed: another change of the lane's list lands before the start's own edit goes on.
-        if (!newer && 'ok' in reply && reply.ok) {
-          newer = true
-          await lanes.startLane(w, { project: 'alpha', builder: 'd3', reviewer: 'r1', cards: [three, one, two], by: 'a newer change' })
-        }
-        return reply
-      })
-      try {
-        const r = await lanes.startLane(w, { project: 'alpha', builder: 'd3', reviewer: 'r1', cards: [two, one, three], by: 'the user', applyNow: true })
-        expect(newer).toBe(true)
-        expect(r.note).toContain('Applied now: ')
-        const now = await lanes.getLane(w, lane.id)
-        expect(now.cards.map((c) => c.number)).toEqual([three, one, two])
-        // The newer list dropped the mark the reorder set, as any list change does.
-        expect(now.startNext).toBeUndefined()
-      } finally {
-        spy.mockRestore()
-      }
-    })
-
-    /** After the reorder's own write commits, `then` runs (another decision on the lane), once. */
-    async function afterCommit(then: () => Promise<void>) {
-      const { Workflow } = await import('../src/main/workflow/runtime')
-      const original = Workflow.prototype.reorderLaneNow
+      const original = Workflow.prototype.putBack
       let ran = false
-      const spy = vi.spyOn(Workflow.prototype, 'reorderLaneNow').mockImplementation(async function (this: InstanceType<typeof Workflow>, id, cards, o) {
-        const reply = await original.call(this, id, cards, o)
+      const spy = vi.spyOn(Workflow.prototype, 'putBack').mockImplementation(async function (this: InstanceType<typeof Workflow>, ref, actor, args) {
+        const reply = await original.call(this, ref, actor, args)
         if (!ran && 'ok' in reply && reply.ok) {
           ran = true
           await then()
@@ -295,86 +235,74 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
       return { ran: () => ran, restore: () => spy.mockRestore() }
     }
 
-    it("a lane ended or replaced just after the reorder's own write stays as that decision left it: never started again (HR1's round 2)", async () => {
-      // Ended: no running lane afterwards.
-      const [a1, a2] = [await card('E one', 'd5'), await card('E two', 'd5')]
-      const ended = (await lanes.startLane(w, { project: 'alpha', builder: 'd5', reviewer: 'r1', cards: [a1, a2], by: 'B (alpha)' })).lane
-      await run(() => tasks.updateTask(a1, { column: 'doing', agent: 'd5' }, user))
-      builder('ready', 'd5')
-      const end = await afterCommit(async () => {
+    it('puts the card in flight back (its line kept) and applies the new order at once; its builder is told', async () => {
+      const { cards: [x1, x2], lane } = await inFlight('b9', ['X one', 'X two'])
+      const r = await lanes.startLane(w, { project: 'alpha', builder: 'b9', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })
+      expect(r.note).toContain('Applied now: ')
+      expect(r.note).toContain('is back in Todo')
+      expect(await columnOf(x1)).toBe('todo')
+      expect(r.lane.id).toBe(lane.id)
+      expect(r.lane.cards.map((c) => c.number)).toEqual([x2, x1])
+      expect(r.lane.queued).toBeNull()
+      // Told in its inbox (a rebrief), as the doorbell typed into it says.
+      expect(pty.typed.join('')).toContain('New in your inbox')
+    })
+
+    it('refuses while its builder is in a turn, or its card is in Review, changing nothing', async () => {
+      const { cards: [x1, x2], st } = await inFlight('d1', ['W one', 'W two'])
+      st.status = 'working'
+      await expect(lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })).rejects.toThrow(/D1 is working: a reorder applied now never puts its card back under it/)
+      expect(await columnOf(x1)).toBe('doing')
+      expect((await lanes.laneOf(w, 'alpha', 'd1'))!.cards.map((c) => c.number)).toEqual([x1, x2])
+    })
+
+    it('with its card in flight still first, it changes nothing: the list is queued behind that card as ever', async () => {
+      const { cards: [x1, x2, x3] } = await inFlight('d2', ['Y one', 'Y two', 'Y three'])
+      const r = await lanes.startLane(w, { project: 'alpha', builder: 'd2', reviewer: 'r1', cards: [x1, x3, x2], by: 'the user', applyNow: true })
+      expect(r.note ?? '').not.toContain('Applied now')
+      expect(r.lane.queued).toEqual([x1, x3, x2])
+      expect(await columnOf(x1)).toBe('doing')
+    })
+
+    it("a lane ended, replaced or changed between the put back and the edit: the edit is refused, the newer decision kept, nothing resumed or recreated (Darren's decision)", async () => {
+      // Ended (abandoned) in between: no lane runs for its builder afterwards; the put back stays, and says so.
+      const { cards: [a1, a2], lane: ended } = await inFlight('d3', ['E one', 'E two'])
+      const end = await afterPutBack(async () => {
         await lanes.endLane(w, ended.id, { abandoned: true })
       })
       try {
-        await lanes.startLane(w, { project: 'alpha', builder: 'd5', reviewer: 'r1', cards: [a2, a1], by: 'the user', applyNow: true })
+        await expect(lanes.startLane(w, { project: 'alpha', builder: 'd3', reviewer: 'r1', cards: [a2, a1], by: 'the user', applyNow: true })).rejects.toThrow(/was put back in Todo .*but the lane was ended meanwhile: its list wasn't changed and nothing was started/)
         expect(end.ran()).toBe(true)
-        expect((await lanes.listLanes(w)).filter((l) => l.builder.id === 'd5' && (l.state === 'active' || l.state === 'paused'))).toEqual([])
+        expect(await runningOf('d3')).toEqual([])
+        expect(await columnOf(a1)).toBe('todo')
       } finally {
         end.restore()
       }
-      // Replaced: the newer lane of the same builder keeps its cards, and no other is started.
-      const [b1, b2, b3] = [await card('R one', 'd6'), await card('R two', 'd6'), await card('R three', 'd6')]
-      const old = (await lanes.startLane(w, { project: 'alpha', builder: 'd6', reviewer: 'r1', cards: [b1, b2], by: 'B (alpha)' })).lane
-      await run(() => tasks.updateTask(b1, { column: 'doing', agent: 'd6' }, user))
-      builder('ready', 'd6')
+      // Replaced in between by a newer lane of the same builder: that lane keeps its cards, and is the only one running.
+      const { cards: [b1, b2], lane: old } = await inFlight('d4', ['R one', 'R two'])
+      const b3 = await card('R three', 'd4')
       let newer: string | null = null
-      const replace = await afterCommit(async () => {
+      const replace = await afterPutBack(async () => {
         await lanes.endLane(w, old.id, { abandoned: true })
-        newer = (await lanes.startLane(w, { project: 'alpha', builder: 'd6', reviewer: 'r1', cards: [b3], by: 'a newer start' })).lane.id
+        newer = (await lanes.startLane(w, { project: 'alpha', builder: 'd4', reviewer: 'r1', cards: [b3], by: 'a newer start' })).lane.id
       })
       try {
-        await lanes.startLane(w, { project: 'alpha', builder: 'd6', reviewer: 'r1', cards: [b2, b1], by: 'the user', applyNow: true })
-        const running = (await lanes.listLanes(w)).filter((l) => l.builder.id === 'd6' && (l.state === 'active' || l.state === 'paused'))
-        expect(running.map((l) => [l.id, l.cards.map((c) => c.number)])).toEqual([[newer, [b3]]])
+        await expect(lanes.startLane(w, { project: 'alpha', builder: 'd4', reviewer: 'r1', cards: [b2, b1], by: 'the user', applyNow: true })).rejects.toThrow(/the lane was ended meanwhile/)
+        expect((await runningOf('d4')).map((l) => [l.id, l.cards.map((c) => c.number)])).toEqual([[newer, [b3]]])
       } finally {
         replace.restore()
       }
-    })
-
-    it("a watch of other work begun as the reorder is written refuses it there, nothing moved (HR1's round 1)", async () => {
-      const [one, two] = [await card('W one', 'd4'), await card('W two', 'd4')]
-      const other = await card('W other', 'd4')
-      const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'd4', reviewer: 'r1', cards: [one, two], by: 'B (alpha)' })).lane
-      await run(() => tasks.updateTask(one, { column: 'doing', agent: 'd4' }, user))
-      const st = builder('ready', 'd4')
-      const { Workflow } = await import('../src/main/workflow/runtime')
-      const original = Workflow.prototype.reorderLaneNow
-      const spy = vi.spyOn(Workflow.prototype, 'reorderLaneNow').mockImplementation(async function (this: InstanceType<typeof Workflow>, id, cards, o) {
-        const cfg = (this as unknown as { cfg: { hooks?: Record<string, unknown> } }).cfg
-        const was = cfg.hooks
-        cfg.hooks = {
-          ...was,
-          beforeWrite: async (move: string) => {
-            if (move !== 'reorder') return
-            st.status = 'watching'
-            ;(s.live.get(`${p.toLowerCase()}#d4`) as { state: Record<string, unknown> }).state.watch = { cards: [other], changes: ['column'] }
-          }
-        }
-        try {
-          return await original.call(this, id, cards, o)
-        } finally {
-          cfg.hooks = was
-        }
+      // Its list changed in between: refused, the newer list kept.
+      const { cards: [c1, c2, c3], lane: changed } = await inFlight('d5', ['C one', 'C two', 'C three'])
+      const change = await afterPutBack(async () => {
+        await lanes.startLane(w, { project: 'alpha', builder: 'd5', reviewer: 'r1', cards: [c3, c1, c2], by: 'a newer change' })
       })
       try {
-        await expect(lanes.startLane(w, { project: 'alpha', builder: 'd4', reviewer: 'r1', cards: [two, one], by: 'the user', applyNow: true })).rejects.toThrow(/waiting on a watch of other work/)
-        expect(await columnOf(one)).toBe('doing')
-        const now = await lanes.getLane(w, lane.id)
-        expect(now.cards.map((c) => c.number)).toEqual([one, two])
-        expect(now.startNext).toBeUndefined()
+        await expect(lanes.startLane(w, { project: 'alpha', builder: 'd5', reviewer: 'r1', cards: [c2, c1, c3], by: 'the user', applyNow: true })).rejects.toThrow(/the lane's list changed meanwhile: this list wasn't applied/)
+        expect((await lanes.getLane(w, changed.id)).cards.map((c) => c.number)).toEqual([c3, c1, c2])
       } finally {
-        spy.mockRestore()
+        change.restore()
       }
-    })
-
-    it('with its card in flight still first, the list applies at once with nothing put back', async () => {
-      const [x1, x2, x3] = [await card('Y one', 'd2'), await card('Y two', 'd2'), await card('Y three', 'd2')]
-      await lanes.startLane(w, { project: 'alpha', builder: 'd2', reviewer: 'r1', cards: [x1, x2, x3], by: 'B (alpha)' })
-      await run(() => tasks.updateTask(x1, { column: 'doing', agent: 'd2' }, user))
-      builder('ready', 'd2')
-      const r = await lanes.startLane(w, { project: 'alpha', builder: 'd2', reviewer: 'r1', cards: [x1, x3, x2], by: 'the user', applyNow: true })
-      expect(r.lane.cards.map((c) => c.number)).toEqual([x1, x3, x2])
-      expect(r.lane.queued).toBeNull()
-      expect(await columnOf(x1)).toBe('doing')
     })
   })
 })

@@ -452,7 +452,7 @@
   "board.laneStart.addCard": "Agregar una tarjeta de Pendiente…",
   "board.laneStart.agentState": "{agent} ({status})",
   "board.laneStart.applyNow": "Aplicar ahora",
-  "board.laneStart.applyNowHint": "El carril de {builder} está trabajando en {card}: esta lista se aplica cuando {card} esté en Hecho. Aplicar ahora devuelve {card} a Pendiente (su trabajo queda en su rama), y {next, select, none {el carril no tiene nada más que iniciar} other {{next} se inicia cuando termine el turno de {builder} y su slot esté listo}}.",
+  "board.laneStart.applyNowHint": "El carril de {builder} está trabajando en {card}: esta lista se aplica cuando {card} esté en Hecho. Aplicar ahora devuelve primero {card} a Pendiente (su trabajo queda en su rama), para que el nuevo orden se aplique al momento, y se lo dice a {builder}.",
   "board.laneStart.applyNowNot": "El carril de {builder} está trabajando en {card}, que está en {column, select, review {Revisión} other {Aprobado}}: esta lista se aplica cuando esté en Hecho. No se puede devolver ahora sin perder {column, select, review {su revisión} other {su aprobación y su fusión}}.",
   "board.laneStart.builder": "Autor",
   "board.laneStart.busyNow": "{agents} {n, plural, one {está ocupado} many {están ocupados} other {están ocupados}} ahora: Esperar e iniciar espera a que {n, plural, one {quede libre} many {queden libres} other {queden libres}} y luego inicia el carril.",

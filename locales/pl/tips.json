@@ -246,7 +246,7 @@
   "tips.isolatedChecks.title": "Sprawdzenie, którego nikt nie zepsuje",
   "tips.keepAwake.text": "Gdy agent pracuje, Hive nie pozwala Windows przejść w uśpienie (ekran nadal może się zablokować), a pozwala, gdy agenci skończą. Kiedy – wybierzesz w Ustawienia → Ogólne.",
   "tips.keepAwake.title": "Agenci pracują, komputer nie zasypia",
-  "tips.laneApplyNow.text": "W oknie Uruchom tor dla wykonawcy toru opcja Zastosuj teraz od razu zmienia kolejność: karta w toku wraca do Do zrobienia, a jej praca zostaje na jej gałęzi, i nowa pierwsza karta zaczyna się, gdy tura wykonawcy się skończy.",
+  "tips.laneApplyNow.text": "W oknie Uruchom tor dla wykonawcy toru opcja Zastosuj teraz od razu zmienia kolejność: karta w toku wraca do Do zrobienia, a jej praca zostaje na jej gałęzi, i wykonawca jest o tym informowany.",
   "tips.laneApplyNow.title": "Przestaw działający tor od razu",
   "tips.laneBranchSquash.text": "Po scaleniu karty agenta jako squash Hive aktualizuje jego gałąź przed następną kartą, więc każda recenzja pokazuje tylko pracę tej karty. O to, czego nie może zrobić bezpiecznie, pyta w sekcji Dla Ciebie; Ustawienia → Zaawansowane sprawiają, że pyta za każdym razem.",
   "tips.laneBranchSquash.title": "Gałąź agenta aktualna między kartami",

@@ -452,7 +452,7 @@
   "board.laneStart.addCard": "从待办添加卡片…",
   "board.laneStart.agentState": "{agent}（{status}）",
   "board.laneStart.applyNow": "立即应用",
-  "board.laneStart.applyNowHint": "{builder} 的通道正在处理 {card}：此列表会在 {card} 完成后生效。“立即应用”会把 {card} 放回待办（其工作保留在它的分支上），并且{next, select, none {通道没有可再开始的卡片} other {在 {builder} 的当前轮次结束且其槽位就绪后开始 {next}}}。",
+  "board.laneStart.applyNowHint": "{builder} 的通道正在处理 {card}：此列表会在 {card} 完成后生效。“立即应用”会先把 {card} 放回待办（其工作保留在它的分支上），使新顺序立即生效，并告知 {builder}。",
   "board.laneStart.applyNowNot": "{builder} 的通道正在处理 {card}，它已在{column, select, review {“评审”} other {“已批准”}}中：此列表会在它完成后生效。现在放回会丢失它的{column, select, review {评审} other {批准和合并}}，因此无法放回。",
   "board.laneStart.builder": "构建者",
   "board.laneStart.busyNow": "{agents} 目前正忙：“等待并启动”会等到{n, plural, =1 {它} other {它们}}空闲后再启动通道。",

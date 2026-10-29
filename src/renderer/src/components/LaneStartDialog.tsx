@@ -75,7 +75,7 @@ const M = {
   notStarted: msg({ id: 'board.laneStart.notStarted', defaultMessage: "{agent} didn't start", description: "A toast's title: the lane was recorded, but one of its agents ({agent}) couldn't be started. The reason follows." }),
   notStartedText: msg({ id: 'board.laneStart.notStartedText', defaultMessage: '{why} The lane is recorded: start {agent} yourself, or end the lane from its row in the Progress panel.', description: "The text of the toast when a lane's agent ({agent}) didn't start: why ({why}, a sentence), and what the user can do." }),
   applyNow: msg({ id: 'board.laneStart.applyNow', defaultMessage: 'Apply now', description: "A checkbox of the Start Lane dialog (HI-1995), off by default, shown when the builder's running lane has a card being worked: the new list applies at once instead of after that card is Done." }),
-  applyNowHint: msg({ id: 'board.laneStart.applyNowHint', defaultMessage: "{builder}'s lane is working on {card}: this list applies once {card} is Done. Apply now puts {card} back in Todo (its work stays on its branch), and {next, select, none {the lane has nothing left to start} other {{next} starts once {builder}'s turn is over and its slot is ready}}.", description: "Under the Apply now checkbox of the Start Lane dialog (HI-1995): {builder} (an agent's name) has a running lane whose card {card} (its key) is in progress; {next} is the key of the card that would start next, or none. A slot is a folder Hive lends to cards. Todo is a board column." }),
+  applyNowHint: msg({ id: 'board.laneStart.applyNowHint', defaultMessage: "{builder}'s lane is working on {card}: this list applies once {card} is Done. Apply now puts {card} back in Todo first (its work stays on its branch), so the new order applies at once, and tells {builder}.", description: "Under the Apply now checkbox of the Start Lane dialog (HI-1995): {builder} (an agent's name) has a running lane whose card {card} (its key) is in progress. Todo is a board column." }),
   applyNowNot: msg({ id: 'board.laneStart.applyNowNot', defaultMessage: "{builder}'s lane is working on {card}, which is in {column, select, review {Review} other {Approved}}: this list applies once it is Done. It can't be put back now without losing its {column, select, review {review} other {approval and merge}}.", description: "In the Start Lane dialog (HI-1995), with Apply now unavailable: the builder's ({builder}) lane card {card} is already in the Review or Approved column (select; translate each)." }),
   show: msg({ id: 'board.laneStart.show', defaultMessage: 'Show', description: 'A button on the toast after a lane started: shows its builder.' })
 }
@@ -146,7 +146,6 @@ export function LaneStartDialog() {
   // that card is Done unless applied now.
   const running = project ? (lanes ?? []).find((l) => (l.state === 'active' || l.state === 'paused') && l.project.toLowerCase() === project.name.toLowerCase() && l.builder.id === builder) : undefined
   const flying = running?.cards.find((c) => !c.elsewhere && (c.column === 'doing' || c.column === 'review' || c.column === 'passed'))
-  const nextAfter = flying ? cards.find((n) => n !== flying.number && tasks.some((c) => c.number === n && c.column !== 'done')) : undefined
   const keyOf = (n: number): string => {
     const c = tasks.find((x) => x.number === n)
     return c ? cardLabel(c) : `#${n}`
@@ -307,7 +306,7 @@ export function LaneStartDialog() {
                 <input type="checkbox" checked={applyNow} disabled={waiting} onChange={(e) => setApplyNow(e.target.checked)} /> {tr(M.applyNow)}
               </label>
             )}
-            <p className="faint">{canApplyNow ? tr(M.applyNowHint, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number), next: nextAfter !== undefined ? keyOf(nextAfter) : 'none' }) : tr(M.applyNowNot, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number), column: flying.column === 'review' ? 'review' : 'passed' })}</p>
+            <p className="faint">{canApplyNow ? tr(M.applyNowHint, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number) }) : tr(M.applyNowNot, { builder: agentOf(builder)?.name ?? builder, card: keyOf(flying.number), column: flying.column === 'review' ? 'review' : 'passed' })}</p>
           </div>
         )}
         {busyNow.length > 0 && <p className="lane-start-busy">{waiting ? tr(M.waiting, { agents: names }) : tr(M.busy, { agents: names, n: busyNow.length })}</p>}

@@ -246,7 +246,7 @@
   "tips.isolatedChecks.title": "Ein Check, den niemand verderben kann",
   "tips.keepAwake.text": "Während ein Agent arbeitet, verhindert Hive den Ruhezustand von Windows (der Bildschirm kann trotzdem sperren) und erlaubt ihn wieder, sobald alle fertig sind. Wann, wählst du unter Einstellungen → Allgemein.",
   "tips.keepAwake.title": "Agenten arbeiten lassen, der PC bleibt wach",
-  "tips.laneApplyNow.text": "In „Lane starten“ für den Bearbeiter einer Lane ändert „Jetzt anwenden“ die Reihenfolge sofort: Die Karte in Arbeit geht zurück nach „Offen“, ihre Arbeit bleibt auf ihrem Branch, und die neue erste Karte startet, sobald der Durchgang des Bearbeiters vorbei ist.",
+  "tips.laneApplyNow.text": "In „Lane starten“ für den Bearbeiter einer Lane ändert „Jetzt anwenden“ die Reihenfolge sofort: Die Karte in Arbeit geht zurück nach „Offen“, ihre Arbeit bleibt auf ihrem Branch, und der Bearbeiter wird informiert.",
   "tips.laneApplyNow.title": "Eine laufende Lane jetzt umsortieren",
   "tips.laneBranchSquash.text": "Nachdem die Karte eines Agenten per Squash gemergt wurde, bringt Hive seinen Branch vor der nächsten Karte auf den neuesten Stand, sodass jedes Review nur die Arbeit dieser Karte zeigt. Was es nicht sicher tun kann, fragt es unter „Für dich“; Einstellungen → Erweitert lässt es jedes Mal fragen.",
   "tips.laneBranchSquash.title": "Der Branch eines Agenten bleibt zwischen Karten aktuell",

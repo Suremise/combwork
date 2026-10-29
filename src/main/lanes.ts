@@ -734,7 +734,16 @@ const IN_A_TURN: Readonly<Record<string, string>> = { working: 'is working', sta
  * alone is ended once it is done (the reorder tells the builder instead). Null when there's nothing to apply now (no
  * card in flight, or it stays first): the start's own edit applies the list. Else what it did, for the reply.
  */
-async function reorderNow(ws: WorkspaceService, s: StartLane, builder: LaneAgent): Promise<{ lane: string; note: string | null } | null> {
+/**
+ * A changed list applied now (HI-1995, `applyNow`; Darren's decision of 29 Oct: two steps Hive already has): when the
+ * builder's own card in flight is no longer the new list's first own open card, it is put back first, as `hive_put_back`
+ * does (the runtime's put back, through the card's intent path: to Todo, its line and work kept); the start's own edit
+ * then applies the list, at once now that no card of the lane is in flight (bound to this lane: one ended or changed in
+ * between is refused there, nothing resumed or recreated). Refused here (409, nothing changed) while that card is in
+ * Review, Approved or merging, its builder is in a turn, or its folder has changes not committed. Null: nothing to put
+ * back (no card in flight, or it stays first): the edit runs as any other.
+ */
+async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: LaneAgent): Promise<{ lane: string; cards: number[]; pending: number[] | null; putBack: string; line: string | null } | null> {
   if (!ws.path) return null
   const projectPath = join(ws.path, s.project)
   const was = (await read(ws)).find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
@@ -742,62 +751,46 @@ async function reorderNow(ws: WorkspaceService, s: StartLane, builder: LaneAgent
   const v = (await views(ws, [was]))[0]
   const flying = v.cards.find((c) => ownOpen(c) && (c.column === 'doing' || c.column === 'review' || c.column === 'passed'))
   if (!flying) return null
-  const { sessions } = await import('./sessions')
-  // A watch on the card put back alone: the reorder makes it obsolete (its wake tells the builder instead).
-  const onlyIt = (w: { cards?: readonly number[]; lanes?: readonly string[]; agents?: readonly unknown[] } | undefined): boolean => !!w && !w.lanes?.length && !w.agents?.length && !!w.cards?.length && w.cards.every((n) => n === flying.number)
-  /**
-   * Why its card can't be put back under the builder now, or null: in a turn (working, starting, waiting for the user,
-   * background tasks), being started, or waiting on a watch of other work. Asked before the write and in it (`free`).
-   */
-  const unavailable = (): string | null => {
-    const st = sessions.liveFor(projectPath, builder.id)
-    if (!st) return sessions.pendingStart(projectPath, builder.id) || sessions.startingFor(projectPath, builder.id) ? `${builder.name} is starting: a reorder applied now never puts its card back under it. Try again once it is idle.` : null // i18n-ignore: hive_lane's refusal (agents)
-    if (IN_A_TURN[st.status]) return `${builder.name} ${IN_A_TURN[st.status]}: a reorder applied now never puts its card back under it. Ask it to finish and end its turn, then reorder again.` // i18n-ignore: hive_lane's refusal (agents)
-    if (st.status === 'watching' && !onlyIt(st.watch)) return `${builder.name} is waiting on a watch of other work: its next card couldn't be given to it until that wait ends. Let it finish (or cancel its watch), then reorder again.` // i18n-ignore: hive_lane's refusal (agents)
-    return null
-  }
-  const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
-  if (!wf) return null
-  const { runIntent, HIVE_LANE_START } = await import('./tasks')
   // The new first own open card, as the board has it now: whether the card in flight stays first.
   const cards = await cardsNow(ws, s.cards)
   const first = s.cards.find((n) => {
     const c = cards.get(n)
     return !!c && !c.archived && c.column !== 'done' && (!c.agent || c.agent === builder.id)
   })
-  const reorder = (free: () => string | null) => runIntent(wf, flying.number, HIVE_LANE_START, (w) => w.reorderLaneNow(was.id, s.cards, { by: s.by, free }))
-  const refused = (r: unknown): r is { refused: true; message: string } => !!r && typeof r === 'object' && (r as { refused?: unknown }).refused === true
-  if (first === flying.number) {
-    const { reply } = await reorder(() => null)
-    if (refused(reply)) throw new LaneError(409, reply.message)
-    return { lane: was.id, note: null }
-  }
-  const label = (n: number): string => cards.get(n)?.key ?? `#${n}`
-  if (flying.column !== 'doing') throw new LaneError(409, `${label(flying.number)} is in ${flying.column === 'review' ? 'Review' : 'Approved or merging'}: putting it back would lose its review or merge. Change the order without applyNow (it applies once ${label(flying.number)} is Done), or wait.`) // i18n-ignore: hive_lane's refusal (agents)
-  const why = unavailable()
-  if (why) throw new LaneError(409, why)
-  const card = wf.store.card(flying.number)
-  const folder = wf.state(card).started?.folder
+  if (first === flying.number) return null
+  const key = cards.get(flying.number)?.key ?? `#${flying.number}`
+  if (flying.column !== 'doing') throw new LaneError(409, `${key} is in ${flying.column === 'review' ? 'Review' : 'Approved or merging'}: putting it back would lose its review or merge. Change the order without applyNow (it applies once ${key} is Done), or wait.`) // i18n-ignore: hive_lane's refusal (agents)
+  const { sessions } = await import('./sessions')
+  const st = sessions.liveFor(projectPath, builder.id)
+  if (st && IN_A_TURN[st.status]) throw new LaneError(409, `${builder.name} ${IN_A_TURN[st.status]}: a reorder applied now never puts its card back under it. Ask it to finish and end its turn, then reorder again.`) // i18n-ignore: hive_lane's refusal (agents)
+  const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
+  if (!wf) return null
+  const state = wf.state(wf.store.card(flying.number))
+  const folder = state.started?.folder
   if (folder && folder !== 'project') {
     const G = await import('./platform/git')
     const d = await G.dirty(folder)
-    if (!Array.isArray(d) || d.length) throw new LaneError(409, `${label(flying.number)}'s folder has changes that aren't committed: commit them first (or ask ${builder.name} to), then reorder again, so its work stays on its branch.`) // i18n-ignore: hive_lane's refusal (agents)
+    if (!Array.isArray(d) || d.length) throw new LaneError(409, `${key}'s folder has changes that aren't committed: commit them first (or ask ${builder.name} to), then reorder again, so its work stays on its branch.`) // i18n-ignore: hive_lane's refusal (agents)
   }
-  let r: Awaited<ReturnType<typeof reorder>>
+  const { runIntent, HIVE_LANE_START } = await import('./tasks')
+  const { reply } = await runIntent(wf, flying.number, HIVE_LANE_START, (w) => w.putBack(`#${flying.number}`, 'hive', { why: `Put back by a lane reorder applied now (${s.by})` })) // i18n-ignore: a fact's reason, agent-facing English
+  const r = reply as { ok?: boolean; refused?: boolean; message?: string }
+  if (r.refused) throw new LaneError(409, r.message ?? `${key} couldn't be put back`) // i18n-ignore: hive_lane's refusal (agents)
+  log.info(`Lane ${was.id}: #${flying.number} put back by a reorder applied now (${userText(s.by)})`)
+  return { lane: was.id, cards: [...was.cards], pending: was.pending ? [...was.pending] : null, putBack: key, line: state.started?.line ?? null }
+}
+
+/** A lane's builder told of a reorder applied now (HI-1995): the card put back, the lane's cards now. */
+async function tellReordered(ws: WorkspaceService, l: LaneRecord, put: { putBack: string; line: string | null }, by: string): Promise<void> {
+  if (!ws.path) return
+  const projectPath = join(ws.path, l.project)
+  const body = withCardNames(ws, () => `Your lane was reordered now by ${by}: ${put.putBack} is back in Todo (its work stays on ${put.line ?? 'its branch'}): stop working on it. Its cards are now ${l.cards.map(cardRef).join(', ')}. hive_lane next names your next card.`) // i18n-ignore: an agent's message (English)
   try {
-    r = await reorder(unavailable)
+    await createDelivery(projectPath, { agentId: l.builder.id, agentName: l.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Hive' }, body, source: 'lane', ref: l.id }) // i18n-ignore: the sender's name and the message an agent reads (English)
+    await offerNow(projectPath, l.builder.id)
   } catch (e) {
-    const { LaneBuilderBusy } = await import('./workflow/runtime')
-    if (e instanceof LaneBuilderBusy) throw new LaneError(409, e.message)
-    throw e
+    log.warn(`telling lane ${l.id}'s builder of its reorder`, e)
   }
-  if (refused(r.reply)) throw new LaneError(409, r.reply.message)
-  const done = r.reply as { putBack: string | null; line: string | null; startNext: string | null }
-  // A watch on that card alone ends (its wake tells the builder instead), decided under the watches' lock: never a watch
-  // of other work begun since.
-  await (await import('./watches')).cancelWatch(ws, projectPath, builder.id, (cond) => onlyIt(cond)).catch((e) => log.warn('ending a watch a reorder made obsolete', e))
-  log.info(`Lane ${was.id} reordered now by ${userText(s.by)}: #${flying.number} put back${done.startNext ? `, ${done.startNext} starts next` : ''}`)
-  return { lane: was.id, note: `Applied now: ${done.putBack} is back in Todo (its work stays on ${done.line ?? 'its branch'})${done.startNext ? `; ${done.startNext} starts next, once ${builder.name}'s turn is over and its slot is ready` : ''}.` } // i18n-ignore: hive_lane's reply (agents)
 }
 
 export async function startLane(ws: WorkspaceService, s: StartLane): Promise<LaneChange> {
@@ -815,9 +808,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const prefs = projectPreferences(ws, projectPath, ws.path ? await ws.projectConfig(projectPath).catch(() => null) : null)
   const defaults = { rounds: prefs.loopRounds, waitHours: prefs.loopWaitHours }
   const on = await enforced()
-  // A changed list applied now (HI-1995): its card in flight put back first, in one write; the edit below then applies
-  // the list as it is (between cards), the lane's other fields with it.
-  const applied = s.applyNow && on ? await reorderNow(ws, s, builder) : null
+  // A changed list applied now (HI-1995): its card in flight put back first; the edit below then applies the list at
+  // once (between cards), bound to that lane.
+  const put = s.applyNow && on ? await putBackForReorder(ws, s, builder) : null
   const ruleset = await rulesetNow(ws, s.project)
   const ended: EndedLane[] = []
   let queuedAfter: number | null = null
@@ -827,11 +820,11 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const decide = () => mutate(ws, async (lanes, checks, also) => {
     queuedAfter = null
     ended.length = 0
-    // A reorder applied now (HI-1995) binds this call to the lane it reordered: ended, abandoned or replaced since, it is
-    // left as the newer decision made it, never started again or another lane edited from this older request.
-    const bound = applied ? lanes.find((l) => l.id === applied.lane) : undefined
-    if (applied && !bound) throw new LaneError(409, 'The reorder was applied, but its lane is gone now: hive_lane list shows the lanes.') // i18n-ignore: hive_lane's refusal (agents)
-    if (bound && !running(bound)) return { rec: bound, did: 'updated' as const, replaced: null }
+    // After a put back for a reorder applied now (HI-1995), only the lane it was for, as it was then: ended or changed in
+    // between, refused with why, nothing resumed or recreated (Darren's decision).
+    const bound = put ? lanes.find((l) => l.id === put.lane) : undefined
+    if (put && (!bound || !running(bound))) throw new LaneError(409, `${put.putBack} was put back in Todo (its work stays on its branch), but the lane was ended meanwhile: its list wasn't changed and nothing was started. hive_lane list shows the lanes.`) // i18n-ignore: hive_lane's refusal (agents)
+    if (put && bound && (!sameList(bound.cards, put.cards) || !sameList(bound.pending ?? [], put.pending ?? []))) throw new LaneError(409, `${put.putBack} was put back in Todo (its work stays on its branch), but the lane's list changed meanwhile: this list wasn't applied. hive_lane list shows it now.`) // i18n-ignore: hive_lane's refusal (agents)
     const was = bound ?? lanes.find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
     shared = sharedCards(ws, lanes, s.project, builder.id, s.cards)
     // As it was under this lock, for the Assistant's change (#1282): recorded with the save, in its transaction.
@@ -842,15 +835,8 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     if (was && (was.cards.some((n) => s.cards.includes(n)) || on)) {
       // Hive owns the list (#1270, §16.11.1): a change while a card is in flight is queued for the next card boundary,
       // never refused; between cards it applies now. With rules off, at once, as before.
-      // A list the runtime's reorder applied now (HI-1995) is saved: kept as the lane has it here (a newer list saved
-      // since included), never written again from this request; only the lane's other fields go on.
-      const listDone = applied?.lane === was.id
-      // A card to start next (HI-1995) holds only for the list its reorder applied: another list change drops it.
-      if (!listDone && !sameList(was.cards, s.cards)) delete was.startNext
-      const change = !listDone && on && !sameList(was.cards, s.cards) ? listChange((await views(ws, [was]))[0], was.cards, s.cards) : null
-      if (listDone) {
-        // Nothing of its list here.
-      } else if (change && change.behind !== null) {
+      const change = on && !sameList(was.cards, s.cards) ? listChange((await views(ws, [was]))[0], was.cards, s.cards) : null
+      if (change && change.behind !== null) {
         queuedAfter = change.behind
         was.pending = [...s.cards]
       } else {
@@ -925,7 +911,10 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (r.did === 'started') laneFact(ws, r.rec)
   tellEnded(ws, ended)
   const queued = queuedAfter !== null ? withCardNames(ws, () => `The list change is queued: it applies once ${cardRef(queuedAfter!)} is Done, and you are told then.`) : null // i18n-ignore: hive_lane's reply (agents)
-  const note = [applied?.note, queued, shared].filter(Boolean).join(' ') || undefined
+  // The builder told of a reorder applied now, once its list is saved (HI-1995).
+  if (put) await tellReordered(ws, r.rec, put, s.by)
+  const applied = put ? `Applied now: ${put.putBack} is back in Todo (its work stays on ${put.line ?? 'its branch'}); the lane's cards are now in this order, and ${builder.name} is told.` : null // i18n-ignore: hive_lane's reply (agents)
+  const note = [applied, queued, shared].filter(Boolean).join(' ') || undefined
   return { lane, did: r.did, replaced: replaced ?? null, ...(note ? { note } : {}) }
 }
 

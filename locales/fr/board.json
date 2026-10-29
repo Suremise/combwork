@@ -452,7 +452,7 @@
   "board.laneStart.addCard": "Ajouter une carte depuis À faire…",
   "board.laneStart.agentState": "{agent} ({status})",
   "board.laneStart.applyNow": "Appliquer maintenant",
-  "board.laneStart.applyNowHint": "Le couloir de {builder} travaille sur {card} : cette liste s’applique une fois {card} terminée. Appliquer maintenant remet {card} dans À faire (son travail reste sur sa branche), et {next, select, none {le couloir n’a plus rien à démarrer} other {{next} démarre une fois le tour de {builder} fini et son emplacement prêt}}.",
+  "board.laneStart.applyNowHint": "Le couloir de {builder} travaille sur {card} : cette liste s’applique une fois {card} terminée. Appliquer maintenant remet d’abord {card} dans À faire (son travail reste sur sa branche), pour que le nouvel ordre s’applique tout de suite, et prévient {builder}.",
   "board.laneStart.applyNowNot": "Le couloir de {builder} travaille sur {card}, qui est en {column, select, review {Relecture} other {Validé}} : cette liste s’applique une fois terminée. Elle ne peut pas être remise maintenant sans perdre {column, select, review {sa relecture} other {sa validation et sa fusion}}.",
   "board.laneStart.builder": "Auteur",
   "board.laneStart.busyNow": "{n, plural, one {L’agent {agents} est occupé} many {Les agents {agents} sont occupés} other {Les agents {agents} sont occupés}} en ce moment : Attendre et démarrer attend {n, plural, one {qu’il soit libre} many {qu’ils soient libres} other {qu’ils soient libres}}, puis démarre le couloir.",
