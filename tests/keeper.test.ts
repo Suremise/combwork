@@ -47,6 +47,8 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
   if ($a[0] -eq 'add') { [Console]::Out.WriteLine('added ' + [HiveJobs]::Add($a[1], [int]$a[2])) }
   if ($a[0] -eq 'follow') { [Console]::Out.WriteLine('followed ' + [HiveJobs]::Follow($a[1], [int]$a[2], 0x0001 -bor 0x100000)) }
   if ($a[0] -eq 'failsnap') { [HiveJobs]::FailSnapshotsWhile = $a[1]; [Console]::Out.WriteLine('failsnap set') }
+  if ($a[0] -eq 'failenum') { [HiveJobs]::FailEnumerationWhile = $a[1]; [Console]::Out.WriteLine('failenum set') }
+  if ($a[0] -eq 'held') { [Console]::Out.WriteLine('held ' + $a[1] + ' ' + [HiveJobs]::IsHeld([int]$a[1])) }
 }
 [HiveJobs]::Keep()
 `
@@ -169,15 +171,16 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     expect(k.state('j4')).toMatchObject({ state: 'ended', total: 0 })
   }, 60_000)
 
-  it("while its sweeps can't be sure (a snapshot Windows refuses), an empty job is never \"ended\": it waits, and writes it once they can", async () => {
-    const k = keeper('unsure')
+  for (const seam of ['failsnap', 'failenum'] as const) {
+  it(`while its sweeps can't be sure (${seam === 'failsnap' ? 'a snapshot Windows refuses' : 'an enumeration that stops part way'}), an empty job is never "ended": it waits, and writes it once they can`, async () => {
+    const k = keeper(`unsure-${seam}`)
     const s = sleeper()
-    const fail = join(dir, 'unsure.fail')
+    const fail = join(dir, `unsure-${seam}.fail`)
     writeFileSync(fail, '')
     k.say(`add j6 ${s.pid}`)
     await waitFor(() => expect(k.out).toContain('added ok'))
-    k.say(`failsnap ${fail}`)
-    await waitFor(() => expect(k.out).toContain('failsnap set'))
+    k.say(`${seam} ${fail}`)
+    await waitFor(() => expect(k.out).toContain(`${seam} set`))
     // Its job empties while every sweep fails: an escaped child a failed sweep didn't take could still run.
     s.kill()
     await exited(s)
@@ -191,6 +194,39 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     rmSync(fail)
     await exited(k.proc)
     expect(k.state('j6')).toMatchObject({ state: 'ended', total: 0 })
+  }, 60_000)
+  }
+
+  it("an exited process's identity is kept through every sweep that wasn't sure, let go only after one that was, and only then \"ended\" (HR2's round 2)", async () => {
+    const k = keeper('retain')
+    const s = sleeper()
+    const fail = join(dir, 'retain.fail')
+    writeFileSync(fail, '')
+    k.say(`add j7 ${s.pid}`)
+    await waitFor(() => expect(k.out).toContain('added ok'))
+    // Held from its joining (the port's notice), as what ties any child it left outside the job to it.
+    const asked = async (): Promise<string> => {
+      const n = k.out.length
+      k.say(`held ${s.pid}`)
+      await waitFor(() => expect(k.out.slice(n).some((l) => l.startsWith(`held ${s.pid} `))).toBe(true))
+      return k.out.slice(n).find((l) => l.startsWith(`held ${s.pid} `))!
+    }
+    await waitFor(async () => expect(await asked()).toBe(`held ${s.pid} True`))
+    k.say(`failsnap ${fail}`)
+    await waitFor(() => expect(k.out).toContain('failsnap set'))
+    s.kill()
+    await exited(s)
+    // Its exit's settlement tries, and fails, again and again: the identity stays.
+    const failed = () => (existsSync(`${fail}.failed`) ? readFileSync(`${fail}.failed`, 'utf8').length : 0)
+    const before = failed()
+    await waitFor(() => expect(failed()).toBeGreaterThanOrEqual(before + 4))
+    expect(await asked()).toBe(`held ${s.pid} True`)
+    // Sure again: let go.
+    rmSync(fail)
+    await waitFor(async () => expect(await asked()).toBe(`held ${s.pid} False`))
+    k.say('keep')
+    await exited(k.proc)
+    expect(k.state('j7')).toMatchObject({ state: 'ended', total: 0 })
   }, 60_000)
 
   it('a keeper ended before its job empties leaves "live", never "ended"', async () => {

@@ -203,6 +203,13 @@ public static class HiveJobs {
     try { System.IO.File.AppendAllText(FailSnapshotsWhile + ".failed", "x"); } catch { }
     return true;
   }
+  /** The unit tests: while this file exists, every sweep's enumeration of its snapshot stops after its first entry, failing. */
+  public static string FailEnumerationWhile = null;
+  static bool EnumerationFailsForTests() {
+    if (FailEnumerationWhile == null || !System.IO.File.Exists(FailEnumerationWhile)) return false;
+    try { System.IO.File.AppendAllText(FailEnumerationWhile + ".failed", "x"); } catch { }
+    return true;
+  }
   public static int Sweep() {
     lock (turn) {
       if (jobs.Count == 0) return 0;
@@ -212,10 +219,20 @@ public static class HiveJobs {
       // TH32CS_SNAPPROCESS
       IntPtr snap = SnapshotFailsForTests() ? IntPtr.Zero : CreateToolhelp32Snapshot(2, 0);
       if (snap == IntPtr.Zero || snap == new IntPtr(-1)) { uncertain++; return 0; }
+      // A snapshot read whole, or not used (HR2's round 2): an enumeration that fails, at its first entry or part way
+      // (anything but ERROR_NO_MORE_FILES at its end), would miss the processes after it.
       try {
         var e = new ProcessEntry(); e.size = (uint)Marshal.SizeOf(typeof(ProcessEntry));
-        for (bool more = Process32FirstW(snap, ref e); more; more = Process32NextW(snap, ref e)) if (e.pid != 0) parents[(int)e.pid] = (int)e.parent;
+        if (!Process32FirstW(snap, ref e)) { uncertain++; return 0; }
+        bool cut = EnumerationFailsForTests();
+        for (bool more = true; more; ) {
+          if (e.pid != 0) parents[(int)e.pid] = (int)e.parent;
+          if (cut) { uncertain++; return 0; }
+          more = Process32NextW(snap, ref e);
+        }
+        if (Marshal.GetLastWin32Error() != 18) { uncertain++; return 0; }
       } finally { CloseHandle(snap); }
+      int unsure = uncertain;
       var owner = new Dictionary<int, string>();
       foreach (var j in jobs) {
         int[] listed = ListChecked(j.Key);
@@ -240,10 +257,14 @@ public static class HiveJobs {
           found = true;
         }
       }
-      // Followed processes that have ended: their children were looked at above, while their ids were still held.
+      // Followed processes that have ended: their children were looked at above, while their ids were still held. Only
+      // after a sweep sure of everything (HR2's round 2: one that wasn't may not have found them yet), and never one
+      // whose state can't be read: it stays followed, unknown.
+      if (uncertain != unsure) return n;
       foreach (int pid in new List<int>(followed.Keys)) {
         uint code;
-        if (GetExitCodeProcess(followed[pid].h, out code) && code == 259) continue;
+        if (!GetExitCodeProcess(followed[pid].h, out code)) { uncertain++; continue; }
+        if (code == 259) continue;
         CloseHandle(followed[pid].h);
         followed.Remove(pid);
       }
@@ -510,6 +531,10 @@ public static class HiveJobs {
   }
   /** Exits gathered for the next Settle: each pid with the entry held for it as its exit was read (null: none). */
   static List<KeyValuePair<int, Held>> exits = new List<KeyValuePair<int, Held>>();
+  /** At most this many exits are kept for a sure sweep (Settle); past it, their jobs' ancestry is lost (ancestryLost). */
+  const int MAX_PENDING_EXITS = 4096;
+  /** Jobs whose exited processes were let go before a sure sweep (HI-2055): never "ended" by the keeper. */
+  static HashSet<string> ancestryLost = new HashSet<string>();
   /** When the gathered exits are settled (on clock), ${EXIT_BATCH_MS} ms after the first of them. */
   static readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
   static long due = 0;
@@ -538,8 +563,16 @@ public static class HiveJobs {
    */
   public static void Settle() {
     lock (turn) {
+      // A sweep that wasn't sure keeps what was held for the exits (HR2's round 2): an exited parent's identity is what
+      // ties its escaped children to its job, so it is let go only after a sweep that was; tried again in a moment.
+      int before = uncertain;
+      try { Sweep(); } catch { uncertain++; }
+      if (uncertain != before) {
+        if (exits.Count <= MAX_PENDING_EXITS) { due = clock.ElapsedMilliseconds + ${EXIT_BATCH_MS}; return; }
+        // Kept too long (sweeps unsure for hours): let go, and their jobs can never be told complete by the keeper.
+        foreach (var e in exits) if (e.Value != null) ancestryLost.Add(e.Value.job);
+      }
       try {
-        Sweep();
         foreach (var e in exits) {
           Held h;
           if (e.Value == null || !held.TryGetValue(e.Key, out h) || !ReferenceEquals(h, e.Value) || WaitForSingleObject(h.h, 0) != 0) continue;
@@ -753,7 +786,10 @@ public static class HiveJobs {
         }
         if (m == null) continue;
         if (m.Length == 0) {
-          for (int tries = 0; tries < 3 && !WriteState(id, "ended", m); tries++) System.Threading.Thread.Sleep(200);
+          bool lost;
+          lock (turn) lost = ancestryLost.Contains(id);
+          // Its ancestry let go unsure: never told complete, so no "ended" (its last "live" stays, and its slot held).
+          if (!lost) for (int tries = 0; tries < 3 && !WriteState(id, "ended", m); tries++) System.Threading.Thread.Sleep(200);
           lock (turn) Forget(id);
           mine.Remove(id);
           continue;

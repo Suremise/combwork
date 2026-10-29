@@ -3810,7 +3810,10 @@ Whether a conversation may resume there is its **hold** (none: it may):
     and writes that job's state to the profile's `keeper\keeper-<run>.json`: `live` with its members (id, start time and
     name, never a command line) while it has any, `ended` once it sees it empty (a job it can't read is looked at again,
     never taken for empty, and its membership is taken only after a sweep that was sure of everything: a failed
-    snapshot or listing, or an escaped child whose checks Windows refused, could hide a process), then lets it go; it exits once it holds none, and says `keeping` first, so a quit doesn't
+    snapshot, an enumeration of it that stops part way, a failed listing, or an escaped child whose checks Windows
+    refused, could hide a process; and what ties an escaped child to its job is kept until such a sweep: an exited
+    process's identity and a followed one's are let go only after one, a followed one whose state can't be read never,
+    and past 4096 exits kept the jobs concerned can no longer be told complete), then lets it go; it exits once it holds none, and says `keeping` first, so a quit doesn't
     wait for it. It ends nothing. A quit whose agents kept nothing running leaves none behind.
     - Each tracked run is bound to its helper (`leftovers.json`'s `helpers`, "pid:created") as it is given its job.
       A gone Hive's writer is settled by a state only when it is whole and its own: the run's file, at most 64 KB,
