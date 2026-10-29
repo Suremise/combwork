@@ -105,9 +105,17 @@ const ancestor = (x, y) => {
      * own, and the restart may come after the lane is listed: refused as unknown (401), the token is read again from the
      * agent's latest launch, once it has a new one, and the intent sent again (a few times at most).
      */
-    /** A call to the Agent API with an agent's token: its status and body. */
-    const api = async (method, route, body, token) => {
+    /**
+     * A call to the Agent API with an agent's token: its status and body. Refused as unknown (401) with B1's or R1's token
+     * held: an older launch's (HI-2027), so that agent's latest launch's token is read and the call made once more with it.
+     */
+    const api = async (method, route, body, token, again = true) => {
       const res = await fetch(`http://127.0.0.1:${h.port}${route}`, { method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
+      const who = token === tokens.b1 ? 'b1' : token === tokens.r1 ? 'r1' : null
+      if (res.status === 401 && again && who) {
+        tokens[who] = (await tokenOf(who === 'b1' ? b1.id : r1.id).catch(() => null)) ?? tokens[who]
+        if (tokens[who] !== token) return api(method, route, body, tokens[who], false)
+      }
       return { status: res.status, body: await res.json().catch(() => null) }
     }
     const intent = async (who, n, name, body = {}) => {
@@ -412,6 +420,11 @@ const ancestor = (x, y) => {
       waitHung(async () => {
         const res = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.b1}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ cards: [c7, c6], applyNow: true }) })
         const body = await res.json().catch(() => null)
+        // Refused as unknown: its token is an older launch's (HI-2027): read again from its latest, and tried again.
+        if (res.status === 401) {
+          tokens.b1 = (await tokenOf(b1.id).catch(() => null)) ?? tokens.b1
+          return null
+        }
         return res.status === 409 && /in a turn|is working|is starting|waiting for the user|background tasks/.test(JSON.stringify(body)) ? null : { status: res.status, body }
       })
     const re = await reorderNow()
