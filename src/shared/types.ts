@@ -572,6 +572,12 @@ export interface AppConfig {
   /** Always on Top: the workspaces (lowercased paths) whose window was left pinned. This machine's, never in .hive. */
   alwaysOnTop?: Record<string, true>
   /**
+   * Moved workspaces whose records here by folder (the window's pin, the close command's runs) are still to follow them
+   * (HI-2007): one per old folder, `to` where the workspace is now, kept until nothing is left at `from`, tried at each
+   * open and Repair (workspaceMove.ts carryProfile). `failed`: why the last try left something it could have moved.
+   */
+  profileMoves?: ProfileMove[]
+  /**
    * Antivirus scanning (#316), this machine's: the exclusions Hive added (resolved paths), Defender's list as last read
    * with administrator rights, and per workspace (lowercased path) the last suggestion (its folders, when and how many
    * times; a plain string is #316's form, the folders only) and "Don't ask again".
@@ -795,6 +801,12 @@ export interface WorkspaceConfig {
   assistantConnection?: Partial<Record<ProviderId, string | null>>
   /** Where the workspace was last opened (#146): a different folder now means it was moved, and Repair… is offered. */
   lastPath?: string
+  /**
+   * The folder Hive's profile keeps this workspace's records by (HI-2007: its window's pin, its close command's runs),
+   * set once they have all followed it here. Apart from lastPath, which stays where Repair needs it until Repair is done:
+   * moved again before that, the records are found where they went.
+   */
+  profileAt?: string
   /** The last project rename (#514, `project-names.json`'s number) its hidden and removed projects follow. */
   renamesApplied?: number
   /**
@@ -2307,9 +2319,21 @@ export interface WorkspaceInfo {
 }
 
 /** What moved (#146): the workspace (from its old folder), or only some of its projects. */
+/** A moved workspace's records by folder still to follow it (HI-2007, config.json's `profileMoves`). */
+export interface ProfileMove {
+  from: string
+  to: string
+  failed?: string
+}
+
 export interface WorkspaceMoved {
   /** The workspace's old folder; null when only projects moved (renamed or moved in from elsewhere). */
   from: string | null
+  /**
+   * Old folders whose records by folder (the close command's runs) the last try couldn't all bring here (HI-2007), and
+   * why: Repair tries again. A run still going there isn't one: it follows once it has ended. Absent when there are none.
+   */
+  profile?: { from: string; failed: string }[]
   /** The projects that moved, by name. */
   projects: string[]
   /** Projects that didn't move but have a worktree's sessions or data still to follow it to a new folder (#146). */
@@ -2467,7 +2491,7 @@ export type MoveReportWhat =
   | { kind: 'sessions' }
   | { kind: 'copy'; provider: ProviderId }
   | { kind: 'board'; from: string }
-  | { kind: 'saved' | 'recent' | 'working' | 'defender' }
+  | { kind: 'saved' | 'recent' | 'working' | 'defender' | 'closeRuns' }
 
 /** A step of Repair's report as a table row (#1313): what, where it was and is, and how it went in a few words. */
 export interface MoveReportRow {

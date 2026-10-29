@@ -7,7 +7,7 @@ const store: { cfg: Pick<AppConfig, 'alwaysOnTop'> } = { cfg: {} }
 vi.mock('../src/main/config', () => ({
   config: { get: () => store.cfg, update: (fn: (c: Pick<AppConfig, 'alwaysOnTop'>) => void) => fn(store.cfg) }
 }))
-const { pinFollower, pinnedFor, setPinned } = await import('../src/main/pin')
+const { carryPin, pinFollower, pinnedFor, setPinned } = await import('../src/main/pin')
 
 const fakeWindow = () => {
   let top = false
@@ -79,5 +79,15 @@ describe('Always on Top', () => {
     setPinned(b as never, 'C:\\Two', false)
     expect([a.isAlwaysOnTop(), b.isAlwaysOnTop()]).toEqual([true, false])
     expect([pinnedFor('C:\\One'), pinnedFor('C:\\Two')]).toEqual([true, false])
+  })
+
+  it('a moved workspace takes its pin to its new folder (HI-2007); one never pinned stays unpinned', () => {
+    setPinned(fakeWindow() as never, 'C:\\Old\\Work', true)
+    setPinned(fakeWindow() as never, 'C:\\Other', true)
+    expect(carryPin('c:\\old\\WORK', 'D:\\New\\Work')).toBe(true)
+    expect(store.cfg.alwaysOnTop).toEqual({ 'd:\\new\\work': true, 'c:\\other': true })
+    expect([pinnedFor('D:\\New\\Work'), pinnedFor('C:\\Old\\Work')]).toEqual([true, false])
+    expect(carryPin('C:\\Never', 'D:\\Elsewhere')).toBe(false)
+    expect(pinnedFor('D:\\Elsewhere')).toBe(false)
   })
 })

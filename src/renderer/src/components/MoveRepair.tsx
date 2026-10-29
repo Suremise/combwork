@@ -20,7 +20,7 @@ import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
  * Recent), does it on confirmation and says what it did. Main works it all out (workspaceMove.ts).
  */
 
-const movedKey = (m: WorkspaceMoved): string => `${m.from ?? ''}|${m.projects.join('|')}|${m.pending.join('|')}|${(m.cards ?? []).map((c) => `${c.from}>${c.to}:${c.cards.length}`).join('|')}|${m.branches ?? 0}`
+const movedKey = (m: WorkspaceMoved): string => `${m.from ?? ''}|${m.projects.join('|')}|${m.pending.join('|')}|${(m.cards ?? []).map((c) => `${c.from}>${c.to}:${c.cards.length}`).join('|')}|${m.branches ?? 0}|${(m.profile ?? []).map((p) => p.from).join('|')}`
 
 const M = {
   cards: msg({ id: 'workspace.move.cards', defaultMessage: '{count, plural, one {# card} other {# cards}}', description: "Board items saved under a project's old name: cards (listed with lanes and card watches)." }),
@@ -33,6 +33,7 @@ const M = {
   stillPoint: msg({ id: 'workspace.move.stillPoint', defaultMessage: "Agents' worktrees, sessions and conversations still point to the old folder.", description: 'The banner over a moved workspace or project, after what moved.' }),
   cardsBanner: msg({ id: 'workspace.move.cardsBanner', defaultMessage: '{lines}, which was renamed or moved: the board still lists them under the old name.', description: 'The banner when cards are listed under a project\'s old name ({lines}: "9 cards of hive-website belong to website", several separated by ;).' }),
   branchesBanner: msg({ id: 'workspace.move.branchesBanner', defaultMessage: "{count, plural, one {An agent's branch is still named after an old folder; Repair renames it.} other {# agents' branches are still named after an old folder; Repair renames them.}}", description: "The banner when agents' git branches are named after where the workspace or project was (hive/<workspace>/<project>/<agent>)." }),
+  profileBanner: msg({ id: 'workspace.move.profileBanner', defaultMessage: "Some of Hive's records of this workspace couldn't follow it from its old folder yet.", description: "The banner when the output Hive keeps of the workspace's close command couldn't all be moved from its old folder's records after a move (HI-2007); Repair… tries again." }),
   repair: msg({ id: 'workspace.move.repairButton', defaultMessage: 'Repair…', description: 'The banner over a moved workspace: opens Repair.' }),
   hide: msg({ id: 'workspace.move.hide', defaultMessage: 'Hide for now (Repair Moved Workspace… stays in the command palette)', description: "The banner's close button. Repair Moved Workspace… is the command's name." }),
   undo: msg({ id: 'workspace.move.undo', defaultMessage: 'Undo', description: "Repair's plan: takes back a choice made for a missing worktree." }),
@@ -94,6 +95,7 @@ export function MovedBanner() {
         {what ? <>{what} {tr(M.stillPoint)}</> : null}
         {cards.length > 0 && <>{what ? ' ' : ''}{tr(M.cardsBanner, { lines: cards.map(cardsLine).join('; ') })}</>}
         {!what && !cards.length && !!moved.branches && tr(M.branchesBanner, { count: moved.branches })}
+        {!what && !cards.length && !moved.branches && !!moved.profile?.length && tr(M.profileBanner)}
       </span>
       <button className="btn small primary" onClick={() => set({ moveRepairOpen: true })}>
         {tr(M.repair)}
@@ -129,6 +131,7 @@ const T = {
   keptFiles: msg({ id: 'workspace.repair.keptFiles', defaultMessage: '{count, plural, one {# file kept} other {# files kept}}', description: "Repair's plan, after the Will do column's copy: files already there with other content, never overwritten (the full list in its tooltip)." }),
   keptTip: msg({ id: 'workspace.repair.keptTip', defaultMessage: "{count, plural, one {# file is} other {# files are}} already in the new folder with other content and won't be overwritten: {files}{more, plural, =0 {} other { and # more}}.", description: "Repair's plan: the tooltip of a coding agent's files left as they are ({files}: up to five names)." }),
   unreadableFiles: msg({ id: 'workspace.repair.unreadableFiles', defaultMessage: "{count, plural, one {# can't be read} other {# can't be read}}", description: "Repair's plan, after the Will do column's copy: files that couldn't be read (Repair tries them again; the list in its tooltip)." }),
+  moveRuns: msg({ id: 'workspace.repair.moveRuns', defaultMessage: 'move here (last try: {why})', description: "Repair's plan, the Will do column of the close command's output (HI-2007): the runs Hive keeps are moved from the old folder's records to the new one's; {why} is the system's message from the last try, which failed." }),
   listNew: msg({ id: 'workspace.repair.listNew', defaultMessage: 'list the new folder', description: "Repair's plan, the Will do column of Open Recent: the new folder replaces the old one." }),
   markAgain: msg({ id: 'workspace.repair.markAgain', defaultMessage: 'mark {projects} again', description: "Repair's plan, the Will do column of Working on ({projects}: the projects)." }),
   showFolders: msg({ id: 'workspace.repair.showFolders', defaultMessage: 'Show the folders', description: "Repair's plan: the button that lists a coding agent's folders one by one under its row." }),
@@ -169,6 +172,7 @@ const T = {
   needsAdmin: msg({ id: 'workspace.repair.needsAdmin', defaultMessage: "Defender shows its exclusions only to administrators: these states are what Hive knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.", description: "Repair's plan, under the table: Defender hides its exclusion list without administrator rights." }),
   readingDefender: msg({ id: 'workspace.repair.readingDefender', defaultMessage: "Reading Defender's exclusions…", description: "Repair's plan, under the table, while Hive reads Microsoft Defender's state of the old and new folders." }),
   result: msg({ id: 'workspace.repair.result', defaultMessage: 'Result', description: "Repair's report, a column heading: how each step went (done, a problem and why, or a choice still to make)." }),
+  closeRuns: msg({ id: 'workspace.repair.closeRuns', defaultMessage: "The close command's output", description: "Repair's plan and report, the What column: the output Hive keeps of the workspace's close command (Settings → Workspace → When this workspace closes, run), moved from the old folder's records to the new one's (HI-2007)." }),
   saved: msg({ id: 'workspace.repair.saved', defaultMessage: 'Handovers and kept comparisons', description: "Repair's report, the What column: handovers and Performance → Compare's kept comparisons saved under a project's earlier name." }),
   sentence: msg({ id: 'workspace.repair.sentence', defaultMessage: '{what}{hasWas, select, yes {: was {was}} other {}}{hasNow, select, yes {, now {now}} other {}}; will {does}', description: "Repair's plan, a row read by a screen reader as one sentence: what it is about, where it was and is (full paths), and what Repair will do. Each part comes from the row's columns." })
 }
@@ -378,6 +382,7 @@ function hostRows(h: MoveHostPlan, open: ReadonlySet<string>, toggle: (k: string
 function workspaceRows(plan: MovePlan): ItemRow[] {
   const rows: ItemRow[] = []
   if (plan.recent && plan.from) rows.push(planRow('ws#recent', { what: tr(T.recent), was: { path: plan.from, other: plan.to }, now: { path: plan.to, other: plan.from }, does: tr(T.listNew) }))
+  for (const p of plan.profile ?? []) rows.push(planRow(`ws#closeRuns#${p.from}`, { what: tr(T.closeRuns), was: { path: p.from, other: plan.to }, now: { path: plan.to, other: p.from }, does: tr(T.moveRuns, { why: p.failed }) }))
   if (plan.working.length) rows.push(planRow('ws#working', { what: tr(T.workingOn), does: tr(T.markAgain, { projects: fmt.list(plan.working, 'unit') }) }))
   for (const m of plan.cards ?? [])
     rows.push(planRow(`ws#cards#${m.from}`, { what: tr(T.board, { from: m.from }), does: tr(T.give, { what: savedUnder(m), hasCards: m.cards.length ? 'yes' : 'no', cards: fmt.list(m.cards.map((n) => cardLabelOf(get(), n)), 'unit'), to: m.to }) }))
@@ -437,6 +442,8 @@ function reportWhat(w: MoveReportWhat): string {
       return tr(T.workingOn)
     case 'defender':
       return tr(T.defender)
+    case 'closeRuns':
+      return tr(T.closeRuns)
   }
 }
 
