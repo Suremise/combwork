@@ -3280,17 +3280,15 @@ module.exports.SCENARIOS = [
     },
     prompt: "Coder is building something for me (there's no card for it). Tell me when it's done.",
     fake: 'skill coordinate-agents then hive hive_wait_for_agents {"agents":[{"project":"alpha","agent":"Coder"}],"wake":true}',
-    // Its turn ended with the watch running: watching, which a wait held in the call never shows.
-    during: (c, status) => {
-      if (status === 'watching') c.sawWatching = true
-    },
-    expect: (o, c) => {
+    // Its turn ended with the watch running: watching, which a wait held in the call never shows. Read from every status the
+    // session reported (HI-2022: sampled between looks, a watch that Coder's end cut short was often missed).
+    expect: (o) => {
       const waits = called(o, 'hive_wait_for_agents')
       const watched = waits.some((x) => x.ok && argsOf(x).wake === true)
       return [
         ['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')],
         ['watched Coder with an agent watch (hive_wait_for_agents with wake), which worked', watched, waits.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
-        ['ended its turn watching (status watching), not waiting in the call', !!c.sawWatching],
+        ['ended its turn watching (status watching), not waiting in the call', (o.statuses ?? []).includes('watching'), (o.statuses ?? []).join(' → ')],
         ['no polling: no wait held in the call', !waits.some((x) => argsOf(x).wake !== true && !argsOf(x).cancel), waits.map((x) => x.args).join(' | ')],
         ['woken when Coder finished: its watch has ended', watched && o.status !== 'watching', o.status]
       ]
