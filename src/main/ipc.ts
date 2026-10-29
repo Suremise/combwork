@@ -1391,7 +1391,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)
       const cards = Array.isArray(r.cards) ? r.cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
       if (typeof r.builder !== 'string' || !r.builder) throw hiveError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
-      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null })
+      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}) })
     },
     'lanes:startInfo': (p) => laneStartInfo(currentWorkspace(), workspace.assertProject(p)),
     'costs:cards': (q) => {

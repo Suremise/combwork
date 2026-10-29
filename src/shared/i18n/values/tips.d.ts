@@ -250,6 +250,8 @@ interface HiveMessageValues {
   'tips.isolatedChecks.title': undefined
   'tips.keepAwake.text': undefined
   'tips.keepAwake.title': undefined
+  'tips.laneApplyNow.text': undefined
+  'tips.laneApplyNow.title': undefined
   'tips.laneBranchSquash.text': undefined
   'tips.laneBranchSquash.title': undefined
   'tips.laneGates.text': undefined

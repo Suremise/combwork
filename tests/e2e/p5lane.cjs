@@ -159,6 +159,8 @@ const ancestor = (x, y) => {
         ready: async () => {
           const state = await live(b1.id)
           seen = { status: state?.status, composer: state?.runtime?.composer, pending: await lib.inboxPending(PORT, 'alpha', b1.name, tokens.b1) }
+          // Its inbox unreadable with the token it had: a launch of its since (a lane's start, its card placed in its slot) has its own.
+          if (seen.pending === null && state?.sessionId) tokens.b1 = (await tokenOf(b1.id).catch(() => null)) ?? tokens.b1
           return lib.agentQuiet(PORT, 'alpha', state, tokens.b1)
         },
         strict: true,
@@ -382,6 +384,37 @@ const ancestor = (x, y) => {
     // Each card's own line from the target: after the last, nothing is moved.
     check('…after its last card no line is moved', !(await kinds(c5)).includes('LineMoved'), JSON.stringify(await kinds(c5)))
     await shoot('8-laneB-ended', 'lanes', async () => (await onBoard('Done', c5)) && !!(await laneNow(b?.id))?.state)
+
+    // ===== Lane C (HI-1995): reordered now. Six is started and committed; B1's own reorder with applyNow puts it back
+    // (its work kept on its line) and applies the new order; B1 starts Seven on a line of its own from main without Six's work. Once
+    // Seven is merged, Hive starts Six again, on its own line with its work.
+    const laneC = []
+    for (const title of ['Six', 'Seven']) laneC.push((await inv('tasks:create', { title, project: 'alpha' })).number)
+    const [c6, c7] = laneC
+    const lc = await startLane(laneC)
+    check('lane C is started from the board', !!lc, JSON.stringify(await inv('lanes:list')))
+    await retoken()
+    const s6 = await start(c6)
+    check("Six starts in lane C's slot, on its line", s6.s.status === 200 && !!s6.line, JSON.stringify(s6))
+    const six = commit('six.txt')
+    /** B1's own lane start with applyNow, tried again while B1 is still in a turn (its card's prompt, a wake): refused then. */
+    const reorderNow = () =>
+      waitHung(async () => {
+        const res = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${tokens.b1}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ cards: [c7, c6], applyNow: true }) })
+        const body = await res.json().catch(() => null)
+        return res.status === 409 && /in a turn|is working|is starting|waiting for the user|background tasks/.test(JSON.stringify(body)) ? null : { status: res.status, body }
+      })
+    const re = await reorderNow()
+    check('the lane reordered now: Six put back to Todo, the new order applied', re?.status === 200 && (re.body?.note ?? '').startsWith('Applied now: ') && (await card(c6)).column === 'todo', JSON.stringify(re))
+    check("…Six's line kept, with its work", git(alpha, 'rev-parse', s6.line) === six)
+    const s7 = await start(c7)
+    check("Seven's line is its own, from main's head, without Six's work", s7.s.status === 200 && s7.base === head() && s7.line !== s6.line && git(wt, 'rev-parse', 'HEAD') === s7.base && !ancestor(six, s7.base), JSON.stringify(s7))
+    await round(c7, 'seven.txt')
+    check('Seven merged: Done, its change only its own', (await done(c7)) && (await submittedFiles(c7)) === JSON.stringify(['seven.txt']), await submittedFiles(c7))
+    const again6 = await waitHung(async () => ((await factsOf(c6, 'Started')).length >= 2 ? (await factsOf(c6, 'Started')).at(-1) : null))
+    check('…then Hive starts Six again', !!again6 && again6.actor === 'hive', JSON.stringify(again6))
+    const s6b = await start(c6)
+    check('…on its own line, with its work', s6b.s.status === 200 && s6b.line === s6.line && ancestor(six, git(wt, 'rev-parse', 'HEAD')), JSON.stringify(s6b))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

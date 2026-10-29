@@ -3598,6 +3598,8 @@ export interface LaneStartRequest {
   cards: number[]
   note?: string
   name?: string | null
+  /** For the builder's running lane with a card in flight: the list applied now, that card put back (HI-1995). */
+  applyNow?: boolean
 }
 
 /**
