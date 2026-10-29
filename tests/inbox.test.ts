@@ -164,10 +164,10 @@ describe('merging a worktree agent', () => {
     expect(mergeBlocked('Two', 'background')).toContain('background tasks')
     // Watching cards: in the middle of its card loop, so its unfinished work isn't merged (cancel the watch first).
     expect(mergeBlocked('Two', 'watching')).toMatch(/waiting for cards .* cancel its watch first/)
-    // The Assistant asks before stopping an agent in the middle of something, watching cards included.
+    // The Assistant asks before stopping an agent in the middle of something; one only watching is idle (HI-1994).
     const { stopAsksUser } = await import('../src/shared/defaults')
-    for (const st of ['starting', 'working', 'waiting', 'background', 'watching'] as const) expect(stopAsksUser(st), st).toBe(true)
-    for (const st of ['ready', 'finished', 'stopped', 'error', null, undefined] as const) expect(stopAsksUser(st), String(st)).toBe(false)
+    for (const st of ['starting', 'working', 'waiting', 'background'] as const) expect(stopAsksUser(st), st).toBe(true)
+    for (const st of ['watching', 'ready', 'finished', 'stopped', 'error', null, undefined] as const) expect(stopAsksUser(st), String(st)).toBe(false)
     for (const s of ['finished', 'ready', 'stopped', null, undefined] as const) expect(mergeBlocked('Two', s)).toBeNull()
   })
 })

@@ -30,6 +30,7 @@ import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalle
 import type { HandoverAuthor } from '../shared/hiveGuidance'
 import { cardRequests, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
+import { STOP_ASK_MS } from './mcp/agentApiCall'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
 import { settingChangeTexts, settingPath, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { addAgent, updateAgent } from './projectAgents'
@@ -1297,7 +1298,7 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
   })
 })
 
-route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body }) => {
+route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body, signal }) => {
   const p = projectByName(params[0])
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
@@ -1305,17 +1306,24 @@ route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body }) 
   return assistantChange('agents', `stop ${a.name} in ${basename(p)}`, { kind: 'stop-agent', project: basename(p), agent: actAgent(a) }, async () => {
     const st = sessions.liveFor(p, agentId)
     if (!st) return { done: `${a.name} in ${basename(p)} wasn't running`, result: { ok: true, wasRunning: false } }
-    // Stopping an agent in the middle of something is the user's call: also one watching cards (its card loop stops).
+    // Stopping an agent in the middle of something is the user's call; one only watching is idle (HI-1994).
     if (stopAsksUser(st.status) && ws) {
       const said = typeof body?.reason === 'string' ? clip(body.reason.trim(), 300) : ''
       const reason = said ? ` Its reason: ${said}${/[.!?]$/.test(said) ? '' : '.'}` : ''
-      const yes = await assistant.ask(ws, {
-        title: `Stop ${a.name} in ${basename(p)}?`,
-        message: `The Assistant wants to stop ${a.name}, which is ${st.status === 'watching' && st.watch ? `${st.watch.label.replace(/^Waiting/, 'waiting')} (${st.watch.agents && !st.watch.lanes ? 'an agent watch' : 'a card watch: its card loop pauses until it is resumed'})` : (STATUS_WORDS[st.status] ?? st.status)}.${reason} Its conversation is kept and can be resumed.`,
-        yes: 'Stop',
-        no: "Don't stop"
-      })
-      if (!yes) throw new HttpError(409, `The user chose not to stop ${a.name}. Leave it running.`)
+      const how = await assistant.ask(
+        ws,
+        {
+          title: `Stop ${a.name} in ${basename(p)}?`,
+          message: `The Assistant wants to stop ${a.name}, which is ${STATUS_WORDS[st.status] ?? st.status}.${reason} Its conversation is kept and can be resumed.`,
+          yes: 'Stop',
+          no: "Don't stop"
+        },
+        { timeoutMs: STOP_ASK_MS, signal }
+      )
+      // Its question closed, whatever ended it: never left open in the panel with nobody waiting on it (HI-1994).
+      if (how === 'timedOut') throw new HttpError(408, `Your request to stop ${a.name} timed out: the user didn't answer in ${STOP_ASK_MS / 1000} seconds, and it was withdrawn. ${a.name} keeps running; ask the user in chat if it should still stop.`)
+      if (how === 'gone') throw new HttpError(409, `Your request to stop ${a.name} was withdrawn: you stopped waiting for the user's answer. ${a.name} keeps running.`)
+      if (how === 'no') throw new HttpError(409, `The user chose not to stop ${a.name}. Leave it running.`)
       // The answer can come minutes later: only the run the user was asked about, and only if Control still allows it.
       if (sessions.liveFor(p, agentId)?.runId !== st.runId) return { done: `${a.name} in ${basename(p)} had already stopped`, result: { ok: true, wasRunning: false } }
       if (!assistant.allows('agents')) throw new HttpError(403, `The user's settings (Settings → Assistant → Control: ${assistant.LEVEL_NAME[assistant.controlLevel()]}) no longer let you stop agents.`)

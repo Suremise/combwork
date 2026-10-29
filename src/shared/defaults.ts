@@ -454,10 +454,11 @@ export function mergeBlocked(name: string, status: SessionStatus | null | undefi
 
 /**
  * Whether stopping an agent at the Assistant's request asks the user first: when it is in the middle of something
- * (starting, working, asking, waiting on background tasks, or on cards in a card loop).
+ * (starting, working, asking, waiting on background tasks). One only watching cards or agents is idle (HI-1994): no
+ * turn runs and its conversation is kept, so it is stopped without asking, as an idle one is.
  */
 export const stopAsksUser = (status: SessionStatus | null | undefined): boolean =>
-  status === 'starting' || status === 'working' || status === 'waiting' || status === 'background' || status === 'watching'
+  status === 'starting' || status === 'working' || status === 'waiting' || status === 'background'
 
 /** Folder-safe slug for branch and worktree names: "Agent 2" → "agent-2". */
 export function slugify(name: string): string {
