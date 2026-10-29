@@ -1159,6 +1159,27 @@ describe("G19's default, the branch's own message (HI-1997)", () => {
     expect((await answered.w.projectConfig(answered.repo)).workflow!.options.commitMessage).toBe('hive')
   })
 
+  it("answered Hive's while inheriting it from the workspace: written into its own options before the workspace's goes, through a failed save and its retry (HR3's note on s26)", async () => {
+    const { commitMessage: _m, ...inheriting } = filled()
+    const { w, repo, ws } = await workspace({ project: inheriting, preset: 'pair', workspace: { git: { commitMessage: 'hive' } } })
+    const name = basename(repo)
+    await store.boardWrite(w, async () => FactStore.forBoard(w, { project: name, key: name }).setMeta(MERGE_CHOICE_KEY, JSON.stringify({ style: 'merge', commitMessage: 'hive', at: 'x', pending: false })))
+    const save = vi.spyOn(w, 'saveWorkspaceConfigWith').mockRejectedValueOnce(new Error('disk full'))
+    try {
+      await settleCommitMessageDefault(w)
+      // The project's own Hive's is written first; the workspace's stays, as the save failed, and nothing is marked.
+      expect((await w.projectConfig(repo)).workflow).toMatchObject({ commitMessageChosen: true, options: { commitMessage: 'hive' } })
+      expect(JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8')).workflow.git.commitMessage).toBe('hive')
+      expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
+    } finally {
+      save.mockRestore()
+    }
+    await settleCommitMessageDefault(w)
+    expect(JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8')).workflow.git).not.toHaveProperty('commitMessage')
+    expect((await form.workflowForm(w, repo)).options.commitMessage).toBe('hive')
+    expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
+  })
+
   it("a failed write leaves no board mark; the next run finishes, never undoing a project already settled (HR3's gap 3)", async () => {
     const { w, repo, ws } = await workspace({ project: filled(), preset: 'pair', workspace: { git: { commitMessage: 'hive' } } })
     const save = vi.spyOn(w, 'saveWorkspaceConfigWith').mockRejectedValueOnce(new Error('disk full'))

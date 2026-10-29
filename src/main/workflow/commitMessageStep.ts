@@ -98,7 +98,14 @@ export async function settleCommitMessageDefault(ws: WorkspaceService, hooks: St
       let did = false
       await ws.mutateProjectConfig(folder, (c) => {
         if (boardValue(ws, COMMIT_MESSAGE_STEP) !== null || c.stepsDone?.includes(COMMIT_MESSAGE_STEP)) return {}
-        const next = settledCommitMessage(c.workflow, answered)
+        // Answered Hive's but inheriting it (HR3's note on s26): written into its own Git options, in the same write, before
+        // the workspace's or Hive's default it inherits from is dropped, so the choice keeps its effect.
+        const wf = c.workflow
+        if (answered && wf?.platform === 'git' && wf.options?.commitMessage === undefined) {
+          did = true
+          return { workflow: writeWorkflow(wf, { platform: 'git', preset: wf.preset, options: { ...wf.options, commitMessage: 'hive' } }), stepsDone: [...(c.stepsDone ?? []), COMMIT_MESSAGE_STEP] }
+        }
+        const next = settledCommitMessage(wf, answered)
         did = !!next
         return { ...(next ? { workflow: next } : {}), stepsDone: [...(c.stepsDone ?? []), COMMIT_MESSAGE_STEP] }
       })
