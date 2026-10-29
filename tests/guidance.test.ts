@@ -526,7 +526,7 @@ describe('the review and merge skills follow the gates (#1525)', () => {
     // The next step is the one Hive names, never inferred from a column or a missing field (HR1's #1525 round 2, the
     // Assistant's m3822): the agent merges on Hive's word, waits on a request for the user, leaves the queue's card alone.
     expect(text).toMatch(/Never infer the next step from the card's column: do the one Hive names\./)
-    expect(way('"Merge it and report the merge"')).toMatch(/\(Hive tells you once the merge is yours\): merge it and report it \(merging\.md\); Hive checks the work is in the base before Done/)
+    expect(way('"Merge it and report the merge"')).toMatch(/\(Hive tells you once the merge is yours\): merge it and report it \(below\); Hive checks the work is in the base before Done/)
     // …and the report is for the cards Hive told it to merge, wherever they are (in Doing, with no review).
     expect(text).toMatch(/`hive_report_merge` for each card Hive told you to merge/)
     expect(text).not.toMatch(/Cards still in Review or Doing stay where they are/)
@@ -569,7 +569,8 @@ describe('the review and merge skills follow the gates (#1525)', () => {
   it('stay smaller than before P8 (review-agent-work 7,475 and merge-ready 5,291 characters, LF)', () => {
     // HI-2011's split added each reference file's heading and SKILL.md's list of them (7,475 and 5,291 before it).
     expect(review().replace(/\r/g, '').length).toBeLessThan(8150)
-    expect(merge().replace(/\r/g, '').length).toBeLessThan(5550)
+    // Round 2: merging back in SKILL.md, what is rarer in who-merges.md under headings of its own.
+    expect(merge().replace(/\r/g, '').length).toBeLessThan(5800)
   })
 })
 
