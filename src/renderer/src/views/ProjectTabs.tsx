@@ -13,7 +13,7 @@ import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUs
 import { contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
 import { useAdvancedValue, useAgentLimit } from '../advanced'
 import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } from '@shared/inboxSwitches'
-import { PROVIDERS, contextLines, defaultProviderLabel, isProviderEnabled, modeDescription, offeredModes, orderedProviders, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
+import { PROVIDERS, contextLines, defaultProviderLabel, inProviderOrder, isProviderEnabled, modeDescription, offeredModes, orderedProviders, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
 import { instructionsStarter } from '@shared/projectTabs'
 import { EffortPicker, ModelPicker } from '../components/ModelPicker'
 import { effortText, runsAsName } from '@shared/models'
@@ -2142,7 +2142,9 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
 
   const q = query.trim().toLowerCase()
   const visible = defs.filter((d) => (q ? `${d.title} ${d.desc} ${d.tip ?? ''} ${d.key}`.toLowerCase().includes(q) : d.section === section))
-  const groups = PROJECT_SECTIONS.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
+  // Each provider's sections in the user's order (HI-1965: Settings → Providers), the others where they are.
+  const sections = inProviderOrder(PROJECT_SECTIONS, (s) => s.provider, settings)
+  const groups = sections.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
 
   return (
     <div className="settings">
@@ -2162,7 +2164,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       <HiveVcsNotice project={project} />
       <div className="settings-body">
         <div className="settings-nav">
-          {PROJECT_SECTIONS.map((s) => (
+          {sections.map((s) => (
             <div
               key={s.id}
               className={cx('row', !q && section === s.id && 'selected')}

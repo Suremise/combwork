@@ -2,7 +2,7 @@
 // turned on and installed, a default the user chose wins, and a project with no agents warns only about a provider
 // the user chose, or when nothing is installed.
 import { afterEach, describe, expect, it } from 'vitest'
-import { AUTO_PROVIDER, agentProvider, autoProvider, autoProviderPending, chosenDefaultProvider, defaultProviderPending, defaultProviderLabel, defaultProviderWarning, movedProviderOrder, orderedProviders, projectDefaultProvider, providerWarnings, providersInUse, setInstalledCheck } from '../src/shared/providers'
+import { AUTO_PROVIDER, agentProvider, autoProvider, autoProviderPending, chosenDefaultProvider, defaultProviderPending, defaultProviderLabel, defaultProviderWarning, inProviderOrder, movedProviderOrder, orderedProviders, projectDefaultProvider, providerWarnings, providersInUse, setInstalledCheck } from '../src/shared/providers'
 import { DEFAULT_APP_CONFIG, DEFAULT_SETTINGS, mergeDefaults, migrateConfig } from '../src/shared/defaults'
 import type { AppSettings, ProviderId } from '../src/shared/types'
 
@@ -220,6 +220,15 @@ describe("the providers' order (HI-1965)", () => {
     // A drop two places away (drag).
     expect(movedProviderOrder(settings(ALL), 'copilot', -2)).toEqual(['copilot', 'claude-code', 'codex'])
     expect(movedProviderOrder(inOrder(['gemini', 'codex']), 'copilot', -2)).toEqual(['copilot', 'codex', 'claude-code', 'gemini'])
+  })
+
+  it("a list's provider entries follow it, each run in its own places; the rest stay (Settings' and Project Settings' sections, Advanced's tabs)", () => {
+    const nav = ['general', 'providers', 'p:claude-code', 'p:codex', 'p:copilot', 'assistant', 'a:claude-code', 'a:codex', 'a:copilot', 'advanced']
+    const providerOf = (s: string) => (s.includes(':') ? (s.split(':')[1] as ProviderId) : null)
+    expect(inProviderOrder(nav, providerOf, inOrder(['copilot', 'claude-code', 'codex']))).toEqual(['general', 'providers', 'p:copilot', 'p:claude-code', 'p:codex', 'assistant', 'a:copilot', 'a:claude-code', 'a:codex', 'advanced'])
+    expect(inProviderOrder(nav, providerOf, settings(ALL))).toEqual(nav)
+    // An entry of a provider this Hive doesn't know (an old Advanced group) stays where it was.
+    expect(inProviderOrder(['hive', 'claude-code', 'codex', 'gemini'], (g) => (g === 'hive' ? null : (g as ProviderId)), inOrder(['codex']))).toEqual(['hive', 'codex', 'claude-code', 'gemini'])
   })
 
   it('survives a restart: saved, loaded as it was; a damaged one is Hive’s order', () => {

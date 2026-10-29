@@ -711,6 +711,7 @@ export function DiagnosticsDialog() {
 
 export function ShortcutsDialog() {
   const open = useStore((s) => s.shortcutsOpen)
+  const settings = useStore((s) => s.settings)
   if (!open) return null
   const withKeys = commands.map((c) => ({ ...c, keybinding: commandKeybinding(c.id) })).filter((c) => c.keybinding)
   return (
@@ -764,7 +765,7 @@ export function ShortcutsDialog() {
           </tr>
         </tbody>
       </table>
-      {PROVIDERS.filter((p) => p.reservedKeys.length).map((p) => (
+      {orderedProviders(settings).filter((p) => p.reservedKeys.length).map((p) => (
         <p key={p.id} className="hint">
           {tr(msg({ id: 'shell.shortcuts.reserved', defaultMessage: '{keys} are left to {provider} while its terminal has focus.', description: "Under Help → Keyboard Shortcuts: keys a coding agent keeps in its terminal. {keys} lists them; {provider} is the agent's name." }), { keys: fmt.list(p.reservedKeys.map((k) => k.replace('MOD+', 'Ctrl+')), 'unit'), provider: p.name })}
         </p>

@@ -211,11 +211,29 @@ const check = (name, ok, extra = '') => {
     await three.page.locator('.settings-content').first().screenshot({ path: path.join(lib.WORK, `defprov-order-${theme}.png`) }).catch(() => three.page.screenshot({ path: path.join(lib.WORK, `defprov-order-${theme}.png`) }))
   }
   await three.app.close()
-  // After a restart: the same order, and Automatic still on Codex.
-  const again = await lib.launch({ userData: userData3, env: { ...claudeEnv, CODEX_HOME: codexHome }, viewport: { width: 1300, height: 820 } })
+  // After a restart: the same order, and Automatic still on Codex. Its first two saves slow (HR2's round 1), for moves made
+  // faster than they save.
+  const again = await lib.launch({ userData: userData3, env: { ...claudeEnv, CODEX_HOME: codexHome, HIVE_TEST_SLOW_IPC: 'settings:update=1200*2' }, viewport: { width: 1300, height: 820 } })
   again.page.on('pageerror', (e) => check('no page errors', false, e.message))
   await openProviders(again)
   check('after a restart: the same order, Automatic on Codex', (await orderOf(again)) === 'copilot,codex,claude-code' && (await automatic(again)) === 'Automatic (Codex)', `${await orderOf(again)} ${await automatic(again)}`)
+  // Settings' provider pages and Advanced's CLI tabs follow the order too (HR2's round 1), the other sections where they were.
+  const navOrder = () => again.page.locator('.settings-nav .row[data-section^="provider:"]').evaluateAll((els) => els.map((e) => e.dataset.section.replace('provider:', '')).join(','))
+  check("Settings' provider pages follow the order", (await navOrder()) === 'copilot,codex,claude-code', await navOrder())
+  await again.page.locator('.settings-nav .row', { hasText: 'Advanced' }).first().click()
+  const tabOrder = () => again.page.locator('.advanced-tabs [data-tab]').evaluateAll((els) => els.map((e) => e.dataset.tab).join(','))
+  const tabs = await lib.until(async () => ((await again.page.locator('.advanced-tabs [data-tab]').count()) > 1 ? tabOrder() : null), 10000)
+  const want = ['hive', 'copilot', 'codex', 'claude-code'].filter((g) => (tabs ?? '').split(',').includes(g)).join(',')
+  check("Advanced's CLI tabs follow it, Hive's first", !!tabs && tabs === want && tabs.startsWith('hive,'), String(tabs))
+  await again.page.locator('.settings-nav .row', { hasText: 'Providers' }).first().click()
+  await lib.until(async () => (await again.page.locator('.provider-list .provider-row').count()) === 3, 10000)
+  // Two moves before either save is back: both kept, shown at once and saved in the end.
+  await again.page.locator('.provider-row[data-provider="copilot"]').focus()
+  await again.page.keyboard.press('Alt+ArrowDown')
+  await again.page.keyboard.press('Alt+ArrowDown')
+  check('two quick moves show at once', !!(await lib.until(async () => (await orderOf(again)) === 'codex,claude-code,copilot', 5000)), await orderOf(again))
+  const savedOrder = async () => JSON.stringify((await again.inv('settings:get')).providerOrder)
+  check('…and both are saved, in order, though the saves are slow', !!(await lib.until(async () => (await savedOrder()) === JSON.stringify(['codex', 'claude-code', 'copilot']) && (await orderOf(again)) === 'codex,claude-code,copilot', 15000)), `${await savedOrder()} ${await orderOf(again)}`)
   await again.app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

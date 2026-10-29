@@ -1,7 +1,7 @@
 import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
 import { QuitCommand, WorkspaceCloseCommand } from '../components/CloseCommandSettings'
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, McpServerInfo, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
 import { DEFAULT_MODE } from '@shared/assistant'
@@ -9,7 +9,7 @@ import { PRICES_CHECKED, SHIPPED_PRICES, listedPriceModels, priceRows } from '@s
 import { APP_SETTINGS_CATALOG, SETTINGS_SECTIONS, providerSection, settingDefault, settingPatch, settingValue, SETTINGS_TEXT, shownSetting, type SettingEntry, type SettingsSection, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { cliDefaultEffort, effortName, fallbackEfforts, fallbackModels, modelCaps, modelSource, modelSourceText, runsAsName } from '@shared/models'
 import type { SettingsPatch } from '@shared/api'
-import { AUTO_PROVIDER, PROVIDERS, defaultProviderLabel, enabledProviders, isProviderEnabled, installSourceText, movedProviderOrder, offeredModes, orderedProviders, permissionLabel, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
+import { AUTO_PROVIDER, PROVIDERS, defaultProviderLabel, enabledProviders, isProviderEnabled, installSourceText, inProviderOrder, movedProviderOrder, offeredModes, orderedProviders, permissionLabel, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
 import { modeName, useModes } from '../components/Assistant'
 import { ModeCaveat } from '../components/AgentDialogs'
 import { EffortPicker, ModelPicker } from '../components/ModelPicker'
@@ -533,12 +533,6 @@ const PROVIDER_ORDER_TEXT = {
   failed: msg({ id: 'settings.provider.reorderFailed', defaultMessage: "Couldn't save the providers' order", description: "An error's title: saving the order of Settings → Providers' list failed." })
 }
 
-/** Saves the providers' order with one moved `by` places (HI-1965). */
-function moveProvider(settings: AppSettings | null, id: ProviderId, by: number): void {
-  if (!by) return
-  saveSettings({ providerOrder: movedProviderOrder(settings, id, by) }).catch((e) => notify('error', tr(PROVIDER_ORDER_TEXT.failed), errorMessage(e)))
-}
-
 /**
  * Every provider with its on/off switch and install state, in the user's order (HI-1965): Automatic picks the first one
  * turned on and installed. A row moves by dragging it, its ⋯ menu's Move Up and Move Down, or Alt+Up and Alt+Down.
@@ -549,10 +543,29 @@ function ProvidersList() {
   const menu = useContextMenu()
   const [dragging, setDragging] = useState<ProviderId | null>(null)
   const [over, setOver] = useState<ProviderId | null>(null)
-  const list = orderedProviders(settings)
+  // Moves made faster than they save (HR2's round 1): the order as the user last made it, shown and moved from until its
+  // save is in, and the saves one at a time, each the whole order as it was then. A save that fails says so; a later one
+  // still saves every move before it, and with none after it the list goes back to what was saved.
+  const [pending, setPending] = useState<ProviderId[] | null>(null)
+  const latest = useRef<ProviderId[] | null>(null)
+  const saving = useRef<Promise<void>>(Promise.resolve())
+  const list = orderedProviders(pending ? { providerOrder: pending } : settings)
+  const moveProvider = (id: ProviderId, by: number): void => {
+    if (!by) return
+    const next = movedProviderOrder(latest.current ? { providerOrder: latest.current } : settings, id, by)
+    latest.current = next
+    setPending(next)
+    saving.current = saving.current.then(async () => {
+      const saved = await actions.attempt(tr(PROVIDER_ORDER_TEXT.failed), () => call('settings:update', { providerOrder: next }))
+      if (latest.current !== next) return
+      latest.current = null
+      if (saved) set({ settings: saved })
+      setPending(null)
+    })
+  }
   const menuItems = (id: ProviderId, i: number): MenuEntry[] => [
-    { label: tr(PROVIDER_ORDER_TEXT.moveUp), icon: 'arrow-up', keybinding: formatKeybinding('Alt+ArrowUp'), disabled: i === 0, onClick: () => moveProvider(settings, id, -1) },
-    { label: tr(PROVIDER_ORDER_TEXT.moveDown), icon: 'arrow-down', keybinding: formatKeybinding('Alt+ArrowDown'), disabled: i === list.length - 1, onClick: () => moveProvider(settings, id, 1) }
+    { label: tr(PROVIDER_ORDER_TEXT.moveUp), icon: 'arrow-up', keybinding: formatKeybinding('Alt+ArrowUp'), disabled: i === 0, onClick: () => moveProvider(id, -1) },
+    { label: tr(PROVIDER_ORDER_TEXT.moveDown), icon: 'arrow-down', keybinding: formatKeybinding('Alt+ArrowDown'), disabled: i === list.length - 1, onClick: () => moveProvider(id, 1) }
   ]
   return (
     <div className="provider-list" data-order={list.map((p) => p.id).join(',')}>
@@ -584,7 +597,7 @@ function ProvidersList() {
             onDragLeave={() => setOver((o) => (o === p.id ? null : o))}
             onDrop={(e) => {
               e.preventDefault()
-              if (dragging) moveProvider(settings, dragging, i - list.findIndex((x) => x.id === dragging))
+              if (dragging) moveProvider(dragging, i - list.findIndex((x) => x.id === dragging))
               setDragging(null)
               setOver(null)
             }}
@@ -595,7 +608,7 @@ function ProvidersList() {
             onKeyDown={(e) => {
               if (e.target !== e.currentTarget || !e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
               e.preventDefault()
-              moveProvider(settings, p.id, e.key === 'ArrowUp' ? -1 : 1)
+              moveProvider(p.id, e.key === 'ArrowUp' ? -1 : 1)
             }}
             onContextMenu={(e) => menu.open(e, menuItems(p.id, i))}
           >
@@ -1211,7 +1224,9 @@ export function SettingsView() {
   }, [query, section, settings, modifiedOnly, advanced, shownLanguage, workspaceName])
 
   if (!settings) return null
-  const grouped = SECTIONS.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
+  // Each provider's page in the user's order (HI-1965: Settings → Providers), the other sections where they are.
+  const sections = inProviderOrder(SECTIONS, (s) => s.provider, settings)
+  const grouped = sections.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
   // Shown in the user's language: a provider's page is its name.
   const sectionText = (s: (typeof SECTIONS)[number]): { label: string; desc: string } => ({ label: shownText(s.text.label), desc: shownText(s.text.desc) })
   const navIcon = (s: (typeof SECTIONS)[number]): React.ReactNode => (s.provider ? <ProviderIcon provider={s.provider} /> : <Icon name={s.icon} />)
@@ -1227,7 +1242,7 @@ export function SettingsView() {
       </div>
       <div className="settings-body">
         <div className="settings-nav">
-          {SECTIONS.map((s) => (
+          {sections.map((s) => (
             <div key={s.id} className={cx('row', !query && !modifiedOnly && section === s.id && 'selected')} data-section={s.id} onClick={() => {
                 set({ settingsSection: s.id, settingsQuery: '' })
                 setModifiedOnly(false)

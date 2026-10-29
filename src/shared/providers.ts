@@ -467,6 +467,31 @@ export function orderedProviders(settings: Partial<Pick<AppSettings, 'providerOr
 }
 
 /**
+ * A list with its providers' entries (a settings section, an Advanced tab) in the user's order (HI-1965): each run of
+ * entries that belong to a provider, one after another, sorted within its places, and the rest where they were. A nav's
+ * General and Workspace stay first; its provider pages, and further down the Assistant's per-provider ones, each follow
+ * the order without mixing.
+ */
+export function inProviderOrder<T>(items: readonly T[], providerOf: (t: T) => ProviderId | null | undefined, settings: Partial<Pick<AppSettings, 'providerOrder'>> | null | undefined): T[] {
+  const rank = new Map(orderedProviders(settings).map((p, i) => [p.id, i]))
+  const known = (t: T): boolean => {
+    const p = providerOf(t)
+    return !!p && rank.has(p)
+  }
+  const out: T[] = []
+  for (let i = 0; i < items.length; ) {
+    if (!known(items[i])) {
+      out.push(items[i++])
+      continue
+    }
+    const run: T[] = []
+    while (i < items.length && known(items[i])) run.push(items[i++])
+    out.push(...run.sort((a, b) => rank.get(providerOf(a)!)! - rank.get(providerOf(b)!)!))
+  }
+  return out
+}
+
+/**
  * The order after moving one provider `by` places (-1 up, +1 down), as `providerOrder` saves it: every known provider,
  * in order, with ids of providers this Hive doesn't know kept at the end. Unchanged at either end.
  */
