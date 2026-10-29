@@ -734,7 +734,7 @@ const IN_A_TURN: Readonly<Record<string, string>> = { working: 'is working', sta
  * alone is ended once it is done (the reorder tells the builder instead). Null when there's nothing to apply now (no
  * card in flight, or it stays first): the start's own edit applies the list. Else what it did, for the reply.
  */
-async function reorderNow(ws: WorkspaceService, s: StartLane, builder: LaneAgent): Promise<string | null> {
+async function reorderNow(ws: WorkspaceService, s: StartLane, builder: LaneAgent): Promise<{ lane: string; note: string | null } | null> {
   if (!ws.path) return null
   const projectPath = join(ws.path, s.project)
   const was = (await read(ws)).find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
@@ -743,9 +743,18 @@ async function reorderNow(ws: WorkspaceService, s: StartLane, builder: LaneAgent
   const flying = v.cards.find((c) => ownOpen(c) && (c.column === 'doing' || c.column === 'review' || c.column === 'passed'))
   if (!flying) return null
   const { sessions } = await import('./sessions')
-  const busyNow = (): string | null => {
+  // A watch on the card put back alone: the reorder makes it obsolete (its wake tells the builder instead).
+  const onlyIt = (w: { cards?: readonly number[]; lanes?: readonly string[]; agents?: readonly unknown[] } | undefined): boolean => !!w && !w.lanes?.length && !w.agents?.length && !!w.cards?.length && w.cards.every((n) => n === flying.number)
+  /**
+   * Why its card can't be put back under the builder now, or null: in a turn (working, starting, waiting for the user,
+   * background tasks), being started, or waiting on a watch of other work. Asked before the write and in it (`free`).
+   */
+  const unavailable = (): string | null => {
     const st = sessions.liveFor(projectPath, builder.id)
-    return st && IN_A_TURN[st.status] ? `${builder.name} ${IN_A_TURN[st.status]}` : null
+    if (!st) return sessions.pendingStart(projectPath, builder.id) || sessions.startingFor(projectPath, builder.id) ? `${builder.name} is starting: a reorder applied now never puts its card back under it. Try again once it is idle.` : null // i18n-ignore: hive_lane's refusal (agents)
+    if (IN_A_TURN[st.status]) return `${builder.name} ${IN_A_TURN[st.status]}: a reorder applied now never puts its card back under it. Ask it to finish and end its turn, then reorder again.` // i18n-ignore: hive_lane's refusal (agents)
+    if (st.status === 'watching' && !onlyIt(st.watch)) return `${builder.name} is waiting on a watch of other work: its next card couldn't be given to it until that wait ends. Let it finish (or cancel its watch), then reorder again.` // i18n-ignore: hive_lane's refusal (agents)
+    return null
   }
   const wf = await (await service()).workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return null
@@ -761,16 +770,12 @@ async function reorderNow(ws: WorkspaceService, s: StartLane, builder: LaneAgent
   if (first === flying.number) {
     const { reply } = await reorder(() => null)
     if (refused(reply)) throw new LaneError(409, reply.message)
-    return null
+    return { lane: was.id, note: null }
   }
-  const label = (n: number): string => (cards.get(n)?.key ?? `#${n}`)
+  const label = (n: number): string => cards.get(n)?.key ?? `#${n}`
   if (flying.column !== 'doing') throw new LaneError(409, `${label(flying.number)} is in ${flying.column === 'review' ? 'Review' : 'Approved or merging'}: putting it back would lose its review or merge. Change the order without applyNow (it applies once ${label(flying.number)} is Done), or wait.`) // i18n-ignore: hive_lane's refusal (agents)
-  const busy = busyNow()
-  if (busy) throw new LaneError(409, `${busy} on ${label(flying.number)}: a reorder applied now never puts its card back under it. Ask it to finish and end its turn, then reorder again.`) // i18n-ignore: hive_lane's refusal (agents)
-  const st = sessions.liveFor(projectPath, builder.id)
-  const watched = st?.status === 'watching' ? (st.watch?.cards ?? []) : []
-  const otherWatch = st?.status === 'watching' && (!!st.watch?.lanes?.length || watched.some((n) => n !== flying.number) || !watched.length)
-  if (otherWatch) throw new LaneError(409, `${builder.name} is waiting on a watch of other work: its next card couldn't be given to it until that wait ends. Let it finish (or cancel its watch), then reorder again.`) // i18n-ignore: hive_lane's refusal (agents)
+  const why = unavailable()
+  if (why) throw new LaneError(409, why)
   const card = wf.store.card(flying.number)
   const folder = wf.state(card).started?.folder
   if (folder && folder !== 'project') {
@@ -780,18 +785,19 @@ async function reorderNow(ws: WorkspaceService, s: StartLane, builder: LaneAgent
   }
   let r: Awaited<ReturnType<typeof reorder>>
   try {
-    r = await reorder(busyNow)
+    r = await reorder(unavailable)
   } catch (e) {
     const { LaneBuilderBusy } = await import('./workflow/runtime')
-    if (e instanceof LaneBuilderBusy) throw new LaneError(409, `${e.message} on ${label(flying.number)}: a reorder applied now never puts its card back under it. Ask it to finish and end its turn, then reorder again.`) // i18n-ignore: hive_lane's refusal (agents)
+    if (e instanceof LaneBuilderBusy) throw new LaneError(409, e.message)
     throw e
   }
   if (refused(r.reply)) throw new LaneError(409, r.reply.message)
   const done = r.reply as { putBack: string | null; line: string | null; startNext: string | null }
-  // Its watch on that card alone ends: the reorder's wake tells it instead, and its next card is given once it is free.
-  if (watched.length) await (await import('./watches')).cancelWatch(ws, projectPath, builder.id).catch((e) => log.warn('ending a watch a reorder made obsolete', e))
+  // A watch on that card alone ends (its wake tells the builder instead), decided under the watches' lock: never a watch
+  // of other work begun since.
+  await (await import('./watches')).cancelWatch(ws, projectPath, builder.id, (cond) => onlyIt(cond)).catch((e) => log.warn('ending a watch a reorder made obsolete', e))
   log.info(`Lane ${was.id} reordered now by ${userText(s.by)}: #${flying.number} put back${done.startNext ? `, ${done.startNext} starts next` : ''}`)
-  return `Applied now: ${done.putBack} is back in Todo (its work stays on ${done.line ?? 'its branch'})${done.startNext ? `; ${done.startNext} starts next, once ${builder.name}'s turn is over and its slot is ready` : ''}.` // i18n-ignore: hive_lane's reply (agents)
+  return { lane: was.id, note: `Applied now: ${done.putBack} is back in Todo (its work stays on ${done.line ?? 'its branch'})${done.startNext ? `; ${done.startNext} starts next, once ${builder.name}'s turn is over and its slot is ready` : ''}.` } // i18n-ignore: hive_lane's reply (agents)
 }
 
 export async function startLane(ws: WorkspaceService, s: StartLane): Promise<LaneChange> {
@@ -831,10 +837,15 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     if (was && (was.cards.some((n) => s.cards.includes(n)) || on)) {
       // Hive owns the list (#1270, §16.11.1): a change while a card is in flight is queued for the next card boundary,
       // never refused; between cards it applies now. With rules off, at once, as before.
+      // A list the runtime's reorder applied now (HI-1995) is saved: kept as the lane has it here (a newer list saved
+      // since included), never written again from this request; only the lane's other fields go on.
+      const listDone = applied?.lane === was.id
       // A card to start next (HI-1995) holds only for the list its reorder applied: another list change drops it.
-      if (!sameList(was.cards, s.cards)) delete was.startNext
-      const change = on && !sameList(was.cards, s.cards) ? listChange((await views(ws, [was]))[0], was.cards, s.cards) : null
-      if (change && change.behind !== null) {
+      if (!listDone && !sameList(was.cards, s.cards)) delete was.startNext
+      const change = !listDone && on && !sameList(was.cards, s.cards) ? listChange((await views(ws, [was]))[0], was.cards, s.cards) : null
+      if (listDone) {
+        // Nothing of its list here.
+      } else if (change && change.behind !== null) {
         queuedAfter = change.behind
         was.pending = [...s.cards]
       } else {
@@ -909,7 +920,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (r.did === 'started') laneFact(ws, r.rec)
   tellEnded(ws, ended)
   const queued = queuedAfter !== null ? withCardNames(ws, () => `The list change is queued: it applies once ${cardRef(queuedAfter!)} is Done, and you are told then.`) : null // i18n-ignore: hive_lane's reply (agents)
-  const note = [applied, queued, shared].filter(Boolean).join(' ') || undefined
+  const note = [applied?.note, queued, shared].filter(Boolean).join(' ') || undefined
   return { lane, did: r.did, replaced: replaced ?? null, ...(note ? { note } : {}) }
 }
 

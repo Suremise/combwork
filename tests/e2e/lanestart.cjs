@@ -67,6 +67,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     for (const title of ['Lane data', 'Lane hover']) await inv('tasks:create', { title, project: 'alpha' })
     const c = await inv('tasks:create', { title: 'Docs', project: 'alpha' })
     const shoot = async (name, target = page) => {
+      // No tooltip of the last click in the picture.
+      await page.mouse.move(2, 2)
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
         await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
@@ -186,6 +188,54 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await ask.getByRole('button', { name: 'Abandon Lane' }).click()
     check('Abandon Lane, confirmed, abandons it', !!(await until(async () => (await inv('lanes:list')).find((l) => l.id === again?.id)?.state === 'abandoned', HUNG_MS)))
     check('…its cards stay where they were', (await card(c.number))?.column === 'todo')
+
+    // --- HI-1995: Apply now. A lane of two, its first card started (B1 placed in the lane's slot); Start Lane for B1 with
+    // the other card offers Apply now, which puts the first back in Todo and has Hive start the second once B1 is free.
+    // Then, that second card in Review, the dialog says why it can't apply now. Screenshots of both.
+    const [d1, d2] = [await inv('tasks:create', { title: 'Lane now one', project: 'alpha' }), await inv('tasks:create', { title: 'Lane now two', project: 'alpha' })].map((x) => x.number)
+    await until(async () => !(await live(b1.id)) || ['ready', 'finished'].includes((await live(b1.id))?.status), HUNG_MS)
+    const third = await until(async () => {
+      const r = await inv('lanes:start', alpha, { builder: b1.id, reviewer: r1.id, cards: [d1, d2], note: '' }).catch(() => null)
+      return r?.lane ?? null
+    }, HUNG_MS)
+    check('a lane of two is started for B1', !!third, JSON.stringify(await lanes()))
+    const quiet = async () => ['ready', 'finished'].includes((await live(b1.id))?.status) && (await api(`/v1/projects/alpha/agents/B1/deliveries?limit=20`)).deliveries?.every((x) => !['queued', 'uncertain'].includes(x.state))
+    await until(quiet, HUNG_MS)
+    const moved = await inv('tasks:move', d1, 'doing', { confirm: true, agent: b1.id })
+    const facts = async (n) => (await inv('tasks:facts', n)) ?? []
+    check('…its first card started', !moved?.refused && !!(await until(async () => (await facts(d1)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)), JSON.stringify(moved))
+    await until(quiet, HUNG_MS)
+    /** Start Lane from the Todo column with only card n left in its list (the other Todo cards taken out). */
+    const openWithOnly = async (n) => {
+      await openFromTodo()
+      await until(async () => (await order()).length > 0, HUNG_MS)
+      for (const x of await order()) if (x !== n) await dialog.locator(`.lane-start-cards > li[data-card="${x}"] button[aria-label^="Take"]`).click()
+      return until(async () => JSON.stringify(await order()) === JSON.stringify([n]), HUNG_MS)
+    }
+    await openWithOnly(d2)
+    const applyBox = dialog.locator('.lane-start-apply-now[data-apply-now="can"] input[type="checkbox"]')
+    check('Start Lane for B1 offers Apply now, off, saying what it does', !!(await until(async () => (await applyBox.count()) === 1, HUNG_MS)) && !(await applyBox.isChecked()) && /puts .* back in Todo \(its work stays on its branch\)/.test(await dialog.innerText()), await dialog.innerText().catch(() => ''))
+    await applyBox.check()
+    await shoot('apply-now', dialog)
+    await dialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
+    check('…applied: the dialog closes', !!(await until(async () => (await dialog.count()) === 0, HUNG_MS)), await dialog.innerText().catch(() => ''))
+    check('…the card being worked is back in Todo, the lane is the new list', !!(await until(async () => (await card(d1))?.column === 'todo' && JSON.stringify((await lanes()).find((l) => l.id === third?.id)?.cards.map((x) => x.number)) === JSON.stringify([d2]), HUNG_MS)), JSON.stringify({ d1: (await card(d1))?.column, lane: (await lanes()).find((l) => l.id === third?.id) }))
+    const started2 = await until(async () => (await facts(d2)).find((f) => f.kind === 'Started' && f.actor === 'hive') ?? null, HUNG_MS)
+    check('…and Hive starts the new first card on B1', !!started2 && (await card(d2))?.agent === b1.id, JSON.stringify({ started2, d2: await card(d2) }))
+    // That card in Review (its work committed in the slot, moved as the user does): Apply now says why it can't.
+    await until(async () => (await facts(d2)).some((f) => f.kind === 'BuilderPlaced'), HUNG_MS)
+    await until(quiet, HUNG_MS)
+    const folder = started2?.data?.folder
+    fs.writeFileSync(path.join(folder, 'now.txt'), 'now\n')
+    lib.git(folder, ['add', '-A'])
+    lib.git(folder, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'now'])
+    const inReview = await inv('tasks:move', d2, 'review', { confirm: true, reason: 'the e2e moves it on' })
+    check('…in Review', !inReview?.refused && !!(await until(async () => (await card(d2))?.column === 'review', HUNG_MS)), JSON.stringify(inReview))
+    await openWithOnly(d1)
+    const not = dialog.locator('.lane-start-apply-now[data-apply-now="not"]')
+    check("…then Start Lane for B1 says why it can't apply now, with no checkbox", !!(await until(async () => (await not.count()) === 1, HUNG_MS)) && (await not.locator('input').count()) === 0 && /which is in Review: this list applies once it is Done/.test(await not.innerText()), await dialog.innerText().catch(() => ''))
+    await shoot('apply-now-review', dialog)
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
   } finally {
     await app.close().catch(() => undefined)
   }
