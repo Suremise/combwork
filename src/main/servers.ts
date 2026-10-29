@@ -22,7 +22,7 @@ import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/ass
 import { timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
-import { cardOfRef, isCardRef, withCardNames } from './projectKeys'
+import { cardOfRef, isCardRef, keysForSearch, withCardNames } from './projectKeys'
 import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLink, type RunLinkDeps } from './workflow/runLink'
 import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, isolatedRunEnded, takeStopped } from './copiesApp'
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
@@ -428,6 +428,9 @@ function requestWorkspace(req: IncomingMessage, url: URL): WorkspaceService | nu
 }
 
 /** The request's workspace, for calls about a whole workspace (shared notes, MCP servers…). */
+/** The workspace's project keys, current and old, for a title naming a card (HI-2061). */
+const titleKeys = (): string[] => keysForSearch(requireWorkspace()).flatMap((k) => [k.key, ...k.aliases])
+
 function requireWorkspace(): WorkspaceService {
   const w = contextWorkspace()
   if (w) return w
@@ -2708,8 +2711,8 @@ route('POST', '/v1/tasks', async ({ body }) => {
   // project is known to be allowed, and published with it.
   const paths = attachmentList(body)
   const create = () => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor)))
-  // A long title is kept, with a line suggesting a shorter one (HI-1872).
-  const nudge = titleNudge(title, actor)
+  // A long title is kept, with a line suggesting a shorter one (HI-1872), or one with what belongs in the description (HI-2061).
+  const nudge = titleNudge(title, actor, titleKeys())
   const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(nudge ? { nudge } : {}) })
   if (actor.kind !== 'assistant') return reply(await create())
   const project = typeof input.project === 'string' && input.project ? input.project : null
@@ -2769,7 +2772,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     changes.push(...attachedLines(c))
     return c
   }
-  const nudge = patch.title === undefined ? null : titleNudge(patch.title, actor)
+  const nudge = patch.title === undefined ? null : titleNudge(patch.title, actor, titleKeys())
   const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, changes) : await taskView(c)), ...(nudge ? { nudge } : {}) })
   if (actor.kind !== 'assistant') {
     const c = await apply()
