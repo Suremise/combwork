@@ -380,8 +380,8 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_inbox',
-    description: `What Hive has for you (messages, tasks, the user's decisions, card events), oldest first, with ids. Read, act, then ack each with its ids (card events need none): one not acked within ${OVERDUE_MINUTES} minutes shows as overdue. (detail: use-hive-api, tools.md)`,
-    inputSchema: { type: 'object', properties: { ack: { type: 'array', items: { type: 'string' }, description: 'Ids you have acted on ("m12"), in your next read.' }, read: { type: 'boolean', description: 'With ack: also read what is new.' } } },
+    description: `What Hive has for you (messages, tasks, the user's decisions, card events), oldest first, with ids. Read, act, then ack what you acted on in your next call, with read=true to read on in it (card events need no ack): one not acked within ${OVERDUE_MINUTES} minutes shows as overdue. (detail: use-hive-api, tools.md)`,
+    inputSchema: { type: 'object', properties: { ack: { type: 'array', items: { type: 'string' }, description: 'Ids you have acted on ("m12"). Alone, it acks and lists nothing.' }, read: { type: 'boolean', description: 'With ack: acks, then reads what is new, in the same call.' } } },
     run: async (a) => {
       if (Array.isArray(a.ack) && a.ack.length) {
         // #1531: with read, the ack and then the read, in one call; what the read lists is received, never acked.
@@ -503,8 +503,8 @@ const tools: Tool[] = [
   {
     name: 'hive_message_agent',
     description:
-      "Leave a busy or watching agent a message in its inbox, on its current work (a re-brief, the user's answer). Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. card ties it to that card's round. (detail: use-hive-api, tools.md)",
-    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, text: { type: 'string' }, card: cardArg, cancel: { type: 'boolean' } }, required: ['project', 'agent'] },
+      "Leave a busy or watching agent, or one the user just typed into, a message in its inbox on its current work (a re-brief, the user's answer). Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. (detail: use-hive-api, tools.md)",
+    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, text: { type: 'string' }, card: { ...cardArg, description: "The card it is about (its key): dropped, never given, once that card's round ends." }, cancel: { type: 'boolean' } }, required: ['project', 'agent'] },
     run: async (a) => {
       const r = (await api('POST', `${agentPath(a)}/message`, a.cancel === true ? { cancel: true } : { text: a.text, ...(a.card !== undefined ? { card: a.card } : {}) })) as { id?: string; typed?: boolean; queued?: number; status?: string; tells?: InboxSwitch[]; cancelled?: number; round?: number; card?: number; names?: Record<string, string> }
       const who = String(a.agent || 'the agent')
