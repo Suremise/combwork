@@ -149,7 +149,8 @@ const prose = (seed, n) => {
       const walk = (o, at) => {
         if (!o || typeof o !== 'object') return
         if (typeof o.description === 'string') found.push([at, o.description])
-        for (const [k, v] of Object.entries(o)) if (k !== 'description') walk(v, `${at}.${k}`)
+        // A parameter named description (hive_create_task's) is walked; only the text itself isn't.
+        for (const [k, v] of Object.entries(o)) if (typeof v === 'object') walk(v, `${at}.${k}`)
       }
       walk(schema?.properties, 'properties')
       return found

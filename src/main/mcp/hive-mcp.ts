@@ -116,7 +116,7 @@ const waitReplyMs = (seconds: unknown, fallback: number, max: number): number =>
 
 const projectArg = {
   type: 'string',
-  description: `Default: this project${PROJECT ? ` ("${PROJECT}")` : ''}.`
+  description: PROJECT ? `Default: "${PROJECT}".` : 'Default: this project.'
 }
 /** A card (#1219; HI-1661: named by its key, an old number still taken). */
 /** A reply worded with the card names the API sent with it (#1219: its `names`). */
