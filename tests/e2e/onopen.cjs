@@ -4,7 +4,7 @@
 // refused while the list holds the agents back; Rerun (the flag made) runs it, Seed after it, and the agents are let
 // go. Opened again: Skip it and continue runs Seed; Stop here runs none of the rest; Don't wait while a command runs
 // lets the agents go and the rest run by themselves. A command run by hand from the palette's IPC shows the same
-// dialog, its reason manual. Screenshots of the dialog, running and failed, in both themes. Dev build, throwaway profile
+// dialog, its reason manual. A long command is cut to two lines, whole in its tooltip (HI-2031). Screenshots of the dialog, running and failed, in both themes. Dev build, throwaway profile
 // and workspaces; test copies run the user's commands only with HIVE_TEST_RUN_ON_CLOSE=1 (unpackaged builds).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -134,7 +134,16 @@ async function shots(inv, page, name) {
   void openWs()
   check("opened with Long first: the dialog, running, with Don't wait", !!(await lib.until(async () => (await dialog(page, 'running').count()) === 1, HUNG_MS)) && ((await page.locator('.close-command .dialog-footer').textContent()) ?? '').includes("Don't wait"))
   check('…Long shown running, its command under it', !!(await lib.until(async () => (await page.locator('.close-command-step[data-state="running"]').count()) === 1 && (await page.locator('.close-command-step .close-command-text').count()) > 0, HUNG_MS)))
+  // HI-2031: Long's command line (node's path, the script's, a marker's) is cut to two lines; hovered, its tooltip has it whole.
+  const line = page.locator('.close-command-step .close-command-line')
+  const cut = await line.evaluate((el) => ({ lines: el.clientHeight / parseFloat(getComputedStyle(el).lineHeight), cut: el.scrollHeight > el.clientHeight + 1, marked: el.dataset.cut === 'true', text: el.textContent }))
+  check('…its command on at most two lines, cut', cut.lines <= 2.05 && cut.cut && cut.marked, JSON.stringify(cut))
+  check('…the whole command is still its text, for a screen reader', cut.text === command('long', `wait:${go}`).replace('{reason}', 'open'), cut.text)
   await shots(inv, page, 'running')
+  await line.hover()
+  check('…hovered, its tooltip shows the whole command', !!(await lib.until(async () => ((await page.locator('.tip.close-command-tip').textContent().catch(() => '')) ?? '') === cut.text, HUNG_MS)))
+  await page.screenshot({ path: path.join(lib.WORK, 'onopen-running-hover-dark.png') })
+  await page.mouse.move(0, 0)
   await page.locator('.close-command .dialog-footer button', { hasText: "Don't wait" }).click()
   check("Don't wait: the dialog goes", !!(await lib.until(async () => (await anyDialog(page).count()) === 0, HUNG_MS)))
   const letGo = await startRefusal(workspaceAlpha, agentId)
