@@ -32,7 +32,7 @@ import { adoptHandovers } from './notes'
 import { noteFormerName } from './projectNames'
 import { adoptBenchmarkOwners, benchContext } from './benchmarks'
 import { carryPin, pinKeptAt } from './pin'
-import { carryViewPrefs, viewPrefsKeptAt } from './viewPrefs'
+import { carryProjectViewPrefs, carryViewPrefs, viewPrefsKeptAt } from './viewPrefs'
 import { carryWorkspaceRuns } from './closeCommand/closeCommands'
 import { emitTo } from './events'
 
@@ -751,6 +751,16 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
         c.profileMoves = (c.profileMoves ?? []).map((x) => (ofFrom(m.from)(x) ? { from: x.from, to: x.to, ...(failed ? { failed } : {}) } : x))
       })
     }
+  }
+  // Projects moved on their own into this workspace from another (HI-2008, HR2's round 1): their view preferences, before
+  // anything records where they are now. Only while the old project folder is gone (a copy's original keeps its own);
+  // one renamed or moved within this workspace is projectRename.ts's (two that swapped names keep their own).
+  if (!current()) return
+  for (const h of (await movedHosts(ws)).hosts) {
+    if (h.assistant || h.pendingOnly || samePath(dirname(h.from), here)) continue
+    const ok = (): boolean => current() && !existsSync(join(h.from, PROJECT_FILE))
+    const n = carryProjectViewPrefs({ from: h.from, to: h.path }, { from: dirname(h.from), to: here }, ok)
+    if (n) log.info(`${n} view preference(s) follow ${userText(h.name)} from ${userText(h.from)}`)
   }
   // All of it here now: the checkpoint says so, in the workspace's own settings (it travels with the folder, so a move
   // after this finds the records here, and a copy finds them still at the original's).

@@ -292,6 +292,63 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     expect(views(to)).toEqual(NONE)
   })
 
+  /** A workspace at `root\ws` with projects alpha and beta, opened and recorded, each project's views and its panes set. */
+  async function twoProjects(root: string): Promise<{ ws: WS; at: string }> {
+    const at = join(root, 'ws')
+    for (const p of ['alpha', 'beta']) {
+      mkdirSync(join(at, p, '.hive'), { recursive: true })
+      writeFileSync(join(at, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    }
+    const ws = createWorkspaceService()
+    open.push(ws)
+    await openAt(ws, at)
+    setViews(at)
+    config.update((c) => {
+      c.ui.skillsProvider = { ...c.ui.skillsProvider, [join(at, 'beta').toLowerCase()]: 'claude-code' }
+    })
+    await ws.close()
+    return { ws, at }
+  }
+  /** Another workspace, at `root\ws`, never opened yet. */
+  function emptyWorkspace(root: string): string {
+    const at = join(root, 'ws')
+    mkdirSync(join(at, '.hive'), { recursive: true })
+    return at
+  }
+
+  it('a project moved on its own into another workspace (nothing else to repair): its views follow it, the fold in its new workspace; the old one keeps the rest (HI-2008, HR2)', async () => {
+    const { ws, at: a } = await twoProjects(join(base, 'solo-a'))
+    const b = emptyWorkspace(join(base, 'solo-b'))
+    const alphaA = join(a, 'alpha').toLowerCase()
+    const alphaB = join(b, 'alpha').toLowerCase()
+    // Set at the new place first (another window): the newer, kept.
+    config.update((c) => {
+      c.ui.sessionsTree = { ...c.ui.sessionsTree, [alphaB]: { 'agent:b2': false } }
+    })
+    renameSync(join(a, 'alpha'), join(b, 'alpha'))
+    await openAt(ws, b)
+    const ui = config.get().ui
+    expect([ui.skillsProvider?.[alphaB], ui.sessionsTree?.[alphaB], ui.hiveVcsNotice?.[alphaB], ui.assistantFold?.[`${b.toLowerCase()}|${alphaB}`]]).toEqual(['codex', { 'agent:b2': false }, 'synced', true])
+    expect([ui.skillsProvider?.[alphaA], ui.sessionsTree?.[alphaA], ui.hiveVcsNotice?.[alphaA], ui.assistantFold?.[`${a.toLowerCase()}|${alphaA}`]]).toEqual([undefined, undefined, undefined, undefined])
+    // The old workspace's other project and its panes are its own.
+    expect(ui.skillsProvider?.[join(a, 'beta').toLowerCase()]).toBe('claude-code')
+    expect([ui.panes?.[`assistant-open:${a.toLowerCase()}`], ui.panes?.[`progress-lanes-rows:${a.toLowerCase()}`]]).toEqual([1, 7])
+    expect((await inWorkspace(ws, () => repairMove(ws))).complete).toBe(true)
+    expect(config.get().ui.skillsProvider?.[alphaB]).toBe('codex')
+  })
+
+  it('a project copied into another workspace (its folder still there): the original keeps its views (HI-2008, HR2)', async () => {
+    const { ws, at: a } = await twoProjects(join(base, 'solo-copy-a'))
+    const b = emptyWorkspace(join(base, 'solo-copy-b'))
+    mkdirSync(join(b, 'alpha', '.hive'), { recursive: true })
+    writeFileSync(join(b, 'alpha', '.hive', 'project.json'), readFileSync(join(a, 'alpha', '.hive', 'project.json')))
+    await openAt(ws, b)
+    const ui = config.get().ui
+    expect(ui.skillsProvider?.[join(a, 'alpha').toLowerCase()]).toBe('codex')
+    expect(ui.skillsProvider?.[join(b, 'alpha').toLowerCase()]).toBeUndefined()
+    expect(ui.assistantFold?.[`${a.toLowerCase()}|${join(a, 'alpha').toLowerCase()}`]).toBe(true)
+  })
+
   it('copied (the old folder still there): the original keeps its pin, runs and token', async () => {
     const { ws, at, runs } = await pinnedWorkspace(join(base, 'two'))
     await ws.close()
