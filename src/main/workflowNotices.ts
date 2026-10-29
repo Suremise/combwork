@@ -57,7 +57,7 @@ const M = {
 }
 
 /** The events Hive tells the user of, as the Assistant's lane watch does by default (§16.11.4), less what it says itself. */
-const EVENTS: LaneEvent[] = ['failed', 'blocked', 'stalled', 'merge-due', 'paused']
+const EVENTS: LaneEvent[] = ['failed', 'blocked', 'stalled', 'merge-due', 'paused-merge']
 
 /** How often running lanes are looked at with no change (a stall comes with time), as lane watches are. */
 const TICK_MS = 30_000
@@ -117,7 +117,8 @@ async function laneNoticeFromAction(a: ActionRow, ws: WorkspaceService, ctx: Par
     if (e.event === 'failed') return withValues(M.failed, { card })
     if (e.event === 'blocked') return e.detail ? withValues(M.blocked, { card, reason: e.detail }) : withValues(M.blockedNoReason, { card })
     if (e.event === 'stalled') return e.card === null ? M.mergeStalled : withValues(M.stalled, { card })
-    if (e.event === 'paused') return withValues(e.detail === 'merging' ? M.merging : M.notMerged, { card })
+    // `paused`: an action kept before HI-1991 split it.
+    if (e.event === 'paused-merge' || (e.event as string) === 'paused') return withValues(e.detail === 'merging' ? M.merging : M.notMerged, { card })
     return M.mergeDue
   })
   if (lines.length) await ctx.dispatch(() => tell(at.projectPath, withValues(M.lane, { lane: String(a.payload.lane ?? '') }), lines))
