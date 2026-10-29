@@ -695,34 +695,60 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     }
   })
 
-  it('HI-2043: a launcher whose output stays open after it exits (held by another process): settled with what came, its code', async () => {
-    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'held', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
-    // A launcher standing in (no process: nothing to end): it writes, exits 0, and its output never closes.
-    const stream = () => Object.assign(new EventEmitter(), { destroy: vi.fn() })
-    const fake = Object.assign(new EventEmitter(), { stdout: stream(), stderr: stream(), pid: undefined })
+  /**
+   * HI-2043: a launcher standing in (no process: nothing to end), started through the runner's spawn and driven by `drive`;
+   * `kill` (its bound's end, through endTree) as `drive` sets it. The run's result, waited for within a bound inside the
+   * test's try (a run that never settles fails into its finally): released, closed and settled however it ends.
+   */
+  async function fakeLaunch(target: string, timeoutMs: number, drive: (cp: EventEmitter & { stdout: EventEmitter; stderr: EventEmitter; kill: () => void }) => void, check: (r: RunResult, cp: { kill: ReturnType<typeof vi.fn>; destroyed: () => number }) => void): Promise<void> {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target, root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    let destroyed = 0
+    const stream = () => Object.assign(new EventEmitter(), { destroy: () => void destroyed++ })
+    const fake = Object.assign(new EventEmitter(), { stdout: stream(), stderr: stream(), pid: undefined, exitCode: null, signalCode: null, kill: vi.fn() })
     vi.spyOn(a.runner, 'spawn').mockImplementation(async () => {
-      setImmediate(() => {
-        fake.stdout.emit('data', Buffer.from('said'))
-        fake.stderr.emit('data', Buffer.from('told'))
-        fake.emit('exit', 0, null)
-      })
+      setImmediate(() => drive(fake))
       return fake as unknown as ChildProcess
     })
     let result: RunResult | null = null
-    const run = a.runner.run('testMerge', process.execPath, ['-e', '']).then((r) => (result = r))
-    // However the test ends (a run that never settles too: the wait is bounded, so it fails into finally): released.
+    const run = a.runner.run('testMerge', process.execPath, ['-e', ''], { timeoutMs }).then((r) => (result = r))
     try {
       await vi.waitFor(() => expect(result).not.toBeNull(), { timeout: 30_000, interval: 100 })
-      expect(result).toMatchObject({ ok: true, code: 0, out: 'said', err: 'told' })
-      expect(result!.timedOut).toBeUndefined()
-      // Its output closed once quiet, as runGit closes a held one.
-      expect(fake.stdout.destroy).toHaveBeenCalled()
-      expect(fake.stderr.destroy).toHaveBeenCalled()
+      check(result!, { kill: fake.kill, destroyed: () => destroyed })
     } finally {
       await a.runner.release()
       fake.emit('close', 0, null)
       await run.catch(() => {})
     }
+  }
+
+  it('HI-2043: a launcher that exits before its bound, its output held open past it (by another process): its code and what came, never timed out', async () => {
+    await fakeLaunch('held', 50, (cp) => {
+      cp.stdout.emit('data', Buffer.from('said'))
+      cp.stderr.emit('data', Buffer.from('told'))
+      cp.emit('exit', 0, null)
+    }, (r, cp) => {
+      expect(r).toMatchObject({ ok: true, code: 0, out: 'said', err: 'told' })
+      expect(r.timedOut).toBeUndefined()
+      // Nothing ended (its bound stopped at its exit), and its output closed once quiet, as runGit closes a held one.
+      expect(cp.kill).not.toHaveBeenCalled()
+      expect(cp.destroyed()).toBe(2)
+    })
+  })
+
+  it('HI-2043: a launcher its bound ends: timed out, with what it had said at the bound, and what came after it', async () => {
+    await fakeLaunch('bounded', 50, (cp) => {
+      cp.stderr.emit('data', Buffer.from('waiting for a passphrase'))
+      cp.kill = vi.fn(() => {
+        cp.emit('exit', null, 'SIGTERM')
+        setImmediate(() => {
+          cp.stderr.emit('data', Buffer.from('; ended'))
+          cp.emit('close', null, 'SIGTERM')
+        })
+      })
+    }, (r) => {
+      expect(r).toMatchObject({ ok: false, timedOut: true, errAtTimeout: 'waiting for a passphrase', err: 'waiting for a passphrase; ended' })
+      expect(r.signal).toBeUndefined()
+    })
   })
 
   it('#1350: a run past its bound (a signer waiting for a passphrase, under git) is ended with its whole tree, and says it timed out', async () => {

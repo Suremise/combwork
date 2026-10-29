@@ -413,6 +413,8 @@ export class QueueRunner {
     let ended = null as string | null
     const code = await new Promise<number>((res) => {
       // HI-2043: its output read whole, bounded once it has exited (its bound's end too: what it wrote meanwhile kept).
+      // Its bound is on the launcher, not its output: one that exited in time is never timed out by output still open.
+      child.once('exit', () => clearTimeout(timer))
       onOutputSettled(child, (c, s) => {
         ended = c === null ? (s ?? 'unknown') : null
         res(c ?? 1)

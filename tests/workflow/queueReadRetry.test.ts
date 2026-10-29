@@ -11,7 +11,7 @@ import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
-import { READ_RETRIES, type QueueConfig } from '../../src/main/workflow/mergeQueue'
+import { gitTree, READ_RETRIES, type QueueConfig } from '../../src/main/workflow/mergeQueue'
 import { git } from '../../src/main/git'
 import * as G from '../../src/main/platform/git'
 import { isUnknown } from '../../src/main/platform/types'
@@ -51,9 +51,12 @@ vi.mock('../../src/main/gitWorker', async (orig) => {
  * Matching ones fail to start: an 'error' with no pid (EAGAIN), or, `sync`, a throw at once; or, `signal` (HI-2042), start
  * and are ended by that signal (an exit with no code, as Node reports a child ended through its handle); or, `late`
  * (HI-2043), run for real with their exit told first and their output after it, two turns later, then their close (as
- * a loaded machine can deliver them), or `held`, its output before its exit and never closed. Everything else is spawned.
+ * a loaded machine can deliver them), or `held`, its output before its exit and never closed; or, `drive`, no process
+ * at all: a child standing in (nothing to end), which the rule's function drives. Everything else is spawned.
  */
-const spawnFail = vi.hoisted(() => ({ rules: [] as { match: string; times: number; sync?: boolean; signal?: string; late?: boolean; held?: boolean }[], seen: [] as string[] }))
+const spawnFail = vi.hoisted(() => ({ rules: [] as { match: string; times: number; sync?: boolean; signal?: string; late?: boolean; held?: boolean; drive?: (cp: FakeChild) => void }[], seen: [] as string[] }))
+/** A child standing in for git (`drive`): its outputs, and `kill` (its bound's end, through endTree) as the rule sets it. */
+type FakeChild = import('events').EventEmitter & { stdout: import('events').EventEmitter & { destroy: () => void }; stderr: import('events').EventEmitter & { destroy: () => void }; pid: undefined; exitCode: number | null; signalCode: string | null; kill: () => void; killed: number; destroyed: number }
 vi.mock('child_process', async (orig) => {
   const real = (await orig()) as typeof import('child_process')
   const { EventEmitter } = await import('events')
@@ -63,6 +66,14 @@ vi.mock('child_process', async (orig) => {
     if (cmd === 'git') spawnFail.seen.push(line)
     if (!rule) return real.spawn(cmd, args as string[], opts as never)
     rule.times--
+    if (rule.drive) {
+      const cp = new EventEmitter() as FakeChild
+      const stream = () => Object.assign(new EventEmitter(), { destroy: () => void cp.destroyed++ })
+      Object.assign(cp, { stdout: stream(), stderr: stream(), pid: undefined, exitCode: null, signalCode: null, killed: 0, destroyed: 0, kill: () => void cp.killed++ })
+      const drive = rule.drive
+      setImmediate(() => drive(cp))
+      return cp
+    }
     if (rule.late || rule.held) {
       const child = real.spawn(cmd, args as string[], opts as never)
       const stream = () => Object.assign(new EventEmitter(), { destroy: () => {} })
@@ -530,6 +541,44 @@ describe("the queue's own git's output, read whole before a failure is told (HI-
     expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
     expect(spawnFail.rules[0].times).toBe(0)
     expect(e.wf.state(card).stage).toBe('done')
+  })
+
+  // HR3's round 1: its bound is on git, not on its output.
+  it('a git that exits before its bound, its output open past it: never timed out, its own answer (nothing ended)', async () => {
+    let child: FakeChild | null = null
+    spawnFail.rules.push({ match: 'merge', times: 1, drive: (cp) => {
+      child = cp
+      cp.stderr.emit('data', Buffer.from('told'))
+      cp.exitCode = 0
+      cp.emit('exit', 0, null)
+    } })
+    const r = await gitTree('.', ['merge', 'x'], { env: {}, timeoutMs: 50 })
+    expect(r).toMatchObject({ ok: true, code: 0, err: 'told' })
+    expect(r.timedOut).toBeUndefined()
+    expect(child!.killed).toBe(0)
+    // Its output closed once quiet.
+    expect(child!.destroyed).toBe(2)
+  })
+
+  it('a git its bound ends: timed out, with what it had said at the bound, and what came after it', async () => {
+    let child: FakeChild | null = null
+    spawnFail.rules.push({ match: 'merge', times: 1, drive: (cp) => {
+      child = cp
+      cp.stderr.emit('data', Buffer.from('waiting for a passphrase'))
+      cp.kill = () => {
+        cp.killed++
+        cp.signalCode = 'SIGTERM'
+        cp.emit('exit', null, 'SIGTERM')
+        setImmediate(() => {
+          cp.stderr.emit('data', Buffer.from('; ended'))
+          cp.emit('close', null, 'SIGTERM')
+        })
+      }
+    } })
+    const r = await gitTree('.', ['merge', 'x'], { env: {}, timeoutMs: 50 })
+    expect(r).toMatchObject({ ok: false, timedOut: true, errAtTimeout: 'waiting for a passphrase', err: 'waiting for a passphrase; ended' })
+    expect(r.signal).toBeUndefined()
+    expect(child!.killed).toBe(1)
   })
 })
 

@@ -484,9 +484,9 @@ function commitEnv(): NodeJS.ProcessEnv {
 /**
  * git as Hive runs it, with no input (no terminal to prompt on), in an environment and within a bound: at the bound its
  * whole tree (git, a hook, a signer) is ended, and the result says so. The queue's git when its config gives none (tests;
- * the app runs it through the runner's recorded spawn).
+ * the app runs it through the runner's recorded spawn). Exported for its tests (HI-2043: its bound against its output).
  */
-function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<QueueGitResult> {
+export function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<QueueGitResult> {
   return new Promise((res) => {
     const out: Buffer[] = []
     const err: Buffer[] = []
@@ -522,6 +522,8 @@ function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<Qu
     })
     // HI-2043: its output read whole before it is told (a hook's refusal by git's trace at its end), bounded once git has
     // exited. HI-2042: ended by a signal (no code of its own) is -1, never 1 (git's "no"); one its bound ended stays timed out.
+    // Its bound is on git, not its output: a git that exited in time is never timed out by output still open after it.
+    child.once('exit', () => clearTimeout(timer))
     onOutputSettled(child, (c, sig) => (c === null && !timedOut ? done(-1, undefined, sig ?? 'unknown') : done(c ?? 1)))
   })
 }
