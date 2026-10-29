@@ -2119,7 +2119,10 @@ export class Workflow {
       w.move(to, skipped.length ? 'override' : 'user')
       return null
     })
-    return out ? this.refuse(card, by, 'move', out) : this.ok(card, from, to)
+    if (out) return this.refuse(card, by, 'move', out)
+    // An override's Done (Darren's option A, HI-2014): the reply says which cards waiting on it start without its work.
+    const waiting = to === 'done' && skipped.length ? this.store.cards().filter((c) => c.blockedBy.includes(card.id) && c.stage !== 'done').map((c) => c.key) : []
+    return this.ok(card, from, to, undefined, waiting.length ? [`${waiting.join(', ')} can start without ${card.key}'s work in the target: it is Done by an override, not merged.`] : undefined) // i18n-ignore: a reply's warning (agents and the Agent API read it)
   }
 
   /**

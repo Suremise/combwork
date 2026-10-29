@@ -155,7 +155,10 @@ describe('what a finish counts for', () => {
     const e = (env = setup({ ...pairOpts, finish: 'agentMerges', target: 'main' }))
     const a = await passed(e, 'A', 'a.txt')
     const b = e.wf.createCard({ title: 'Needs A', blockedBy: [a.id] })
-    moved(await e.wf.move(a.key, 'done', 'user', { confirm: true, reason: 'not needed in main' }))
+    const reply = await e.wf.move(a.key, 'done', 'user', { confirm: true, reason: 'not needed in main' })
+    moved(reply)
+    // The move's reply says it (Darren's option A): the card waiting on it starts without its work.
+    expect('warnings' in reply ? reply.warnings : []).toEqual([`${b.key} can start without ${a.key}'s work in the target: it is Done by an override, not merged.`])
     moved(await e.wf.start(b.key, B2))
   })
 
