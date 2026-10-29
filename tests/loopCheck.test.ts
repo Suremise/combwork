@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { cardsInPlay, owedCards, unwatched } from '../src/main/loopCheck'
 import { providerDescriptor } from '../src/shared/providers'
-import { laneOrderWait, laneOrderWaitReason, LOOP_STEP_STALL_GRACE_MS, loopStepWait, loopStepWaitReason, notWatchingAgent, pendingDesign, pendingStep, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
+import { backgroundTaskMinutes, builderJobOf, laneOrderWait, laneOrderWaitReason, LOOP_STEP_STALL_GRACE_MS, loopStepWait, loopStepWaitReason, notWatchingAgent, pendingDesign, pendingStep, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
 
 const card = (number: number, over: Partial<TaskCard> = {}): TaskCard => ({ number, title: `Card ${number}`, project: 'alpha', column: 'todo', agent: null, archived: false, labels: [], blockedBy: [], links: [], comments: [], history: [], ...over }) as unknown as TaskCard
@@ -166,6 +166,56 @@ describe('a card in Review whose reviewer started, gave no verdict and only watc
     expect(reviewVerdictWaitReason(started(), [], late)).toBeNull()
     // The other review stall (#521) is for a review not started: the two never both apply.
     expect(reviewWaitReason(started({ history: [{ at: at(-1), by: 'HB3 (alpha)', what: 'Moved to Review' }] }), watching, late)).toBeNull()
+  })
+})
+
+describe("a started review waiting on its builder's background job for the card (HI-1993)", () => {
+  const t0 = Date.parse('2026-10-28T15:00:00.000Z')
+  const at = (min: number) => new Date(t0 + min * 60_000).toISOString()
+  const ms = (min: number) => t0 + min * 60_000
+  const limit = 60 * 60_000
+  const started = (over: Partial<TaskCard> = {}) => card(191, { column: 'review', agent: 'b1', review: { agent: 'r1', agentName: 'LR1', since: at(0) }, ...over })
+  // LR1 asked for a 50-run stress proof two minutes in, and went back to watching the card for it.
+  const watching = [{ name: 'LR1', project: 'alpha', agentId: 'r1', cards: [191], status: 'watching', watchSince: at(2) }]
+  const run = (over: Record<string, unknown> = {}) => ({ agentId: 'b1', projectPath: 'D:\\work\\alpha', card: 191, state: 'running' as const, staleReason: null, startedAt: ms(3), finishedAt: null, ...over })
+  const stall = (job: ReturnType<typeof builderJobOf>, now: number) => reviewVerdictWaitReason(started(), watching, now, undefined, job)
+
+  it("no stall while the builder's run for the card goes, or its background tasks do", () => {
+    // A Progress run of the builder's for the card: running, or quiet with its process still there.
+    expect(stall(builderJobOf(started(), [run()], null, limit, ms(50)), ms(50))).toBeNull()
+    expect(stall(builderJobOf(started(), [run({ state: 'stale', staleReason: 'quiet' })], null, limit, ms(50)), ms(50))).toBeNull()
+    // Its CLI's background tasks (a background shell or a Monitor), with no run.
+    expect(stall(builderJobOf(started(), [], { backgroundTasks: 1 }, limit, ms(50)), ms(50))).toBeNull()
+  })
+
+  it("once the job ends with no verdict: a stall, its clock from the job's end", () => {
+    const ended = [run({ state: 'passed', finishedAt: ms(40) })]
+    expect(stall(builderJobOf(started(), ended, null, limit, ms(54)), ms(54))).toBeNull()
+    expect(stall(builderJobOf(started(), ended, null, limit, ms(55)), ms(55))).toBe('LR1 started reviewing #191 but has given no verdict, and has only been watching it for 15 min.')
+    // Background tasks that ended: from when they did.
+    const tasks = { backgroundTasks: 0, backgroundEndedAt: at(30) }
+    expect(stall(builderJobOf(started(), [], tasks, limit, ms(44)), ms(44))).toBeNull()
+    expect(stall(builderJobOf(started(), [], tasks, limit, ms(45)), ms(45))).toMatch(/^LR1 started reviewing #191 but has given no verdict/)
+    // A run that never ends counts only to the background task limit from its start: then it is taken as ended.
+    expect(builderJobOf(started(), [run()], null, limit, ms(63) - 1)).toEqual({ running: true, endedAt: null })
+    expect(builderJobOf(started(), [run()], null, limit, ms(63))).toEqual({ running: false, endedAt: ms(63) })
+    expect(stall(builderJobOf(started(), [run()], null, limit, ms(78)), ms(78))).toMatch(/watching it for 15 min\.$/)
+    // A run its agent stopped before it finished isn't going.
+    expect(stall(builderJobOf(started(), [run({ state: 'stale', staleReason: 'agent-stopped' })], null, limit, ms(30)), ms(30))).toMatch(/^LR1 started reviewing/)
+  })
+
+  it('no job at all: a stall, as before', () => {
+    expect(builderJobOf(started(), [], null, limit, ms(30))).toBeNull()
+    expect(stall(null, ms(30))).toBe(reviewVerdictWaitReason(started(), watching, ms(30)))
+    expect(stall(null, ms(30))).toMatch(/watching it for 28 min\.$/)
+    // Runs that aren't the builder's for this card, in its project, are none of its job.
+    const others = [run({ agentId: 'r1' }), run({ card: 192 }), run({ projectPath: 'D:\\work\\beta' }), run({ projectPath: null })]
+    expect(builderJobOf(started(), others, null, limit, ms(30))).toBeNull()
+    expect(builderJobOf(started({ agent: null }), [run()], { backgroundTasks: 2 }, limit, ms(30))).toBeNull()
+  })
+
+  it('the background task limit as Settings keeps it', () => {
+    expect([backgroundTaskMinutes(60), backgroundTaskMinutes(5), backgroundTaskMinutes(900), backgroundTaskMinutes(undefined)]).toEqual([60, 10, 480, 60])
   })
 })
 

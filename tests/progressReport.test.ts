@@ -540,6 +540,21 @@ describe('reporting a run', () => {
     expect(commandLabel(ok).startsWith(String(calls[0].body.title).replace(/…$/, ''))).toBe(true)
   })
 
+  it("a command's output tells Hive its run still goes, at most every keep-alive; a silent one sends nothing (HI-1993)", async () => {
+    // A stress loop with no step lines, printing as it goes: it ends once Hive has had a keep-alive (an empty update).
+    const loud = `const t = setInterval(() => console.log('run'), 20); seen((c) => c.some((x) => x.method === 'PATCH')).then(() => { clearInterval(t) })`
+    const r = await wrap(['--', ...seenNode, '-e', loud], env(), 0, dir, { resolveTimeoutMs: 1000, keepAliveMs: 50 })
+    expect(r.code).toBe(0)
+    const patches = calls.filter((c) => c.method === 'PATCH')
+    expect(patches.length).toBeGreaterThan(0)
+    expect(patches.every((c) => c.path === '/v1/progress/run-1' && Object.keys(c.body).length === 0)).toBe(true)
+    // Silent for as long: no keep-alive (a command that stopped reporting still goes stale).
+    calls.length = 0
+    const quiet = `seen((c) => c.length > 0).then(() => new Promise((res) => setTimeout(res, 300)))`
+    await wrap(['--', ...seenNode, '-e', quiet], env(), 0, dir, { resolveTimeoutMs: 1000, keepAliveMs: 50 })
+    expect(calls.map((c) => c.method)).toEqual(['POST', 'POST'])
+  })
+
   it('a total given after the run started (no step line at first) is sent once, with the first update that has it (#145)', async () => {
     // The step lines come only once the start has been reported; the second total is ignored.
     const script = `seen((c) => c.length > 0).then(() => { console.log('##hive-progress step=2 total=5 name=late'); return seen((c) => c.some((x) => x.method === 'PATCH')) }).then(() => { console.log('##hive-progress step=3 total=9 name=later'); return seen((c) => c.some((x) => x.body.stepName === 'later')) })`

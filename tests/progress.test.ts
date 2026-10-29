@@ -432,6 +432,25 @@ describe('progress runs', () => {
     expect(s.list(WS).find((r) => r.id === sc.id)!.state).toBe('running')
   })
 
+  it("a keep-alive (an empty report: hive-progress's command still writing output, HI-1993) keeps it running, and its deadline", () => {
+    const s = store()
+    const loop = s.start(alfie, { title: 'stress loop' })
+    const timed = s.start(betty, { title: 'timed', estimateMs: 20 * 60_000 })
+    for (let i = 0; i < 15; i++) {
+      now += 60_000
+      s.update(alfie, loop.id, {})
+      s.update(betty, timed.id, {})
+      s.sweep()
+    }
+    expect(s.list(WS).find((r) => r.id === loop.id)).toMatchObject({ state: 'running', staleReason: null })
+    // What is left of an estimate is as it was: a keep-alive moves no deadline.
+    expect(timeLeft(s.list(WS).find((r) => r.id === timed.id)!, now)).toBe(5 * 60_000)
+    // Silent past the limit, it goes stale as before.
+    now += 10 * 60_000 + 1000
+    s.sweep()
+    expect(s.list(WS).find((r) => r.id === loop.id)).toMatchObject({ state: 'stale', staleReason: 'quiet' })
+  })
+
   it('waiting (#549): no time left while it waits, never stale meanwhile; what was left comes back from when it stops waiting', () => {
     const s = store()
     // Waiting from the start, with an estimate: it is held, not counted down.

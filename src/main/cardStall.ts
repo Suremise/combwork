@@ -1,8 +1,8 @@
 import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
-import { columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, type LaneOrderView, type StallAgent } from '../shared/tasks'
-import type { AgentInfo, AgentStart, TaskCard } from '../shared/types'
+import { backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, type LaneOrderView, type StallAgent } from '../shared/tasks'
+import type { AgentInfo, AgentStart, ProgressRun, TaskCard } from '../shared/types'
 import { LOOP_STEP_WAIT_MINUTES } from '../shared/lanes'
 import { projectPreferences } from './workflow/preferences'
 import { queueReturnOf, staleApprovalOf } from './queueReturn'
@@ -10,6 +10,7 @@ import { isResuming } from './restartResume'
 import { startNow, startSeq } from './agentStarts'
 import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
+import { config } from './config'
 
 /**
  * Why a card is stalled, in one place (the Agent API's `stalled`, and lane watches, #531): a Doing card nobody works on
@@ -30,6 +31,15 @@ import { workspaceOf, type WorkspaceService } from './workspace'
 let reviewCopyWaitReason: ((c: TaskCard, wsPath: string | null) => string | null) | null = null
 export function setReviewCopyWaitReason(fn: typeof reviewCopyWaitReason): void {
   reviewCopyWaitReason = fn
+}
+
+/**
+ * A workspace's Progress runs (by its folder), given by the app as it starts (progressService brings in the windows):
+ * a review waiting on its builder's run for the card isn't stalled (HI-1993). None in unit tests.
+ */
+let runsOf: ((wsPath: string) => ProgressRun[]) | null = null
+export function setStallRuns(fn: typeof runsOf): void {
+  runsOf = fn
 }
 
 /** How long a card the merge queue returned waits in Doing, its builder idle or watching, before it is stalled (HI-1721). */
@@ -97,12 +107,12 @@ export function laneNextWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column'
 }
 
 /** A workspace's live agents (by its folder): their names, projects, cards left with no watch, card watches (and since when), and how each is now. */
-function liveOf(wsPath: string): { name: string; project: string; agentId: string; notWatching?: number[]; untaken: boolean; cards: number[]; watchSince?: string; status: string; silentMinutes?: number }[] {
+function liveOf(wsPath: string): { name: string; project: string; agentId: string; notWatching?: number[]; untaken: boolean; cards: number[]; watchSince?: string; status: string; silentMinutes?: number; backgroundTasks?: number; backgroundEndedAt?: string }[] {
   const ws = wsPath.toLowerCase()
   return sessions
     .liveStates()
     .filter((s) => workspaceOf(s.projectPath).path?.toLowerCase() === ws)
-    .map((s) => ({ name: s.agentName ?? s.agentId, project: basename(s.projectPath), agentId: s.agentId, notWatching: s.notWatching, untaken: !!s.untakenLine, cards: s.watch?.cards ?? [], watchSince: s.watch?.since, status: s.status, silentMinutes: agentRuntime(s).silentMinutes }))
+    .map((s) => ({ name: s.agentName ?? s.agentId, project: basename(s.projectPath), agentId: s.agentId, notWatching: s.notWatching, untaken: !!s.untakenLine, cards: s.watch?.cards ?? [], watchSince: s.watch?.since, status: s.status, silentMinutes: agentRuntime(s).silentMinutes, backgroundTasks: s.backgroundTasks, backgroundEndedAt: s.backgroundEndedAt }))
 }
 
 export type { StallAgent }
@@ -154,7 +164,9 @@ export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: stri
   const builder = (returned || stale) && c.agent && c.project ? live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project!.toLowerCase()) : undefined
   const now = builder ? { name: builder.name, status: builder.status, watching: builder.cards.length > 0 } : null
   const back = now ? (returnedWaitReason(c, returned, now) ?? staleWaitReason(c, stale, now)) : null
-  return startFailedReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs) ?? laneNext(c, lane, live, agentNow) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
+  // A started review's builder's job for the card (HI-1993): only read for a card it could stall.
+  const job = c.column === 'review' && c.review && c.agent && wsPath ? builderJobOf(c, runsOf?.(wsPath) ?? [], live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project.toLowerCase()) ?? null, backgroundTaskMinutes(config.settings.agents.backgroundTaskMinutes) * 60_000) : null
+  return startFailedReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers, Date.now(), undefined, job) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs) ?? laneNext(c, lane, live, agentNow) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
 }
 
 /**

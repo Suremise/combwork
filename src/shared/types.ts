@@ -2244,6 +2244,8 @@ export interface LiveSessionState {
   settingUp?: boolean
   /** Background tasks the agent started that are still running (commands, Monitors, Codex's background terminals). */
   backgroundTasks?: number
+  /** When its background tasks last ended (ISO: the count went to none), so a review waiting on them starts its clock then (HI-1993). */
+  backgroundEndedAt?: string
   /** The running conversation's transcript size in bytes, once the provider has written one. */
   transcriptBytes?: number
   /** The start of its latest reply, as its last turn's end reported it (shared/tiles.ts replyStart): its tile's last lines (#976). */
