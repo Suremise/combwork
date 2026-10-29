@@ -36,9 +36,9 @@
 import { createRequire } from 'module'
 import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { buildWhy, devBuild, ensureBuild } from '../e2e/build.mjs'
+import { devBuild, ensureBuildWithSlot } from '../e2e/build.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from '../e2e/lanes.mjs'
-import { creditFor, heldCredit, preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from '../e2e/slots.mjs'
+import { buildNeedsCpuSlot, creditFor, preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from '../e2e/slots.mjs'
 import { waitForCodexHome } from '../e2e/codexHomeLock.mjs'
 import { autoClean } from '../e2e/clean.mjs'
 import { scenariosProgress, slotWaitProgress } from '../progressReport.mts'
@@ -174,15 +174,13 @@ process.on('exit', lane.release)
 process.on('SIGINT', () => process.exit(130))
 
 // A model trial holds no CPU slot (HI-2070): a build it has to make is CPU work, so it takes a small run's slot (the
-// side slot, else a heavy one) for the build alone, unless what it runs inside holds one for it.
-let buildSlot = null
-if (pool === 'model' && !heldCredit().has('cpu') && buildWhy(lib.ROOT).why) {
-  const what = `the build for scenarios: ${chosen.length} (${provider})`
+// side slot, else a heavy one) for the build alone, unless what it holds or runs inside covers CPU work.
+const takeBuildSlot = async () => {
   const buildQueue = slotWaitProgress('scenarios', `npm run scenarios -- ${argv.join(' ')}`.trim(), argv)
   let said = ''
-  buildSlot = await waitForSlot(runContext.HEAVY_DIR, {
+  const got = await waitForSlot(runContext.HEAVY_DIR, {
     pool: 'small',
-    what,
+    what: `the build for scenarios: ${chosen.length} (${provider})`,
     root: lib.ROOT,
     wait: !argv.includes('--no-wait'),
     onWait: (look) => {
@@ -192,20 +190,22 @@ if (pool === 'model' && !heldCredit().has('cpu') && buildWhy(lib.ROOT).why) {
       buildQueue.waitingAs(waitSummary(look))
     }
   })
-  if (buildSlot.refused) {
-    console.error(refusedLine(buildSlot.refused))
+  if (got.refused) {
+    console.error(refusedLine(got.refused))
     process.exit(2)
   }
-  if (said) await buildQueue.finish(`got a test slot after ${Math.round(buildSlot.waitedMs / 1000)} s`)
+  if (said) await buildQueue.finish(`got a test slot after ${Math.round(got.waitedMs / 1000)} s`)
+  return got
 }
 
 // Under the worktree's build lock (build.mjs): an e2e or scenario run started beside this one builds it once. Once it
 // has a lane (#735): a run that waited for one tests the source as it is then, not as it was when it started.
 let build
 try {
-  build = ensureBuild({
+  build = await ensureBuildWithSlot({
     root: lib.ROOT,
-    build: true,
+    needsSlot: buildNeedsCpuSlot({ provider, pool }),
+    takeSlot: takeBuildSlot,
     runBuild: () => {
       console.log('Building (the dev build is not from this source)…')
       devBuild(lib.ROOT)
@@ -214,8 +214,6 @@ try {
 } catch (e) {
   console.error(e.message)
   process.exit(e.status ?? 2)
-} finally {
-  buildSlot?.release()
 }
 if (build.waited) console.log(`Waited for another runner's build of this worktree${build.built ? '' : ': it is from this source'}.`)
 if (build.stale) {

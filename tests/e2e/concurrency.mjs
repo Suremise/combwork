@@ -292,9 +292,13 @@ async function heavyRound(k, worktrees) {
       const one = { ...env, HIVE_TEST_HEAVY_SLOTS: '1' }
       const scenarios = ['--repeat', '2', '--only', SCENARIO, '--no-wait', '--no-progress']
       // What a suite's agent shell keeps of its run context (E2E_RUN_*).
-      const inSuite = { ...one, E2E_RUN_SUITE: 'progressreport', E2E_RUN_DIR: join(pool, 'parent-run'), E2E_RUN_PORT: '47950' }
+      // Its parent's run holds the CPU slot it runs in: E2E_RUN_SLOTS says so (HI-2070).
+      const inSuite = { ...one, E2E_RUN_SUITE: 'progressreport', E2E_RUN_DIR: join(pool, 'parent-run'), E2E_RUN_PORT: '47950', E2E_RUN_SLOTS: 'cpu' }
       const nested = await start({ name: 'nested heavy scenarios', cwd: root, script: 'tests/scenarios/run.mjs', args: scenarios, env: inSuite })
       check('a heavy scenario run inside a suite runs without a slot while its parent holds the only one, even with --no-wait', parent.slot === 0 && nested.code === 0 && !/test slot/i.test(nested.out), `parent slot ${parent.slot}, exit ${nested.code}: ${nested.out.trim().split('\n').slice(-3).join(' / ')}`)
+      // Inside a suite of a light run, which holds no slot (HI-2070): no credit, so it asks for a slot and is refused.
+      const light = await start({ name: 'nested heavy scenarios, light parent', cwd: root, script: 'tests/scenarios/run.mjs', args: scenarios, env: { ...inSuite, E2E_RUN_SLOTS: '' } })
+      check("…while inside a light run's suite (no slot held: no credit) it asks for one, refused at once", light.code === 2 && /No test slot free \(--no-wait\).*held by the parent e2e run/.test(light.out) && light.ms < 15_000, `exit ${light.code} in ${light.ms} ms: ${light.out.trim().split('\n').at(-1)}`)
       const top = await start({ name: 'top-level heavy scenarios', cwd: root, script: 'tests/scenarios/run.mjs', args: scenarios, env: one })
       check('…while the same run at the top level is refused, naming the holder', top.code === 2 && /No test slot free \(--no-wait\).*held by the parent e2e run/.test(top.out) && top.ms < 15_000, `exit ${top.code} in ${top.ms} ms: ${top.out.trim().split('\n').at(-1)}`)
     } finally {

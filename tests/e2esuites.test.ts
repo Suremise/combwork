@@ -20,11 +20,11 @@ import { recordJson, recordMarkdown, selectionLine, selectionOf } from './e2e/re
 // @ts-expect-error: plain .mjs modules without types
 import { makeDist } from '../scripts/distCopy.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { buildLock, buildStamp, buildStamped, buildStampedAt, builtOnce, devBuild, ensureBuild } from './e2e/build.mjs'
+import { buildLock, buildStamp, buildStamped, buildStampedAt, builtOnce, devBuild, ensureBuild, ensureBuildWithSlot } from './e2e/build.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { LANES, LANE_FIRST, LANE_PORTS, claimHeld, claimLane, describeHolder, holdOwnPool, laneHolders, lanePorts, laneWaitLine, lanesFirst, laneWork, pickLane, portFree, waitForLane } from './e2e/lanes.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { SIDE_E2E_JOBS, creditFor, describeClaim, heavySlots, heldCredit, holdsMergeSlot, isFullUnitRun, isHeavy, launchEnded, leftOverCheck, leftOverLine, needsSlot, preMerge, refusedLine, runOwner, slotPool, slotSettings, trySlot, waitForSlot, waitLine, waitSummary } from './e2e/slots.mjs'
+import { SIDE_E2E_JOBS, buildNeedsCpuSlot, creditFor, describeClaim, heavySlots, heldCredit, holdsMergeSlot, isFullUnitRun, isHeavy, launchEnded, leftOverCheck, leftOverLine, needsSlot, preMerge, refusedLine, runOwner, slotPool, slotSettings, trySlot, waitForSlot, waitLine, waitSummary } from './e2e/slots.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { addWorktree, invocationDir, keepDir, removeInvocation, removeStale, removeWorktree } from './e2e/tempWorktrees.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -2571,7 +2571,7 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     for (const f of ['e2e/run.mjs', 'scenarios/run.mjs']) {
       const src = readFileSync(join(__dirname, f), 'utf8')
       expect(src, f).toMatch(/const pool = slotPool\(\{ kind: '(e2e|scenarios)', count: chosen\.length, repeat: \w+(\.repeat)?(, provider)? \}\)\r?\nif \(pool\) \{/)
-      expect(src, f).not.toMatch(/\bisHeavy\b|\bneedsSlot\b/)
+      expect(src, f).not.toMatch(/\bisHeavy\b|\bneedsSlot\(/)
     }
     // A suite's nested heavy run has the suite's CPU credit; a real model's trial inside it still needs a model trial's
     // slot (HI-2070: only matching credit counts; "a resource-aware rule" below).
@@ -2923,10 +2923,87 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { CARRIED: string[]; suiteEnv: (o: object, parent: object) => Record<string, string> }
     expect(runContext.CARRIED).toContain('E2E_RUN_SLOTS')
     expect(runContext.suiteEnv({ name: 's', runDir: 'C:/x', slots: 'cpu,model' }, {}).E2E_RUN_SLOTS).toBe('cpu,model')
-    expect(readFileSync(join(__dirname, 'e2e', 'run.mjs'), 'utf8')).toContain("slots: creditFor('cpu')")
+    expect(runContext.suiteEnv({ name: 's', runDir: 'C:/x' }, {}).E2E_RUN_SLOTS).toBe('')
+    // Each runner passes on what it holds and was given, never a kind it doesn't hold (HR2's round 2).
+    expect(readFileSync(join(__dirname, 'e2e', 'run.mjs'), 'utf8')).toContain('slots: creditFor(pool) })')
+    expect(readFileSync(join(__dirname, 'e2e', 'run.mjs'), 'utf8')).not.toMatch(/creditFor\('cpu'\)/)
     expect(readFileSync(join(__dirname, 'scenarios', 'run.mjs'), 'utf8')).toMatch(/process\.env\.E2E_RUN_SLOTS = creditFor\(pool\)/)
-    // A model trial's build is CPU work: it takes a small run's slot unless it has CPU credit.
-    expect(readFileSync(join(__dirname, 'scenarios', 'run.mjs'), 'utf8')).toMatch(/if \(pool === 'model' && !heldCredit\(\)\.has\('cpu'\) && buildWhy\(lib\.ROOT\)\.why\) \{[\s\S]{0,400}pool: 'small'/)
+    expect(readFileSync(join(__dirname, 'scenarios', 'run.mjs'), 'utf8')).toMatch(/ensureBuildWithSlot\(\{[\s\S]{0,120}needsSlot: buildNeedsCpuSlot\(\{ provider, pool \}\),\s+takeSlot: takeBuildSlot/)
+  })
+
+  it("composed (HI-2070, HR2's round 2): a light run passes on only what it was given; a model parent's light e2e run's suite gives its heavy child no CPU credit", () => {
+    const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { suiteEnv: (o: object, parent: object) => Record<string, string> }
+    const small = { e2eSuites: 3, e2eRepeat: 3, scenarioRuns: 5 }
+    // What the e2e runner does: its pool from slotPool, then each suite's environment from suiteEnv with creditFor(pool).
+    const e2eRun = (run: object, env: Record<string, string>) => {
+      const pool = slotPool({ kind: 'e2e', ...run }, env, small)
+      return { pool, suite: runContext.suiteEnv({ name: 'inner', port: 48950, runDir: 'C:/x', slots: creditFor(pool, env) }, env) }
+    }
+    // A model trial's test Hive session (the scenario runner's creditFor('model'), carried into it).
+    const trialSession = { E2E_RUN_SUITE: 'real-model-parent', E2E_RUN_PORT: '47950', E2E_RUN_SLOTS: creditFor('model', {}) }
+    const light = e2eRun({ count: 1 }, trialSession)
+    expect(light.pool).toBeNull()
+    expect(light.suite.E2E_RUN_SLOTS).toBe('model')
+    // Its suite's heavy grandchild asks for a CPU slot, and so does a full unit run there; a nested trial is covered.
+    expect(slotPool({ kind: 'e2e', count: 196 }, light.suite, small)).toBe('heavy')
+    expect(heldCredit(light.suite).has('cpu')).toBe(false)
+    expect(slotPool({ kind: 'scenarios', count: 1, provider: 'codex' }, light.suite, small)).toBeNull()
+    // A light top-level run mints no credit either; a heavy one gives its suites CPU credit, as before (#211).
+    expect(e2eRun({ count: 2 }, {}).suite.E2E_RUN_SLOTS).toBe('')
+    expect(slotPool({ kind: 'e2e', count: 196 }, e2eRun({ count: 2 }, {}).suite, small)).toBe('heavy')
+    const heavy = e2eRun({ count: 196 }, {})
+    expect([heavy.pool, heavy.suite.E2E_RUN_SLOTS, slotPool({ kind: 'e2e', count: 196 }, heavy.suite, small)]).toEqual(['heavy', 'cpu', null])
+    // Inside a CPU parent's suite, a model trial's light e2e run passes CPU credit on, with model credit from the trial.
+    expect(e2eRun({ count: 1 }, { E2E_RUN_SLOTS: 'cpu,model', E2E_RUN_SUITE: 'x' }).suite.E2E_RUN_SLOTS).toBe('cpu,model')
+  })
+
+  it("a real model's trial's build takes a CPU slot unless it holds or runs inside one (HI-2070): only a stale build, looked at once no other runner builds", async () => {
+    // Which trials: by the credit after its own slot, whether it took a model slot or one it runs inside covers it.
+    expect(buildNeedsCpuSlot({ provider: 'codex', pool: 'model' }, {})).toBe(true)
+    expect(buildNeedsCpuSlot({ provider: 'codex', pool: null }, { E2E_RUN_SUITE: 'x', E2E_RUN_SLOTS: 'model' })).toBe(true)
+    expect(buildNeedsCpuSlot({ provider: 'claude-code', pool: null }, { E2E_RUN_SUITE: 'x', E2E_RUN_SLOTS: 'cpu,model' })).toBe(false)
+    expect(buildNeedsCpuSlot({ provider: 'codex', pool: 'model' }, { E2E_RUN_SUITE: 'x', E2E_RUN_SLOTS: 'cpu' })).toBe(false)
+    // A fake run's build is covered as its run is.
+    expect([buildNeedsCpuSlot({ provider: 'fake', pool: null }, {}), buildNeedsCpuSlot({ provider: 'fake-codex', pool: 'small' }, {})]).toEqual([false, false])
+    // The order of what happens: a fake ensureBuild (its answers in turn) and a slot that records when it is held.
+    const run = async (slotNeeded: boolean, answers: { stale: boolean; waited?: boolean }[]) => {
+      const steps: string[] = []
+      let held = false
+      const ensure = ({ build }: { build: boolean }) => {
+        steps.push(`${build ? 'build' : 'look'}${held ? ' (slot held)' : ''}`)
+        return { built: build, why: null, waited: false, ...answers.shift()! }
+      }
+      const takeSlot = async () => {
+        steps.push('slot')
+        held = true
+        return { release: () => ((held = false), steps.push('release')) }
+      }
+      const result = await ensureBuildWithSlot({ root: 'C:/wt', runBuild: () => {}, needsSlot: slotNeeded, takeSlot, ensure })
+      return { steps, result, held }
+    }
+    // Model credit only, a stale build: it takes the slot, builds holding it, and lets it go.
+    expect(await run(true, [{ stale: true }, { stale: false }])).toMatchObject({ steps: ['look', 'slot', 'build (slot held)', 'release'], held: false })
+    // A build that became needed while it waited out another runner's (the look waits for the build lock): the same.
+    expect((await run(true, [{ stale: true, waited: true }, { stale: false }])).steps).toEqual(['look', 'slot', 'build (slot held)', 'release'])
+    // Current once looked at: no slot, no build.
+    expect(await run(true, [{ stale: false }])).toMatchObject({ steps: ['look'], result: { stale: false } })
+    // CPU credit with model credit: the build is covered: as before, no slot taken.
+    expect((await run(false, [{ stale: false }])).steps).toEqual(['build'])
+    // The slot is let go when the build throws too.
+    const failing = { steps: [] as string[] }
+    await expect(
+      ensureBuildWithSlot({
+        root: 'C:/wt',
+        runBuild: () => {},
+        needsSlot: true,
+        takeSlot: async () => ({ release: () => failing.steps.push('release') }),
+        ensure: ({ build }: { build: boolean }) => {
+          if (build) throw new Error('build failed')
+          return { stale: true }
+        }
+      })
+    ).rejects.toThrow('build failed')
+    expect(failing.steps).toEqual(['release'])
   })
 
   it('an e2e run on the side slot runs at most two suites at once (HI-2070)', () => {

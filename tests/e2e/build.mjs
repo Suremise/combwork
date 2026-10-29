@@ -222,6 +222,25 @@ export function ensureBuild({ root, build, runBuild, lock: lockOpts = {} }) {
 }
 
 /**
+ * ensureBuild for a run whose build needs a CPU slot it doesn't hold (HI-2070: a model trial with no CPU credit,
+ * slots.mjs buildNeedsCpuSlot): it looks first, once no other runner of this worktree is building (ensureBuild without
+ * build, which waits that out), so a build that became needed meanwhile is seen; only a stale one takes the slot
+ * (takeSlot: async, its release()), held while it builds and let go after. The slot before the build lock, as every
+ * runner takes them, so neither waits on the other. needsSlot false: ensureBuild as it is. ensure: for tests.
+ */
+export async function ensureBuildWithSlot({ root, runBuild, needsSlot, takeSlot, ensure = ensureBuild }) {
+  if (!needsSlot) return ensure({ root, build: true, runBuild })
+  const looked = ensure({ root, build: false })
+  if (!looked.stale) return looked
+  const slot = await takeSlot()
+  try {
+    return ensure({ root, build: true, runBuild })
+  } finally {
+    slot.release()
+  }
+}
+
+/**
  * Runs runBuild and stamps out/ with `before` (the inputs it was made from), only if they are still the source's
  * afterwards: whether it stamped. The old stamp goes before the build touches out/: a build that fails, or whose source
  * changes while it runs, leaves output that no stamp vouches for (and a later run with the old source mustn't match

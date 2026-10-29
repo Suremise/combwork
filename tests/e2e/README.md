@@ -232,12 +232,15 @@ any size, is network-bound, not CPU-bound: it takes no CPU slot (heavy or side),
 (`modelTrials`, default 2, `model-<k>.json`), which bounds API spend and Codex's account-wide rate window (429s). It
 waits only for another model trial (`Waiting for a model-trial slot (2 real-model trials at once on this machine,
 modelTrials): held by …`). Its build, when the dev build isn't from its source, is CPU work: the trial takes a small
-run's slot (the side slot, else a heavy one) for the build alone.
+run's slot (the side slot, else a heavy one) for the build alone (below).
 **Runs inside runs** get credit only for the kind of slot their parent holds (HI-2070, `heldCredit`): each runner
-sets `E2E_RUN_SLOTS` (`cpu`, `model` or both) for what it starts, carried into a test Hive's sessions. An e2e suite
-gives its nested runs CPU credit, as before (#211: a nested run waiting for its parent's own slot would never end); a
-model trial gives model credit and passes on what it was given. So a heavy e2e or full unit run inside a model trial
-asks for a CPU slot, and a model trial inside an e2e suite for a model trial's. A suite of an older runner (no
+sets `E2E_RUN_SLOTS` (`cpu`, `model` or both) for what it starts, carried into a test Hive's sessions: what it was
+given, and the kind of slot it holds itself (`creditFor`). A heavy or small e2e run gives its suites CPU credit (#211: a
+nested run waiting for its parent's own slot would never end); a light one, which holds none, passes on only what it
+was given; a model trial adds model credit. So a heavy e2e or full unit run inside a model trial asks for a CPU slot,
+also through a light e2e run in between, and a model trial inside an e2e suite for a model trial's. A model trial's
+build takes a CPU slot unless its credit covers CPU work (`buildNeedsCpuSlot`): it looks once no other runner is
+building and takes the slot only for a stale build (`ensureBuildWithSlot`). A suite of an older runner (no
 `E2E_RUN_SLOTS`) gives CPU credit. **On the side slot**, an e2e run runs at most two suites at once (`SIDE_E2E_JOBS`),
 whatever `--jobs` says: four beside two heavy runs took the machine near full load.
 **A pre-merge run goes first** (#558): one started in the session of the agent that holds its project's merge slot

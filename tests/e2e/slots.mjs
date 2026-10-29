@@ -158,6 +158,16 @@ export function creditFor(pool, env = process.env) {
 }
 
 /**
+ * Whether a scenario run's build needs a CPU slot it doesn't hold (HI-2070): a real model's trial (its own work takes no
+ * CPU slot), with no CPU credit from the slot it took (pool) or what it runs inside, whether it took a model trial's
+ * slot itself or one it runs inside covers it. A fake run's build is covered as its run is (a heavy or side slot, or none
+ * for a light run, as an e2e run's).
+ */
+export function buildNeedsCpuSlot({ provider, pool }, env = process.env) {
+  return MODEL_PROVIDERS.includes(provider) && !creditFor(pool, env).split(',').includes('cpu')
+}
+
+/**
  * Which slot a run waits for (HI-2070): 'model' for a scenario run on a real model, whatever its size; 'small' for a
  * heavy run within the small-run bound; 'heavy' for any other heavy run; null for one that waits for none: not heavy,
  * or started inside a run that holds a slot of the kind it needs (heldCredit: waiting for the parent's own slot would
