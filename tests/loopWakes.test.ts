@@ -407,6 +407,41 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("HI-2023: the failed verdict's loop wake says it failed however slowly the verdict's lines are written (the flake under load)", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+    await typedUntil(st, 1)
+    st.status.set('b1', 'watching')
+    await watches.registerWatch(w, alpha, 'b1', readCondition({ cards: [c], column: 'passed' }) as WatchCondition)
+    await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+    // A loaded machine between the verdict's lines: the clock moves on by a millisecond at each read (HI-2016's cause).
+    const RealDate = Date
+    let tick = 0
+    ;(globalThis as { Date: DateConstructor }).Date = class extends RealDate {
+      constructor(...args: unknown[]) {
+        if (args.length) super(...(args as [number]))
+        else super(RealDate.now() + tick++)
+      }
+      static now(): number {
+        return RealDate.now() + tick++
+      }
+    } as DateConstructor
+    try {
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'Round 1: FAILED.' }))
+    } finally {
+      ;(globalThis as { Date: DateConstructor }).Date = RealDate
+    }
+    await watches.evaluateWatches(w)
+    await typedUntil(st, 2)
+    expect(st.typed[1].agent).toBe('b1')
+    expect(st.typed[1].text).toMatch(new RegExp(`^\\[Hive\\] #${c} is in Doing: R1 \\(alpha\\) failed it; .*This is your card in its loop`))
+    await disposeWorkspaceService(w)
+  })
+
   it('a waiting arrival is dropped once that round is reviewed: a review started and failed before the reviewer was idle (round 2 finding)', async () => {
     await loopWakes.clearLoopWakes()
     const { w, alpha } = await open()
