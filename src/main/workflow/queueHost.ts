@@ -140,9 +140,15 @@ export function kickQueue(ws: WorkspaceService, projectPath: string, target: str
     return h.running
   }
   const host = h
-  // Its own course, outside any write fence of whatever started it (an action run a queue's write set going).
+  // Its own course, outside any write fence of whatever started it (an action run a queue's write set going). A run its
+  // workspace's close ended (it closed between two of its steps: "has closed", a write refused) didn't fail: said so, no
+  // warning (HI-1989: a quit while a queue ran warned).
   host.running = withoutWriteFence(() => runHost(host))
-    .catch((e) => log.warn(`running the merge queue for ${userText(target)} in ${userText(basename(projectPath))}`, e))
+    .catch((e) => {
+      const what = `the merge queue for ${userText(target)} in ${userText(basename(projectPath))}` // i18n-ignore: part of a log line
+      if (alive(host)) log.warn(`running ${what}`, e)
+      else log.info(`${what} ended: its workspace closed (${userText(e instanceof Error ? e.message : String(e))})`)
+    })
     .finally(() => {
       host.running = null
       host.now = null
