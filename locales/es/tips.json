@@ -250,6 +250,8 @@
   "tips.laneBranchSquash.title": "La rama de un agente, al día entre tarjetas",
   "tips.laneGates.text": "En el panel Progreso, un carril dice en su cabecera por qué espera, y una muesca roja en el segmento de una tarjeta significa que su última petición fue rechazada: pasa el puntero por encima para ver por qué y qué hacer.",
   "tips.laneGates.title": "Mira por qué un carril no avanza",
+  "tips.laneNext.text": "Con las reglas del flujo de trabajo aplicadas, cuando una tarjeta de un carril está en Hecho, Hive le da la siguiente a su autor en cuanto termina su turno, así el carril sigue sin que tú ni el Asistente tengan que pedírselo.",
+  "tips.laneNext.title": "Hive empieza la siguiente tarjeta de un carril",
   "tips.laneNotices.text": "Hive te avisa cuando la revisión de un carril no se supera, una tarjeta se bloquea o se estanca, o todas las tarjetas superaron la revisión y toca fusionar, con un aviso por carril. Configuración → Notificaciones decide dónde aparecen.",
   "tips.laneNotices.title": "Entérate de cómo va un carril, sin el Asistente",
   "tips.laneSlots.text": "En el panel Progreso, un carril nombra su slot tras sus agentes (· slot-b): pasa el puntero por encima para ver la rama que se construye allí y si el slot está listo, o haz clic para ir a Ramas y remotos.",

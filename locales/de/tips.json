@@ -250,6 +250,8 @@
   "tips.laneBranchSquash.title": "Der Branch eines Agenten bleibt zwischen Karten aktuell",
   "tips.laneGates.text": "Im Fortschrittspanel sagt eine Lane in ihrer Kopfzeile, worauf sie wartet, und eine rote Kerbe am Segment einer Karte bedeutet, dass ihre letzte Anfrage abgelehnt wurde: Zeige mit der Maus darauf, um zu sehen, warum und was als Nächstes.",
   "tips.laneGates.title": "Sieh, warum eine Lane nicht weitergeht",
+  "tips.laneNext.text": "Mit durchgesetzten Workflow-Regeln gibt Hive, sobald eine Karte einer Lane erledigt ist, die nächste ihrem Bearbeiter, sobald dessen Durchgang vorbei ist. So geht die Lane ohne Anstoß von dir oder dem Assistenten weiter.",
+  "tips.laneNext.title": "Hive startet die nächste Karte einer Lane",
   "tips.laneNotices.text": "Hive benachrichtigt dich, wenn eine Karte einer Lane das Review nicht besteht, blockiert ist oder festfährt, oder wenn alle Karten bestanden haben und der Merge ansteht, mit einer Benachrichtigung pro Lane. Einstellungen → Benachrichtigungen legt fest, wo sie erscheinen.",
   "tips.laneNotices.title": "Erfahre, wie eine Lane läuft, auch ohne den Assistenten",
   "tips.laneSlots.text": "Im Fortschrittspanel nennt eine Lane ihren Slot nach ihren Agenten (· slot-b): Zeige darauf für den Branch, der dort gebaut wird, und ob der Slot bereit ist, oder klicke für „Branches & Remotes“.",

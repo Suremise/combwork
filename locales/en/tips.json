@@ -1003,6 +1003,14 @@
     "defaultMessage": "See why a lane isn’t moving",
     "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
   },
+  "tips.laneNext.text": {
+    "defaultMessage": "With workflow rules on, once a lane's card is Done Hive gives the next one to its builder as soon as the builder's turn is over, so the lane goes on without a prompt from you or the Assistant.",
+    "description": "A tip (HI-1990). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.laneNext.title": {
+    "defaultMessage": "Hive starts a lane's next card",
+    "description": "A tip's title (HI-1990). A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
+  },
   "tips.laneNotices.text": {
     "defaultMessage": "Hive notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

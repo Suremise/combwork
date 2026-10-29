@@ -459,9 +459,13 @@ const NOTE_MAX = 600
 /** And of the user's answer (#1626): its reply whole, up to this; the card's comment has it in full. */
 export const ANSWER_MAX = 4000
 
-export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string): string {
+/**
+ * `next`: for a builder's card Done in its lane (HI-1990), what comes next in the lane, in its words (laneNextWords),
+ * told in place of carrying on with the card.
+ */
+export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string, next?: string): string {
   const who =
-    kind === 'review' ? 'You review this card in its loop: carry on with it' : kind === 'step'
+    kind === 'done' && next ? next : kind === 'review' ? 'You review this card in its loop: carry on with it' : kind === 'step'
         ? "You review this card in its loop: check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)"
         : kind === 'stepNotice'
           ? 'Nothing to answer: carry on with your loop'
@@ -473,6 +477,28 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
   const whose = kind === 'request' ? 'The reviewer asks' : kind === 'step' || kind === 'stepNotice' ? 'The builder' : kind === 'stepAnswer' ? 'The reviewer' : 'Hive'
   const what = !said.length ? '' : `. ${whose}: "${said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('')}"`
   return lineOf(change, `${what}. ${who} (hive_read_task with latestComment for the comment in full).`)
+}
+
+/**
+ * What comes next in a builder's lane, as its Done wake says it (HI-1990; English, agent-facing): its next card, which
+ * Hive starts for it once its turn ends (`hiveStarts`, rules on), for it to start (`start`, rules off), already under way
+ * (`started`) or not yet startable (`waits`); the lane paused; or none left.
+ */
+export function laneNextWords(next: { card: number; title: string; is: 'hiveStarts' | 'start' | 'started' | 'waits' } | 'paused' | 'last'): string {
+  if (next === 'paused') return 'Your lane is paused: hive_lane next says why'
+  if (next === 'last') return "That was your lane's last card: the lane ends by itself, so end your turn unless you have other work"
+  const title = [...next.title.trim()]
+  const card = `${cardRef(next.card)} ("${title.length > 60 ? `${title.slice(0, 59).join('')}…` : title.join('')}")`
+  switch (next.is) {
+    case 'hiveStarts':
+      return `Your lane's next card is ${card}: Hive starts it for you once your turn ends, so end your turn now`
+    case 'start':
+      return `Your lane's next card is ${card}: start it now (hive_lane next, then hive_start_card); this card's own prompt doesn't narrow the lane`
+    case 'started':
+      return `Your lane's next card, ${card}, is under way: carry on with it`
+    case 'waits':
+      return `Your lane's next card is ${card}: hive_lane next says when it can start`
+  }
 }
 
 /**

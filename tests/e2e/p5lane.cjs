@@ -291,8 +291,14 @@ const ancestor = (x, y) => {
     const msg1 = git(alpha, 'log', '-1', '--format=%B', 'main')
     check("…Integrated by Hive at the approved revision: a merge commit of One's line, Hive's trailers", i1?.data?.by === 'hive' && i1.data.result === head() && git(alpha, 'rev-parse', 'main^2') === one.rev && msg1.includes(`Hive-Card: ${k1}`) && msg1.includes(`Hive-Revision: ${one.rev}`), JSON.stringify(i1))
     const main1 = head()
+    // HI-1990: nobody starts Two. Once One is Done and B1's turn is over, Hive starts it on B1 as the lane's next card, and
+    // B1 is given it in its slot; B1's own start then is that start (it raced Hive's), with the same folder and line.
+    const byHive = await waitHung(async () => (await factsOf(c2, 'Started')).find((f) => f.actor === 'hive') ?? null)
+    check('Hive starts Two on B1 itself once One is Done, with no prompt from the user or the Assistant', !!byHive && byHive.data?.builder === b1.id && (await card(c2))?.agent === b1.id, JSON.stringify({ byHive, card: await card(c2) }))
+    check('…and gives it to B1 in its slot (placed there)', !!(await waitHung(async () => (await kinds(c2)).includes('BuilderPlaced'))), JSON.stringify(await kinds(c2)))
     const s2 = await start(c2)
     check("only then does Two start, in the lane's slot still, its line from main's head (One merged in)", s2.s.status === 200 && path.basename(wt ?? '') === lentA && s2.base === main1 && ancestor(one.rev, s2.base) && git(wt, 'rev-parse', 'HEAD') === s2.base, JSON.stringify(s2))
+    check("…B1's own start of it is Hive's, told so", (s2.s.body?.warnings ?? []).some((x) => /^Hive started .* for you, as your lane's next card/.test(x)) && (await factsOf(c2, 'Started')).length === 1, JSON.stringify(s2.s.body))
     check("…One's line, merged, deleted once Two's is out (LineDeleted)", !!(await waitHung(async () => (await kinds(c1)).includes('LineDeleted'))) && !git(alpha, 'branch', '--list', line1), JSON.stringify(await kinds(c1)))
     await shoot('3-one-merged', 'lanes', async () => (await onBoard('Done', c1)) && (await onBoard('Active', c2)))
 

@@ -47,6 +47,13 @@ export function agentBusyError(agent: string, status: string): HiveError {
 /** A Start undone because the card's start got no slot where its project builds in slots (HI-1966). */
 const NO_SLOT = msg({ id: 'tasks.start.noSlot', defaultMessage: "{card} wasn't started: its project builds each card in a slot, and {active, select, yes {its start has none} other {this start got none}}, so its agent would have worked in the project folder. {active, select, yes {Put it back to Todo, then start it again.} other {The card is back where it was: start it again.}}", description: "An error: a Start of the card {card} (its key, such as HI-12) was refused. The card's project has each card built in a slot (a working folder of its own), but the card's start has no slot, so the agent would have worked in the project's own folder instead. {active} (select): yes, the card was already Active (in work) with no slot, and must be put back to Todo and started again; other, this start was undone and the card moved back to its column. Translate both." })
 
+/**
+ * A start's own condition, checked where its move is written (in its transaction, under the board's lock): it throws to
+ * refuse the start, nothing assigned, written or delivered (HI-1990: the lane that asked for it still there, its card
+ * still its next).
+ */
+export type StartGuard = (now: TaskCard) => void
+
 /** Cards being started now ("<workspace>#<n>"): a second Start of the same card is refused, not run twice. */
 const starting = new Set<string>()
 
@@ -70,13 +77,13 @@ const MAX_NOTE = 4000
  * can't be started, the card goes back where it was and a new agent is removed again. note: what to do now (such as
  * "address the latest review comment"), added to the prompt.
  */
-export async function startTask(n: number, target: TaskStartTarget, actor: TaskActor, note?: string, reason?: string): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
+export async function startTask(n: number, target: TaskStartTarget, actor: TaskActor, note?: string, reason?: string, guard?: StartGuard): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
   if (note && note.length > MAX_NOTE) throw hiveError(msg({ id: 'tasks.start.noteTooLong', defaultMessage: 'The note is too long (at most {max, number} characters).', description: 'An error: the note given with a Start (what the agent should do now) is longer than it may be ({max}, a number of characters).' }), { max: MAX_NOTE }, { kind: 'invalid' })
   const key = `${(workspace.path ?? '').toLowerCase()}#${n}`
   if (starting.has(key)) throw hiveError(msg({ id: 'tasks.start.alreadyStarting', defaultMessage: '{card} is already being started.', description: 'An error: card {card} (its key, such as HI-12) is being started already; a second Start of it is refused.' }), { card: cardRef(n) }, { kind: 'conflict' })
   starting.add(key)
   try {
-    return await startReserved(n, target, actor, note?.trim() || undefined, reason?.trim() || undefined)
+    return await startReserved(n, target, actor, note?.trim() || undefined, reason?.trim() || undefined, guard)
   } finally {
     starting.delete(key)
   }
@@ -106,7 +113,7 @@ function startable(card: TaskCard): void {
   if (!card.project) throw hiveError(msg({ id: 'tasks.start.noProject', defaultMessage: '{card} has no project. Give it one first: the agent works in that project.', description: 'An error: card {card} (its key, such as HI-12) belongs to no project (only the workspace), so no agent can start it; give it a project first.' }), { card: cardRef(card.number) }, { kind: 'invalid' })
 }
 
-async function startReserved(n: number, target: TaskStartTarget, actor: TaskActor, note: string | undefined, reason: string | undefined): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
+async function startReserved(n: number, target: TaskStartTarget, actor: TaskActor, note: string | undefined, reason: string | undefined, guard?: StartGuard): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; run?: string }> {
   const before = await getTask(n)
   startable(before)
   const p = workspace.assertProject(join(workspace.path!, before.project))
@@ -138,7 +145,7 @@ async function startReserved(n: number, target: TaskStartTarget, actor: TaskActo
   let typed = false
   let slotted = false
   try {
-    const { typed: t, slotted: s, ...result } = await giveCard(n, before, p, agentId, agentName, target.kind !== 'agent', actor, note, reason)
+    const { typed: t, slotted: s, ...result } = await giveCard(n, before, p, agentId, agentName, target.kind !== 'agent', actor, note, reason, guard)
     typed = t
     slotted = s
     return result
@@ -163,7 +170,8 @@ async function giveCard(
   added: boolean,
   actor: TaskActor,
   note: string | undefined,
-  reason?: string
+  reason?: string,
+  guard?: StartGuard
 ): Promise<{ card: TaskCard; agentId: string; agentName: string; added: boolean; typed: boolean; slotted: boolean }> {
   const undoAgent = async (): Promise<void> => {
     if (added) await removeAgent(p, agentId, { deleteWorktree: true }).catch((e) => log.warn(`Could not remove ${userText(agentName)} after #${n} didn't start`, e))
@@ -180,6 +188,8 @@ async function giveCard(
     card = await updateTask(n, { agent: agentId, ...(before.column === 'doing' ? {} : { column: 'doing' as const }), ...(reason && actor.kind === 'user' ? { override: { reason } } : {}) }, actor, {
       check: (now) => {
         startable(now)
+        // What the start's caller said must still hold, where the start is written (HI-1990: Hive's start of a lane's next card).
+        guard?.(now)
         if (now.project.toLowerCase() !== before.project.toLowerCase()) {
           throw now.project
             ? hiveError(msg({ id: 'tasks.start.movedProject', defaultMessage: '{card} moved to {project} meanwhile. Start it again.', description: 'An error: while card {card} (its key, such as HI-12) was being started, it was moved to the project {project} (a folder name).' }), { card: cardRef(n), project: now.project }, { kind: 'conflict' })

@@ -111,6 +111,7 @@ import { agentTokenFile } from './agentTokens'
 import { progress, setTaskbarTestHook, startProgress } from './progressService'
 import { startMergeSlots } from './mergeSlotHost'
 import { startLanes } from './lanes'
+import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
 import { checkInstallDir } from './installDir'
 import { exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
@@ -1179,6 +1180,8 @@ app.whenReady().then(async () => {
   startProgress()
   startMergeSlots()
   startLanes()
+  // A lane's next card, started on its builder once the card before it is Done (HI-1990).
+  startLaneStarts()
   startHandOverCheck()
   // Test builds can record the taskbar's progress calls, which the page can't see.
   if (!app.isPackaged && process.env.HIVE_TEST_TASKBAR_LOG) {

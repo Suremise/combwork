@@ -145,7 +145,8 @@ describe('loop wakes from the facts (#1266)', () => {
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'done' }, user))
     await typedUntil(st, 2)
     expect(st.typed.at(-1)).toMatchObject({ agent: 'b1' })
-    expect(st.typed.at(-1)!.text).toMatch(new RegExp(`^\\[Hive\\] #${c} is in Done.*This is your card in its loop: carry on`))
+    // HI-1990: what comes next in its lane, in place of carrying on with the card (the next one is in Doing already).
+    expect(st.typed.at(-1)!.text).toMatch(new RegExp(`^\\[Hive\\] #${c} is in Done.*Your lane's next card, #${next} \\("Work"\\), is under way: carry on with it`))
     // Moved back by the user (its builder told) and on again by its own builder: its own change wakes it not.
     st.status.set('b1', 'ready')
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'passed' }, user))

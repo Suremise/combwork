@@ -250,6 +250,8 @@
   "tips.laneBranchSquash.title": "Gałąź agenta aktualna między kartami",
   "tips.laneGates.text": "W panelu Postęp tor mówi w nagłówku, na co czeka, a czerwone wcięcie na segmencie karty oznacza, że jej ostatnie żądanie zostało odrzucone: najedź na nie, aby zobaczyć dlaczego i co dalej.",
   "tips.laneGates.title": "Zobacz, dlaczego tor stoi",
+  "tips.laneNext.text": "Gdy reguły przepływu pracy są egzekwowane, a karta toru jest gotowa, Hive daje następną jego wykonawcy, gdy tylko skończy on swoją turę, więc tor idzie dalej bez ponaglania przez ciebie ani Asystenta.",
+  "tips.laneNext.title": "Hive zaczyna następną kartę toru",
   "tips.laneNotices.text": "Hive powiadamia Cię, gdy recenzja na torze jest niezaliczona, karta zostaje zablokowana lub utknie albo wszystkie karty zaliczyły recenzję i czas na scalenie, jednym powiadomieniem na tor. O tym, gdzie się pojawiają, decydują Ustawienia → Powiadomienia.",
   "tips.laneNotices.title": "Śledź tor bez Asystenta",
   "tips.laneSlots.text": "W panelu Postęp tor podaje po swoich agentach swój slot (· slot-b): wskaż go, aby zobaczyć budowaną tam gałąź i czy slot jest gotowy, albo kliknij, aby otworzyć Gałęzie i zdalne repozytoria.",

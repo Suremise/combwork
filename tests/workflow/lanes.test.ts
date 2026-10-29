@@ -1,6 +1,6 @@
 // Lanes, switching options and the upgrade at the core (#1118, SPEC §16.11, §16.6.5, §16.17).
 import { afterEach, describe, expect, it } from 'vitest'
-import { B1, B2, commit, moved, R1, setup, type Env } from './harness'
+import { B1, B2, commit, moved, R1, refusedBy, setup, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { adopt, upgradeOptions } from '../../src/main/workflow/upgrade'
 import { reconcile } from '../../src/main/workflow/reconcile'
@@ -48,6 +48,25 @@ describe('lanes', () => {
     moved(await e.wf.move(c4.key, 'done', 'user', { confirm: true, reason: 'done elsewhere' }))
     expect(e.wf.laneNext('L')).toBeNull()
     expect(e.store.deliveries().filter((d) => d.kind === 'laneEnded')).toHaveLength(1)
+  })
+
+  it("HI-1990: Hive starts a lane's next card for its builder; the builder's own start of it, racing Hive's, is that start", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'agentMerges', preChecks: [], mergeChecks: [] }))
+    const [c1, c2] = [1, 2].map((n) => e.wf.createCard({ title: `Card ${n}` }))
+    e.wf.startLane('L', [c1.id, c2.id], 'R1')
+    await finish(e, c1.key, 'one.txt')
+    const byHive = await e.wf.start(c2.key, 'hive', { builder: 'B1' })
+    moved(byHive)
+    const again = await e.wf.start(c2.key, B1)
+    moved(again)
+    expect(again.data).toEqual(byHive.data)
+    expect(again.warnings).toEqual([`Hive started ${c2.key} for you, as your lane's next card: carry on with it.`])
+    expect(e.store.facts(c2.id).filter((f) => f.kind === 'Started')).toHaveLength(1)
+    // Another agent's start of it is refused, as before; so is its builder's second start of a card it started itself.
+    refusedBy(await e.wf.start(c2.key, B2), 'move.notFromHere')
+    const c3 = e.wf.createCard({ title: 'Card 3' })
+    moved(await e.wf.start(c3.key, B2))
+    refusedBy(await e.wf.start(c3.key, B2), 'move.notFromHere')
   })
 
   it('S19: options changed while a lane runs → its cards keep the lane\'s ruleset ("old rules"); a card started after the lane ends uses the new one', async () => {

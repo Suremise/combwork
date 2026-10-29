@@ -250,6 +250,8 @@
   "tips.laneBranchSquash.title": "An agent's branch kept up to date between cards",
   "tips.laneGates.text": "In the Progress panel, a lane says why it waits in its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
   "tips.laneGates.title": "See why a lane isn’t moving",
+  "tips.laneNext.text": "With workflow rules on, once a lane's card is Done Hive gives the next one to its builder as soon as the builder's turn is over, so the lane goes on without a prompt from you or the Assistant.",
+  "tips.laneNext.title": "Hive starts a lane's next card",
   "tips.laneNotices.text": "Hive notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",
   "tips.laneNotices.title": "Hear how a lane goes, without the Assistant",
   "tips.laneSlots.text": "In the Progress panel, a lane names its slot after its agents (· slot-b): point at it for the branch being built there and whether the slot is ready, or click it for Branches & remotes.",
