@@ -112,14 +112,12 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await active()) === '1', 5000)
   check("choosing an agent on page 1 in the summary chip's list goes there", (await active()) === '1')
 
-  // Twelve is the most.
+  // Twelve, the workflow's Maximum agents by default: the user goes past it below (HI-2001).
   await add(4)
   const n = (await inv('workspace:refresh')).projects[0].agents.length
   check('twelve agents', n === 12, String(n))
   await go(2)
   check('page 2 is a full 3×2 grid too', (await shown()).split(',').length === 6)
-  const refused = await inv('agents:add', proj, { location: 'project', provider: 'claude-code' }).then(() => '', (e) => String(e.message ?? e))
-  check('a thirteenth is refused', /up to 12 agents/.test(refused), refused)
   await page.screenshot({ path: path.join(lib.WORK, 'pages-3-twelve.png') })
 
   // Removing the focused agent on page 2 stays on page 2 (the next agent takes focus) until page 2 empties.
@@ -161,7 +159,7 @@ const check = (name, ok, extra = '') => {
   await add(12)
   check('twenty-four agents', (await agentsNow()).length === 24, String((await agentsNow()).length))
   const at24 = await refusal()
-  check('a twenty-fifth is refused', at24 === 'A project can have up to 24 agents.', at24)
+  check('a twenty-fifth is refused', /A project can have up to 24 agents\.$/.test(at24), at24)
   check("…and + Add ▾'s Configure Agent and Add… is greyed out", !!(await lib.until(addGreyed, HUNG_MS)))
   await choose('Grid of six')
   check('24 in the grid of six: four pages', (await buttons()) === 4, String(await buttons()))
@@ -231,7 +229,7 @@ const check = (name, ok, extra = '') => {
   const loaded = await inv('templates:load', proj, 'project', saved.saved.file, plan.remove.map((a) => a.id))
   check('loaded past Maximum agents: 24 agents again', loaded.created.length === 24 && (await agentsNow()).length === 24, `${loaded.created.length} / ${(await agentsNow()).length}`)
   const after = await refusal()
-  check('…and a twenty-fifth is refused', after === 'A project can have up to 24 agents.', after)
+  check('…and a twenty-fifth is refused', /A project can have up to 24 agents\.$/.test(after), after)
 
   await app.close()
   process.exit(failed ? 1 : 0)

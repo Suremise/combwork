@@ -7,6 +7,7 @@
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
+const { createHash } = require('crypto')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30000
@@ -16,6 +17,7 @@ const ws = path.join(lib.WORK, 'maxagents-ws')
 const claudeHome = path.join(lib.WORK, 'maxagents-claude-home')
 const shots = path.join(lib.WORK, 'maxagents-shots')
 const solo = path.join(ws, 'solo')
+const assistantHome = path.join(ws, '.hive', 'assistant')
 const PORT = Number(lib.port(47794))
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -34,7 +36,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
   // Agents per project from before HI-2001: Settings → Advanced's (advanced.json) and this workspace's own.
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'hive.agents.perProject': 16 } }))
   fs.writeFileSync(path.join(ws, '.hive', 'workspace.json'), JSON.stringify({ advanced: { 'hive.agents.perProject': 5 } }))
-  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws, solo].map((p) => p.toLowerCase())))
+  fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws, solo, assistantHome].map((p) => p.toLowerCase())))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -66,14 +68,23 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     const advancedValues = () => JSON.parse(fs.readFileSync(path.join(userData, 'advanced.json'), 'utf8')).values ?? {}
     check('…and gone from advanced.json', !!(await until(() => !('hive.agents.perProject' in advancedValues()))), JSON.stringify(advancedValues()))
 
-    // --- On Solo: the Agent API keeps to Maximum agents (1), the user goes past it.
-    const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
+    // --- On Solo: the Assistant, through the Agent API, keeps to Maximum agents (1); the user goes past it.
+    const live = async (project, agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === agentId && s.status !== 'stopped') ?? null
+    await inv('session:start', assistantHome, { agentId: 'assistant' })
+    const ready = await until(async () => {
+      const st = await live(assistantHome, 'assistant')
+      if (st?.status === 'waiting') await inv('pty:write', lib.ptyKey(assistantHome, 'assistant'), '\r')
+      return st?.status === 'ready' || st?.status === 'finished'
+    })
+    check('the Assistant starts', !!ready)
+    const tokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
+    const token = JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token
     const api = async (method, route, body) => {
       const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: r.status, body: await r.json().catch(() => null) }
     }
     const refused = await api('POST', '/v1/projects/solo/agents', { name: 'SO-B2' })
-    check("the Agent API's add on Solo is refused (409), naming Maximum agents and where the user raises it", refused.status === 409 && /Maximum agents to 1, the user's team size/.test(refused.body?.error) && /Version Control → Workflow/.test(refused.body?.error), JSON.stringify(refused))
+    check("the Assistant's add on Solo is refused (409), naming Maximum agents and where the user raises it", refused.status === 409 && /Maximum agents to 1, the user's team size/.test(refused.body?.error) && /Version Control → Workflow/.test(refused.body?.error), JSON.stringify(refused))
     check('…nothing added', JSON.stringify(agentNames()) === '["SO-B1"]', JSON.stringify(agentNames()))
     await lib.addAgent(inv, solo, { name: 'SO-B2' })
     check("the user's own add goes past it", !!(await until(() => agentNames().length === 2)), JSON.stringify(agentNames()))
@@ -105,7 +116,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     if (await until(async () => (await confirmSave.getByRole('button', { name: 'Save', exact: true }).count()) === 1)) await confirmSave.getByRole('button', { name: 'Save', exact: true }).click()
     check('Save…: Maximum agents 8, still Solo (no other option changed)', !!(await until(() => projectOf().workflow.options.maxAgents === 8)) && projectOf().workflow.preset === 'solo', JSON.stringify(projectOf().workflow))
     const again = await api('POST', '/v1/projects/solo/agents', { name: 'SO-X' })
-    check('…and at 8 the Agent API is refused again', again.status === 409 && /Maximum agents to 8/.test(again.body?.error), JSON.stringify(again))
+    check("…and at 8 the Assistant's add is refused again", again.status === 409 && /Maximum agents to 8/.test(again.body?.error), JSON.stringify(again))
 
     // --- Lowered in the form, under the agents it has: they all stay, and the row says so.
     await box.fill('2')
@@ -116,6 +127,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
   } catch (e) {
     check('the suite threw', false, e.stack)
   } finally {
+    await inv('session:stop', assistantHome, 'assistant').catch(() => undefined)
     await app.close().catch(() => undefined)
   }
   if (failed) {

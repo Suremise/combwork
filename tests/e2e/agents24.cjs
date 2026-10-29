@@ -109,8 +109,9 @@ const check = (name, ok, extra = '') => {
     // --- Settings → Version Control → Workspace defaults (HI-2001): Maximum agents' note measures the running agents.
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav .row', { hasText: 'Version Control' }).click()
-    await page.locator('.tabs .tab', { hasText: 'Workspace defaults' }).click()
-    const row = page.locator('.workflow-option[data-option="maxAgents"]')
+    await page.locator('.settings-group[data-section="workflow"] [role="tab"][data-setting-tab="workflow.workspaceDefaults"]').click()
+    // One form per version control (None, Git), the one shown has the note.
+    const row = page.locator('.workflow-option[data-option="maxAgents"]:visible').first()
     const note = row.locator('[data-note="many-agents"]')
     const noteText = async () => ((await note.count()) ? await note.innerText() : '')
     check("Maximum agents' note measures the 24 running agents, and this computer", !!(await until(async () => /Your 24 running agents take [\d.]+ [GM]B now \(about \d+ MB each\); this computer has [\d.]+ GB of memory/.test(await noteText()), HUNG_MS)), await noteText())
