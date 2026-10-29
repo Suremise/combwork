@@ -246,13 +246,12 @@ const log = () => {
     await h.app.close().catch(() => {})
     // Started again in German (HI-1733): the answer kept on the card as the user's comment is in their language.
     await startAgain({ HIVE_LANG: 'de' })
-    // The crash is told in the corner for two minutes ("Hive closed unexpectedly"), where it can lie over the card clicked
-    // below (HI-1989): seen, then closed.
-    const deText = (area, id) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', 'de', `${area}.json`), 'utf8'))[id]
-    const notice = h.page.locator('.toasts .toast', { has: h.page.locator('.toast-title', { hasText: deText('main', 'main.unexpectedClose.title') }) })
+    // The crash is told in the corner ("Hive closed unexpectedly", for two minutes), beside other notices of the restart
+    // (resume the agent that was working…), any of which can lie over the card clicked below (HI-1989): the crash's seen,
+    // then the corner's notices hidden.
+    const notice = h.page.locator('.toasts .toast-title', { hasText: JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', 'de', 'main.json'), 'utf8'))['main.unexpectedClose.title'] })
     check('…the crash told in the corner: Hive closed unexpectedly', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)))
-    await notice.getByRole('button', { name: deText('shell', 'shell.toast.dismiss'), exact: true }).click()
-    await until(async () => (await notice.count()) === 0, HUNG_MS)
+    await h.page.addStyleTag({ content: '.toasts { display: none !important; }' })
     const open = async () => !(await h.facts(five.n)).some((f) => (f.kind === 'Approval' || f.kind === 'RequestClosed') && f.data?.request === five.request)
     check('…nothing kept: no choice recorded, project.json as it was, the question still open, nothing merged', recorded() === null && projectJson().workflow?.options?.style === 'merge' && unrelated() && (await open()) && (await h.card(five.n))?.column !== 'done', `${JSON.stringify(recorded())} / ${JSON.stringify(projectJson().workflow?.options)}`)
     await h.inv('workflow:chooseMerge', fx.alpha, { card: five.n, request: five.request, style: 'squash', commitMessage: 'branch' })
