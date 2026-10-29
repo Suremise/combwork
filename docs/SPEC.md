@@ -3792,7 +3792,8 @@ Whether a conversation may resume there is its **hold** (none: it may):
     keeps in its profile's `leftovers.json` (`ended`) the runs it saw end, each run whose release couldn't be written
     (its workspace closed), and, as it quits, the stopped launches whose jobs it sees empty: their jobs are looked at
     until empty for at most 5 s (`recordEndedLaunches`), so a CLI slow to exit as Hive quits for an install still
-    counts; only from the helper that held its job as the look began, never a run lost meanwhile (a helper started in
+    counts, and so do the leftovers the quit has just ended (`confirming`, HI-2055: rc.11's slot-d stayed held by a run
+    whose leftovers the quit ended, as nothing looked again); only from the helper that held its job as the look began, never a run lost meanwhile (a helper started in
     its place has none of the old jobs and lists any as empty: HR2's round 2). Kept forward until the writer is settled, at most 100; never offered as leftovers. When a writer's Hive is
     known to have gone (`alive` false) and its run is kept as ended, it is cleared and drained. A list of the run's
     processes taken earlier (the last run's marker, a crash's) never settles it, even with none of them still running:
@@ -3801,6 +3802,38 @@ Whether a conversation may resume there is its **hold** (none: it may):
     the run left running kept from before this start (#614's `restored:<run>`). Settled as a start claims the slot (`claimPlace`), at each
     pool's refresh (a lend), as a pool is made, and at the hourly tidy; a slot freed so tells the lanes waiting for one.
     The Version Control tab's Worktrees list marks a held slot too (*Held by B1's ended session*, **Release…**).
+  - **The keeper** (HI-2055: after rc.10's install six slots stayed held, though every process their runs had left
+    ended seconds later). The helper holding the launches' jobs is the only one that can tell a job complete (its whole
+    membership: what its processes start joins it, and what escapes is adopted or followed by its sweeps), so it
+    outlives its Hive: when its input ends (a quit, a crash), the merge queue's jobs close at once as before (ending
+    what is in them), and while an agent launch's job it holds still has a process it stays, hidden, sweeping as before,
+    and writes that job's state to the profile's `keeper\keeper-<run>.json`: `live` with its members (id, start time and
+    name, never a command line) while it has any, `ended` once it sees it empty (a job it can't read is looked at again,
+    never taken for empty, and its membership is taken only after a sweep that was sure of everything: a failed
+    snapshot, an enumeration of it that stops part way, a failed listing, or an escaped child whose checks Windows
+    refused, could hide a process; and what ties an escaped child to its job is kept until such a sweep: an exited
+    process's identity and a followed one's are let go only after one, a followed one whose state can't be read never,
+    and past 4096 exits kept the jobs concerned can no longer be told complete), then lets it go; it exits once it holds none, and says `keeping` first, so a quit doesn't
+    wait for it. It ends nothing. A quit whose agents kept nothing running leaves none behind.
+    - Each tracked run is bound to its helper (`leftovers.json`'s `helpers`, "pid:created") as it is given its job.
+      A gone Hive's writer is settled by a state only when it is whole and its own: the run's file, at most 64 KB,
+      version 1, its run, its Hive (the writer's "pid:started"), the helper its run is bound to and not revoked,
+      `observed: complete`, and `ended` with no member and total 0 (`keeperState`). The clear checks that binding again
+      inside its write, and the state is removed only once the writer is cleared. Logged: *slot-d … settled: HB5's ended
+      run left nothing running*.
+    - A helper lost while Hive runs is revoked (`revoked`) at once, its bindings going with it (so the bounded list
+      never gives one back), and the revocation is written before its replacement is given a launch, however late the
+      loss (before the launch, while its helper is made ready, or while its job is made): a launch can't be tracked
+      while it can't be (the tracker notice says so). A run is bound only to the helper configured as its keeper that
+      made its job, with no loss between.
+    - What settled a writer is that attempt's own (its run and helper), carried to its clear's guard: another check of
+      the same run never changes it.
+    - `live`: held; Release Slot… lists its members still running, each checked again by id and start time (one that
+      can't be is never listed as running). A keeper ended before its jobs empty (killed, a logoff) leaves `live` or
+      nothing, and no state, a run from before this change or bound to no helper, leaves the writer held, as before.
+      States older than 7 days are removed at the start.
+    - This replaces recording each process as it starts (the card's first idea): a record can't hold what a process
+      started after it through one that has since exited; the job's own holder sees it.
   - **Release Slot…** (#1506, the user's recovery, `agentFolders.ts` `heldWriter`/`releaseHeldWriter`): a writer is
     *held* when its run isn't live in this Hive (its token ended: the session over and its leftovers kept, untracked
     or unreadable) and its Hive is this one or one known to have gone (`writerHeld`). The agent's ⋯ offers Release
