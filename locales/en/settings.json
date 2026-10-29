@@ -4603,6 +4603,18 @@
     "defaultMessage": "Models (fallback)",
     "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
   },
+  "settings.provider.more": {
+    "defaultMessage": "More for {provider}",
+    "description": "The ⋯ button of a provider's row in Settings → Providers, for screen readers and its tooltip: opens its menu (Move Up, Move Down). {provider} is its name."
+  },
+  "settings.provider.moveDown": {
+    "defaultMessage": "Move Down",
+    "description": "A provider row's menu in Settings → Providers: moves it one place down the list (Automatic picks from the list's order)."
+  },
+  "settings.provider.moveUp": {
+    "defaultMessage": "Move Up",
+    "description": "A provider row's menu in Settings → Providers: moves it one place up the list (Automatic picks from the list's order)."
+  },
   "settings.provider.notInstalled": {
     "defaultMessage": "CLI not installed",
     "description": "A badge on a provider's page: Hive didn't find its CLI."
@@ -4630,6 +4642,14 @@
   "settings.provider.prices.title": {
     "defaultMessage": "API prices",
     "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
+  },
+  "settings.provider.reorderFailed": {
+    "defaultMessage": "Couldn't save the providers' order",
+    "description": "An error's title: saving the order of Settings → Providers' list failed."
+  },
+  "settings.provider.rowLabel": {
+    "defaultMessage": "{provider}, {position, number} of {count, number}. Drag, or Alt+Up and Alt+Down, to reorder.",
+    "description": "A provider's row in Settings → Providers, for screen readers: its place in the list, which Automatic picks from, and how to move it. {provider} is its name."
   },
   "settings.provider.settings": {
     "defaultMessage": "Settings",
@@ -4695,8 +4715,12 @@
     "defaultMessage": "Turn off {provider}?",
     "description": "Title of the question before a provider is turned off while its agents run. {provider} is its name."
   },
+  "settings.providers.automaticOrder": {
+    "defaultMessage": "Automatic tries {order}, in that order.",
+    "description": "Under Settings → Providers → Default provider while it is Automatic: the providers that are turned on, in the list's order, which Automatic picks the first installed one of. {order} is their names joined as a list (\"Codex, Claude Code and GitHub Copilot\")."
+  },
   "settings.providers.defaultProvider.desc": {
-    "defaultMessage": "The provider Add Agent uses for new agents (one click, with its default settings) unless the project chooses another. Automatic uses the first provider that is turned on and installed (Claude Code, then Codex, then GitHub Copilot).",
+    "defaultMessage": "The provider Add Agent uses for new agents (one click, with its default settings) unless the project chooses another. Automatic uses the first provider that is turned on and installed, in the order of the list above: drag a provider, or use its ⋯ menu, to reorder it.",
     "description": "What the setting \"Default provider\" does, under its title (Settings → Providers)."
   },
   "settings.providers.defaultProvider.tip": {

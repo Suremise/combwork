@@ -157,6 +157,66 @@ const check = (name, ok, extra = '') => {
   check('once an agent uses Claude Code, its banner shows', !!used, JSON.stringify(await two.page.locator('.providers-banner').allInnerTexts()))
   await two.page.screenshot({ path: path.join(lib.WORK, 'defprov-claude-used.png') })
   await two.app.close()
+
+  // --- 3. The providers' order (HI-1965): Claude Code and Codex both installed (the fakes), Automatic on Claude Code;
+  // reordering the list in Settings → Providers (by its ⋯ menu, Alt+Up and Alt+Down, and dragging) changes what Automatic
+  // picks and what the order line under it names, and the order survives a restart.
+  const userData3 = path.join(lib.WORK, 'defprov-profile-3')
+  const claudeHome3 = path.join(lib.WORK, 'defprov-claude-home-3')
+  fs.rmSync(userData3, { recursive: true, force: true })
+  lib.enableProviders(userData3, ['claude-code', 'codex'])
+  const claudeEnv = lib.fakeClaude(userData3, claudeHome3)
+  const cfg3 = JSON.parse(fs.readFileSync(path.join(userData3, 'config.json'), 'utf8'))
+  cfg3.settings.providers.codex.executablePath = path.join(__dirname, 'fake-codex', 'fake-codex.cmd')
+  cfg3.settings.general = { ...cfg3.settings.general, confirmOnQuit: 'never' }
+  fs.writeFileSync(path.join(userData3, 'config.json'), JSON.stringify(cfg3, null, 2))
+  const openProviders = async (run) => {
+    await lib.waitForProvider(run.inv, 'codex')
+    await lib.waitForProvider(run.inv, 'claude-code')
+    await run.page.keyboard.press('Control+,')
+    await run.page.locator('.settings-nav .row', { hasText: 'Providers' }).first().click()
+    await lib.until(async () => (await run.page.locator('.provider-list .provider-row').count()) === 3, 10000)
+  }
+  const orderOf = (run) => run.page.locator('.provider-list').getAttribute('data-order')
+  const automatic = (run) => run.page.locator('.setting', { hasText: 'Default provider' }).locator('select').first().evaluate((el) => el.selectedOptions[0]?.textContent ?? '')
+  const orderLine = (run) => run.page.locator('.default-provider-order').innerText().catch(() => '')
+  const three = await lib.launch({ userData: userData3, env: { ...claudeEnv, CODEX_HOME: codexHome }, viewport: { width: 1300, height: 820 } })
+  three.page.on('pageerror', (e) => check('no page errors', false, e.message))
+  await openProviders(three)
+  check("Hive's order at first, Automatic on Claude Code", (await orderOf(three)) === 'claude-code,codex,copilot' && (await automatic(three)) === 'Automatic (Claude Code)', `${await orderOf(three)} ${await automatic(three)}`)
+  check('…and the line under it names the order', (await orderLine(three)) === 'Automatic tries Claude Code and Codex, in that order.', await orderLine(three))
+  // Codex's ⋯ menu: Move Up.
+  const row = (id) => three.page.locator(`.provider-row[data-provider="${id}"]`)
+  await row('codex').getByRole('button', { name: 'More for Codex' }).click()
+  const menuUp = three.page.locator('.menu .menu-item', { hasText: 'Move Up' })
+  check("a row's ⋯ menu offers Move Up and Move Down", !!(await lib.until(async () => (await menuUp.count()) === 1, 5000)) && (await three.page.locator('.menu .menu-item', { hasText: 'Move Down' }).count()) === 1)
+  await menuUp.click()
+  const moved = await lib.until(async () => (await orderOf(three)) === 'codex,claude-code,copilot' && (await automatic(three)) === 'Automatic (Codex)', 10000)
+  check('Move Up puts Codex first: Automatic picks Codex', !!moved, `${await orderOf(three)} ${await automatic(three)}`)
+  check('…the order line follows', (await orderLine(three)) === 'Automatic tries Codex and Claude Code, in that order.', await orderLine(three))
+  check('…and Settings saves it', JSON.stringify((await three.inv('settings:get')).providerOrder) === JSON.stringify(['codex', 'claude-code', 'copilot']), JSON.stringify((await three.inv('settings:get')).providerOrder))
+  // Keys: Alt+Down on Codex's row takes it back down.
+  await row('codex').focus()
+  await three.page.keyboard.press('Alt+ArrowDown')
+  check('Alt+Down moves the focused row down: Automatic back on Claude Code', !!(await lib.until(async () => (await orderOf(three)) === 'claude-code,codex,copilot' && (await automatic(three)) === 'Automatic (Claude Code)', 10000)), `${await orderOf(three)} ${await automatic(three)}`)
+  // Dragging GitHub Copilot to the top.
+  await row('copilot').dragTo(row('claude-code'))
+  check('dragging a row onto another puts it there', !!(await lib.until(async () => (await orderOf(three)) === 'copilot,claude-code,codex', 10000)), await orderOf(three))
+  // Copilot is off: Automatic skips it. Codex above Claude Code again, for the restart.
+  await three.inv('settings:update', { providerOrder: ['copilot', 'codex', 'claude-code'] })
+  check('a provider turned off is skipped: Automatic on Codex', !!(await lib.until(async () => (await automatic(three)) === 'Automatic (Codex)', 10000)), await automatic(three))
+  for (const theme of ['dark', 'light']) {
+    await three.inv('settings:update', { appearance: { theme } })
+    await lib.until(async () => (await three.page.evaluate(() => document.documentElement.getAttribute('data-theme'))) === theme, 5000)
+    await three.page.locator('.settings-content').first().screenshot({ path: path.join(lib.WORK, `defprov-order-${theme}.png`) }).catch(() => three.page.screenshot({ path: path.join(lib.WORK, `defprov-order-${theme}.png`) }))
+  }
+  await three.app.close()
+  // After a restart: the same order, and Automatic still on Codex.
+  const again = await lib.launch({ userData: userData3, env: { ...claudeEnv, CODEX_HOME: codexHome }, viewport: { width: 1300, height: 820 } })
+  again.page.on('pageerror', (e) => check('no page errors', false, e.message))
+  await openProviders(again)
+  check('after a restart: the same order, Automatic on Codex', (await orderOf(again)) === 'copilot,codex,claude-code' && (await automatic(again)) === 'Automatic (Codex)', `${await orderOf(again)} ${await automatic(again)}`)
+  await again.app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)
 })().catch((e) => {

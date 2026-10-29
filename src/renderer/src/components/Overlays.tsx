@@ -10,7 +10,7 @@ import { TerminalView } from './TerminalView'
 import { UpdateStatusRow } from './Updates'
 import { discardDrafts, saveAllDrafts, unsavedFiles } from './FileView'
 import type { ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli, ToastMessage } from '@shared/types'
-import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, providerDescriptor, shownText } from '@shared/providers'
+import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, orderedProviders, providerDescriptor, shownText } from '@shared/providers'
 import { distinguishingParents } from '@shared/folderLabels'
 import { GIT_DOWNLOAD, GIT_MIN, gitFixText, gitOldText, gitProblemText } from '@shared/gitTool'
 import { testedNote, testedSummary } from '@shared/testedClis'
@@ -865,7 +865,7 @@ export function AgentSetupDialog() {
   const [finished, setFinished] = useState<{ text: string; ok: boolean } | null>(null)
   useEffect(() => {
     if (typeof open === 'string') setTab(open)
-    else if (open) setTab(enabledProviders(settings)[0]?.id ?? PROVIDERS[0].id)
+    else if (open) setTab(enabledProviders(settings)[0]?.id ?? orderedProviders(settings)[0].id)
     // Only when the dialog opens: a settings change while it is open doesn't move the tab.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -950,7 +950,7 @@ export function AgentSetupDialog() {
     >
       {PROVIDERS.length > 1 && (
         <div className="setup-tabs">
-          {PROVIDERS.map((x) => (
+          {orderedProviders(settings).map((x) => (
             <button key={x.id} className={cx('setup-tab', tab === x.id && 'selected')} disabled={running} onClick={() => { setTab(x.id); setFinished(null) }}>
               <ProviderIcon provider={x.id} /> {isProviderEnabled(settings, x.id) ? x.name : <span>{tRich(msg({ id: 'shell.setup.tabOff', defaultMessage: '{provider}<faint> (off)</faint>', description: 'A tab of Provider Setup for a provider that is turned off. {provider} is its name; <faint> is greyed.' }), { provider: x.name, faint })}</span>}
             </button>

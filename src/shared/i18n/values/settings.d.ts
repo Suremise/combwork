@@ -1152,6 +1152,9 @@ interface HiveMessageValues {
   'settings.provider.modelFallback.desc': { provider: string | number }
   'settings.provider.modelFallback.tip': undefined
   'settings.provider.modelFallback.title': undefined
+  'settings.provider.more': { provider: string | number }
+  'settings.provider.moveDown': undefined
+  'settings.provider.moveUp': undefined
   'settings.provider.notInstalled': undefined
   'settings.provider.notInstalledShort': undefined
   'settings.provider.off': { provider: string | number }
@@ -1159,6 +1162,8 @@ interface HiveMessageValues {
   'settings.provider.prices.descReported': { provider: string | number }
   'settings.provider.prices.tip': { checked: string | number; provider: string | number }
   'settings.provider.prices.title': undefined
+  'settings.provider.reorderFailed': undefined
+  'settings.provider.rowLabel': { provider: string | number; position: number; count: number }
   'settings.provider.settings': undefined
   'settings.provider.status.tip': { provider: string | number }
   'settings.provider.status.title': undefined
@@ -1175,6 +1180,7 @@ interface HiveMessageValues {
   'settings.providerOff.stop': undefined
   'settings.providerOff.stopFailed': { provider: string | number }
   'settings.providerOff.title': { provider: string | number }
+  'settings.providers.automaticOrder': { order: string | number }
   'settings.providers.defaultProvider.desc': undefined
   'settings.providers.defaultProvider.tip': undefined
   'settings.providers.defaultProvider.title': undefined

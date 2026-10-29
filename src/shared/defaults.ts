@@ -64,8 +64,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
     terminalCursorBlink: true
   },
   providers: Object.fromEntries(PROVIDERS.map((p) => [p.id, defaultProviderSettings(p)])),
-  // Automatic (#474): the first provider turned on and installed.
+  // Automatic (#474): the first provider turned on and installed, in the order below.
   defaultProvider: AUTO_PROVIDER,
+  // Hive's own order until the user reorders Settings → Providers (HI-1965).
+  providerOrder: [],
   notifications: {
     chimeEnabled: true,
     chimeSound: 'chime',
@@ -637,6 +639,9 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
   cfg.version = 8
   // Settings for providers this version doesn't know are kept (a newer Hive wrote them), but never used.
   if (!isDefaultProviderValue(cfg.settings.defaultProvider)) cfg.settings.defaultProvider = AUTO_PROVIDER
+  // The provider order (HI-1965): a list of ids, each once; ids this Hive doesn't know are kept (a newer Hive's).
+  const order: unknown = cfg.settings.providerOrder
+  cfg.settings.providerOrder = Array.isArray(order) ? [...new Set(order.filter((x): x is ProviderId => typeof x === 'string' && x.length > 0 && x.length <= 64))] : []
   return cfg
 }
 

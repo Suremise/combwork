@@ -202,6 +202,11 @@ export interface AppSettings {
   providers: Record<ProviderId, ProviderSettings>
   /** The provider Add Agent's quick add uses unless the project says otherwise. */
   defaultProvider: ProviderId
+  /**
+   * The order Settings → Providers lists the providers in, which Automatic picks from and every provider list follows
+   * (HI-1965: orderedProviders). Empty: Hive's own order. Providers it doesn't name follow, in Hive's order.
+   */
+  providerOrder: ProviderId[]
   notifications: {
     chimeEnabled: boolean
     chimeSound: ChimeSound

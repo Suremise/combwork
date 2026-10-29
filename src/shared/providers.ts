@@ -449,13 +449,44 @@ export function isProviderEnabled(settings: Pick<AppSettings, 'providers'> | nul
   return isKnownProvider(id) && !!settings?.providers?.[id]?.enabled
 }
 
-export function enabledProviders(settings: Pick<AppSettings, 'providers'> | null | undefined): ProviderDescriptor[] {
-  return PROVIDERS.filter((p) => isProviderEnabled(settings, p.id))
+/** Settings as the provider order reads them: `providerOrder` optional, so callers holding only `providers` still fit. */
+type OrderedSettings = Pick<AppSettings, 'providers'> & Partial<Pick<AppSettings, 'providerOrder'>>
+
+/**
+ * Every provider in the user's order (HI-1965: Settings → Providers, reordered): those `providerOrder` names first, as
+ * listed, then any it doesn't (one added since, or none saved) in Hive's own order (PROVIDERS'). Ids it names that
+ * this Hive doesn't know (a newer Hive's) are skipped, not dropped from the setting. Automatic picks from this order.
+ */
+export function orderedProviders(settings: Partial<Pick<AppSettings, 'providerOrder'>> | null | undefined): ProviderDescriptor[] {
+  const order = Array.isArray(settings?.providerOrder) ? settings.providerOrder : []
+  const rank = (id: ProviderId): number => {
+    const i = order.indexOf(id)
+    return i < 0 ? order.length + PROVIDERS.findIndex((p) => p.id === id) : i
+  }
+  return [...PROVIDERS].sort((a, b) => rank(a.id) - rank(b.id))
 }
 
 /**
- * Settings → Providers → Default provider left to Hive (#474), the default: new agents use the first provider (in
- * PROVIDERS' order) that is turned on and installed, so a Codex-only or Copilot-only user is never pointed at Claude Code.
+ * The order after moving one provider `by` places (-1 up, +1 down), as `providerOrder` saves it: every known provider,
+ * in order, with ids of providers this Hive doesn't know kept at the end. Unchanged at either end.
+ */
+export function movedProviderOrder(settings: Partial<Pick<AppSettings, 'providerOrder'>> | null | undefined, id: ProviderId, by: number): ProviderId[] {
+  const ids = orderedProviders(settings).map((p) => p.id)
+  const from = ids.indexOf(id)
+  const to = Math.max(0, Math.min(ids.length - 1, from + by))
+  if (from >= 0 && to !== from) ids.splice(to, 0, ...ids.splice(from, 1))
+  const unknown = (Array.isArray(settings?.providerOrder) ? settings.providerOrder : []).filter((x) => !isKnownProvider(x))
+  return [...ids, ...unknown]
+}
+
+export function enabledProviders(settings: OrderedSettings | null | undefined): ProviderDescriptor[] {
+  return orderedProviders(settings).filter((p) => isProviderEnabled(settings, p.id))
+}
+
+/**
+ * Settings → Providers → Default provider left to Hive (#474), the default: new agents use the first provider (in the
+ * user's order, orderedProviders: HI-1965) that is turned on and installed, so a Codex-only or Copilot-only user is never
+ * pointed at Claude Code.
  */
 export const AUTO_PROVIDER = 'auto'
 
@@ -476,7 +507,8 @@ export function setInstalledCheck(fn: (id: ProviderId) => boolean | null): void 
 }
 
 /**
- * Automatic's provider: the first turned on and installed, else the first turned on, else Claude Code. Never from
+ * Automatic's provider, in the user's order (HI-1965): the first turned on and installed, else the first turned on, else
+ * Claude Code. Never from
  * partial detection (#506): until every turned-on provider has answered (autoProviderPending), this is only a guess for
  * display, the first turned-on provider not known to be missing (never Codex because it answered before Claude Code).
  * What commits to it (a launch, a new agent) waits for detection, and is refused if Hive is still looking.

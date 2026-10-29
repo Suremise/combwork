@@ -372,6 +372,8 @@
   "tips.projectTabsKeys.title": "Alt und eine Zahl für jeden Tab",
   "tips.projectTabsSettings.text": "Der letzte Eintrag von „Mehr ▾“ am Ende der Tabs eines Projekts ist „Projekteinstellungen…“, mit seiner Tastenkombination (Alt+0, sofern du sie nicht änderst).",
   "tips.projectTabsSettings.title": "Projekteinstellungen aus „Mehr ▾“",
+  "tips.providerOrder.text": "Sortiere die Liste unter Einstellungen → Anbieter um, indem du einen Anbieter ziehst oder Nach oben und Nach unten in seinem ⋯-Menü nutzt: „Automatisch“ gibt neuen Agenten den ersten in dieser Reihenfolge, der eingeschaltet und installiert ist, etwa Codex vor Claude Code.",
+  "tips.providerOrder.title": "Wähle, welchen Coding-Agenten „Automatisch“ zuerst versucht",
   "tips.quitWhenDone.text": "Beendest du Hive, während ein Agent arbeitet, bietet es „Beenden, wenn Agenten fertig sind“ an: Hive blendet sich aus und beendet sich selbst, sobald sie fertig sind. Unterhaltungen bleiben immer erhalten.",
   "tips.quitWhenDone.title": "Beenden, wenn Agenten fertig sind",
   "tips.recentWorkspaces.text": "Entferne einen Arbeitsbereich aus Datei → Zuletzt geöffnet oder von der Startseite mit seinem ✕ oder per Rechtsklick. „Zuletzt geöffnete leeren“ vergisst alle; Ordner, die nicht mehr da sind, erscheinen als nicht gefunden.",

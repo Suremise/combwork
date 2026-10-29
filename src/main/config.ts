@@ -151,6 +151,9 @@ class ConfigStore {
         if (problem) throw new Error(problem)
       }
     }
+    // The provider order (HI-1965): provider ids, each once.
+    const order: unknown = patch.providerOrder
+    if (order !== undefined && (!Array.isArray(order) || order.some((x) => typeof x !== 'string' || !x || x.length > 64) || new Set(order).size !== order.length)) throw new Error('providerOrder must list provider ids, each once.') // i18n-ignore: a programming error's message
     const prev = structuredClone(this.data.settings)
     this.data.settings = mergeDefaults(this.data.settings, patch)
     this.scheduleSave()
