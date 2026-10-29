@@ -309,7 +309,7 @@ async function runScenario(sc, providerKey, opts = {}) {
   // The stand-in model for fake-copilot, on a port of its own: closed when the run ends, or at once if Copilot's
   // environment or the launch fails before the run begins (#464), and that failure is the one thrown.
   const standIn = p.standIn ? await startFakeCopilotApi({ log: modelLog }) : null
-  let app, inv, env
+  let app, inv, env, page
   try {
     // Each CLI's home is a test one: the fake's per run, the real Claude Code's and Codex's signed-in test homes.
     env = {
@@ -325,7 +325,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       // Copilot in the run's own home, its profile folder faked and the GitHub CLI's login hidden (fake-copilot-api.cjs).
       ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {})
     }
-    ;({ app, inv } = await lib.launch({ userData, env }))
+    ;({ app, inv, page } = await lib.launch({ userData, env }))
   } catch (e) {
     await standIn?.close().catch(() => undefined)
     throw e
@@ -595,6 +595,16 @@ async function runScenario(sc, providerKey, opts = {}) {
     // What setup left the session under test rings its doorbell once it's idle, as the prompt is typed (#1613: on Copilot
     // the prompt was lost to the doorbell's turn). A scenario's beforePrompt waits for that turn, so the prompt comes after.
     ctx.subjectStatus = async () => (await live())?.status ?? 'stopped'
+    // Every status the session under test reports, in order, as Hive emits it (HI-2022): a state the loop below would
+    // look at between its looks (each a few calls and a second apart; a short watch ends in between) is still seen.
+    await page.evaluate((who) => {
+      window.__subjectStatuses = []
+      window.hive.onEvent((e) => {
+        if (e.type === 'session-status' && e.state?.agentId === who.agentId && String(e.state.projectPath).toLowerCase() === who.host.toLowerCase()) window.__subjectStatuses.push(e.state.status)
+      })
+    }, { host, agentId })
+    /** The statuses the session under test has reported since its prompt was sent, in order (`watching` included). */
+    ctx.statusesSeen = () => page.evaluate(() => [...(window.__subjectStatuses ?? [])])
     if (sc.beforePrompt && !endedAtLaunch) await sc.beforePrompt(ctx)
     const prompt = typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
     const fakePrompt = typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake
@@ -696,6 +706,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     }
     const observed = observeTranscript(items, skillNames)
     observed.status = s?.status ?? 'stopped'
+    // Every status it reported during the turn, in order (HI-2022): `watching` seen even when it came and went between looks.
+    observed.statuses = await ctx.statusesSeen().catch(() => [])
     // The watch it ended its turn with (#402): the live one, not every watch it started (a new one replaces the last).
     observed.watch = s?.watch ?? null
     // What Hive woke it with (#402), in order: a line it typed in, or (#650: its doorbell) what the session's next
