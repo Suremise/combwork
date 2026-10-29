@@ -243,6 +243,55 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     expect(record(a)).toBeUndefined()
   })
 
+  /** Each project's view preferences and the workspace's panes, as windows save them (by lower-cased paths). */
+  function setViews(at: string): void {
+    const ws = at.toLowerCase()
+    const alpha = join(at, 'alpha').toLowerCase()
+    config.update((c) => {
+      c.ui.skillsProvider = { ...c.ui.skillsProvider, [alpha]: 'codex' }
+      c.ui.sessionsTree = { ...c.ui.sessionsTree, [alpha]: { 'agent:b1': true } }
+      c.ui.hiveVcsNotice = { ...c.ui.hiveVcsNotice, [alpha]: 'synced' }
+      c.ui.assistantFold = { ...c.ui.assistantFold, [`${ws}|${alpha}`]: true }
+      c.ui.panes = { ...c.ui.panes, [`assistant-open:${ws}`]: 1, [`progress-lanes-rows:${ws}`]: 7 }
+    })
+  }
+  function views(at: string): unknown[] {
+    const ws = at.toLowerCase()
+    const alpha = join(at, 'alpha').toLowerCase()
+    const ui = config.get().ui
+    return [ui.skillsProvider?.[alpha], ui.sessionsTree?.[alpha], ui.hiveVcsNotice?.[alpha], ui.assistantFold?.[`${ws}|${alpha}`], ui.panes?.[`assistant-open:${ws}`], ui.panes?.[`progress-lanes-rows:${ws}`]]
+  }
+  const NONE = [undefined, undefined, undefined, undefined, undefined, undefined]
+
+  it("moved: each project's view preferences and the workspace's panes follow; one already set at the new place stays (HI-2008)", async () => {
+    const { ws, at } = await pinnedWorkspace(join(base, 'views'))
+    setViews(at)
+    await ws.close()
+    const root = join(base, 'views-moved')
+    const to = join(root, 'ws')
+    // Set at the new place since the move (another window): the newer, kept.
+    config.update((c) => {
+      c.ui.panes = { ...c.ui.panes, [`progress-lanes-rows:${to.toLowerCase()}`]: 3 }
+    })
+    mkdirSync(root)
+    renameSync(at, to)
+    await openAt(ws, to)
+    expect(views(to)).toEqual(['codex', { 'agent:b1': true }, 'synced', true, 1, 3])
+    expect(views(at)).toEqual(NONE)
+    expect(record(at)).toBeUndefined()
+  })
+
+  it("copied: the original keeps its view preferences, and the copy takes none (HI-2008)", async () => {
+    const { ws, at } = await pinnedWorkspace(join(base, 'views-two'))
+    setViews(at)
+    await ws.close()
+    mkdirSync(join(base, 'views-copy'))
+    const to = copied(at, join(base, 'views-copy'))
+    await openAt(ws, to)
+    expect(views(at)).toEqual(['codex', { 'agent:b1': true }, 'synced', true, 1, 7])
+    expect(views(to)).toEqual(NONE)
+  })
+
   it('copied (the old folder still there): the original keeps its pin, runs and token', async () => {
     const { ws, at, runs } = await pinnedWorkspace(join(base, 'two'))
     await ws.close()

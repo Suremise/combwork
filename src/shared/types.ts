@@ -3301,6 +3301,8 @@ export type HiveEvent =
   | { type: 'advanced-changed' }
   /** One project's view preference saved (ui:setProjectPref): every window's store follows. */
   | { type: 'ui-pref-changed'; pref: ProjectPref; project: string; value: unknown }
+  /** Panes' sizes and states moved to other keys (HI-2008: a moved workspace's): every window's store follows; null removes one. */
+  | { type: 'ui-panes-changed'; panes: Record<string, number | null> }
   /** What the tips know changed (ui:changeTips): every window's store follows. */
   | { type: 'tips-changed'; tips: TipsState }
   | { type: 'provider-install'; provider: ProviderId; info: AgentInstallInfo }

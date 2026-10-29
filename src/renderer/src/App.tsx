@@ -184,6 +184,15 @@ function handleEvent(e: HiveEvent): void {
     case 'ui-pref-changed':
       applyProjectPref(e.pref, e.project, e.value)
       break
+    case 'ui-panes-changed': {
+      const panes = { ...get().panes }
+      for (const [k, v] of Object.entries(e.panes)) {
+        if (v === null) delete panes[k]
+        else panes[k] = v
+      }
+      set({ panes })
+      break
+    }
     case 'tips-changed':
       applyTipsState(tipsState(e.tips))
       break

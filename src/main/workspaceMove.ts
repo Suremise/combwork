@@ -32,6 +32,7 @@ import { adoptHandovers } from './notes'
 import { noteFormerName } from './projectNames'
 import { adoptBenchmarkOwners, benchContext } from './benchmarks'
 import { carryPin, pinKeptAt } from './pin'
+import { carryViewPrefs, viewPrefsKeptAt } from './viewPrefs'
 import { carryWorkspaceRuns } from './closeCommand/closeCommands'
 import { emitTo } from './events'
 
@@ -664,7 +665,7 @@ export const movedSummary = (plan: MovePlan | null): WorkspaceMoved | null =>
 
 /**
  * What Hive's profile keeps by a workspace's folder follows it when it moves (HI-2007): its window's pin and its close
- * command's runs. The Assistant's old token file is left: it is written again at each launch, and deleting it could take
+ * command's runs, and its view preferences, each project's and its panes' (HI-2008, viewPrefs.ts). The Assistant's old token file is left: it is written again at each launch, and deleting it could take
  * a workspace's back there (HR2's round 2). Design HI-2007/s40 and s42:
  * - A move is recorded as the moved workspace opens (config.json's `profileMoves`, one per old folder) only when the
  *   old folder is gone (no .hive, not open): a copy's original keeps its own. Records about that old folder follow it
@@ -714,6 +715,8 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
       end()
       continue
     }
+    const views = carryViewPrefs(m.from, here, ok)
+    if (views) log.info(`${views} view preference(s) follow the workspace from ${userText(m.from)}`)
     if (carryPin(m.from, here, ok)) {
       const win = ws.window
       if (win && !win.isDestroyed() && !win.isAlwaysOnTop()) {
@@ -741,7 +744,7 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
       if (report) say(report, 'failed', tr(msg({ id: 'main.move.closeRunsFailed', defaultMessage: "Hive's records of the workspace's close command couldn't all follow it from the old folder ({why}). Hive tries again.", description: "A line of Repair's report, after a workspace moved to another folder: the output Hive keeps of the workspace's close command couldn't all be moved from the old folder's records. {why} is the system's message." }), { why }), { what: { kind: 'closeRuns' }, result: tr(R.failedWhy, { why }) })
       else log.warn(`carrying a close-command run from ${userText(m.from)}: ${userText(why)}`)
     }
-    if (!pinKeptAt(m.from) && !r.going.length && !r.stuck.length && !r.stopped) end()
+    if (!pinKeptAt(m.from) && !viewPrefsKeptAt(m.from) && !r.going.length && !r.stuck.length && !r.stopped) end()
     else {
       const failed = r.stuck[0]?.why
       config.update((c) => {
