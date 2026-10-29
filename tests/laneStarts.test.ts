@@ -66,7 +66,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.hive'), { recursive: true })
     mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -142,6 +142,49 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     release!()
     await checkLaneStarts(w)
     expect(await columnOf(first)).toBe('doing')
+    await lanes.endLane(w, lane.id, { abandoned: true })
+  })
+
+  it("a lane waiting for a slot (a stoppedOnly wait too) isn't started until the slot pass's deferred launch clears it, even with the slot lent meanwhile (HR1 on HI-2029)", async () => {
+    const first = await card('Retry the backup', 'e6')
+    const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'e6', reviewer: 'r1', cards: [first], by: 'the Assistant' })).lane
+    // POST /v1/lanes over stopped agents with no slot free (launchRecordedLane), then the slot pass lends one and is
+    // launching the agents (startWaitingLane, its awaits before launchAgents): the wait is kept until that is done.
+    await lanes.setLaneSlotWait(w, lane.id, { since: new Date().toISOString(), note: '', stoppedOnly: true })
+    // Its slot lent (its view no longer says it waits for one, so nothing in it pauses the lane), its launch under way.
+    lanes.setLaneSlots((_ws, l) => (l.id === lane.id ? { name: 'slot-x', carried: false, line: null, state: 'ready', since: new Date().toISOString() } : null))
+    try {
+      builder('ready', 'e6')
+      await checkLaneStarts(w)
+      expect(await columnOf(first)).toBe('todo')
+      expect(rung()).toBe(false)
+      // Launched: the pass clears the wait, and Hive's start comes after.
+      await lanes.setLaneSlotWait(w, lane.id, null)
+      await checkLaneStarts(w)
+      expect(await columnOf(first)).toBe('doing')
+    } finally {
+      lanes.setLaneSlots(null)
+    }
+    await lanes.endLane(w, lane.id, { abandoned: true })
+  })
+
+  it("a wait for a slot that begins after the look is checked again just before the start: nothing started (HR1 on HI-2029)", async () => {
+    const first = await card('Retry the restore', 'e7')
+    const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'e7', reviewer: 'r1', cards: [first], by: 'the Assistant' })).lane
+    builder('ready', 'e7')
+    // Lent at once as it waits (the slot pass's lend between the look and the start).
+    lanes.setLaneSlots((_ws, l) => (l.id === lane.id ? { name: 'slot-y', carried: false, line: null, state: 'ready', since: new Date().toISOString() } : null))
+    laneStartsTestHooks.beforeStart = async () => {
+      await lanes.setLaneSlotWait(w, lane.id, { since: new Date().toISOString(), note: '' })
+    }
+    try {
+      await checkLaneStarts(w)
+      expect(await columnOf(first)).toBe('todo')
+      expect(rung()).toBe(false)
+    } finally {
+      laneStartsTestHooks.beforeStart = null
+      lanes.setLaneSlots(null)
+    }
     await lanes.endLane(w, lane.id, { abandoned: true })
   })
 

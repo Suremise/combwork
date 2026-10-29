@@ -5,7 +5,7 @@ import { cardRef } from '../shared/projectKeys'
 import { agentNowOf } from './cardStall'
 import { coalesced } from './coalesce'
 import { onHiveEvent } from './events'
-import { laneNow, lanesEnforced, laneStartHeld, lanesWaitingForSlot, laneViewsChanged, listLanes, setLaneStartWaits } from './lanes'
+import { laneNow, lanesEnforced, laneStartHeld, laneViewsChanged, laneWaitsForSlot, listLanes, setLaneStartWaits } from './lanes'
 import { createLogger, userText } from './logger'
 import { withCardNames } from './projectKeys'
 import { offerNow, waitingForRun } from './deliveries'
@@ -87,10 +87,10 @@ class LaneChanged extends Error {}
  * Whether the lane still asks for card n now (HR1's rounds 1 and 2): as `laneNow` reads it, the lane view's own reading
  * (its effective pause for the user, a block or a merge, its cards' owners, a queued list), still running in the same
  * workspace with the same builder, and n still its next card due, with no lane start launching the builder meanwhile
- * (HI-2029). `now`: the card as the start's write sees it.
+ * and no wait for a slot (HI-2029: either may have begun since the look). `now`: the card as the start's write sees it.
  */
 function stillDue(ws: WorkspaceService, path: string, lane: { id: string; project: string; builder: { id: string } }, n: number, now?: TaskCard): boolean {
-  if (!ws.path || ws.path.toLowerCase() !== path.toLowerCase() || laneStartHeld(ws, lane.project, lane.builder.id)) return false
+  if (!ws.path || ws.path.toLowerCase() !== path.toLowerCase() || laneStartHeld(ws, lane.project, lane.builder.id) || laneWaitsForSlot(ws, lane.id)) return false
   const v = laneNow(ws, { lane: lane.id }, now)
   return !!v && v.builder.id === lane.builder.id && laneStartDue(v)?.number === n
 }
@@ -118,12 +118,12 @@ export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
 }
 
 async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
-  // A lane waiting for a slot (Start Lane… found none free) has its stopped agents started once one is lent (slotCards'
-  // pass), its card with them: its status says it waits for a slot.
-  const forSlot = new Set((await lanesWaitingForSlot(ws)).filter((l) => !l.slotWait?.stoppedOnly).map((l) => l.id))
   for (const lane of await listLanes(ws)) {
     const next = laneStartDue(lane)
-    if (!next || forSlot.has(lane.id)) continue
+    // A lane waiting for a slot (none was free as it started) has its stopped agents started once one is lent (slotCards'
+    // pass), which keeps the wait until they are launched (HR1 on HI-2029: a `stoppedOnly` one too): its status says it
+    // waits for a slot, and Hive's start comes after.
+    if (!next || laneWaitsForSlot(ws, lane.id)) continue
     const projectPath = join(path, lane.project)
     waiting.set(builderKey(path, lane.project, lane.builder.id), next.number)
     const wait = (why: LaneStartWhy): void => void waits.set(waitKey(path, lane.id), { card: next.number, why, agent: lane.builder.name })

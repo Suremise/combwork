@@ -1196,6 +1196,16 @@ export function holdLaneStart(ws: WorkspaceService, project: string, builder: st
     changed(ws)
   }
 }
+/**
+ * Whether a running lane waits for a slot now, as kept (`slotWait`), read synchronously (laneStarts.ts, as it decides
+ * and again just before its start, HI-2029). The slot pass clears it only once it has lent the slot and launched the
+ * lane's agents (startWaitingLane), so it covers that deferred launch too, `stoppedOnly` or not.
+ */
+export function laneWaitsForSlot(ws: WorkspaceService, id: string): boolean {
+  if (!ws.path) return false
+  const rec = readLanes({ version: 1, lanes: readTable(ws.path, 'lanes').docs as Record<string, unknown>[] }).find((l) => l.id === id)
+  return !!rec && running(rec) && !!rec.slotWait
+}
 /** Whether a lane's start is launching this builder now (holdLaneStart). */
 export const laneStartHeld = (ws: WorkspaceService, project: string, builder: string): boolean => launching.has(launchKey(ws, project, builder))
 
