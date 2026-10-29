@@ -3068,6 +3068,13 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
      run to an exit of its own (Node's `EAGAIN` on a busy machine, Hive's git worker ending, the output bound, a signal) is
      never git's answer anywhere in Hive: its result has code -1 (never 1, which callers read as git's "no": a key not
      set, HEAD detached, not an ancestor) and `notRun` naming why, and it doesn't mark git as missing.
+   - **A commit of the test merge whose git never started** (HI-2020: the merge, a squash's commit, strict's update,
+     Rebase's rebase): nothing ran, so there is nothing to tell a hook, a signer or a conflict from. The queue's worktree
+     is put back as after any failure and the entry goes round again, admitted afresh, within the same budget; then
+     `needsYou` with the start's error. "Never started" is only ever positive: Node's start error with no process (in
+     tests, the queue's own spawn); in the app, the runner's launcher that couldn't start, or the launcher's own line,
+     marked with the launch's nonce, saying the command's start failed. An exit code never says it: a command that ran
+     and exited 127 is that command's 127. A git that ran and failed is classified as before.
    - **No trace** (a git older than 2.24): only git's own "Not committing merge" is a hook, and signing is never read
      from text.
    - **Signing:** the repository's config (never overridden). Hive's commits run with no terminal: no input,

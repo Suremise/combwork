@@ -597,16 +597,46 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
     expect(w.store.queueLease('retry')).toBeNull()
   })
 
-  it("HR4 r2 #3: a command whose folder is gone fails with its start's own error, nothing left recorded or unhandled; a missing executable fails as a run", async () => {
+  it("HR4 r2 #3: a command whose folder is gone never starts: a run saying so with its start's own error (HI-2020), nothing left recorded or unhandled; a missing executable never starts either", async () => {
     const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'gone', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
     const missing = join(tempDir('qr-gone-'), 'no-such-folder')
-    await expect(a.runner.run('check', process.execPath, ['-e', ''], { cwd: missing })).rejects.toThrow(/ENOENT/)
+    // The launcher itself can't start (its folder is gone): run's result says it never ran (HI-2020: was thrown).
+    const gone = await a.runner.run('check', process.execPath, ['-e', ''], { cwd: missing })
+    expect(gone).toMatchObject({ ok: false, code: -1, notRun: 'ENOENT', err: expect.stringMatching(/ENOENT/) })
     expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job'])
-    // The launcher starts and the command can't: its run fails (127), and its launcher's record goes with it.
-    expect(await a.runner.run('check', 'no-such-command-hive-1360', [])).toMatchObject({ ok: false, code: 127 })
+    // The launcher starts and the command can't: the launcher says so by its nonce, and its record goes with it.
+    const none = await a.runner.run('check', 'no-such-command-hive-1360', [])
+    expect(none).toMatchObject({ ok: false, code: -1, notRun: 'ENOENT', err: expect.stringMatching(/ENOENT/) })
+    expect(none.err).not.toMatch(/notStarted/)
     await vi.waitFor(() => expect(w.store.queueProcs(a.runner.lease).map((p) => p.what)).toEqual(['job']), { timeout: 30_000, interval: 100 })
     await a.runner.release()
     expect(w.store.queueProcs(null, 'gone')).toEqual([])
+  })
+
+  it("HI-2020: a command that ran and exited 127 is the command's 127, a look-alike line included; only the launcher's own nonce means never started", async () => {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target: 'exit127', root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    const plain = await a.runner.run('testMerge', process.execPath, ['-e', 'process.exit(127)'])
+    expect(plain).toMatchObject({ ok: false, code: 127 })
+    expect(plain.notRun).toBeUndefined()
+    // The command writes what the launcher's line looks like, with a nonce of its own: still its own exit.
+    const lookAlike = `process.stderr.write('\\n00000000-0000-4000-8000-000000000000:notStarted:ENOENT\\n'); process.exit(127)`
+    const fake = await a.runner.run('testMerge', process.execPath, ['-e', lookAlike])
+    expect(fake).toMatchObject({ ok: false, code: 127 })
+    expect(fake.notRun).toBeUndefined()
+    // Other exits are as they were.
+    for (const c of [0, 1, 128]) expect(await a.runner.run('testMerge', process.execPath, ['-e', `process.exit(${c})`])).toMatchObject({ ok: c === 0, code: c })
+    // A launcher that started but couldn't be recorded isn't "never started": that failure is thrown, as before.
+    const add = w.store.addQueueProc.bind(w.store)
+    w.store.addQueueProc = (p) => {
+      if (p.what === 'testMerge') throw new Error('disk full')
+      add(p)
+    }
+    try {
+      await expect(a.runner.run('testMerge', process.execPath, ['-e', ''])).rejects.toThrow('disk full')
+    } finally {
+      w.store.addQueueProc = add
+    }
+    await a.runner.release()
   })
 
   it('#1350: a run past its bound (a signer waiting for a passphrase, under git) is ended with its whole tree, and says it timed out', async () => {

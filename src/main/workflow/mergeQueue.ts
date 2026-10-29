@@ -186,6 +186,8 @@ export interface QueueGitResult {
   timedOut?: boolean
   /** Its stderr as far as it had come when the bound ended it: what was running then. */
   errAtTimeout?: string
+  /** HI-2020: git never started (Node's code for why): nothing ran, so nothing to classify; the entry goes round again. */
+  notRun?: string
 }
 
 export type QueueOutcome =
@@ -487,7 +489,8 @@ function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<Qu
     try {
       child = spawn('git', [...GIT_PREFIX, ...args], { cwd, env: opts.env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     } catch (e) {
-      return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1 })
+      // HI-2020: a start that failed at once ran nothing.
+      return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1, notRun: String((e as NodeJS.ErrnoException).code ?? 'error') })
     }
     let atTimeout: string | undefined
     const timer = opts.timeoutMs
@@ -500,15 +503,16 @@ function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<Qu
     child.stdout?.on('data', (d: Buffer) => out.push(d))
     child.stderr?.on('data', (d: Buffer) => err.push(d))
     let settled = false
-    const done = (code: number): void => {
+    const done = (code: number, notRun?: string): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}) })
+      res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}), ...(notRun ? { notRun } : {}) })
     }
     child.once('error', (e) => {
       err.push(Buffer.from(e.message))
-      done(-1)
+      // HI-2020: an error with no pid is a start that failed (EAGAIN on a loaded machine): nothing ran.
+      done(-1, child.pid ? undefined : String((e as NodeJS.ErrnoException).code ?? 'error'))
     })
     // `exit`, not `close`: a descendant that got away may hold the output open.
     child.once('exit', (c) => setImmediate(() => done(c ?? 1)))
@@ -1172,6 +1176,12 @@ export class MergeQueue {
     // 1: with the repository's `rebase.updateRefs` on, git would move the builder's branch, or a user's, to the update).
     // Overridden for this command only; the repository's config is left as it is.
     const u = rebase ? await this.git(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await this.git(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
+    // HI-2020: git never started (nothing ran): the worktree put back as after any failure, and the entry goes round again.
+    if (u.notRun) {
+      await this.git(f, rebase ? ['rebase', '--abort'] : ['merge', '--abort'])
+      await this.folderAt(expected)
+      return again(u.err)
+    }
     if (!u.ok) {
       const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
       const files = namesOf(c?.out)
@@ -1226,6 +1236,11 @@ export class MergeQueue {
     }
     // Its output read with git's own trace in it (commitEnv), so a failure is told by who said what, never by words.
     const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
+    // HI-2020: git never started (nothing ran, so nothing to tell a hook or a conflict from): put back, and again.
+    if (m.notRun) {
+      await clean()
+      return again(m.err)
+    }
     if (!m.ok) {
       const u = m.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
       const files = namesOf(u?.out)
@@ -1239,7 +1254,7 @@ export class MergeQueue {
       const c = await this.git(f, [...who, 'commit', '-q', '-m', message], opts)
       if (!c.ok) {
         await clean()
-        return commitFailed(c, signs)
+        return c.notRun ? again(c.err) : commitFailed(c, signs)
       }
     }
     const h = await G.head(f)
@@ -1275,6 +1290,12 @@ export class MergeQueue {
       const signs = await this.signs(reads, f)
       const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
       const u = await this.git(f, [...who, '-c', 'rebase.rebaseMerges=false', '-c', 'rebase.updateRefs=false', 'rebase', '--no-rebase-merges', '--no-update-refs', '--no-autostash', ...(linear ? [] : ['--force-rebase']), '--onto', expected, base], opts)
+      // HI-2020: git never started: put back, and again.
+      if (u.notRun) {
+        await this.git(f, ['rebase', '--abort'])
+        await this.folderAt(expected)
+        return again(u.err)
+      }
       if (!u.ok) {
         const c = u.timedOut ? null : await this.git(f, ['diff', '--name-only', '--diff-filter=U', '-z'])
         const files = namesOf(c?.out)

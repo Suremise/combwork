@@ -46,6 +46,29 @@ vi.mock('../../src/main/gitWorker', async (orig) => {
   }
 })
 
+/**
+ * HI-2020: the queue's own git with options (its merge commits: mergeQueue's gitTree) starts with child_process.spawn.
+ * Matching ones fail to start: an 'error' with no pid (EAGAIN), or, `sync`, a throw at once. Everything else is spawned.
+ */
+const spawnFail = vi.hoisted(() => ({ rules: [] as { match: string; times: number; sync?: boolean }[], seen: [] as string[] }))
+vi.mock('child_process', async (orig) => {
+  const real = (await orig()) as typeof import('child_process')
+  const { EventEmitter } = await import('events')
+  const spawn = (cmd: string, args: readonly string[], opts: object) => {
+    const line = (args ?? []).join(' ')
+    const rule = cmd === 'git' ? spawnFail.rules.find((r) => r.times > 0 && line.includes(r.match)) : undefined
+    if (cmd === 'git') spawnFail.seen.push(line)
+    if (!rule) return real.spawn(cmd, args as string[], opts as never)
+    rule.times--
+    const failure = Object.assign(new Error('spawn git EAGAIN'), { code: 'EAGAIN', errno: -11, syscall: 'spawn git' })
+    if (rule.sync) throw failure
+    const cp = Object.assign(new EventEmitter(), { stdout: null, stderr: null, pid: undefined })
+    setImmediate(() => cp.emit('error', failure))
+    return cp
+  }
+  return { ...real, spawn, default: { ...real, spawn } }
+})
+
 const BUSY = "fatal: Unable to create 'index.lock': File exists."
 /** `native`: the process didn't run to an exit (Node's code, e.g. EAGAIN), as a loaded machine can say. */
 const failing = (match: string | RegExp, times = 1, more: { code?: number; err?: string; native?: string; after?: () => Promise<void> } = {}): void => {
@@ -57,6 +80,8 @@ let env: Env | null = null
 beforeEach(() => {
   fail.rules.length = 0
   fail.calls.length = 0
+  spawnFail.rules.length = 0
+  spawnFail.seen.length = 0
 })
 afterEach(() => {
   env?.close()
@@ -371,6 +396,42 @@ describe('after the advance: only the branch is read again', () => {
     expect(await e.queue({ holds: () => holds }).drain('main')).toEqual([])
     expect(count(e, card.id, 'Integrated')).toBe(0)
     expect(e.store.queuePause('main')).toBeNull()
+  })
+})
+
+describe("the test merge's commit, its git never started (HI-2020): put back, and the entry goes round again", () => {
+  const cases: [string, Partial<WorkflowOptions>, string, boolean][] = [
+    ['the merge (an error, no pid)', {}, 'merge --no-ff', false],
+    ['the merge (a throw at once)', {}, 'merge --no-ff', true],
+    ["a squash's commit", { style: 'squash' }, 'commit -q', false],
+    ["strict's update of the card", { strict: true }, 'merge --no-ff --no-edit', false],
+    ["Rebase and fast-forward's rebase", { style: 'rebase' }, 'rebase --no-rebase-merges', false]
+  ]
+  for (const [what, o, match, sync] of cases)
+    it(`${what}: merged once, nothing paused`, async () => {
+      const e = project(o)
+      const card = await queued(e)
+      // Behind main, so strict updates and Rebase rebases (each a commit of the queue's).
+      if (o.strict || o.style === 'rebase') commit(e.project, { 'other.txt': 'meanwhile\n' }, 'meanwhile')
+      spawnFail.rules.push({ match, times: 1, sync })
+      expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
+      expect(spawnFail.rules[0].times).toBe(0)
+      expect(e.store.queuePause('main')).toBeNull()
+      expect(e.wf.state(card).stage).toBe('done')
+      expect(count(e, card.id, 'IntegrationStarted')).toBe(1)
+      expect(count(e, card.id, 'Integrated')).toBe(1)
+    })
+
+  it('never starting, every time: needsYou with its start error after 1 + READ_RETRIES tries; nothing merged', async () => {
+    const e = project()
+    const card = await queued(e)
+    const before = sh(e.project, 'rev-parse', 'main')
+    spawnFail.rules.push({ match: 'merge --no-ff', times: Infinity })
+    expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: 'spawn git EAGAIN' }])
+    expect(spawnFail.seen.filter((l) => l.includes('merge --no-ff'))).toHaveLength(1 + READ_RETRIES)
+    expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
+    expect(count(e, card.id, 'CheckRan')).toBe(0)
+    expect(e.wf.state(card).stage).toBe('merging')
   })
 })
 
