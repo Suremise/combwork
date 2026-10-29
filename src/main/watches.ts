@@ -17,7 +17,7 @@ import { dbGenerationAt, onDbReplaced } from './boardStore'
 import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { listLanes } from './lanes'
-import { LANE_ALWAYS_EVENTS, LANE_CARD_CHANGES, laneCardMark, laneHits, laneLimitLine, laneWakeLine, laneWatchLabel, mergeDue, mergeStallReason, newLaneBase, readSavedLaneCondition, readSavedLaneMark, verdictsOf, type LaneAsked, type LaneHit, type LaneMark, type LaneNow, type LaneWatchCards, type LaneWatchCondition, type WaitHit } from '../shared/laneWatch'
+import { keepAsked, LANE_ALWAYS_EVENTS, LANE_CARD_CHANGES, laneCardMark, laneHits, laneLimitLine, laneWakeLine, laneWatchLabel, mergeDue, mergeStallReason, newLaneBase, readSavedLaneCondition, readSavedLaneMark, verdictsOf, type LaneAsked, type LaneHit, type LaneMark, type LaneNow, type LaneWatchCards, type LaneWatchCondition, type WaitHit } from '../shared/laneWatch'
 import { cardStallIn, laneOrderView } from './cardStall'
 import { noteLoopWatch } from './loopCheck'
 import { isResuming } from './restartResume'
@@ -1477,7 +1477,7 @@ async function laneRound(store: Store, rec: WatchRecord, board: LaneBoard = lane
     // Its hits' texts name cards as the watch's line does (HI-1777): by key, whatever workspace is the context meanwhile.
     const h = withCardNames(store.ws, () => laneHits(was, n, cond.events, from), rec.scope)
     if (h) hits.push(h)
-    next[n.id] = n.mark
+    next[n.id] = keepAsked(was, n.mark, from)
   }
   const c = rec.cond.cards.length ? await check(store, rec) : null
   // Named lanes: the waits of their projects' agents; "all": of every project in the watcher's view.
@@ -1601,7 +1601,7 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
       const t = told?.marks.get(n.id)
       if (t) laneMarks[n.id] = t
       // Started since that wake: left unmarked, so the first check measures it from an empty start.
-      else if (!(told && Date.parse(started.get(n.id) ?? '') > Date.parse(laneSince))) laneMarks[n.id] = n.mark
+      else if (!(told && Date.parse(started.get(n.id) ?? '') > Date.parse(laneSince))) laneMarks[n.id] = keepAsked(null, n.mark, laneSince)
     }
     const old = recordOf(store, projectPath, agentId)
     // The cards beside its lanes (#726): those named, else the last lane watch's (the one it replaces, or the one whose

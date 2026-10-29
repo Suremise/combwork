@@ -220,6 +220,21 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
 }
 
 /**
+ * A lane's mark with its cards' requests for the user carried over where they couldn't be read (HI-1991 round 1 finding):
+ * a card with no `q` keeps its last mark's, or, new to the watch, `since` (when the watch began), so a question asked
+ * meanwhile is told once they are read again. A card whose last mark is from before (no `q`) stays without one.
+ */
+export function keepAsked(was: LaneMark | null | undefined, now: LaneMark, since: string): LaneMark {
+  if (Object.values(now.cards).every((c) => c.q !== undefined)) return now
+  const cards: Record<string, LaneCardMark> = {}
+  for (const [n, c] of Object.entries(now.cards)) {
+    const q = c.q ?? (was?.cards[n] ? was.cards[n].q : since)
+    cards[n] = q === undefined ? c : { ...c, q }
+  }
+  return { ...now, cards }
+}
+
+/**
  * Where a lane first seen by a watch on every lane starts, when it began after the watch did (#531): its cards as they
  * are, but neither blocked nor stalled, and no verdict before the watch began (`since`). So a block or stall it already
  * has is told once, and a verdict since the watch began; a lane there when the watch began starts from now instead.

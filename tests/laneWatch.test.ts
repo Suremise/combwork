@@ -7,7 +7,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, blockNewsAt, laneHits, laneWakeLine, mergeStallReason, readLaneCards, readLaneCondition, readSavedLaneMark, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
+import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, blockNewsAt, keepAsked, laneHits, laneWakeLine, mergeStallReason, readLaneCards, readLaneCondition, readSavedLaneMark, type LaneMark, type LaneNow } from '../src/shared/laneWatch'
 import { WAKE_MAX_BYTES, type CardChange } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
 import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
@@ -116,6 +116,23 @@ describe('what a lane watch counts (#531)', () => {
     expect(laneHits(was, paused({ reason: 'merging', card: 1 }), ['paused-merge'])!.parts).toEqual([{ n: 1, event: 'paused-merge', text: 'paused for a merge: waiting: #1 merging', detail: 'merging' }])
     expect(laneHits(was, paused({ reason: 'you', card: 1 }), ['paused-merge'])).toBeNull()
     expect(laneHits(was, paused({ reason: 'merging', card: 1 }), ['paused-user'])).toBeNull()
+  })
+
+  // HI-1991 round 1 finding: a round that couldn't read the requests saved marks without q, and the question asked
+  // meanwhile was then taken as the baseline, never told.
+  it("requests that couldn't be read keep the last mark's q (or the watch's start, for a card new to it), so a question asked meanwhile is told once read", () => {
+    const t0 = '2026-10-29T00:00:00.000Z'
+    const t1 = '2026-10-29T00:10:00.000Z'
+    const unread: LaneMark = { state: 'active', mergeDue: false, cards: { 1: card(), 2: card() } }
+    const kept = keepAsked({ state: 'active', mergeDue: false, cards: { 1: card({ q: '' }) } }, unread, t0)
+    expect(kept.cards[1].q).toBe('')
+    expect(kept.cards[2].q).toBe(t0)
+    // Read again: the question since is told.
+    const now: LaneNow = { id: 'lane-1', label: 'B1 / R1', mark: { ...unread, cards: { 1: card({ q: t1 }), 2: card({ q: '' }) } }, cards: [{ number: 1, blocked: null, stalled: null, failedBy: null, passedBy: null, asked: { since: t1, by: 'HB6', text: 'Go on?' } }, { number: 2, blocked: null, stalled: null, failedBy: null, passedBy: null, asked: null }] }
+    expect(laneHits(kept, now, ['paused-user'])!.parts.map((p) => p.n)).toEqual([1])
+    // Read marks are kept as they are; a card whose last mark is from before (no q) stays without one.
+    expect(keepAsked(null, now.mark, t0)).toBe(now.mark)
+    expect(keepAsked({ ...unread, cards: { 1: card() } }, unread, t0).cards[1].q).toBeUndefined()
   })
 
   it('a block lifted is told by default (#922, #1272); a lane ended with its merge commit names it (#1270), else as before', () => {
@@ -463,6 +480,39 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     // Watched again with the question still open: nothing new to tell.
     await watchAll(w, home, st, ['failed'])
     await inWorkspace(w, () => tasks.updateTask(a, { column: 'review' }, agent('b1')).catch(() => undefined))
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(st.told).toHaveLength(1)
+    await disposeWorkspaceService(w)
+  })
+
+  it("HI-1991 round 1 finding: a question asked while the cards' requests can't be read wakes the lane watch once they can, once", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const { workflowFor } = await import('../src/main/workflow/service')
+    const cardWork = await import('../src/main/workflow/cardWork')
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    await watchAll(w, home, st, ['failed'])
+    const failing = vi.spyOn(cardWork, 'forYouOfCards').mockImplementation(() => {
+      throw new Error('board busy')
+    })
+    try {
+      // A quiet round with the requests unread saves its marks; the question comes while they still can't be read.
+      await watches.evaluateWatches(w)
+      const wf = (await workflowFor(w, alpha))!
+      await inWorkspace(w, () => wf.askTheUser(`#${a}`, 'agent:b1', { kind: 'decide', text: 'Rename the event?' }))
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(failing).toHaveBeenCalled()
+      expect(st.told).toEqual([])
+    } finally {
+      failing.mockRestore()
+    }
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toContain(`#${a} waits for the user (b1 asks): "Rename the event?"`)
+    await watchAll(w, home, st, ['failed'])
     await watches.evaluateWatches(w)
     await watches.settled()
     expect(st.told).toHaveLength(1)
