@@ -155,7 +155,9 @@ describe('a finish’s steps', () => {
     expect(await e.wf.askSlotDirty(a, f, { slot: 'slot-a', line: 'hive/x', target: 'main' })).toBe(false)
     expect(await e.wf.finishStep(a, f, 'requests')).toBe('done')
     expect(e.wf.state(a).requests.map((r) => r.gate)).toEqual(['slotDirty'])
-    expect(await e.wf.closeSlotDirty(a)).toBe(true)
+    // Only the finish it was asked for closes it.
+    expect(await e.wf.closeSlotDirty(a, f + 1000)).toBe(false)
+    expect(await e.wf.closeSlotDirty(a, f)).toBe(true)
     expect(e.wf.state(a).requests).toEqual([])
   })
 })

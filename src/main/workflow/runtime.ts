@@ -617,10 +617,14 @@ export class Workflow {
     })
   }
 
-  /** The question about a finished card's slot closed (HI-2014): the slot is clean now, detached or another card's. */
-  async closeSlotDirty(card: CardRecord): Promise<boolean> {
+  /**
+   * The question about a finished card's slot closed (HI-2014): the slot is clean now, detached or another card's. Only
+   * while `finish` is the card's: a later finish's question is its own.
+   */
+  async closeSlotDirty(card: CardRecord, finish: number): Promise<boolean> {
     return this.write(card, null, 'hive', (w) => {
-      const open = w.state().requests.filter((r) => r.gate === SLOT_DIRTY_GATE)
+      const s = w.state()
+      const open = s.finished?.seq === finish ? s.requests.filter((r) => r.gate === SLOT_DIRTY_GATE) : []
       for (const r of open) w.fact('RequestClosed', { request: r.request, why: 'slotClean' }) // i18n-ignore: a fact's kind and codes, not text
       return open.length > 0
     })

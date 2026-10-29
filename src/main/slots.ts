@@ -1331,22 +1331,31 @@ export class SlotPool {
     const to = await this.look(s)
     // Clean, it waits for its next card detached at the target's head (HI-2014, HI-1986), before it is ready to lend: its
     // card's line is no longer checked out (committed work stays on that line), so a merged one can be deleted.
-    if (to === 'ready' && s.state !== 'ready') await this.detach(s)
+    // Not detached (git couldn't read or switch it: an index lock, say): not ready yet either, so the next look tries again
+    // (HR2's HI-2014 round 1, finding 4), never a ready slot left on its card's line.
+    if (to === 'ready' && s.state !== 'ready' && !(await this.detach(s))) return
     if (to !== s.state) await this.store.look(name, s.state, to)
   }
 
   /**
-   * A clean slot on a line, switched to its target's head, detached; left as it is when that can't be read or done. Only
-   * after a card's or a lane's lease: an adopted worktree (a carried lease, #1441) stays on its agent's own line.
+   * A clean slot on a line, switched to its target's head, detached. Only after a card's or a lane's lease: an adopted
+   * worktree (a carried lease, #1441) stays on its agent's own line. False when it should be and isn't (unread, or the
+   * switch failed); true when it is, or needn't be.
    */
-  private async detach(s: Slot): Promise<void> {
+  private async detach(s: Slot): Promise<boolean> {
     const last = this.store.lastLease(s.name)
-    if (!s.target || !last || (last.kind !== 'card' && last.kind !== 'lane')) return
+    if (!s.target || !last || (last.kind !== 'card' && last.kind !== 'lane')) return true
     const h = await G.heads(s.folder, s.target)
-    if (isUnknown(h.line) || !h.line || isUnknown(h.target) || !h.target) return
+    if (isUnknown(h.line)) return false
+    if (!h.line) return true
+    if (isUnknown(h.target) || !h.target) return false
     const r = await git(s.folder, ['switch', '--detach', h.target])
-    if (r.ok) log.info(`${userText(s.name)} detached at ${userText(s.target)} (it was on ${userText(h.line)})`)
-    else log.warn(`detaching ${userText(s.name)} at ${userText(s.target)}: ${userText(r.err.trim())}`)
+    if (!r.ok) {
+      log.warn(`detaching ${userText(s.name)} at ${userText(s.target)}: ${userText(r.err.trim())}`)
+      return false
+    }
+    log.info(`${userText(s.name)} detached at ${userText(s.target)} (it was on ${userText(h.line)})`)
+    return true
   }
 
   /** What a slot is on disk now: gone (no folder, or git doesn't list it), dirty, or ready. */

@@ -15,6 +15,7 @@ import { B1, commit, moved, setup, sh, type Env } from './workflow/harness'
 import { tempDir } from './tempDir'
 import { join } from 'path'
 import { lineName } from '../src/main/workflow/runtime'
+import { withRepoLock } from '../src/main/repoLock'
 import type { Fact } from '../src/shared/workflow/facts'
 import { DatabaseSync } from 'node:sqlite'
 import { boardFile } from '../src/main/boardStore'
@@ -201,7 +202,7 @@ vi.mock('../src/main/deliveries', async (orig) => {
 const { tellListeners } = await import('../src/main/events')
 const { withWriteFence } = await import('../src/main/workflow/factStore')
 const { LeaseLost } = await import('../src/main/workflow/queueRunner')
-const { cycleIn, deleteMergedLine, expectStartPrompt, finishedSlot, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { cycleIn, deleteMergedLine, expectStartPrompt, finishedSlot, finishedSlots, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 const { resetAgentStartsForTests, startBegun, startNow } = await import('../src/main/agentStarts')
 
 let env: Env | null = null
@@ -379,6 +380,69 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     moved(await e.wf.move(e.store.cardByKey(`#${n}`)!.key, 'todo', 'user', { confirm: true, reason: 'reopened' }))
     await finishedSlot(e.project, e.wf, n, 'l-1', view(slot))
     expect(branch(slot)).toBe(line)
+  })
+
+  // HR2's round 1 finding 1: what the pass decided on changes while it waits for the repository's lock. The lock held,
+  // the pass started (it waits for it), the change made, the lock let go: the slot is left as it is.
+  const whileWaiting = async (e: Env, run: () => Promise<boolean>, meanwhile: () => Promise<void> | void): Promise<boolean> => {
+    let release!: () => void
+    let held!: () => void
+    const taken = new Promise<void>((r) => (held = r))
+    const lock = withRepoLock(e.project, () => {
+      held()
+      return new Promise<void>((r) => (release = r))
+    })
+    await taken
+    const pass = run()
+    await meanwhile()
+    release()
+    await lock
+    return pass
+  }
+
+  it('its card reopened while the pass waits for the lock: its checkout left on its line', async () => {
+    const { e, n, line, slot } = await doneInSlot('Reopened while waiting')
+    const key = e.store.cardByKey(`#${n}`)!.key
+    expect(await whileWaiting(e, () => finishedSlot(e.project, e.wf, n, 'l-1', view(slot)), async () => void moved(await e.wf.move(key, 'todo', 'user', { confirm: true, reason: 'reopened' })))).toBe(false)
+    expect(branch(slot)).toBe(line)
+  })
+
+  it('its workspace closed while the pass waits: nothing done', async () => {
+    const { e, n, line, slot } = await doneInSlot('Closed while waiting')
+    let open = true
+    expect(await whileWaiting(e, () => finishedSlot(e.project, e.wf, n, 'l-1', view(slot), null, () => open), () => void (open = false))).toBe(false)
+    expect(branch(slot)).toBe(line)
+  })
+
+  it("its slot another lease's while the pass waits: the new checkout untouched, the old question closed", async () => {
+    const { e, n, line, slot } = await doneInSlot('Reused while waiting')
+    writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
+    await finishedSlot(e.project, e.wf, n, 'l-1', view(slot))
+    expect(asked(e, n)).toBe(1)
+    rmSync(join(slot, 'wip.txt'))
+    let mine = true
+    const reused = () => (mine ? view(slot)() : null)
+    expect(await whileWaiting(e, () => finishedSlot(e.project, e.wf, n, 'l-1', reused), () => void (mine = false))).toBe(false)
+    expect(branch(slot)).toBe(line)
+    // The next look finds it another lease's: its question closes, the checkout still untouched.
+    await finishedSlot(e.project, e.wf, n, 'l-1', reused)
+    expect(asked(e, n)).toBe(0)
+    expect(branch(slot)).toBe(line)
+  })
+
+  it("an ended lane gone from the lanes' list: its finished card's slot question still settled from the board's lane (HR2's finding 3)", async () => {
+    const { e, n, slot } = await doneInSlot('Old lane')
+    const ruleset = e.store.facts(n).find((f) => f.kind === 'Started')!.ruleset!
+    e.store.startLane('lane-old', [n], ruleset)
+    writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
+    await finishedSlot(e.project, e.wf, n, 'l-1', view(slot))
+    expect(asked(e, n)).toBe(1)
+    rmSync(join(slot, 'wip.txt'))
+    // The lane's lease ended long ago, and the lane has left the list the pass reads (an empty map).
+    const lease = { id: 'l-1', project: 'project', slot: 'slot-a', kind: 'lane', card: null, lane: 'lane-old', agent: 'b1', from: '2026-01-01T00:00:00Z', to: '2026-01-01T01:00:00Z', why: 'laneEnded', endRev: null }
+    const pool = { openLeases: () => [], endedSince: () => [lease], slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', op: null }), openLease: () => null, lease: () => lease }
+    await finishedSlots({ lifetime: { aborted: false } } as never, e.project, e.wf, pool as never, new Map())
+    expect(asked(e, n)).toBe(0)
   })
 
   it("a released card's slot isn't switched here (the pool detaches it as it looks at it)", async () => {

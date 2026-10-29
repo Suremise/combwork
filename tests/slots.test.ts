@@ -404,6 +404,24 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     expect(sh(r.slot.folder, 'log', '-1', '--format=%s', 'hive/AM-1-work').trim()).toBe('work')
   })
 
+  it("a detach git refuses (an index lock): not ready, still on its line; the next look detaches it (HI-2014)", async () => {
+    const w = world({ builders: 1 })
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    sh(r.slot.folder, 'switch', '-q', '-c', 'hive/AM-1-work')
+    commit(r.slot.folder, { 'work.txt': 'work\n' }, 'work')
+    const lock = join(sh(r.slot.folder, 'rev-parse', '--absolute-git-dir').trim(), 'index.lock')
+    writeFileSync(lock, '')
+    await w.pool.release(r.lease.id, 'done')
+    expect(w.store.slot('slot-a')?.state).not.toBe('ready')
+    expect(sh(r.slot.folder, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('hive/AM-1-work')
+    expect(await w.pool.lend({ agent: 'a2', card: 2 })).toMatchObject({ ok: false })
+    // The lock gone, the pool's next look detaches it and makes it ready.
+    rmSync(lock)
+    await w.pool.refresh()
+    expect(sh(r.slot.folder, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('HEAD')
+    expect(w.store.slot('slot-a')?.state).toBe('ready')
+  })
+
   it("released on its card's line with uncommitted changes: left on its line, dirty (HI-2014)", async () => {
     const w = world({ builders: 1 })
     const r = await lent(w, { agent: 'a1', card: 1 })

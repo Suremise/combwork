@@ -703,13 +703,15 @@ const waitingForRepair = new Set<string>()
  * user is asked once on the card (SLOT_DIRTY_GATE). That question closes once the slot is clean or on another line. Read
  * from the slot each time, under the lock: never another card's checkout, never a slot an operation holds.
  */
-async function finishedSlots(ws: WorkspaceService, projectPath: string, wf: Workflow, pool: SlotPool, lanes: Map<string, LaneRecord>): Promise<boolean> {
+export async function finishedSlots(ws: WorkspaceService, projectPath: string, wf: Workflow, pool: SlotPool, lanes: Map<string, LaneRecord>): Promise<boolean> {
   const since = new Date(Date.now() - DELETE_WITHIN_MS).toISOString()
   let detached = false
   for (const l of [...pool.openLeases(), ...pool.endedSince(since)]) {
     if (ended(ws)) return detached
     const lane = l.kind === 'lane' && l.lane ? lanes.get(l.lane) : undefined
-    const cards = l.kind === 'card' && l.card !== null ? [l.card] : (lane?.cards ?? [])
+    // A lane's cards from the list, or, once an ended lane has left it, from the board's own record of the lane: its
+    // finished cards' slot questions are still settled (HR2's HI-2014 round 1, finding 3).
+    const cards = l.kind === 'card' && l.card !== null ? [l.card] : (lane?.cards ?? (l.kind === 'lane' && l.lane ? (wf.store.lane(l.lane)?.cards ?? []) : []))
     // The slot as the lease still has it: null once another lease holds it (or it is gone).
     const slotNow = (): FinishedSlotView | null => {
       const now = pool.slotOf(l)
@@ -719,7 +721,7 @@ async function finishedSlots(ws: WorkspaceService, projectPath: string, wf: Work
     }
     for (const n of cards) {
       if (ended(ws)) return detached
-      detached = (await finishedSlot(projectPath, wf, n, l.id, slotNow, l.lane)) || detached
+      detached = (await finishedSlot(projectPath, wf, n, l.id, slotNow, l.lane, () => !ended(ws))) || detached
     }
     // A running lane's slot its builder kept busy: looked at again once it is quiet (as a preparation waits), once per lease.
     const card = cards.map((n) => cardOf(wf, n)).find((c) => !!c && !!wf.state(c).finished && wf.state(c).started?.lease === l.id)
@@ -751,50 +753,62 @@ export interface FinishedSlotView {
 }
 
 /**
- * One finished card's slot (finishedSlots): nothing unless the card is Done in a cycle started with `lease`. The slot
- * read again under the repository's lock: another lease's now, or on another line, its question closes; dirty, asked
- * once; clean, an open lease's slot detached at the target's head (a released one is the pool's), its question closed.
+ * One finished card's slot (finishedSlots): nothing unless the card is Done in a cycle started with `lease`. What it was
+ * for (the card's finish, its lease and line, the workspace) is checked again inside the repository's lock and after
+ * each read there, before anything changes (HR2's HI-2014 round 1, finding 1): a card reopened, finished again or
+ * started elsewhere meanwhile, or a workspace closed, leaves the slot as it is. The slot read again too: another
+ * lease's now, or on another line, its question closes; dirty, asked once; clean, an open lease's slot detached at the
+ * target's head (a released one is the pool's), its question closed.
  */
-export async function finishedSlot(projectPath: string, wf: Workflow, n: number, lease: string, slotNow: () => FinishedSlotView | null, lane: string | null = null): Promise<boolean> {
+export async function finishedSlot(projectPath: string, wf: Workflow, n: number, lease: string, slotNow: () => FinishedSlotView | null, lane: string | null = null, alive: () => boolean = () => true): Promise<boolean> {
   const card = cardOf(wf, n)
   const s = card ? wf.state(card) : null
   if (!card || !s?.finished || s.started?.lease !== lease || !s.started.line) return false
-  const asked = s.requests.some((r) => r.gate === SLOT_DIRTY_GATE)
+  const finish = s.finished.seq
+  const line = s.started.line
+  // The finish this was for, still the card's: Done in that finish, on that lease and line.
+  const own = (): boolean => {
+    if (!alive()) return false
+    const now = wf.state(card)
+    return now.stage === 'done' && now.finished?.seq === finish && now.started?.lease === lease && now.started.line === line
+  }
+  const asked = (): boolean => wf.state(card).requests.some((r) => r.gate === SLOT_DIRTY_GATE)
   const slot = slotNow()
   if (!slot) {
-    if (asked) await wf.closeSlotDirty(card)
+    if (asked()) await wf.closeSlotDirty(card, finish)
     return false
   }
-  const line = s.started.line
   const target = slot.target ?? s.started.target
   if (!target) return false
-  const finish = s.finished.seq
   let detached = false
   await withRepoLock(
     projectPath,
     async () => {
       const now = slotNow()
-      if (!now || now.busy) return
+      if (!own() || !now || now.busy) return
       const h = await G.heads(now.folder, target)
-      if (isUnknown(h.line)) return
+      if (isUnknown(h.line) || !own()) return
       if (h.line !== line) {
-        if (asked) await wf.closeSlotDirty(card)
+        if (asked()) await wf.closeSlotDirty(card, finish)
         return
       }
       const d = await G.dirty(now.folder)
-      if (isUnknown(d)) return
+      if (isUnknown(d) || !own()) return
       if (d.length) {
-        if (!asked) await wf.askSlotDirty(card, finish, { slot: now.name, line, target })
+        if (!asked()) await wf.askSlotDirty(card, finish, { slot: now.name, line, target })
         return
       }
-      // Clean: a running lane's slot detached here; a released one is the pool's (it looks at it as it settles).
+      // Clean: a running lane's slot detached here; a released one is the pool's (it looks at it as it settles). Its
+      // owner and the slot checked once more at the switch itself.
       if (now.open && !isUnknown(h.target) && h.target) {
+        const at = slotNow()
+        if (!own() || !at || at.busy) return
         const r = await git(now.folder, ['switch', '--detach', h.target])
         if (!r.ok) return void log.warn(`detaching ${userText(now.name)} at ${userText(target)}: ${userText(r.err)}`)
         log.info(`${userText(now.name)} detached at ${userText(target)} after #${n}${lane ? ` (lane ${userText(lane)})` : ''}`)
         detached = true
       }
-      if (asked) await wf.closeSlotDirty(card)
+      if (asked()) await wf.closeSlotDirty(card, finish)
     },
     { quiet: true, project: projectPath }
   )
