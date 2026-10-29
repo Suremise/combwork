@@ -47,7 +47,7 @@ vi.mock('../src/main/lanes', () => ({
   },
   holdLaneStart: () => () => undefined,
   // A new conversation owed (HI-2034), as recorded.
-  oweFreshStart: async (_ws: unknown, lane: string, agent: string, role: string, oldSession: string | null) => void state.owed.push({ lane, agent, role, oldSession }),
+  oweFreshStart: async (_ws: unknown, lane: string, agent: string, role: string, oldSession: string | null, note = '') => void state.owed.push({ lane, agent, role, oldSession, ...(note ? { note } : {}) }),
   rawLanes: async () => {
     await state.lanesHeld
     return state.lanes
@@ -197,6 +197,13 @@ describe('Start lane… in main (#1280)', () => {
     expect(state.owed).toEqual([{ lane: 'lane-1', agent: 'b1', role: 'builder', oldSession: 'old-b1' }])
   })
 
+  it("owed with the user's Start Lane note (HR1 round 1, finding 2): its later launch's brief says the same", async () => {
+    state.live.set('b1', { status: 'ready', sessionId: 'old-b1' })
+    state.pending.add('b1')
+    await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: null, cards: [1], note: 'Use the staging database' })
+    expect(state.owed).toEqual([{ lane: 'lane-1', agent: 'b1', role: 'builder', oldSession: 'old-b1', note: 'Use the staging database' }])
+  })
+
   it('an agent asked to sign in again is refused, not owed (that does not pass by itself)', async () => {
     state.live.set('r1', { status: 'signin', sessionId: 'old-r1' })
     const r = await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: 'r1', cards: [1] }).catch((e: Error) => e)
@@ -220,6 +227,14 @@ describe('Start lane… in main (#1280)', () => {
 
 describe('a lane waiting for a slot, started as Hive quits (#1628)', () => {
   const waiting = (): void => void (state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1], rounds: 3 }])
+
+  it("lent its slot with its builder not free: owed its new conversation with the slot wait's note (HR1 round 1, finding 2), never failed", async () => {
+    state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: null, cards: [1], rounds: 3, slotWait: { since: new Date().toISOString(), note: 'Use the staging database' } }]
+    state.live.set('b1', { status: 'ready', sessionId: 'old-b1' })
+    state.pending.add('b1')
+    expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false)).toBe(true)
+    expect(state.owed).toEqual([{ lane: 'lane-1', agent: 'b1', role: 'builder', oldSession: 'old-b1', note: 'Use the staging database' }])
+  })
 
   it('quitting while its lane is read: nothing is started, and it keeps waiting (false)', async () => {
     waiting()

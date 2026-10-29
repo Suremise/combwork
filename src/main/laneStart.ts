@@ -4,7 +4,7 @@ import { msg } from '../shared/i18n'
 import { laneBrief, type LaneRole } from '../shared/laneBrief'
 import { cardLabel } from '../shared/projectKeys'
 import type { LaneInfo, LaneStartInfo, LaneStartRequest, LaneStartResult } from '../shared/types'
-import { cancelFromSource, deliveriesOf, launchWith } from './deliveries'
+import { cancelDeliveries, deliveriesOf, launchWith } from './deliveries'
 import { legacyWorktree, slotsMigrated } from './agentFolders'
 import { lendLane } from './slotCards'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
@@ -102,10 +102,10 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
         return { lane: recorded.lane as LaneInfo, started: [], waitingForSlot: got.waiting }
       }
       const brief = briefFor(recorded.lane.rounds, project, cards, builder, reviewer, pooled, options, where, got.slot, req.note ?? '')
-      return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief), slot: got.slot }
+      return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief, undefined, undefined, undefined, req.note ?? ''), slot: got.slot }
     }
     const brief = briefFor(recorded.lane.rounds, project, cards, builder, reviewer, pooled, options, where, null, req.note ?? '')
-    return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief) }
+    return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief, undefined, undefined, undefined, req.note ?? '') }
   } finally {
     starting.delete(key)
     release()
@@ -190,7 +190,7 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
  * without it, HR6's round 1), is left out and never given a new conversation; one found running at its launch, idle or
  * busy, is left out too, never reported as failed.
  */
-async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: string, builder: AgentDef, reviewer: AgentDef | null, brief: (role: LaneRole) => string, over: () => boolean = () => false, stoppedOnly?: { left: ReadonlySet<string> }, fresh?: FreshLaunch): Promise<LaneStartResult['started']> {
+async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: string, builder: AgentDef, reviewer: AgentDef | null, brief: (role: LaneRole) => string, over: () => boolean = () => false, stoppedOnly?: { left: ReadonlySet<string> }, fresh?: FreshLaunch, note = ''): Promise<LaneStartResult['started']> {
   const project = basename(projectPath)
   const started: LaneStartResult['started'] = []
   for (const [a, role] of [[builder, 'builder'], ...(reviewer ? [[reviewer, 'reviewer']] : [])] as [AgentDef, LaneRole][]) {
@@ -232,12 +232,18 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
         // Running by now (stoppedOnly), whatever it is doing: left as it is, before the busy check would call it failed.
         if (stoppedOnly && !over() && sessions.liveFor(projectPath, a.id)) throw new StartedMeanwhile()
         free()
-        if (!sessions.liveFor(projectPath, a.id)) return sessions.start(projectPath, { agentId: a.id, prompt: line })
+        // An owed fresh start's obligation (HR1 on HI-2034) is checked at every boundary the session layer gives: just
+        // before the old run stops, and again before the new launch spawns (after the stop's awaits), for a stopped agent's
+        // start too; the lane ended or changed in between, nothing is launched.
+        const owner = fresh ? (): void => fresh.still() : undefined
+        if (!sessions.liveFor(projectPath, a.id)) return sessions.start(projectPath, { agentId: a.id, prompt: line, ...(owner ? { allowed: owner } : {}) })
         how = 'fresh'
-        // Its first call is just before the agent is stopped; later ones (as the new conversation starts) aren't ours.
+        // Its first call is just before the agent is stopped: free then (idle, nothing pending). Later ones (as the new
+        // conversation starts) aren't about what it is doing, only whether its obligation still holds.
         let first = true
         return sessions.newConversation(projectPath, a.id, line, () => {
           if (first) free()
+          else owner?.()
           first = false
         })
       })
@@ -254,7 +260,8 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
       // Not free yet (HI-2034): owed its new conversation, launched once it is free (laneStarts.ts' pass). An owed one
       // stays owed; a start's is recorded with the lane, the agent's conversation now its old one.
       if (e instanceof NotFreeYet || notTakenYet(e)) {
-        if (!fresh) await oweFreshStart(ws, laneId, a.id, role, sessions.liveFor(projectPath, a.id)?.sessionId || null)
+        // With the note its brief was made with (the user's, Start Lane… or a slot wait's), so its launch says the same.
+        if (!fresh) await oweFreshStart(ws, laneId, a.id, role, sessions.liveFor(projectPath, a.id)?.sessionId || null, note)
         log.info(`${userText(a.name)} isn't free for lane ${laneId} yet (${userText((e as Error).message)}): its new conversation is owed`)
         started.push({ agentId: a.id, name: a.name, role, how: 'deferred' })
         continue
@@ -397,14 +404,14 @@ export async function startWaitingLane(ws: WorkspaceService, projectPath: string
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
-  const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, over, lane.slotWait?.stoppedOnly === true ? { left: new Set() } : undefined)
+  const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, over, lane.slotWait?.stoppedOnly === true ? { left: new Set() } : undefined, undefined, lane.slotWait?.note ?? '')
   if (over()) return false
   log.info(`Lane ${laneId} got ${userText(slot)}: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
   return started.every((s) => s.how !== 'failed')
 }
 
-/** For tests: awaited between an owed fresh start's claim and its launch (HI-2034: the lane changing meanwhile). */
-export const laneStartTestHooks: { beforeFreshLaunch: ((lane: string, entry: string) => Promise<void>) | null } = { beforeFreshLaunch: null }
+/** For tests (HI-2034): awaited between an owed fresh start's claim and its launch (the lane changing meanwhile), and as a Retry's cancellation of earlier start tasks begins. */
+export const laneStartTestHooks: { beforeFreshLaunch: ((lane: string, entry: string) => Promise<void>) | null; retryCancelling: (() => Promise<void>) | null } = { beforeFreshLaunch: null, retryCancelling: null }
 
 /** An owed fresh start's launch (HI-2034, launchFresh): its role, and its obligation checked again where it is launched. */
 interface FreshLaunch {
@@ -468,7 +475,8 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   const where = await builderWhere(projectPath, builder, options)
   const slot = (await listLanes(ws)).find((l) => l.id === laneId)?.slot ?? null
-  const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, where, slot, lane.slotWait?.note ?? '')
+  // The note it was owed with (HR1 on HI-2034: the user's Start Lane note, kept through its wait, a restart and a retry).
+  const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, where, slot, entry.note ?? lane.slotWait?.note ?? '')
   // Claimed under the lock: still this obligation, unblocked and not being launched.
   let claimed = false
   await changeFreshStart(ws, laneId, entryId, (f) => {
@@ -498,15 +506,38 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
 
 /**
  * The user's Retry of a lane's new conversations no more tried (HI-2034; the lane's row, or the Assistant's
- * `POST /v1/lanes/{id}/fresh-start`): each blocked one owed again from now (retryFreshStarts, under the lanes' lock), and
- * the start task an earlier launch of it left on its way cancelled, so the next launch makes its own. How many.
+ * `POST /v1/lanes/{id}/fresh-start`). First the start tasks its earlier launches left on their way are cancelled, by
+ * their ids (HR1: never a later attempt's): meanwhile the obligations stay blocked, so no pass launches one, and a
+ * cancellation that fails fails the Retry, nothing owed again. Then each, still the same blocked obligation under the
+ * lanes' lock, is owed again from now (retryFreshStarts). How many.
  */
 export async function retryFreshStart(ws: WorkspaceService, laneId: string): Promise<number> {
   const lane = (await rawLanes(ws)).find((l) => l.id === laneId)
   if (!lane || lane.state !== 'active' || !ws.path) return 0
-  const retried = await retryFreshStarts(ws, laneId)
+  const blocked = (lane.freshStart ?? []).filter((f) => f.blocked)
+  if (!blocked.length) return 0
   const projectPath = join(ws.path, lane.project)
-  for (const f of retried) await cancelFromSource(projectPath, BRIEF, `${laneId}:${f.role}`, 'its new conversation is tried again').catch((e) => log.warn(`Lane ${laneId}: cancelling ${f.role}'s earlier start task`, e)) // i18n-ignore: a delivery's end reason (agent-facing, the log)
+  for (const f of blocked) {
+    const ref = `${laneId}:${f.role}`
+    const earlier = new Set((await deliveriesOf(projectPath, f.agent)).filter((r) => r.source === BRIEF && r.ref === ref).map((r) => r.id))
+    // For tests: the cancellation held (a pass running meanwhile finds the obligation still blocked).
+    await laneStartTestHooks.retryCancelling?.()
+    if (earlier.size) await cancelDeliveries(projectPath, f.agent, 'the retry of its new conversation', undefined, (r) => earlier.has(r.id)) // i18n-ignore: who cancelled a delivery (agent-facing, the log)
+  }
+  const retried = await retryFreshStarts(ws, laneId, new Set(blocked.map((f) => f.id)))
   if (retried.length) log.info(`Lane ${laneId}: ${retried.map((f) => f.role).join(' and ')}'s new conversation tried again`)
   return retried.length
+}
+
+/**
+ * Test copies only (`lanes:test`, HI-2034): lane `laneId`'s agent in `role` owed its new conversation as a busy start
+ * leaves it, its wait begun `minutesAgo` minutes ago (past the wait: blocked by the next pass). Whether it was recorded.
+ */
+export async function oweFreshForTest(ws: WorkspaceService, laneId: string, role: LaneRole, minutesAgo: number): Promise<boolean> {
+  const lane = (await rawLanes(ws)).find((l) => l.id === laneId)
+  const agent = role === 'builder' ? lane?.builder.id : lane?.reviewer?.id
+  if (!lane || !agent || !ws.path) return false
+  await oweFreshStart(ws, laneId, agent, role, sessions.liveFor(join(ws.path, lane.project), agent)?.sessionId || null)
+  const f = freshStartsNow(ws, laneId).find((x) => x.role === role)
+  return !!f && (await changeFreshStart(ws, laneId, f.id, (x) => ({ ...x, since: new Date(Date.now() - minutesAgo * 60_000).toISOString() })))
 }

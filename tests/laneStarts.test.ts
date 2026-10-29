@@ -68,7 +68,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.hive'), { recursive: true })
     mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -467,11 +467,17 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     /** Each new conversation given, by agent: a stand-in for SessionManager's (its `allowed` before the old run stops, as the real one). */
     let launches: string[] = []
     let notices: string[] = []
+    /** Awaited between the stand-in's `allowed` before the old run stops and its `allowed` before the new launch spawns. */
+    let midLaunch: (() => Promise<void>) | null = null
     beforeEach(() => {
       launches = []
       notices = []
+      midLaunch = null
       laneStartTestHooks.beforeFreshLaunch = null
+      laneStartTestHooks.retryCancelling = null
       vi.spyOn(sessions, 'newConversation').mockImplementation(async (_p: string, id: string, _line: string, allowed?: () => void) => {
+        allowed?.()
+        await midLaunch?.()
         allowed?.()
         launches.push(id)
         const st = builder('starting', id) as unknown as Record<string, unknown>
@@ -480,6 +486,16 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
         return st as never
       })
       vi.spyOn(sessions, 'notice').mockImplementation((_p: string, title: unknown) => void notices.push(JSON.stringify(title)))
+      // A stopped agent's start: its `allowed` just before it spawns, after the start's own awaits.
+      vi.spyOn(sessions, 'start').mockImplementation(async (_p: string, o: { agentId?: string; allowed?: () => void }) => {
+        await midLaunch?.()
+        o.allowed?.()
+        launches.push(o.agentId!)
+        const st = builder('starting', o.agentId!) as unknown as Record<string, unknown>
+        st.sessionId = `new-${o.agentId}-${launches.length}`
+        st.runId = `run-new-${o.agentId}-${launches.length}`
+        return st as never
+      })
     })
     afterEach(() => vi.restoreAllMocks())
     /** A running agent in its old conversation (`old-<id>`, run `run-<id>`). */
@@ -624,6 +640,95 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
       expect(launches).toEqual([])
       expect(owed(lane2.id)).toEqual([])
       await lanes.endLane(w, lane2.id, { abandoned: true })
+    })
+
+    it("ended or reassigned after the old run's stop began (HR1 round 1, finding 1): the obligation is checked again before the new launch spawns, for a stopped agent too", async () => {
+      const first = await card('Fresh mid', 'g1')
+      const lane = await laneOf('g1', [first])
+      old('ready', 'g1')
+      await lanes.oweFreshStart(w, lane.id, 'g1', 'builder', 'old-g1')
+      midLaunch = async () => void (await lanes.endLane(w, lane.id, { abandoned: true }))
+      await checkLaneStarts(w)
+      expect(launches).toEqual([])
+      // A stopped reviewer, reassigned while its start prepares: never spawned for the lane it no longer has.
+      const second = await card('Fresh mid stopped', 'g2')
+      const lane2 = await laneOf('g2', [second], 'g7')
+      old('working', 'g2')
+      await lanes.oweFreshStart(w, lane2.id, 'g7', 'reviewer', 'old-g7')
+      midLaunch = async () => void (await lanes.startLane(w, { project: 'alpha', builder: 'g2', reviewer: 'o1', cards: [second], by: 'the user' }))
+      await checkLaneStarts(w)
+      expect(launches).toEqual([])
+      await lanes.endLane(w, lane2.id, { abandoned: true })
+    })
+
+    it("its launch's brief carries the note it was owed with (HR1 round 1, finding 2: the user's Start Lane note)", async () => {
+      const first = await card('Fresh note', 'g3')
+      const lane = await laneOf('g3', [first])
+      old('ready', 'g3')
+      await lanes.oweFreshStart(w, lane.id, 'g3', 'builder', 'old-g3', 'Use the staging database')
+      expect(owed(lane.id)[0].note).toBe('Use the staging database')
+      await checkLaneStarts(w)
+      expect(launches).toEqual(['g3'])
+      const { deliveriesOf } = await import('../src/main/deliveries')
+      const brief = (await deliveriesOf(p, 'g3')).filter((d) => d.source === 'lane-brief' && d.ref === `${lane.id}:builder`).at(-1)
+      expect(brief?.body).toContain('Use the staging database')
+      await lanes.endLane(w, lane.id, { abandoned: true })
+    })
+
+    it('with the workflow rules off, or turned off while it is owed, it is still launched once free (HR1 round 1, finding 3)', async () => {
+      const first = await card('Fresh rules', 'g4')
+      const lane = await laneOf('g4', [first])
+      const b = old('working', 'g4')
+      await lanes.oweFreshStart(w, lane.id, 'g4', 'builder', 'old-g4')
+      await checkLaneStarts(w)
+      expect(launches).toEqual([])
+      await advanced.set(ENFORCE, false)
+      b.status = 'ready'
+      await checkLaneStarts(w)
+      expect(launches).toEqual(['g4'])
+      expect(owed(lane.id)).toEqual([])
+      // Past its wait with the rules off: blocked, told.
+      const second = await card('Fresh rules off', 'g5')
+      const lane2 = await laneOf('g5', [second])
+      old('working', 'g5')
+      await lanes.oweFreshStart(w, lane2.id, 'g5', 'builder', 'old-g5')
+      const [g] = owed(lane2.id)
+      await lanes.changeFreshStart(w, lane2.id, g.id, (x) => ({ ...x, since: new Date(Date.now() - 11 * 60_000).toISOString() }))
+      await checkLaneStarts(w)
+      expect(owed(lane2.id)[0].blocked?.why).toBe('timeout')
+      expect(notices).toHaveLength(1)
+      await advanced.set(ENFORCE, true)
+      await lanes.endLane(w, lane.id, { abandoned: true })
+      await lanes.endLane(w, lane2.id, { abandoned: true })
+    })
+
+    it("Retry cancels only the earlier attempt's start task, before owing it again (HR1 round 1, finding 4): a pass meanwhile launches nothing, and the new attempt's task is never cancelled", async () => {
+      const first = await card('Fresh retry', 'g6')
+      const lane = await laneOf('g6', [first])
+      old('ready', 'g6')
+      await lanes.oweFreshStart(w, lane.id, 'g6', 'builder', 'old-g6')
+      const [f] = owed(lane.id)
+      // An earlier attempt's start task left on its way, then blocked (uncertain).
+      await lanes.changeFreshStart(w, lane.id, f.id, (x) => ({ ...x, launching: new Date().toISOString() }))
+      const earlier = await createDelivery(p, { agentId: 'g6', agentName: 'G6', kind: 'task', from: { kind: 'user', name: 'the user' }, body: 'Earlier attempt.', source: 'lane-brief', ref: `${lane.id}:builder`, launching: true })
+      await checkLaneStarts(w)
+      expect(owed(lane.id)[0].blocked?.why).toBe('uncertain')
+      // Its cancellation held while a pass runs: still blocked, nothing launched.
+      laneStartTestHooks.retryCancelling = async () => {
+        await checkLaneStarts(w)
+        expect(launches).toEqual([])
+        expect(owed(lane.id)[0].blocked).toBeTruthy()
+      }
+      expect(await run(() => retryFreshStart(w, lane.id))).toBe(1)
+      laneStartTestHooks.retryCancelling = null
+      expect(deliveryNow(p, earlier.id)?.state).toBe('cancelled')
+      await checkLaneStarts(w)
+      expect(launches).toEqual(['g6'])
+      const { deliveriesOf } = await import('../src/main/deliveries')
+      const latest = (await deliveriesOf(p, 'g6')).filter((d) => d.source === 'lane-brief' && d.ref === `${lane.id}:builder` && d.id !== earlier.id)
+      expect(latest).toHaveLength(1)
+      expect(latest[0].state).not.toBe('cancelled')
+      await lanes.endLane(w, lane.id, { abandoned: true })
     })
 
     it('builder and reviewer both owed: each launched once, when each is free (the reviewer after the builder has started its card), the builder never again', async () => {

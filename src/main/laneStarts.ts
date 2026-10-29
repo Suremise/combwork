@@ -126,6 +126,9 @@ export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
   const before = JSON.stringify([...waits].filter(([k]) => k.startsWith(`${path.toLowerCase()}#`)))
   for (const k of [...waits.keys()]) if (k.startsWith(`${path.toLowerCase()}#`)) waits.delete(k)
   try {
+    // An agent owed its new conversation is launched with the rules off too (HR1 on HI-2034: Start Lane owes it either
+    // way); only Hive's own card starts need them.
+    await freshPass(ws, path)
     if (await lanesEnforced()) await lookAt(ws, path)
   } finally {
     // The lanes' statuses follow what this look found (the window and the lane watch read them).
@@ -137,7 +140,6 @@ export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
 const builderOwed = (ws: WorkspaceService, id: string): boolean => freshStartsNow(ws, id).some((f) => f.role === 'builder')
 
 async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
-  await freshPass(ws, path)
   for (const lane of await listLanes(ws)) {
     const next = laneStartDue(lane)
     // A lane waiting for a slot (none was free as it started) has its stopped agents started once one is lent (slotCards'

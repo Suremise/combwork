@@ -368,7 +368,10 @@ const ancestor = (x, y) => {
     const [up] = await factsOf(c2, 'Updated')
     check('…brought up to date by the queue (strict): Updated, carried, from the reviewed revision', up?.data?.carried === true && up.data.from === two.rev, JSON.stringify(up))
     check("…merged with the user's commit kept, naming both revisions", git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Updated: ${up?.data?.to}`) && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Revision: ${two.rev}`) && ancestor(two.moved, 'main'))
-    check("…the slot untouched (its HEAD and status as they were)", untouched(two.was), JSON.stringify({ now: worktreeNow(), was: two.was }))
+    // The queue's update and merge leave the slot alone. Hive starts Three about a second after Two is Done (HI-1990), its
+    // line made in the slot: that change, and only that, may be there by now.
+    const threeTook = (await factsOf(c3, 'Started')).some((f) => f.actor === 'hive') && (await kinds(c3)).includes('SlotPrepared')
+    check("…the slot untouched by the merge (its HEAD and status as they were, or Three's start since)", (untouched(two.was) || threeTook) && !(await kinds(c2)).includes('LineMoved'), JSON.stringify({ now: worktreeNow(), was: two.was, threeTook, two: await kinds(c2) }))
 
     // --- Three: main changes the same line while it is in review: returned (notUpToDate); B1 resumes cleanly.
     const s3 = await start(c3)

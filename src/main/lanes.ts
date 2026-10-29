@@ -502,11 +502,11 @@ export async function setLaneSlotWait(ws: WorkspaceService, id: string, wait: La
  * A lane agent's new conversation owed (HI-2034): its start found it not free. One per role (a later one replaces it);
  * a lane not running, or whose agent in that role is another now, gets nothing.
  */
-export async function oweFreshStart(ws: WorkspaceService, id: string, agent: string, role: 'builder' | 'reviewer', oldSession: string | null): Promise<void> {
+export async function oweFreshStart(ws: WorkspaceService, id: string, agent: string, role: 'builder' | 'reviewer', oldSession: string | null, note = ''): Promise<void> {
   await mutate(ws, (lanes) => {
     const l = lanes.find((x) => x.id === id)
     if (!l || !running(l) || (role === 'builder' ? l.builder.id : l.reviewer?.id) !== agent) return
-    const entry: FreshStart = { id: randomBytes(6).toString('hex'), agent, role, since: new Date().toISOString(), oldSession }
+    const entry: FreshStart = { id: randomBytes(6).toString('hex'), agent, role, since: new Date().toISOString(), oldSession, ...(note ? { note: note.slice(0, 4000) } : {}) }
     l.freshStart = [...(l.freshStart ?? []).filter((f) => f.role !== role), entry]
   })
 }
@@ -537,19 +537,19 @@ export async function changeFreshStart(ws: WorkspaceService, id: string, entryId
 
 /**
  * A lane's fresh starts no more tried, tried again (HI-2034: the user's Retry, from the lane's row or the Assistant's
- * `POST /v1/lanes/{id}/fresh-start`): each blocked one becomes a new obligation (new id, its wait from now), the same
- * old conversation to leave. Which were (their ids before), for the caller to cancel their briefs left on their way.
+ * `POST /v1/lanes/{id}/fresh-start`): each of `ids` still blocked (the same obligation the caller cleaned up after)
+ * becomes a new one (new id, its wait from now), the same old conversation to leave and note. Which were.
  */
-export async function retryFreshStarts(ws: WorkspaceService, id: string): Promise<FreshStart[]> {
+export async function retryFreshStarts(ws: WorkspaceService, id: string, ids: ReadonlySet<string>): Promise<FreshStart[]> {
   let retried: FreshStart[] = []
   await mutate(ws, (lanes) => {
     retried = []
     const l = lanes.find((x) => x.id === id)
     if (!l || !running(l) || !l.freshStart) return
     l.freshStart = l.freshStart.map((f) => {
-      if (!f.blocked) return f
+      if (!f.blocked || !ids.has(f.id)) return f
       retried.push(f)
-      return { id: randomBytes(6).toString('hex'), agent: f.agent, role: f.role, since: new Date().toISOString(), oldSession: f.oldSession }
+      return { id: randomBytes(6).toString('hex'), agent: f.agent, role: f.role, since: new Date().toISOString(), oldSession: f.oldSession, ...(f.note ? { note: f.note } : {}) }
     })
   })
   return retried

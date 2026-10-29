@@ -33,6 +33,8 @@ export interface FreshStart {
   role: 'builder' | 'reviewer'
   since: string
   oldSession: string | null
+  /** The note its brief was made with (Start Lane…'s, or a slot wait's): its launch's brief says the same. */
+  note?: string
   launching?: string
   blocked?: { at: string; why: 'timeout' | 'uncertain' | 'failed'; message?: string }
 }
@@ -50,6 +52,7 @@ function readFreshStarts(v: unknown): FreshStart[] | null {
       role: f.role,
       since: f.since as string,
       oldSession: text(f.oldSession, 128) ? (f.oldSession as string) : null,
+      ...(typeof f.note === 'string' && f.note ? { note: f.note.slice(0, 4000) } : {}),
       ...(time(f.launching) ? { launching: f.launching as string } : {}),
       ...(b ? { blocked: { at: b.at as string, why: b.why as 'timeout' | 'uncertain' | 'failed', ...(typeof b.message === 'string' ? { message: b.message.slice(0, 500) } : {}) } } : {})
     })
