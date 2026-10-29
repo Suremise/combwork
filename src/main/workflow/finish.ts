@@ -10,6 +10,8 @@ import type { Tx } from './factStore'
 /** What a route knows of its Done that the facts it wrote don't say: a builder's unchecked merge report's result. */
 export interface FinishFacts {
   claimed?: string | null
+  /** A move the board recorded (rules off, no workflow): a board move whoever made it, never an unchecked report. */
+  board?: boolean
 }
 
 /**
@@ -26,7 +28,7 @@ export function recordFinish(tx: Tx, card: number, actor: Actor, ruleset: string
   const override = written.findLast((f): f is Fact<'Override'> => f.kind === 'Override')?.data
   const accepted = !!cycle.accepted
   const moved = written.findLast((f): f is Fact<'Moved'> => f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'done')?.data
-  const how: FinishHow = integrated ? (integrated.by === 'hive' && integrated.method !== 'committed' ? 'queue' : 'reported') : accepted ? 'accepted' : override ? 'override' : o.claimed || moved?.cause === 'intent' ? 'unchecked' : 'board'
+  const how: FinishHow = integrated ? (integrated.by === 'hive' && integrated.method !== 'committed' ? 'queue' : 'reported') : accepted ? 'accepted' : override ? 'override' : !o.board && (o.claimed || moved?.cause === 'intent') ? 'unchecked' : 'board'
   const data: FactData['Finished'] = {
     how,
     verified: integrated?.result ?? null,

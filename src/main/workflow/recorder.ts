@@ -364,7 +364,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
       moved = m.seq
       tx.setStage(n, to)
       // A board move into Done is a finish like any other (HI-2014): what follows hangs off it.
-      if (to === 'done') recordFinish(tx, n, actor, ruleset().ruleset ?? null, [m])
+      if (to === 'done') recordFinish(tx, n, actor, ruleset().ruleset ?? null, [m], { board: true })
     }
     // The runtime's own move: its loop wake is written here, with the board's other handoffs (a submission's reviewer
     // wake is the runtime's own).

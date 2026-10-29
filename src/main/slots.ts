@@ -1335,9 +1335,13 @@ export class SlotPool {
     if (to !== s.state) await this.store.look(name, s.state, to)
   }
 
-  /** A clean slot on a line, switched to its target's head, detached; left as it is when that can't be read or done. */
+  /**
+   * A clean slot on a line, switched to its target's head, detached; left as it is when that can't be read or done. Only
+   * after a card's or a lane's lease: an adopted worktree (a carried lease, #1441) stays on its agent's own line.
+   */
   private async detach(s: Slot): Promise<void> {
-    if (!s.target) return
+    const last = this.store.lastLease(s.name)
+    if (!s.target || !last || (last.kind !== 'card' && last.kind !== 'lane')) return
     const h = await G.heads(s.folder, s.target)
     if (isUnknown(h.line) || !h.line || isUnknown(h.target) || !h.target) return
     const r = await git(s.folder, ['switch', '--detach', h.target])
