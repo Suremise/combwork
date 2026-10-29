@@ -111,6 +111,9 @@ export interface RunResult {
    * HI-2042: the command (or its launcher) was ended by a signal, as Node saw it: its name. Code -1 then, never 1 (which
    * git's reads take for "no"). Not set for a command that exited with a code of its own, nor one ended at its bound.
    * On Windows a process ended from outside (TerminateProcess) exits with the code it was given: that is no signal.
+   * HI-2054: Hive's own ending of a runner's job comes after `stop()` (release): a queue command run through the runner
+   * can't start the next one then (LeaseLost), and the queue's later store writes are refused (its write fence), so its
+   * exit 1 can't become a recorded answer. One another program ends (Task Manager, an antivirus) can't be told apart.
    */
   signal?: string
 }
