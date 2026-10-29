@@ -38,6 +38,7 @@ export function DocEditor({
   defaultPreview,
   editingNote,
   notice,
+  onLink,
   onSaved
 }: {
   path: string
@@ -50,6 +51,8 @@ export function DocEditor({
   editingNote?: React.ReactNode
   /** Shown above the file, in preview and while editing, from its text as it is in the editor now (as you type). */
   notice?: (text: string) => React.ReactNode
+  /** A link clicked in the preview: true when it was handled (a skill's own file, HI-2011), else the usual handling. */
+  onLink?: (href: string) => boolean
   onSaved?: () => void
 }) {
   const [text, setText] = useState('')
@@ -162,7 +165,7 @@ export function DocEditor({
       <div className="editor-host">
         {loading ? null : preview ? (
           <div className="scroll-page">
-            {text.trim() ? <Markdown source={text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '')} /> : <div className="empty-state">{tr(FILES_TEXT.empty)}</div>}
+            {text.trim() ? <Markdown source={text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '')} onLink={onLink} /> : <div className="empty-state">{tr(FILES_TEXT.empty)}</div>}
           </div>
         ) : (
           <CodeEditor

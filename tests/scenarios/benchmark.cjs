@@ -88,6 +88,7 @@ function measuresOf(before, after, observed, usage) {
   m.hiveCallErrors = calls.filter((c) => !c.ok).length
   m.repeatedCalls = repeated
   m.skillsRead = observed?.skillsRead?.length ?? 0
+  m.skillRefsRead = observed?.skillRefsRead?.length ?? 0
   const u = usage && (usage.inputTokens || usage.outputTokens || usage.requests) ? usage : null
   m.usage = u
     ? {

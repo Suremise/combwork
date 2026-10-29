@@ -1869,6 +1869,23 @@ module.exports.SCENARIOS = [
     fakeSkips: ['followed the edit: labelled checked']
   },
   {
+    id: 'skill-reference-read',
+    title: "A builder in a card loop follows card-loop's link to its builder file (HI-2011: SKILL.md as a contents page, reference files one level deep), not the reviewer's",
+    async setup(c) {
+      await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder' })
+    },
+    prompt: (c) => `You'll work through #${c.cards.a} as the builder in a card loop, with Implementer reviewing. Before anything else, read how the builder's side of the loop works and list its steps for me in a few lines. Don't start the card or the lane yet.`,
+    fake: 'skill card-loop then skillref card-loop builder.md',
+    expect: (o) => {
+      const refs = o.skillRefsRead ?? []
+      return [
+        ['read the card-loop skill (its SKILL.md)', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ["read card-loop's builder.md, by SKILL.md's link, and the read worked", refs.includes('card-loop/builder.md'), refs.join(',') || 'none'],
+        ["didn't read the reviewer's file", !refs.includes('card-loop/reviewer.md'), refs.join(',')]
+      ]
+    }
+  },
+  {
     id: 'card-detail',
     title: "A card's details, exactly: the detail it asks for, read once, the board unchanged (a smaller reply missing them fails)",
     async setup(c) {

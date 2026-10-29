@@ -57,7 +57,7 @@ const WRITERS = /^(Write|Edit|MultiEdit|NotebookEdit|apply_patch)$/i
  * (a Codex code-mode script's exec_command result carries the file as `"output":"---\r\nname: x\r\n…"`), so the result
  * is also matched with escaped line breaks and quotes turned back into real ones.
  */
-function observeTranscript(items, skillNames) {
+function observeTranscript(items, skillNames, skillRefs = new Map()) {
   const tools = items.filter((x) => x.kind === 'tool').map((x) => ({ name: x.tool.name, summary: x.tool.summary, input: String(x.tool.input ?? ''), isError: x.tool.isError, result: String(x.tool.result ?? '') }))
   const unescaped = (text) => text.replace(/\\+r\\+n|\\+[rn]/g, '\n').replace(/\\+"/g, '"')
   const skillsRead = []
@@ -71,12 +71,50 @@ function observeTranscript(items, skillNames) {
       if (viaTool || viaRead) skillsRead.push(n)
     }
   }
+  // A skill's reference files read (HI-2011: SKILL.md as a contents page): only a read that worked, of that one file,
+  // whose result holds the file's own first line (its heading). A writer, a failed call, a listing, a search, or a
+  // command that mentions the path but shows something else never counts; nor does reading SKILL.md (skillsRead).
+  const skillRefsRead = []
+  const LISTING = /\b(ls|dir|Get-ChildItem|gci|grep|rg|Select-String|findstr|find|tree|Glob|Grep)\b/i
+  for (const t of tools) {
+    if (t.isError || WRITERS.test(t.name) || /^(Glob|Grep|LS)$/i.test(t.name)) continue
+    const shell = !/^(Read|view|read_file)$/i.test(t.name)
+    if (shell && (LISTING.test(t.input) || !/\b(cat|type|Get-Content|gc)\b/i.test(t.input))) continue
+    for (const [n, files] of skillRefs) {
+      for (const [file, head] of files) {
+        const ref = `${n}/${file}`
+        if (skillRefsRead.includes(ref)) continue
+        const at = new RegExp(`skills[\\\\/]+(hive-)?${escape(n)}[\\\\/]+${escape(file)}`, 'gi')
+        // One file a call: a command naming two of the skill's files is no evidence of either.
+        const named = [...t.input.matchAll(new RegExp(`skills[\\\\/]+(?:hive-)?${escape(n)}[\\\\/]+[\\w.-]+\\.md`, 'gi'))].length
+        if ((t.input.match(at) ?? []).length && named === 1 && (t.result.includes(head) || unescaped(t.result).includes(head))) skillRefsRead.push(ref)
+      }
+    }
+  }
   // Names of hive tools in the transcript: a direct call (mcp__hive__x, hive.x, Hive's "hive · x"), or one written in a
   // Codex script (tools.mcp__hive__x(...)), which may or may not have run.
   const hiveName = (name) => /(?:^|[_.\s])(hive_[a-z]+(?:_[a-z]+)*)$/.exec(name)?.[1]
   const hiveMentions = tools.flatMap((t) => (hiveName(t.name) ? [hiveName(t.name)] : [...t.input.matchAll(/\btools\.(?:mcp__hive__)?(hive_[a-z]+(?:_[a-z]+)*)\s*\(/g)].map((m) => m[1])))
   const replies = items.filter((x) => x.kind === 'assistant').map((x) => x.text)
-  return { tools, skillsRead, hiveMentions, finalReply: replies.at(-1) ?? '', replies }
+  return { tools, skillsRead, skillRefsRead, hiveMentions, finalReply: replies.at(-1) ?? '', replies }
+}
+
+/**
+ * Each skill's reference files (HI-2011) and their first lines, by skill: what a read of one is known by.
+ */
+function skillRefsOf(dir, names) {
+  const out = new Map()
+  for (const n of names) {
+    const folder = path.join(dir, n)
+    const files = new Map()
+    for (const f of fs.existsSync(folder) ? fs.readdirSync(folder) : []) {
+      if (f === 'SKILL.md' || !f.endsWith('.md')) continue
+      const head = fs.readFileSync(path.join(folder, f), 'utf8').split(/\r?\n/)[0].trim()
+      if (head) files.set(f, head)
+    }
+    if (files.size) out.set(n, files)
+  }
+  return out
 }
 
 /**
@@ -694,7 +732,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     for (const it of items) {
       if (it.kind === 'tool' && (it.tool.inputLength || it.tool.resultLength)) it.tool = (await inv('transcript:tool', host, sessionId, it.id).catch(() => null)) ?? it.tool
     }
-    const observed = observeTranscript(items, skillNames)
+    const observed = observeTranscript(items, skillNames, skillRefsOf(ctx.skillsDir, skillNames))
     observed.status = s?.status ?? 'stopped'
     // The watch it ended its turn with (#402): the live one, not every watch it started (a new one replaces the last).
     observed.watch = s?.watch ?? null
@@ -798,4 +836,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, observeTranscript, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, observeTranscript, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }

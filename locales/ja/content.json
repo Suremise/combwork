@@ -59,6 +59,7 @@
   "content.skill.notClosed": "ヘッダーが閉じていません（後ろに---の行がありません）",
   "content.skill.notClosedWithin": "ヘッダーが最初の{kb} KB以内で閉じていません",
   "content.skill.notFields": "ヘッダーがフィールドのリストになっていません（`name: …`、`description: …`）",
+  "content.skill.notListed": "そのフォルダーは Hive が一覧に表示するスキルではありません。",
   "content.skill.notSkill": "スキルのフォルダーではありません（SKILL.mdがありません）",
   "content.skill.yaml": "ヘッダーが有効なYAMLではありません（{reason}）",
   "content.skill.yamlAt": "ヘッダーが有効なYAMLではありません（{line}行目：{reason}）",

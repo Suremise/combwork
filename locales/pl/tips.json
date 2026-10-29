@@ -420,6 +420,8 @@
   "tips.signInExpired.title": "Gdy logowanie wygaśnie",
   "tips.silentUnknown.text": "Hive nigdy nie zgaduje, że agent jest bezczynny: gdy jego tura od dłuższego czasu milczy bez oznak końca, jego panel to mówi. Jeśli jego terminal czeka na prompt, Oznacz jako bezczynny to naprawia.",
   "tips.silentUnknown.title": "Agent milczy, a jego stan jest nieznany",
+  "tips.skillFiles.text": "Agenci czytają SKILL.md skilla za każdym razem, gdy go używają, a podlinkowany plik tylko wtedy, gdy potrzebują tej części. Strona skilla pokazuje każdy jego plik w osobnej karcie do czytania i edycji; link do pliku otwiera jego kartę.",
+  "tips.skillFiles.title": "Skill może linkować pliki obok swojego SKILL.md",
   "tips.skillsDelivered.text": "Przełącznik obok każdej umiejętności Hive, w widoku Umiejętności albo w zakładce Umiejętności projektu, mówi, czy agenci ją dostają (Dostarczana agentom). Kopie, które Hive umieszcza w folderze dla Codex i Copilot, są usuwane, gdy nie pracuje tam już żaden agent, tak jak mówią Ustawienia → Zaawansowane.",
   "tips.skillsDelivered.title": "Wybierz, jakie umiejętności dostają agenci",
   "tips.slotHeld.text": "Gdy Hive nie wie, czy zakończyło się wszystko, co sesja agenta uruchomiła w slocie, zatrzymuje slot dla niej, zamiast zgadywać. Zwolnij slot… w menu ⋯ agenta pokazuje, co Hive wie, na życzenie kończy to, co wymienia, i zwalnia slot.",

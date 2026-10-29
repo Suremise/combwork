@@ -396,6 +396,9 @@ interface HiveMessageValues {
   'assistant.skills.editTip': undefined
   'assistant.skills.fileMessage': { file: string | number; where: string | number }
   'assistant.skills.fileTitle': undefined
+  'assistant.skills.files': { skill: string | number }
+  'assistant.skills.filesMore': { count: number }
+  'assistant.skills.filesTip': undefined
   'assistant.skills.levelHive': undefined
   'assistant.skills.levelLocal': undefined
   'assistant.skills.levelPlugin': undefined

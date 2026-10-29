@@ -2854,6 +2854,49 @@ p.hint {
   display: flex;
   flex-direction: column;
 }
+/* A skill's page (HI-2011): its files' tabs, then the file in the editor below them. */
+.skill-detail {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.skill-detail > .split-main {
+  min-height: 0;
+}
+.skill-files {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px 0 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  overflow-x: auto;
+  font-size: 12px;
+}
+.skill-files .faint {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+.skill-file-tab {
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: none;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.skill-file-tab:hover {
+  color: var(--fg-strong);
+}
+.skill-file-tab.active {
+  color: var(--fg-strong);
+  background: var(--bg-active);
+  border-color: var(--border-subtle);
+}
 /* The Changes tab's split (#906). Its list gives up width first, down to 200px, so the detail keeps the 320px a drag of
    the divider leaves it; short of room for both, the list sits above the detail (at most 40% of the height, its files
    scrolling) instead of pushing it out of the tab, behind the panels beside it. A project's Templates tab does the same

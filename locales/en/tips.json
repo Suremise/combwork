@@ -1683,6 +1683,14 @@
     "defaultMessage": "An agent silent with its state unknown",
     "description": "A tip's title."
   },
+  "tips.skillFiles.text": {
+    "defaultMessage": "Agents read a skill's SKILL.md whenever they use it, and a file it links only when they need that part. A skill's page shows each of its files in a tab, to read and edit; a link to one opens its tab.",
+    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. SKILL.md is a file name: keep it in English."
+  },
+  "tips.skillFiles.title": {
+    "defaultMessage": "A skill can link files beside its SKILL.md",
+    "description": "A tip's title. SKILL.md is a file name: keep it in English."
+  },
   "tips.skillsDelivered.text": {
     "defaultMessage": "The switch beside each Hive skill, in the Skills view or a project's Skills tab, says whether agents get it (Delivered to agents). Copies Hive puts in a folder for Codex and Copilot are removed once no agent works there, as Settings → Advanced says.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Codex and Copilot are CLIs' names."

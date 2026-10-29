@@ -239,6 +239,10 @@
     "defaultMessage": "its header isn't a list of fields (`name: …`, `description: …`)",
     "description": "Why nobody gets a Hive skill: its SKILL.md header is YAML but not a set of fields. Keep what is between backticks (`name: …`, `description: …`) as it is, backticks included: they mark YAML. It starts in lower case (it follows a colon)."
   },
+  "content.skill.notListed": {
+    "defaultMessage": "That folder isn't a skill Hive lists.",
+    "description": "An error listing a skill's files for its page: the folder asked for isn't one of the skills Hive shows (the workspace's skills or a project's)."
+  },
   "content.skill.notSkill": {
     "defaultMessage": "Not a skill folder (no SKILL.md)",
     "description": "An error copying a skill into the workspace: its folder has no SKILL.md (a file name: keep it)."

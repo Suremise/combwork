@@ -420,6 +420,8 @@
   "tips.signInExpired.title": "Quand une connexion expire",
   "tips.silentUnknown.text": "Hive ne devine jamais qu’un agent est inactif : quand son tour est silencieux depuis un moment sans signe de fin, son volet le dit. Si son terminal attend à son prompt, Marquer comme inactif rétablit les choses.",
   "tips.silentUnknown.title": "Un agent silencieux, d’état inconnu",
+  "tips.skillFiles.text": "Les agents lisent le SKILL.md d’un skill chaque fois qu’ils l’utilisent, et un fichier lié seulement quand ils ont besoin de cette partie. La page d’un skill affiche chacun de ses fichiers dans un onglet, à lire et modifier ; un lien vers l’un d’eux ouvre son onglet.",
+  "tips.skillFiles.title": "Un skill peut lier des fichiers à côté de son SKILL.md",
   "tips.skillsDelivered.text": "L’interrupteur à côté de chaque compétence de Hive, dans la vue Compétences ou l’onglet Compétences d’un projet, indique si les agents la reçoivent (Fournie aux agents). Les copies que Hive place dans un dossier pour Codex et Copilot sont supprimées dès qu’aucun agent n’y travaille, comme le dit Paramètres → Avancé.",
   "tips.skillsDelivered.title": "Choisis les compétences que reçoivent les agents",
   "tips.slotHeld.text": "Quand Hive ne peut pas dire si tout ce que la session d’un agent a lancé dans un emplacement est terminé, il lui garde l’emplacement plutôt que de deviner. Libérer l’emplacement… dans le menu ⋯ de l’agent montre ce que Hive sait, arrête ce qu’il liste si tu veux et libère l’emplacement.",
