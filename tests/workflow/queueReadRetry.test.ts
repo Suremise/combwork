@@ -125,6 +125,9 @@ const failing = (match: string | RegExp, times = 1, more: { code?: number; err?:
   fail.rules.push({ match: (l) => (typeof match === 'string' ? l.includes(match) : match.test(l)), times, err: more.err ?? BUSY, code: more.code ?? 128, ...(more.native ? { native: more.native } : {}), ...(more.after ? { after: more.after } : {}) })
 }
 const callsOf = (match: string): number => fail.calls.filter((l) => l.includes(match)).length
+/** HI-2050: the one git that reads the commit identity (both keys). */
+const IDENTITY = 'config --null --get-regexp'
+const HEAD_READ = 'rev-parse --verify -q HEAD'
 
 let env: Env | null = null
 beforeEach(() => {
@@ -163,11 +166,10 @@ const count = (e: Env, card: number, kind: string): number => e.store.facts(card
 
 /** The reads before anything is touched, each as the queue asks git (the target checked out: the journal's too). */
 const BEFORE_TOUCH: [string, string, boolean][] = [
-  ['the identity (user.name)', 'config user.name', false],
-  ['the identity (user.email)', 'config user.email', false],
+  ['the identity', IDENTITY, false],
   ["the queue worktree's listing", 'worktree list --porcelain', false],
   ["the queue worktree's add", 'worktree add --detach', false],
-  ["the test merge's head", 'rev-parse --verify -q HEAD', false],
+  ["the test merge's head", HEAD_READ, false],
   ["the checked-out folder's staged files", 'diff --cached --name-only', true],
   ["the merge's files", 'diff --name-only -z --no-renames', true],
   ["the checked-out folder's status", 'status --porcelain -z --untracked-files=all --no-renames', true]
@@ -220,7 +222,7 @@ describe('a read that fails once before anything is touched: the entry goes roun
     const e = project({ strict: true })
     const card = await queued(e)
     commit(e.project, { 'other.txt': 'meanwhile\n' }, 'meanwhile') // the card is behind main: brought up to date
-    failing('config user.name')
+    failing(IDENTITY)
     expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
     expect(e.kinds(card.id)).toContain('Updated')
     expect(e.store.queuePause('main')).toBeNull()
@@ -242,9 +244,9 @@ describe('a read that keeps failing pauses needsYou with what git said, after th
   it("the identity: read 1 + READ_RETRIES times, paused needsYou with git's words, never identity; the card stays queued", async () => {
     const e = project()
     const card = await queued(e)
-    failing('config user.name', Infinity, { err: 'fatal: bad config line 1 in file .git/config' })
+    failing(IDENTITY, Infinity, { err: 'fatal: bad config line 1 in file .git/config' })
     expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: 'fatal: bad config line 1 in file .git/config' }])
-    expect(callsOf('config user.name')).toBe(1 + READ_RETRIES)
+    expect(callsOf(IDENTITY)).toBe(1 + READ_RETRIES)
     expect(e.store.queuePause('main')).toMatchObject({ reason: 'needsYou', message: 'fatal: bad config line 1 in file .git/config' })
     expect(e.wf.state(card).stage).toBe('merging')
     expect(count(e, card.id, 'CheckRan')).toBe(0)
@@ -260,17 +262,17 @@ describe('a read that keeps failing pauses needsYou with what git said, after th
   it('the identity, git never running to an exit (EAGAIN): needsYou, never identity', async () => {
     const e = project()
     await queued(e)
-    failing('config user.name', Infinity, { native: 'EAGAIN' })
+    failing(IDENTITY, Infinity, { native: 'EAGAIN' })
     expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: "git config didn't run to an exit (EAGAIN)" }])
-    expect(callsOf('config user.name')).toBe(1 + READ_RETRIES)
+    expect(callsOf(IDENTITY)).toBe(1 + READ_RETRIES)
   })
 
   it('the identity read failing once is read again (not the failed answer kept): 2 reads, returned', async () => {
     const e = project()
     await queued(e)
-    failing('config user.name')
+    failing(IDENTITY)
     expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'returned' }])
-    expect(callsOf('config user.name')).toBe(2)
+    expect(callsOf(IDENTITY)).toBe(2)
   })
 })
 
@@ -286,7 +288,7 @@ describe('what needs the user still pauses at once, with no retry', () => {
     sh(e.project, 'config', '--unset', 'user.name')
     const r = retried()
     expect(await e.queue({ ...red, hooks: r.hooks }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'identity', files: [e.project] }])
-    expect(callsOf('config user.name')).toBe(1)
+    expect(callsOf(IDENTITY)).toBe(1)
     expect(r.tries()).toBe(0)
     expect(e.wf.state(card).stage).toBe('merging')
   })
@@ -360,7 +362,7 @@ describe('admitted afresh after the wait, before any new merge or check', () => 
   }
   // Red: a read before the checks (the identity); green: a read after them, in the advance's conditions.
   const cases: [string, string, Partial<QueueConfig>][] = [
-    ['red', 'config user.name', red],
+    ['red', IDENTITY, red],
     ['green', 'diff --cached --name-only', {}]
   ]
 
@@ -659,7 +661,7 @@ describe("a git that didn't run to an exit is never git's answer (HR2's round 2:
 
   it("the identity: unknown when git didn't run to an exit, null only when git says a key isn't set", async () => {
     const e = project()
-    failing('config user.name', 1, { native: 'EAGAIN' })
+    failing(IDENTITY, 1, { native: 'EAGAIN' })
     const failed = await G.identity(e.project)
     expect(isUnknown(failed) && failed.detail).toBe("git config didn't run to an exit (EAGAIN)")
     expect(await G.identity(e.project)).toEqual({ name: expect.any(String), email: expect.any(String) })
