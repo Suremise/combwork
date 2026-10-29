@@ -10,7 +10,7 @@
 // change of connection (kept, cleared, a change of CLI resetting what was the old one's, decided again under the lock).
 // In this file's temp folders
 // only: the CLI is never run (its status is faked) and nothing signs in.
-import { mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
+import { lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -45,6 +45,7 @@ const templates = await import('../src/main/templates')
 const { TEMPLATE_VERSION } = await import('../src/shared/templates')
 const { fileLockDepth, withFileLock } = await import('../src/main/fsutil')
 const { listSkills, invalidateSkillCache, machineSkillCacheSize } = await import('../src/main/skills')
+const { encodeProjectPath } = await import('../src/main/providers/claude/usage')
 
 const status = new Map<string, () => Promise<{ ok: true; loggedIn: boolean; email?: string; orgId?: string } | { ok: false; error: string }>>()
 const signedIn = (email: string) => async () => ({ ok: true as const, loggedIn: true, email, orgId: 'org-1' })
@@ -301,6 +302,34 @@ describe('what is read from a connection’s home', () => {
     expect(allowed(join(f, '.credentials.json'))).toBe(false)
     expect(allowed(join(f, 'settings.json'), true)).toBe(false)
     expect(allowed(join(home, 'CLAUDE.md'))).toBe(false)
+  })
+
+  it('auto memory: every file the Memory tab lists opens and saves, by either path, and nothing else of the CLI’s home (HI-1999)', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const f = accounts.accountFolder(a.id)
+    // The connection's projects is Hive's junction to the CLI home's, where the list reads auto memory from.
+    expect(lstatSync(join(f, 'projects')).isSymbolicLink()).toBe(true)
+    const project = join(wsPath, 'alpha')
+    const key = encodeProjectPath(realpathSync(project))
+    mkdirSync(join(home, 'projects', key, 'memory', 'sub'), { recursive: true })
+    for (const name of ['MEMORY.md', 'note.md']) writeFileSync(join(home, 'projects', key, 'memory', name), '# memory\n')
+    const homes = here(() => accounts.connectionHomes('claude-code', w.config))!
+    const autos = (await provider('claude-code').memorySources(project, homes)).filter((s) => s.kind === 'auto-memory')
+    expect(autos.map((s) => s.label)).toEqual(['MEMORY.md', 'note.md'])
+    const allowed = (p: string, write = false) => provider('claude-code').fileAllowed(p, write, homes.map((h) => h.home))
+    for (const s of autos) {
+      expect(allowed(s.path)).toBe(true)
+      expect(allowed(s.path, true)).toBe(true)
+    }
+    // The same file through the connection's junction.
+    expect(allowed(join(f, 'projects', key, 'memory', 'note.md'), true)).toBe(true)
+    // The rest of the CLI's own home stays refused: its settings, user memory, transcripts and deeper files.
+    expect(allowed(join(home, 'settings.json'))).toBe(false)
+    expect(allowed(join(home, 'CLAUDE.md'), true)).toBe(false)
+    expect(allowed(join(home, 'projects', key, 'abc.jsonl'))).toBe(false)
+    expect(allowed(join(home, 'projects', key, 'notes.md'))).toBe(false)
+    expect(allowed(join(home, 'projects', key, 'memory', 'sub', 'x.md'))).toBe(false)
+    expect(allowed(join(home, 'projects', key, 'memory', 'MEMORY.txt'))).toBe(false)
   })
 
   it('its settings’ default model: the connection’s own', async () => {

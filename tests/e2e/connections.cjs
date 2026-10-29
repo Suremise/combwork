@@ -117,6 +117,18 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     const linkedProjects = fs.realpathSync(path.join(accountsRoot, max1.id, 'projects'))
     const memoryDir = path.join(linkedProjects, alpha.replace(/[^a-zA-Z0-9]/g, '-'), 'memory')
     check('…its projects folder a junction, its auto memory named by the real path', linkedProjects.toLowerCase() !== path.join(accountsRoot, max1.id, 'projects').toLowerCase() && oneSettings.autoMemoryDirectory === memoryDir && oneSettings.permissions === undefined, JSON.stringify({ got: oneSettings.autoMemoryDirectory, memoryDir, permissions: oneSettings.permissions }))
+    // The Memory tab's auto memory opens and saves with connections on (HI-1999): it's listed from the CLI home's projects
+    // folder, which the file guard accepts beside the connections' homes, and nothing else of that home.
+    fs.mkdirSync(memoryDir, { recursive: true })
+    fs.writeFileSync(path.join(memoryDir, 'MEMORY.md'), '# Memory\n')
+    const auto = (await inv('memory:list', alpha)).find((s) => s.kind === 'auto-memory' && s.label === 'MEMORY.md')
+    check('the Memory tab lists the project’s auto memory', !!auto, JSON.stringify(auto))
+    const read = auto ? await failure(inv('file:read', auto.path).then((t) => { if (t !== '# Memory\n') throw new Error(`read ${JSON.stringify(t)}`) })) : 'not listed'
+    check('…it opens', read === null, read)
+    const saved = auto ? await failure(inv('file:write', auto.path, '# Memory\nsaved\n', '# Memory\n')) : 'not listed'
+    check('…and saves', saved === null && fs.readFileSync(path.join(memoryDir, 'MEMORY.md'), 'utf8') === '# Memory\nsaved\n', saved)
+    const settingsRead = await failure(inv('file:read', path.join(home, 'settings.json')))
+    check('…while the CLI home’s other files stay refused', /only read and write files inside the workspace/.test(settingsRead ?? ''), settingsRead ?? 'read')
     check('…and its run says so', (await live('a-two'))?.launchedConnection?.id === max2.id && (await live('a-one'))?.launchedConnection?.id === max1.id)
     check('the footer names the connection', !!(await lib.until(async () => (await page.locator(`.foot-connection[data-connection="${max1.id}"]`).count()) >= 1, HUNG_MS)))
     await shots('running')
