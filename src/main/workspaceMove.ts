@@ -1,5 +1,5 @@
 import { existsSync } from 'original-fs'
-import { mkdir, readFile, stat } from 'original-fs/promises'
+import { mkdir, readFile, rm, stat } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import type { MoveBranch, MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveReportRow, MoveWorktree, PathDataCopy, ProjectConfig, WorkspaceMoved } from '../shared/types'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
@@ -10,13 +10,13 @@ import { legacyWorktree, slotsMigrated } from './agentFolders'
 import { projectFolders as foldersOf, recreateSlot, relocateFolder, releaseSlotLease, type ProjectFolder } from './projectFolders'
 import { folderWhat } from '../shared/projectFolders'
 import { config } from './config'
-import { realPath, samePlace } from './fsutil'
+import { placeKey, realPath, samePlace } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
 import { allProviders } from './providers'
 import { recentChanged } from './recentWorkspaces'
 import { sessions } from './sessions'
-import type { WorkspaceService } from './workspace'
+import { workspaceFor, type WorkspaceService } from './workspace'
 import { listWorktrees, listWorktreesOrNull, localBranches } from './worktrees'
 import type { SlotRenamer } from './slots'
 import { workflowFor } from './workflow/service'
@@ -31,6 +31,10 @@ import { legacyWatches, moveOrphanWatches } from './watches'
 import { adoptHandovers } from './notes'
 import { noteFormerName } from './projectNames'
 import { adoptBenchmarkOwners, benchContext } from './benchmarks'
+import { carryPin } from './pin'
+import { carryWorkspaceRuns } from './closeCommand/closeCommands'
+import { assistantTokenFile } from './assistantControl'
+import { emitTo } from './events'
 
 /**
  * A workspace (or project) moved to another folder (#146). Hive records where each was last opened (`lastPath` in
@@ -1059,6 +1063,26 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
     })
     recentChanged()
     say(report, 'done', tr(msg({ id: 'main.move.recent', defaultMessage: 'Open Recent lists {to} instead of {from}.', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). Open Recent is a menu (File → Open Recent): use its name as shown. {to} is the workspace folder now, {from} where it was." }), { to: plan.to, from }), { what: { kind: 'recent' }, was: from, now: plan.to, result: tr(R.recent) })
+  }
+  // What Hive's profile keeps by the workspace's folder follows it (HI-2007): its window's pin, its close command's runs,
+  // and its Assistant's old token file goes. Only when the old folder is gone: a copy's original keeps its own.
+  if (plan.from && !existsSync(join(plan.from, HIVE_DIR)) && !workspaceFor(plan.from)) {
+    const from = plan.from
+    if (carryPin(from, plan.to)) {
+      const win = ws.window
+      if (win && !win.isDestroyed() && !win.isAlwaysOnTop()) {
+        win.setAlwaysOnTop(true)
+        emitTo(win, { type: 'window-state', maximized: win.isMaximized(), focused: win.isFocused(), alwaysOnTop: true })
+      }
+      log.info(`Repair: the window's pin follows the workspace from ${userText(from)}`)
+    }
+    try {
+      const n = await carryWorkspaceRuns([placeKey(from), resolve(from).toLowerCase()], ws.openPlace ?? placeKey(plan.to))
+      if (n) log.info(`Repair: ${n} close-command run(s) follow the workspace from ${userText(from)}`)
+    } catch (e) {
+      log.warn('moving the close-command runs', e)
+    }
+    await rm(assistantTokenFile(from), { force: true }).catch((e) => log.warn("removing the Assistant's old token file", e))
   }
   if (plan.working.length) {
     config.update((c) => {

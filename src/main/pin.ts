@@ -28,6 +28,23 @@ export function setPinned(win: BrowserWindow, workspacePath: string | null, on: 
 }
 
 /**
+ * A moved workspace's pin (HI-2007, Repair…): remembered under its new folder instead of its old one. Returns whether it
+ * was pinned.
+ */
+export function carryPin(from: string, to: string): boolean {
+  let pinned = false
+  config.update((c) => {
+    if (c.alwaysOnTop?.[key(from)] !== true) return
+    const pins = { ...c.alwaysOnTop }
+    delete pins[key(from)]
+    pins[key(to)] = true
+    c.alwaysOnTop = pins
+    pinned = true
+  })
+  return pinned
+}
+
+/**
  * Keeps the window's pin with the workspace it shows: called whenever the workspace may have changed, it applies the
  * workspace's remembered pin once per workspace (so a pin set meanwhile isn't undone). Returns whether it changed.
  */

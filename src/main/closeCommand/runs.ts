@@ -1,7 +1,7 @@
 import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'child_process'
 import { createHash, randomBytes } from 'crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'original-fs'
-import { open, rm } from 'original-fs/promises'
+import { open, rename, rm } from 'original-fs/promises'
 import { basename, join } from 'path'
 import { closeCommandOf, fillCloseCommand } from '../../shared/closeCommand'
 import type { CloseCommandSetting, CloseReason } from '../../shared/types'
@@ -152,28 +152,54 @@ export function alive(pid: number | null | undefined): boolean {
  */
 export async function pruneRuns(root: string, prefix: string, keep = KEEP_RUNS): Promise<void> {
   if (!existsSync(root)) return
-  const mine = readdirSync(root)
+  const ended = runsOf(root, prefix).filter((n) => runEnded(join(root, n)))
+  for (const n of ended.slice(keep)) await rm(join(root, n), { recursive: true, force: true }).catch(() => undefined)
+}
+
+/** The runs of a kind under `root`, newest first. */
+function runsOf(root: string, prefix: string): string[] {
+  return readdirSync(root)
     .filter((n) => n.startsWith(prefix) && /^\d{4}-/.test(n.slice(prefix.length)))
     .sort()
     .reverse()
-  const ended = mine.filter((n) => {
-    const dir = join(root, n)
+}
+
+/** Whether a run has ended: its status says so or its runner is gone; one not started yet counts as going. */
+function runEnded(dir: string): boolean {
+  try {
+    const s = JSON.parse(readFileSync(join(dir, 'status.json'), 'utf8')) as RunStatus
+    return s.state !== 'running' || !alive(s.runnerPid)
+  } catch {
+    // No status yet (still starting), or one being replaced: kept while its runner lives, or while it is new enough
+    // that its runner's pid may not be written yet (round 1, finding 2).
     try {
-      const s = JSON.parse(readFileSync(join(dir, 'status.json'), 'utf8')) as RunStatus
-      return s.state !== 'running' || !alive(s.runnerPid)
+      return !alive(Number(readFileSync(join(dir, 'runner.pid'), 'utf8')))
     } catch {
-      // No status yet (still starting), or one being replaced: kept while its runner lives, or while it is new enough
-      // that its runner's pid may not be written yet (round 1, finding 2).
       try {
-        return !alive(Number(readFileSync(join(dir, 'runner.pid'), 'utf8')))
+        return Date.now() - statSync(dir).mtimeMs > START_MS
       } catch {
-        try {
-          return Date.now() - statSync(dir).mtimeMs > START_MS
-        } catch {
-          return true
-        }
+        return true
       }
     }
-  })
-  for (const n of ended.slice(keep)) await rm(join(root, n), { recursive: true, force: true }).catch(() => undefined)
+  }
+}
+
+/**
+ * A moved workspace's runs (HI-2007): the ended ones kept under its old place's prefixes take its new place's, and the
+ * newest KEEP_RUNS of them all are kept. One still going stays where it is, as its runner writes there. Returns how many
+ * were moved.
+ */
+export async function carryRuns(root: string, fromPrefixes: readonly string[], toPrefix: string, keep = KEEP_RUNS): Promise<number> {
+  if (!existsSync(root)) return 0
+  let moved = 0
+  for (const prefix of new Set(fromPrefixes)) {
+    if (prefix === toPrefix) continue
+    for (const n of runsOf(root, prefix).filter((x) => runEnded(join(root, x)))) {
+      const to = join(root, toPrefix + n.slice(prefix.length))
+      if (existsSync(to)) continue
+      if (await rename(join(root, n), to).then(() => true, () => false)) moved++
+    }
+  }
+  await pruneRuns(root, toPrefix, keep)
+  return moved
 }

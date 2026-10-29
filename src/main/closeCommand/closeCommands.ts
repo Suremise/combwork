@@ -10,7 +10,7 @@ import { testQuiet } from '../testQuiet'
 import { checkEnv } from '../workflow/queueChecks'
 import type { WorkspaceService } from '../workspace'
 import { drainWorkspace, type DrainResult } from './drain'
-import { alive, planRun, pruneRuns, readRun, runFolderName, runPrefix, runsCloseCommands, startRun, START_MS } from './runs'
+import { alive, carryRuns, planRun, pruneRuns, readRun, runFolderName, runPrefix, runsCloseCommands, startRun, START_MS } from './runs'
 
 // HI-1368: the close commands as Hive runs them, in the window they belong to. A workspace's runs once it has closed
 // and Hive has finished writing it (the drain); Hive waits for it with a panel (Don't wait, or Close once it failed),
@@ -50,6 +50,13 @@ export function dismiss(win: BrowserWindow, id: string): void {
 
 /** Where the runs' folders are: in Hive's profile. */
 const runsRoot = (): string => join(app.getPath('userData'), 'close-commands')
+
+/**
+ * A moved workspace's close-command runs follow it (HI-2007, Repair…): those kept under any of its old place's spellings
+ * (`fromPlaces`) are its new place's. Returns how many moved.
+ */
+export const carryWorkspaceRuns = (fromPlaces: readonly string[], toPlace: string): Promise<number> =>
+  carryRuns(runsRoot(), fromPlaces.map((p) => runPrefix('workspace', p)), runPrefix('workspace', toPlace))
 
 /** The runner's script, outside the asar (electron-builder.yml unpacks it). */
 function runnerScript(): string {
