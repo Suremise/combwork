@@ -2,7 +2,7 @@ import { basename } from 'path'
 import type { AgentDef, PageLayout, TemplateLoadPlan, WorkflowChange, WorkflowForm } from '../shared/types'
 import type { TemplateAgent, TemplateEntry, TemplateScope } from '../shared/templates'
 import type { PlatformId } from '../shared/platform/descriptors'
-import { overlayTemplateWorkflow, TEMPLATE_PLATFORMS, type TemplateWorkflowOverlay } from '../shared/workflow/templateOptions'
+import { overlayTemplateWorkflow, TEMPLATE_PLATFORMS, type TemplateOptions, type TemplateWorkflowOverlay } from '../shared/workflow/templateOptions'
 import { nameTaken, suggestTemplateAgentName } from '../shared/agentNames'
 import { workspaceAgents } from './agentNames'
 import { noteChange } from './assistantChanges'
@@ -137,7 +137,9 @@ async function workflowOf(projectPath: string, plan: TemplateLoadPlan): Promise<
   if (!wf) return null
   const ws = workspaceOf(projectPath)
   const form = await workflowForm(ws, projectPath)
-  const overlay = wf.section ? overlayTemplateWorkflow(wf.section, { platform: form.platform, options: form.options, own: form.own, identity: form.identity }) : null
+  // Maximum agents is the user's team size (HI-2001): the Assistant's load never changes it, whatever the template's says.
+  const section = wf.section ? { ...wf.section, options: Object.fromEntries(Object.entries(wf.section.options).filter(([k]) => k !== 'maxAgents')) as TemplateOptions } : null
+  const overlay = section ? overlayTemplateWorkflow(section, { platform: form.platform, options: form.options, own: form.own, identity: form.identity }) : null
   const change: WorkflowChange | null = overlay ? { preset: overlay.preset, options: overlay.own, base: { preset: form.preset, options: form.own } } : null
   const problems = change ? (await checkWorkflowChange(ws, projectPath, change)).problems : []
   const shown: WorkflowShown = {

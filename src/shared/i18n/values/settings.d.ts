@@ -340,8 +340,6 @@ interface HiveMessageValues {
   'settings.advanced.error.oneLine': { title: string | number; most: string | number }
   'settings.advanced.error.pattern': { title: string | number }
   'settings.advanced.error.text': { title: string | number }
-  'settings.advanced.hive.agents.perProject.desc': { usual: string | number; most: string | number }
-  'settings.advanced.hive.agents.perProject.title': undefined
   'settings.advanced.hive.assistant.startView.desc': undefined
   'settings.advanced.hive.assistant.startView.title': undefined
   'settings.advanced.hive.cards.attachmentMax.desc': undefined

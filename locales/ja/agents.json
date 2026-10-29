@@ -171,7 +171,7 @@
   "agents.layout.single": "1つずつ",
   "agents.limit.many": "{limit}個を超えるエージェント：それぞれがCLIのコピーを1つずつ実行し、1つあたり約200～500MBのメモリを使います。このコンピューターのメモリは{total}で、空きは{free}です。すべてのエージェントがプランの使用量上限を共有するため、上限に早く達します。",
   "agents.limit.manyMeasured": "{limit}個を超えるエージェント：それぞれがCLIのコピーを1つずつ実行します。実行中の{running, plural, other {#個のエージェント}}は現在{used}を使っています（1つあたり約{each}）。このコンピューターのメモリは{total}で、空きは{free}です。すべてのエージェントがプランの使用量上限を共有するため、上限に早く達します。",
-  "agents.limit.reached": "1つのプロジェクトに追加できるエージェントは{limit}個までです（「設定」→「詳細」→「プロジェクトあたりのエージェント数」）。",
+  "agents.limit.most": "1つのプロジェクトに置けるエージェントは{most, number}個までです。",
   "agents.mcp.all": "プロジェクトのすべて",
   "agents.mcp.its": "このエージェントのMCPサーバー",
   "agents.mcp.loading": "読み込み中…",

@@ -1,5 +1,5 @@
 // The Progress panel in P7 (#1446) on fake Claude Code agents, the Assistant off: alpha with each card in its own folder
-// (the agent merges), the reviewer pool and one slot (Agents per project: 1), the slots' setup a script:
+// (the agent merges), the reviewer pool and one slot (Maximum agents: 1), the slots' setup a script:
 // 1. a lane from the window with the pool gets slot-a: its setup runs as "Hive (slot slot-a)", its own entry in the Runs
 //    tab's Agent filter; the lane's row reads "B1 / pool · slot-a", and its hover names slot-a, ready, and the card's line;
 // 2. the pool's reviewer R1 runs the card's check in its review copy: the run's row reads "AL-1 · <revision> · in copy-1";
@@ -80,8 +80,8 @@ const lines = (file) => {
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const b2 = await lib.addAgent(inv, alpha, { name: 'B2', workflowRole: 'builder' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
-    // One slot for the project (its pool is its builders, at most Agents per project): a second lane waits for it.
-    await inv('advanced:set', 'hive.agents.perProject', 1)
+    // One slot for the project (its pool is its builders, at most its Maximum agents: HI-2001): a second lane waits for it.
+    await lib.setMaxAgents(inv, 1)
     const live = async (id) => (await inv('session:live')).find((s) => same(s.projectPath, alpha) && s.agentId === id) ?? null
     const launches = () => lines(path.join(home, 'fake-launches.jsonl')).map((l) => JSON.parse(l))
     const tokenOf = async (id) => {

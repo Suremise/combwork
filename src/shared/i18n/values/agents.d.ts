@@ -173,7 +173,7 @@ interface HiveMessageValues {
   'agents.layout.single': undefined
   'agents.limit.many': { limit: string | number; total: string | number; free: string | number }
   'agents.limit.manyMeasured': { limit: string | number; running: number; used: string | number; each: string | number; total: string | number; free: string | number }
-  'agents.limit.reached': { limit: string | number }
+  'agents.limit.most': { most: number }
   'agents.mcp.all': undefined
   'agents.mcp.its': undefined
   'agents.mcp.loading': undefined

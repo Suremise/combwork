@@ -171,6 +171,7 @@
   "agents.layout.single": "One at a time",
   "agents.limit.many": "More than {limit} agents: each runs its own copy of its CLI, roughly 200–500 MB of memory each; this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.",
   "agents.limit.manyMeasured": "More than {limit} agents: each runs its own copy of its CLI. {running, plural, one {Your # running agent takes} other {Your # running agents take}} {used} now (about {each} each); this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.",
+  "agents.limit.most": "A project can have up to {most, number} agents.",
   "agents.limit.reached": "A project can have up to {limit} agents (Settings → Advanced → Agents per project).",
   "agents.mcp.all": "All of the project's",
   "agents.mcp.its": "Its MCP servers",

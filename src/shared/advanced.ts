@@ -19,7 +19,6 @@
 import { createIntl, createIntlCache } from '@formatjs/intl'
 import { CLAUDE_FOOTER_MODES } from './claude'
 import { COPILOT_FOOTER_MODES } from './copilot'
-import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from './defaults'
 import { fmt, language, msg, tr, type Msg } from './i18n'
 import { INBOX_SWITCH_ID } from './inboxSwitches'
 import { SAFEGUARD_DEFAULTS } from './safeguards'
@@ -241,9 +240,10 @@ export const RETIRED_ADVANCED: ReadonlySet<string> = new Set(['hive.accounts.pre
 /**
  * Settings Hive no longer lists but keeps in advanced.json as they are, never listed as unknown, read once more where a
  * workspace still needs to move them to its own settings: `hive.assistant.otherMcpServers` (HI-1472, each workspace's
- * Assistant MCP choices).
+ * Assistant MCP choices); `hive.agents.perProject` (#562), Agents per project, Maximum agents in the workflow defaults
+ * since HI-2001 (main's migrateAgentsPerProject moves it, then drops it).
  */
-export const LEGACY_ADVANCED: ReadonlySet<string> = new Set(['hive.assistant.otherMcpServers'])
+export const LEGACY_ADVANCED: ReadonlySet<string> = new Set(['hive.assistant.otherMcpServers', 'hive.agents.perProject'])
 
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
 export const COPIES_REVIEW = 'hive.copies.review'
@@ -348,9 +348,6 @@ const HOOKS_TAKEN: Record<string, AdvancedSample> = {
   codex: { from: `${FIX}/turns-codex-0.162.1.json`, version: '0.162.1', text: '"hook_event_name": "PreToolUse"', shows: "Codex running Hive's hooks (trusted, so their timeouts match the hashes Hive gave it), PreToolUse too" }, // i18n-ignore: a CLI's recorded text (#367)
   copilot: { from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"name": "PreToolUse"', shows: "Copilot sending Hive's hooks from its launch plugin, PreToolUse too" } // i18n-ignore: a CLI's recorded text (#367)
 }
-
-/** The agents-per-project value's id (#562). */
-export const AGENTS_PER_PROJECT = 'hive.agents.perProject'
 
 /** Each CLI's footer in each mode, from screens recorded in it (#696). */
 const FOOTER_SAMPLES: Record<string, AdvancedSample> = {
@@ -740,26 +737,6 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 1440,
     unit: 'min',
-    workspace: true,
-    applies: 'now'
-  },
-  {
-    id: AGENTS_PER_PROJECT,
-    group: 'hive',
-    title: msg({ id: 'settings.advanced.hive.agents.perProject.title', defaultMessage: 'Agents per project', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
-    desc: withValues(
-      msg({
-        id: 'settings.advanced.hive.agents.perProject.desc',
-        defaultMessage: "How many agents a project can have (#562): {usual} unless you need more, up to {most}. Each agent runs its own copy of its CLI, so more agents take more memory, and they all share your plans' usage limits. Lowering it removes no agents: a project with more just can't add another. Templates and the Agent API keep to it too.",
-        description: 'What the advanced setting "Agents per project" is for (Settings → Advanced). {usual} and {most} are numbers of agents. #562 is an issue number: keep it.'
-      }),
-      { usual: AGENT_LIMIT_DEFAULT, most: AGENT_LIMIT_MAX }
-    ),
-    kind: 'number',
-    default: AGENT_LIMIT_DEFAULT,
-    min: 1,
-    max: AGENT_LIMIT_MAX,
-    unit: 'agents',
     workspace: true,
     applies: 'now'
   },

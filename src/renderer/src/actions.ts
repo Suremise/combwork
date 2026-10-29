@@ -413,7 +413,7 @@ export async function quickAddAgent(path: string | null = get().selectedProject,
   if (!path) return null
   const p = project(path)
   if (p && p.agents.length >= agentLimit()) {
-    notify('warning', tr(msg({ id: 'actions.agent.noRoom', defaultMessage: 'No room for another agent', description: "A warning's title: the project has as many agents as it may have." })), tr(msg({ id: 'actions.agent.noRoomMessage', defaultMessage: '{why} Remove one first.', description: 'Under the warning that a project has no room for another agent: {why} says the limit and where it is set.' }), { why: agentLimitText(agentLimit(), tr) }))
+    notify('warning', tr(msg({ id: 'actions.agent.noRoom', defaultMessage: 'No room for another agent', description: "A warning's title: the project has as many agents as it may have." })), tr(msg({ id: 'actions.agent.noRoomMessage', defaultMessage: '{why} Remove one first.', description: 'Under the warning that a project has no room for another agent: {why} says the limit and where it is set.' }), { why: agentLimitText(tr) }))
     return null
   }
   const provider = await detectedProvider(
@@ -1409,6 +1409,8 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   const suggested = wf ? null : plan.suggestedPreset
   let switchPreset = false
   let applyWorkflow = true
+  // Maximum agents raised to its agents (HI-2001), when the dialog offers it and it stays ticked.
+  let raiseMax = false
   let setUpGit = false
   // The plan the dialog shows last, and what the load read (HR5's round 1: never a workflow other than the one shown).
   let shown = plan
@@ -1430,6 +1432,7 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
       onChange: (now: string[]) => void (names = now),
       onConnections: (now: Record<number, string | null>) => void (connections = now),
       onWorkflow: (v: boolean) => void (applyWorkflow = v),
+      onRaise: (v: boolean) => void (raiseMax = v),
       onPlan: (now: TemplateLoadPlan) => void (shown = now),
       // Closes this dialog (nothing loaded) for Version Control's Git page: never a dialog over a dialog.
       onSetUpGit: () => {
@@ -1457,18 +1460,23 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   }
   await refreshWorkspace()
   const seen = shown.workflow
+  const raise = raiseMax && shown.maxAgents ? { maxAgents: shown.maxAgents.needs } : {}
   if (applyWorkflow && seen?.section) {
     // The section the load read, only if it is the one shown: changed meanwhile, it is said, never filled in.
     const section = got.loaded?.workflow ?? null
     if (JSON.stringify(section) !== JSON.stringify(seen.section)) notify('warning', tr(TW.changed, { template: plan.name }))
     else {
       // Laid over the project's options as the Workflow form reads them, and left for the user to save (HR5: never here).
-      set({ workflowPrefill: { path, preset: seen.section.preset, template: { name: plan.name, platform: seen.platform, section: seen.section } } })
+      set({ workflowPrefill: { path, preset: seen.section.preset, template: { name: plan.name, platform: seen.platform, section: seen.section }, ...raise } })
       openVersionControl(path, 'workflow')
     }
   } else if (suggested && switchPreset) {
     // Filled in once the form has read the project's options (#1423's way), and left for the user to save.
-    set({ workflowPrefill: { path, preset: suggested } })
+    set({ workflowPrefill: { path, preset: suggested, ...raise } })
+    openVersionControl(path, 'workflow')
+  } else if (raise.maxAgents) {
+    // Filled in once the form has read the project's options, and left for the user to save (HI-2001).
+    set({ workflowPrefill: { path, preset: null, ...raise } })
     openVersionControl(path, 'workflow')
   }
 }

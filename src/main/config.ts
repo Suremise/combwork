@@ -263,14 +263,24 @@ class ConfigStore {
   private saving: Promise<void> = Promise.resolve()
 
   flush(): Promise<void> {
+    return this.saveNow().then(() => undefined)
+  }
+
+  /**
+   * Saves now, as flush does, and says whether this save reached the disk: a move between files (HI-2001's Agents per
+   * project) drops its source only once its new place is saved.
+   */
+  saveNow(): Promise<boolean> {
     if (this.saveTimer) clearTimeout(this.saveTimer)
     this.saveTimer = null
     // Each save writes the settings as they are when its turn comes.
-    this.saving = this.saving.then(() => this.write())
-    return this.saving
+    const saved = this.saving.then(() => this.write())
+    this.saving = saved.then(() => undefined)
+    return saved
   }
 
-  private async write(): Promise<void> {
+  /** Writes the settings; false when that failed (logged). */
+  private async write(): Promise<boolean> {
     try {
       if (this.backupBeforeSave) {
         this.backupBeforeSave = false
@@ -289,8 +299,10 @@ class ConfigStore {
         this.stateWritten = text
       }
       await writeKeptJson(this.path, saved, { compact: true, bakOncePerRun: true })
+      return true
     } catch (e) {
       log.error('Failed to save config', e)
+      return false
     }
   }
 }

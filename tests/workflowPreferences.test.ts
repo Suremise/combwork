@@ -19,7 +19,7 @@ describe('the preferences resolve on their own (HI-1766)', () => {
     expect(preferencesOf('git', {}).values).toEqual(PREFERENCE_DEFAULTS)
     const r = preferencesOf('git', { global: { git: { fileLocks: 'off', loopRounds: 4 } }, workspace: { git: { loopRounds: 5 }, none: { loopWaitHours: 9 } }, project: { loopWakes: false } })
     expect(r.values).toEqual({ ...PREFERENCE_DEFAULTS, fileLocks: 'off', loopRounds: 5, loopWakes: false })
-    expect(r.origins).toEqual({ fileLocks: 'global', loopRounds: 'workspace', loopWakes: 'project', loopWaitHours: 'platform', loopStepWaitMinutes: 'platform' })
+    expect(r.origins).toEqual({ fileLocks: 'global', loopRounds: 'workspace', loopWakes: 'project', loopWaitHours: 'platform', loopStepWaitMinutes: 'platform', maxAgents: 'platform' })
   })
 
   it('a value an option doesn’t take is passed over, not the level: other levels and options still count', () => {
@@ -52,9 +52,10 @@ describe('they aren’t rules (HI-1766)', () => {
     }
   })
 
-  it('no preset or All off sets them, and the form’s Custom never counts them', () => {
+  it('no preset or All off sets them but Maximum agents (HI-2001), and the form’s Custom never counts them', () => {
     for (const platform of ['none', 'git'] as const) {
-      for (const o of [allOff(platform), preset(platform, 'pair')]) for (const k of PREFERENCE_OPTIONS) expect(o[k]).toBeUndefined()
+      for (const o of [allOff(platform), preset(platform, 'pair')]) for (const k of PREFERENCE_OPTIONS) expect(o[k], k).toBe(k === 'maxAgents' ? o.maxAgents : undefined)
+      expect([allOff(platform).maxAgents, preset(platform, 'pair').maxAgents]).toEqual([12, 2])
       for (const k of PREFERENCE_OPTIONS) expect(FORM_OPTIONS[platform]).not.toContain(k)
     }
   })
@@ -64,8 +65,8 @@ describe('they aren’t rules (HI-1766)', () => {
     const { platform: _p, ...pair } = preset('git', 'pair')
     const chosen = withUnpreset({ ...pair, loopRounds: 99 } as never, own)
     expect(chosen).toMatchObject({ ...PREFS, stageNames: { active: 'Building' }, review: 'agent' })
-    // Inherited (not the draft's own): the preset sets none, so they keep inheriting.
-    expect(Object.keys(withUnpreset(pair, { review: 'none' })).some((k) => (PREFERENCE_OPTIONS as readonly string[]).includes(k))).toBe(false)
+    // Inherited (not the draft's own): the preset sets none but Maximum agents (HI-2001), so they keep inheriting.
+    expect(Object.keys(withUnpreset(pair, { review: 'none' })).filter((k) => (PREFERENCE_OPTIONS as readonly string[]).includes(k))).toEqual(['maxAgents'])
   })
 
   it('options with only preferences answer no "How do you work?"', () => {

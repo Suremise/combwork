@@ -128,6 +128,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     title: msg({ id: 'workflow.option.loopWakes.title', defaultMessage: 'Wake reviewers and builders', description: 'A workflow option, under Card loops: Hive wakes the agents of a card loop for its handoffs (glossary: card loop).' }),
     desc: msg({ id: 'workflow.option.loopWakes.desc', defaultMessage: 'When a card with a reviewer arrives in Review, Hive wakes the reviewer, and on the review’s verdict the card’s builder; off, only the agents’ own card watches wake them.', description: 'What the workflow option “Wake reviewers and builders” does.' })
   },
+  maxAgents: {
+    title: msg({ id: 'workflow.option.maxAgents.title', defaultMessage: 'Maximum agents', description: 'A workflow option (HI-2001): the most agents the project has, its team size. The Hive Assistant adds agents only up to it.' }),
+    desc: msg({ id: 'workflow.option.maxAgents.desc', defaultMessage: 'Your team size: the most agents the Assistant (and programs using the Agent API) add to this project, though you can add more yourself and lowering it removes none.', description: 'What the workflow option “Maximum agents” does. Agent API is the name of a Hive feature.' })
+  },
   loopRounds: {
     title: msg({ id: 'workflow.option.loopRounds.title', defaultMessage: 'Rounds', description: 'A workflow option, under Card loops: how many rounds (a build and its review) a card gets before its agents ask you.' }),
     desc: msg({ id: 'workflow.option.loopRounds.desc', defaultMessage: 'How many rounds a card gets in a card loop (a build and its review each) before its agents stop and ask you, when the loop doesn’t say.', description: 'What the workflow option “Rounds” does (Card loops).' })
@@ -216,6 +220,7 @@ export const optionTitle = (key: OptionKey, platform: PlatformId, folder?: 'slot
 
 /** The Workflow section's group headings (#1418). */
 export const GROUP_TEXT: Record<FormGroupId, Msg> = {
+  team: msg({ id: 'workflow.group.team', defaultMessage: 'Team', description: 'A heading of the Workflow section: how many agents the project has (its team, HI-2001).' }),
   review: msg({ id: 'workflow.group.review', defaultMessage: 'Review', description: 'A heading of the Version Control tab’s Workflow section: the options about reviewing a card’s work.' }),
   checks: msg({ id: 'workflow.group.checks', defaultMessage: 'Checks', description: 'A heading of the Workflow section: the options about the checks that must pass (glossary 2.3: checks).' }),
   merging: msg({ id: 'workflow.group.merging', defaultMessage: 'Merging', description: 'A heading of the Workflow section (Git): the options about how and where work is merged.' }),
@@ -234,6 +239,7 @@ export const MERGE_ANSWER = msg({ id: 'workflow.mergeChoice.answer', defaultMess
 
 /** Why the presets set each option as they do (§16.6.3's Why column), one sentence each, shown in a preset's preview. */
 export const OPTION_WHY: Partial<Record<OptionKey, Msg>> = {
+  maxAgents: msg({ id: 'workflow.why.maxAgents', defaultMessage: 'Each preset is for a team of its size (one agent solo, a builder and a reviewer as a pair), so the Assistant never adds agents you didn’t plan for.', description: 'Why the presets set “Maximum agents” as they do (Solo: 1; Pair: 2; Team: 12).' }),
   review: msg({ id: 'workflow.why.review', defaultMessage: 'A pair exists to review: a second agent catches what the builder missed, while working solo you read the card’s work yourself.', description: 'Why the presets set “Work is reviewed before it’s merged” as they do (Solo: no review; Pair and Team: a reviewer agent).' }),
   reviewers: msg({ id: 'workflow.why.reviewers', defaultMessage: 'One reviewer is enough for most work; a second doubles the cost.', description: 'Why the presets set “Reviewers per card” to 1.' }),
   noSelfReview: msg({ id: 'workflow.why.noSelfReview', defaultMessage: 'A builder never passes its own work.', description: 'Why the presets turn on “Nobody reviews their own work” wherever there is a reviewer.' }),

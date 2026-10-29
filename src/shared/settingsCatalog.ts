@@ -14,7 +14,7 @@
 import type { AppSettings, ProjectConfig, ProviderId, WorkflowLevel, WorkspaceConfig } from './types'
 import type { PlatformId } from './platform/descriptors'
 import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from './loopLimits'
-import { DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES, SLOT_COPY_DEFAULT } from './defaults'
+import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES, SLOT_COPY_DEFAULT } from './defaults'
 import { SLOT_COPY_TEXT } from './slotDefaults'
 import { PRICES_CHECKED } from './prices'
 import { isCliOwnMode } from './cliOwnMode'
@@ -806,7 +806,9 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('loopWakes', 'boolean'),
     { ...option('loopRounds', 'number'), min: 1, max: LANE_MAX_ROUNDS, step: 1 },
     { ...option('loopWaitHours', 'number'), min: 1, max: LOOP_WAIT_MAX_HOURS, step: 1 },
-    { ...option('loopStepWaitMinutes', 'number'), min: 1, max: LOOP_STEP_WAIT_MAX_MINUTES, step: 5 }
+    { ...option('loopStepWaitMinutes', 'number'), min: 1, max: LOOP_STEP_WAIT_MAX_MINUTES, step: 5 },
+    // Maximum agents (HI-2001): the user's team size, read-only to the Assistant (SENSITIVE).
+    { ...option('maxAgents', 'number'), min: 1, max: AGENT_LIMIT_MAX, step: 1 }
   ]
   // A level's rows are its platform's options (and their check commands), never another platform's.
   return platform ? rows.filter((r) => r.workflow === 'commands' || FORM_GROUPS[platform].some((g) => g.options.includes(r.workflow!))) : rows
@@ -904,7 +906,7 @@ const PROJECT_ROWS: Row[] = [
     ]
   },
   { section: 'keys', key: 'keybindings', title: msg({ id: 'settings.project.keybindings.title', defaultMessage: 'Shortcuts', description: "A setting's title (Project Settings → Keyboard Shortcuts)." }), desc: msg({ id: 'settings.project.keybindings.desc', defaultMessage: 'Change one to give this project its own; Reset returns it to the global shortcut. Stored in the project’s .hive folder, which is not committed.', description: 'What the setting "Shortcuts" does, under its title (Project Settings → Keyboard Shortcuts).' }), type: 'custom', wide: true },
-  { section: 'agents', key: 'agents', title: msg({ id: 'settings.project.agents.title', defaultMessage: 'Agents', description: "A setting's title (Project Settings → Agents)." }), desc: msg({ id: 'settings.project.agents.desc', defaultMessage: "Up to 12 agents can work on the project at once (up to 24 with Settings → Advanced → Agents per project), each in the project folder or a slot. Agents without their own settings use this project's.", description: 'What the setting "Agents" does, under its title (Project Settings → Agents).' }), type: 'custom', wide: true },
+  { section: 'agents', key: 'agents', title: msg({ id: 'settings.project.agents.title', defaultMessage: 'Agents', description: "A setting's title (Project Settings → Agents)." }), desc: msg({ id: 'settings.project.agents.desc', defaultMessage: "The Assistant adds agents up to the project's Maximum agents (Version Control → Workflow), and you can add more yourself, up to 24, each working in the project folder or a slot. Agents without their own settings use this project's.", description: 'What the setting "Agents" does, under its title (Project Settings → Agents).' }), type: 'custom', wide: true },
   // The project's own copied files (HI-1765: its slots.copy, as Version Control → Slots and copies sets it), for the Assistant's tool.
   slotCopyRow('workflow', 'slotCopy', 'project'),
   { section: 'agents', key: 'worktreeSetup', title: msg({ id: 'settings.project.worktreeSetup.title', defaultMessage: 'Setup command', description: "A setting's title (Project Settings → Agents)." }), desc: msg({ id: 'settings.project.worktreeSetup.desc', defaultMessage: "Runs in a new worktree before its agent's first session, e.g. npm install. Its output shows in the agent's pane.", description: 'What the setting "Setup command" does, under its title (Project Settings → Agents).' }), tip: msg({ id: 'settings.project.worktreeSetup.tip', defaultMessage: 'Runs with cmd.exe in the worktree folder. If it fails, the pane offers to retry or to start the agent without it.', description: 'The info tip of the setting "Setup command" (Project Settings → Agents): more on what it does and when it applies.' }), type: 'text', placeholder: 'npm install', hidden: true }, // i18n-ignore: a command, not text
@@ -984,7 +986,8 @@ const SENSITIVE: [RegExp, string][] = [
   [/^[\w-]+\.allowBackgroundSessions$/, "It lets sessions run out of Hive's reach (Hive can't see or stop them)"], // i18n-ignore: the Assistant's tools (English)
   [/^project\.worktreeSetup$/, 'It is a command Hive runs in every new worktree'], // i18n-ignore: the Assistant's tools (English)
   [/^workspace\.onClose$|^general\.onQuit$/, 'It is a command Hive runs as a workspace closes or Hive quits'], // i18n-ignore: the Assistant's tools (English)
-  [/^updates\.prerelease$/, 'It decides which builds of Hive install'] // i18n-ignore: the Assistant's tools (English)
+  [/^updates\.prerelease$/, 'It decides which builds of Hive install'], // i18n-ignore: the Assistant's tools (English)
+  [/(^|\.)maxAgents$/, "Maximum agents is the user's team size, the most agents you may add"] // i18n-ignore: the Assistant's tools (English)
 ]
 
 /** Read-only to the Assistant for now, though not sensitive (#186: keybindings). */

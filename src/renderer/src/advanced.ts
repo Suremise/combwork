@@ -1,4 +1,5 @@
-import { AGENTS_PER_PROJECT, advancedDef, advancedRow, rightClickToCliId } from '@shared/advanced'
+import { advancedDef, advancedRow, rightClickToCliId } from '@shared/advanced'
+import { AGENT_LIMIT_MAX } from '@shared/defaults'
 import { INBOX_SWITCH_ID, inboxSwitchOn, type InboxSwitch } from '@shared/inboxSwitches'
 import type { ProjectConfig } from '@shared/types'
 import { call } from './api'
@@ -31,14 +32,17 @@ export function useRightClickToCli(provider: string | undefined): boolean {
   return !!def && advancedRow(def, state).value === true
 }
 
-/** How many agents a project of this window's workspace can have (#562): Settings → Advanced → Agents per project. The main process checks it again. */
+/**
+ * How many agents the user can give a project by hand (#562, HI-2001): the most any project can have, past its workflow's
+ * Maximum agents, which binds the Assistant and the Agent API. The main process checks it again.
+ */
 export function useAgentLimit(): number {
-  return useAdvancedValue<number>(AGENTS_PER_PROJECT)
+  return AGENT_LIMIT_MAX
 }
 
 /** The same, outside a component. */
 export function agentLimit(): number {
-  return advancedRow(advancedDef(AGENTS_PER_PROJECT)!, useStore.getState().advanced).value as number
+  return AGENT_LIMIT_MAX
 }
 
 /** Whether a carrying-on switch is on for a project's agents (#1432): its own over Settings → Advanced's; no project (the Assistant), Settings'. */

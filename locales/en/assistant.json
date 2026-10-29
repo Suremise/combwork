@@ -435,6 +435,10 @@
     "defaultMessage": "Agent names are unique across the workspace, and {count, plural, one {this name is} other {these names are}} taken already: {names} (projects: {projects}). {count, plural, one {A free name is} other {Free names are}} filled in below. Change any name you like.",
     "description": "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them. Each sentence whole, the verb never agreeing with a list (HI-1585: glossary §1 rules 3 and 4)."
   },
+  "assistant.loadNames.raiseMax": {
+    "defaultMessage": "Also raise Maximum agents from {now, number} to {needs, number} (opens Version Control → Workflow with it set, to save there)",
+    "description": "Load template (HI-2001), a tick box: the template has more agents ({needs}) than the project's workflow option Maximum agents ({now}); ticked, the project's Version Control tab opens at Workflow with Maximum agents set to {needs}, not saved. Version Control → Workflow: use the translated names."
+  },
   "assistant.loadNames.sameTwice": {
     "defaultMessage": "Another of its agents has this name.",
     "description": "Load template, under a name box: another of the template's agents is given the same name."
@@ -1899,10 +1903,6 @@
     "defaultMessage": "It has {count} agents; a project can have up to {max}.",
     "description": "Why a template file can't be used: more agents than any project can have."
   },
-  "assistant.template.tooManyHere": {
-    "defaultMessage": "It has {count} agents, and this project can have up to {limit} (Settings → Advanced → Agents per project).",
-    "description": "Why a template can't be loaded into this project: it has more agents than the project allows. Keep the setting's path as Settings shows it."
-  },
   "assistant.templateLoad.afterLoad": {
     "defaultMessage": "{removed, select, yes {Their conversations stay in the Sessions tab, and their open cards go back (Active ones to Todo). The layout becomes the template's.} other {The layout becomes the template's.}}",
     "description": "Load template, the last note: what happens to the agents that go (when some do) and to the project's layout. Sessions, Active and Todo as Hive names them."
@@ -2324,8 +2324,8 @@
     "description": "Under Template exported, after the file's path."
   },
   "assistant.templates.fullTip": {
-    "defaultMessage": "A template can have up to {limit} agents, as many as a project (Settings → Advanced → Agents per project)",
-    "description": "Tooltip on Add Agent when the template is full. Keep the setting's path as Settings shows it."
+    "defaultMessage": "A template can have up to {limit, number} agents, the most a project can have",
+    "description": "Tooltip on Add Agent when the template is full: {limit} is the most agents a project can have (24)."
   },
   "assistant.templates.gone": {
     "defaultMessage": "That template is no longer there.",
