@@ -1,9 +1,13 @@
 // The hive tools' short replies (shared/toolReplies.ts): a change confirms what changed and where the card is now,
 // a listing is one line per item, and nothing echoes a card's description, comments or history.
 import { describe, expect, it } from 'vitest'
+import { addRetryWaited, retryWaitEnd } from '../src/shared/runtime'
 import {
+  CLI_DEFAULT,
   MAX_ROWS,
   cardRequests,
+  modelInUse,
+  retryWaitsView,
   messageQueuedText,
   notifiedText,
   changedText,
@@ -122,6 +126,41 @@ describe('task changes', () => {
     expect(v.historyEntries).toBe(1)
     expect(v.description).toBe(LONG)
     expect(v.comments).toHaveLength(1)
+  })
+})
+
+describe("an agent's model, effort and retry waits (HI-1996)", () => {
+  it('what its CLI reports, else what its launch gave, else its CLI’s default; not running: none', () => {
+    expect(modelInUse(null)).toBeNull()
+    expect(modelInUse({ modelId: 'claude-opus-5-5', effort: 'high', launchedWith: { model: 'opus', effort: 'medium' } })).toEqual({ model: 'claude-opus-5-5', effort: 'high' })
+    expect(modelInUse({ launchedWith: { model: 'gpt-5.6', effort: 'xhigh' } })).toEqual({ model: 'gpt-5.6', effort: 'xhigh' })
+    expect(modelInUse({ modelName: 'Sonnet', launchedWith: { model: null, effort: null } })).toEqual({ model: 'Sonnet', effort: CLI_DEFAULT })
+    expect(modelInUse({})).toEqual({ model: CLI_DEFAULT, effort: CLI_DEFAULT })
+  })
+
+  const wait = { at: '2026-10-29T10:00:00.000Z', since: '2026-10-29T10:00:00.000Z', retryAt: '2026-10-29T10:06:40.000Z', attempt: 1, max: 5, status: 429 }
+  const at = (iso: string): number => Date.parse(iso)
+
+  it('none: absent, so the reply stays as it was', () => {
+    expect(retryWaitsView(null)).toBeUndefined()
+    expect(retryWaitsView({})).toBeUndefined()
+  })
+
+  it('a wait ends at its retry time when Hive notices later, never before it began; the waits add up', () => {
+    expect(retryWaitEnd(wait, at('2026-10-29T10:06:45.000Z'))).toBe(at(wait.retryAt))
+    expect(retryWaitEnd(wait, at('2026-10-29T10:02:00.000Z'))).toBe(at('2026-10-29T10:02:00.000Z'))
+    expect(retryWaitEnd({ ...wait, retryAt: null }, at('2026-10-29T09:59:00.000Z'))).toBe(at(wait.since))
+    const one = addRetryWaited(undefined, wait, at('2026-10-29T10:06:45.000Z'))
+    expect(one).toEqual({ waits: 1, ms: 400_000, latest: { since: wait.since, ended: wait.retryAt, tries: 1, status: 429 } })
+    const two = addRetryWaited(one, { ...wait, since: '2026-10-29T11:00:00.000Z', retryAt: null, attempt: 3, status: null, network: true }, at('2026-10-29T11:01:00.000Z'))
+    expect(two).toEqual({ waits: 2, ms: 460_000, latest: { since: '2026-10-29T11:00:00.000Z', ended: '2026-10-29T11:01:00.000Z', tries: 3, status: null, network: true } })
+    // As hive_agent_activity gives them: seconds; one under way counted to now, the latest.
+    expect(retryWaitsView({ retryWaited: two })).toEqual({ waits: 2, seconds: 460, latest: { since: '2026-10-29T11:00:00.000Z', seconds: 60, tries: 3, status: null, network: true } })
+    expect(retryWaitsView({ retryWaited: two, retryWait: { ...wait, since: '2026-10-29T12:00:00.000Z', retryAt: '2026-10-29T12:05:00.000Z' } }, at('2026-10-29T12:01:30.000Z'))).toEqual({
+      waits: 3,
+      seconds: 550,
+      latest: { since: '2026-10-29T12:00:00.000Z', seconds: 90, tries: 1, status: 429, ongoing: true, retryAt: '2026-10-29T12:05:00.000Z' }
+    })
   })
 })
 

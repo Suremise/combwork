@@ -2095,6 +2095,16 @@ export interface RetryWait {
   network?: true
 }
 
+/**
+ * The retry waits this launch has finished (HI-1996): how many, their time together (ms), and the latest one (from its
+ * first try, `since`, to when it ended, as RetryWait says), for telling a throttled round from a slow one afterwards.
+ */
+export interface RetryWaited {
+  waits: number
+  ms: number
+  latest: { since: string; ended: string; tries: number; status: number | null; network?: true }
+}
+
 export interface LiveSessionState {
   provider: ProviderId
   /** This launch, until the process exits; hooks name it so they reach the right agent. */
@@ -2147,6 +2157,8 @@ export interface LiveSessionState {
    * With no `retryAt` (HI-1973: Copilot doesn't say), it stands until one of those.
    */
   retryWait?: RetryWait
+  /** The retry waits this launch has finished (HI-1996); absent until one has. retryWait is the one under way. */
+  retryWaited?: RetryWaited
   /**
    * Facts of its runtime besides its turn and background tasks, each set where Hive learns it, never read back from the
    * status word (#648; shared/runtime.ts agentRuntime() gathers them all, and the labels are projected from them).
@@ -2187,6 +2199,11 @@ export interface LiveSessionState {
     /** A server connection's (HI-1772): its models as launched, so the footer shows the real model and what it stands in for, and whether it runs only on this PC (its server is, and none of its models runs elsewhere: HI-1773). */
     server?: { models: ServerModel[]; local?: boolean }
   }
+  /**
+   * The model and effort this launch gave its CLI (HI-1996), after the agent's, project's, provider's and connection's
+   * choices; null: none given, so its CLI's own default. What the CLI reports once it runs is `modelId` and `effort`.
+   */
+  launchedWith?: { model: string | null; effort: string | null; /** The model was the agent's own choice, not a default. */ own?: true }
   /** A switch to the connection it would launch on now waits for its turn to be over (HI-1755). */
   switchPending?: boolean
   /** Its conversation ran only on servers on this PC (HI-1772): free, its cost a known $0, shown as "free (local)". */

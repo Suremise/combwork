@@ -59,6 +59,7 @@
   "panes.footer.handOverWhen": "{when, select, now {Przekaż pracę nowej rozmowie: kliknij, aby otworzyć Przekaż pracę…, i wybierz samego agenta.} other {Może przekazać pracę nowej rozmowie, gdy skończy: nie w trakcie pracy, scalania ani na karcie pętli kart.}}",
   "panes.footer.modelTip": "{chosenAs, select, none {} other {{model} · wybrany jako {chosenAs}. }}{effort, select, yes {Model i wysiłek} other {Model}} {provider} {live, select, yes {w tej sesji} other {dla nowych sesji}}{reported, select, yes { (wysiłek według sesji)} other {}}. Zmienisz to w {where}.",
   "panes.footer.reading": "Odczytuję użycie tej rozmowy…",
+  "panes.footer.retryWaited": "Ta sesja czekała łącznie {minutes, plural, =0 {mniej niż minutę} one {# minutę} few {# minuty} many {# minut} other {# minuty}}, aż {provider} ponowi ograniczone lub nieudane żądania ({waits, plural, one {# oczekiwanie} few {# oczekiwania} many {# oczekiwań} other {# oczekiwania}}, ostatnie od {time}{ongoing, select, yes {, nadal czeka} other {}}): czas niespędzony na pracy.",
   "panes.footer.settingsName": "ustawieniach agenta lub ustawieniach projektu",
   "panes.footer.stale": "Nie udało się teraz odczytać tego ponownie: dane mogą być nieaktualne.",
   "panes.footer.tasks": "{n, plural, one {# zadanie w tle} few {# zadania w tle} many {# zadań w tle} other {# zadania w tle}}",

@@ -5,7 +5,7 @@
  * returns a short row per item, and full detail comes on request. No imports beyond shared code without side
  * effects: hive-mcp.js runs outside the app bundle.
  */
-import type { MergeSlotInfo, TaskCard, TaskColumn, TaskDecision } from './types'
+import type { LiveSessionState, MergeSlotInfo, TaskCard, TaskColumn, TaskDecision } from './types'
 import { holderText, minutes, slotLine } from './mergeSlot'
 import { columnLabel, commentSummary } from './tasks'
 import { cardName, cardRef, namedBy, namesFrom, namesOf } from './projectKeys'
@@ -15,6 +15,43 @@ import type { StageId } from './workflow/facts'
 import type { NextStep } from './workflow/nextStep'
 import type { QueuePublic } from './workflow/queue'
 import { INBOX_SWITCHES, type InboxSwitch } from './inboxSwitches'
+
+/** A running agent's CLI's own default, where its launch gave none and it hasn't said (HI-1996). */
+export const CLI_DEFAULT = 'default'
+
+/**
+ * The model and effort a running agent uses (HI-1996, hive_agent_activity): what its CLI reports, else what its launch
+ * gave it (after the agent's, project's and connection's choices), else its CLI's default. Null: not running.
+ */
+export function modelInUse(st: Pick<LiveSessionState, 'modelId' | 'modelName' | 'effort' | 'launchedWith'> | null | undefined): { model: string; effort: string } | null {
+  if (!st) return null
+  return { model: st.modelId || st.modelName || st.launchedWith?.model || CLI_DEFAULT, effort: st.effort || st.launchedWith?.effort || CLI_DEFAULT }
+}
+
+/** A launch's retry waits as hive_agent_activity gives them (HI-1996); `latest.ongoing`: it waits now. */
+export interface RetryWaitsView {
+  waits: number
+  seconds: number
+  latest: { since: string; seconds: number; tries: number; status: number | null; network?: true; ongoing?: true; retryAt?: string }
+}
+
+/**
+ * A launch's time waiting for its CLI to retry a model request (HI-1996): its finished waits, with the one under way
+ * counted to now and the latest. Absent when it has had none, so a reply stays as it was.
+ */
+export function retryWaitsView(st: Pick<LiveSessionState, 'retryWait' | 'retryWaited'> | null | undefined, now = Date.now()): RetryWaitsView | undefined {
+  const done = st?.retryWaited
+  const w = st?.retryWait
+  if (!done && !w) return undefined
+  const secs = (ms: number): number => Math.max(0, Math.round(ms / 1000))
+  const doneSeconds = done ? secs(done.ms) : 0
+  if (!w) {
+    const l = done!.latest
+    return { waits: done!.waits, seconds: doneSeconds, latest: { since: l.since, seconds: secs(Date.parse(l.ended) - Date.parse(l.since)), tries: l.tries, status: l.status, ...(l.network ? { network: true as const } : {}) } }
+  }
+  const so = secs(now - (Date.parse(w.since) || now))
+  return { waits: (done?.waits ?? 0) + 1, seconds: doneSeconds + so, latest: { since: w.since, seconds: so, tries: w.attempt, status: w.status, ...(w.network ? { network: true as const } : {}), ongoing: true, ...(w.retryAt ? { retryAt: w.retryAt } : {}) } }
+}
 
 /** A card's request waiting for the user, as agents read it (TaskView.forYou); `asker` absent: Hive asked. */
 export interface CardRequest {

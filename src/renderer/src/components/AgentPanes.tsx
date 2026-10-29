@@ -8,7 +8,7 @@ import { cardLabel } from '@shared/projectKeys'
 import { modelCaps, serverModelLabel } from '@shared/models'
 import { serverDefaultModel, serverModelOf } from '@shared/serverConnection'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
-import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, contextPercent, agentModelShown, effortLabel, isCompacting, layoutPanes, mergeBlocked, mostUrgent, projectLayout, sessionInAgentFolder, transcriptWarnLimit, unmergedWork } from '@shared/defaults'
+import { SESSION_LAYOUTS, agentLimitText, agentsPerPage, compactThreshold, contextPercent, agentModelShown, effortLabel, footerChoices, isCompacting, layoutPanes, mergeBlocked, mostUrgent, projectLayout, sessionInAgentFolder, transcriptWarnLimit, unmergedWork } from '@shared/defaults'
 import { cellPage, cellPageCount, neighbourCell, pageCells, pageIds, type CellDirection } from '@shared/paneCells'
 import { agentLimit, inboxSwitchNow, useAgentLimit } from '../advanced'
 import type { AgentInfo, LiveSessionState, PageLayout, ProjectInfo, SessionLayout, SessionListItem, SessionUsage, SessionView } from '@shared/types'
@@ -41,6 +41,7 @@ import { contextLines, projectProviderConfig, providerDescriptor, providerName, 
 import { safeguardText } from '@shared/safeguards'
 import { unpricedModel, unpricedText } from '@shared/prices'
 import { hooksMissingNote, hooksMissingText, retryWaitText, unknownStateText } from '@shared/runtime'
+import { retryWaitsView } from '@shared/toolReplies'
 import { Icon, IconButton, ReviewMark, SafeguardMark, signInNote, statusText, Tooltip, useContextMenu, useFolds, type MenuEntry } from './ui'
 import { useConnections } from './ConnectionChoice'
 import { startBlockedReason, useStartBlocked } from './BoardUpgrade'
@@ -1413,6 +1414,11 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
 }
 
 /** What a click on the footer's cost does, as its tooltip says. */
+const RETRY_WAITED = msg({
+  id: 'panes.footer.retryWaited',
+  defaultMessage: 'This session has waited {minutes, plural, =0 {under a minute} one {# minute} other {# minutes}} in all for {provider} to retry rate-limited or failed requests ({waits, plural, one {# wait} other {# waits}}, the latest from {time}{ongoing, select, yes {, still waiting} other {}}): time not spent on its work.',
+  description: "Added to the hover of the model in a pane's footer, after a blank line: how long this session of the agent has spent waiting for its coding agent ({provider}, a product name) to try a model request again after the service refused it (rate-limited) or it failed, so slow work can be told from waiting. {minutes} is the total in minutes, {waits} how many separate waits, {time} the clock time the latest wait began; ongoing yes adds that it is still waiting now."
+})
 const COST_CLICK = msg({ id: 'panes.footer.costClick', defaultMessage: "Click to see this session's details in the Overview", description: "The last line of the hover of a pane footer's cost: what clicking does (the project's Overview tab)." })
 
 /** The footer's context: "ctx 42%", or its tokens while the context window's size isn't known ("ctx 120K", "ctx –"). */
@@ -1521,14 +1527,18 @@ export function PaneFooter({
   const email = signedInAs ? (signedInAs.observed?.email ?? signedInAs.accepted?.email) : undefined
   // What runs (#248): the session's reported model while it runs (status line, else its transcript), else what the choice
   // resolves to; the choice itself in the tooltip when it reads differently (an alias).
-  const shown = agentModelShown(provider, a.model || pc.model, ps.defaultModel, providers[provider], live ? live.modelId || usage?.model || null : null)
+  // A running session's from its own launch (HI-1996), never the settings as they are now; a new session's from them.
+  const chose = footerChoices(a, pc, ps, live)
+  const shown = agentModelShown(provider, chose.model, chose.modelGlobal, providers[provider], live ? live.modelId || usage?.model || null : null)
   // On a server connection (HI-1772): the server's real model, with the Claude names it stands in for, and no effort.
   const onServer = live?.launchedConnection?.server
-  const serverModel = onServer ? serverModelOf(onServer.models, live?.modelId || usage?.model || a.model || serverDefaultModel(onServer.models) || '') : null
+  const serverModel = onServer ? serverModelOf(onServer.models, live?.modelId || usage?.model || (live?.launchedWith ? live.launchedWith.model : a.model) || serverDefaultModel(onServer.models) || '') : null
   const model = serverModel?.id ? serverModelLabel(serverModel.id, serverModel.as, tr, serverModel.remote) : shown.label
   // With no effort set or reported, the model's own default when the CLI said what it is ("Medium (default)", #125).
-  const runModel = a.model || (pc.model && pc.model !== 'inherit' ? pc.model : ps.defaultModel) || providers[provider]?.defaultModel || null
-  const effort = onServer ? null : effortLabel(provider, live?.effort, a.effort ?? pc.effort, ps.defaultEffort, modelCaps(provider, runModel, providers[provider], settings).defaultEffort, settings)
+  const runModel = (chose.model && chose.model !== 'inherit' ? chose.model : chose.modelGlobal) || providers[provider]?.defaultModel || null
+  // This launch's time waiting for its CLI to retry a request (HI-1996), told apart from a slow model in the hover.
+  const waited = live ? retryWaitsView(live) : undefined
+  const effort = onServer ? null : effortLabel(provider, live?.effort, chose.effort, chose.effortGlobal, modelCaps(provider, runModel, providers[provider], settings).defaultEffort, settings)
   const threshold = compactThreshold(project.config, settings?.sessions.compactSuggestTokens ?? 0)
   const ctx = usage?.contextTokens ?? 0
   const pct = contextPercent(ctx, usage?.contextWindow)
@@ -1698,14 +1708,14 @@ export function PaneFooter({
   return (
     <div ref={footerRef} className="pane-footer-bar" data-fit={fit} onMouseDown={() => focusAgent(project.path, a.id)}>
       <Tooltip
-        content={tr(
+        content={<span style={{ whiteSpace: 'pre-line' }}>{`${tr(
           msg({
             id: 'panes.footer.modelTip',
             defaultMessage: '{chosenAs, select, none {} other {{model} · chosen as {chosenAs}. }}{provider} {effort, select, yes {model and effort} other {model}} {live, select, yes {of this session} other {for new sessions}}{reported, select, yes { (effort as the session reports it)} other {}}. Change them in {where}.',
             description: "Hover of the model in a pane's footer: the model shown and the name it was chosen by ({chosenAs}; none: leave that branch empty), the provider (\"Claude Code\"), whether effort is shown too, whether it is the running session's or new sessions', and where to change them ({where}: \"Agent Settings or Project Settings\")."
           }),
           { chosenAs: shown.chosenAs || 'none', model, provider: providerName(provider), effort: effort ? 'yes' : 'no', live: live ? 'yes' : 'no', reported: live?.effort ? 'yes' : 'no', where: settingsName ?? tr(msg({ id: 'panes.footer.settingsName', defaultMessage: 'Agent Settings or Project Settings', description: "Where an agent's model and effort are changed, ending the footer model's hover (\"Change them in …\"): the two dialogs' names." })) }
-        )}
+        )}${waited ? `\n\n${tr(RETRY_WAITED, { minutes: Math.floor(waited.seconds / 60), waits: waited.waits, provider: providerName(provider), time: formatTime(waited.latest.since), ongoing: waited.latest.ongoing ? 'yes' : 'no' })}` : ''}`}</span>}
       >
         <span className="pane-foot-item foot-model fit-clip" onClick={() => (onSettings ? onSettings() : set({ agentSettingsFor: { project: project.path, agentId: a.id } }))}>
           {model}

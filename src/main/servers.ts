@@ -28,7 +28,7 @@ import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, iso
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
-import { cardRequests, newestComments, progressLabel, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
+import { cardRequests, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
 import { settingChangeTexts, settingPath, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
@@ -1599,13 +1599,19 @@ async function agentActivity(p: string, agentId: string, detail = false) {
   const provider = st?.provider ?? agentProvider(a, info.config, config.settings)
   // What was left for it (#530, #647): unread and overdue, and its latest deliveries with their states and times.
   const inbox = await deliveryView(p, agentId, detail ? 20 : 5)
+  // The model and effort it runs with, and its time waiting for its CLI to retry a throttled or failed request (HI-1996):
+  // a slow round told from a throttled one.
+  const inUse = modelInUse(st)
+  const retryWaits = retryWaitsView(st)
   return {
     project: info.name,
     agent: a.name,
     id: a.id,
     provider,
+    ...inUse,
     status: st?.status ?? 'stopped',
     statusMessage: statusMessageOf(st),
+    ...(retryWaits ? { retryWaits } : {}),
     ...(watchingOf(st) ? { watching: watchingOf(st) } : {}),
     ...(progressOf(p, a.id) ? { progress: progressOf(p, a.id) } : {}),
     reviewing: st?.review ?? null,

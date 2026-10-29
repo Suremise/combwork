@@ -61,6 +61,7 @@ interface HiveMessageValues {
   'panes.footer.handOverWhen': { when: string }
   'panes.footer.modelTip': { chosenAs: string; model: string | number; provider: string | number; effort: string; live: string; reported: string; where: string | number }
   'panes.footer.reading': undefined
+  'panes.footer.retryWaited': { minutes: number; provider: string | number; waits: number; time: string | number; ongoing: string }
   'panes.footer.settingsName': undefined
   'panes.footer.stale': undefined
   'panes.footer.tasks': { n: number }

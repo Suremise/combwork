@@ -239,6 +239,10 @@
     "defaultMessage": "Reading this conversation's usage…",
     "description": "Hover of a pane footer's context before its numbers are read."
   },
+  "panes.footer.retryWaited": {
+    "defaultMessage": "This session has waited {minutes, plural, =0 {under a minute} one {# minute} other {# minutes}} in all for {provider} to retry rate-limited or failed requests ({waits, plural, one {# wait} other {# waits}}, the latest from {time}{ongoing, select, yes {, still waiting} other {}}): time not spent on its work.",
+    "description": "Added to the hover of the model in a pane's footer, after a blank line: how long this session of the agent has spent waiting for its coding agent ({provider}, a product name) to try a model request again after the service refused it (rate-limited) or it failed, so slow work can be told from waiting. {minutes} is the total in minutes, {waits} how many separate waits, {time} the clock time the latest wait began; ongoing yes adds that it is still waiting now."
+  },
   "panes.footer.settingsName": {
     "defaultMessage": "Agent Settings or Project Settings",
     "description": "Where an agent's model and effort are changed, ending the footer model's hover (\"Change them in …\"): the two dialogs' names."

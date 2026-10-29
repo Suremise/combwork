@@ -59,6 +59,7 @@
   "panes.footer.handOverWhen": "{when, select, now {Übergib an eine neue Unterhaltung: Klicke für Übergeben an… und wähle den Agenten selbst.} other {Der Agent kann an eine neue Unterhaltung übergeben, wenn er fertig ist: nicht, während er arbeitet, mergt oder auf einer Karte einer Kartenschleife ist.}}",
   "panes.footer.modelTip": "{chosenAs, select, none {} other {{model} · gewählt als {chosenAs}. }}{provider}: {effort, select, yes {Modell und Aufwand} other {Modell}} {live, select, yes {dieser Sitzung} other {für neue Sitzungen}}{reported, select, yes { (Aufwand laut Sitzung)} other {}}. Ändern kannst du sie in {where}.",
   "panes.footer.reading": "Nutzung dieser Unterhaltung wird gelesen…",
+  "panes.footer.retryWaited": "Diese Sitzung hat insgesamt {minutes, plural, =0 {weniger als eine Minute} one {# Minute} other {# Minuten}} darauf gewartet, dass {provider} abgelehnte oder fehlgeschlagene Anfragen erneut versucht ({waits, plural, one {# Wartezeit} other {# Wartezeiten}}, die letzte ab {time}{ongoing, select, yes {, wartet noch} other {}}): Zeit, die nicht in ihre Arbeit ging.",
   "panes.footer.settingsName": "den Agent-Einstellungen oder den Projekteinstellungen",
   "panes.footer.stale": "Konnte gerade nicht erneut gelesen werden: Die Werte sind eventuell veraltet.",
   "panes.footer.tasks": "{n, plural, one {# Hintergrundaufgabe} other {# Hintergrundaufgaben}}",
