@@ -760,12 +760,14 @@ const QUIT_LOOK_EVERY_MS = 250
 export async function recordEndedLaunches(): Promise<void> {
   await readRecords()
   const ended = [...outcomes].filter(([, o]) => o === 'ended').map(([r]) => r)
-  const pending = new Set([...running.keys(), ...looking.keys()].filter((r) => !outcomes.has(r)))
+  // With the launches whose leftovers were asked to end and not yet seen gone (`confirming`, HI-2055: a quit that ends
+  // them must still see them end, or their writers stay held after it).
+  const pending = new Set([...running.keys(), ...looking.keys(), ...confirming.keys()].filter((r) => !outcomes.has(r)))
   const until = Date.now() + QUIT_LOOK_MS
   // Only the helper holding their jobs can say they're empty (HR2's round 2): one started in its place has none of them
   // and lists any as empty. The look stops once it changes, and a run settled meanwhile (lost: `unknown`) is let go.
   const helper = host.instance
-  const tracked = (run: string): boolean => host.instance === helper && (running.has(run) || looking.has(run)) && !outcomes.has(run)
+  const tracked = (run: string): boolean => host.instance === helper && (running.has(run) || looking.has(run) || confirming.has(run)) && !outcomes.has(run)
   // No helper as it begins: nothing can be seen empty.
   if (helper !== null) {
     scan: while (pending.size) {

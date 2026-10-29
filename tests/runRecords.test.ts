@@ -17,7 +17,9 @@ const jobs = vi.hoisted(() => ({
   instance: 1 as number | null,
   listed: [] as string[],
   onList: (_run: string) => undefined as void,
-  lose: (): void => undefined
+  lose: (): void => undefined,
+  /** Jobs still holding a process (HI-2055), as the helper holding them lists them; any other lists empty. */
+  members: new Set<string>()
 }))
 vi.mock('../src/main/processSupervisor', async (orig) => {
   class JobHost {
@@ -46,11 +48,15 @@ vi.mock('../src/main/processSupervisor', async (orig) => {
       // A request with no helper starts a new one.
       if (jobs.instance === null) jobs.instance = 2
       if (cmd === 'add') return 'ok'
+      // Asked to end its processes: only asked (they end when the test says, `members`).
+      if (cmd === 'kill' || cmd === 'forget') return true
       if (cmd !== 'list') return null
       jobs.listed.push(run!)
       jobs.onList(run!)
       if (jobs.instance === null) return null
-      return { processes: [], more: 0, adopted: 0 }
+      // A helper started since holds none of the old jobs: it lists each as empty.
+      const held = jobs.instance === 1 && jobs.members.has(run!)
+      return { processes: held ? [{ pid: 7001, name: 'node.exe', cmd: 'node server.js', created: '133000000000000000' }] : [], total: held ? 1 : 0, adopted: 0 }
     }
   }
   return { ...((await orig()) as object), JobHost }
@@ -136,5 +142,63 @@ describe("a run's record for its slot writer (HI-1886)", () => {
     jobs.onList = () => undefined
     await m.recordEndedLaunches()
     expect(await m.endedEarlier('s-1')).toBe(false)
+  })
+
+  /**
+   * HI-2055: a launch whose CLI exited leaving processes, which Hive quitting then ends (Settings → Agents): asked to end,
+   * its job is looked at until seen empty (`confirming`). The quit's look waits for it as for a running launch, by the same
+   * rules: kept as ended only once the helper that held its job sees it empty.
+   */
+  describe('leftovers Hive ended as it quits (HI-2055)', () => {
+    const track = async (m: typeof import('../src/main/agentProcesses'), runId: string) => expect(await m.trackLaunch({ runId, projectPath: profile.dir, agentId: runId, agentName: runId }, 100)).toEqual({ tracked: true })
+    /** A launch that left a process running, ended by Hive quitting: asked, not yet seen gone. */
+    async function endedAtQuit(runId: string): Promise<typeof import('../src/main/agentProcesses')> {
+      writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))
+      jobs.instance = 1
+      jobs.onList = () => undefined
+      const m = await restarted()
+      await track(m, runId)
+      jobs.members.add(runId)
+      expect((await m.launchEnded(runId))?.processes).toHaveLength(1)
+      expect(await m.settleAllLeftovers('end')).toBe(1)
+      expect(m.runOutcome(runId)).toBeNull()
+      return m
+    }
+
+    it.runIf(process.platform === 'win32')('seen gone during the look: kept as ended, so its writer settles after the restart', async () => {
+      const m = await endedAtQuit('c-gone')
+      jobs.members.delete('c-gone')
+      await m.recordEndedLaunches()
+      await m.leftoversSaved()
+      expect(await (await restarted()).endedEarlier('c-gone')).toBe(true)
+    })
+
+    it.runIf(process.platform === 'win32')('settled ended meanwhile (its own poll saw it gone): kept', async () => {
+      const m = await endedAtQuit('c-polled')
+      jobs.onList = (run) => {
+        if (run === 'c-polled') m.settleRunForTests('c-polled', 'ended')
+      }
+      await m.recordEndedLaunches()
+      await m.leftoversSaved()
+      expect(await (await restarted()).endedEarlier('c-polled')).toBe(true)
+    })
+
+    it.runIf(process.platform === 'win32')('still running when the look gives up: not kept, so its writer stays held', async () => {
+      const m = await endedAtQuit('c-stays')
+      await m.recordEndedLaunches()
+      await m.leftoversSaved()
+      expect(await (await restarted()).endedEarlier('c-stays')).toBe(false)
+    }, 20_000)
+
+    it.runIf(process.platform === 'win32')('its helper lost during the look, and the next one lists it empty: not kept', async () => {
+      const m = await endedAtQuit('c-lost')
+      jobs.onList = (run) => {
+        if (run === 'c-lost') jobs.lose()
+      }
+      await m.recordEndedLaunches()
+      expect(m.runOutcome('c-lost')).toBe('unknown')
+      await m.leftoversSaved()
+      expect(await (await restarted()).endedEarlier('c-lost')).toBe(false)
+    })
   })
 })
