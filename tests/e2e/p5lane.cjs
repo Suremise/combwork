@@ -76,12 +76,14 @@ const ancestor = (x, y) => {
     await waitHung(async () => (await strictRow.count()) === 1)
     await strictRow.scrollIntoViewIfNeeded()
     await strictRow.locator('[role="switch"], input[type="checkbox"]').first().click()
+    // Hive's commit message chosen too (G19: Pair's is the branch's own since HI-1997): this lane's merges are checked by their trailers.
+    await form.locator('.workflow-option[data-option="commitMessage"] select').selectOption('hive')
     await form.getByRole('button', { name: 'Save…' }).click()
     const save = page.locator('.dialog', { hasText: 'Save Workflow Options' })
     await save.waitFor({ timeout: HUNG_MS })
     await save.getByRole('button', { name: 'Save', exact: true }).click()
     await save.waitFor({ state: 'detached', timeout: HUNG_MS })
-    const options = await waitHung(() => (projectJson().workflow?.options?.finish === 'hiveMerges' && projectJson().workflow.options.strict === true ? projectJson().workflow.options : null))
+    const options = await waitHung(() => (projectJson().workflow?.options?.finish === 'hiveMerges' && projectJson().workflow.options.strict === true && projectJson().workflow.options.commitMessage === 'hive' ? projectJson().workflow.options : null))
     check("Pair (Hive merges) saved from the form, strict on: Hive merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity",!!options && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email,JSON.stringify(projectJson().workflow))
     await page.keyboard.press('Escape')
     const identity = options?.identity ?? fx.identity
