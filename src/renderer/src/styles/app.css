@@ -8211,7 +8211,8 @@ button.agent-place:hover {
   white-space: nowrap;
 }
 /* The chip as a grid here: the title's column (the third) is as wide as the title when there is room and nothing at
-   the least, so the chip shrinks down to its icon and key, never past them. */
+   the least, so the chip shrinks down to its icon and key, never past them. Its key stays whole by the base rule
+   (HI-2000); the grid is what lets the chip itself give way to the row. */
 .running-line .card-chip {
   flex: 0 1 auto;
   display: inline-grid;
@@ -8220,8 +8221,7 @@ button.agent-place:hover {
   min-width: auto;
   max-width: 100%;
 }
-.running-line .card-chip .codicon,
-.running-line .card-chip-number {
+.running-line .card-chip .codicon {
   white-space: nowrap;
 }
 .running-ctx {
@@ -8489,10 +8489,14 @@ button.agent-place:hover {
 }
 .card-chip .codicon {
   font-size: 12px;
+  flex-shrink: 0;
 }
+/* Its key stays whole on one line: only the title gives way (HI-2000: "HI-" over "1985" in a Journal entry's Links). */
 .card-chip-number {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .card-chip-title {
   overflow: hidden;
@@ -8502,6 +8506,8 @@ button.agent-place:hover {
 }
 .card-chip-more {
   color: var(--fg-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 /* In a pane header, the strip and the Assistant's overview the chip is its icon and number (+n), the titles on hover
    (#311): it keeps its size, and the agent's status gives way first. */
