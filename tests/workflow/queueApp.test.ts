@@ -2,7 +2,7 @@
 // advance under the repository lock with the lease checked inside it, a target checked out in a folder paused until
 // #1351, workflow rules turned off while an entry runs, and the card's ruleset over the project's options now.
 import { afterEach, describe, expect, it } from 'vitest'
-import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
+import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 
 let env: Env | null = null
@@ -78,7 +78,7 @@ describe('the merge queue in the app (#1348)', () => {
     expect(e.wf.state(card).stage).toBe('done')
   })
 
-  it('recovery per target: each host recovers only its own target\'s entries', async () => {
+  it('recovery per target: each host recovers only its own target\'s entries', { timeout: GIT_HEAVY_MS }, async () => {
     const e = team()
     detach(e)
     sh(e.project, 'branch', 'release', 'main')
