@@ -226,8 +226,12 @@ export function changesSince(card: TaskCard | null, base: Baseline & { since: st
   const out: WatchChange[] = []
   // Any move into the column counts, also for a watch that waits only to see it there (#521): a starting mark carried
   // over from a wake can say the card was there when it has left and come back since (told in Review, then Doing).
-  const moved = !!cond.column && h.some((e) => intoColumn(e.what) === cond.column)
-  if (kinds.has('column') && (now.column !== base.mark.column || moved) && (!cond.column || now.column === cond.column)) out.push('column')
+  // The watcher's own moves aren't news (HI-2015: a builder's submission moving its card into Review woke its watch):
+  // a column changed only by its moves since doesn't count, nor a move into the column of its own.
+  const moves = h.filter((e) => intoColumn(e.what))
+  const ownMoves = !!base.watcher && moves.length > 0 && moves.every((e) => e.by === base.watcher)
+  const moved = !!cond.column && h.some((e) => intoColumn(e.what) === cond.column && e.by !== base.watcher)
+  if (kinds.has('column') && ((now.column !== base.mark.column && !ownMoves) || moved) && (!cond.column || now.column === cond.column)) out.push('column')
   if (kinds.has('comment') && c.length) out.push('comment')
   if (kinds.has('verdict') && h.some((e) => VERDICT.test(e.what))) out.push('verdict')
   if (kinds.has('agent') && now.agent !== base.mark.agent) out.push('agent')

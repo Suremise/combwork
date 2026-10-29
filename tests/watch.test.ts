@@ -140,6 +140,23 @@ describe('what counts as a change', () => {
     expect(changesSince(sent, { ...base, watcher: undefined }, cond)).toEqual(['comment'])
   })
 
+  it("the watcher's own moves aren't news; another's are (HI-2015: a builder's submission moving its card into Review woke its watch)", () => {
+    const h = (m: number, what: string, by: string) => ({ at: at(m), by, what })
+    const doing = cardOf({ column: 'doing', agent: 'a1', history: [h(1, 'Moved to Doing', 'B (alpha)')], comments: [] })
+    const base = { mark: markOf(doing), seen: seenOf(doing), since: at(1), watcher: 'B (alpha)' }
+    const anyMove = { changes: ['verdict' as const, 'column' as const, 'comment' as const] }
+    const sent = { ...doing, column: 'review' as const, history: [...doing.history, h(2, 'Moved to Review', 'B (alpha)')] }
+    expect(changesSince(sent, base, anyMove)).toEqual([])
+    // Nor a move into the column it waits for, of its own.
+    expect(changesSince(sent, base, { changes: ['column'], column: 'review', moveInto: true })).toEqual([])
+    // Another's move counts: the reviewer's verdict sending it back, a move into Passed.
+    const back = { ...sent, column: 'passed' as const, history: [...sent.history, h(3, 'Review passed', 'R (alpha)'), h(3, 'Moved to Passed', 'R (alpha)')] }
+    expect(changesSince(back, base, anyMove)).toEqual(['column', 'verdict'])
+    expect(changesSince(back, base, { changes: ['column'], column: 'passed', moveInto: true })).toEqual(['column'])
+    // Without a watcher (the Assistant's watches), every move counts as before.
+    expect(changesSince(sent, { ...base, watcher: undefined }, anyMove)).toEqual(['column'])
+  })
+
   it("a reviewer's request and the user's decisions count for a watch that counts a verdict, a move or a comment; not for one waiting only for a column, nor the watcher's own (#1272, #912)", () => {
     const h = (m: number, what: string, by: string) => ({ at: at(m), by, what })
     const review = cardOf({ column: 'review', agent: 'a1', history: [h(1, 'Moved to Review', 'B (alpha)'), h(2, 'Started reviewing', 'R (alpha)')], comments: [{ at: at(1), by: 'B (alpha)', text: 'Round 1 ready' }] })
