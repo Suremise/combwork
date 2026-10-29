@@ -114,7 +114,8 @@ function initialize(def) {
     for (const [name, query, id] of [['guidance', 'guidance for agents', GUIDANCE], ['statusline', 'status line in place', 'claude-code.override.statusLine']]) {
       await search.fill(query)
       const row = page.locator(`.advanced-row[data-advanced="${id}"]`)
-      check(`Advanced lists ${id}, on`, !!(await lib.until(async () => (await row.count()) === 1, HUNG_MS)) && (await row.getByRole('switch').getAttribute('aria-checked')) === 'true')
+      // The list's values are the store's, refreshed by advanced:set's event after it returns (HI-1988): wait for the switch too.
+      check(`Advanced lists ${id}, on`, !!(await lib.until(async () => (await row.count()) === 1 && (await row.getByRole('switch').getAttribute('aria-checked')) === 'true', HUNG_MS)), await row.getByRole('switch').getAttribute('aria-checked', { timeout: 1000 }).catch((e) => e.message))
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
         await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme ?? document.body.className)).includes(theme), HUNG_MS)
