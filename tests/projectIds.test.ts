@@ -562,6 +562,30 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
     }
   })
 
+  // HI-2045 (HR2's round 1): deleted later, once `.hive` is there and before its folders and project.json are made, the
+  // project isn't made again either: each is made only inside a folder that is there.
+  it("a project deleted while it is being set up isn't made again by its folders or its project.json", async () => {
+    const wsPath = join(base, 'ws-deleted-in-setup')
+    project(wsPath, 'keep')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      const gone = join(wsPath, 'gone')
+      mkdirSync(gone)
+      // Its exclusion from git starts beside the folders: the project goes then, after `.hive` was made.
+      const exclude = w.ensureGitExclude.bind(w)
+      w.ensureGitExclude = async (p: string) => {
+        if (p.toLowerCase() === gone.toLowerCase()) rmSync(gone, { recursive: true, force: true })
+        else await exclude(p)
+      }
+      await expect(w.ensureProject(gone)).rejects.toMatchObject({ code: 'ENOENT' })
+      expect(existsSync(gone)).toBe(false)
+    } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
+
   /**
    * A workspace whose folder listings the test sets (`folders`), with every read of `gone`'s project.json held until
    * `release` (HR3's probe for HI-1668 round 1): the order reads list and settle in is the test's.
