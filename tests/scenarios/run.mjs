@@ -13,7 +13,8 @@
 // the environment at once (no checks failed, no cost), and so are the provider's other trials, said once (#302).
 //
 // More than five scenarios, or --repeat, waits for a test slot (tests/e2e/slots.mjs; --no-wait fails at once instead),
-// unless started inside an e2e suite, whose run holds one. A pre-merge run goes first in that queue (#558): --pre-merge,
+// unless started inside an e2e suite, whose run holds one: a few fake runs in all take the side slot, and a real
+// model's run of any size only a model trial's slot (HI-2070). A pre-merge run goes first in that queue (#558): --pre-merge,
 // or one started by the agent holding its project's merge slot. Every run waits for a test lane while all 10 are taken
 // (tests/e2e/lanes.mjs, #707; --no-wait fails at once instead).
 // --budget N (USD, API-equivalent, above 0, default 2) stops a model run once the scenarios so far cost that much, or
@@ -37,7 +38,7 @@ import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { devBuild, ensureBuild } from '../e2e/build.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from '../e2e/lanes.mjs'
-import { describeClaim, heavySlots, needsSlot, preMerge, waitForSlot, waitLine } from '../e2e/slots.mjs'
+import { preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from '../e2e/slots.mjs'
 import { waitForCodexHome } from '../e2e/codexHomeLock.mjs'
 import { autoClean } from '../e2e/clean.mjs'
 import { scenariosProgress, slotWaitProgress } from '../progressReport.mts'
@@ -108,32 +109,36 @@ if (notSignedIn) {
 
 const chosen = SCENARIOS.filter((s) => !only?.length || only.includes(s.id))
 // More than a few scenarios (or --repeat) is a heavy run: it waits for a test slot, as the e2e runner's do
-// (tests/e2e/slots.mjs), so runs on this machine don't slow each other until tests time out; not one started inside a
-// suite, whose parent holds a slot (needsSlot, #211). --no-wait: fail at once.
-if (needsSlot({ count: chosen.length, repeat: repeats })) {
-  const queue = slotWaitProgress('scenarios', `npm run scenarios -- ${argv.join(' ')}`.trim(), argv)
+// (tests/e2e/slots.mjs), so runs on this machine don't slow each other until tests time out; a few fake runs in all
+// take the side slot, else a heavy one. A real model's run (a model trial) takes none of those, only a model trial's
+// slot, whatever its size (HI-2070). Not one started inside a suite, whose parent holds a slot (slotPool, #211).
+// --no-wait: fail at once.
+const pool = slotPool({ kind: 'scenarios', count: chosen.length, repeat: repeats, provider })
+if (pool) {
+  const resource = pool === 'model' ? 'a model-trial slot' : 'a test slot'
+  const queue = slotWaitProgress('scenarios', `npm run scenarios -- ${argv.join(' ')}`.trim(), argv, resource)
   let said = ''
   const got = await waitForSlot(runContext.HEAVY_DIR, {
+    pool,
     what: `scenarios: ${chosen.length} (${provider})${repeats > 1 ? ` × ${repeats}` : ''}`,
     root: lib.ROOT,
     wait: !argv.includes('--no-wait'),
     first: preMerge(argv.includes('--pre-merge')),
     onWait: (look) => {
-      const who = look.holders.map((c) => describeClaim(c)).join('; ')
       const line = waitLine(look)
       if (line !== said) console.log(line)
       said = line
-      queue.waiting(who)
+      queue.waitingAs(waitSummary(look))
     }
   })
   if (got.refused) {
-    console.error(`No test slot free (--no-wait): ${heavySlots()} heavy runs at once on this machine, held by ${got.refused.holders.map((c) => describeClaim(c)).join('; ')}.`)
+    console.error(refusedLine(got.refused))
     process.exit(2)
   }
   if (said) {
     const after = `${Math.round(got.waitedMs / 1000)} s`
-    console.log(`Got a test slot after ${after}.`)
-    await queue.finish(`got a test slot after ${after}`)
+    console.log(`Got ${resource} after ${after}.`)
+    await queue.finish(`got ${resource} after ${after}`)
   }
 }
 

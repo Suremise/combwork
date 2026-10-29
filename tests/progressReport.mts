@@ -107,15 +107,17 @@ export function scenariosProgress(names: string[], provider: string, argv: strin
  * waiting (#549): no time left, a waiting bar, and the wait not counted against the wrapper's estimate. Nothing until
  * waiting(), and nothing with --no-progress.
  */
-export function slotWaitProgress(kind: string, command: string, argv: string[] = process.argv, resource = 'a test slot'): { waiting(holders: string): void; finish(summary: string): Promise<void> } {
-  if (!progressWanted(argv)) return { waiting() {}, finish: async () => {} }
+export function slotWaitProgress(kind: string, command: string, argv: string[] = process.argv, resource = 'a test slot'): { waiting(holders: string): void; waitingAs(line: string): void; finish(summary: string): Promise<void> } {
+  if (!progressWanted(argv)) return { waiting() {}, waitingAs() {}, finish: async () => {} }
   let run: ProgressRun | null = null
+  const show = (waiting: string): void => {
+    if (!run) run = new ProgressRun(progressTarget(), { title: `${kind}: waiting for ${resource}`, command, waiting }, { lines: wrappedLines() })
+    else run.update({ waiting })
+  }
   return {
-    waiting(holders: string) {
-      const waiting = `waiting for ${resource}: ${holders}`
-      if (!run) run = new ProgressRun(progressTarget(), { title: `${kind}: waiting for ${resource}`, command, waiting }, { lines: wrappedLines() })
-      else run.update({ waiting })
-    },
+    waiting: (holders: string) => show(`waiting for ${resource}: ${holders}`),
+    // The whole line, as the test slots word it (slots.mjs waitSummary, HI-2070: what is ahead, by whose run).
+    waitingAs: show,
     finish: async (summary: string) => {
       // Under hive-progress the wrapper's run goes on: it waits no more.
       run?.update({ waiting: '' })

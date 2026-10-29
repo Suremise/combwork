@@ -217,8 +217,21 @@ holds a slot and waiting behind it would never end. It still keeps apart from it
 parent's `nested` folder with ports above the parent's, a nested scenario run in a lane of its own). A heavy run that finds both slots taken waits for one,
 before it builds, in the order runs asked. It prints `Waiting for a test slot …: held by e2e: 68 suites in <worktree>
 (process …, 12 min)` and shows in the Progress panel as **e2e: waiting for a test slot** (or **scenarios: …**, **unit tests: …**), naming
-who holds them, until it gets one (`Got a test slot after N s`). So a run that seems stuck is usually waiting: that line
-says for whom. `--no-wait` fails at once instead (exit 2, saying who holds them).
+what is ahead of it by whose run (`waiting for a test slot (2 heavy runs ahead: HB6's scenarios: 151 (fake), HB4's e2e:
+4 suites × 5)`, HI-2070: the holders' runs, never this one's), until it gets one (`Got a test slot after N s`). So a run
+that seems stuck is usually waiting: that line says for whom. `--no-wait` fails at once instead (exit 2, saying who
+holds them).
+**Small runs take the side slot** (HI-2070). A heavy run within the small-run bound, `smallRun` in `config.json`
+(default: an e2e run of at most 3 suites repeated at most 3 times, or fake scenario runs of at most 5 in all, scenarios
+× repeats), is small: it takes the **side slot** when that is free (`sideSlots`, default 1), else a heavy slot, else it
+waits for whichever frees first. Heavy runs never take the side slot, so at most one small CPU run goes beside the two
+heavy ones. A focused unit run (named files) stays light and takes no slot, as before. So a flake proof of one suite × 3
+no longer waits behind a full scenario set. Held side slots are `side-<k>.json`.
+**Model trials have their own cap** (HI-2070). A scenario run on a real model (`--provider claude-code` or `codex`), of
+any size, is network-bound, not CPU-bound: it takes no CPU slot (heavy or side), only one of the model trials' own
+(`modelTrials`, default 2, `model-<k>.json`), which bounds API spend and Codex's account-wide rate window (429s). It
+waits only for another model trial (`Waiting for a model-trial slot (2 real-model trials at once on this machine,
+modelTrials): held by …`). An e2e or unit run it starts is a run of its own and asks for its own slot.
 **A pre-merge run goes first** (#558): one started in the session of the agent that holds its project's merge slot
 (the runner asks Hive's Agent API, with the session's `HIVE_API_URL`, token, `HIVE_PROJECT` and `HIVE_AGENT`, at its
 first look and every 30 s while it waits), or one with `--pre-merge` (either runner; for a merge's checks started
@@ -239,7 +252,8 @@ over from a session that ended: …`), so a resumed agent knows its earlier run 
 its results may still be wanted. Stop it by its process id (never by name), or with **Stop Them** in Hive's notice after
 an unexpected close, which ends the whole run.
 `npm run e2e:concurrency -- --heavy` checks it: three heavy runs from three worktrees with two slots (in a pool of their
-own, `HIVE_TEST_HEAVY_DIR`), one waiting visibly, `--no-wait`, a killed run's slot, a pre-merge run taking the slot
+own, `HIVE_TEST_HEAVY_DIR`, with no side slot), one waiting visibly, `--no-wait`, with both heavy slots held a small run
+taking the side slot while a heavy one is refused, a killed run's slot, a pre-merge run taking the slot
 before two that asked earlier (the stand-in Agent API says its agent holds the merge slot), and a killed pre-merge run's
 place.
 
@@ -254,7 +268,11 @@ run (the concurrency checker uses it); Hive doesn't pass it on to its sessions (
 run started with a higher number than the others can take a slot they are waiting for, so use the file for the
 machine's setting. If runs start failing after raising it, go back down. A pool of its own (`HIVE_TEST_HEAVY_DIR`) with
 a count of its own is for checking the queue itself (`npm run e2e:concurrency -- --heavy`), never for getting round
-it.
+it. The side slot and model trials are set beside it (HI-2070), read the same way:
+`{ "heavySlots": 2, "sideSlots": 1, "modelTrials": 2, "smallRun": { "e2eSuites": 3, "e2eRepeat": 3, "scenarioRuns": 5 } }`.
+`sideSlots` is a whole number from 0 (0: no side slot, small runs queue for the heavy slots); `modelTrials` and each of
+`smallRun`'s from 1; one left out, or one that isn't valid (said in a `Test slots: …` line), is its default.
+`HIVE_TEST_SIDE_SLOTS` and `HIVE_TEST_MODEL_TRIALS` override the first two for one run, as `HIVE_TEST_HEAVY_SLOTS` does.
 
 **Unit tests under load.** `npm test` uses half the cores (`maxWorkers: '50%'` in `vitest.config.ts`) and allows 20 s
 a test and 30 s a hook, so a full run beside an e2e set doesn't hit Vitest's 5 s default. A test that needs longer says

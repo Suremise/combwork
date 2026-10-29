@@ -8,7 +8,7 @@ import { join } from 'path'
 import type { TestProject } from 'vitest/node'
 import { slotWaitProgress } from './progressReport.mts'
 // @ts-expect-error: plain .mjs modules without types
-import { describeClaim, isFullUnitRun, preMerge, waitForSlot, waitLine } from './e2e/slots.mjs'
+import { isFullUnitRun, preMerge, waitForSlot, waitLine, waitSummary } from './e2e/slots.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { parentSuite } from './e2e/runner.mjs'
 
@@ -28,7 +28,7 @@ export default async function setup(project: TestProject): Promise<(() => void) 
       const line = waitLine(look)
       if (line !== said) console.log(line)
       said = line
-      queue.waiting(look.holders.map((h) => describeClaim(h)).join('; '))
+      queue.waitingAs(waitSummary(look))
     }
   })
   if (said) {

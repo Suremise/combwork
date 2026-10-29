@@ -20,7 +20,8 @@
 // on the machine neither wait for it nor make it wait): three heavy runs (a repeat) started at once from three
 // worktrees with two slots. Checked: two run and the third waits, saying so (and in the Progress panel, through a
 // stand-in for Hive's Agent API), then starts when a slot is let go; no more than two hold slots at any moment; all
-// pass; a run with --no-wait while the slots are taken fails at once, saying who holds them; the slot of a run that
+// pass; a run with --no-wait while the slots are taken fails at once, saying who holds them; with both heavy slots
+// held, a small run takes the side slot and a heavy run is refused (HI-2070: no side slot in the rest); the slot of a run that
 // is killed is taken by the next run without waiting; a pre-merge run (its agent holds the merge slot, as the stand-in
 // says) takes the only slot before two runs that asked earlier, and a killed pre-merge run's place expires (#558); and
 // with the only slot held by a parent run, a heavy scenario run started inside its suite runs without asking for one
@@ -194,7 +195,8 @@ async function heavyRound(k, worktrees) {
     })
   })
   await new Promise((r) => api.listen(0, '127.0.0.1', r))
-  const env = { HIVE_TEST_HEAVY_DIR: pool, HIVE_TEST_HEAVY_SLOTS: '2', HIVE_API_URL: `http://127.0.0.1:${api.address().port}`, HIVE_API_TOKEN: 'agent-token' }
+  // No side slot (HI-2070): these runs are small (two suites, twice), and queue for the heavy slots as heavy runs do.
+  const env = { HIVE_TEST_HEAVY_DIR: pool, HIVE_TEST_HEAVY_SLOTS: '2', HIVE_TEST_SIDE_SLOTS: '0', HIVE_API_URL: `http://127.0.0.1:${api.address().port}`, HIVE_API_TOKEN: 'agent-token' }
   const slots = () => (existsSync(pool) ? readdirSync(pool).filter((f) => /^slot-\d+\.json$/.test(f)).length : 0)
   const waiting = () => (existsSync(pool) ? readdirSync(pool).filter((f) => f.startsWith('wait-')).length : 0)
   // Heavy by repeating: two quick suites, twice.
@@ -218,10 +220,28 @@ async function heavyRound(k, worktrees) {
     const row = reports.findIndex((x) => x.method === 'POST' && x.url === '/v1/progress' && x.body.title === 'e2e: waiting for a test slot')
     const id = `r${row + 1}`
     // What it waits for is the run's `waiting` (#549), set as it starts and updated while it waits.
-    const named = reports.some((x) => ((x.method === 'POST' && reports.indexOf(x) === row) || (x.method === 'PATCH' && x.url === `/v1/progress/${id}`)) && /waiting for a test slot: .*e2e: 2 suites × 2/.test(x.body.waiting ?? ''))
+    // Named as what is ahead of it (HI-2070), never as if the holders' run were its own.
+    const named = reports.some((x) => ((x.method === 'POST' && reports.indexOf(x) === row) || (x.method === 'PATCH' && x.url === `/v1/progress/${id}`)) && /^waiting for a test slot \(2 heavy runs ahead: .*e2e: 2 suites × 2/.test(x.body.waiting ?? ''))
     const ended = reports.some((x) => x.url === `/v1/progress/${id}/finish` && x.body.ok === true && /got a test slot after/.test(x.body.summary ?? ''))
     check('…and showed in the Progress panel as waiting, naming who held the slots, until it got one', row >= 0 && named && ended, JSON.stringify(reports.filter((x) => /waiting|slot/.test(JSON.stringify(x.body))).slice(0, 4)))
     check('every slot is let go at the end', slots() === 0 && waiting() === 0, readdirSync(pool).join(', '))
+
+    // The side slot (HI-2070): with both heavy slots held (by this checker), a small run takes the side slot without
+    // waiting, while a heavy run (more than three suites' repeats) is refused at once: it never takes the side slot.
+    const sided = { ...env, HIVE_TEST_SIDE_SLOTS: '1' }
+    const gates = [await trySlot(pool, { slots: 2, owner: process.pid, what: 'the checker, 1', root }), await trySlot(pool, { slots: 2, owner: process.pid, what: 'the checker, 2', root })]
+    try {
+      let sideHeld = false
+      const sideWatch = setInterval(() => (sideHeld ||= existsSync(pool) && readdirSync(pool).some((f) => /^side-\d+\.json$/.test(f))), 50)
+      const small = await start({ name: 'small run', cwd: root, script: 'tests/e2e/run.mjs', args: [...args.slice(0, -1), '--no-wait'], env: sided })
+      clearInterval(sideWatch)
+      check('a small run takes the side slot while two heavy runs hold theirs, and passes', gates.every((g) => g.slot !== undefined) && sideHeld && small.code === 0 && !/Waiting for a test slot/.test(small.out), `heavy slots ${gates.map((g) => g.slot)}, side held ${sideHeld}, exit ${small.code}: ${small.out.trim().split('\n').at(-1)}`)
+      const big = await start({ name: 'heavy run', cwd: root, script: 'tests/e2e/run.mjs', args: ['isolation', 'about', '--repeat', '4', '--no-wait'], env: sided })
+      check('…while a heavy run never takes the side slot: refused at once, with the side slot free', big.code === 2 && /No test slot free \(--no-wait\): 2 heavy runs at once/.test(big.out) && big.ms < 15_000, `exit ${big.code} in ${big.ms} ms: ${big.out.trim().split('\n').at(-1)}`)
+    } finally {
+      for (const g of gates) rmSync(join(pool, `slot-${g.slot}.json`), { force: true })
+    }
+    check('…and every slot is let go', existsSync(pool) && !readdirSync(pool).some((f) => /^(slot|side|model)-\d+\.json$/.test(f)), readdirSync(pool).join(', '))
 
     // A run killed while it holds a slot: with one slot, the next run takes it without waiting.
     let child

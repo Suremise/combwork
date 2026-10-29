@@ -60,7 +60,7 @@ export const KEPT = {
   'build-locks': "the worktrees' build locks",
   concurrency: "the concurrency checker's folders (it removes its own)",
   'progress-timings.json': "the Progress panel's suite timings",
-  'config.json': "the machine's test settings (heavySlots, slots.mjs CONFIG_FILE, #589)"
+  'config.json': "the machine's test settings (heavySlots, sideSlots, modelTrials, smallRun: slots.mjs CONFIG_FILE, #589, HI-2070)"
 }
 
 /**
