@@ -681,7 +681,7 @@ async function quitNow(tellUser: boolean): Promise<void> {
  */
 async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
   const entries = hiveWindows()
-  const global = config.settings.general.onQuit
+  const global = config.settings.commands
   if (!quitRunsAny(entries.map((e) => e.ws), global)) return
   // When Hive quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
   // No timer: each window's saving step shows, and its Don't wait is the user's (Darren's decision, 28 Oct ~14:15).

@@ -41,7 +41,8 @@ import { openExternalTerminal } from './externalTerminal'
 import { hiveWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchOf, unusedBranchStatus, unusedWorktrees } from './unusedWorktrees'
 import { branchMergeStatus, lineCard, lineConfirmed, mergeBranch, mergeBranches } from './branchMerge'
 import { createLogger, logsDir, userText } from './logger'
-import { closeCommandState, closeWithCommand, dismiss, dontWait } from './closeCommand/closeCommands'
+import { closeCommandsRun, closeCommandState, closeWithCommand, controlRun, dismiss, dontWait, runByHand, runOpenCommands } from './closeCommand/closeCommands'
+import { cleanHive, cleanWorkspace } from '../shared/commands'
 import { diagnostics } from './diagnostics'
 import { resumeAfterClose, startupStep, stopLeftAfterClose } from './lastRun'
 import { dismissOffered, resumeOffered, workspaceRecovering } from './restartResume'
@@ -417,6 +418,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
   // Each time a workspace opens: Hive's bundled skills and modes it hasn't got, or has untouched older copies of.
   // After the open, not before it (HI-1705): a launch waits for it.
   WorkspaceService.bringItemsUpToDate = (fresh) => syncBundled({ fresh })
+  WorkspaceService.runsCommands = closeCommandsRun
   // Each part in the background, timed in the open's "after opening" line (HI-1705).
   WorkspaceService.onOpened = async (_fresh, after) => {
     const ws = workspace
@@ -428,6 +430,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     void after.track('builds left for it', pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Hive', e))) // i18n-ignore: a part of a log line's timing
     // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
     void after.track('leftovers', sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))) // i18n-ignore: a part of a log line's timing
+    // Its open point's commands (HI-1954), in its window, its agents held until they're done (the gate reserved as it opened).
+    void after.track('open commands', runOpenCommands(contextWorkspace()!)) // i18n-ignore: a part of a log line's timing
     // Moved since it was last opened (#146)? In the background: the window opens meanwhile, and a banner follows.
     void after.track('whether it moved', checkMoved(contextWorkspace()!).catch((e) => log.warn('checking whether the workspace moved', e))) // i18n-ignore: a part of a log line's timing
     // A merge slot an agent held when Hive closed: its merge may be half done (#350).
@@ -470,14 +474,21 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'closeCommand:state': () => closeCommandState(win()),
     'closeCommand:dontWait': (id) => dontWait(win(), String(id)),
     'closeCommand:dismiss': (id) => dismiss(win(), String(id)),
-    'closeCommand:setWorkspace': async (setting) => {
+    'closeCommand:control': (id, action, step, attempt) => controlRun(win(), String(id), action, step, attempt),
+    // Only the user sets them, from the window (HI-1954, as HI-1368's): the Assistant proposes, the user confirms.
+    'commands:setWorkspace': async (commands) => {
       const ws = currentWorkspace()
-      // Only the user sets it, from the window (HI-1368): never the Agent API (SENSITIVE).
-      const onClose = { command: typeof setting?.command === 'string' ? setting.command.slice(0, 4000) : '', onUpdate: setting?.onUpdate === true }
-      await ws.saveWorkspaceConfigWith(() => ({ onClose }))
+      const saved = cleanWorkspace(commands)
+      await ws.saveWorkspaceConfigWith(() => ({ commands: saved }))
       ws.scheduleRefresh()
-      return onClose
+      return saved
     },
+    'commands:setHive': (commands) => {
+      const saved = cleanHive(commands)
+      config.updateSettings({ commands: saved })
+      return saved
+    },
+    'commands:run': (ref) => runByHand(win(), currentWorkspace(), ref),
     'app:quitState': () => quitControl.state(win()),
     'app:openExternal': (url) => {
       if (/^https?:\/\//i.test(url) || url.startsWith('mailto:')) void shell.openExternal(url)

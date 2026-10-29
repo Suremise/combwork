@@ -21,7 +21,9 @@ import type {
   ArchiveRequest,
   ArchiveResult,
   CloseCommandRun,
-  CloseCommandSetting,
+  CommandRef,
+  CommandsHive,
+  CommandsWorkspace,
   UnarchiveResult,
   BoardFold,
   UpdateState,
@@ -179,8 +181,14 @@ export interface HiveRequests {
   'closeCommand:dontWait': (id: string) => void
   /** The panel's Close, on a failed close command: Hive goes on. */
   'closeCommand:dismiss': (id: string) => void
-  /** Settings → Workspace → When this workspace closes, run (HI-1368): saved in workspace.json; returns it as saved. */
-  'closeCommand:setWorkspace': (setting: CloseCommandSetting) => CloseCommandSetting
+  /** The panel's choice on a failed command (HI-1954), for that step's attempt only: a stale or repeated one does nothing. */
+  'closeCommand:control': (id: string, action: 'rerun' | 'skip' | 'stop', step: number, attempt: number) => void
+  /** Settings → Commands at the workspace's level (HI-1954): its commands and its open and close points, saved in workspace.json; returns them as saved. Only the user's window sets them. */
+  'commands:setWorkspace': (commands: CommandsWorkspace) => CommandsWorkspace
+  /** Settings → Commands at Hive's level (HI-1954): Hive's commands and When Hive quits, run; returns them as saved. */
+  'commands:setHive': (commands: CommandsHive) => CommandsHive
+  /** Runs one command by hand in this window (HI-1954): its panel, as a point's, with one step. */
+  'commands:run': (ref: CommandRef) => void
   /** Current quit state, for a window that reloads while a quit dialog or pending quit is open. */
   'app:quitState': () => { request: QuitSession[] | null; unsaved: string[]; scope: QuitScope; pending: boolean; working: number }
   'app:openExternal': (url: string) => void

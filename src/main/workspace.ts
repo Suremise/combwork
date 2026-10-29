@@ -17,6 +17,7 @@ import { ASSISTANT_OTHER_MCP, advancedDef, checkAdvanced } from '../shared/advan
 import { advanced } from './advanced'
 import { fmt, msg, tr } from '../shared/i18n'
 import { MIGRATED_CLOSE, migrateWorkspaceCommands } from '../shared/commands'
+import { OpenGate } from './openGate'
 import { HiveError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
 import { config } from './config'
@@ -251,6 +252,10 @@ export class WorkspaceService {
   closing = false
   /** Repair… of a move is running (#146): no agent starts meanwhile, as it would find paths half repaired. */
   repairingMove = false
+  /** Its open point's commands running as it opened (HI-1954): while held, no agent of it starts. */
+  openGate: OpenGate | null = null
+  /** Whether this Hive runs the user's commands (never a test copy, but for the suites' seam): set by ipc.ts. */
+  static runsCommands: () => boolean = () => false
   /** Moved since last opened, with something to repair (#146, workspaceMove.ts); the window's banner offers Repair…. */
   private moved: WorkspaceMoved | null = null
   /** The projects' ids (#508) as last read, for the folder list they were read for (`key`), and a read under way. */
@@ -405,6 +410,9 @@ export class WorkspaceService {
     const fresh = !existsSync(join(abs, HIVE_DIR))
     await this.ensureWorkspaceStructure()
     this.wsConfig = loadedConfig(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}))
+    // Its open point's commands hold its agents back until they are done (HI-1954): reserved here, before anything hears
+    // of the open (the recent list, workspace-changed, onOpened), so no start slips in ahead of them.
+    this.openGate = this.wsConfig.commands?.onOpen.run.length && WorkspaceService.runsCommands() ? new OpenGate(this.generation, this.life.signal) : null
     const last = this.wsConfig.lastPath
     this.movedFrom = last && resolve(last).toLowerCase() !== abs.toLowerCase() ? resolve(last) : null
     config.update((c) => {

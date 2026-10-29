@@ -5,7 +5,7 @@
 // Node built-ins only: it runs outside the asar (hive-close-runner.js).
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync } from 'fs'
 import { join } from 'path'
-import { fillCommand, type CommandValues } from '../../shared/commands'
+import { CONTROL_MS, fillCommand, OBSERVER_STALE_MS, type CommandValues } from '../../shared/commands'
 import { nodeDeps, runJob, type RunnerDeps, type RunStatus } from './runner'
 
 /** A step as the run's snapshot holds it: the command's template and its folder's, as saved when the run began. */
@@ -70,12 +70,7 @@ export interface ListControl {
   values?: CommandValues
 }
 
-/** How often the runner looks for a control while a failure waits. */
-export const CONTROL_MS = 250
-/** Hive touches the run's `observer` file this often while it watches. */
-export const OBSERVE_MS = 5000
-/** An `observer` older than this: nobody watches, and a failure waiting for a choice is settled as unattended. */
-export const OBSERVER_STALE_MS = 30_000
+export { OBSERVER_STALE_MS }
 
 /** What the list's runner needs besides runJob's: reading the run's folder, and waiting. */
 export interface ListDeps extends RunnerDeps {

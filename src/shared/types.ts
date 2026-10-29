@@ -928,6 +928,27 @@ export interface CloseCommandRun {
   failure?: 'drain' | 'spawn' | 'runner'
   /** The error, for 'spawn' (the system's text). */
   error?: string
+  /** Which point runs it (HI-1954): a workspace opening or closing, Hive quitting, or by hand. */
+  point?: 'open' | 'close' | 'quit' | 'manual'
+  /** Its commands, in the order they run (HI-1954); `command`, `lines` and `exitCode` above are the current step's. */
+  steps?: CloseCommandStep[]
+  /**
+   * A failed step waiting for the user's choice (HI-1954): Rerun, Skip it and continue, Stop here, the controls bound to
+   * its step and attempt. `needed`: "The commands after this need it" is ticked, so Stop here leads.
+   */
+  awaiting?: { step: number; attempt: number; needed: boolean } | null
+}
+
+/** A step of a run as its panel shows it (HI-1954). */
+export interface CloseCommandStep {
+  name: string
+  state: 'waiting' | 'running' | 'ok' | 'failed' | 'skipped'
+  exitCode: number | null
+  /** Why it failed with no exit code: a placeholder or folder it couldn't use, or the command not starting. */
+  failure?: 'placeholder' | 'folder' | 'spawn'
+  detail?: string
+  startedAt?: string
+  endedAt?: string
 }
 
 /**

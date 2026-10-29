@@ -15,6 +15,13 @@ export type PointName = 'onOpen' | 'onClose' | 'onQuit'
 export const MIGRATED_CLOSE = msg({ id: 'commands.migrated.close', defaultMessage: 'Close command', description: "The name Hive gives the command the user had in Settings → Workspace → When this workspace closes, run, as it becomes one of the workspace's named commands (HI-1954). The user can rename it." })
 export const MIGRATED_QUIT = msg({ id: 'commands.migrated.quit', defaultMessage: 'Quit command', description: "The name Hive gives the command the user had in Settings → General → When Hive quits, run, as it becomes one of Hive's named commands (HI-1954). The user can rename it." })
 
+/** How often a list's runner looks for a control while a failure waits (main/closeCommand/listRunner.ts). */
+export const CONTROL_MS = 250
+/** Hive touches a list's `observer` file this often while it watches its run. */
+export const OBSERVE_MS = 5000
+/** An `observer` older than this: nobody watches, and a failure waiting for a choice is settled as unattended. */
+export const OBSERVER_STALE_MS = 30_000
+
 export const MAX_NAME = 100
 export const MAX_COMMAND = 4000
 export const MAX_FOLDER = 1000

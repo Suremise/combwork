@@ -4,8 +4,10 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { open, rename, rm } from 'original-fs/promises'
 import { basename, join } from 'path'
 import { closeCommandOf, fillCloseCommand } from '../../shared/closeCommand'
-import type { CloseCommandSetting, CloseReason } from '../../shared/types'
+import type { CloseCommandSetting, CloseReason, CommandPoint, CustomCommand } from '../../shared/types'
 import type { RunStatus } from './runner'
+import type { ListJob, ListStatus, ListStep } from './listRunner'
+import { resolvePoint, type CommandReason } from '../../shared/commands'
 
 // HI-1368: a close command's run, as Hive starts and follows it. Hive starts the runner (hive-close-runner.js) detached,
 // with no pipe to it; the runner starts the command and keeps its folder's status.json and tail.txt (runner.ts). Hive
@@ -33,6 +35,20 @@ export function runsCloseCommands(env: NodeJS.ProcessEnv, packaged: boolean): bo
   const testProfile = !!env.HIVE_USER_DATA || env.HIVE_TEST_QUIET === '1'
   if (!testProfile) return true
   return !packaged && env.HIVE_TEST_RUN_ON_CLOSE === '1'
+}
+
+/**
+ * A point's commands as a run's steps (HI-1954): each command its point picks, in order, as saved now (its template:
+ * placeholders are filled as each step runs), or why none runs. A ref to a command no longer there is left out, and
+ * said in `gone`.
+ */
+export function planList(point: CommandPoint | null | undefined, lists: { hive: readonly CustomCommand[]; workspace?: readonly CustomCommand[] }, reason: CommandReason, o: { runs: boolean }): { steps: ListStep[]; gone: number } | { skip: Skip } {
+  const resolved = point ? resolvePoint(point, lists) : []
+  const steps = resolved.flatMap(({ command: c }) => (c ? [{ name: c.name, command: c.command, folder: c.folder ?? '', needed: !!c.needed }] : []))
+  if (!steps.length) return { skip: 'none' }
+  if (!o.runs) return { skip: 'test' }
+  if (reason === 'update' && point?.onUpdate !== true) return { skip: 'update' }
+  return { steps, gone: resolved.length - steps.length }
 }
 
 /** The command to run for a close, its placeholders filled in, or why none runs. */
@@ -70,7 +86,7 @@ export interface StartDeps {
  * Starts the runner for a command in a new folder under `root`: detached, hidden, with no pipe to Hive (so nothing of
  * it breaks when Hive stops waiting or exits). Throws as spawn does; a later failure shows in the folder (no status).
  */
-export function startRun(root: string, folder: string, command: string, cwd: string, deps: StartDeps): string {
+export function startRun(root: string, folder: string, command: string | ListJob, cwd: string, deps: StartDeps): string {
   mkdirSync(root, { recursive: true })
   // A folder of its own, made exclusively: two runs started in the same millisecond never share one (round 1, finding 2).
   let dir = ''
@@ -83,7 +99,7 @@ export function startRun(root: string, folder: string, command: string, cwd: str
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
     }
   }
-  writeFileSync(join(dir, 'job.json'), JSON.stringify({ command, cwd }))
+  writeFileSync(join(dir, 'job.json'), JSON.stringify(typeof command === 'string' ? { command, cwd } : command))
   const spawn = deps.spawn ?? nodeSpawn
   const child = spawn(deps.exec, [deps.script, dir], { cwd, env: { ...deps.env, ELECTRON_RUN_AS_NODE: '1' }, detached: true, windowsHide: true, stdio: 'ignore' })
   child.on('error', () => undefined)
@@ -97,6 +113,24 @@ export function startRun(root: string, folder: string, command: string, cwd: str
 export interface RunRead {
   status: RunStatus | null
   lines: string[]
+}
+
+/** A list's run as Hive reads it (HI-1954): its status (null: none yet, or unreadable) and its current step's last lines. */
+export interface ListRead {
+  status: ListStatus | null
+  lines: string[]
+}
+
+/** Reads a list's run: its status, and the last lines of the step that runs (or last ran) now. */
+export async function readList(dir: string): Promise<ListRead> {
+  let status: ListStatus | null = null
+  try {
+    status = JSON.parse(readFileSync(join(dir, 'status.json'), 'utf8')) as ListStatus
+  } catch {
+    // Not written yet, or being replaced this instant: the next read has it.
+  }
+  const step = status ? [...status.steps].reverse().find((s) => s.dir && s.state !== 'waiting') : undefined
+  return { status, lines: step?.dir ? await tailLines(join(step.dir, 'tail.txt')) : [] }
 }
 
 /** Reads a run's status and the end of its tail, at most READ_TAIL_BYTES of it, never the whole file. */

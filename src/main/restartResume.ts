@@ -18,6 +18,7 @@ import { listLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { allTasks } from './tasks'
+import { onGateSettled } from './openGate'
 import { inWorkspace, openWorkspaces, workspaceOf, type WorkspaceService } from './workspace'
 
 /**
@@ -351,6 +352,9 @@ export function stopRestartRecovery(): void {
 const recoveries = new Map<string, Promise<unknown>>()
 const recovered = new Set<string>()
 
+// A workspace's open commands done, or let go (HI-1954): what waited for them is admitted now.
+onGateSettled(() => pump())
+
 /**
  * A workspace opening (ipc.ts' onOpened): its merge slots' recovery, which a resume waits for, as the unexpected-close
  * notice does. Its entries are admitted once it has settled and the workspace's first read is done.
@@ -377,7 +381,8 @@ const openWorkspaceOf = (e: RestartEntry): WorkspaceService | undefined => openW
  */
 const readyWorkspaceOf = (e: RestartEntry): WorkspaceService | undefined => {
   const ws = openWorkspaceOf(e)
-  return ws?.path && ws.info() && recovered.has(placeKey(ws.path)) ? ws : undefined
+  // Not while its open commands hold its agents back (HI-1954): the gate settling pumps again.
+  return ws?.path && ws.info() && recovered.has(placeKey(ws.path)) && !ws.openGate?.held ? ws : undefined
 }
 
 /** Whether a launch is still live (by its runId). */
