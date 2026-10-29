@@ -77,7 +77,7 @@ async function shots(inv, page, name) {
 
   const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47705), HIVE_TEST_RUN_ON_CLOSE: '1' } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
-  await lib.openWorkspace(inv, other, other)
+  await lib.openWorkspace(inv, page, other)
   const agent = await lib.addAgent(inv, path.join(ws, 'alpha'), { name: 'Builder' }).catch(() => null)
   /** An agent's start as the Agent API or a lane would ask: why it was refused, or null. */
   const startRefusal = (projectPath, agentId) => inv('session:start', projectPath, { agentId }).then(() => null, (e) => String(e?.message ?? e))
@@ -130,6 +130,7 @@ async function shots(inv, page, name) {
   fs.writeFileSync(wsFile, JSON.stringify({ version: 1, commands: commandsFor([ids.long, ids.seed]) }))
   void openWs()
   check("opened with Long first: the dialog, running, with Don't wait", !!(await lib.until(async () => (await dialog(page, 'running').count()) === 1, HUNG_MS)) && ((await page.locator('.close-command .dialog-footer').textContent()) ?? '').includes("Don't wait"))
+  check('…Long shown running, its command under it', !!(await lib.until(async () => (await page.locator('.close-command-step[data-state="running"]').count()) === 1 && (await page.locator('.close-command-step .close-command-text').count()) > 0, HUNG_MS)))
   await shots(inv, page, 'running')
   await page.locator('.close-command .dialog-footer button', { hasText: "Don't wait" }).click()
   check("Don't wait: the dialog goes", !!(await lib.until(async () => (await anyDialog(page).count()) === 0, HUNG_MS)))

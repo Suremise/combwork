@@ -180,7 +180,7 @@ export async function runList(dir: string, job: ListJob, deps: ListDeps = nodeLi
       s.startedAt = deps.now().toISOString()
       delete s.endedAt
       save()
-      const ok = await runAttempt(dir, i, step, s, values, job.home, deps, baseEnv)
+      const ok = await runAttempt(dir, i, step, s, values, job.home, deps, baseEnv, save)
       s.endedAt = deps.now().toISOString()
       s.state = ok ? 'ok' : 'failed'
       save()
@@ -229,7 +229,7 @@ export async function runList(dir: string, job: ListJob, deps: ListDeps = nodeLi
 }
 
 /** One attempt of a step: its placeholders and folder checked first (nothing malformed runs), then runJob. */
-async function runAttempt(dir: string, i: number, step: ListStep, s: StepState, values: CommandValues, home: string, deps: ListDeps, baseEnv: NodeJS.ProcessEnv): Promise<boolean> {
+async function runAttempt(dir: string, i: number, step: ListStep, s: StepState, values: CommandValues, home: string, deps: ListDeps, baseEnv: NodeJS.ProcessEnv, save: () => void): Promise<boolean> {
   const command = fillCommand(step.command, values)
   const folder = fillCommand(step.folder, values)
   const missing = [...new Set([...command.missing, ...folder.missing])]
@@ -252,6 +252,8 @@ async function runAttempt(dir: string, i: number, step: ListStep, s: StepState, 
   } catch {
     // runJob's writes say so if it can't write there.
   }
+  // Its command and folder in the list's status as it starts: Hive's dialog shows them, and finds its output there.
+  save()
   const r: RunStatus = await runJob(sub, { command: command.text, cwd }, deps, baseEnv)
   if (r.state === 'spawnFailed') {
     s.failure = 'spawn'

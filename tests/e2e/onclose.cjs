@@ -110,7 +110,7 @@ async function shots(page, name) {
   check('the commands are saved as given', savedA.list?.[0]?.command === command('a-switch', `wait:${goA}`) && savedA.onClose?.run?.length === 1, JSON.stringify(savedA))
   // The settings rows (Settings still open from step 0): the command's dialog says what it will run here, filled in.
   await page.locator('.settings-nav .row[data-section="workspace"]').click()
-  await page.locator('[data-setting="workspace.commands"] .commands-row', { hasText: 'Close' }).getByTitle('Edit…').click()
+  await page.locator('[data-setting="workspace.commands"] .commands-row', { hasText: 'Close' }).getByRole('button', { name: 'Edit…' }).click()
   const preview = page.locator('.dialog .close-command-preview')
   check('Settings shows exactly what it will run here', !!(await lib.until(async () => ((await preview.textContent().catch(() => '')) ?? '').includes(`"${wsA}" `), HUNG_MS)), await preview.textContent().catch(() => ''))
   await preview.scrollIntoViewIfNeeded()
@@ -118,7 +118,7 @@ async function shots(page, name) {
   await page.locator('.dialog button', { hasText: 'Cancel' }).click()
   // Hive's command, in Settings → General: its preview, run by hand here.
   await page.locator('.settings-nav .row[data-section="general"]').click()
-  await page.locator('[data-setting="general.commands"] .commands-row', { hasText: 'Quit' }).getByTitle('Edit…').click()
+  await page.locator('[data-setting="general.commands"] .commands-row', { hasText: 'Quit' }).getByRole('button', { name: 'Edit…' }).click()
   const quitPreview = page.locator('.dialog .close-command-preview')
   check('…and a command of Hive\'s, its own', !!(await lib.until(async () => ((await quitPreview.textContent().catch(() => '')) ?? '').includes('global manual -'), HUNG_MS)), await quitPreview.textContent().catch(() => ''))
   await quitPreview.scrollIntoViewIfNeeded()
@@ -128,7 +128,7 @@ async function shots(page, name) {
   await inv('tasks:create', { title: 'Made as the workspace closed', project: 'alpha' })
   let switched = false
   const switching = lib.openWorkspace(inv, page, wsB, HUNG_MS * 2).then(() => (switched = true))
-  check('switching: the panel is up, with its spinner and the command', !!(await lib.until(async () => (await panel(page, 'running').count()) === 1, HUNG_MS)) && (await page.locator('.close-command .spin').count()) > 0 && ((await page.locator('.close-command-text').textContent()) ?? '').includes('a-switch switch'))
+  check('switching: the panel is up, with its spinner and the command', !!(await lib.until(async () => (await panel(page, 'running').count()) === 1, HUNG_MS)) && (await page.locator('.close-command .spin').count()) > 0 && !!(await lib.until(async () => ((await page.locator('.close-command-text').first().textContent().catch(() => '')) ?? '').includes('a-switch switch'), HUNG_MS)))
   check("…its output's last lines", !!(await lib.until(async () => /step \d+/.test((await page.locator('.close-command-output').textContent().catch(() => '')) ?? ''), HUNG_MS)))
   check('…and the window waits for it: still on the old workspace', !switched && (await page.evaluate(() => document.title)).includes(path.basename(wsA)))
   // Keyboard-modal (HR6's round 1, finding 4): Tab stays in the panel, a shortcut reaches nothing behind it, Escape
