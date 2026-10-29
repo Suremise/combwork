@@ -1,4 +1,4 @@
-// What follows a card's Done (HI-2014, SPEC §16.4.6): the `finish` action every move into Done writes (workflow/finish.ts)
+// What follows a card's Done (HI-2014, SPEC §16.4.7): the `finish` action every move into Done writes (workflow/finish.ts)
 // runs one handler, whatever the route. Its steps are independent, each kept to once where its effect is made:
 // - requests: the card's asked questions closed (`FinishStep` `requests`, in whose write closeSettled closes them) and
 //   the Hive Assistant's unread asks on the card cancelled (cancelling one twice cancels nothing);

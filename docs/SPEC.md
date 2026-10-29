@@ -1803,6 +1803,40 @@ these moments).
 - The rule is part of review and approval (on whenever a reviewer or the user checks the work) and can't be switched
   off apart from them [P1].
 
+#### 16.4.7 Done: one finish path
+
+A card reaches Done by several routes: the merge queue, a builder's merge report (checked, or under Not checked), the
+user's move with an override, the Assistant's with the user's reason, a no-code card's acceptance (or Accept's), a hand
+merge reconciliation finds, and a plain board move (rules off, no workflow). Every one of them ends the same way
+(HI-2014): the move into Done records one `Finished` fact, in the move's own transaction, and one durable `finish`
+action, and everything that follows a Done hangs off that action, never off the route.
+
+- **What it records.** `how` (`queue`, `reported`, `unchecked`, `accepted`, `override`, `board`), `verified` (the merge
+  commit the target was found to hold, the cycle's `Integrated` result, else null) and, under Not checked, `claimed`
+  (the result the builder reported: a claim, never read as containment), with an override's `by` and `reason`. Out of
+  Done, the finish is over; Done again is another finish.
+- **What follows, each once** (`FinishStep` facts, keyed by the finish):
+  - *Requests*: the card's open questions closed (as any write in Done closes them), and the Hive Assistant's unread
+    requests on it cancelled. Hive's own requests stay (a merge stopped part way, a dirty slot below).
+  - *Dependents*: an override's Done counts as accepted for the cards that depend on it (Darren's option A), so they
+    start without its work in the target; each is told so by a comment of Hive's, once. Any other Done counts as before:
+    accepted, or its work found in the target (an unchecked claim never counts).
+  - *The slot and the line*: the project's slot pass, from what is on disk each time. The card's lease ends (a lane's
+    stays while the lane runs); a slot still on the card's line is **detached at its target's head** when clean (a
+    released one as the pool looks at it, before it is lent again; a running lane's by the pass), so the line is no
+    longer checked out and, once its target contains it, is deleted (§16.10.1). Committed work that isn't merged stays
+    on its line, which is kept. **Uncommitted changes** keep the slot on its line: the user is asked once on the card
+    (For you, Hive's own gate `slotDirty`), and the question closes once the slot is clean (then detached) or another
+    lease's. A lane's next card waits while its finished card's slot is in that state.
+  - *The lane*: read again (one whose cards are all Done ends).
+  - Watches on the card end or fire as every board change makes them; stalls are read from the column.
+- **Put back and an abandoned lane** aren't finishes: their slot is released and detached the same way, its line kept,
+  and nothing else follows (no acceptance, no dependents).
+- **Recovery.** A finish's steps are run after its commit and again as its workspace opens, for each Done card whose
+  current finish still owes one; each step finds what was done (its fact, the comment's id, the slot as it is). A step
+  whose finish is over is recorded as superseded and does nothing. The old `releaseSlot` and `endLaneIfDone` actions
+  keep their own meaning when an older one is still pending.
+
 ### 16.5 Stages, categories and the piece library
 
 #### 16.5.1 Categories

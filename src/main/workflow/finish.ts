@@ -1,4 +1,4 @@
-// The one finish path (HI-2014, SPEC §16.4.6): every move into Done, whatever made it (the merge queue, a builder's merge
+// The one finish path (HI-2014, SPEC §16.4.7): every move into Done, whatever made it (the merge queue, a builder's merge
 // report, an override, a no-code card's acceptance, a plain board move), records one `Finished` fact and one durable
 // `finish` action in the transaction of the move, and everything that follows a card's Done hangs off that action
 // (finishPath.ts): its slot, its line, its dependents, its lane, its requests. A route can't skip it: the runtime's
