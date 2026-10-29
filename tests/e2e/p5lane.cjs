@@ -402,6 +402,8 @@ const ancestor = (x, y) => {
     const lc = await startLane(laneC)
     check('lane C is started from the board', !!lc, JSON.stringify(await inv('lanes:list')))
     await retoken()
+    // Once its slot is recorded, as lanes A and B: lane B's end lets the builder's slot go to it (HI-2027).
+    check("lane C's slot is recorded", !!(await waitHung(async () => (await laneNow(lc?.id))?.slot ?? null)), JSON.stringify(await laneNow(lc?.id)))
     const s6 = await start(c6)
     check("Six starts in lane C's slot, on its line", s6.s.status === 200 && !!s6.line, JSON.stringify(s6))
     const six = commit('six.txt')
