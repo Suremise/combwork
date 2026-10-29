@@ -454,7 +454,9 @@ const prose = (seed, n) => {
   const longReply = prose(8, 7000)
   entry({ type: 'assistant', requestId: 'req_long_end', message: { model: 'claude-fake', content: [{ type: 'text', text: longReply }], usage: { input_tokens: 1, output_tokens: 1 } } })
   await lib.sleep(500)
-  const activity = JSON.parse(measure('hive_agent_activity', tool('hive_agent_activity', { project: 'alpha', agent: 'Coder' }, 'assistant'), 1800))
+  // 1900 (HI-1996): its model and effort added, a slow round told from a throttled one.
+  const activity = JSON.parse(measure('hive_agent_activity', tool('hive_agent_activity', { project: 'alpha', agent: 'Coder' }, 'assistant'), 1900))
+  check('activity: the model and effort it runs with (the fake reports neither: its CLI’s default)', activity.model === 'default' && activity.effort === 'default' && !('retryWaits' in activity), JSON.stringify({ model: activity.model, effort: activity.effort, retryWaits: activity.retryWaits }))
   const detail = JSON.parse(measure('hive_agent_activity (detail)', tool('hive_agent_activity', { project: 'alpha', agent: 'Coder', detail: true }, 'assistant'), 8500))
   const shortOk = activity.toolCalls === 12 && activity.recentTools.length === 3 && activity.currentTask.length <= 301 && activity.latestReply.length <= 501 && activity.recentTools.every((t) => t.summary.length <= 101)
   check('activity: the short form is clipped as described (300, 500, last 3 calls at 100)', shortOk, JSON.stringify({ calls: activity.toolCalls, tools: activity.recentTools?.length, task: activity.currentTask?.length, reply: activity.latestReply?.length }))

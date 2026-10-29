@@ -59,6 +59,7 @@
   "panes.footer.handOverWhen": "{when, select, now {Traspásalo a una conversación nueva: haz clic para Traspasar a… y elige el propio agente.} other {Puede traspasar a una conversación nueva cuando haya terminado: no mientras trabaja, fusiona o está en una tarjeta de un ciclo de tarjetas.}}",
   "panes.footer.modelTip": "{chosenAs, select, none {} other {{model} · elegido como {chosenAs}. }}{effort, select, yes {Modelo y esfuerzo} other {Modelo}} de {provider} {live, select, yes {de esta sesión} other {para las sesiones nuevas}}{reported, select, yes { (el esfuerzo según lo informa la sesión)} other {}}. Se cambian en {where}.",
   "panes.footer.reading": "Leyendo el uso de esta conversación…",
+  "panes.footer.retryWaited": "Esta sesión ha esperado {minutes, plural, =0 {menos de un minuto} one {# minuto} other {# minutos}} en total a que {provider} reintentara solicitudes limitadas o fallidas ({waits, plural, one {# espera} other {# esperas}}, la última desde las {time}{ongoing, select, yes {, aún esperando} other {}}): tiempo que no dedicó a su trabajo.",
   "panes.footer.settingsName": "Configuración del agente o configuración del proyecto",
   "panes.footer.stale": "No se pudo volver a leer ahora mismo: puede estar desactualizado.",
   "panes.footer.tasks": "{n, plural, one {# tarea en segundo plano} many {# tareas en segundo plano} other {# tareas en segundo plano}}",

@@ -59,6 +59,7 @@
   "panes.footer.handOverWhen": "{when, select, now {把它交接给新对话：点击打开“交接给…”，并选择该智能体自己。} other {它可以在完成后交接给新对话：工作、合并或在卡片循环的卡片上时不行。}}",
   "panes.footer.modelTip": "{chosenAs, select, none {} other {{model} · 选择的是 {chosenAs}。}}{live, select, yes {此会话的} other {新会话的}} {provider} {effort, select, yes {模型和推理强度} other {模型}}{reported, select, yes {（推理强度以会话报告为准）} other {}}。可在{where}中更改。",
   "panes.footer.reading": "正在读取此对话的用量…",
+  "panes.footer.retryWaited": "此会话总共等待了 {minutes, plural, =0 {不到 1 分钟} other {# 分钟}}，等 {provider} 重试被限速或失败的请求（{waits, plural, other {# 次等待}}，最近一次从 {time} 开始{ongoing, select, yes {，仍在等待} other {}}）：这段时间没有用于工作。",
   "panes.footer.settingsName": "“智能体设置”或“项目设置”",
   "panes.footer.stale": "刚才无法重新读取：数据可能不是最新的。",
   "panes.footer.tasks": "{n, plural, other {# 个后台任务}}",

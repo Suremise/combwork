@@ -82,7 +82,7 @@ import { emit, emitTo, onHiveEvent, tellListeners, toast } from './events'
 import { presentWindow, showOsNotification, testNotifyLog, testQuiet } from './testQuiet'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
-import { COMPACTING_TEXT, HOOKS_MISSING_NOTE, retryWaitCurrent } from '../shared/runtime'
+import { COMPACTING_TEXT, HOOKS_MISSING_NOTE, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
 import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
 import { memoModel, memoTools, memoTurn, noteSafeguard, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
 import { admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
@@ -889,6 +889,13 @@ function autoName(projectPath: string, agent: Pick<AgentDef, 'name'>, count: num
 const taskMinutes = (): number => backgroundTaskMinutes(config.settings.agents.backgroundTaskMinutes)
 
 const liveId = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}#${agentId}`
+
+/** Its retry wait over (HI-1972), kept in the launch's tally of them (HI-1996: retryWaited) before it is cleared. */
+function endRetryWait(st: LiveSessionState, now = Date.now()): void {
+  if (!st.retryWait) return
+  st.retryWaited = addRetryWaited(st.retryWaited, st.retryWait, now)
+  st.retryWait = undefined
+}
 
 /** What a start asks for. */
 export interface StartOptions {
@@ -2425,6 +2432,7 @@ class SessionManager {
     // Checked after the last await, just before spawning: stopped, its workspace closed or switched, or the
     // provider turned off while this launch was being prepared, it must not start a process.
     if (l.stopRequested || this.live.get(id) !== l || this.starting.get(id)?.cancelled || !workspaceFor(projectPath) || this.shuttingDown || workspaceFor(projectPath)?.closing) throw hiveError(M.stoppedBeforeStart)
+    state.launchedWith = { model: ctx.model ?? null, effort: ctx.effort ?? null }
     state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models, local: conn.server.local } } : {}) } : undefined
     if (conn?.server && state.sessionId) (l.serverSids ??= new Set()).add(state.sessionId)
     if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name }, { kind: 'conflict' })
@@ -5666,7 +5674,7 @@ class SessionManager {
     }
     // Its CLI is heard from again (HI-1972): whatever it waited to retry has gone on.
     else if (took.verdict !== 'stale' && st.retryWait) {
-      st.retryWait = undefined
+      endRetryWait(st, at)
       this.emitState(st)
     }
     // What the ledger made of it, for the Hooks dialog (HI-982), apart from Hive's reply: an ignored hook may have had one.
@@ -5755,7 +5763,7 @@ class SessionManager {
     const turn: LiveSessionState['turn'] = !a ? undefined : unknown ? { state: 'unknown', ...(a.id ? { id: a.id } : {}), silentSince: new Date(unknown.since).toISOString() } : { state: a.state === 'running' ? 'running' : 'over', ...(a.id ? { id: a.id } : {}) }
     // A retry wait (HI-1972) is its turn's: gone with it, when it ends or another begins.
     const retryGone = !!st.retryWait && (!a || a !== l.retryTurn || a.state !== 'running')
-    if (retryGone) st.retryWait = undefined
+    if (retryGone) endRetryWait(st)
     if (!retryGone && JSON.stringify(turn) === JSON.stringify(st.turn)) return
     st.turn = turn
     this.emitState(st)
@@ -5851,7 +5859,7 @@ class SessionManager {
     const now = Date.now()
     // A wait past (a pushed one too: HI-1973's Copilot, whose adapter has nothing to look at) is cleared here.
     if (st.retryWait && !retryWaitCurrent(st.retryWait, now)) {
-      st.retryWait = undefined
+      endRetryWait(st, now)
       this.emitState(st)
     }
     if (!l.adapter.retryWait || !l.launchEnv) return

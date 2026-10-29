@@ -26,6 +26,7 @@ const ws = path.join(lib.WORK, 'turnledger-ws')
 const claudeHome = path.join(lib.WORK, 'turnledger-claude-home')
 const codexHome = path.join(lib.WORK, 'turnledger-codex-home')
 const proj = path.join(ws, 'alpha')
+const API_PORT = lib.port(47870)
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -49,7 +50,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47870), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_SILENT_MS: String(SILENT_MS) })
+  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: API_PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_SILENT_MS: String(SILENT_MS) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -173,6 +174,17 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(codexHome, 'fake-retried-Codex'), '')
   const over = await is(codex, 'finished', 'over')
   check('its retry going through clears it: the turn ends as usual', !!over && !over.retryWait, JSON.stringify(over?.retryWait))
+  // HI-1996: afterwards, the wait is in the launch's tally: hive_agent_activity says how long it waited, with the model and
+  // effort it runs with, and the footer model's hover says it too.
+  const activityOf = async (name) => {
+    const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
+    const res = await fetch(`http://127.0.0.1:${API_PORT}/v1/projects/alpha/agents/${name}/activity`, { headers: { Authorization: `Bearer ${token}` } })
+    return res.json()
+  }
+  const act = await activityOf('Codex')
+  check('hive_agent_activity: the wait it had, its model and effort', act.retryWaits?.waits === 1 && act.retryWaits.latest?.status === 429 && act.retryWaits.latest.tries === 1 && !act.retryWaits.latest.ongoing && act.retryWaits.latest.since === waiting.retryWait.since && typeof act.retryWaits.seconds === 'number' && typeof act.model === 'string' && act.model.length > 0 && typeof act.effort === 'string', JSON.stringify({ retryWaits: act.retryWaits, model: act.model, effort: act.effort }))
+  const footTip = await lib.hoverTip(page, page.locator('.agent-pane').filter({ has: header }).locator('.pane-footer-bar .foot-model'), (t) => /This session has waited/.test(t))
+  check("the footer model's hover says how long this session waited for retries", /This session has waited (under a minute|\d+ minutes?) in all for Codex to retry rate-limited or failed requests \(1 wait, the latest from .+\): time not spent on its work\./.test(footTip), footTip)
 
   // HI-1973: Claude Code's 429 tries, recorded only in its transcript, no hook while it waits: read after its quiet while
   // (5 s here), its pane says it is rate-limited, which try of how many and when it retries; its next hook clears it.
