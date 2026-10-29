@@ -61,6 +61,11 @@ describe('the settings catalog', () => {
         if (!ids.has('providers.defaultProvider')) missing.push(section)
         continue
       }
+      // The user's commands (HI-1954): read as their lists and points (general.commands, general.onQuit), not field by field.
+      if (section === 'commands') {
+        for (const id of ['general.commands', 'general.onQuit']) if (!ids.has(id)) missing.push(id)
+        continue
+      }
       if (section === 'providers') {
         for (const p of PROVIDERS) {
           // A setting the provider's capabilities don't give it has no row (Codex has no 200K switch, nor a cost source: it reports no cost).
@@ -150,18 +155,20 @@ describe('the settings catalog', () => {
     expect(entry('assistant.control').readOnly).toMatch(/only the user can change it, in Settings → Assistant → Control/)
   })
 
-  it('keeps the close commands to the user (HI-1368): sensitive, and the tools read the command but never set it', () => {
-    for (const id of ['workspace.onClose', 'general.onQuit']) {
+  it("keeps the user's commands to the user (HI-1368, HI-1954): sensitive, and the tools read their names but never set them", () => {
+    for (const id of ['general.commands', 'general.onQuit', 'workspace.commands', 'workspace.onOpen', 'workspace.onClose']) {
       expect(entry(id).sensitive, id).toBe(true)
-      expect(entry(id).readOnly, id).toMatch(/It is a command Hive runs as a workspace closes or Hive quits: only the user can change it/)
+      expect(entry(id).readOnly, id).toMatch(/Its commands run on this machine by themselves or by hand: the user saves them, the Assistant may only propose/)
       expect(settingKind(entry(id)), id).toBeNull()
-      expect(entry(id).docs, id).toBe('close-commands')
-      expect(settingDefault(entry(id)), id).toBe('')
+      expect(entry(id).docs, id).toBe(id.endsWith('commands') ? 'commands' : 'close-commands')
+      expect(settingDefault(entry(id)), id).toEqual([])
     }
-    const settings = { ...DEFAULT_SETTINGS, general: { ...DEFAULT_SETTINGS.general, onQuit: { command: ' backup.cmd ', onUpdate: true } } }
-    expect(settingValue(entry('general.onQuit'), settings)).toBe('backup.cmd')
-    expect(settingValue(entry('workspace.onClose'), settings, null, { onClose: { command: 'sync.cmd "{workspace}"', onUpdate: false } })).toBe('sync.cmd "{workspace}"')
-    expect(settingValue(entry('workspace.onClose'), settings, null, {})).toBe('')
+    const settings = { ...DEFAULT_SETTINGS, commands: { list: [{ id: 'c-0000000a', name: 'Backup', command: 'backup.cmd' }], onQuit: { run: [{ scope: 'hive' as const, id: 'c-0000000a' }], onUpdate: true } } }
+    expect(settingValue(entry('general.commands'), settings)).toEqual(['Backup'])
+    expect(settingValue(entry('general.onQuit'), settings)).toEqual(['Backup'])
+    const ws = { commands: { list: [{ id: 'c-0000000b', name: 'Serve', command: 'serve' }], onOpen: { run: [{ scope: 'workspace' as const, id: 'c-0000000b' }, { scope: 'hive' as const, id: 'c-0000000a' }, { scope: 'hive' as const, id: 'c-0000000c' }] }, onClose: { run: [] } } }
+    expect(settingValue(entry('workspace.onOpen'), settings, null, ws)).toEqual(['Serve', 'Backup', '(deleted)'])
+    expect(settingValue(entry('workspace.onClose'), settings, null, {})).toEqual([])
   })
 
   it('keeps buttons, statuses and lists of things out of the values the tools set; keybindings are read-only', () => {

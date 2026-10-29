@@ -2,6 +2,7 @@
   "errors.assistantUndo.gone": "Diese Änderung des Assistenten wird nicht mehr aufbewahrt: Änderungen werden 7 Tage lang aufbewahrt.",
   "errors.assistantUndo.which": "Wähle eine Änderung des Assistenten zum Rückgängigmachen oder die Änderungen einer Nachricht.",
   "errors.changes.notFile": "{file} ist keine Datei in {folder}.",
+  "errors.commands.otherWorkspace": "Dieses Fenster zeigt jetzt einen anderen Arbeitsbereich, daher wurden die Befehle, die du geändert hast, nicht gespeichert.",
   "errors.console.hidden": "Die Entwicklerkonsole ist ausgeblendet: Schalte „Entwicklerfunktionen anzeigen“ unter Einstellungen → Erweitert ein.",
   "errors.console.notRecording": "Keine Aufzeichnung der Entwicklerkonsole",
   "errors.console.notSource": "Keine Quelle der Entwicklerkonsole, die dieses Fenster aufzeichnen kann",

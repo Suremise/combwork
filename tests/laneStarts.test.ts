@@ -6,6 +6,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { claudeInput } from './claudeInputStandIn'
 
 // What Hive types into agents' terminals, recorded instead (no process runs).
 const pty = vi.hoisted(() => ({ typed: [] as string[] }))
@@ -49,7 +50,10 @@ function builder(status: string, id = 'b1'): { status: string } {
     enumerable: true
   })
   state.status = status
-  s.live.set(`${p.toLowerCase()}#${id}`, { state, adapter: claudeCode, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
+  // Its input box (HI-1979: Hive types into Claude Code only once its own key shows the box empty), fed what is typed.
+  const input = claudeInput({ paste: false })
+  input.from(() => pty.typed)
+  s.live.set(`${p.toLowerCase()}#${id}`, { state, adapter: claudeCode, screen: input.screen, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
   return state as unknown as { status: string }
 }
 
@@ -62,7 +66,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.hive'), { recursive: true })
     mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -202,5 +206,103 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     expect((await lanes.getLane(w, l2.id)).state).toBe('active')
     await checkLaneStarts(w)
     expect(await columnOf(b2)).toBe('doing')
+  })
+
+  describe('a lane reordered now (HI-1995; the project with a workflow, as the case above left it)', () => {
+    /** A lane on builder `b` of `titles`, its first card Active (started by its builder), its builder idle. */
+    async function inFlight(b: string, titles: string[]) {
+      const cards: number[] = []
+      for (const t of titles) cards.push(await card(t, b))
+      const lane = (await lanes.startLane(w, { project: 'alpha', builder: b, reviewer: 'r1', cards, by: 'B (alpha)' })).lane
+      await run(() => tasks.updateTask(cards[0], { column: 'doing', agent: b }, user))
+      const st = builder('ready', b)
+      return { cards, lane, st }
+    }
+    const runningOf = async (b: string) => (await lanes.listLanes(w)).filter((l) => l.builder.id === b && (l.state === 'active' || l.state === 'paused'))
+    /** After the put back's own write, `then` runs (another decision on the lane), once: the seam between the two steps. */
+    async function afterPutBack(then: () => Promise<void>) {
+      const { Workflow } = await import('../src/main/workflow/runtime')
+      const original = Workflow.prototype.putBack
+      let ran = false
+      const spy = vi.spyOn(Workflow.prototype, 'putBack').mockImplementation(async function (this: InstanceType<typeof Workflow>, ref, actor, args) {
+        const reply = await original.call(this, ref, actor, args)
+        if (!ran && 'ok' in reply && reply.ok) {
+          ran = true
+          await then()
+        }
+        return reply
+      })
+      return { ran: () => ran, restore: () => spy.mockRestore() }
+    }
+
+    it('puts the card in flight back (its line kept) and applies the new order at once; its builder is told', async () => {
+      const { cards: [x1, x2], lane } = await inFlight('b9', ['X one', 'X two'])
+      const r = await lanes.startLane(w, { project: 'alpha', builder: 'b9', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })
+      expect(r.note).toContain('Applied now: ')
+      expect(r.note).toContain('is back in Todo')
+      expect(await columnOf(x1)).toBe('todo')
+      expect(r.lane.id).toBe(lane.id)
+      expect(r.lane.cards.map((c) => c.number)).toEqual([x2, x1])
+      expect(r.lane.queued).toBeNull()
+      // Told in its inbox (a rebrief), as the doorbell typed into it says.
+      expect(pty.typed.join('')).toContain('New in your inbox')
+    })
+
+    it('refuses while its builder is in a turn, or its card is in Review, changing nothing', async () => {
+      const { cards: [x1, x2], st } = await inFlight('d1', ['W one', 'W two'])
+      st.status = 'working'
+      await expect(lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })).rejects.toThrow(/D1 is working: a reorder applied now never puts its card back under it/)
+      expect(await columnOf(x1)).toBe('doing')
+      expect((await lanes.laneOf(w, 'alpha', 'd1'))!.cards.map((c) => c.number)).toEqual([x1, x2])
+    })
+
+    it('with its card in flight still first, it changes nothing: the list is queued behind that card as ever', async () => {
+      const { cards: [x1, x2, x3] } = await inFlight('d2', ['Y one', 'Y two', 'Y three'])
+      const r = await lanes.startLane(w, { project: 'alpha', builder: 'd2', reviewer: 'r1', cards: [x1, x3, x2], by: 'the user', applyNow: true })
+      expect(r.note ?? '').not.toContain('Applied now')
+      expect(r.lane.queued).toEqual([x1, x3, x2])
+      expect(await columnOf(x1)).toBe('doing')
+    })
+
+    it("a lane ended, replaced or changed between the put back and the edit: the edit is refused, the newer decision kept, nothing resumed or recreated (Darren's decision)", async () => {
+      // Ended (abandoned) in between: no lane runs for its builder afterwards; the put back stays, and says so.
+      const { cards: [a1, a2], lane: ended } = await inFlight('d3', ['E one', 'E two'])
+      const end = await afterPutBack(async () => {
+        await lanes.endLane(w, ended.id, { abandoned: true })
+      })
+      try {
+        await expect(lanes.startLane(w, { project: 'alpha', builder: 'd3', reviewer: 'r1', cards: [a2, a1], by: 'the user', applyNow: true })).rejects.toThrow(/was put back in Todo .*but the lane was ended meanwhile: its list wasn't changed and nothing was started/)
+        expect(end.ran()).toBe(true)
+        expect(await runningOf('d3')).toEqual([])
+        expect(await columnOf(a1)).toBe('todo')
+      } finally {
+        end.restore()
+      }
+      // Replaced in between by a newer lane of the same builder: that lane keeps its cards, and is the only one running.
+      const { cards: [b1, b2], lane: old } = await inFlight('d4', ['R one', 'R two'])
+      const b3 = await card('R three', 'd4')
+      let newer: string | null = null
+      const replace = await afterPutBack(async () => {
+        await lanes.endLane(w, old.id, { abandoned: true })
+        newer = (await lanes.startLane(w, { project: 'alpha', builder: 'd4', reviewer: 'r1', cards: [b3], by: 'a newer start' })).lane.id
+      })
+      try {
+        await expect(lanes.startLane(w, { project: 'alpha', builder: 'd4', reviewer: 'r1', cards: [b2, b1], by: 'the user', applyNow: true })).rejects.toThrow(/the lane was ended meanwhile/)
+        expect((await runningOf('d4')).map((l) => [l.id, l.cards.map((c) => c.number)])).toEqual([[newer, [b3]]])
+      } finally {
+        replace.restore()
+      }
+      // Its list changed in between: refused, the newer list kept.
+      const { cards: [c1, c2, c3], lane: changed } = await inFlight('d5', ['C one', 'C two', 'C three'])
+      const change = await afterPutBack(async () => {
+        await lanes.startLane(w, { project: 'alpha', builder: 'd5', reviewer: 'r1', cards: [c3, c1, c2], by: 'a newer change' })
+      })
+      try {
+        await expect(lanes.startLane(w, { project: 'alpha', builder: 'd5', reviewer: 'r1', cards: [c2, c1, c3], by: 'the user', applyNow: true })).rejects.toThrow(/the lane's list changed meanwhile: this list wasn't applied/)
+        expect((await lanes.getLane(w, changed.id)).cards.map((c) => c.number)).toEqual([c3, c1, c2])
+      } finally {
+        change.restore()
+      }
+    })
   })
 })

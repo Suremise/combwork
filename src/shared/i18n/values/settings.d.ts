@@ -701,12 +701,35 @@ interface HiveMessageValues {
   'settings.chime.soft': undefined
   'settings.closeCommand.command': undefined
   'settings.closeCommand.hint': undefined
-  'settings.closeCommand.noWorkspace': undefined
   'settings.closeCommand.onUpdate': undefined
   'settings.closeCommand.runs': { command: string | number }
   'settings.closeCommand.saveFailed': undefined
   'settings.columnColors.pick': { column: string | number }
   'settings.columnColors.reset': { column: string | number }
+  'settings.commands.add': undefined
+  'settings.commands.cancel': undefined
+  'settings.commands.cantFill': { placeholders: string | number }
+  'settings.commands.delete': undefined
+  'settings.commands.down': undefined
+  'settings.commands.edit': undefined
+  'settings.commands.empty': undefined
+  'settings.commands.folder': undefined
+  'settings.commands.gone': undefined
+  'settings.commands.hiveBadge': undefined
+  'settings.commands.name': undefined
+  'settings.commands.needed': undefined
+  'settings.commands.neededBadge': undefined
+  'settings.commands.noWorkspace': undefined
+  'settings.commands.placeholders': undefined
+  'settings.commands.pointAdd': undefined
+  'settings.commands.pointEmpty': undefined
+  'settings.commands.pointRemove': undefined
+  'settings.commands.run': undefined
+  'settings.commands.runFailed': undefined
+  'settings.commands.save': undefined
+  'settings.commands.titleEdit': undefined
+  'settings.commands.titleNew': undefined
+  'settings.commands.up': undefined
   'settings.connections.add.addServer': undefined
   'settings.connections.add.addSignIn': undefined
   'settings.connections.add.adding': undefined
@@ -807,6 +830,9 @@ interface HiveMessageValues {
   'settings.general.closeToTray.desc': undefined
   'settings.general.closeToTray.tip': undefined
   'settings.general.closeToTray.title': undefined
+  'settings.general.commands.desc': undefined
+  'settings.general.commands.tip': undefined
+  'settings.general.commands.title': undefined
   'settings.general.confirmOnQuit.desc': undefined
   'settings.general.confirmOnQuit.option.always': undefined
   'settings.general.confirmOnQuit.option.never': undefined
@@ -1342,12 +1368,18 @@ interface HiveMessageValues {
   'settings.workspace.antivirus.desc': undefined
   'settings.workspace.antivirus.tip': undefined
   'settings.workspace.antivirus.title': undefined
+  'settings.workspace.commands.desc': undefined
+  'settings.workspace.commands.tip': undefined
+  'settings.workspace.commands.title': undefined
   'settings.workspace.hiddenProjects.desc': undefined
   'settings.workspace.hiddenProjects.tip': undefined
   'settings.workspace.hiddenProjects.title': undefined
   'settings.workspace.onClose.desc': undefined
   'settings.workspace.onClose.tip': undefined
   'settings.workspace.onClose.title': undefined
+  'settings.workspace.onOpen.desc': undefined
+  'settings.workspace.onOpen.tip': undefined
+  'settings.workspace.onOpen.title': undefined
   'settings.workspace.storage.desc': undefined
   'settings.workspace.storage.tip': undefined
   'settings.workspace.storage.title': undefined

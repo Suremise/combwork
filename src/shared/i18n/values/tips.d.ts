@@ -178,6 +178,8 @@ interface HiveMessageValues {
   'tips.copyDiagnostics.title': undefined
   'tips.ctrlCvToCli.text': undefined
   'tips.ctrlCvToCli.title': undefined
+  'tips.customCommands.text': undefined
+  'tips.customCommands.title': undefined
   'tips.dateFormat.text': { date: string | number; time: string | number }
   'tips.dateFormat.title': undefined
   'tips.defaultProvider.text': undefined
@@ -248,6 +250,8 @@ interface HiveMessageValues {
   'tips.isolatedChecks.title': undefined
   'tips.keepAwake.text': undefined
   'tips.keepAwake.title': undefined
+  'tips.laneApplyNow.text': undefined
+  'tips.laneApplyNow.title': undefined
   'tips.laneBranchSquash.text': undefined
   'tips.laneBranchSquash.title': undefined
   'tips.laneGates.text': undefined

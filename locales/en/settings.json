@@ -2799,10 +2799,6 @@
     "defaultMessage": "Hive waits for it, showing it running. A command that shouldn't hold Hive up can start its job and return, e.g. start \"\" \"backup.cmd\".",
     "description": "A hint under the close command in Settings. start \"\" \"backup.cmd\" is a Windows command (cmd.exe starts the file and returns at once): keep it as it is."
   },
-  "settings.closeCommand.noWorkspace": {
-    "defaultMessage": "Open a workspace to set its close command.",
-    "description": "Settings → Workspace → When this workspace closes, run, with no workspace open."
-  },
   "settings.closeCommand.onUpdate": {
     "defaultMessage": "Also when Hive restarts to install an update",
     "description": "A checkbox under the close command (Settings → Workspace → When this workspace closes, run, and Settings → General → When Hive quits, run): run it too when Hive restarts to install an update (by default it is skipped then)."
@@ -2822,6 +2818,102 @@
   "settings.columnColors.reset": {
     "defaultMessage": "Reset {column} to its default",
     "description": "Button beside a board column's colour: puts back its default colour. {column} is the column's name."
+  },
+  "settings.commands.add": {
+    "defaultMessage": "Add Command…",
+    "description": "A button under Settings → Commands (HI-1954): opens the dialog to name a new command."
+  },
+  "settings.commands.cancel": {
+    "defaultMessage": "Cancel",
+    "description": "The command dialog's button (HI-1954)."
+  },
+  "settings.commands.cantFill": {
+    "defaultMessage": "{placeholders} can't be filled here: it won't run",
+    "description": "A warning beside a command a point runs (HI-1954): placeholders in it have no value at that point (for example {workspace} as Hive quits), so Hive won't run it there. {placeholders} lists them as written."
+  },
+  "settings.commands.delete": {
+    "defaultMessage": "Delete",
+    "description": "A button beside one of the user's commands in Settings → Commands (HI-1954): deletes it, and takes it off this level's points."
+  },
+  "settings.commands.down": {
+    "defaultMessage": "Move down",
+    "description": "A button beside a command in a list (Settings → Commands, or a point such as When this workspace opens, run; HI-1954)."
+  },
+  "settings.commands.edit": {
+    "defaultMessage": "Edit…",
+    "description": "A button beside one of the user's commands in Settings → Commands (HI-1954)."
+  },
+  "settings.commands.empty": {
+    "defaultMessage": "No commands yet.",
+    "description": "Settings → Commands (HI-1954), when the list is empty."
+  },
+  "settings.commands.folder": {
+    "defaultMessage": "Folder (empty: the workspace folder)",
+    "description": "A field of the command dialog (HI-1954): the folder the command runs in; empty, the workspace's folder (the user's home folder for Hive's quit point)."
+  },
+  "settings.commands.gone": {
+    "defaultMessage": "(deleted)",
+    "description": "A command a point still names but which was deleted (HI-1954): it is skipped."
+  },
+  "settings.commands.hiveBadge": {
+    "defaultMessage": "Hive",
+    "description": "A short tag beside a command in a workspace's point (HI-1954): one of Hive's own commands (Settings → General → Commands), not the workspace's."
+  },
+  "settings.commands.name": {
+    "defaultMessage": "Name",
+    "description": "A field of the command dialog (HI-1954): the command's name, as lists and Hive's dialog show it."
+  },
+  "settings.commands.needed": {
+    "defaultMessage": "The commands after this need it",
+    "description": "A checkbox of one of the user's commands (HI-1954): when it fails, Hive's dialog leads with Stop here, and when nobody is waiting, the commands after it don't run."
+  },
+  "settings.commands.neededBadge": {
+    "defaultMessage": "needed by the next",
+    "description": "A short tag beside a command in Settings → Commands (HI-1954) whose \"The commands after this need it\" is ticked."
+  },
+  "settings.commands.noWorkspace": {
+    "defaultMessage": "Open a workspace to set its commands.",
+    "description": "Settings → Workspace's commands and its open and close points (HI-1954), with no workspace open."
+  },
+  "settings.commands.placeholders": {
+    "defaultMessage": "cmd.exe runs it. '{workspace}' becomes the workspace's folder, '{name}' its name, '{reason}' why it runs (open, window, switch, quit, update or manual), and '{project:api}' the folder of the project api. Quote them where a path may hold spaces.",
+    "description": "A hint in the command dialog (HI-1954). '{workspace}', '{name}', '{reason}' and '{project:api}' are placeholders the user writes in the command (api is an example project name), and open, window, switch, quit, update and manual are the values {reason} becomes: keep all of them as they are (the quotes around them keep them from being read as placeholders here)."
+  },
+  "settings.commands.pointAdd": {
+    "defaultMessage": "Add a command to run here…",
+    "description": "A drop-down under a point such as \"When this workspace opens, run\" (HI-1954): picks one of the commands to run there, after those already picked."
+  },
+  "settings.commands.pointEmpty": {
+    "defaultMessage": "Nothing runs.",
+    "description": "A point such as \"When this workspace opens, run\" (HI-1954) with no command picked."
+  },
+  "settings.commands.pointRemove": {
+    "defaultMessage": "Don't run it here",
+    "description": "A button beside a command a point runs (HI-1954): takes it off that point; the command itself stays."
+  },
+  "settings.commands.run": {
+    "defaultMessage": "Run it now",
+    "description": "A button beside one of the user's commands in Settings → Commands (HI-1954): runs it now, by hand, in Hive's commands dialog."
+  },
+  "settings.commands.runFailed": {
+    "defaultMessage": "Couldn't run the command",
+    "description": "An error's title: running one of the user's commands by hand failed to start (why follows; HI-1954)."
+  },
+  "settings.commands.save": {
+    "defaultMessage": "Save",
+    "description": "The command dialog's button (HI-1954)."
+  },
+  "settings.commands.titleEdit": {
+    "defaultMessage": "Edit a Command",
+    "description": "The title of the dialog that edits one of the user's commands (Settings → Commands, HI-1954)."
+  },
+  "settings.commands.titleNew": {
+    "defaultMessage": "Add a Command",
+    "description": "The title of the dialog that names a new command (Settings → Commands, HI-1954)."
+  },
+  "settings.commands.up": {
+    "defaultMessage": "Move up",
+    "description": "A button beside a command in a list (Settings → Commands, or a point such as When this workspace opens, run; HI-1954)."
   },
   "settings.connections.add.addServer": {
     "defaultMessage": "Add",
@@ -3223,6 +3315,18 @@
     "defaultMessage": "Close to tray",
     "description": "A setting's title (Settings → General)."
   },
+  "settings.general.commands.desc": {
+    "defaultMessage": "Your own commands for Hive as a whole: run one by hand (here, or Run Command in the command palette), or pick them for When Hive quits, run, or for any workspace's open and close.",
+    "description": "What the setting \"Commands\" does, under its title (Settings → General, HI-1954). When Hive quits, run is another setting's title: use its translation."
+  },
+  "settings.general.commands.tip": {
+    "defaultMessage": "Saved in Hive's own settings, never in a workspace, so a repository you clone brings none that run by themselves. Only you can set them: the Assistant can't change them.",
+    "description": "The info tip of the setting \"Commands\" (Settings → General, HI-1954)."
+  },
+  "settings.general.commands.title": {
+    "defaultMessage": "Commands",
+    "description": "A setting's title (Settings → General): the user's own named commands for Hive as a whole (HI-1954)."
+  },
   "settings.general.confirmOnQuit.desc": {
     "defaultMessage": "When to ask before quitting stops running sessions.",
     "description": "What the setting \"Confirm before quitting\" does, under its title (Settings → General)."
@@ -3324,12 +3428,12 @@
     "description": "A setting's title (Settings → General)."
   },
   "settings.general.onQuit.desc": {
-    "defaultMessage": "A command Hive runs as it quits, once every window's workspace has closed. Hive waits for it, showing it running.",
-    "description": "What the setting \"When Hive quits, run\" does, under its title (Settings → General)."
+    "defaultMessage": "The commands Hive runs, in order, as it quits, once every window's workspace has closed. Hive waits for them, showing them running.",
+    "description": "What the setting \"When Hive quits, run\" does, under its title (Settings → General; HI-1954: a list of the user's commands)."
   },
   "settings.general.onQuit.tip": {
-    "defaultMessage": "cmd.exe runs it. '{reason}' becomes quit, or update when Hive restarts to install an update (only with that box ticked). Don't wait, in the panel Hive shows, lets Hive go on while the command carries on. Only you can set it: the Assistant can't change it.",
-    "description": "The info tip of the setting \"When Hive quits, run\" (Settings → General). '{reason}' is a placeholder the user writes in the command, and quit and update are the values it becomes: keep all three as they are (the quotes around {reason} keep it from being read as a placeholder of this text). Don't wait is the name of a button of the panel."
+    "defaultMessage": "Pick them from Commands above. '{reason}' becomes quit, or update when Hive restarts to install an update (only with that box ticked). Don't wait, in the dialog Hive shows, lets Hive go on while the rest run by themselves. Only you can set them: the Assistant can't change them.",
+    "description": "The info tip of the setting \"When Hive quits, run\" (Settings → General; HI-1954). '{reason}' is a placeholder the user writes in a command, and quit and update are the values it becomes: keep all three as they are (the quotes around {reason} keep it from being read as a placeholder of this text). Commands is the title of the setting above; Don't wait is the name of a button of the dialog."
   },
   "settings.general.onQuit.title": {
     "defaultMessage": "When Hive quits, run",
@@ -5363,6 +5467,18 @@
     "defaultMessage": "Antivirus scanning",
     "description": "A setting's title (Settings → Workspace)."
   },
+  "settings.workspace.commands.desc": {
+    "defaultMessage": "This workspace's own commands: run one by hand (here, or Run Command in the command palette), or pick it, or one of Hive's, for when this workspace opens or closes.",
+    "description": "What the setting \"Commands\" does, under its title (Settings → Workspace, HI-1954)."
+  },
+  "settings.workspace.commands.tip": {
+    "defaultMessage": "Saved in the workspace's .hive/workspace.json, which Hive keeps out of version control. Only you can set them: the Assistant can't change them.",
+    "description": "The info tip of the setting \"Commands\" (Settings → Workspace, HI-1954). Keep the file path as it is."
+  },
+  "settings.workspace.commands.title": {
+    "defaultMessage": "Commands",
+    "description": "A setting's title (Settings → Workspace): the user's own named commands for this workspace (HI-1954)."
+  },
   "settings.workspace.hiddenProjects.desc": {
     "defaultMessage": "Restore one to bring it back with its cards (and, for a removed one, the handovers packed into its folder). A folder that has left the workspace can be forgotten.",
     "description": "What the setting \"Hidden and removed projects\" does, under its title (Settings → Workspace)."
@@ -5376,16 +5492,28 @@
     "description": "A setting's title (Settings → Workspace)."
   },
   "settings.workspace.onClose.desc": {
-    "defaultMessage": "A command Hive runs as this workspace closes: its window closes, another workspace opens in it, or Hive quits. Hive waits for it, showing it running.",
-    "description": "What the setting \"When this workspace closes, run\" does, under its title (Settings → Workspace)."
+    "defaultMessage": "The commands Hive runs, in order, as this workspace closes: its window closes, another workspace opens in it, or Hive quits. Hive waits for them, showing them running.",
+    "description": "What the setting \"When this workspace closes, run\" does, under its title (Settings → Workspace; HI-1954: a list of the user's commands)."
   },
   "settings.workspace.onClose.tip": {
-    "defaultMessage": "cmd.exe runs it. '{workspace}' becomes the workspace's folder, '{name}' its name and '{reason}' why it closes: window, switch, quit, or update when Hive restarts to install an update (only with that box ticked). Saved in the workspace's .hive/workspace.json. Only you can set it: the Assistant can't change it.",
-    "description": "The info tip of the setting \"When this workspace closes, run\" (Settings → Workspace). '{workspace}', '{name}' and '{reason}' are placeholders the user writes in the command, and window, switch, quit and update are the values {reason} becomes: keep them all as they are (the quotes around each placeholder keep it from being read as one of this text). Keep the file path as it is."
+    "defaultMessage": "Pick them from Commands above. '{workspace}' becomes the workspace's folder, '{name}' its name and '{reason}' why it closes: window, switch, quit, or update when Hive restarts to install an update (only with that box ticked). Only you can set them: the Assistant can't change them.",
+    "description": "The info tip of the setting \"When this workspace closes, run\" (Settings → Workspace; HI-1954). '{workspace}', '{name}' and '{reason}' are placeholders the user writes in a command, and window, switch, quit and update are the values {reason} becomes: keep them all as they are (the quotes around each placeholder keep it from being read as one of this text). Commands is the title of the setting above."
   },
   "settings.workspace.onClose.title": {
     "defaultMessage": "When this workspace closes, run",
     "description": "A setting's title (Settings → Workspace): a command of the user's that Hive runs as the open workspace closes."
+  },
+  "settings.workspace.onOpen.desc": {
+    "defaultMessage": "The commands Hive runs, in order, as this workspace opens: a local server or a database its agents need, say. Its agents start once they're done, or once you choose Don't wait.",
+    "description": "What the setting \"When this workspace opens, run\" does, under its title (Settings → Workspace, HI-1954). Don't wait is the name of a button of the dialog Hive shows."
+  },
+  "settings.workspace.onOpen.tip": {
+    "defaultMessage": "Pick them from Commands above. '{reason}' becomes open. If one fails, Hive asks: Rerun, Skip it and continue, or Stop here; a command ticked \"The commands after this need it\" leads with Stop here. Only you can set them: the Assistant can't change them.",
+    "description": "The info tip of the setting \"When this workspace opens, run\" (Settings → Workspace, HI-1954). '{reason}' is a placeholder the user writes in a command, and open the value it becomes: keep both as they are. Rerun, Skip it and continue and Stop here are buttons of the dialog; the quoted text is a checkbox's label: use their translations."
+  },
+  "settings.workspace.onOpen.title": {
+    "defaultMessage": "When this workspace opens, run",
+    "description": "A setting's title (Settings → Workspace): the user's commands Hive runs as the workspace opens (HI-1954)."
   },
   "settings.workspace.storage.desc": {
     "defaultMessage": "What Hive keeps for each of the workspace's projects (the biggest first) and the Hive Assistant: transcript backups, archived sessions, attachments and worktrees. Storage opens a project's page, with Clean Up… and Purge…; Purge… here removes everything Hive keeps for the sessions of the whole workspace.",

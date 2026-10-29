@@ -34,6 +34,12 @@ const { setLanguage } = await import('../src/shared/i18n')
 const projectKeys = await import('../src/main/projectKeys')
 const { agentActor, MERGE_CHOICE_GATE } = await import('../src/shared/workflow/facts')
 const { compile } = await import('../src/shared/workflow/compile')
+const { COMMIT_MESSAGE_STEP, settleCommitMessageDefault, settleGlobalCommitMessage, settledCommitMessage, settledDefaults } = await import('../src/main/workflow/commitMessageStep')
+const { writeWorkflow } = await import('../src/shared/workflow/projectWorkflow')
+const { resolveOptions } = await import('../src/main/workflow/rulesets')
+const { FactStore } = await import('../src/main/workflow/factStore')
+const { MERGE_CHOICE_KEY } = await import('../src/shared/workflow/facts')
+/** A Git project's own options as a pre-1.0 build's preset left them: Pair whole, G19 Hive's. */
 
 /** The bound for a hung run: a start's facts are recorded within it. */
 const HUNG_MS = 15_000
@@ -492,13 +498,14 @@ describe("the upgrade's merge question (HI-1697)", () => {
     const { commitMessage: _m, style: _s, ...inheriting } = pair
     await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...inheriting, strict: true } })
     expect(recorded(w)).toBeNull()
-    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, commitMessage: 'branch' } })
-    expect(recorded(w)).toMatchObject({ style: 'merge', commitMessage: 'branch', pending: false })
-    expect((await w.projectConfig(repo)).workflow).toMatchObject({ mergeAsk: true, options: { commitMessage: 'branch', strict: true } })
+    // Hive's, against Pair's branch's own (HI-1997): a change, so the choice.
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, commitMessage: 'hive' } })
+    expect(recorded(w)).toMatchObject({ style: 'merge', commitMessage: 'hive', pending: false })
+    expect((await w.projectConfig(repo)).workflow).toMatchObject({ mergeAsk: true, commitMessageChosen: true, options: { commitMessage: 'hive', strict: true } })
     // Chosen: later saves are ordinary ones, whatever they change, and the record never takes them back.
-    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, commitMessage: 'hive', style: 'squash' } })
+    await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, strict: true, commitMessage: 'branch', style: 'squash' } })
     await form.settleMergeChoice(w, repo)
-    expect((await w.projectConfig(repo)).workflow?.options).toMatchObject({ style: 'squash', commitMessage: 'hive' })
+    expect((await w.projectConfig(repo)).workflow?.options).toMatchObject({ style: 'squash', commitMessage: 'branch' })
   })
 
   it("the answer records the choice on the board, then project.json follows; the waiting card works under it", async () => {
@@ -1087,6 +1094,164 @@ describe("G15 saved before P7: the one-time step (#1445)", () => {
     expect(boardValue(w, SLOTS_UP_TO_DATE_STEP)).not.toBeNull()
   })
 })
+describe("G19's default, the branch's own message (HI-1997)", () => {
+  const filled = (): Partial<WorkflowOptions> => {
+    const { platform: _p, ...o } = preset('git', 'pair')
+    return { ...o, commitMessage: 'hive' }
+  }
+
+  it("every Git preset and All off, and no level at all, merge with the branch's own", () => {
+    expect(allOff('git').commitMessage).toBe('branch')
+    for (const p of PRESETS.git) expect(preset('git', p.id).commitMessage, p.id).toBe('branch')
+    expect(resolveOptions('git', {}).options.commitMessage).toBe('branch')
+  })
+
+  it("a write that makes it Hive's marks the choice; one that only keeps a preset's Hive's doesn't; the mark goes with Hive's", () => {
+    const wf = (o: Partial<WorkflowOptions>, mark?: true) => ({ platform: 'git' as const, preset: 'pair' as const, options: o, ...(mark ? { commitMessageChosen: mark } : {}) })
+    expect(writeWorkflow(wf({}), { platform: 'git', preset: null, options: { commitMessage: 'hive' } }).commitMessageChosen).toBe(true)
+    expect(writeWorkflow(wf({ commitMessage: 'branch' }), { platform: 'git', preset: null, options: { commitMessage: 'hive' } }).commitMessageChosen).toBe(true)
+    // A preset's fill saved again unchanged: not a choice.
+    expect(writeWorkflow(wf(filled()), { platform: 'git', preset: 'pair', options: { ...filled(), style: 'squash' } }).commitMessageChosen).toBeUndefined()
+    // Marked, it stays while Hive's, and goes with it.
+    expect(writeWorkflow(wf({ commitMessage: 'hive' }, true), { platform: 'git', preset: null, options: { commitMessage: 'hive', strict: true } }).commitMessageChosen).toBe(true)
+    expect(writeWorkflow(wf({ commitMessage: 'hive' }, true), { platform: 'git', preset: null, options: { commitMessage: 'branch' } }).commitMessageChosen).toBeUndefined()
+    expect(writeWorkflow(wf({ commitMessage: 'hive' }, true), { platform: 'git', preset: null, options: {} }).commitMessageChosen).toBeUndefined()
+  })
+
+  it("the step's choices: an ambiguous Hive's switched (in force and kept), a proven one and the branch's own kept", () => {
+    const wf = { platform: 'git' as const, preset: 'pair' as const, options: filled() }
+    expect(settledCommitMessage(wf, false)?.options).not.toHaveProperty('commitMessage')
+    expect(settledCommitMessage(wf, true)).toBeNull()
+    expect(settledCommitMessage({ ...wf, commitMessageChosen: true }, false)).toBeNull()
+    expect(settledCommitMessage({ ...wf, options: { commitMessage: 'branch' } }, false)).toBeNull()
+    const kept = settledCommitMessage({ platform: 'none', preset: null, options: {}, kept: { git: { preset: 'pair', options: filled() } } }, false)
+    expect(kept?.kept?.git?.options).not.toHaveProperty('commitMessage')
+    expect(settledDefaults({ git: { commitMessage: 'hive', review: 'agent' }, none: { review: 'agent' } })).toEqual({ git: { review: 'agent' }, none: { review: 'agent' } })
+    expect(settledDefaults({ git: { commitMessage: 'branch' } })).toBeNull()
+  })
+
+  it("a workspace's projects and own defaults switched once, each recorded with its change, then the board's mark; a choice made since is kept", async () => {
+    const { w, repo, ws } = await workspace({ project: filled(), preset: 'pair', workspace: { git: { commitMessage: 'hive', review: 'agent' } } })
+    expect(await settleCommitMessageDefault(w)).toBe(1)
+    const cfg = await w.projectConfig(repo)
+    expect(cfg.workflow!.options).not.toHaveProperty('commitMessage')
+    expect(cfg.stepsDone).toContain(COMMIT_MESSAGE_STEP)
+    const wsFile = JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8'))
+    expect(wsFile.workflow.git).toEqual({ review: 'agent' })
+    expect(wsFile.stepsDone).toContain(COMMIT_MESSAGE_STEP)
+    expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
+    expect((await form.workflowForm(w, repo)).options.commitMessage).toBe('branch')
+    // Hive's chosen afterwards: kept by a second run.
+    await w.mutateProjectConfig(repo, (c) => ({ workflow: writeWorkflow(c.workflow, { platform: 'git', preset: c.workflow!.preset, options: { ...c.workflow!.options, commitMessage: 'hive' } }) }))
+    expect(await settleCommitMessageDefault(w)).toBe(0)
+    expect((await w.projectConfig(repo)).workflow!.options.commitMessage).toBe('hive')
+  })
+
+  it("Hive's proven by the mark or by the board's merge choice (HI-1697) is kept", async () => {
+    const marked = await workspace({ project: { commitMessage: 'hive' }, preset: null })
+    await marked.w.mutateProjectConfig(marked.repo, (c) => ({ workflow: { ...c.workflow!, commitMessageChosen: true } }))
+    expect(await settleCommitMessageDefault(marked.w)).toBe(0)
+    expect((await marked.w.projectConfig(marked.repo)).workflow!.options.commitMessage).toBe('hive')
+    const answered = await workspace({ project: filled(), preset: 'pair' })
+    const name = basename(answered.repo)
+    await store.boardWrite(answered.w, async () => FactStore.forBoard(answered.w, { project: name, key: name }).setMeta(MERGE_CHOICE_KEY, JSON.stringify({ style: 'merge', commitMessage: 'hive', at: 'x', pending: false })))
+    expect(await settleCommitMessageDefault(answered.w)).toBe(0)
+    expect((await answered.w.projectConfig(answered.repo)).workflow!.options.commitMessage).toBe('hive')
+  })
+
+  it("answered Hive's while inheriting it from the workspace: written into its own options before the workspace's goes, through a failed save and its retry (HR3's note on s26)", async () => {
+    const { commitMessage: _m, ...inheriting } = filled()
+    const { w, repo, ws } = await workspace({ project: inheriting, preset: 'pair', workspace: { git: { commitMessage: 'hive' } } })
+    const name = basename(repo)
+    await store.boardWrite(w, async () => FactStore.forBoard(w, { project: name, key: name }).setMeta(MERGE_CHOICE_KEY, JSON.stringify({ style: 'merge', commitMessage: 'hive', at: 'x', pending: false })))
+    const save = vi.spyOn(w, 'saveWorkspaceConfigWith').mockRejectedValueOnce(new Error('disk full'))
+    try {
+      await settleCommitMessageDefault(w)
+      // The project's own Hive's is written first; the workspace's stays, as the save failed, and nothing is marked.
+      expect((await w.projectConfig(repo)).workflow).toMatchObject({ commitMessageChosen: true, options: { commitMessage: 'hive' } })
+      expect(JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8')).workflow.git.commitMessage).toBe('hive')
+      expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
+    } finally {
+      save.mockRestore()
+    }
+    await settleCommitMessageDefault(w)
+    expect(JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8')).workflow.git).not.toHaveProperty('commitMessage')
+    expect((await form.workflowForm(w, repo)).options.commitMessage).toBe('hive')
+    expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
+  })
+
+  it("answered Hive's inherited in the Git options a None project keeps: written there too, so switching back to Git is still Hive's (HR3's round 1)", async () => {
+    const { setKept } = await import('../src/shared/workflow/projectWorkflow')
+    const { commitMessage: _m, ...inheriting } = filled()
+    const { w, repo, ws } = await workspace({ project: inheriting, preset: 'pair', workspace: { git: { commitMessage: 'hive' } } })
+    // On None now, its Git options kept (#1419), inheriting Hive's from the workspace.
+    await w.mutateProjectConfig(repo, (c) => ({ workflow: setKept(c.workflow!, 'none') }))
+    expect((await w.projectConfig(repo)).workflow).toMatchObject({ platform: 'none', kept: { git: { preset: 'pair' } } })
+    const name = basename(repo)
+    await store.boardWrite(w, async () => FactStore.forBoard(w, { project: name, key: name }).setMeta(MERGE_CHOICE_KEY, JSON.stringify({ style: 'merge', commitMessage: 'hive', at: 'x', pending: false })))
+    const save = vi.spyOn(w, 'saveWorkspaceConfigWith').mockRejectedValueOnce(new Error('disk full'))
+    try {
+      await settleCommitMessageDefault(w)
+      expect((await w.projectConfig(repo)).workflow).toMatchObject({ commitMessageChosen: true, kept: { git: { options: { commitMessage: 'hive' } } } })
+      expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
+    } finally {
+      save.mockRestore()
+    }
+    await settleCommitMessageDefault(w)
+    const wsFile = JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8'))
+    expect(wsFile.workflow.git).not.toHaveProperty('commitMessage')
+    expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
+    // Back on Git: its own Hive's, over the workspace's defaults as they are now.
+    const back = setKept((await w.projectConfig(repo)).workflow!, 'git')
+    expect(back.commitMessageChosen).toBe(true)
+    expect(resolveOptions('git', { workspace: wsFile.workflow, project: back.options }).options.commitMessage).toBe('hive')
+  })
+
+  it("a failed write leaves no board mark; the next run finishes, never undoing a project already settled (HR3's gap 3)", async () => {
+    const { w, repo, ws } = await workspace({ project: filled(), preset: 'pair', workspace: { git: { commitMessage: 'hive' } } })
+    const save = vi.spyOn(w, 'saveWorkspaceConfigWith').mockRejectedValueOnce(new Error('disk full'))
+    try {
+      expect(await settleCommitMessageDefault(w)).toBe(1)
+      expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).toBeNull()
+      expect((await w.projectConfig(repo)).stepsDone).toContain(COMMIT_MESSAGE_STEP)
+      expect(JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8')).workflow.git.commitMessage).toBe('hive')
+      // Hive's chosen on the project before the retry: the project's record keeps the retry off it.
+      await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, options: { ...c.workflow!.options, commitMessage: 'hive' } } }))
+    } finally {
+      save.mockRestore()
+    }
+    expect(await settleCommitMessageDefault(w)).toBe(0)
+    expect((await w.projectConfig(repo)).workflow!.options.commitMessage).toBe('hive')
+    expect(JSON.parse(readFileSync(join(ws, '.hive', 'workspace.json'), 'utf8')).workflow.git).not.toHaveProperty('commitMessage')
+    expect(store.boardValue(w, COMMIT_MESSAGE_STEP)).not.toBeNull()
+  })
+
+  it("Hive's own defaults: switched with their record only once the save reaches the disk", async () => {
+    const was = { workflow: config.settings.workflow, stepsDone: config.settings.stepsDone }
+    const save = vi.spyOn(config, 'saveNow').mockResolvedValueOnce(false)
+    try {
+      config.settings.workflow = { git: { commitMessage: 'hive', review: 'agent' } }
+      config.settings.stepsDone = undefined
+      await settleGlobalCommitMessage()
+      expect(save).toHaveBeenCalledTimes(1)
+      // As read again from disk at the next start, the save having failed: the step runs again.
+      config.settings.workflow = { git: { commitMessage: 'hive', review: 'agent' } }
+      config.settings.stepsDone = undefined
+      await settleGlobalCommitMessage()
+      expect(config.settings.workflow).toEqual({ git: { review: 'agent' } })
+      expect(config.settings.stepsDone).toContain(COMMIT_MESSAGE_STEP)
+      // Done: Hive's chosen since is kept.
+      config.settings.workflow = { git: { commitMessage: 'hive' } }
+      await settleGlobalCommitMessage()
+      expect(config.settings.workflow).toEqual({ git: { commitMessage: 'hive' } })
+    } finally {
+      save.mockRestore()
+      config.settings.workflow = was.workflow
+      config.settings.stepsDone = was.stepsDone
+    }
+  })
+})
+
 describe("Slots and copies: one setting saved at a time (#1445, HR5's round 1)", () => {
   it('changes only its own key, under the lock: two at once both stay, with what another window saved', async () => {
     const { setSlotSetting } = await import('../src/main/slotSettings')

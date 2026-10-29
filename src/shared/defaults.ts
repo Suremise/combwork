@@ -1,5 +1,6 @@
 import type { AgentBranchStatus, AgentDef, AppConfig, AppSettings, CompactionEvent, KeybindingOverrides, FileLockMode, PageLayout, PlanLimit, PlanUsage, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, SessionLayout, SessionRecord, SessionStatus, SessionView, WorkspaceConfig } from './types'
 import { CLAUDE_CODE } from './claude'
+import { MIGRATED_QUIT, migrateHiveCommands } from './commands'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from './agentLimits'
 import { DEFAULT_COLUMN_COLORS } from './tasks'
 import { formatDateTime } from './dates'
@@ -32,6 +33,7 @@ export const RETIRED_PERSONAS: Record<string, string> = { overseer: 'coordinator
 
 export const DEFAULT_SETTINGS: AppSettings = {
   keybindings: {},
+  commands: { list: [], onQuit: { run: [] } },
   updates: {
     checkAutomatically: true,
     downloadAutomatically: true,
@@ -52,8 +54,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     dateFormat: 'ymd',
     timeFormat: '24h',
     userName: 'User', // i18n-ignore: a stored default name, which agents' wake lines quote
-    language: 'auto',
-    onQuit: { command: '', onUpdate: false }
+    language: 'auto'
   },
   appearance: {
     theme: 'dark',
@@ -566,6 +567,9 @@ const V1_LIMITS: Record<string, Pick<PlanLimit, 'id' | 'label' | 'windowMinutes'
 const OLD_ASSISTANT_DEFAULTS: Record<string, { model?: string; effort: string }> = { 'claude-code': { model: 'sonnet', effort: 'low' }, codex: { effort: 'low' } }
 
 export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppConfig {
+  // HI-1954: Hive's commands cleaned, and HI-1368's When Hive quits, run adopted as one of them (once; written next save).
+  cfg.settings.commands = migrateHiveCommands({ commands: raw?.settings?.commands, onQuit: raw?.settings?.general?.onQuit }, trNow(MIGRATED_QUIT))
+  delete cfg.settings.general.onQuit
   const g = cfg.settings.general
   const q = g.confirmOnQuit as unknown
   // 0.1 stored on/off; "on" asked whenever sessions ran, which maps to asking when an agent is working.

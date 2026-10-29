@@ -159,6 +159,7 @@
   "session.start.couldNot": "无法启动 {agent}",
   "session.start.fenced": "{why}，因此它的智能体现在无法启动。",
   "session.start.moveFailed": "Hive 无法将 {project} 的模型设置移到其智能体上：{error}。请重新启动它。",
+  "session.start.openCommands": "此工作区打开时的命令仍在运行：它们完成或你选择继续后，智能体才会启动。",
   "session.start.openIn": "此对话已在 {agent} 中打开。智能体只能恢复没有其他智能体在运行的会话。",
   "session.start.otherFolder": "此会话曾在 {folder} 中运行。请用在该文件夹中工作的智能体恢复它。",
   "session.start.projectRunning": "此项目已有会话在运行。请先停止它。",

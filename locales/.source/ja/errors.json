@@ -2,6 +2,7 @@
   "errors.assistantUndo.gone": "That change of the Assistant's is no longer kept: changes are kept for 7 days.",
   "errors.assistantUndo.which": "Choose one change of the Assistant's to undo, or one message's changes.",
   "errors.changes.notFile": "{file} isn't a file of {folder}.",
+  "errors.commands.otherWorkspace": "This window shows another workspace now, so the commands you changed weren't saved.",
   "errors.console.hidden": "The developer console is hidden: turn on Settings → Advanced → Show developer features.",
   "errors.console.notRecording": "Not a developer console recording",
   "errors.console.notSource": "Not a developer console source this window can record",

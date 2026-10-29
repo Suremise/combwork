@@ -99,6 +99,10 @@
     "defaultMessage": "{card} failed {rounds, plural, one {# review} other {# reviews}}: carry on with more rounds, split it, accept it with follow-ups, or take it over?",
     "description": "A For you request (Decide): the card reached its card loop's round limit (Settings → Card loops), so its loop pauses until the user chooses one of four ways on. {card} is a card key like AM-12; {rounds} the reviews it failed (a number)."
   },
+  "workflow.forYou.slotDirty": {
+    "defaultMessage": "{card} is Done, but {slot} has uncommitted changes, so it stays on {line}. Commit or discard them there: Hive then detaches the slot at {target}, ready for its next card.",
+    "description": "A For you request (Decide, HI-2014): a card reached Done while its slot (a reused working folder, such as slot-b) had uncommitted changes, so Hive left the slot on the card's branch {line} instead of detaching it at the target branch {target}. {card} is a card key like AM-12; {slot}, {line} and {target} are names, kept as they are."
+  },
   "workflow.forYouKind": {
     "defaultMessage": "{kind, select, approve {Approve} decide {Decide} test {Test} signIn {Sign in} other {Other}}",
     "description": "The kind of a request for the user (For you), shown as its label: approve something, decide something, test something, sign in somewhere, or anything else. Translate each choice; keep the codes before the braces."
@@ -2000,8 +2004,8 @@
     "description": "A value of the workflow option “Merge style” (glossary 2.6, G6)."
   },
   "workflow.why.commitMessage": {
-    "defaultMessage": "The card’s key in the history links each merge to its card; a project that keeps card numbers out of its history uses the branch’s own.",
-    "description": "Why the presets set “Commit message” to Hive’s (the card’s key and title, with trailers)."
+    "defaultMessage": "Card titles can name people and details a public history shouldn’t keep; choose Hive’s for the card’s key, linking each merge to its card.",
+    "description": "Why the presets set “Commit message” to the branch’s own (HI-1997), and what choosing Hive’s (the card’s key and title, with trailers) gives instead."
   },
   "workflow.why.dependenciesDone": {
     "defaultMessage": "It’s cheap, and no card is built on work that isn’t in yet.",

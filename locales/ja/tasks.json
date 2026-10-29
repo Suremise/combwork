@@ -104,6 +104,7 @@
   "tasks.history.context": "最初に読む：{refs}",
   "tasks.history.contextRemoved": "最初に読むドキュメントのセクションを削除しました",
   "tasks.history.created": "「{column, select, hold {保留} todo {未着手} doing {進行中} review {レビュー} passed {承認済み} done {完了} other {{column}}}」に作成",
+  "tasks.history.startsWithout": "{card}は作業がターゲットにないまま完了に移動されました（{reason}）。このカードはその作業なしで開始できます。",
   "tasks.history.decision": "決定事項を記録：「{decision}」",
   "tasks.history.decisionChanged": "決定事項を「{decision}」に変更（変更前：「{was}」）",
   "tasks.history.decisionRemoved": "決定事項を削除：「{decision}」",

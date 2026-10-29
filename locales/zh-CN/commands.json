@@ -1,0 +1,6 @@
+{
+  "commands.migrated.close": "关闭时命令",
+  "commands.migrated.quit": "退出时命令",
+  "commands.run.gone": "该命令已不存在。",
+  "commands.run.testCopy": "这是 Hive 的测试副本：它不会运行你的命令。"
+}

@@ -3,6 +3,7 @@ import './threadPool'
 import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watches'
 import { initLoopWakes } from './loopWakes'
 import { migrateAgentsPerProject } from './workflow/preferences'
+import { settleGlobalCommitMessage } from './workflow/commitMessageStep'
 import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
 import { initReviewsOnOpen } from './reviewsOnOpen'
@@ -68,6 +69,7 @@ import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost
 import { poolFor, startSlots, stopSlots } from './slotsApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
 import { quitSlotCards, startSlotCards, stopSlotCards } from './slotCards'
+import { startFinishPath } from './finishPath'
 import { startLaneBriefs, stopLaneBriefs } from './laneBriefs'
 import { startSlotMigration, stopSlotMigration } from './slotMigration'
 import { startReviewerPool, stopReviewerPool } from './reviewerPool'
@@ -681,7 +683,7 @@ async function quitNow(tellUser: boolean): Promise<void> {
  */
 async function closeCommandsOnQuit(reason: CloseReason): Promise<void> {
   const entries = hiveWindows()
-  const global = config.settings.general.onQuit
+  const global = config.settings.commands
   if (!quitRunsAny(entries.map((e) => e.ws), global)) return
   // When Hive quits runs only once every workspace has closed and drained, theirs with a command or not (HR6's round 1).
   // No timer: each window's saving step shows, and its Don't wait is the user's (Darren's decision, 28 Oct ~14:15).
@@ -885,6 +887,8 @@ app.whenReady().then(async () => {
   advanced.load()
   // Agents per project from before HI-2001: Maximum agents in Hive's workflow defaults now.
   await migrateAgentsPerProject()
+  // HI-1997: Hive's own workflow defaults' commit message from a preset, switched once to the branch's own.
+  await settleGlobalCommitMessage()
   // Show developer features is one of them too, kept under its settings key: the file and the setting stay one value.
   bindAdvancedSettings(config)
   // The developer console's flight recorder (#698): its triggers are advanced settings, followed as they change.
@@ -1113,6 +1117,7 @@ app.whenReady().then(async () => {
   })
   // Cards on slots (#1438): a start lends its builder a slot and makes its line there, Done or put back gives it back.
   startSlotCards()
+  startFinishPath()
   // Lanes' briefs outside slots, delivered once per revision (HI-1795).
   startLaneBriefs()
   // Agents' worktrees adopted as slots at the 1.0 upgrade (#1441): which projects are migrated, and their retired homes.

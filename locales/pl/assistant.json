@@ -702,6 +702,7 @@
   "assistant.undo.why.declarePaths": "Zadeklarowane ścieżki zostają przy karcie.",
   "assistant.undo.why.handOver": "Przekazania nie da się cofnąć: praca trafiła do innego agenta.",
   "assistant.undo.why.laneEnded": "Zakończony tor pozostaje zakończony: uruchom go ponownie, jeśli ma trwać dalej.",
+  "assistant.undo.why.laneReorderNow": "Karta cofnięta przez przestawienie toru zastosowane od razu zostaje w Do zrobienia: cofnięcie przywraca tylko kolejność toru.",
   "assistant.undo.why.message": "Wysłanej wiadomości nie da się odwołać.",
   "assistant.undo.why.nothing": "Nie zmieniło niczego, co cofnięcie przywraca.",
   "assistant.undo.why.projectClosed": "Zamknięty projekt pozostaje zamknięty: otwórz go ponownie, jeśli jest potrzebny.",

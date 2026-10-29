@@ -149,8 +149,12 @@ export type KeybindingOverrides = Record<string, string | null>
 export interface AppSettings {
   /** The user's changes to the default keyboard shortcuts. */
   keybindings: KeybindingOverrides
+  /** Hive's own commands (HI-1954, Settings → Commands at Hive's level) and When Hive quits, run. */
+  commands: CommandsHive
   /** The global default workflow options (SPEC §16.6.6), under each workspace's and project's own; absent: all off. */
   workflow?: WorkflowDefaults
+  /** The one-time steps settled in Hive's own defaults (HI-1997's `workflow.commitMessageDefault`), each saved with its change. */
+  stepsDone?: string[]
   /** Hive's default slot options for Git projects (HI-1765), under each workspace's and project's own (`slots`). */
   slotDefaults?: SlotDefaults
   updates: {
@@ -187,8 +191,8 @@ export interface AppSettings {
     userName: string
     /** The language Hive shows (#767): 'auto' (Windows' display languages) or a language's code (de, pl…). */
     language: string
-    /** Settings → General → When Hive quits, run (HI-1368): once, after every window's workspace has closed. */
-    onQuit: CloseCommandSetting
+    /** HI-1368's When Hive quits, run, as saved before HI-1954: read once into `commands`, then dropped. */
+    onQuit?: CloseCommandSetting
   }
   appearance: {
     theme: ThemeSetting
@@ -847,10 +851,53 @@ export interface WorkspaceConfig {
   journalSuggested?: boolean
   /** The workspace's default workflow options (SPEC §16.6.6), between the global ones and each project's own. */
   workflow?: WorkflowDefaults
+  /** The one-time steps settled in this workspace's own defaults (HI-1997's `workflow.commitMessageDefault`), each in the same write as its change. */
+  stepsDone?: string[]
   /** The workspace's default slot options (HI-1765), between Hive's and each project's own. */
   slotDefaults?: SlotDefaults
-  /** Settings → Workspace → When this workspace closes, run (HI-1368); absent or an empty command: nothing runs. */
+  /** HI-1368's When this workspace closes, run, as saved before HI-1954: read once into `commands`, then dropped. */
   onClose?: CloseCommandSetting
+  /** The workspace's own commands (HI-1954, Settings → Commands at its level) and its open and close points. */
+  commands?: CommandsWorkspace
+}
+
+/**
+ * A command of the user's (HI-1954, like JetBrains' External Tools): run by cmd.exe from `folder` (the workspace's folder
+ * when absent), its placeholders filled in (shared/commands.ts fillCommand), by hand or at the points that pick it.
+ */
+export interface CustomCommand {
+  /** `c-` and 8 hex. */
+  id: string
+  name: string
+  command: string
+  folder?: string
+  /** "The commands after this need it": failing, its dialog leads with Stop here; unattended, the list stops there. */
+  needed?: boolean
+}
+
+/** A command a point runs: Hive's or the workspace's, by id. */
+export interface CommandRef {
+  scope: 'hive' | 'workspace'
+  id: string
+}
+
+/** A point's commands, in the order they run. `onUpdate`: close and quit run them too when Hive restarts for an update. */
+export interface CommandPoint {
+  run: CommandRef[]
+  onUpdate?: boolean
+}
+
+/** Hive's commands and When Hive quits, run (its commands only). */
+export interface CommandsHive {
+  list: CustomCommand[]
+  onQuit: CommandPoint
+}
+
+/** A workspace's commands and its points, which may pick Hive's commands too. */
+export interface CommandsWorkspace {
+  list: CustomCommand[]
+  onOpen: CommandPoint
+  onClose: CommandPoint
 }
 
 /**
@@ -892,6 +939,27 @@ export interface CloseCommandRun {
   failure?: 'drain' | 'spawn' | 'runner'
   /** The error, for 'spawn' (the system's text). */
   error?: string
+  /** Which point runs it (HI-1954): a workspace opening or closing, Hive quitting, or by hand. */
+  point?: 'open' | 'close' | 'quit' | 'manual'
+  /** Its commands, in the order they run (HI-1954); `command`, `lines` and `exitCode` above are the current step's. */
+  steps?: CloseCommandStep[]
+  /**
+   * A failed step waiting for the user's choice (HI-1954): Rerun, Skip it and continue, Stop here, the controls bound to
+   * its step and attempt. `needed`: "The commands after this need it" is ticked, so Stop here leads.
+   */
+  awaiting?: { step: number; attempt: number; needed: boolean } | null
+}
+
+/** A step of a run as its panel shows it (HI-1954). */
+export interface CloseCommandStep {
+  name: string
+  state: 'waiting' | 'running' | 'ok' | 'failed' | 'skipped'
+  exitCode: number | null
+  /** Why it failed with no exit code: a placeholder or folder it couldn't use, or the command not starting. */
+  failure?: 'placeholder' | 'folder' | 'spawn'
+  detail?: string
+  startedAt?: string
+  endedAt?: string
 }
 
 /**
@@ -1274,6 +1342,11 @@ export interface ProjectWorkflow {
    * or a save that changes either; optionsForm.ts).
    */
   mergeAsk?: true
+  /**
+   * HI-1997: Git's commit message (G19) set to Hive's by a choice, not left by a preset: set by `writeWorkflow` when a
+   * write changes it to 'hive', kept while it stays so. The one-time switch to the branch's own keeps such a project's.
+   */
+  commitMessageChosen?: true
 }
 
 /** The answer to "How do you work? Solo / Pair / Team" (#1423): a preset was chosen, or Not now. */
@@ -3532,6 +3605,8 @@ export interface LaneStartRequest {
   cards: number[]
   note?: string
   name?: string | null
+  /** For the builder's running lane with a card in flight: the list applied now, that card put back (HI-1995). */
+  applyNow?: boolean
 }
 
 /**

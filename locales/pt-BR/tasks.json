@@ -104,6 +104,7 @@
   "tasks.history.context": "Ler primeiro: {refs}",
   "tasks.history.contextRemoved": "Removidas as seções de documentos para ler primeiro",
   "tasks.history.created": "Criado em {column, select, hold {Em espera} todo {A fazer} doing {Fazendo} review {Revisão} passed {Aprovado} done {Concluído} other {{column}}}",
+  "tasks.history.startsWithout": "{card} foi movido para Concluído sem que seu trabalho esteja no destino ({reason}): este cartão pode começar sem ele.",
   "tasks.history.decision": "Registrou uma decisão: “{decision}”",
   "tasks.history.decisionChanged": "Alterou uma decisão para “{decision}” (era “{was}”)",
   "tasks.history.decisionRemoved": "Removeu uma decisão: “{decision}”",

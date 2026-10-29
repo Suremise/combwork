@@ -89,7 +89,9 @@ describe('the user moves cards through the rules (#1265)', () => {
     expect(o).toHaveLength(1)
     expect(o[0]).toMatchObject({ actor: 'user', data: { by: 'user', move: 'active→done', reason: '' } })
     expect((o[0].data as { rules: string[] }).rules).toEqual(expect.arrayContaining(['submit.clean', 'integrate.approved', 'done.contained']))
-    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'Moved', data: { from: 'active', to: 'done', cause: 'override' } })
+    expect(facts(w, card).at(-2)).toMatchObject({ kind: 'Moved', data: { from: 'active', to: 'done', cause: 'override' } })
+    // Its finish follows (HI-2014): an override's, nothing verified.
+    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'Finished', data: { how: 'override', verified: null } })
     expect(kinds(w, card)).not.toContain('Integrated')
     expect(foldCard(facts(w, card)).stage).toBe('done')
   })
@@ -534,8 +536,10 @@ describe('with nothing to enforce (#1265)', () => {
     await update(w, card, { column: 'doing', agent: 'a1' })
     const moved = await update(w, card, { column: 'done' }, assistant)
     expect(moved.column).toBe('done')
-    expect(kinds(w, card)).toEqual(['Started', 'Moved', 'Moved'])
-    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'Moved', actor: 'assistant', data: { to: 'done', cause: 'intent' } })
+    expect(kinds(w, card)).toEqual(['Started', 'Moved', 'Moved', 'Finished'])
+    expect(facts(w, card).at(-2)).toMatchObject({ kind: 'Moved', actor: 'assistant', data: { to: 'done', cause: 'intent' } })
+    // A board move's finish (HI-2014), whoever made it.
+    expect(facts(w, card).at(-1)).toMatchObject({ kind: 'Finished', actor: 'assistant', data: { how: 'board', verified: null } })
   })
 
   it('with the rules not enforced, the intent path runs no guard: a blocked card starts, nothing refused or overridden', async () => {
@@ -548,7 +552,7 @@ describe('with nothing to enforce (#1265)', () => {
     expect(reply).toMatchObject({ ok: true, to: 'active' })
     // A move past review asks nothing either: no Override.
     expect(await inWorkspace(w, () => tasks.moveTask(card, 'done'))).toMatchObject({ moved: { column: 'done' } })
-    expect(kinds(w, card)).toEqual(['Blocked', 'Started', 'Moved', 'Moved'])
+    expect(kinds(w, card)).toEqual(['Blocked', 'Started', 'Moved', 'Moved', 'Finished'])
   })
 
   it("an agent's column move is its intent (#1268): its move to Done is report merge, refused from Doing, never overridden", async () => {

@@ -138,7 +138,7 @@ const log = () => {
 
     // No restart: "Hive merges" into integration, and a card approved now goes to the queue. The upgrade left the merge
     // style and commit message unchosen (HI-1697): the queue asks under For you before it merges, and merges as answered.
-    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
+    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { commitMessage: undefined }) })
     const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.hive', 'project.json'), 'utf8'))
     check('the upgrade marked the project: its merge style and commit message are to be asked (a save keeping them keeps it)', projectJson().workflow?.mergeAsk === true, JSON.stringify(projectJson().workflow))
     let reviewer = await q.agent(fx, h, 'R1')
@@ -153,7 +153,7 @@ const log = () => {
     const helpers = q.folderHelpers(fx)
     const { dialog, section } = await helpers.forYouSection(h, one.n)
     const choice = section.locator('[data-merge-choice]')
-    check('…shown in For you with the two options, as until now by default', !!(await until(async () => (await choice.count()) === 1, HUNG_MS)) && (await choice.locator('[data-option="style"]').inputValue()) === 'merge' && (await choice.locator('[data-option="commitMessage"]').inputValue()) === 'hive')
+    check("…shown in For you with the two options: the merge style as until now, the branch's own message first (HI-1997)", !!(await until(async () => (await choice.count()) === 1, HUNG_MS)) && (await choice.locator('[data-option="style"]').inputValue()) === 'merge' && (await choice.locator('[data-option="commitMessage"]').inputValue()) === 'branch')
     await helpers.themes(h.page, section, 'queueupgrade-merge-choice')
     await choice.locator('[data-option="style"]').selectOption('squash')
     await choice.locator('[data-option="commitMessage"]').selectOption('branch')
@@ -181,7 +181,7 @@ const log = () => {
     // crash seam, `crash`). The builder and reviewer rejoin each run.
     let builder = one.builder
     const unchosen = async (crash) => {
-      await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
+      await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { commitMessage: undefined }) })
       await h.app.close().catch(() => {})
       const db = new DatabaseSync(dbFile, { timeout: 5000 })
       try {

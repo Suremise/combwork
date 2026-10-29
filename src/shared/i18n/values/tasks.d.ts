@@ -150,6 +150,7 @@ interface HiveMessageValues {
   'tasks.history.reviewerRequest': { text: string | number }
   'tasks.history.safeguardStop': { agent: string | number; stops: number; model: string; time: string | number; to: string | number; from: string | number; since: string | number; state: string; hasTools: string; tools: string | number; hasHelp: string; help: string | number }
   'tasks.history.stageRepaired': { stage: string }
+  'tasks.history.startsWithout': { card: string | number; reason: string | number }
   'tasks.history.takenFrom': { agent: string | number }
   'tasks.history.takenFromAgent': undefined
   'tasks.history.takenFromOf': { agent: string | number; project: string | number }

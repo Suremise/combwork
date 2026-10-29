@@ -118,6 +118,18 @@ describe('recording facts from the board’s moves (#1216)', () => {
     expect(factsOf(w, card).filter((f) => f.kind === 'DecisionsReceived').map((f) => f.data)).toEqual([{ agent: 'a1', generation: 2 }])
   })
 
+  it('a plain board move into Done is a finish like any other: Moved, then Finished (board, nothing verified) (HI-2014)', async () => {
+    const { w } = await workspace()
+    const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Moved by hand', project: 'p' }, user))).number
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'done' }, user))
+    expect(kinds(w, card).slice(-2)).toEqual(['Moved', 'Finished'])
+    expect(last(w, card, 'Finished')?.data).toEqual({ how: 'board', verified: null })
+    // Back out and in again: another finish.
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'todo' }, user))
+    await inWorkspace(w, () => tasks.updateTask(card, { column: 'done' }, user))
+    expect(kinds(w, card).filter((k) => k === 'Finished')).toHaveLength(2)
+  })
+
   it('blocked and unblocked', async () => {
     const { w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Blocked', project: 'p' }, user))).number

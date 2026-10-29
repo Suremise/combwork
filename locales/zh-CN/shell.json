@@ -265,6 +265,7 @@
   "shell.palette.openCard": "打开卡片：{card} {title}",
   "shell.palette.placeholder": "输入命令或项目名称",
   "shell.palette.projectsPlaceholder": "转到项目",
+  "shell.palette.runCommand": "运行命令：{name}",
   "shell.path.copied": "已复制路径",
   "shell.path.copy": "复制路径",
   "shell.path.copyFailed": "无法复制路径",

@@ -232,7 +232,7 @@ export const AREAS = [
   { paths: ['src/shared/models.ts', 'tests/fixtures/claude-initialize.json', 'tests/fixtures/codex-debug-models.json'], suites: ['models', 'assistant', 'footerfit', 'agents-ui', 'automode'] },
   { paths: ['src/main/power.ts', 'src/shared/keepAwake.ts'], suites: ['quitwait', 'quit'] },
   // The close commands (HI-1368): run as a workspace closes and as Hive quits, after the drain of its writes.
-  { paths: ['src/main/closeCommand/', 'src/main/dbWrites.ts', 'src/shared/closeCommand.ts', 'src/renderer/src/components/CloseCommandPanel.tsx', 'src/renderer/src/components/CloseCommandSettings.tsx', 'tests/e2e/onclose/'], suites: ['onclose', 'quit', 'closewindow'] },
+  { paths: ['src/main/closeCommand/', 'src/main/dbWrites.ts', 'src/shared/closeCommand.ts', 'src/shared/commands.ts', 'src/main/openGate.ts', 'src/renderer/src/components/CloseCommandPanel.tsx', 'src/renderer/src/components/CommandsSettings.tsx', 'tests/e2e/onclose/', 'tests/e2e/onopen.cjs'], suites: ['onclose', 'onopen', 'quit', 'closewindow'] },
   { paths: ['src/main/progress.ts', 'src/main/progressService.ts', 'src/shared/progress.ts', 'src/renderer/src/components/Progress.tsx', 'src/renderer/src/components/ShowAllList.tsx', 'src/shared/progressTabs.ts', 'tests/e2e/progresstabs.cjs'], suites: ['progress', 'progressgates', 'progresslanes', 'progressreport', 'progressstates', 'progresstabs', 'replysize'] },
   { paths: ['src/renderer/src/components/ProgressLanes.tsx', 'src/renderer/src/components/ProgressMerge.tsx', 'src/renderer/src/laneSource.ts', 'src/shared/laneBar.ts', 'tests/e2e/progressgates.cjs'], suites: ['agentstable', 'lanestages', 'lanestart', 'progressgates', 'progresslanes', 'cardcost'] },
   // Branches next to their cards (#1424).
@@ -283,7 +283,7 @@ export const AREAS = [
   { paths: ['tests/e2e/followupsubmit.cjs'], suites: ['followupsubmit'] },
   { paths: ['tests/e2e/reviewerpool.cjs', 'src/main/reviewerPool.ts', 'src/shared/workflow/reviewerPool.ts', 'src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'src/main/loopReviewer.ts'], suites: ['reviewerpool'] },
   { paths: ['tests/e2e/isolatedcheck.cjs', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/workflow/launcher.ts', 'src/main/progressReporters/wrapper.ts', 'src/main/progressReporters/report.mts', 'src/main/workflow/runLink.ts', 'src/main/workflow/runChecks.ts'], suites: ['isolatedcheck', 'progressreport'] },
-  { paths: ['tests/e2e/slotcards.cjs', 'tests/e2e/slotrecovery.cjs', 'src/main/slotCards.ts', 'src/main/laneStart.ts', 'src/main/platform/gitPlatform.ts', 'src/main/workflow/service.ts'], suites: ['slotcards', 'slotrecovery', 'lanestart'] },
+  { paths: ['tests/e2e/slotcards.cjs', 'tests/e2e/slotrecovery.cjs', 'src/main/slotCards.ts', 'src/main/finishPath.ts', 'src/main/laneStart.ts', 'src/main/platform/gitPlatform.ts', 'src/main/workflow/service.ts'], suites: ['slotcards', 'slotrecovery', 'lanestart'] },
   { paths: ['tests/e2e/slotpool.cjs', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotJobs.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts'], suites: ['slotpool', 'slotsessions'] },
   // P7's switches and slot options set in the window and acting in the app (#1563).
   { paths: ['tests/e2e/p7settings.cjs', 'src/shared/advanced.ts', 'src/renderer/src/components/AdvancedSettings.tsx', 'src/renderer/src/views/ProjectTabs.tsx'], suites: ['p7settings'] },

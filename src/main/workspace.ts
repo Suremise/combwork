@@ -16,6 +16,8 @@ import { migratedProjectMcp, migratedWorkspaceMcp } from '../shared/agentMcp'
 import { ASSISTANT_OTHER_MCP, advancedDef, checkAdvanced } from '../shared/advanced'
 import { advanced } from './advanced'
 import { fmt, msg, tr } from '../shared/i18n'
+import { MIGRATED_CLOSE, migrateWorkspaceCommands } from '../shared/commands'
+import { OpenGate } from './openGate'
 import { HiveError, hiveError } from './hiveError'
 import type { AgentDef, AgentInfo, HiddenProject, HiveEvent, KeptUsage, LiveSessionState, ProjectConfig, ProjectInfo, RemovedData, SessionRecord, WorkspaceConfig, WorkspaceInfo, WorkspaceMoved } from '../shared/types'
 import { config } from './config'
@@ -38,6 +40,17 @@ import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, typ
 import { migrateProjectPreferences } from '../shared/workflow/preferences'
 
 const log = createLogger('workspace')
+
+/**
+ * workspace.json as read: Hive's defaults under it, and its older forms brought up to date (HI-1954: HI-1368's close
+ * command adopted into its commands, the old field dropped; written with its next save, and the same again until then).
+ */
+function loadedConfig(raw: unknown): WorkspaceConfig {
+  const c = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), migrateWorkspacePreferences(withoutSkillSwitches(raw as Record<string, unknown>)))
+  c.commands = migrateWorkspaceCommands(c, tr(MIGRATED_CLOSE))
+  delete c.onClose
+  return c
+}
 
 /** Where this user's view of a project is kept (AppConfig.ui.projectViews, HI-1749): by its id, which a rename or a move keeps, else by its folder. */
 export const projectViewKey = (cfg: Pick<ProjectConfig, 'id'>, projectPath: string): string => (cfg.id ? `id:${cfg.id}` : `path:${resolve(projectPath).toLowerCase()}`)
@@ -239,6 +252,10 @@ export class WorkspaceService {
   closing = false
   /** Repair… of a move is running (#146): no agent starts meanwhile, as it would find paths half repaired. */
   repairingMove = false
+  /** Its open point's commands running as it opened (HI-1954): while held, no agent of it starts. */
+  openGate: OpenGate | null = null
+  /** Whether this Hive runs the user's commands (never a test copy, but for the suites' seam): set by ipc.ts. */
+  static runsCommands: () => boolean = () => false
   /** Moved since last opened, with something to repair (#146, workspaceMove.ts); the window's banner offers Repair…. */
   private moved: WorkspaceMoved | null = null
   /** The projects' ids (#508) as last read, for the folder list they were read for (`key`), and a read under way. */
@@ -392,7 +409,10 @@ export class WorkspaceService {
     }
     const fresh = !existsSync(join(abs, HIVE_DIR))
     await this.ensureWorkspaceStructure()
-    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), migrateWorkspacePreferences(withoutSkillSwitches(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}))))
+    this.wsConfig = loadedConfig(await readKeptJson(join(this.hiveDir, 'workspace.json'), {}))
+    // Its open point's commands hold its agents back until they are done (HI-1954): reserved here, before anything hears
+    // of the open (the recent list, workspace-changed, onOpened), so no start slips in ahead of them.
+    this.openGate = this.wsConfig.commands?.onOpen.run.length && WorkspaceService.runsCommands() ? new OpenGate(this.generation, this.life.signal) : null
     const last = this.wsConfig.lastPath
     this.movedFrom = last && resolve(last).toLowerCase() !== abs.toLowerCase() ? resolve(last) : null
     config.update((c) => {
@@ -800,7 +820,7 @@ export class WorkspaceService {
     const text = await readFile(file, 'utf8').catch(() => '')
     // Hive's own save, or a save started meanwhile (its settings are newer), or another workspace opened since.
     if (text === this.configWritten || this.configSaves || generation !== this.generation) return
-    this.wsConfig = mergeDefaults(structuredClone(DEFAULT_WORKSPACE_CONFIG), migrateWorkspacePreferences(withoutSkillSwitches(await readKeptJson(file, {}))))
+    this.wsConfig = loadedConfig(await readKeptJson(file, {}))
     this.emit({ type: 'skills-changed' })
     this.scheduleRefresh()
   }

@@ -9,7 +9,7 @@ import { openNoticeTarget } from '../noticeTarget'
 import { TerminalView } from './TerminalView'
 import { UpdateStatusRow } from './Updates'
 import { discardDrafts, saveAllDrafts, unsavedFiles } from './FileView'
-import type { ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli, ToastMessage } from '@shared/types'
+import type { CustomCommand, ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli, ToastMessage } from '@shared/types'
 import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, orderedProviders, providerDescriptor, shownText } from '@shared/providers'
 import { distinguishingParents } from '@shared/folderLabels'
 import { GIT_DOWNLOAD, GIT_MIN, gitFixText, gitOldText, gitProblemText } from '@shared/gitTool'
@@ -321,6 +321,9 @@ function score(text: string, q: string): number {
   return 10
 }
 
+/** No commands: a stable value for the store's selectors (a fresh [] would render forever). */
+const NO_COMMANDS: CustomCommand[] = []
+
 export function CommandPalette() {
   const open = useStore((s) => s.paletteOpen)
   const mode = useStore((s) => s.paletteMode)
@@ -328,6 +331,9 @@ export function CommandPalette() {
   const tasks = useStore((s) => s.tasks)
   const keys = useStore((s) => s.projectKeys)
   const moved = useStore((s) => s.movedCardNames)
+  // The user's commands (HI-1954): each one runs by hand from here, as from Settings.
+  const hiveCommands = useStore((s) => s.settings?.commands?.list ?? NO_COMMANDS)
+  const wsCommands = useStore((s) => s.workspace?.config.commands?.list ?? NO_COMMANDS)
   // Toggles' states as one string, so their rows' checkmarks follow live changes (pinning the window
   // while the palette is open) without rebuilding the item list; a string keeps the selector stable.
   useStore(() => commands.map((c) => (c.checked ? (c.checked() ? '1' : '0') : '')).join(''))
@@ -373,13 +379,22 @@ export function CommandPalette() {
             checked: undefined as (() => boolean) | undefined
           }))
       : []
-    return [...cardItems.map((i) => ({ ...i, s: 1000 })), ...[...projectItems, ...cmdItems].map((i) => ({ ...i, s: score(i.label, q) }))]
+    const runItems = mode === 'projects' ? [] : [...wsCommands.map((c) => ({ c, scope: 'workspace' as const })), ...hiveCommands.map((c) => ({ c, scope: 'hive' as const }))].map(({ c, scope }) => ({
+      id: `run:${scope}:${c.id}`,
+      command: undefined as string | undefined,
+      label: tr(msg({ id: 'shell.palette.runCommand', defaultMessage: 'Run Command: {name}', description: "One of the user's own commands in the command palette (Settings → Commands, HI-1954): choosing it runs it now. {name} is the command's name." }), { name: c.name }),
+      keybinding: undefined as string | undefined,
+      run: () => void call('commands:run', { scope, id: c.id }).catch((e) => notify('error', errorMessage(e))),
+      icon: 'play',
+      checked: undefined as (() => boolean) | undefined
+    }))
+    return [...cardItems.map((i) => ({ ...i, s: 1000 })), ...[...projectItems, ...cmdItems, ...runItems].map((i) => ({ ...i, s: score(i.label, q) }))]
       .filter((i) => i.s > 0)
       .sort((a, b) => b.s - a.s)
       .slice(0, 60)
     // `open`: commands' availability (when()) is read again each time the palette opens; `shownLanguage`: their labels.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, projects, open, mode, shownLanguage, tasks, keys, moved])
+  }, [q, projects, open, mode, shownLanguage, tasks, keys, moved, hiveCommands, wsCommands])
 
   useEffect(() => {
     listRef.current?.querySelector('.active')?.scrollIntoView({ block: 'nearest' })
