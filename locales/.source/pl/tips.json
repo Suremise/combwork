@@ -414,6 +414,8 @@
   "tips.signInExpired.title": "When a sign-in expires",
   "tips.silentUnknown.text": "Hive never guesses an agent is idle: when its turn has been silent for a while with no sign of its end, its pane says so. If its terminal waits at its prompt, Mark idle puts it right.",
   "tips.silentUnknown.title": "An agent silent with its state unknown",
+  "tips.skillFiles.text": "Agents read a skill's SKILL.md whenever they use it, and a file it links only when they need that part. A skill's page shows each of its files in a tab, to read and edit; a link to one opens its tab.",
+  "tips.skillFiles.title": "A skill can link files beside its SKILL.md",
   "tips.skillsDelivered.text": "The switch beside each Hive skill, in the Skills view or a project's Skills tab, says whether agents get it (Delivered to agents). Copies Hive puts in a folder for Codex and Copilot are removed once no agent works there, as Settings → Advanced says.",
   "tips.skillsDelivered.title": "Choose which skills agents get",
   "tips.slotHeld.text": "When Hive can't tell that everything an agent's session started in a slot has ended, it keeps the slot for it rather than guess. Release Slot… in the agent's ⋯ menu shows what Hive knows, ends what it lists if you want, and frees the slot.",

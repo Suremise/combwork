@@ -414,6 +414,8 @@
   "tips.signInExpired.title": "Wenn eine Anmeldung abläuft",
   "tips.silentUnknown.text": "Hive rät nie, dass ein Agent untätig ist: Ist sein Durchgang eine Weile still, ohne Anzeichen für sein Ende, sagt sein Bereich das. Wartet sein Terminal an der Eingabeaufforderung, stellt „Als untätig markieren“ es richtig.",
   "tips.silentUnknown.title": "Ein stiller Agent mit unbekanntem Zustand",
+  "tips.skillFiles.text": "Agenten lesen die SKILL.md eines Skills, wann immer sie ihn nutzen, und eine verlinkte Datei nur, wenn sie diesen Teil brauchen. Die Seite eines Skills zeigt jede seiner Dateien in einem Tab zum Lesen und Bearbeiten; ein Link darauf öffnet ihren Tab.",
+  "tips.skillFiles.title": "Ein Skill kann Dateien neben seiner SKILL.md verlinken",
   "tips.skillsDelivered.text": "Der Schalter neben jedem Skill von Hive, in der Skills-Ansicht oder im Skills-Tab eines Projekts, sagt, ob die Agenten ihn bekommen (An Agenten ausgeliefert). Kopien, die Hive für Codex und Copilot in einen Ordner legt, werden entfernt, sobald dort kein Agent mehr arbeitet, wie es Einstellungen → Erweitert sagt.",
   "tips.skillsDelivered.title": "Wähle, welche Skills Agenten bekommen",
   "tips.slotHeld.text": "Kann Hive nicht sagen, ob alles beendet ist, was die Sitzung eines Agenten in einem Slot gestartet hat, hält es den Slot für ihn, statt zu raten. „Slot freigeben…“ im ⋯-Menü des Agenten zeigt, was Hive weiß, beendet auf Wunsch, was es auflistet, und gibt den Slot frei.",

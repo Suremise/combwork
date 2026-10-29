@@ -59,6 +59,7 @@
   "content.skill.notClosed": "its header isn't closed (no line with --- after it)",
   "content.skill.notClosedWithin": "its header isn't closed within its first {kb} KB",
   "content.skill.notFields": "its header isn't a list of fields (`name: …`, `description: …`)",
+  "content.skill.notListed": "That folder isn't a skill Hive lists.",
   "content.skill.notSkill": "Not a skill folder (no SKILL.md)",
   "content.skill.yaml": "its header isn't valid YAML ({reason})",
   "content.skill.yamlAt": "its header isn't valid YAML (line {line}: {reason})",

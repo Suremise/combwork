@@ -414,6 +414,8 @@
   "tips.signInExpired.title": "Quando um login expira",
   "tips.silentUnknown.text": "O Hive nunca supõe que um agente está ocioso: quando o turno dele fica em silêncio por um tempo, sem sinal de fim, o painel dele avisa. Se o terminal estiver esperando no prompt, Marcar como ocioso corrige isso.",
   "tips.silentUnknown.title": "Um agente em silêncio, com estado desconhecido",
+  "tips.skillFiles.text": "Os agentes leem o SKILL.md de um skill sempre que o usam, e um arquivo com link só quando precisam daquela parte. A página de um skill mostra cada um dos seus arquivos numa aba, para ler e editar; um link para um deles abre a aba dele.",
+  "tips.skillFiles.title": "Um skill pode ter links para arquivos ao lado do seu SKILL.md",
   "tips.skillsDelivered.text": "O interruptor ao lado de cada skill do Hive, na visualização Skills ou na aba Skills de um projeto, diz se os agentes a recebem (Entregue aos agentes). As cópias que o Hive coloca numa pasta para o Codex e o Copilot são removidas quando nenhum agente trabalha mais lá, como diz Configurações → Avançado.",
   "tips.skillsDelivered.title": "Escolha quais skills os agentes recebem",
   "tips.slotHeld.text": "Quando o Hive não consegue saber se terminou tudo o que a sessão de um agente iniciou em um slot, ele o mantém reservado em vez de adivinhar. Liberar slot… no menu ⋯ do agente mostra o que o Hive sabe, encerra o que ele lista se você quiser e libera o slot.",

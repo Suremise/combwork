@@ -416,6 +416,8 @@ interface HiveMessageValues {
   'tips.signInExpired.title': undefined
   'tips.silentUnknown.text': undefined
   'tips.silentUnknown.title': undefined
+  'tips.skillFiles.text': undefined
+  'tips.skillFiles.title': undefined
   'tips.skillsDelivered.text': undefined
   'tips.skillsDelivered.title': undefined
   'tips.slotHeld.text': undefined

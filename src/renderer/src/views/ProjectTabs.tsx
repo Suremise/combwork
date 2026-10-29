@@ -1573,7 +1573,7 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
       </div>
       <div className="split-main">
         {current ? (
-          <SkillDetail key={current.path} skill={current} where="project" onDeleted={() => setSelected(null)} />
+          <SkillDetail key={current.path} skill={current} where="project" projectPath={project.path} onDeleted={() => setSelected(null)} />
         ) : (
           <div className="empty-state" style={{ paddingTop: '14vh' }}>
             <Icon name="sparkle" />

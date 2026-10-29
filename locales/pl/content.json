@@ -59,6 +59,7 @@
   "content.skill.notClosed": "jej nagłówek nie jest zamknięty (brak kończącej linii ---)",
   "content.skill.notClosedWithin": "jej nagłówek nie kończy się w pierwszych {kb} KB",
   "content.skill.notFields": "jej nagłówek nie jest listą pól (`name: …`, `description: …`)",
+  "content.skill.notListed": "Ten folder nie jest skillem, który pokazuje Hive.",
   "content.skill.notSkill": "To nie jest folder umiejętności (brak SKILL.md)",
   "content.skill.yaml": "jej nagłówek nie jest poprawnym YAML ({reason})",
   "content.skill.yamlAt": "jej nagłówek nie jest poprawnym YAML (wiersz {line}: {reason})",

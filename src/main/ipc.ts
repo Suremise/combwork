@@ -1268,6 +1268,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return s
     },
     'skills:openFolder': () => void shell.openPath(workspace.skillsDir),
+    'skills:files': (path, p) => skills.listedSkillFiles(path, p ? workspace.assertProject(p) : undefined),
     'skills:setDelivered': async (p, name, on) => {
       if (typeof name !== 'string' || !skills.validSkillName(name)) throw hiveError(msg({ id: 'content.skill.deliveredName', defaultMessage: 'That is not a skill name.', description: 'An error switching a skill on or off for agents (Skills → Delivered to agents): the name given is not a valid skill name.' }))
       if (p) await workspace.mutateProjectConfig(workspace.assertProject(p), (cfg) => ({ skillDelivery: withSkillDelivered(cfg.skillDelivery, name, on === true) }))

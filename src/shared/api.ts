@@ -744,6 +744,8 @@ export interface HiveRequests {
   /** A Hive skill delivered to agents or not (#1431, Skills → Delivered to agents): in the workspace (no project), or one project's. */
   'skills:setDelivered': (projectPath: string | null, name: string, on: boolean) => void
   'skills:openFolder': () => void
+  /** A listed skill's files (HI-2011), relative with "/", SKILL.md among them; `projectPath`: its project's tab. */
+  'skills:files': (skillPath: string, projectPath?: string) => { files: string[]; truncated: boolean }
 
   'mcp:list': () => McpServerInfo[]
   /**

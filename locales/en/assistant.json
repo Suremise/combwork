@@ -1579,6 +1579,18 @@
     "defaultMessage": "Add Skill from File",
     "description": "The Add Skill from File dialog's title."
   },
+  "assistant.skills.files": {
+    "defaultMessage": "Files of {skill}",
+    "description": "Accessible name of the row of tabs above a skill's page, one tab per file of the skill ({skill}: the skill's name): its SKILL.md and the reference files it links."
+  },
+  "assistant.skills.filesMore": {
+    "defaultMessage": "Only the first {count, number} files are shown.",
+    "description": "Shown after a skill's file tabs when the skill's folder has more files than Hive lists ({count}: how many are shown)."
+  },
+  "assistant.skills.filesTip": {
+    "defaultMessage": "SKILL.md is what an agent reads when it uses the skill. The other files are read only when SKILL.md's link to them is needed.",
+    "description": "Tooltip on the tabs of a skill's files: an agent reads SKILL.md whenever it uses the skill, and each reference file only when it follows SKILL.md's link to it."
+  },
   "assistant.skills.levelHive": {
     "defaultMessage": "Hive",
     "description": "A skill's kind, on a badge: one of the workspace's Hive skills. Usually kept as Hive."

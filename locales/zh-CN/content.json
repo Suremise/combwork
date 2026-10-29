@@ -59,6 +59,7 @@
   "content.skill.notClosed": "其头部没有结束（之后没有 --- 行）",
   "content.skill.notClosedWithin": "其头部在前 {kb} KB 内没有结束",
   "content.skill.notFields": "其头部不是字段列表（`name: …`、`description: …`）",
+  "content.skill.notListed": "该文件夹不是 Hive 列出的技能。",
   "content.skill.notSkill": "不是技能文件夹（没有 SKILL.md）",
   "content.skill.yaml": "其头部不是有效的 YAML（{reason}）",
   "content.skill.yamlAt": "其头部不是有效的 YAML（第 {line} 行：{reason}）",

@@ -316,6 +316,18 @@ export async function skillFiles(dir: string, lim = SKILL_FILES_LIMITS): Promise
   return { files, truncated }
 }
 
+/**
+ * A skill's files for its page (HI-2011: SKILL.md and the reference files it links), only for a skill the Skills view
+ * or the project's skills tab lists (the workspace's Hive skills, or `projectPath`'s): any other folder is refused, so
+ * the window can't list a folder that isn't a skill it shows. Bounded as skillFiles is, saying when it stopped short.
+ */
+export async function listedSkillFiles(dir: string, projectPath?: string): Promise<{ files: string[]; truncated: boolean }> {
+  const want = resolve(String(dir)).toLowerCase()
+  const listed = [...(await hiveSkills(true)), ...(projectPath ? await listSkills(projectPath) : [])]
+  if (!listed.some((s) => resolve(s.path).toLowerCase() === want)) throw hiveError(msg({ id: 'content.skill.notListed', defaultMessage: "That folder isn't a skill Hive lists.", description: "An error listing a skill's files for its page: the folder asked for isn't one of the skills Hive shows (the workspace's skills or a project's)." }), undefined, { kind: 'forbidden' })
+  return skillFiles(dir)
+}
+
 /** The folder a provider's project skills are created in (e.g. <project>/.claude/skills): the first it loads them from. */
 function localDir(projectPath: string, id: ProviderId): string {
   const rel = provider(id).skillRoots().local[0]
