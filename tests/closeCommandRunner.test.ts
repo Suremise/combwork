@@ -207,7 +207,7 @@ describe('the runs kept', () => {
     const C = 'd:/three/work'
     const other = made(C, 1, ended)
     // The one still going is left, for the caller to carry once it has ended.
-    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toEqual({ moved: 4, left: 1, errors: [] })
+    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toEqual({ moved: 4, going: [running], stuck: [], stopped: false })
     const left = readdirSync(root)
     // Under the old place: only the run still going. Under the new: the newest five (two of its own, three carried).
     expect(left.filter((f) => f.startsWith(runPrefix('workspace', A)))).toEqual([running])
@@ -215,7 +215,21 @@ describe('the runs kept', () => {
     expect(now.map((f) => f.slice(runPrefix('workspace', B).length))).toEqual([2, 3, 4, 10, 11].map((i) => `${new Date(Date.UTC(2026, 9, 28, 12, 0, i)).toISOString().replace(/[:.]/g, '-')}-0000000${i}`))
     expect(left).toContain(other)
     // Again: nothing more to move.
-    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toEqual({ moved: 0, left: 1, errors: [] })
+    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toEqual({ moved: 0, going: [running], stuck: [], stopped: false })
+  })
+
+  it('a moved run whose name is already taken at the new place is stuck, with why; `proceed` false stops before a rename', async () => {
+    const root = folder()
+    const at = runFolderName(runPrefix('workspace', A), new Date(Date.UTC(2026, 9, 28, 12, 0, 1)))
+    const there = runPrefix('workspace', B) + at.slice(runPrefix('workspace', A).length)
+    for (const f of [at, there]) {
+      mkdirSync(join(root, f))
+      writeFileSync(join(root, f, 'status.json'), JSON.stringify({ state: 'exited', runnerPid: 1 }))
+    }
+    const r = await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))
+    expect(r).toMatchObject({ moved: 0, going: [], stopped: false, stuck: [{ name: at, why: expect.stringMatching(/^EEXIST/) }] })
+    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B), () => false)).toEqual({ moved: 0, going: [], stuck: [], stopped: true })
+    expect(readdirSync(root).sort()).toEqual([at, there].sort())
   })
 
   it('two workspaces of the same name: their runs apart, by their real places', () => {

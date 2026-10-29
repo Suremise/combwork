@@ -1,7 +1,7 @@
 import { existsSync } from 'original-fs'
-import { mkdir, readFile, rm, stat } from 'original-fs/promises'
+import { mkdir, readFile, stat } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
-import type { MoveBranch, MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveReportRow, MoveWorktree, PathDataCopy, ProjectConfig, WorkspaceMoved } from '../shared/types'
+import type { MoveBranch, MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveReportRow, MoveWorktree, PathDataCopy, ProfileMove, ProjectConfig, WorkspaceMoved } from '../shared/types'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { fmt, msg, tr } from '../shared/i18n'
 import { moveHasWork, rebase, rebaseAny, samePath, worktreeCandidates, type PathMove } from '../shared/movePaths'
@@ -31,9 +31,8 @@ import { legacyWatches, moveOrphanWatches } from './watches'
 import { adoptHandovers } from './notes'
 import { noteFormerName } from './projectNames'
 import { adoptBenchmarkOwners, benchContext } from './benchmarks'
-import { carryPin } from './pin'
+import { carryPin, pinKeptAt } from './pin'
 import { carryWorkspaceRuns } from './closeCommand/closeCommands'
-import { assistantTokenFile } from './assistantControl'
 import { emitTo } from './events'
 
 /**
@@ -641,7 +640,8 @@ export async function movePlan(ws: WorkspaceService, opts: MoveOptions = {}): Pr
     if (branches.length) planned.push({ path: p, name: basename(p), from: p, folder: p, worktrees: [], sessions: 0, folders: [], branches })
   }
   const renames = planned.reduce((n, h) => n + (h.branches ?? []).filter((b) => !b.kept).length, 0)
-  if (!hosts.length && !from && !cards.length && !renames) return null
+  const profile = profileFailed(here)
+  if (!hosts.length && !from && !cards.length && !renames && !profile.length) return null
   return {
     from,
     to: here,
@@ -653,76 +653,108 @@ export async function movePlan(ws: WorkspaceService, opts: MoveOptions = {}): Pr
     // By each project's name now: one renamed with the move (juniper, now dialect) is marked under its new name.
     working: from ? [...new Set(workingAt(from).map((n) => hosts.find((h) => !h.assistant && basename(h.from).toLowerCase() === n.toLowerCase())?.name ?? n))].filter((n) => !workingAt(here).includes(n)) : [],
     ...(cards.length ? { cards } : {}),
-    ...(renames ? { branches: renames } : {})
+    ...(renames ? { branches: renames } : {}),
+    ...(profile.length ? { profile } : {})
   }
 }
 
 /** The plan's headline for the banner, or null when there's nothing to repair. */
 export const movedSummary = (plan: MovePlan | null): WorkspaceMoved | null =>
-  plan && moveHasWork(plan) ? { from: plan.from, projects: plan.projects, pending: plan.pending, ...(plan.cards?.length ? { cards: plan.cards } : {}), ...(plan.branches ? { branches: plan.branches } : {}) } : null
+  plan && moveHasWork(plan) ? { from: plan.from, projects: plan.projects, pending: plan.pending, ...(plan.cards?.length ? { cards: plan.cards } : {}), ...(plan.branches ? { branches: plan.branches } : {}), ...(plan.profile?.length ? { profile: plan.profile } : {}) } : null
+
+/**
+ * What Hive's profile keeps by a workspace's folder follows it when it moves (HI-2007): its window's pin and its close
+ * command's runs. The Assistant's old token file is left: it is written again at each launch, and deleting it could take
+ * a workspace's back there (HR2's round 2). Design HI-2007/s40 and s42:
+ * - A move is recorded as the moved workspace opens (config.json's `profileMoves`, one per old folder) only when the
+ *   old folder is gone (no .hive, not open): a copy's original keeps its own. Records about that old folder follow it
+ *   on, keeping their own old folder (A→B becomes A→C), only when the folder they went to is gone too (a copy left
+ *   there keeps them). Never evicted.
+ * - Tried at each open and Repair, whatever Repair's plan says, until nothing is left at the old folder (a pin there, a
+ *   run under its prefixes): a run still going follows once it has ended.
+ * - Every change rechecks, as it is made, that the workspace is still open here and the old folder still gone; a close
+ *   or a switch stops it with the record kept, the original back ends the record.
+ * - What couldn't move (a run that couldn't be renamed, a folder that couldn't be read) is the record's `failed`: shown
+ *   in the plan and the banner, a failed row in `report` (Repair isn't complete), or logged.
+ */
+async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<void> {
+  const here = ws.path
+  const life = ws.lifetime
+  if (!here) return
+  const current = (): boolean => !life.aborted && ws.path === here
+  const gone = (p: string): boolean => !existsSync(join(p, HIVE_DIR)) && !workspaceFor(p)
+  const ofFrom = (from: string) => (m: ProfileMove): boolean => samePath(m.from, from)
+  const from = ws.movedFrom
+  if (from && !samePath(from, here)) {
+    config.update((c) => {
+      if (!current() || !gone(from)) return
+      // Records about the folder it came from (that folder's own, or one whose workspace went there) follow it on, when
+      // the folder they last went to is gone too: lastPath stays at the first old folder until a Repair is done.
+      const ours = (m: ProfileMove): boolean => (samePath(m.to, from) || samePath(m.from, from)) && !samePath(m.to, here) && gone(m.to)
+      const list = (c.profileMoves ?? []).map((m) => (ours(m) ? { ...m, to: here } : m))
+      // The folders they went to are old folders of this one now too (the pin went there with it): each has its record.
+      const via = (c.profileMoves ?? []).filter(ours).map((m) => m.to)
+      for (const f of [from, ...via]) if (!list.some(ofFrom(f))) list.push({ from: f, to: here })
+      c.profileMoves = list
+    })
+  }
+  for (const m of (config.get().profileMoves ?? []).filter((x) => samePath(x.to, here))) {
+    if (!current()) return
+    const ok = (): boolean => current() && gone(m.from)
+    const end = (): void =>
+      config.update((c) => {
+        c.profileMoves = (c.profileMoves ?? []).filter((x) => !ofFrom(m.from)(x))
+      })
+    // A workspace at the old folder again (moved back, or another one there): what is kept there is its own.
+    if (!gone(m.from)) {
+      end()
+      continue
+    }
+    if (carryPin(m.from, here, ok)) {
+      const win = ws.window
+      if (win && !win.isDestroyed() && !win.isAlwaysOnTop()) {
+        win.setAlwaysOnTop(true)
+        emitTo(win, { type: 'window-state', maximized: win.isMaximized(), focused: win.isFocused(), alwaysOnTop: true })
+      }
+      log.info(`The window's pin follows the workspace from ${userText(m.from)}`)
+    }
+    let r: Awaited<ReturnType<typeof carryWorkspaceRuns>>
+    try {
+      r = await carryWorkspaceRuns([placeKey(m.from), resolve(m.from).toLowerCase()], ws.openPlace ?? placeKey(here), ok)
+    } catch (e) {
+      r = { moved: 0, going: [], stuck: [{ name: '', why: (e as Error).message }], stopped: false }
+    }
+    if (r.moved) log.info(`${r.moved} close-command run(s) follow the workspace from ${userText(m.from)}`)
+    // Closed or switched meanwhile: the record stays for the next try. The original back: it ends.
+    if (!current()) return
+    if (!gone(m.from)) {
+      end()
+      continue
+    }
+    if (r.going.length) log.info(`${r.going.length} close-command run(s) still going at ${userText(m.from)}: they follow once ended`)
+    for (const s of r.stuck) {
+      const why = s.why
+      if (report) say(report, 'failed', tr(msg({ id: 'main.move.closeRunsFailed', defaultMessage: "Hive's records of the workspace's close command couldn't all follow it from the old folder ({why}). Hive tries again.", description: "A line of Repair's report, after a workspace moved to another folder: the output Hive keeps of the workspace's close command couldn't all be moved from the old folder's records. {why} is the system's message." }), { why }), { what: { kind: 'closeRuns' }, result: tr(R.failedWhy, { why }) })
+      else log.warn(`carrying a close-command run from ${userText(m.from)}: ${userText(why)}`)
+    }
+    if (!pinKeptAt(m.from) && !r.going.length && !r.stuck.length && !r.stopped) end()
+    else {
+      const failed = r.stuck[0]?.why
+      config.update((c) => {
+        c.profileMoves = (c.profileMoves ?? []).map((x) => (ofFrom(m.from)(x) ? { from: x.from, to: x.to, ...(failed ? { failed } : {}) } : x))
+      })
+    }
+  }
+}
+
+/** This workspace's records by an old folder that couldn't all follow it (HI-2007): Repair tries again. */
+const profileFailed = (here: string): NonNullable<MovePlan['profile']> =>
+  (config.get().profileMoves ?? []).filter((m) => samePath(m.to, here) && !!m.failed).map((m) => ({ from: m.from, failed: m.failed! }))
 
 /**
  * On opening a workspace: records the folders of those opened for the first time, and works out whether anything
  * moved. A move with nothing to repair is simply recorded; otherwise the window's banner offers Repair….
  */
-/**
- * What Hive's profile keeps by a workspace's folder follows it when it moves (HI-2007): its window's pin, its close
- * command's runs, and its Assistant's old token file goes. A move is recorded (`profileMoves`) as it is first seen, only
- * when the old folder is gone (a copy's original keeps its own), and tried at each open and Repair until all of it has
- * followed, whatever Repair's plan says: a run still going is carried once it has ended (HR2's round 1). A step that
- * fails goes in `report` (Repair isn't complete), or the log.
- */
-async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<void> {
-  const here = ws.path
-  if (!here) return
-  const gone = (p: string): boolean => !existsSync(join(p, HIVE_DIR)) && !workspaceFor(p)
-  const from = ws.movedFrom
-  if (from && !samePath(from, here) && gone(from)) {
-    config.update((c) => {
-      const list = c.profileMoves ?? []
-      if (!list.some((m) => samePath(m.from, from) && samePath(m.to, here))) c.profileMoves = [...list, { from, to: here }].slice(-20)
-    })
-  }
-  for (const m of (config.get().profileMoves ?? []).filter((x) => samePath(x.to, here))) {
-    // A workspace at the old folder again (moved back, or another one there): its records are its own now.
-    let done = !gone(m.from)
-    if (!done) {
-      if (carryPin(m.from, here)) {
-        const win = ws.window
-        if (win && !win.isDestroyed() && !win.isAlwaysOnTop()) {
-          win.setAlwaysOnTop(true)
-          emitTo(win, { type: 'window-state', maximized: win.isMaximized(), focused: win.isFocused(), alwaysOnTop: true })
-        }
-        log.info(`The window's pin follows the workspace from ${userText(m.from)}`)
-      }
-      const errors: string[] = []
-      let left = 0
-      try {
-        const r = await carryWorkspaceRuns([placeKey(m.from), resolve(m.from).toLowerCase()], ws.openPlace ?? placeKey(here))
-        if (r.moved) log.info(`${r.moved} close-command run(s) follow the workspace from ${userText(m.from)}`)
-        if (r.left > r.errors.length) log.info(`${r.left - r.errors.length} close-command run(s) still going at ${userText(m.from)}: carried once ended`)
-        left = r.left
-        errors.push(...r.errors)
-      } catch (e) {
-        errors.push((e as Error).message)
-      }
-      try {
-        await rm(assistantTokenFile(m.from), { force: true })
-      } catch (e) {
-        errors.push((e as Error).message)
-      }
-      for (const why of errors) {
-        if (report) say(report, 'failed', tr(msg({ id: 'main.move.closeRunsFailed', defaultMessage: "Hive's records of the workspace's close command couldn't all follow it from the old folder ({why}). Hive tries again.", description: "A line of Repair's report, after a workspace moved to another folder: the output Hive keeps of the workspace's close command (or its Hive Assistant's old token file) couldn't be moved from the old folder's records. {why} is the system's message." }), { why }), { what: { kind: 'closeRuns' }, result: tr(R.failedWhy, { why }) })
-        else log.warn(`carrying the profile's records from ${userText(m.from)}: ${userText(why)}`)
-      }
-      done = left === 0 && !errors.length
-    }
-    if (done) config.update((c) => {
-      c.profileMoves = (c.profileMoves ?? []).filter((x) => !(samePath(x.from, m.from) && samePath(x.to, m.to)))
-    })
-  }
-}
-
 export async function checkMoved(ws: WorkspaceService): Promise<void> {
   const path = ws.path
   if (!path) return

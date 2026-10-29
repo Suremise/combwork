@@ -572,10 +572,11 @@ export interface AppConfig {
   /** Always on Top: the workspaces (lowercased paths) whose window was left pinned. This machine's, never in .hive. */
   alwaysOnTop?: Record<string, true>
   /**
-   * Moved workspaces whose records here (by folder: the pin, the close command's runs, the Assistant's token file) are
-   * still to follow them (HI-2007): kept until all have, tried at each open and Repair (workspaceMove.ts carryProfile).
+   * Moved workspaces whose records here by folder (the window's pin, the close command's runs) are still to follow them
+   * (HI-2007): one per old folder, `to` where the workspace is now, kept until nothing is left at `from`, tried at each
+   * open and Repair (workspaceMove.ts carryProfile). `failed`: why the last try left something it could have moved.
    */
-  profileMoves?: { from: string; to: string }[]
+  profileMoves?: ProfileMove[]
   /**
    * Antivirus scanning (#316), this machine's: the exclusions Hive added (resolved paths), Defender's list as last read
    * with administrator rights, and per workspace (lowercased path) the last suggestion (its folders, when and how many
@@ -2310,9 +2311,21 @@ export interface WorkspaceInfo {
 }
 
 /** What moved (#146): the workspace (from its old folder), or only some of its projects. */
+/** A moved workspace's records by folder still to follow it (HI-2007, config.json's `profileMoves`). */
+export interface ProfileMove {
+  from: string
+  to: string
+  failed?: string
+}
+
 export interface WorkspaceMoved {
   /** The workspace's old folder; null when only projects moved (renamed or moved in from elsewhere). */
   from: string | null
+  /**
+   * Old folders whose records by folder (the close command's runs) the last try couldn't all bring here (HI-2007), and
+   * why: Repair tries again. A run still going there isn't one: it follows once it has ended. Absent when there are none.
+   */
+  profile?: { from: string; failed: string }[]
   /** The projects that moved, by name. */
   projects: string[]
   /** Projects that didn't move but have a worktree's sessions or data still to follow it to a new folder (#146). */

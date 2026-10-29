@@ -53,10 +53,10 @@ const runsRoot = (): string => join(app.getPath('userData'), 'close-commands')
 
 /**
  * A moved workspace's close-command runs follow it (HI-2007, Repair…): those kept under any of its old place's spellings
- * (`fromPlaces`) are its new place's.
+ * (`fromPlaces`) are its new place's, while `proceed` says so (runs.ts carryRuns).
  */
-export const carryWorkspaceRuns = (fromPlaces: readonly string[], toPlace: string): Promise<RunsCarried> =>
-  carryRuns(runsRoot(), fromPlaces.map((p) => runPrefix('workspace', p)), runPrefix('workspace', toPlace))
+export const carryWorkspaceRuns = (fromPlaces: readonly string[], toPlace: string, proceed: () => boolean): Promise<RunsCarried> =>
+  carryRuns(runsRoot(), fromPlaces.map((p) => runPrefix('workspace', p)), runPrefix('workspace', toPlace), proceed)
 
 /** The runner's script, outside the asar (electron-builder.yml unpacks it). */
 function runnerScript(): string {

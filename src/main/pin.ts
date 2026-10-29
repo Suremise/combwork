@@ -8,6 +8,9 @@ import { config } from './config'
  */
 const key = (workspacePath: string): string => workspacePath.toLowerCase()
 
+/** Whether a pin is still remembered under a folder (HI-2007: a moved workspace's old one, still to follow it). */
+export const pinKeptAt = (folder: string): boolean => config.get().alwaysOnTop?.[key(folder)] === true
+
 /** Whether the workspace's window was last left on top. */
 export function pinnedFor(workspacePath: string | null): boolean {
   return !!workspacePath && config.get().alwaysOnTop?.[key(workspacePath)] === true
@@ -28,13 +31,13 @@ export function setPinned(win: BrowserWindow, workspacePath: string | null, on: 
 }
 
 /**
- * A moved workspace's pin (HI-2007, Repair…): remembered under its new folder instead of its old one. Returns whether it
- * was pinned.
+ * A moved workspace's pin (HI-2007): remembered under its new folder instead of its old one, when `ok()` still holds as
+ * config.json is changed (the same synchronous step). Returns whether it moved.
  */
-export function carryPin(from: string, to: string): boolean {
+export function carryPin(from: string, to: string, ok: () => boolean = () => true): boolean {
   let pinned = false
   config.update((c) => {
-    if (c.alwaysOnTop?.[key(from)] !== true) return
+    if (c.alwaysOnTop?.[key(from)] !== true || !ok()) return
     const pins = { ...c.alwaysOnTop }
     delete pins[key(from)]
     pins[key(to)] = true

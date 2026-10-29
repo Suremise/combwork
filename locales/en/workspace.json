@@ -743,6 +743,10 @@
     "defaultMessage": "Repair finished, with problems:",
     "description": "After Repair; what failed follows."
   },
+  "workspace.move.profileBanner": {
+    "defaultMessage": "Some of Hive's records of this workspace couldn't follow it from its old folder yet.",
+    "description": "The banner when the output Hive keeps of the workspace's close command couldn't all be moved from its old folder's records after a move (HI-2007); Repair… tries again."
+  },
   "workspace.move.projects": {
     "defaultMessage": "{count, plural, one {The project {name} was moved to another folder.} other {# projects were moved to another folder.}}",
     "description": "The banner when projects moved."
@@ -1505,7 +1509,7 @@
   },
   "workspace.repair.closeRuns": {
     "defaultMessage": "The close command's output",
-    "description": "Repair's report, the What column: the output Hive keeps of the workspace's close command (Settings → Workspace → When this workspace closes, run), moved from the old folder's records to the new one's (HI-2007)."
+    "description": "Repair's plan and report, the What column: the output Hive keeps of the workspace's close command (Settings → Workspace → When this workspace closes, run), moved from the old folder's records to the new one's (HI-2007)."
   },
   "workspace.repair.conversations": {
     "defaultMessage": "{provider}'s conversations and memory",
@@ -1578,6 +1582,10 @@
   "workspace.repair.moveExclusion": {
     "defaultMessage": "move Hive's exclusion",
     "description": "Repair's plan, the Will do column of a Defender row: Hive's exclusion of the old folder is removed and the new folder excluded instead."
+  },
+  "workspace.repair.moveRuns": {
+    "defaultMessage": "move here (last try: {why})",
+    "description": "Repair's plan, the Will do column of the close command's output (HI-2007): the runs Hive keeps are moved from the old folder's records to the new one's; {why} is the system's message from the last try, which failed."
   },
   "workspace.repair.needsAdmin": {
     "defaultMessage": "Defender shows its exclusions only to administrators: these states are what Hive knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.",

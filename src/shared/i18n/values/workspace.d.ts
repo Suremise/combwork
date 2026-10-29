@@ -187,6 +187,7 @@ interface HiveMessageValues {
   'workspace.move.owner': { owner: string; agent: string | number }
   'workspace.move.pending': { projects: string | number }
   'workspace.move.problems': undefined
+  'workspace.move.profileBanner': undefined
   'workspace.move.projects': { count: number; name: string | number }
   'workspace.move.projectsMoved': undefined
   'workspace.move.recreateButton': undefined
@@ -396,6 +397,7 @@ interface HiveMessageValues {
   'workspace.repair.markAgain': { projects: string | number }
   'workspace.repair.moveBox': { count: number }
   'workspace.repair.moveExclusion': undefined
+  'workspace.repair.moveRuns': { why: string | number }
   'workspace.repair.needsAdmin': undefined
   'workspace.repair.noneToMove': undefined
   'workspace.repair.notFound': undefined

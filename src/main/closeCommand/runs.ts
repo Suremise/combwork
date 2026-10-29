@@ -184,36 +184,50 @@ function runEnded(dir: string): boolean {
   }
 }
 
-/** What carrying a moved workspace's runs did: how many moved, how many are left under the old prefixes, and why not. */
+/**
+ * What carrying a moved workspace's runs did. Every run left under an old prefix is in `going` (its runner alive: it
+ * follows once it has ended) or `stuck` (ended, and why it couldn't move), unless `stopped`.
+ */
 export interface RunsCarried {
   moved: number
-  /** Still under an old prefix: one going (its runner writes there), or one that couldn't be renamed (`errors`). */
-  left: number
-  errors: string[]
+  going: string[]
+  stuck: { name: string; why: string }[]
+  /** `proceed` said stop before a rename: the rest wasn't looked at. */
+  stopped: boolean
 }
 
 /**
  * A moved workspace's runs (HI-2007): the ended ones kept under its old place's prefixes take its new place's, and the
- * newest KEEP_RUNS of them all are kept. One still going stays where it is, as its runner writes there: `left` counts
- * it, for the caller to try again once it has ended.
+ * newest KEEP_RUNS of them all are kept. One still going stays where it is, as its runner writes there. `proceed` is
+ * asked before each rename (the workspace still open there, its old folder still gone): false stops it, nothing more
+ * changed. A folder that can't be read throws.
  */
-export async function carryRuns(root: string, fromPrefixes: readonly string[], toPrefix: string, keep = KEEP_RUNS): Promise<RunsCarried> {
-  const out: RunsCarried = { moved: 0, left: 0, errors: [] }
+export async function carryRuns(root: string, fromPrefixes: readonly string[], toPrefix: string, proceed: () => boolean = () => true, keep = KEEP_RUNS): Promise<RunsCarried> {
+  const out: RunsCarried = { moved: 0, going: [], stuck: [], stopped: false }
   if (!existsSync(root)) return out
-  const olds = [...new Set(fromPrefixes)].filter((p) => p !== toPrefix)
-  for (const prefix of olds) {
-    for (const n of runsOf(root, prefix).filter((x) => runEnded(join(root, x)))) {
-      const to = join(root, toPrefix + n.slice(prefix.length))
-      if (existsSync(to)) continue
-      try {
-        await rename(join(root, n), to)
-        out.moved++
-      } catch (e) {
-        out.errors.push((e as Error).message)
+  for (const prefix of [...new Set(fromPrefixes)].filter((p) => p !== toPrefix)) {
+    for (const n of runsOf(root, prefix)) {
+      if (!runEnded(join(root, n))) {
+        out.going.push(n)
+        continue
       }
+      if (!proceed()) {
+        out.stopped = true
+        return out
+      }
+      const to = join(root, toPrefix + n.slice(prefix.length))
+      // As a rename that found it there would say.
+      if (existsSync(to)) out.stuck.push({ name: n, why: `EEXIST: file already exists, rename '${n}' -> '${basename(to)}'` }) // i18n-ignore: the system's message, as a rename's own are
+      else
+        try {
+          await rename(join(root, n), to)
+          out.moved++
+        } catch (e) {
+          out.stuck.push({ name: n, why: (e as Error).message })
+        }
     }
   }
-  await pruneRuns(root, toPrefix, keep)
-  out.left = olds.reduce((n, p) => n + runsOf(root, p).length, 0)
+  if (!proceed()) out.stopped = true
+  else await pruneRuns(root, toPrefix, keep)
   return out
 }
