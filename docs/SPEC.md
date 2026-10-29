@@ -3050,7 +3050,10 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
      never "no identity" (`identity` pauses only when git says the name or email isn't set). The queue's worktree is
      reused only when this repository's worktree list names it; a folder there that git doesn't list is used only if
      empty, else left as it is and paused, named; nothing of it is ever removed or pruned. After the advance, only the
-     folder's branch is read again (3 times, 100 ms apart, in the lock): the advance is never redone.
+     folder's branch is read again (3 times, 100 ms apart, in the lock): the advance is never redone. A git that didn't
+     run to an exit of its own (Node's `EAGAIN` on a busy machine, Hive's git worker ending, the output bound, a signal) is
+     never git's answer anywhere in Hive: its result has code -1 (never 1, which callers read as git's "no": a key not
+     set, HEAD detached, not an ancestor) and `notRun` naming why, and it doesn't mark git as missing.
    - **No trace** (a git older than 2.24): only git's own "Not committing merge" is a hook, and signing is never read
      from text.
    - **Signing:** the repository's config (never overridden). Hive's commits run with no terminal: no input,

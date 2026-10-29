@@ -3,43 +3,53 @@
 // rules on, the lease held), within READ_RETRIES; only a read that keeps failing pauses, needsYou with git's own words. A
 // commit identity git couldn't read is never taken for one that isn't set. The queue's worktree is reused only when git
 // lists it, and nothing of it is ever removed. After the advance, only the folder's branch is read again: nothing is
-// redone. git is wrapped by command here (src/main/git's git(): the queue's reads and the platform's), deterministically:
-// no load.
+// redone. The failures are injected where git's outcome comes from (gitWorker's runGit: what the process did, before
+// src/main/git's git() reads it), so the real normalisation and the platform's reads see them: git's own exit (128, with
+// what it said) or a git that didn't run to an exit (Node's EAGAIN, nothing said). Deterministic: no load.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { READ_RETRIES, type QueueConfig } from '../../src/main/workflow/mergeQueue'
-import type { GitResult } from '../../src/main/git'
+import { git } from '../../src/main/git'
+import * as G from '../../src/main/platform/git'
+import { isUnknown } from '../../src/main/platform/types'
+import { gitTool } from '../../src/main/gitTool'
+import type { GitOutcome, GitRequest } from '../../src/main/gitWorker'
 
+type Rule = { match: (args: string) => boolean; times: number; native?: string; err: string; code: number; after?: () => Promise<void> }
 /** The git calls to fail: the first whose command matches, `times` times (Infinity: always); each call's command. */
-const fail = vi.hoisted(() => ({ rules: [] as { match: (args: string) => boolean; times: number; err: string; code: number; after?: () => Promise<void> }[], calls: [] as string[] }))
-vi.mock('../../src/main/git', async (orig) => {
-  const real = (await orig()) as typeof import('../../src/main/git')
+const fail = vi.hoisted(() => ({ rules: [] as Rule[], calls: [] as string[] }))
+vi.mock('../../src/main/gitWorker', async (orig) => {
+  const real = (await orig()) as typeof import('../../src/main/gitWorker')
+  // The command as Hive's code wrote it: GIT_PREFIX (git.ts's options for every command) left out.
+  const commandOf = (args: string[]): string => args.slice(args.indexOf('core.quotepath=off') + 1).join(' ')
   return {
     ...real,
-    git: async (cwd: string, args: string[], ...rest: unknown[]): Promise<GitResult> => {
-      const line = args.join(' ')
+    runGit: async (m: Omit<GitRequest, 'id'>, ...rest: unknown[]): Promise<GitOutcome> => {
+      const line = commandOf(m.args)
       fail.calls.push(line)
       const rule = fail.rules.find((r) => r.times > 0 && r.match(line))
-      if (rule) {
-        rule.times--
-        // A command that did its work and then said it failed (a partial add): run first, then fail.
-        if (rule.after) {
-          await (real.git as (...a: unknown[]) => Promise<GitResult>)(cwd, args, ...rest)
-          await rule.after()
-        }
-        return { out: '', ok: false, buf: Buffer.alloc(0), err: rule.err, code: rule.code }
+      if (!rule) return (real.runGit as (...a: unknown[]) => Promise<GitOutcome>)(m, ...rest)
+      rule.times--
+      // A command that did its work and then said it failed (a partial add): run first, then fail.
+      if (rule.after) {
+        await (real.runGit as (...a: unknown[]) => Promise<GitOutcome>)(m, ...rest)
+        await rule.after()
       }
-      return (real.git as (...a: unknown[]) => Promise<GitResult>)(cwd, args, ...rest)
+      const none = new Uint8Array()
+      return rule.native
+        ? { stdout: none, stderr: none, error: { code: rule.native, killed: false, signal: null }, cwdExists: true }
+        : { stdout: none, stderr: Buffer.from(rule.err), error: { code: rule.code, killed: false, signal: null }, cwdExists: true }
     }
   }
 })
 
 const BUSY = "fatal: Unable to create 'index.lock': File exists."
-const failing = (match: string | RegExp, times = 1, more: { code?: number; err?: string; after?: () => Promise<void> } = {}): void => {
-  fail.rules.push({ match: (l) => (typeof match === 'string' ? l.includes(match) : match.test(l)), times, err: more.err ?? BUSY, code: more.code ?? 128, ...(more.after ? { after: more.after } : {}) })
+/** `native`: the process didn't run to an exit (Node's code, e.g. EAGAIN), as a loaded machine can say. */
+const failing = (match: string | RegExp, times = 1, more: { code?: number; err?: string; native?: string; after?: () => Promise<void> } = {}): void => {
+  fail.rules.push({ match: (l) => (typeof match === 'string' ? l.includes(match) : match.test(l)), times, err: more.err ?? BUSY, code: more.code ?? 128, ...(more.native ? { native: more.native } : {}), ...(more.after ? { after: more.after } : {}) })
 }
 const callsOf = (match: string): number => fail.calls.filter((l) => l.includes(match)).length
 
@@ -88,30 +98,37 @@ const BEFORE_TOUCH: [string, string, boolean][] = [
   ["the checked-out folder's status", 'status --porcelain -z --untracked-files=all --no-renames', true]
 ]
 
+/** How a read fails: git's own exit, with what it said; or a git that didn't run to an exit (HR2's round 2: Node's EAGAIN). */
+const KINDS: [string, { native?: string }][] = [
+  ['git exiting 128', {}],
+  ['git not running to an exit (EAGAIN)', { native: 'EAGAIN' }]
+]
+
 describe('a read that fails once before anything is touched: the entry goes round again (HI-2019)', () => {
-  for (const [what, match, advanceOnly] of BEFORE_TOUCH) {
-    if (!advanceOnly)
-      it(`${what}, the check red: returned, nothing paused`, async () => {
+  for (const [how, more] of KINDS)
+    for (const [what, match, advanceOnly] of BEFORE_TOUCH) {
+      if (!advanceOnly)
+        it(`${what}, ${how}, the check red: returned, nothing paused`, async () => {
+          const e = project()
+          const card = await queued(e)
+          failing(match, 1, more)
+          expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'returned', reason: 'checks' }])
+          expect(e.store.queuePause('main')).toBeNull()
+          expect(e.wf.state(card).stage).toBe('active')
+          expect(count(e, card.id, 'CheckRan')).toBe(1)
+        })
+      it(`${what}, ${how}, the check green: merged once, nothing paused`, async () => {
         const e = project()
         const card = await queued(e)
-        failing(match)
-        expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'returned', reason: 'checks' }])
+        failing(match, 1, more)
+        expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
         expect(e.store.queuePause('main')).toBeNull()
-        expect(e.wf.state(card).stage).toBe('active')
-        expect(count(e, card.id, 'CheckRan')).toBe(1)
+        expect(e.wf.state(card).stage).toBe('done')
+        expect(count(e, card.id, 'IntegrationStarted')).toBe(1)
+        expect(count(e, card.id, 'Integrated')).toBe(1)
+        expect(fail.rules.every((r) => r.times === 0)).toBe(true)
       })
-    it(`${what}, the check green: merged once, nothing paused`, async () => {
-      const e = project()
-      const card = await queued(e)
-      failing(match)
-      expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
-      expect(e.store.queuePause('main')).toBeNull()
-      expect(e.wf.state(card).stage).toBe('done')
-      expect(count(e, card.id, 'IntegrationStarted')).toBe(1)
-      expect(count(e, card.id, 'Integrated')).toBe(1)
-      expect(fail.rules.every((r) => r.times === 0)).toBe(true)
-    })
-  }
+    }
 
   it('the target checked out nowhere: its listing under the lock failing once, merged once', async () => {
     const e = project({}, false)
@@ -158,11 +175,19 @@ describe('a read that keeps failing pauses needsYou with what git said, after th
     expect(count(e, card.id, 'CheckRan')).toBe(0)
   })
 
-  it("the test merge's head (git not starting): paused needsYou with git's words", async () => {
+  it("the test merge's head, git never running to an exit (EAGAIN): paused needsYou, saying so", async () => {
     const e = project()
     await queued(e)
-    failing('rev-parse --verify -q HEAD', Infinity, { code: -1, err: 'spawn git EAGAIN' })
-    expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: 'spawn git EAGAIN' }])
+    failing('rev-parse --verify -q HEAD', Infinity, { native: 'EAGAIN' })
+    expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: "git rev-parse didn't run to an exit (EAGAIN)" }])
+  })
+
+  it('the identity, git never running to an exit (EAGAIN): needsYou, never identity', async () => {
+    const e = project()
+    await queued(e)
+    failing('config user.name', Infinity, { native: 'EAGAIN' })
+    expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: "git config didn't run to an exit (EAGAIN)" }])
+    expect(callsOf('config user.name')).toBe(1 + READ_RETRIES)
   })
 
   it('the identity read failing once is read again (not the failed answer kept): 2 reads, returned', async () => {
@@ -320,20 +345,21 @@ describe('admitted afresh after the wait, before any new merge or check', () => 
 })
 
 describe('after the advance: only the branch is read again', () => {
-  it("the folder's branch unreadable once just after the swap: Done, merged and Integrated once, nothing paused", async () => {
-    const e = project()
-    const card = await queued(e)
-    let swapped = false
-    fail.rules.push({ match: (l) => (l.startsWith('update-ref refs/heads/main') && (swapped = true), false), times: 1, err: '', code: 0 })
-    fail.rules.push({ match: (l) => swapped && l.startsWith('symbolic-ref'), times: 1, err: BUSY, code: 128 })
-    expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
-    expect(e.wf.state(card).stage).toBe('done')
-    expect(count(e, card.id, 'IntegrationStarted')).toBe(1)
-    expect(count(e, card.id, 'Integrated')).toBe(1)
-    expect(e.store.queuePause('main')).toBeNull()
-    // Hive's merge commit, once (the card's own commit isn't a merge).
-    expect(sh(e.project, 'log', '--merges', '--format=%s', 'main').split('\n').filter((s) => s.startsWith(`${card.key}:`))).toHaveLength(1)
-  })
+  for (const [how, more] of KINDS)
+    it(`the folder's branch unreadable once just after the swap (${how}): Done, merged and Integrated once, nothing paused`, async () => {
+      const e = project()
+      const card = await queued(e)
+      let swapped = false
+      fail.rules.push({ match: (l) => (l.startsWith('update-ref refs/heads/main') && (swapped = true), false), times: 1, err: '', code: 0 })
+      fail.rules.push({ match: (l) => swapped && l.startsWith('symbolic-ref'), times: 1, err: BUSY, code: 128, ...more })
+      expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
+      expect(e.wf.state(card).stage).toBe('done')
+      expect(count(e, card.id, 'IntegrationStarted')).toBe(1)
+      expect(count(e, card.id, 'Integrated')).toBe(1)
+      expect(e.store.queuePause('main')).toBeNull()
+      // Hive's merge commit, once (the card's own commit isn't a merge).
+      expect(sh(e.project, 'log', '--merges', '--format=%s', 'main').split('\n').filter((s) => s.startsWith(`${card.key}:`))).toHaveLength(1)
+    })
 
   it('the lease lost while the branch is read again: nothing more written after the swap', async () => {
     const e = project()
@@ -345,5 +371,47 @@ describe('after the advance: only the branch is read again', () => {
     expect(await e.queue({ holds: () => holds }).drain('main')).toEqual([])
     expect(count(e, card.id, 'Integrated')).toBe(0)
     expect(e.store.queuePause('main')).toBeNull()
+  })
+})
+
+describe("a git that didn't run to an exit is never git's answer (HR2's round 2: src/main/git's normalisation)", () => {
+  it("git(): ok false, code -1 (never 1, git's \"no\"), notRun naming why, said when git said nothing; git not taken for missing", async () => {
+    const e = project()
+    failing('rev-parse --verify -q HEAD', 1, { native: 'EAGAIN' })
+    const r = await git(e.project, ['rev-parse', '--verify', '-q', 'HEAD'])
+    expect(r).toMatchObject({ ok: false, code: -1, notRun: 'EAGAIN', err: "git rev-parse didn't run to an exit (EAGAIN)" })
+    expect(r.missing).toBeUndefined()
+    expect(gitTool().state).not.toBe('missing')
+    // git's own exit 1 is still git's answer, as it was.
+    const own = await git(e.project, ['config', 'hi2019.unset'])
+    expect(own).toMatchObject({ ok: false, code: 1 })
+    expect(own.notRun).toBeUndefined()
+  })
+
+  it("the identity: unknown when git didn't run to an exit, null only when git says a key isn't set", async () => {
+    const e = project()
+    failing('config user.name', 1, { native: 'EAGAIN' })
+    const failed = await G.identity(e.project)
+    expect(isUnknown(failed) && failed.detail).toBe("git config didn't run to an exit (EAGAIN)")
+    expect(await G.identity(e.project)).toEqual({ name: expect.any(String), email: expect.any(String) })
+    sh(e.project, 'config', '--unset', 'user.email')
+    expect(await G.identity(e.project)).toBeNull()
+  })
+
+  it("the folder's branch: unknown when git didn't run to an exit, null only for a detached HEAD", async () => {
+    const e = project()
+    failing('symbolic-ref', 1, { native: 'EAGAIN' })
+    expect(isUnknown(await G.branch(e.project))).toBe(true)
+    expect(await G.branch(e.project)).toBe('main')
+    sh(e.project, 'checkout', '-q', '--detach')
+    expect(await G.branch(e.project)).toBeNull()
+  })
+
+  it("an ancestry read: a git that didn't run is neither yes (0) nor no (1)", async () => {
+    const e = project()
+    const head = sh(e.project, 'rev-parse', 'HEAD')
+    failing('merge-base --is-ancestor', 1, { native: 'EAGAIN' })
+    expect((await git(e.project, ['merge-base', '--is-ancestor', head, head])).code).toBe(-1)
+    expect((await git(e.project, ['merge-base', '--is-ancestor', head, head])).code).toBe(0)
   })
 })
