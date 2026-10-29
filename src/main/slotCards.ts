@@ -703,10 +703,11 @@ const waitingForRepair = new Set<string>()
  * user is asked once on the card (SLOT_DIRTY_GATE). That question closes once the slot is clean or on another line. Read
  * from the slot each time, under the lock: never another card's checkout, never a slot an operation holds.
  */
-async function finishedSlots(ws: WorkspaceService, projectPath: string, wf: Workflow, pool: SlotPool, lanes: Map<string, LaneRecord>): Promise<void> {
+async function finishedSlots(ws: WorkspaceService, projectPath: string, wf: Workflow, pool: SlotPool, lanes: Map<string, LaneRecord>): Promise<boolean> {
   const since = new Date(Date.now() - DELETE_WITHIN_MS).toISOString()
+  let detached = false
   for (const l of [...pool.openLeases(), ...pool.endedSince(since)]) {
-    if (ended(ws)) return
+    if (ended(ws)) return detached
     const lane = l.kind === 'lane' && l.lane ? lanes.get(l.lane) : undefined
     const cards = l.kind === 'card' && l.card !== null ? [l.card] : (lane?.cards ?? [])
     // The slot as the lease still has it: null once another lease holds it (or it is gone).
@@ -717,8 +718,8 @@ async function finishedSlots(ws: WorkspaceService, projectPath: string, wf: Work
       return now && !(l.to && pool.openLease(now.name)) ? { name: now.name, folder: now.folder, target: now.target, busy: !!now.op || (!l.to && !quiet(projectPath, l.agent)), open: !l.to } : null
     }
     for (const n of cards) {
-      if (ended(ws)) return
-      await finishedSlot(projectPath, wf, n, l.id, slotNow, l.lane)
+      if (ended(ws)) return detached
+      detached = (await finishedSlot(projectPath, wf, n, l.id, slotNow, l.lane)) || detached
     }
     // A running lane's slot its builder kept busy: looked at again once it is quiet (as a preparation waits), once per lease.
     const card = cards.map((n) => cardOf(wf, n)).find((c) => !!c && !!wf.state(c).finished && wf.state(c).started?.lease === l.id)
@@ -734,6 +735,7 @@ async function finishedSlots(ws: WorkspaceService, projectPath: string, wf: Work
         .finally(() => quietWaits.delete(l.id))
     }
   }
+  return detached
 }
 
 /** Running lanes' leases whose finished card's slot waits for its builder to be quiet (finishedSlots). */
@@ -753,20 +755,21 @@ export interface FinishedSlotView {
  * read again under the repository's lock: another lease's now, or on another line, its question closes; dirty, asked
  * once; clean, an open lease's slot detached at the target's head (a released one is the pool's), its question closed.
  */
-export async function finishedSlot(projectPath: string, wf: Workflow, n: number, lease: string, slotNow: () => FinishedSlotView | null, lane: string | null = null): Promise<void> {
+export async function finishedSlot(projectPath: string, wf: Workflow, n: number, lease: string, slotNow: () => FinishedSlotView | null, lane: string | null = null): Promise<boolean> {
   const card = cardOf(wf, n)
   const s = card ? wf.state(card) : null
-  if (!card || !s?.finished || s.started?.lease !== lease || !s.started.line) return
+  if (!card || !s?.finished || s.started?.lease !== lease || !s.started.line) return false
   const asked = s.requests.some((r) => r.gate === SLOT_DIRTY_GATE)
   const slot = slotNow()
   if (!slot) {
     if (asked) await wf.closeSlotDirty(card)
-    return
+    return false
   }
   const line = s.started.line
   const target = slot.target ?? s.started.target
-  if (!target) return
+  if (!target) return false
   const finish = s.finished.seq
+  let detached = false
   await withRepoLock(
     projectPath,
     async () => {
@@ -787,13 +790,15 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
       // Clean: a running lane's slot detached here; a released one is the pool's (it looks at it as it settles).
       if (now.open && !isUnknown(h.target) && h.target) {
         const r = await git(now.folder, ['switch', '--detach', h.target])
-        if (r.ok) log.info(`${userText(now.name)} detached at ${userText(target)} after #${n}${lane ? ` (lane ${userText(lane)})` : ''}`)
-        else return void log.warn(`detaching ${userText(now.name)} at ${userText(target)}: ${userText(r.err)}`)
+        if (!r.ok) return void log.warn(`detaching ${userText(now.name)} at ${userText(target)}: ${userText(r.err)}`)
+        log.info(`${userText(now.name)} detached at ${userText(target)} after #${n}${lane ? ` (lane ${userText(lane)})` : ''}`)
+        detached = true
       }
       if (asked) await wf.closeSlotDirty(card)
     },
     { quiet: true, project: projectPath }
   )
+  return detached
 }
 
 async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<void> {
@@ -867,7 +872,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   if (ended(ws)) return
   // 1b. Finished cards' slots (HI-2014): one still on its card's line is detached at the target's head when clean (a
   //     running lane's here; a released card's as the pool looks at it), else the user is asked once on the card.
-  await finishedSlots(ws, projectPath, wf, pool, lanes).catch((e) => failedStep("settling finished cards' slots", e)) // i18n-ignore: a log line (failedStep logs it)
+  const detached = await finishedSlots(ws, projectPath, wf, pool, lanes).catch((e) => (failedStep("settling finished cards' slots", e), false)) // i18n-ignore: a log line (failedStep logs it)
   if (ended(ws)) return
   // With the rules off nothing is placed: no placement is pending, so none keeps anything (HI-1804).
   if (!workflowEnforced()) return void keepTracksOf(ws, projectPath, new Map())
@@ -887,8 +892,11 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   // What placements no longer pending kept (their card put back, Done, deleted; a cycle placed or replaced) is let go
   // here, where retired cycles are passed over (HR4's HI-1804 round 1: a failed try's record outlived its card's return).
   keepTracksOf(ws, projectPath, pending)
-  // 3. Done cards' merged lines, from leases still open or ended within DELETE_WITHIN_MS.
-  if (advanced.get(SLOTS_DELETE_MERGED) !== false) {
+  // 3. Done cards' merged lines, from leases still open or ended within DELETE_WITHIN_MS. A slot just detached (1b): the
+  //    next pass, asked for now, deletes its line after its releases (a lane that ended meanwhile gives its slot back
+  //    first, rather than after a deletion).
+  if (detached) void settleSlotCards(ws, projectPath)
+  else if (advanced.get(SLOTS_DELETE_MERGED) !== false) {
     const since = new Date(Date.now() - DELETE_WITHIN_MS).toISOString()
     const done = new Set<number>()
     for (const l of [...pool.openLeases(), ...pool.endedSince(since)]) {

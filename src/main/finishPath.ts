@@ -62,9 +62,10 @@ export async function runFinish(ws: WorkspaceService, wf: Workflow, projectPath:
       await commentAsHive(dep.id, storedText(HISTORY.startsWithout, { card: key, reason: f.reason ?? '' }), ws, (c) => c.column !== 'done', dependentNoteId(key, finish))
     }
   })
-  // The slot and its line: decided by the pass from what is there (a lane's next card waits on it, below).
-  await settleSlotCards(ws, projectPath).catch((e) => log.warn(`#${n}'s finish: its slot`, e))
+  // The lane first: it ends as its last card is Done, never later for its slot (its next card waits on the slot itself,
+  // laneStatus). Then the slot and its line, decided by the pass from what is there.
   await step('lane', () => refreshLanes(ws))
+  await settleSlotCards(ws, projectPath).catch((e) => log.warn(`#${n}'s finish: its slot`, e))
 }
 
 /** Each open project's Done cards whose current finish still owes a step: run again (a workspace opening). */
