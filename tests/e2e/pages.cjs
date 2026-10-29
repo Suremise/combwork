@@ -159,7 +159,7 @@ const check = (name, ok, extra = '') => {
   await add(12)
   check('twenty-four agents', (await agentsNow()).length === 24, String((await agentsNow()).length))
   const at24 = await refusal()
-  check('a twenty-fifth is refused', /A project can have up to 24 agents\.$/.test(at24), at24)
+  check('a twenty-fifth is refused', at24.endsWith('A project can have up to 24 agents.'), at24)
   check("…and + Add ▾'s Configure Agent and Add… is greyed out", !!(await lib.until(addGreyed, HUNG_MS)))
   await choose('Grid of six')
   check('24 in the grid of six: four pages', (await buttons()) === 4, String(await buttons()))
@@ -229,7 +229,7 @@ const check = (name, ok, extra = '') => {
   const loaded = await inv('templates:load', proj, 'project', saved.saved.file, plan.remove.map((a) => a.id))
   check('loaded past Maximum agents: 24 agents again', loaded.created.length === 24 && (await agentsNow()).length === 24, `${loaded.created.length} / ${(await agentsNow()).length}`)
   const after = await refusal()
-  check('…and a twenty-fifth is refused', /A project can have up to 24 agents\.$/.test(after), after)
+  check('…and a twenty-fifth is refused', after.endsWith('A project can have up to 24 agents.'), after)
 
   await app.close()
   process.exit(failed ? 1 : 0)
