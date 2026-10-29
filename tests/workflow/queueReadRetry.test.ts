@@ -48,9 +48,11 @@ vi.mock('../../src/main/gitWorker', async (orig) => {
 
 /**
  * HI-2020: the queue's own git with options (its merge commits: mergeQueue's gitTree) starts with child_process.spawn.
- * Matching ones fail to start: an 'error' with no pid (EAGAIN), or, `sync`, a throw at once. Everything else is spawned.
+ * Matching ones fail to start: an 'error' with no pid (EAGAIN), or, `sync`, a throw at once; or, `signal` (HI-2042), start
+ * and are ended by that signal (an exit with no code, as Node reports a child ended through its handle). Everything else
+ * is spawned.
  */
-const spawnFail = vi.hoisted(() => ({ rules: [] as { match: string; times: number; sync?: boolean }[], seen: [] as string[] }))
+const spawnFail = vi.hoisted(() => ({ rules: [] as { match: string; times: number; sync?: boolean; signal?: string }[], seen: [] as string[] }))
 vi.mock('child_process', async (orig) => {
   const real = (await orig()) as typeof import('child_process')
   const { EventEmitter } = await import('events')
@@ -60,6 +62,11 @@ vi.mock('child_process', async (orig) => {
     if (cmd === 'git') spawnFail.seen.push(line)
     if (!rule) return real.spawn(cmd, args as string[], opts as never)
     rule.times--
+    if (rule.signal) {
+      const cp = Object.assign(new EventEmitter(), { stdout: null, stderr: null, pid: 4242 })
+      setImmediate(() => cp.emit('exit', null, rule.signal))
+      return cp
+    }
     const failure = Object.assign(new Error('spawn git EAGAIN'), { code: 'EAGAIN', errno: -11, syscall: 'spawn git' })
     if (rule.sync) throw failure
     const cp = Object.assign(new EventEmitter(), { stdout: null, stderr: null, pid: undefined })
@@ -421,6 +428,33 @@ describe("the test merge's commit, its git never started (HI-2020): put back, an
       expect(count(e, card.id, 'IntegrationStarted')).toBe(1)
       expect(count(e, card.id, 'Integrated')).toBe(1)
     })
+
+  // HI-2042: git ended by a signal (no answer of its own): never taken for a conflict or a hook's refusal; put back, again.
+  for (const [what, o, match] of cases.filter(([, , , sync]) => !sync))
+    it(`${what}, git ended by a signal (HI-2042): merged once, nothing paused or returned`, async () => {
+      const e = project(o)
+      const card = await queued(e)
+      if (o.strict || o.style === 'rebase') commit(e.project, { 'other.txt': 'meanwhile\n' }, 'meanwhile')
+      spawnFail.rules.push({ match, times: 1, signal: 'SIGTERM' })
+      expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
+      expect(spawnFail.rules[0].times).toBe(0)
+      expect(e.store.queuePause('main')).toBeNull()
+      expect(e.wf.state(card).stage).toBe('done')
+      expect(count(e, card.id, 'IntegrationFailed')).toBe(0)
+      expect(count(e, card.id, 'Integrated')).toBe(1)
+    })
+
+  it('ended by a signal every time (HI-2042): needsYou saying so after 1 + READ_RETRIES tries; never a hook or conflict', async () => {
+    const e = project()
+    const card = await queued(e)
+    const before = sh(e.project, 'rev-parse', 'main')
+    spawnFail.rules.push({ match: 'merge --no-ff', times: Infinity, signal: 'SIGTERM' })
+    expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: 'git was ended by a signal (SIGTERM)' }])
+    expect(spawnFail.seen.filter((l) => l.includes('merge --no-ff'))).toHaveLength(1 + READ_RETRIES)
+    expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
+    expect(count(e, card.id, 'IntegrationFailed')).toBe(0)
+    expect(e.wf.state(card).stage).toBe('merging')
+  })
 
   it('never starting, every time: needsYou with its start error after 1 + READ_RETRIES tries; nothing merged', async () => {
     const e = project()
