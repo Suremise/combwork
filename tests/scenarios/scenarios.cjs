@@ -4174,21 +4174,26 @@ module.exports.SCENARIOS.push(
   },
   {
     id: 'coordinator-start-reviewer',
-    title: "Coordinator mode woken as a card started on its builder alone reaches Review, in a project whose work an agent reviews (#1346 item 2): starts the idle reviewer on it without asking",
+    title: "Coordinator mode woken as a card started on its builder alone reaches Review, in a project whose work an agent reviews (#1346 item 2, HI-2046): Hive has given it to the reviewer, so it starts none and asks nothing",
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
     async setup(c) {
       await reviewedPair(c)
       // Coder's work committed and submitted (#1537: a card set in Review with nothing committed stayed in Doing).
-      await submittedCard(c, 'r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', after: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
+      const n = await submittedCard(c, 'r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', after: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
+      // HI-2046: a loose card in Review is Hive's to give out; the Assistant is woken once it has.
+      const given = async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'ReviewerAssigned' && f.data?.reviewer === c.agents.implementer.id)
+      if (!(await require('../e2e/lib.cjs').until(given, 30000))) throw new Error(`setup: Hive didn't give #${n} to Implementer`)
     },
     prompt: (c) => `[Hive] #${c.cards.r} (Coder's card) is in Review; latest comment by Coder: "Ready: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`,
-    fake: (c) => `skill coordinate-agents then hive hive_start_agent {"project":"alpha","agent":"Implementer","prompt":"Review #${c.cards.r} with the review-agent-work skill. (work 1)"}`,
+    fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.r},"latestComment":true}`,
     expect: (o, c) => {
       const n = c.cards.r
+      const reviewers = [...briefsTo(o, 'Implementer'), ...ran(o, 'hive_lane').filter((x) => argsOf(x).action === 'start').map((x) => x.args)]
       return [
-        ['started Implementer on its review', briefsTo(o, 'Implementer').some((t) => names(t, 'review', n)) || ran(o, 'hive_lane').some((x) => argsOf(x).action === 'start' && /implementer/i.test(String(argsOf(x).reviewer ?? ''))), briefsTo(o, 'Implementer').join(' | ').slice(0, 300)],
+        ['Hive gave it to Implementer (a ReviewerAssigned fact)', factsOf(o, 'r', 'ReviewerAssigned').some((f) => f.data?.reviewer === c.agents.implementer.id), JSON.stringify(factsOf(o, 'r', 'ReviewerAssigned').map((f) => f.data))],
+        ['started no reviewer itself (no brief to Implementer, no lane)', reviewers.length === 0, reviewers.join(' | ').slice(0, 300)],
         ["didn't ask the user whether it should be reviewed", called(o, 'hive_notify').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
         ['moved the card nowhere and gave no verdict of its own', !called(o, 'hive_update_task').some((x) => field(x.args, 'number', n) && (argsOf(x).column || argsOf(x).review)) && called(o, 'hive_verdict').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
       ]
