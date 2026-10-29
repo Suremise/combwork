@@ -2811,6 +2811,10 @@
     "defaultMessage": "A lane that ended stays ended: start it again if it should go on.",
     "description": "Why a change of the Assistant's can't be undone: it ended a lane (a card loop's record)."
   },
+  "assistant.undo.why.laneReorderNow": {
+    "defaultMessage": "A lane reordered now isn't undone: its card put back stays in Todo and its next card starts. Reorder it again, or move the card.",
+    "description": "Why a change of the Assistant's can't be undone (HI-1995): it reordered a running lane at once, which put the card being worked back in Todo and has Hive start the lane's new first card."
+  },
   "assistant.undo.why.message": {
     "defaultMessage": "A message that was sent can't be taken back.",
     "description": "Why a change of the Assistant's can't be undone: it sent an agent a message."

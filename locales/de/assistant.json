@@ -702,6 +702,7 @@
   "assistant.undo.why.declarePaths": "Die angegebenen Pfade bleiben bei der Karte.",
   "assistant.undo.why.handOver": "Eine Übergabe lässt sich nicht rückgängig machen: Die Arbeit ging an den anderen Agenten.",
   "assistant.undo.why.laneEnded": "Eine beendete Lane bleibt beendet: Starte sie neu, wenn sie weitergehen soll.",
+  "assistant.undo.why.laneReorderNow": "Eine sofort umsortierte Lane wird nicht rückgängig gemacht: Ihre zurückgelegte Karte bleibt in „Offen“, und ihre nächste Karte startet. Sortiere sie erneut um oder verschiebe die Karte.",
   "assistant.undo.why.message": "Eine gesendete Nachricht lässt sich nicht zurücknehmen.",
   "assistant.undo.why.nothing": "Nichts davon wird durch Rückgängig wiederhergestellt.",
   "assistant.undo.why.projectClosed": "Ein geschlossenes Projekt bleibt geschlossen: Öffne es wieder, wenn es gewünscht ist.",

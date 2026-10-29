@@ -246,6 +246,8 @@
   "tips.isolatedChecks.title": "Una comprobación que nadie puede estropear",
   "tips.keepAwake.text": "Mientras un agente trabaja, Hive impide que Windows entre en suspensión (la pantalla aún puede bloquearse), y lo deja suspenderse cuando terminan. Elige cuándo en Configuración → General.",
   "tips.keepAwake.title": "Deja a los agentes trabajando: el equipo sigue despierto",
+  "tips.laneApplyNow.text": "En Iniciar carril para el autor de un carril, Aplicar ahora cambia el orden al momento: la tarjeta en curso vuelve a Pendiente con su trabajo en su rama, y la nueva primera tarjeta se inicia cuando termina el turno del autor.",
+  "tips.laneApplyNow.title": "Reordena ya un carril en marcha",
   "tips.laneBranchSquash.text": "Tras fusionar con squash la tarjeta de un agente, Hive actualiza su rama antes de su siguiente tarjeta, para que cada revisión muestre solo el trabajo de esa tarjeta. Lo que no puede hacer con seguridad lo pregunta en Para ti; Configuración → Avanzado hace que pregunte siempre.",
   "tips.laneBranchSquash.title": "La rama de un agente, al día entre tarjetas",
   "tips.laneGates.text": "En el panel Progreso, un carril dice en su cabecera por qué espera, y una muesca roja en el segmento de una tarjeta significa que su última petición fue rechazada: pasa el puntero por encima para ver por qué y qué hacer.",

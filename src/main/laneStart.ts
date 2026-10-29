@@ -87,7 +87,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   if (starting.has(key)) throw hiveError(M.starting, { agent: builder.name }, { kind: 'conflict' })
   starting.add(key)
   try {
-    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: 'the user' }) // i18n-ignore: who started it, as the lane records it (agents read it)
+    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: 'the user', ...(req.applyNow ? { applyNow: true } : {}) }) // i18n-ignore: who started it, as the lane records it (agents read it)
     const where = await builderWhere(projectPath, builder, options)
     if (where.inSlots) {
       // Its slot, lent before its agents start and kept for the whole lane (§16.10.2). None free: the lane is recorded

@@ -1807,6 +1807,18 @@
     "defaultMessage": "{agent} ({status})",
     "description": "An agent in the Start Lane dialog's choices, with what it is doing ({status}: \"Working…\", \"Not running\")."
   },
+  "board.laneStart.applyNow": {
+    "defaultMessage": "Apply now",
+    "description": "A checkbox of the Start Lane dialog (HI-1995), off by default, shown when the builder's running lane has a card being worked: the new list applies at once instead of after that card is Done."
+  },
+  "board.laneStart.applyNowHint": {
+    "defaultMessage": "{builder}'s lane is working on {card}: this list applies once {card} is Done. Apply now puts {card} back in Todo (its work stays on its branch), and {next, select, none {the lane has nothing left to start} other {{next} starts once {builder}'s turn is over and its slot is ready}}.",
+    "description": "Under the Apply now checkbox of the Start Lane dialog (HI-1995): {builder} (an agent's name) has a running lane whose card {card} (its key) is in progress; {next} is the key of the card that would start next, or none. A slot is a folder Hive lends to cards. Todo is a board column."
+  },
+  "board.laneStart.applyNowNot": {
+    "defaultMessage": "{builder}'s lane is working on {card}, which is in {column, select, review {Review} other {Approved}}: this list applies once it is Done. It can't be put back now without losing its {column, select, review {review} other {approval and merge}}.",
+    "description": "In the Start Lane dialog (HI-1995), with Apply now unavailable: the builder's ({builder}) lane card {card} is already in the Review or Approved column (select; translate each)."
+  },
   "board.laneStart.builder": {
     "defaultMessage": "Builder",
     "description": "A field label in the Start Lane dialog: the agent that builds the cards. Glossary: builder."

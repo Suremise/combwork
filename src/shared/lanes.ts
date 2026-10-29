@@ -65,6 +65,20 @@ export interface LaneRecord {
    * given to the next free pooled reviewer. Kept with the lane (its row's `extra`).
    */
   pool?: true
+  /**
+   * The card Hive starts next though no card before it is Done (HI-1995): a running lane reordered with `applyNow`, its
+   * card in flight put back. Written with the put back (the runtime's reorder, one write), cleared by the start of that
+   * card (its own write), and by any later list change; due only while it is the lane's first own open card, in Todo and
+   * not blocked, in a lane not paused (laneStartDue), as any next card. Kept with the lane (its row's `extra`).
+   */
+  startNext?: LaneStartNext
+}
+
+/** A lane's card to start next after a reorder applied now (HI-1995): the card, how it came, and when. */
+export interface LaneStartNext {
+  card: number
+  by: 'applyNow'
+  at: string
 }
 
 // The limits and defaults (loopLimits.ts). A loop's rounds, wait and design check wait when its request doesn't say are
@@ -123,16 +137,17 @@ export const ownOpen = (c: LaneCard): boolean => c.column !== 'done' && c.column
 
 /**
  * A running lane's next card for Hive to start on its builder (HI-1990), or null: the first of its own open cards, in
- * Todo and not blocked, once the card before it is Done (every card before it Done or another lane's, one of them Done).
- * A lane's first card is its builder's to start.
+ * Todo and not blocked, once the card before it is Done (every card before it Done or another lane's, one of them Done),
+ * or once a reorder applied now names it (`startNext`, HI-1995). Otherwise a lane's first card is its builder's to start.
  */
-export function laneStartDue(lane: Pick<LaneInfo, 'state' | 'cards'>): LaneCard | null {
+export function laneStartDue(lane: Pick<LaneInfo, 'state' | 'cards' | 'startNext'>): LaneCard | null {
   if (lane.state !== 'active') return null
   const at = lane.cards.findIndex(ownOpen)
-  if (at < 1) return null
+  if (at < 0) return null
   const c = lane.cards[at]
   if (c.column !== 'todo' || c.blocked) return null
-  return lane.cards.slice(0, at).some((x) => x.column === 'done') ? c : null
+  if (lane.startNext === c.number) return c
+  return at > 0 && lane.cards.slice(0, at).some((x) => x.column === 'done') ? c : null
 }
 
 /** Whether a lane reads its cards as it left them (ended or abandoned, with its snapshot) rather than from the board. */
@@ -196,6 +211,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     mergeCommit: rec.mergeCommit,
     status,
     queued: running(rec) && rec.pending ? [...rec.pending] : null,
+    ...(running(rec) && rec.startNext ? { startNext: rec.startNext.card } : {}),
     oldRules: laneOldRules(rec, rulesetNow),
     stages: running(rec) && rec.ruleset && rulesetStages ? [...rulesetStages] : null,
     slot: running(rec) ? (slot?.slot ?? null) : null,
@@ -390,7 +406,8 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(whole(v.inFlight, 1e9) ? { inFlight: v.inFlight as number } : {}),
     ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000), ...(v.slotWait.stoppedOnly === true ? { stoppedOnly: true as const } : {}) } } : {}),
     ...(isObj(v.brief) && whole(v.brief.rev, 1e9) && (v.brief.text === null || typeof v.brief.text === 'string') && (v.brief.out === null || whole(v.brief.out, 1e9)) ? { brief: { text: v.brief.text === null ? null : (v.brief.text as string).slice(0, LANE_BRIEF_MAX), rev: v.brief.rev as number, out: v.brief.out as number | null, ...(text(v.brief.notIn, 128) ? { notIn: v.brief.notIn as string } : {}) } } : {}),
-    ...(v.pool === true && !reviewer ? { pool: true as const } : {})
+    ...(v.pool === true && !reviewer ? { pool: true as const } : {}),
+    ...(isObj(v.startNext) && whole(v.startNext.card, 1e9) && v.startNext.by === 'applyNow' && time(v.startNext.at) ? { startNext: { card: v.startNext.card as number, by: 'applyNow' as const, at: v.startNext.at as string } } : {})
   }
 }
 

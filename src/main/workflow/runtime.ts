@@ -172,7 +172,7 @@ export interface WorkflowConfig {
   autoRun?: boolean
   effects?: Effects
   /** Test seams: called between gathering and the transaction. */
-  hooks?: { beforeWrite?: (move: string) => void | Promise<void> }
+  hooks?: { beforeWrite?: (move: string) => void | Promise<void>; inReorder?: () => void }
   /**
    * Runs a write of the store under the lock its store needs (#1217): in the app, a change of the workspace's board
    * (boardWrite), since the board's store writes only inside one; left out, the write runs as it is (a store on its own
@@ -345,6 +345,23 @@ export interface LineBehind extends LineNow {
   /** A move begun (its `LineMoving`) with no `LineMoved` after it, and the line not back where it was (HR2's round 3). */
   unfinished?: { from: string; to: string }
 }
+
+/** What a reorder applied now did (HI-1995): the card it put back (its key and line), and the card to start next. */
+export interface LaneReordered {
+  ok: true
+  putBack: string | null
+  line: string | null
+  startNext: string | null
+}
+
+/** A lane changed between a reorder's decision and its write (HI-1995): nothing written; decided again by its caller. */
+class LaneMoved extends Error {}
+
+/** A reorder applied now refused in its write because its builder is in a turn (HI-1995): nothing written; why. */
+export class LaneBuilderBusy extends Error {}
+
+/** Whether two lists are the same cards in the same order. */
+const sameList = (a: readonly number[], b: readonly number[]): boolean => a.length === b.length && a.every((x, i) => x === b[i])
 
 class DragUndone extends Error {
   constructor(readonly refused: GuardRefusal) {
@@ -803,6 +820,9 @@ export class Workflow {
         const bad = opts.drag ? this.across(w, 'start', 'active', g.ins, opts.drag) : this.check(w, 'start', g.ins)
         if (bad) return undone(bad)
         this.applyStart(w, g, w.written.some((f) => f.kind === 'Override') ? 'override' : actor === 'user' ? 'user' : 'intent')
+        // A card to start next after a reorder applied now (HI-1995): consumed by this start, of it or of another card.
+        const its = this.store.card(card.id).lane
+        if (its && this.store.laneStartNext(its)) this.store.setLaneStartNext(its, null)
         return null
       })
       if (out && laneMoved && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
@@ -2354,7 +2374,68 @@ export class Workflow {
     // A card queued is in the lane already (its queued list): it uses the lane's ruleset.
     const next = changeList({ ...l, current }, cards)
     this.saveLane(next)
+    this.store.setLaneStartNext(id, null)
     return { lane: next, queuedAfter: current !== null ? this.store.card(current).key : null }
+  }
+
+  /**
+   * A running lane reordered now (HI-1995, `hive_lane start` with `applyNow`), in one write of its card in flight: that
+   * card, if it is no longer the new list's first own open card, put back (as putBack writes it: to Todo, its folder
+   * released, its line and work kept) and the list saved at once with the card to start next (`startNext`, which the
+   * lane's continuation, laneStarts.ts, starts once the builder is free); else the list only. Checked in that write: the
+   * card still where it was decided (stillAt), still the lane's own, the lane still running with the list it had, and
+   * `free()` (the caller's: its builder not in a turn) still null; any of them not, refused with nothing written (a
+   * throw from `free` undoes the write whole). A card in flight in Review, Approved or Merging is refused: its review or
+   * merge would be lost. The builder is told (a wake) in the same write. Replies with what was put back and what starts.
+   */
+  async reorderLaneNow(laneId: string, cards: number[], o: { by: string; free: () => string | null }): Promise<LaneReordered | Refusal> {
+    const l = this.lane(laneId)
+    if (!l || l.ended) return refusal('evidence.changed', { card: laneId }, null)
+    const own = (c: number): boolean => this.laneOwn(l.id, c)
+    const flying = l.cards.find((c) => this.laneCardFlying(c) && own(c)) ?? null
+    const first = cards.find((c) => !this.laneDone(c) && own(c)) ?? null
+    const keys = (list: readonly number[]): string => list.map((c) => this.store.card(c).key).join(', ')
+    const builder = this.store.laneBuilder(l.id)
+    if (flying === null || flying === first) {
+      try {
+        await this.locked(() =>
+          this.store.tx(() => {
+            const now = this.lane(laneId)
+            if (!now || now.ended || !sameList(now.cards, l.cards) || !sameList(now.pending ?? [], l.pending ?? [])) throw new LaneMoved()
+            this.saveLane({ ...now, cards: [...cards], pending: null })
+            this.store.setLaneStartNext(laneId, null)
+          })
+        )
+      } catch (e) {
+        if (e instanceof LaneMoved) return refusal('evidence.changed', { card: laneId }, null)
+        throw e
+      }
+      return { ok: true, putBack: null, line: null, startNext: null }
+    }
+    const card = this.store.card(flying)
+    const s = this.state(card)
+    if (s.stage !== 'active') return this.refuse(card, 'hive', 'put back', { rule: 'move.notFromHere', values: { card: card.key, stage: s.stage, move: 'put back', moves: this.movesFrom(s.stage, this.rulesetOf(card, s), s).join(', ') } }) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    const line = s.started?.line ?? null
+    await this.cfg.hooks?.beforeWrite?.('reorder')
+    const out = await this.write(card, this.rulesetOf(card, s), 'hive', (w) => {
+      const moved = this.stillAt(w, s, 'put back') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      if (moved) return moved
+      const now = this.lane(laneId)
+      if (!now || now.ended || !sameList(now.cards, l.cards) || !sameList(now.pending ?? [], l.pending ?? []) || !own(flying) || this.store.laneBuilder(l.id) !== builder) return { rule: 'evidence.changed', values: { card: card.key } } as GuardRefusal
+      const busy = o.free()
+      if (busy) throw new LaneBuilderBusy(busy)
+      w.move('todo', 'intent', `Moved back by a lane reorder applied now (${o.by})`) // i18n-ignore: a fact's reason, agent-facing English
+      w.action('releaseSlot', {})
+      this.saveLane({ ...now, cards: [...cards], pending: null, current: null })
+      this.store.setLaneStartNext(laneId, first !== null ? { card: first, by: 'applyNow', at: new Date().toISOString() } : null)
+      const next = first !== null ? ` Your next card, ${this.store.card(first).key}, is given to you once your turn is over and its slot is ready.` : " It has no card left to do." // i18n-ignore: a wake, agent-facing
+      // For tests: a failure once all of it is written (it is undone whole).
+      this.cfg.hooks?.inReorder?.()
+      this.wake(w, builder, `Your lane was reordered now by ${o.by}: its cards are ${keys(cards)}. ${card.key} is back in Todo (its work stays on ${line ?? 'its branch'}): stop working on it.${next}`) // i18n-ignore: a wake, agent-facing
+      return null
+    })
+    if (out) return this.refuse(card, 'hive', 'put back', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+    return { ok: true, putBack: card.key, line, startNext: first !== null ? this.store.card(first).key : null }
   }
 
   /** A lane's card in flight: started and not Done (Active, Review, Approved or Merging), by the stage the board keeps. */
@@ -2411,6 +2492,7 @@ export class Workflow {
     const now = this.laneNow(l)
     if (!now.applies) return
     this.saveLane({ ...l, cards: [...now.cards], pending: null })
+    this.store.setLaneStartNext(l.id, null)
     const builder = this.store.laneBuilder(l.id)
     if (builder) this.wake(w, builder, `Your lane's card list changed, as queued: its cards are now ${now.cards.map((c) => this.store.card(c).key).join(', ')}. hive_lane next names your next card.`) // i18n-ignore: a wake, agent-facing
   }

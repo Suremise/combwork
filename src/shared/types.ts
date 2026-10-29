@@ -3437,6 +3437,8 @@ export interface LaneInfo {
   pool?: boolean
   /** In the lane's order. */
   cards: LaneCard[]
+  /** The card Hive starts next after a reorder applied now (HI-1995: LaneRecord's `startNext`), while the lane runs. */
+  startNext?: number
   /** The first card not in Passed or Done (null: none left). */
   current: number | null
   state: LaneState
@@ -3513,6 +3515,8 @@ export interface LaneStartRequest {
   cards: number[]
   note?: string
   name?: string | null
+  /** For the builder's running lane with a card in flight: the list applied now, that card put back (HI-1995). */
+  applyNow?: boolean
 }
 
 /**

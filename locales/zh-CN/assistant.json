@@ -702,6 +702,7 @@
   "assistant.undo.why.declarePaths": "它声明的路径保留在卡片上。",
   "assistant.undo.why.handOver": "交接无法撤销：工作已交给另一个智能体。",
   "assistant.undo.why.laneEnded": "已结束的通道保持结束：如需继续，请重新启动它。",
+  "assistant.undo.why.laneReorderNow": "立即重新排序的通道不会被撤销：放回的卡片留在待办中，其下一张卡片会开始。请再次重新排序，或移动该卡片。",
   "assistant.undo.why.message": "已发送的消息无法收回。",
   "assistant.undo.why.nothing": "它没有更改任何撤销可以恢复的内容。",
   "assistant.undo.why.projectClosed": "它关闭的项目保持关闭：如需要，请重新打开。",

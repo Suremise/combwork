@@ -702,6 +702,7 @@
   "assistant.undo.why.declarePaths": "宣言したパスはカードに残ります。",
   "assistant.undo.why.handOver": "引き継ぎは元に戻せません。作業は別のエージェントに移りました。",
   "assistant.undo.why.laneEnded": "終了したレーンは終了したままです。続ける場合は再開してください。",
+  "assistant.undo.why.laneReorderNow": "今すぐ並べ替えたレーンは元に戻せません。戻したカードは「未着手」に残り、次のカードが開始されます。もう一度並べ替えるか、カードを移動してください。",
   "assistant.undo.why.message": "送信済みのメッセージは取り消せません。",
   "assistant.undo.why.nothing": "元に戻せる変更はありません。",
   "assistant.undo.why.projectClosed": "閉じたプロジェクトは閉じたままです。必要ならもう一度開いてください。",

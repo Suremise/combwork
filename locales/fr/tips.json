@@ -246,6 +246,8 @@
   "tips.isolatedChecks.title": "Une vérification que personne ne peut gâcher",
   "tips.keepAwake.text": "Pendant qu’un agent travaille, Hive empêche Windows de se mettre en veille (l’écran peut toujours se verrouiller), et le laisse se mettre en veille une fois les agents terminés. Choisis quand dans Paramètres → Général.",
   "tips.keepAwake.title": "Laisse les agents travailler, le PC reste éveillé",
+  "tips.laneApplyNow.text": "Dans Démarrer un couloir pour l’auteur d’un couloir, Appliquer maintenant change l’ordre tout de suite : la carte en cours revient dans À faire, son travail gardé sur sa branche, et la nouvelle première carte démarre à la fin du tour de l’auteur.",
+  "tips.laneApplyNow.title": "Réordonner un couloir en cours, tout de suite",
   "tips.laneBranchSquash.text": "Après la fusion en squash de la carte d’un agent, Hive met sa branche à jour avant sa carte suivante, pour que chaque relecture ne montre que le travail de cette carte. Ce qu’il ne peut pas faire sans risque, il le demande dans Pour toi ; Paramètres → Avancé le fait demander à chaque fois.",
   "tips.laneBranchSquash.title": "La branche d’un agent à jour entre les cartes",
   "tips.laneGates.text": "Dans le panneau Progression, un couloir dit dans son en-tête ce qu’il attend, et une encoche rouge sur le segment d’une carte signifie que sa dernière demande a été refusée : survole-la pour voir pourquoi et quoi faire ensuite.",

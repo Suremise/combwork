@@ -453,6 +453,9 @@ interface HiveMessageValues {
   'board.lane.workVerdict': { pass: string; revision: string; current: string }
   'board.laneStart.addCard': undefined
   'board.laneStart.agentState': { agent: string | number; status: string | number }
+  'board.laneStart.applyNow': undefined
+  'board.laneStart.applyNowHint': { builder: string | number; card: string | number; next: string }
+  'board.laneStart.applyNowNot': { builder: string | number; card: string | number; column: string }
   'board.laneStart.builder': undefined
   'board.laneStart.busyNow': { agents: string | number; n: number }
   'board.laneStart.cancel': undefined

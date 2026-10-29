@@ -6,6 +6,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { claudeInput } from './claudeInputStandIn'
 
 // What Hive types into agents' terminals, recorded instead (no process runs).
 const pty = vi.hoisted(() => ({ typed: [] as string[] }))
@@ -49,7 +50,10 @@ function builder(status: string, id = 'b1'): { status: string } {
     enumerable: true
   })
   state.status = status
-  s.live.set(`${p.toLowerCase()}#${id}`, { state, adapter: claudeCode, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
+  // Its input box (HI-1979: Hive types into Claude Code only once its own key shows the box empty), fed what is typed.
+  const input = claudeInput({ paste: false })
+  input.from(() => pty.typed)
+  s.live.set(`${p.toLowerCase()}#${id}`, { state, adapter: claudeCode, screen: input.screen, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
   return state as unknown as { status: string }
 }
 
@@ -62,7 +66,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.hive'), { recursive: true })
     mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -202,5 +206,58 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     expect((await lanes.getLane(w, l2.id)).state).toBe('active')
     await checkLaneStarts(w)
     expect(await columnOf(b2)).toBe('doing')
+  })
+
+  describe('a lane reordered now (HI-1995; the project with a workflow, as the case above left it)', () => {
+    /** A lane of two on `b`: its first card Active (started by its builder), its builder idle. */
+    async function inFlight(b: string) {
+      const [x1, x2] = [await card('X one', b), await card('X two', b)]
+      const lane = (await lanes.startLane(w, { project: 'alpha', builder: b, reviewer: 'r1', cards: [x1, x2], by: 'B (alpha)' })).lane
+      await run(() => tasks.updateTask(x1, { column: 'doing', agent: b }, user))
+      const st = builder('ready', b)
+      return { x1, x2, lane, st }
+    }
+
+    it('puts the card in flight back and Hive starts the new first card once its builder is free; the reply and the builder say so', async () => {
+      const { x1, x2, lane } = await inFlight('b9')
+      const r = await lanes.startLane(w, { project: 'alpha', builder: 'b9', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })
+      expect(r.note).toContain('Applied now: ')
+      expect(r.note).toContain(`${x1} is back in Todo`)
+      expect(r.note).toContain(`${x2} starts next, once B9's turn is over and its slot is ready`)
+      expect(await columnOf(x1)).toBe('todo')
+      expect(r.lane.cards.map((c) => c.number)).toEqual([x2, x1])
+      expect(r.lane.startNext).toBe(x2)
+      await checkLaneStarts(w)
+      expect(await columnOf(x2)).toBe('doing')
+      expect((await lanes.getLane(w, lane.id)).startNext).toBeUndefined()
+    })
+
+    it("refuses while its builder is in a turn or waits on a watch of other work, changing nothing; a watch on that card alone doesn't stop it", async () => {
+      const { x1, x2, st } = await inFlight('d1')
+      st.status = 'working'
+      await expect(lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })).rejects.toThrow(/D1 is working on \S+: a reorder applied now never puts its card back under it/)
+      const live = s.live.get(`${p.toLowerCase()}#d1`) as { state: Record<string, unknown> }
+      st.status = 'watching'
+      live.state.watch = { cards: [x2], changes: ['column'] }
+      await expect(lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })).rejects.toThrow(/waiting on a watch of other work/)
+      expect(await columnOf(x1)).toBe('doing')
+      expect((await lanes.laneOf(w, 'alpha', 'd1'))!.cards.map((c) => c.number)).toEqual([x1, x2])
+      // Watching only the card it puts back: that wait is obsolete, so the reorder goes ahead.
+      live.state.watch = { cards: [x1], changes: ['column'] }
+      const r = await lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true })
+      expect(r.note).toMatch(/^Applied now/)
+      expect(await columnOf(x1)).toBe('todo')
+    })
+
+    it('with its card in flight still first, the list applies at once with nothing put back', async () => {
+      const [x1, x2, x3] = [await card('Y one', 'd2'), await card('Y two', 'd2'), await card('Y three', 'd2')]
+      await lanes.startLane(w, { project: 'alpha', builder: 'd2', reviewer: 'r1', cards: [x1, x2, x3], by: 'B (alpha)' })
+      await run(() => tasks.updateTask(x1, { column: 'doing', agent: 'd2' }, user))
+      builder('ready', 'd2')
+      const r = await lanes.startLane(w, { project: 'alpha', builder: 'd2', reviewer: 'r1', cards: [x1, x3, x2], by: 'the user', applyNow: true })
+      expect(r.lane.cards.map((c) => c.number)).toEqual([x1, x3, x2])
+      expect(r.lane.queued).toBeNull()
+      expect(await columnOf(x1)).toBe('doing')
+    })
   })
 })
