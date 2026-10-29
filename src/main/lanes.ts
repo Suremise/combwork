@@ -14,7 +14,7 @@ import { onHiveEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { placeKey, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable } from './storeTables'
-import { boardOpen, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
+import { boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou } from '../shared/workflow/facts'
@@ -993,6 +993,26 @@ export async function laneNext(ws: WorkspaceService, project: string, agentId: s
   if (flying) return { lane, next: { card: flying.number, title: flying.title, carryOn: true }, waits: lane.status }
   const todo = open.find((c) => c.column === 'todo')
   return { lane, next: todo ? { card: todo.number, title: todo.title, carryOn: false } : null, waits: lane.status }
+}
+
+/**
+ * A builder's running lane as the board has it now, read without waiting (HI-1990): by its id, or the one holding `card`;
+ * its cards in order, its queued list when there is one (it applies once the card in flight is Done), each as the board's
+ * row tells it (a card given to another agent is held elsewhere; archived or gone, gone). Null: no such running lane.
+ * Read inside a write's transaction it is what that write sees, so a check there can't be undone by a lane change.
+ */
+export function builderLaneNow(ws: WorkspaceService, builder: string, by: { lane: string } | { card: number }): { id: string; cards: LaneCard[] } | null {
+  return boardRead(ws, (db) => {
+    const lane = ('lane' in by
+      ? db.prepare("SELECT id FROM lanes WHERE id = ? AND state = 'active' AND builder_id = ?").get(by.lane, builder) // i18n-ignore: SQL, not text
+      : db.prepare("SELECT l.id FROM lane_cards c JOIN lanes l ON l.id = c.lane WHERE c.card = ? AND l.state = 'active' AND l.builder_id = ? LIMIT 1").get(by.card, builder)) as { id: string } | undefined // i18n-ignore: SQL, not text
+    if (!lane) return null
+    const list = db.prepare('SELECT 1 FROM lane_pending WHERE lane = ? LIMIT 1').get(lane.id) ? 'lane_pending' : 'lane_cards' // i18n-ignore: SQL, not text
+    // i18n-ignore: SQL, not text
+    const rows = db.prepare(`SELECT c.card AS number, k.col AS col, k.agent AS agent, k.archived AS archived, k.title AS title, k.blocked AS blocked FROM ${list} c LEFT JOIN cards k ON k.number = c.card WHERE c.lane = ? ORDER BY c.ord`).all(lane.id) as { number: number; col: string | null; agent: string | null; archived: number | null; title: string | null; blocked: string | null }[]
+    const cards = rows.map((r): LaneCard => ({ number: r.number, title: r.title ?? '', column: !r.col || r.archived ? 'gone' : (r.col as LaneCard['column']), blocked: r.blocked || null, round: 1, reviewing: false, ...(r.agent && r.agent !== builder ? { elsewhere: r.agent } : {}) }))
+    return { id: lane.id, cards }
+  })
 }
 
 /** The running lane of a project agent (as builder, else as reviewer), or null. */

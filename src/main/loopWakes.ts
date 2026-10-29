@@ -6,7 +6,7 @@ import { HISTORY, storedText } from '../shared/taskHistory'
 import { ANSWER_MAX, cardChange, LOOP_WAKE_KINDS, laneNextWords, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
 import { boardRead } from './boardStore'
 import { onHiveEvent } from './events'
-import { onLanesWritten } from './lanes'
+import { builderLaneNow, onLanesWritten } from './lanes'
 import { laneStartDue, ownOpen } from '../shared/lanes'
 import { loopReviewerOf, poolCard } from './loopReviewer'
 import { createLogger, userText } from './logger'
@@ -172,22 +172,13 @@ const covered = (projectPath: string, agentId: string, card: TaskCard, kind: Loo
  * card, which Hive starts for it once its turn ends (rules on: laneStarts.ts) or which it starts itself (rules off),
  * one under way, or none left. Undefined: not a Done wake, or no lane of its holds the card. Read from the board without
  * waiting, as the rest of the wake is decided (an await here let the builder's own watch tell the Done first): a card
- * given to another agent is another lane's (laneView's `elsewhere`, as far as the board's row tells it).
+ * given to another agent is another lane's (builderLaneNow).
  */
 function laneNextOf(ws: WorkspaceService, card: TaskCard, agentId: string, kind: LoopWakeKind): string | undefined {
   if (kind !== 'done' || card.column !== 'done') return undefined
-  let cards: LaneCard[] | null
+  let cards: LaneCard[] | undefined
   try {
-    cards = boardRead(ws, (db) => {
-      // i18n-ignore: SQL, not text
-      const lane = db.prepare("SELECT l.id FROM lane_cards c JOIN lanes l ON l.id = c.lane WHERE c.card = ? AND l.state = 'active' AND l.builder_id = ? LIMIT 1").get(card.number, agentId) as { id: string } | undefined
-      if (!lane) return null
-      // Its list as it is once this card is Done: a change queued while the card was in flight applies then (#1270).
-      const list = db.prepare('SELECT 1 FROM lane_pending WHERE lane = ? LIMIT 1').get(lane.id) ? 'lane_pending' : 'lane_cards' // i18n-ignore: SQL, not text
-      // i18n-ignore: SQL, not text
-      const rows = db.prepare(`SELECT c.card AS number, k.col AS col, k.agent AS agent, k.archived AS archived, k.title AS title, k.blocked AS blocked FROM ${list} c LEFT JOIN cards k ON k.number = c.card WHERE c.lane = ? ORDER BY c.ord`).all(lane.id) as { number: number; col: string | null; agent: string | null; archived: number | null; title: string | null; blocked: string | null }[]
-      return rows.map((r): LaneCard => ({ number: r.number, title: r.title ?? '', column: !r.col || r.archived ? 'gone' : (r.col as LaneCard['column']), blocked: r.blocked || null, round: 1, reviewing: false, ...(r.agent && r.agent !== agentId ? { elsewhere: r.agent } : {}) }))
-    })
+    cards = builderLaneNow(ws, agentId, { card: card.number })?.cards
   } catch {
     return undefined
   }

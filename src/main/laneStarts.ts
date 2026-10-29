@@ -1,12 +1,14 @@
 import { join } from 'path'
+import type { TaskCard } from '../shared/types'
 import { laneStartDue } from '../shared/lanes'
 import { cardRef } from '../shared/projectKeys'
 import { agentNowOf } from './cardStall'
 import { coalesced } from './coalesce'
 import { onHiveEvent } from './events'
-import { lanesEnforced, listLanes } from './lanes'
+import { builderLaneNow, lanesEnforced, listLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { withCardNames } from './projectKeys'
+import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
 import { startTask } from './taskStart'
 import { HIVE_LANE_START } from './tasks'
@@ -27,27 +29,53 @@ const log = createLogger('laneStarts')
 
 /** A board change and the status changes after it are looked at together. */
 const SETTLE_MS = 1000
-/** A start refused (its line behind, a slot to wait for, the user typing) is tried again at most this often. */
+/** A start refused (its line behind, a slot to wait for, the user typing) is tried again at most this often, or at its builder's next status change. */
 const RETRY_MS = 30_000
 
 /** Next cards waiting for their builder ("<workspace>#<project>|<builder>" → the card), looked at again as it changes. */
 const waiting = new Map<string, number>()
 /** When each card's start was last tried ("<workspace>#<lane>#<n>"), and the refusal last logged. */
-const tried = new Map<string, { at: number; why: string }>()
+const tried = new Map<string, { at: number; why: string; builder: string }>()
 const timers = new Map<string, NodeJS.Timeout>()
 const inFlight = new Set<Promise<unknown>>()
 
 const builderKey = (wsPath: string, project: string, agentId: string): string => `${wsPath.toLowerCase()}#${project.toLowerCase()}|${agentId}`
 
-/** Whether the builder can be given a card now: idle (its turn over, nobody typing there), or not running and not starting. */
+/**
+ * Whether the builder can be given a card now: idle with a line of Hive's free to go in (its turn over, nobody typing
+ * there, no line being typed or waiting: a start whose card can't then be typed in is undone, and that undoing raced the
+ * builder's own start, HR1's round 2 run), or not running and not starting.
+ */
 function builderFree(projectPath: string, b: { id: string; name: string }): boolean {
   const st = sessions.liveFor(projectPath, b.id)
-  if (st) return (st.status === 'ready' || st.status === 'finished') && !sessions.userMayBeTyping(projectPath, b.id)
+  if (st) return (st.status === 'ready' || st.status === 'finished') && whyNoLine(projectPath, b.id, 'free') === null
   const now = agentNowOf(projectPath, b.id, b.name)
   return !now.running && !now.failed
 }
 
-/** Looks at a workspace's running lanes and starts each next card whose builder is free. */
+/** A start the lane no longer asks for: its lane ended, was changed or isn't the builder's, or the card isn't its next. */
+class LaneChanged extends Error {}
+
+/**
+ * Whether the lane still asks for card n now, as the board has it (builderLaneNow): still running in the same workspace,
+ * still the builder's, and n still its next card due (the card itself as the start's write sees it, `now`).
+ */
+function stillDue(ws: WorkspaceService, path: string, lane: { id: string; builder: { id: string } }, n: number, now?: TaskCard): boolean {
+  if (!ws.path || ws.path.toLowerCase() !== path.toLowerCase()) return false
+  const l = builderLaneNow(ws, lane.builder.id, { lane: lane.id })
+  if (!l) return false
+  const cards = now ? l.cards.map((c) => (c.number === n ? { ...c, column: now.archived ? ('gone' as const) : now.column, blocked: now.blocked || null, ...(now.agent && now.agent !== lane.builder.id ? { elsewhere: now.agent } : {}) } : c)) : l.cards
+  return laneStartDue({ state: 'active', cards })?.number === n
+}
+
+/** For tests: awaited just before each start, once it is decided (a lane changing while a start is on its way). */
+export const laneStartsTestHooks: { beforeStart: ((lane: string, n: number) => Promise<void>) | null } = { beforeStart: null }
+
+/**
+ * Looks at a workspace's running lanes and starts each next card whose builder is free. Each start is decided again just
+ * before it is made, and checked once more where it is written (HR1's round 1): a lane abandoned, changed or reassigned
+ * while an earlier start was on its way (slot, git and placement work take a while) gets nothing.
+ */
 export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
   const path = ws.path
   if (!path) return
@@ -66,14 +94,23 @@ export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
     // Agent-facing: the builder's prompt says why the card came now.
     const note = await withCardNames(ws, () => `Hive started this card for you: it is your lane's next card, after ${prev ? cardRef(prev.number) : 'the card before it'} went Done.`) // i18n-ignore: agent-facing, the card's start prompt
     try {
+      await laneStartsTestHooks.beforeStart?.(lane.id, next.number)
+      if (!stillDue(ws, path, lane, next.number)) throw new LaneChanged('its lane changed meanwhile') // i18n-ignore: for the log
       log.info(`Lane ${lane.id}: starting #${next.number} on ${userText(lane.builder.name)} in ${userText(lane.project)}${prev ? ` (#${prev.number} is Done)` : ''}`)
-      await inWorkspace(ws, () => startTask(next.number, { kind: 'agent', agentId: lane.builder.id }, HIVE_LANE_START, note))
+      await inWorkspace(ws, () => startTask(next.number, { kind: 'agent', agentId: lane.builder.id }, HIVE_LANE_START, note, undefined, (now) => {
+        if (!stillDue(ws, path, lane, next.number, now)) throw new LaneChanged('its lane changed meanwhile') // i18n-ignore: for the log
+      }))
       tried.delete(key)
       waiting.delete(builderKey(path, lane.project, lane.builder.id))
     } catch (e) {
+      // Nothing to try again: the next look decides from the lane as it is then.
+      if (e instanceof LaneChanged || (e instanceof Error && e.cause instanceof LaneChanged)) {
+        log.info(`Lane ${lane.id}: #${next.number} not started: its lane changed meanwhile`)
+        continue
+      }
       const why = e instanceof Error ? e.message : String(e)
       if (last?.why !== why) log.info(`Lane ${lane.id}: #${next.number} not started yet: ${userText(why)}`)
-      tried.set(key, { at: Date.now(), why })
+      tried.set(key, { at: Date.now(), why, builder: builderKey(path, lane.project, lane.builder.id) })
       if (tried.size > 500) tried.delete(tried.keys().next().value!)
     }
   }
@@ -101,7 +138,12 @@ function agentChanged(projectPath: string, agentId: string): void {
   const ws = workspaceFor(projectPath)
   if (!ws?.path) return
   const project = projectPath.slice(ws.path.length).replace(/^[\\/]+/, '')
-  if (waiting.has(builderKey(ws.path, project, agentId))) soon(ws)
+  const k = builderKey(ws.path, project, agentId)
+  if (!waiting.has(k)) return
+  // Its status changed (a line Hive was typing into it went in, its turn ended): a start refused for that is tried again
+  // now, not after RETRY_MS.
+  for (const [key, t] of tried) if (t.builder === k) tried.delete(key)
+  soon(ws)
 }
 
 /** Resolves once no look started so far is under way, for tests. */

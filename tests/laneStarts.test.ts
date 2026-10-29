@@ -22,7 +22,7 @@ const base = tempDir('hive-lanestarts-')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
-const { checkLaneStarts } = await import('../src/main/laneStarts')
+const { checkLaneStarts, laneStartsTestHooks } = await import('../src/main/laneStarts')
 const { sessions } = await import('../src/main/sessions')
 const { claudeCode } = await import('../src/main/providers/claude/adapter')
 const { advanced } = await import('../src/main/advanced')
@@ -35,11 +35,11 @@ const s = sessions as unknown as { live: Map<string, unknown> }
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 
-/** The builder running, as SessionManager keeps one (no process): its runtime facts follow its status (#648, #649). */
-function builder(status: string): { status: string } {
+/** A builder running, as SessionManager keeps one (no process): its runtime facts follow its status (#648, #649). */
+function builder(status: string, id = 'b1'): { status: string } {
   let now = status
   const rt = { lifecycle: 'running', maintenance: null, attention: null, composer: 'free' }
-  const state = { provider: 'claude', runId: 'run-b1', projectPath: p, agentId: 'b1', cwd: p, sessionId: '', startedAt: '', launchSignature: '', unseen: false, runtime: rt, turn: { state: 'over' } } as Record<string, unknown>
+  const state = { provider: 'claude', runId: `run-${id}`, projectPath: p, agentId: id, cwd: p, sessionId: '', startedAt: '', launchSignature: '', unseen: false, runtime: rt, turn: { state: 'over' } } as Record<string, unknown>
   Object.defineProperty(state, 'status', {
     get: () => now,
     set: (v: string) => {
@@ -49,11 +49,11 @@ function builder(status: string): { status: string } {
     enumerable: true
   })
   state.status = status
-  s.live.set(`${p.toLowerCase()}#b1`, { state, adapter: claudeCode, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
+  s.live.set(`${p.toLowerCase()}#${id}`, { state, adapter: claudeCode, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
   return state as unknown as { status: string }
 }
 
-const card = async (title: string): Promise<number> => (await run(() => tasks.createTask({ title, project: 'alpha', agent: 'b1' }, user))).number
+const card = async (title: string, agent = 'b1'): Promise<number> => (await run(() => tasks.createTask({ title, project: 'alpha', agent }, user))).number
 const columnOf = async (n: number): Promise<string> => (await run(() => tasks.getTask(n, w))).column
 // The builder's doorbell for its task (#650: the task's id, which it reads with hive_inbox).
 const rung = (): boolean => pty.typed.join('').includes('New in your inbox: 1 task')
@@ -62,7 +62,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.hive'), { recursive: true })
     mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -73,6 +73,8 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     ;(await import('../src/main/boardStore')).closeAllBoards()
   })
   beforeEach(async () => {
+    laneStartsTestHooks.beforeStart = null
+    for (const l of await lanes.listLanes(w)) if (l.state === 'active' || l.state === 'paused') await lanes.endLane(w, l.id, { abandoned: true })
     pty.typed.length = 0
     s.live.clear()
     await advanced.set(ENFORCE, true)
@@ -113,5 +115,64 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     await checkLaneStarts(w)
     expect(await columnOf(next)).toBe('todo')
     expect(rung()).toBe(false)
+  })
+
+  /**
+   * Two lanes, builders `x` and `y` (each test its own: a builder just given a card stays reserved a moment), each with
+   * its first card Done and its next in Todo; both builders idle.
+   */
+  async function twoDue(x: string, y: string) {
+    const [a1, a2] = [await card('A one', x), await card('A two', x)]
+    const [b1, b2] = [await card('B one', y), await card('B two', y)]
+    const l1 = (await lanes.startLane(w, { project: 'alpha', builder: x, reviewer: 'r1', cards: [a1, a2], by: 'B (alpha)' })).lane
+    const l2 = (await lanes.startLane(w, { project: 'alpha', builder: y, reviewer: 'r1', cards: [b1, b2], by: 'B (alpha)' })).lane
+    for (const [n, a] of [[a1, x], [b1, y]] as const) {
+      await run(() => tasks.updateTask(n, { column: 'doing', agent: a }, user))
+      await run(() => tasks.updateTask(n, { column: 'done' }, user))
+    }
+    builder('ready', x)
+    builder('ready', y)
+    return { a2, b2, l1, l2 }
+  }
+
+  it("a lane abandoned while an earlier lane's start is on its way gets nothing; the earlier one starts (HR1's round 1)", async () => {
+    const { a2, b2, l1, l2 } = await twoDue('b2', 'b3')
+    // While the first start of the batch is decided, the user abandons the other lane.
+    laneStartsTestHooks.beforeStart = async (lane) => {
+      if (lane === l1.id) await lanes.endLane(w, l2.id, { abandoned: true })
+    }
+    await checkLaneStarts(w)
+    expect(await columnOf(a2)).toBe('doing')
+    const b = await run(() => tasks.getTask(b2, w))
+    expect([b.column, b.agent]).toEqual(['todo', 'b3'])
+    expect(pty.typed.join('').split('New in your inbox: 1 task').length - 1).toBe(1)
+  })
+
+  it("a lane's next card given to another agent meanwhile isn't started; the lane whose start comes first still is", async () => {
+    const { a2, b2, l2 } = await twoDue('b4', 'b5')
+    laneStartsTestHooks.beforeStart = async (lane, n) => {
+      if (lane === l2.id && n === b2) await run(() => tasks.updateTask(b2, { agent: 'o1' }, user))
+    }
+    await checkLaneStarts(w)
+    const b = await run(() => tasks.getTask(b2, w))
+    expect([b.column, b.agent]).toEqual(['todo', 'o1'])
+    expect(await columnOf(a2)).toBe('doing')
+  })
+
+  it("a start whose condition no longer holds where it is written assigns, writes and delivers nothing (the guard Hive's start checks there)", async () => {
+    const n = await card('Guarded', 'b6')
+    builder('ready', 'b6')
+    const { startTask } = await import('../src/main/taskStart')
+    let seen: string | null = null
+    const refused = await run(() => startTask(n, { kind: 'agent', agentId: 'b6' }, tasks.HIVE_LANE_START, undefined, undefined, (now) => {
+      seen = now.column
+      throw new Error('its lane changed meanwhile')
+    })).then(() => null, (e: Error) => e.message)
+    expect(refused).toMatch(/its lane changed meanwhile/)
+    expect(seen).toBe('todo')
+    const c = await run(() => tasks.getTask(n, w))
+    expect([c.column, c.agent]).toEqual(['todo', 'b6'])
+    expect(c.history.some((h) => /Doing/.test(h.what))).toBe(false)
+    expect(pty.typed.join('')).not.toContain('New in your inbox')
   })
 })
