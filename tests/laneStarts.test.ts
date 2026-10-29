@@ -66,7 +66,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.hive'), { recursive: true })
     mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -276,6 +276,57 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
         expect(now.startNext).toBeUndefined()
       } finally {
         spy.mockRestore()
+      }
+    })
+
+    /** After the reorder's own write commits, `then` runs (another decision on the lane), once. */
+    async function afterCommit(then: () => Promise<void>) {
+      const { Workflow } = await import('../src/main/workflow/runtime')
+      const original = Workflow.prototype.reorderLaneNow
+      let ran = false
+      const spy = vi.spyOn(Workflow.prototype, 'reorderLaneNow').mockImplementation(async function (this: InstanceType<typeof Workflow>, id, cards, o) {
+        const reply = await original.call(this, id, cards, o)
+        if (!ran && 'ok' in reply && reply.ok) {
+          ran = true
+          await then()
+        }
+        return reply
+      })
+      return { ran: () => ran, restore: () => spy.mockRestore() }
+    }
+
+    it("a lane ended or replaced just after the reorder's own write stays as that decision left it: never started again (HR1's round 2)", async () => {
+      // Ended: no running lane afterwards.
+      const [a1, a2] = [await card('E one', 'd5'), await card('E two', 'd5')]
+      const ended = (await lanes.startLane(w, { project: 'alpha', builder: 'd5', reviewer: 'r1', cards: [a1, a2], by: 'B (alpha)' })).lane
+      await run(() => tasks.updateTask(a1, { column: 'doing', agent: 'd5' }, user))
+      builder('ready', 'd5')
+      const end = await afterCommit(async () => {
+        await lanes.endLane(w, ended.id, { abandoned: true })
+      })
+      try {
+        await lanes.startLane(w, { project: 'alpha', builder: 'd5', reviewer: 'r1', cards: [a2, a1], by: 'the user', applyNow: true })
+        expect(end.ran()).toBe(true)
+        expect((await lanes.listLanes(w)).filter((l) => l.builder.id === 'd5' && (l.state === 'active' || l.state === 'paused'))).toEqual([])
+      } finally {
+        end.restore()
+      }
+      // Replaced: the newer lane of the same builder keeps its cards, and no other is started.
+      const [b1, b2, b3] = [await card('R one', 'd6'), await card('R two', 'd6'), await card('R three', 'd6')]
+      const old = (await lanes.startLane(w, { project: 'alpha', builder: 'd6', reviewer: 'r1', cards: [b1, b2], by: 'B (alpha)' })).lane
+      await run(() => tasks.updateTask(b1, { column: 'doing', agent: 'd6' }, user))
+      builder('ready', 'd6')
+      let newer: string | null = null
+      const replace = await afterCommit(async () => {
+        await lanes.endLane(w, old.id, { abandoned: true })
+        newer = (await lanes.startLane(w, { project: 'alpha', builder: 'd6', reviewer: 'r1', cards: [b3], by: 'a newer start' })).lane.id
+      })
+      try {
+        await lanes.startLane(w, { project: 'alpha', builder: 'd6', reviewer: 'r1', cards: [b2, b1], by: 'the user', applyNow: true })
+        const running = (await lanes.listLanes(w)).filter((l) => l.builder.id === 'd6' && (l.state === 'active' || l.state === 'paused'))
+        expect(running.map((l) => [l.id, l.cards.map((c) => c.number)])).toEqual([[newer, [b3]]])
+      } finally {
+        replace.restore()
       }
     })
 

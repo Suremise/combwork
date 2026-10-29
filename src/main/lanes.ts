@@ -827,7 +827,12 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const decide = () => mutate(ws, async (lanes, checks, also) => {
     queuedAfter = null
     ended.length = 0
-    const was = lanes.find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
+    // A reorder applied now (HI-1995) binds this call to the lane it reordered: ended, abandoned or replaced since, it is
+    // left as the newer decision made it, never started again or another lane edited from this older request.
+    const bound = applied ? lanes.find((l) => l.id === applied.lane) : undefined
+    if (applied && !bound) throw new LaneError(409, 'The reorder was applied, but its lane is gone now: hive_lane list shows the lanes.') // i18n-ignore: hive_lane's refusal (agents)
+    if (bound && !running(bound)) return { rec: bound, did: 'updated' as const, replaced: null }
+    const was = bound ?? lanes.find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
     shared = sharedCards(ws, lanes, s.project, builder.id, s.cards)
     // As it was under this lock, for the Assistant's change (#1282): recorded with the save, in its transaction.
     const before = was ? laneValues(was) : null
