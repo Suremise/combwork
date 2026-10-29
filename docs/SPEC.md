@@ -3809,7 +3809,8 @@ Whether a conversation may resume there is its **hold** (none: it may):
     what is in them), and while an agent launch's job it holds still has a process it stays, hidden, sweeping as before,
     and writes that job's state to the profile's `keeper\keeper-<run>.json`: `live` with its members (id, start time and
     name, never a command line) while it has any, `ended` once it sees it empty (a job it can't read is looked at again,
-    never taken for empty), then lets it go; it exits once it holds none, and says `keeping` first, so a quit doesn't
+    never taken for empty, and its membership is taken only after a sweep that was sure of everything: a failed
+    snapshot or listing, or an escaped child whose checks Windows refused, could hide a process), then lets it go; it exits once it holds none, and says `keeping` first, so a quit doesn't
     wait for it. It ends nothing. A quit whose agents kept nothing running leaves none behind.
     - Each tracked run is bound to its helper (`leftovers.json`'s `helpers`, "pid:created") as it is given its job.
       A gone Hive's writer is settled by a state only when it is whole and its own: the run's file, at most 64 KB,
@@ -3817,8 +3818,13 @@ Whether a conversation may resume there is its **hold** (none: it may):
       `observed: complete`, and `ended` with no member and total 0 (`keeperState`). The clear checks that binding again
       inside its write, and the state is removed only once the writer is cleared. Logged: *slot-d … settled: HB5's ended
       run left nothing running*.
-    - A helper lost while Hive runs is revoked (`revoked`) at once, and the revocation is written before its replacement
-      is given a launch: a launch can't be tracked while it can't be (the tracker notice says so).
+    - A helper lost while Hive runs is revoked (`revoked`) at once, its bindings going with it (so the bounded list
+      never gives one back), and the revocation is written before its replacement is given a launch, however late the
+      loss (before the launch, while its helper is made ready, or while its job is made): a launch can't be tracked
+      while it can't be (the tracker notice says so). A run is bound only to the helper configured as its keeper that
+      made its job, with no loss between.
+    - What settled a writer is that attempt's own (its run and helper), carried to its clear's guard: another check of
+      the same run never changes it.
     - `live`: held; Release Slot… lists its members still running, each checked again by id and start time (one that
       can't be is never listed as running). A keeper ended before its jobs empty (killed, a logoff) leaves `live` or
       nothing, and no state, a run from before this change or bound to no helper, leaves the writer held, as before.
