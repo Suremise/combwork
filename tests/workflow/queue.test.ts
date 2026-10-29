@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 const team = (over: Partial<ReturnType<typeof preset>> = {}, extra: Parameters<typeof setup>[1] = {}) =>
-  (env = setup({ ...preset('git', 'team', { quick: ['quick'], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, commands: { quick: 'npm run quick' }, ...over }, extra))
+  (env = setup({ ...preset('git', 'team', { quick: ['quick'], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, commands: { quick: 'npm run quick' }, commitMessage: 'hive', ...over }, extra))
 
 /** A card approved and queued: started by B1, committed, submitted, passed by R1. */
 async function queued(e: Env, title = 'Change', files: Record<string, string> = { 'src/c.txt': 'c\n' }, labels: string[] = []) {

@@ -500,7 +500,7 @@
   "workflow.value.style.merge": "マージコミット",
   "workflow.value.style.rebase": "リベースして早送り",
   "workflow.value.style.squash": "スカッシュ",
-  "workflow.why.commitMessage": "履歴にカードのキーがあると、各マージがそのカードに結び付きます。履歴にカード番号を残さないプロジェクトは、ブランチ自身のものを使います。",
+  "workflow.why.commitMessage": "カードのタイトルには、公開の履歴に残すべきでない人名や詳細が含まれることがあります。カードのキーで各マージをそのカードに結び付けるには、Hiveのものを選びます。",
   "workflow.why.dependenciesDone": "コストが低く、まだ取り込まれていない作業の上にカードが作られることはありません。",
   "workflow.why.excluded": "依存関係やビルド出力は、カードの成果物には含まれません。",
   "workflow.why.finish": "Hiveのキューを通してマージすれば、失敗した作業がマージ先ブランチに入ることはなく、ソロで作業するならコミットした時点でカードは完了です。",

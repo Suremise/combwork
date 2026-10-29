@@ -62,7 +62,7 @@ export interface WorkflowOptions {
    */
   pushTarget: boolean
   /**
-   * G19 (HI-1697): the message of the commit Hive's merge makes (a merge commit, or a squash's commit): Hive's, the
+   * G19 (HI-1697; the branch's own by default since HI-1997): the message of the commit Hive's merge makes (a merge commit, or a squash's commit): Hive's, the
    * card's key and title with its `Hive-` trailers, or the branch's own, with neither. Not a rule, as G18: left out of
    * every ruleset (`ruleOptions`), the queue reads it from the project's options as they are when it merges.
    */
@@ -202,7 +202,8 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
   target: '',
   strict: false,
   pushTarget: false,
-  commitMessage: 'hive',
+  // G19 (HI-1997, Darren's decision): the branch's own message in every preset, so card titles never reach a history unasked.
+  commitMessage: 'branch',
   mergeChecks: [],
   mergeInstall: 'onManifestChange',
   focusedTests: false,
