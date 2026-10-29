@@ -127,16 +127,24 @@ const ancestor = (x, y) => {
       const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
       return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
     }
-    /** The agents' tokens after a lane start, once both run again. */
+    /**
+     * The agents' tokens after a lane start, once both run again. Starting a lane restarts its agents, each launch with a
+     * token of its own, and the restart can come seconds after the lane is listed (HI-2027: lane B's came 2.3 s after,
+     * once its slot was prepared): until then the old tokens still work, so taking them then left a token that died with
+     * the restart. Each token is taken once it is a new launch's, different from the one before the lane started.
+     */
     const retoken = async () => {
-      // Until each token is taken (a restart may still be on its way as the lane starts).
+      const before = { ...tokens }
       const ok = await waitHung(async () => {
         if (!(await idle(b1.id)) || !(await idle(r1.id))) return false
-        tokens.b1 = await tokenOf(b1.id)
-        tokens.r1 = await tokenOf(r1.id)
+        const b = await tokenOf(b1.id)
+        const r = await tokenOf(r1.id)
+        if (!b || !r || (before.b1 && b === before.b1) || (before.r1 && r === before.r1)) return false
+        tokens.b1 = b
+        tokens.r1 = r
         return (await intent('b1', 0, 'start')).status !== 401 && (await intent('r1', 0, 'start')).status !== 401
       })
-      check('…both agents run, with their tokens', !!ok, JSON.stringify(tokens))
+      check("…both agents run again after the lane start, with their new launches' tokens", !!ok, JSON.stringify({ before, now: tokens }))
     }
     const head = () => q.head(fx, 'main')
     const untouched = (was) => git(wt, 'rev-parse', 'HEAD') === was.head && git(wt, 'status', '--porcelain') === was.status
