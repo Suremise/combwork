@@ -187,7 +187,7 @@ describe('the runs kept', () => {
     const other = Array.from({ length: 7 }, (_, i) => made(B, i + 1, ended))
     const quit = runFolderName(runPrefix('quit', null), new Date())
     mkdirSync(join(root, quit))
-    await pruneRuns(root, runPrefix('workspace', A))
+    await pruneRuns(root, runPrefix('workspace', A), 5)
     expect(readdirSync(root).sort()).toEqual([running, ...old.slice(2), ...other, quit].sort())
   })
 
@@ -207,7 +207,7 @@ describe('the runs kept', () => {
     const C = 'd:/three/work'
     const other = made(C, 1, ended)
     // The one still going is left, for the caller to carry once it has ended.
-    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toEqual({ moved: 4, going: [running], stuck: [], stopped: false })
+    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B), () => true, 5)).toEqual({ moved: 4, going: [running], stuck: [], stopped: false })
     const left = readdirSync(root)
     // Under the old place: only the run still going. Under the new: the newest five (two of its own, three carried).
     expect(left.filter((f) => f.startsWith(runPrefix('workspace', A)))).toEqual([running])
@@ -215,7 +215,7 @@ describe('the runs kept', () => {
     expect(now.map((f) => f.slice(runPrefix('workspace', B).length))).toEqual([2, 3, 4, 10, 11].map((i) => `${new Date(Date.UTC(2026, 9, 28, 12, 0, i)).toISOString().replace(/[:.]/g, '-')}-0000000${i}`))
     expect(left).toContain(other)
     // Again: nothing more to move.
-    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toEqual({ moved: 0, going: [running], stuck: [], stopped: false })
+    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B), () => true, 5)).toEqual({ moved: 0, going: [running], stuck: [], stopped: false })
   })
 
   it('a moved run whose name is already taken at the new place is stuck, with why; `proceed` false stops before a rename', async () => {
@@ -266,7 +266,7 @@ describe('the runs kept', () => {
     const fresh = run(2)
     const gone = run(3)
     writeFileSync(join(root, gone, 'runner.pid'), '999999999')
-    await pruneRuns(root, prefix)
+    await pruneRuns(root, prefix, 5)
     const left = readdirSync(root)
     expect(left).toContain(starting)
     expect(left).toContain(fresh)

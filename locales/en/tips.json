@@ -707,6 +707,14 @@
     "defaultMessage": "Give Ctrl+C and Ctrl+V to the agent's CLI",
     "description": "A tip's title. Ctrl+C and Ctrl+V name keys: use the key names your language uses."
   },
+  "tips.customCommands.text": {
+    "defaultMessage": "Name a command once in Settings → Commands and run it from the command palette (Run Command), or pick it for when a workspace opens or closes: a local server or a database your agents need, say. As a workspace opens, its agents start once they are done.",
+    "description": "A tip (HI-1954). Names of Hive's menus, views, settings and commands (Settings → Commands, Run Command): keep them as Hive shows them."
+  },
+  "tips.customCommands.title": {
+    "defaultMessage": "Your own commands, one click away",
+    "description": "A tip's title (HI-1954)."
+  },
   "tips.dateFormat.text": {
     "defaultMessage": "Hive shows dates as {date} and times as {time}. Settings → General → Date format and Time format change them everywhere, sessions named by when they started too.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {date} and {time} are an example date and time (4 October 2026, 14:05) in the formats chosen now."

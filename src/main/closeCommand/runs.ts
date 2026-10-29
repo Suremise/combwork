@@ -18,8 +18,11 @@ export const READ_TAIL_BYTES = 16 * 1024
 /** The panel's lines: the last few, each cut short. */
 export const PANEL_LINES = 8
 export const LINE_CHARS = 400
-/** Runs kept per workspace name, and for When Hive quits: the newest; one still running is never removed. */
-export const KEEP_RUNS = 5
+/**
+ * Runs kept per workspace, all its points' and by-hand runs together, and for When Hive quits: the newest; one still
+ * running is never removed. 10 since a run holds a point's whole list (HI-1954), 5 before.
+ */
+export const KEEP_RUNS = 10
 /** How long a runner may take to write its first status before the run counts as not started. */
 export const START_MS = 10_000
 

@@ -500,7 +500,7 @@ export function runByHand(win: BrowserWindow, ws: WorkspaceService | null, ref: 
   if (!closeCommandsRun()) throw hiveError(M.testCopy, undefined, { kind: 'conflict' })
   const place = ws?.path ? (ws.openPlace ?? ws.path.toLowerCase()) : null
   const step = { name: c.name, command: c.command, folder: c.folder ?? '', needed: false }
-  void runListInWindow(win, 'manual', place, [step], () => (ws?.path ? workspaceValues(ws, 'manual') : { reason: 'manual' }))
+  void runListInWindow(win, 'manual', place, [step], () => (ws?.path ? workspaceValues(ws, 'manual') : { reason: 'manual' })) // i18n-ignore: {reason}'s value, as the command reads it
 }
 
 const M = {
