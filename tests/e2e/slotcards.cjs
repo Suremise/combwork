@@ -7,7 +7,11 @@
 // 2. card 2 starts in slot-a from the new target, installed again first (card 1 changed the lock file), and card 1's
 //    line, merged, is deleted (LineDeleted on card 1);
 // 3. with one slot (Agents per project: 1), a second lane waits ("waiting for a slot", paused) and starts in slot-a once
-//    the first ends, its builder there; the first's builder is stopped.
+//    the first ends, its builder there; the first's builder is stopped;
+// 4. HI-2014 (Legible's LE-249): the second lane's card 3, committed and not merged, moved to Done by the user's override:
+//    slot-a leaves its line (detached at the target's head), the line kept; card 4, which depends on it, is told it
+//    starts without card 3's work, and starts as the lane's next card in slot-a.
+// After each Done, the lane's slot leaves the card's line once its builder is quiet (HI-2014, HI-1986).
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -134,6 +138,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const c1 = await create('Slot one')
     const c2 = await create('Slot two')
     const c3 = await create('Slot three')
+    const c4 = (await inv('tasks:create', { title: 'Slot four', project: 'alpha', blockedBy: [c3] })).number
     const key = (await card(c1)).key.split('-')[0]
     const line = (n, slug) => `hive/${key}/${key}-${n}-${slug}`
 
@@ -165,6 +170,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check('…into integration', isIn(rev1, 'integration'))
     const lent = (await slots()).find((s) => s.name === 'slot-a')
     check('the lane keeps slot-a after card 1 is Done', !!lent?.lease && lent.lease.lane === started.lane.id, JSON.stringify(lent))
+    check("…and slot-a leaves card 1's line: detached at integration's head (HI-2014)", !!(await until(() => branchIn(slotA) === '' && git(slotA, 'rev-parse', 'HEAD') === git(alpha, 'rev-parse', 'integration'), HUNG_MS)), branchIn(slotA))
 
     // --- 2. Card 2 in slot-a from the new target, installed again first; card 1's line, merged, deleted. While B1 has a
     // run going in slot-a (HR1's round 1 finding 3), nothing of the slot changes: prepared only once it is quiet.
@@ -188,9 +194,9 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const headBusy = git(slotA, 'rev-parse', 'HEAD')
     const s2 = await intent(tb1, c2, 'start')
     const busyFacts = async () => (await inv('tasks:facts', c2)).map((f) => f.kind)
-    check('card 2 started while B1 is busy: the slot not touched yet', s2.status === 200 && !!(await until(async () => (await busyFacts()).includes('Started'), HUNG_MS)) && branchIn(slotA) === line(c1, 'slot-one') && git(slotA, 'rev-parse', 'HEAD') === headBusy && !(await busyFacts()).includes('SlotPrepared'), JSON.stringify({ branch: branchIn(slotA), facts: await busyFacts() }))
+    check('card 2 started while B1 is busy: the slot not touched yet', s2.status === 200 && !!(await until(async () => (await busyFacts()).includes('Started'), HUNG_MS)) && branchIn(slotA) === '' && git(slotA, 'rev-parse', 'HEAD') === headBusy && !(await busyFacts()).includes('SlotPrepared'), JSON.stringify({ branch: branchIn(slotA), facts: await busyFacts() }))
     fs.writeFileSync(holdGo, 'go')
-    check("…B1's run over, slot-a still on card 1's line as it ended", !!(await until(async () => (await progressRuns()).length === 0, HUNG_MS)) && fs.existsSync(holdSaw) && fs.readFileSync(holdSaw, 'utf8') === line(c1, 'slot-one'), fs.existsSync(holdSaw) ? fs.readFileSync(holdSaw, 'utf8') : 'no record')
+    check("…B1's run over, slot-a still detached where it was as it ended", !!(await until(async () => (await progressRuns()).length === 0, HUNG_MS)) && fs.existsSync(holdSaw) && fs.readFileSync(holdSaw, 'utf8') === headBusy, fs.existsSync(holdSaw) ? fs.readFileSync(holdSaw, 'utf8') : 'no record')
     check("card 2 starts in the lane's slot-a", s2.status === 200 && same(s2.body?.data?.folder, slotA), JSON.stringify(s2.body))
     const base2 = git(alpha, 'rev-parse', 'integration')
     check(`card 2's line from the target as it is now (card 1 in it)`, !!(await until(() => branchIn(slotA) === line(c2, 'slot-two'), HUNG_MS)) && git(slotA, 'rev-parse', 'HEAD') === base2 && base2 !== base1)
@@ -199,7 +205,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check("card 2's line is kept (not merged)", hasLine(line(c2, 'slot-two')))
 
     // --- 3. One slot, a second lane: it waits for a slot, then starts in slot-a when the first ends.
-    const second = await inv('lanes:start', alpha, { builder: b2.id, reviewer: r2.id, cards: [c3] })
+    const second = await inv('lanes:start', alpha, { builder: b2.id, reviewer: r2.id, cards: [c3, c4] })
     check('the second lane is recorded, waiting for a slot, its agents not started', !!second.waitingForSlot && second.started.length === 0 && !(await live(b2.id)), JSON.stringify(second))
     const waiting = await lane(second.lane.id)
     check("…its lane says 'waiting for a slot', paused", waiting?.status?.reason === 'slot' && waiting.state === 'paused' && waiting.slot === null, JSON.stringify(waiting?.status))
@@ -215,6 +221,24 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const now = await lane(second.lane.id)
     check('…its lane names slot-a and waits no more', now?.slot === 'slot-a' && now?.status?.reason !== 'slot', JSON.stringify(now))
     check('…R2 starts too', !!(await until(async () => !!(await live(r2.id)), HUNG_MS)))
+
+    // --- 4. HI-2014 (LE-249): card 3 committed, not merged, moved to Done by the user's override.
+    const tb2 = await tokenOf(b2.id)
+    check('B2 starts card 3 in slot-a', (await intent(tb2, c3, 'start')).status === 200 && !!(await until(() => branchIn(slotA) === line(c3, 'slot-three'), HUNG_MS)), branchIn(slotA))
+    const rev3 = commitIn(slotA, { 'three.txt': 'three\n' }, 'Slot three')
+    const why = 'Merged by hand in another repository'
+    const moved3 = await inv('tasks:move', c3, 'done', { confirm: true, reason: why })
+    check("the user's override moves card 3 to Done", (await card(c3))?.column === 'done', JSON.stringify(moved3))
+    const finished3 = (await inv('tasks:facts', c3)).find((f) => f.kind === 'Finished')
+    check('…its finish recorded as an override, with no merge', finished3?.data?.how === 'override' && finished3.data.verified === null && finished3.data.reason === why, JSON.stringify(finished3))
+    check("slot-a leaves card 3's line once B2 is quiet: detached at integration's head", !!(await until(() => branchIn(slotA) === '' && git(slotA, 'rev-parse', 'HEAD') === git(alpha, 'rev-parse', 'integration'), HUNG_MS)), branchIn(slotA))
+    check("…card 3's line kept, with its work (not in the target)", hasLine(line(c3, 'slot-three')) && git(alpha, 'rev-parse', line(c3, 'slot-three')) === rev3 && !isIn(rev3, 'integration'))
+    const note = async () => (await card(c4))?.comments?.find((c) => c.hiveText?.id === 'tasks.history.startsWithout') ?? null
+    check("card 4 is told it starts without card 3's work", !!(await until(note, HUNG_MS)) && (await note()).hiveText.values.reason === why, JSON.stringify((await card(c4))?.comments))
+    const next4 = (await lane(second.lane.id))
+    check("the lane goes on: card 4 is its next, nothing waits", next4?.state === 'active' && next4?.status?.reason !== 'you', JSON.stringify(next4?.status))
+    const s4 = await intent(tb2, c4, 'start')
+    check('card 4 starts (its dependency counts as accepted) in slot-a, from the target', s4.status === 200 && same(s4.body?.data?.folder, slotA) && !!(await until(() => branchIn(slotA) === line(c4, 'slot-four'), HUNG_MS)), JSON.stringify(s4.body))
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
   } finally {

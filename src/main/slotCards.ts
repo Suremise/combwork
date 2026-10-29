@@ -712,16 +712,34 @@ async function finishedSlots(ws: WorkspaceService, projectPath: string, wf: Work
     // The slot as the lease still has it: null once another lease holds it (or it is gone).
     const slotNow = (): FinishedSlotView | null => {
       const now = pool.slotOf(l)
-      return now && !(l.to && pool.openLease(now.name)) ? { name: now.name, folder: now.folder, target: now.target, busy: !!now.op, open: !l.to } : null
+      // Busy: an operation holds it, or (a running lane's) its builder works there: nothing of it changes until quiet,
+      // as a preparation waits (HR1's #1438 round 1).
+      return now && !(l.to && pool.openLease(now.name)) ? { name: now.name, folder: now.folder, target: now.target, busy: !!now.op || (!l.to && !quiet(projectPath, l.agent)), open: !l.to } : null
     }
     for (const n of cards) {
       if (ended(ws)) return
       await finishedSlot(projectPath, wf, n, l.id, slotNow, l.lane)
     }
+    // A running lane's slot its builder kept busy: looked at again once it is quiet (as a preparation waits), once per lease.
+    const card = cards.map((n) => cardOf(wf, n)).find((c) => !!c && !!wf.state(c).finished && wf.state(c).started?.lease === l.id)
+    // Not while a later card of the lane is under way there (its own start moves the slot on).
+    const later = cards.some((n) => {
+      const c = cardOf(wf, n)
+      return !!c && wf.state(c).started?.lease === l.id && wf.state(c).stage !== 'done' && wf.state(c).stage !== 'todo'
+    })
+    if (!l.to && card && !later && !quiet(projectPath, l.agent) && !quietWaits.has(l.id)) {
+      quietWaits.add(l.id)
+      void until(projectPath, l.agent, () => quiet(projectPath, l.agent), () => ended(ws) || !!pool.lease(l.id)?.to)
+        .then((ok) => (ok ? settleSlotCards(ws, projectPath) : undefined))
+        .finally(() => quietWaits.delete(l.id))
+    }
   }
 }
 
-/** A finished card's slot as its lease still has it (HI-2014): `busy`, an operation holds it; `open`, its lease (a lane's) is. */
+/** Running lanes' leases whose finished card's slot waits for its builder to be quiet (finishedSlots). */
+const quietWaits = new Set<string>()
+
+/** A finished card's slot as its lease still has it (HI-2014): `busy`, an operation or its builder's work holds it; `open`, its lease (a lane's) is. */
 export interface FinishedSlotView {
   name: string
   folder: string
