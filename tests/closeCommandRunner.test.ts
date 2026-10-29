@@ -100,8 +100,10 @@ describe('the runner, with a real command', () => {
   it('a command writing about 5 MB as fast as it can: followed to its end, the tail never over its bound, the command never held up', async () => {
     const dir = folder()
     const marker = join(dir, 'finished.txt')
-    // 5,000 lines of 1 KB, then a marker of its own: it ends only if its output never blocked it.
-    const script = `const l='y'.repeat(1023)+'\\n';for(let i=0;i<5000;i++)process.stdout.write(l);process.stderr.write('last line\\n');require('fs').writeFileSync(${JSON.stringify(marker)},'done')`
+    // 5,000 lines of 1 KB, then a marker of its own: it ends only if its output never blocked it. Its last line goes to
+    // stdout, after the rest (HI-2032): stdout and stderr are two pipes, read as their chunks arrive, so a line on stderr
+    // can come before stdout's last chunks under load.
+    const script = `const l='y'.repeat(1023)+'\\n';for(let i=0;i<5000;i++)process.stdout.write(l);process.stdout.write('last line\\n');require('fs').writeFileSync(${JSON.stringify(marker)},'done')`
     const scriptFile = join(dir, 'chatty.js')
     writeFileSync(scriptFile, script)
     let biggest = 0
