@@ -74,7 +74,8 @@ function seed(cards, secondKey) {
     await lib.openWorkspace(inv, page, ws)
     // Hive's own fact: a card into Done makes the journal and its first entry.
     const first = await inv('tasks:create', { title: 'Journal browser', project: 'alpha' })
-    const second = await inv('tasks:create', { title: 'Timeline rows', project: 'alpha' })
+    // A long title (HI-2000): its chip in an entry's Links cut its key in two ("HI-" over "1985").
+    const second = await inv('tasks:create', { title: 'Timeline rows: newest first by day, with search, filters, the keyboard and the entry pane beside them', project: 'alpha' })
     await inv('tasks:update', second.number, { column: 'doing' })
     await inv('tasks:update', first.number, { column: 'done' })
     check("Hive's fact made the journal", !!(await lib.until(async () => (await inv('journal:status')).entries === 1, HUNG_MS)))
@@ -140,6 +141,33 @@ function seed(cards, secondKey) {
       await page.screenshot({ path: path.join(lib.WORK, `journalbrowse-entry-${theme}.png`) })
     }
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+
+    // HI-2000: a linked card with a long title keeps its key whole on one line; only its title is cut.
+    await rows.filter({ hasText: 'Build the timeline first' }).locator('.journal-row-main').click()
+    const longChip = pane.locator(`.journal-links .card-chip[data-task="${second.number}"]`)
+    check('an entry links a card with a long title', !!(await lib.until(async () => (await longChip.count()) === 1, HUNG_MS)), await pane.innerText().catch(() => ''))
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      const k = await longChip.evaluate((chip) => {
+        const key = chip.querySelector('.card-chip-number')
+        const title = chip.querySelector('.card-chip-title')
+        const range = document.createRange()
+        if (key) range.selectNodeContents(key)
+        return { lines: key ? new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size : 0, keyH: key?.getBoundingClientRect().height ?? 0, chipH: chip.getBoundingClientRect().height, cut: !!title && title.scrollWidth > title.clientWidth }
+      })
+      check(`…its key on one line, its title cut (${theme})`, k.lines === 1 && k.keyH <= k.chipH && k.cut, JSON.stringify(k))
+      await pane.locator('.journal-links').first().screenshot({ path: path.join(lib.WORK, `journalbrowse-longchip-${theme}.png`) })
+    }
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    // The rows' chips (key only) keep theirs too.
+    const rowKeys = await view.locator('.journal-chips .card-chip-number').evaluateAll((els) => els.map((e) => {
+      const range = document.createRange()
+      range.selectNodeContents(e)
+      return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size
+    }))
+    check("…and the rows' chips theirs", rowKeys.length > 0 && rowKeys.every((n) => n === 1), JSON.stringify(rowKeys))
+    await top.locator('.journal-row-main').click()
+    await lib.until(async () => /Ship the journal browser/.test((await pane.innerText().catch(() => '')) ?? ''), HUNG_MS)
 
     // Edit: summary, kind and importance.
     await pane.getByRole('button', { name: 'Edit' }).click()
