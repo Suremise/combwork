@@ -20,7 +20,7 @@ const HUNG_MS = 10000
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 /** The bundled skills from before Hive kept track of them (an existing workspace without them deleted them), and the newer ones. */
 const EARLIER = ['handover', 'merge-ready', 'pick-up', 'review-agent-work', 'split-work', 'workspace-note']
-const NEWER = ['board-hygiene', 'card-loop', 'coordinate-agents', 'journal', 'licence-audit', 'run-lanes', 'triage-report', 'tune-settings', 'use-hive-api', 'work-on-card']
+const NEWER = ['board-hygiene', 'card-loop', 'coordinate-agents', 'generalist', 'journal', 'licence-audit', 'run-lanes', 'triage-report', 'tune-settings', 'use-hive-api', 'work-on-card']
 const BUNDLED = [...EARLIER, ...NEWER]
 let failed = 0
 const check = (name, ok, extra = '') => {

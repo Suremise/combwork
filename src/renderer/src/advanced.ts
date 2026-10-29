@@ -18,6 +18,11 @@ export function useAdvancedValue<T extends string | number | string[] | boolean>
   const state = useStore((s) => s.advanced)
   return advancedRow(advancedDef(id)!, state).value as T
 }
+/** An advanced value as this window has it now, for tests: a change reaches the window in the states' batch (HI-1938), after its IPC answers. */
+;(window as unknown as { __hiveAdvancedValue?: (id: string) => unknown }).__hiveAdvancedValue = (id) => {
+  const def = advancedDef(id)
+  return def ? advancedRow(def, useStore.getState().advanced).value : undefined
+}
 
 /** Whether right-click in a provider's terminal goes to its CLI rather than Hive's copy/paste (#737): off for a provider with no such setting. */
 export function useRightClickToCli(provider: string | undefined): boolean {

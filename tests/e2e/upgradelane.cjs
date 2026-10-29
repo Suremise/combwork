@@ -2,7 +2,8 @@
 // agents, a builder and a reviewer, with a card in Review, one in Doing and one in Todo, and closes. The dev build opens
 // the workspace, upgrades its board, and adopts it in the background: the cards in flight get `Adopted` (the Review card
 // an adopted submission too), the Todo card none (from before 1.0), the project its options. The agents resume and the
-// loop carries on as on 0.9: every move is accepted, nothing refused, and every card ends in Passed.
+// loop carries on as on 0.9: every move is accepted, nothing refused, and every card passes, each finished by the
+// builder's report of its merge before the next starts (HI-1985: a carried-over lane goes on at Done, S40).
 //
 // The 0.9 Hive is a packaged 0.9.x build: HIVE_E2E_HIVE09 (its win-unpacked folder), else the main checkout's
 // dist/win-unpacked when that is 0.9.x; with neither, the suite is skipped. Throwaway profiles, workspace and
@@ -164,7 +165,12 @@ function driver(app, page) {
     // Its moves are now the cards' intents (#1268): a move to Review submits the card, so the builder commits its work
     // first, with the card's trailer (everyone works in the project folder), as an agent would.
     const work = (n) => `shell: echo card ${n}>card${n}.txt && git add -A && git -c user.email=b@t -c user.name=Builder commit -qm "card ${n}" --trailer "Hive-Card: alpha-${n}"`
-    script('Builder', [`${work(n2)} then boardmove ${n2} review then boardcomment ${n2}`, `boardmove ${n3} doing then ${work(n3)} then boardmove ${n3} review then boardcomment ${n3}`, 'work 1'])
+    // Under the upgrade's options (G5 Not checked, a reviewer agent) a passed card is Approved until its builder reports
+    // its merge, and the lane's next card starts once the one before it is Done (Darren on HI-1985: 1.0's rule holds for
+    // a lane carried over, as card-loop says): woken by each verdict, the builder reports that card's merge first.
+    const cards = await dev.inv('tasks:list')
+    const merged = (n) => `hive hive_report_merge ${JSON.stringify({ card: cards.find((c) => c.number === n)?.key })}`
+    script('Builder', [`${merged(n1)} then ${work(n2)} then boardmove ${n2} review then boardcomment ${n2}`, `${merged(n2)} then boardmove ${n3} doing then ${work(n3)} then boardmove ${n3} review then boardcomment ${n3}`, 'work 1'])
     const sessions = await dev.inv('session:list', alpha)
     const sessionOf = (id) => sessions.find((x) => x.agentId === id && x.source === 'hive')?.id
     check("the 0.9 sessions are there, one per agent", !!sessionOf(builder.id) && !!sessionOf(reviewer.id), JSON.stringify(sessions.map((x) => [x.agentId, x.id])))
@@ -174,11 +180,12 @@ function driver(app, page) {
     check('Hive wakes the reviewer for c1, which passes it', !!(await lib.until(async () => (await dev.column(n1)) === 'passed', HUNG_MS)))
     check('…the builder, woken by the verdict, sends c2 to Review, which passes', !!(await lib.until(async () => (await dev.column(n2)) === 'passed', HUNG_MS)))
     check('…and works c3, from before 1.0, as on 0.9, which passes', !!(await lib.until(async () => (await dev.column(n3)) === 'passed', HUNG_MS)))
+    check("c1 and c2 are Done, by the builder's reports of their merges", (await dev.column(n1)) === 'done' && (await dev.column(n2)) === 'done', `${await dev.column(n1)}, ${await dev.column(n2)}`)
     const calls = fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
     const refused = calls.filter((c) => c.status !== 200)
     check('nothing either agent did was refused, before or after the upgrade', calls.length > 0 && refused.length === 0, JSON.stringify(refused).slice(0, 400))
     const lane10 = (await dev.inv('lanes:list')).find((l) => l.id === lane09?.id)
-    check('the same lane, every card Passed', lane10?.state === 'active' && lane10?.cards?.every((c) => c.column === 'passed'), JSON.stringify(lane10))
+    check('the same lane, every card passed: c1 and c2 Done, c3 Passed', lane10?.state === 'active' && lane10?.cards?.map((c) => c.column).join() === 'done,done,passed', JSON.stringify(lane10))
     await close(dev)
     // 4. Started again: the adoption has run, and adds nothing.
     const facts = rows('SELECT COUNT(*) AS n FROM card_facts')[0]?.n
