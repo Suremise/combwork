@@ -147,90 +147,8 @@ export function headSync(folder: string): { line: string | null; head: string } 
   }
 }
 
-/** A config value as git reads it (its quotes and escapes, a comment after it), or undefined where git would refuse it. */
-function configValue(s: string): string | undefined {
-  let out = ''
-  let quoted = false
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i]
-    if (c === '\\') {
-      const n = s[i + 1]
-      if (n === undefined || !'\\"ntb'.includes(n)) return undefined
-      out += n === 'n' ? '\n' : n === 't' ? '\t' : n === 'b' ? '\b' : n
-      i++
-    } else if (c === '"') quoted = !quoted
-    else if (!quoted && (c === '#' || c === ';')) break
-    else out += c
-  }
-  return quoted ? undefined : out.trim()
-}
-
-/**
- * HI-2050 (HR3's round 1): whether git surely accepts a repository's config file as it stands, by a strict grammar of
- * plain config (sections, `key = value` and bare keys, comments, quoted values with git's own escapes), and its
- * worktreeConfig. Null for anything git might refuse or read further: a line outside that grammar (a continued line, an
- * unknown escape, an open quote), an include, a format version other than 0 or 1, any extension but the object format
- * and worktreeConfig (a reftable's refStorage among them). Never a parser of config: only "plain" or not.
- */
-function plainConfig(text: string): { worktreeConfig: boolean } | null {
-  let section = ''
-  let worktreeConfig = false
-  for (const raw of text.split(/\r?\n/)) {
-    const l = raw.trim()
-    if (!l || l.startsWith('#') || l.startsWith(';')) continue
-    const header = /^\[([A-Za-z0-9.-]+)(?:\s+"(?:[^"\\]|\\["\\])*")?\]\s*(?:[#;].*)?$/.exec(l)
-    if (header) {
-      section = header[1].toLowerCase()
-      if (section === 'include' || section === 'includeif') return null
-      continue
-    }
-    const kv = /^([A-Za-z][A-Za-z0-9-]*)\s*(?:=(.*))?$/.exec(l)
-    if (!kv || !section) return null
-    const value = kv[2] === undefined ? null : configValue(kv[2])
-    if (value === undefined) return null
-    const key = `${section}.${kv[1].toLowerCase()}`
-    if (key === 'core.repositoryformatversion' && value !== '0' && value !== '1') return null
-    if (section !== 'extensions') continue
-    if (key === 'extensions.objectformat' && (value === 'sha1' || value === 'sha256')) continue
-    if (key !== 'extensions.worktreeconfig' || (value !== 'true' && value !== 'false')) return null
-    worktreeConfig = value === 'true'
-  }
-  return { worktreeConfig }
-}
-
-/**
- * HI-2050: a folder's checkout from its `.git` files, as strictly as git answers it (for `head` and `heads`; headSync
- * stays as its callers read it): HEAD exactly a full object id (detached, `line` null), or `ref: refs/heads/<name>` for
- * a plain name, with its commit as branchRefSync reads it (null: git must say). Null whenever git must say anything:
- * GIT_DIR or GIT_COMMON_DIR set, a `.git` that doesn't name its git dir, a reftable repository, a config git might not
- * accept (plainConfig: the repository's, and the worktree's own where worktreeConfig is on), a HEAD that can't be read
- * or says anything else (a short or malformed id, a symbolic ref to anything but a plain branch, such as a worktree's
- * own ref). Read again each time it is asked: nothing is kept. Not looked at: the user's and the system's config files
- * (where git refuses one of those, this read alone still answers; every git run beside it fails).
- */
-function checkoutSync(folder: string): { line: string | null; head: string | null; common: string } | null {
-  const own = gitDirSync(folder)
-  const common = own ? commonDirSync(folder) : null
-  if (!own || !common) return null
-  try {
-    if (existsSync(join(common, 'reftable'))) return null
-    const config = plainConfig(readFileSync(join(common, 'config'), 'utf8'))
-    if (!config) return null
-    const worktree = join(own, 'config.worktree')
-    if (config.worktreeConfig && existsSync(worktree) && !plainConfig(readFileSync(worktree, 'utf8'))) return null
-    const v = readFileSync(join(own, 'HEAD'), 'utf8').trim()
-    if (SHA.test(v)) return { line: null, head: v, common }
-    const m = /^ref: refs\/heads\/(.+)$/.exec(v)
-    return m && plainBranch(m[1]) ? { line: m[1], head: branchRefSync(common, m[1]), common } : null
-  } catch {
-    return null
-  }
-}
-
-/** The commit HEAD names in a folder: from the `.git` files where they say it (HI-2050: checkoutSync), else git. */
+/** The commit HEAD names in a folder. */
 export async function head(folder: string): Promise<Maybe<string>> {
-  const known = checkoutSync(folder)?.head
-  if (known) return known
   const r = await git(folder, ['rev-parse', '--verify', '-q', 'HEAD'])
   return r.ok ? r.out.trim() : withDetail(unknown(U.head, { where: folder }), r.err)
 }
@@ -356,13 +274,9 @@ export function mergeBase(repo: string, a: string, b: string): Promise<Maybe<str
 /**
  * A folder's branch (null: detached), head, and a line's head (null: no such line), in one git (#1376): what
  * `branch`, `head` and `lineHead` answer, asked together. Where the one read can't say (no commit yet, no such line, a
- * HEAD that isn't a branch's), each is asked on its own. HI-2050: all three from the `.git` files where they say each
- * (checkoutSync, and the line's head as lineHead reads it), with no git process; else as before.
+ * HEAD that isn't a branch's), each is asked on its own.
  */
 export async function heads(folder: string, target: string): Promise<{ line: Maybe<string | null>; head: Maybe<string>; target: Maybe<string | null> }> {
-  const c = checkoutSync(folder)
-  const known = c?.head && plainBranch(target) ? branchRefSync(c.common, target) : null
-  if (c?.head && known) return { line: c.line, head: c.head, target: known }
   const r = await git(folder, ['rev-parse', 'HEAD', `refs/heads/${target}`, '--symbolic-full-name', 'HEAD'])
   const out = r.ok ? lines(r.out).map((l) => l.trim()) : []
   if (out.length === 3 && SHA.test(out[0]) && SHA.test(out[1]) && (out[2] === 'HEAD' || out[2].startsWith('refs/heads/'))) {

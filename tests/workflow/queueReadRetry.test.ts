@@ -14,8 +14,7 @@ import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { gitTree, READ_RETRIES, type QueueConfig, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
 import { git } from '../../src/main/git'
 import * as G from '../../src/main/platform/git'
-import { isUnknown, unknown, withDetail } from '../../src/main/platform/types'
-import { UNREADABLE as U } from '../../src/shared/workflow/texts'
+import { isUnknown } from '../../src/main/platform/types'
 import { gitTool } from '../../src/main/gitTool'
 import type { GitOutcome, GitRequest } from '../../src/main/gitWorker'
 
@@ -128,12 +127,7 @@ const failing = (match: string | RegExp, times = 1, more: { code?: number; err?:
 const callsOf = (match: string): number => fail.calls.filter((l) => l.includes(match)).length
 /** HI-2050: the one git that reads the commit identity (both keys). */
 const IDENTITY = 'config --null --get-regexp'
-/**
- * HI-2050: a folder's head is read from its `.git` files where they say it, with no git to fail, so a rule matching
- * HEAD's read fails it where the platform answers it: as G.head answers when the git it gives way to fails.
- */
 const HEAD_READ = 'rev-parse --verify -q HEAD'
-const realHead = G.head
 
 let env: Env | null = null
 beforeEach(() => {
@@ -141,16 +135,8 @@ beforeEach(() => {
   fail.calls.length = 0
   spawnFail.rules.length = 0
   spawnFail.seen.length = 0
-  vi.spyOn(G, 'head').mockImplementation(async (folder) => {
-    const rule = fail.rules.find((r) => r.times > 0 && r.match(HEAD_READ))
-    if (!rule) return realHead(folder)
-    fail.calls.push(HEAD_READ)
-    rule.times--
-    return withDetail(unknown(U.head, { where: folder }), rule.native ? `git rev-parse didn't run to an exit (${rule.native})` : rule.err)
-  })
 })
 afterEach(() => {
-  vi.restoreAllMocks()
   env?.close()
   env = null
 })

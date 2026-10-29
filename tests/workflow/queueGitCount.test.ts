@@ -1,6 +1,6 @@
 // HI-2050: the git processes one card's queue step runs, counted, each style bounded at what it runs now (a merge 27 to
-// 24): the identity in one git, the merge's commit and the advance's checkout read from the `.git` files. What each step
-// checks still runs: the checks' bracket (status before and after), where the target is checked out (outside the lock
+// 26): the identity in one git. git answers every read (Darren's decision: no reads from the `.git` files beside it). What
+// each step checks still runs: the checks' bracket (status before and after), where the target is checked out (outside the lock
 // and again under it), the conditions under the lock, and the branch read after the swap. The second card of two is
 // counted (the queue's folder reused, as it is from then on), with the target moved meanwhile in the project.
 import { afterEach, describe, expect, it } from 'vitest'
@@ -59,29 +59,30 @@ function second(ran: { kind: string; line: string }[]): { kind: string; line: st
 
 describe("the git a queue step runs for a card (HI-2050)", () => {
   // Measured before HI-2050 (6e11c0403), card 2: merge 27, squash 28, rebase 34, strict 38.
-  const styles: [string, Partial<WorkflowOptions>, number][] = [
-    ['a merge', {}, 24],
-    ['a squash', { style: 'squash' }, 25],
-    ['Rebase and fast-forward', { style: 'rebase' }, 31],
-    ['strict, the card behind its target', { strict: true }, 34]
+  // [what, options, at most, the commits the queue makes for it (each read back by its own git)]
+  const styles: [string, Partial<WorkflowOptions>, number, number][] = [
+    ['a merge', {}, 26, 1],
+    ['a squash', { style: 'squash' }, 27, 1],
+    ['Rebase and fast-forward', { style: 'rebase' }, 33, 1],
+    ['strict, the card behind its target', { strict: true }, 37, 2]
   ]
-  for (const [what, o, most] of styles)
+  for (const [what, o, most, commits] of styles)
     // GIT_HEAVY_MS: two cards' whole course and drain, about 70 git processes in all.
     it(`${what}: at most ${most} git, every check of the step still read`, { timeout: GIT_HEAVY_MS }, async () => {
       const card = second(await drained(o))
       expect(card.length).toBeLessThanOrEqual(most)
       const count = (re: RegExp, kind?: string): number => card.filter((r) => re.test(r.line) && (!kind || r.kind === kind)).length
-      // The identity in one git; the merge's commit read from the files.
+      // The identity in one git; each commit the queue made read back by git.
       expect(count(/^config --null --get-regexp \^user/)).toBe(1)
       expect(count(/^config user\./)).toBe(0)
-      expect(count(/^rev-parse --verify -q HEAD$/)).toBe(0)
+      expect(count(/^rev-parse --verify -q HEAD$/)).toBe(commits)
       // The checks' bracket: the folder's status before the checks and after them.
       expect(count(/^status --porcelain=v2 /, 'read')).toBe(2)
       // Where the target is checked out: outside the lock, and again under it.
       expect(count(/^worktree list --porcelain$/, 'read')).toBe(2)
-      // Under the lock: the folder's branch and the target's head (now from the files), what is staged, what the merge
-      // changes, what the user has edited; then the swap, and the branch read again after it.
-      expect(count(/^rev-parse HEAD refs\/heads\/main --symbolic-full-name HEAD$/)).toBe(0)
+      // Under the lock: the folder's branch and the target's head (one git), what is staged, what the merge changes, what
+      // the user has edited; then the swap, and the branch read again after it.
+      expect(count(/^rev-parse HEAD refs\/heads\/main --symbolic-full-name HEAD$/)).toBe(1)
       expect(count(/^diff --cached --name-only -z /, 'queue')).toBe(1)
       expect(count(/^diff --name-only -z --no-renames /, 'queue')).toBe(1)
       expect(count(/^status --porcelain -z /, 'queue')).toBe(1)

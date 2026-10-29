@@ -123,9 +123,8 @@ describe('workflow scenarios, several agents in one folder', () => {
     }
     expect(ran.filter((c) => c.startsWith('status '))).toHaveLength(2)
     expect(ran.filter((c) => c.includes('--absolute-git-dir'))).toEqual([])
-    // The card's revision (its line's head) from the `.git` files (HI-2050: no git); the folder's, before and after, from
-    // the status reads.
-    expect(ran.filter((c) => c === 'rev-parse --verify -q HEAD')).toHaveLength(0)
+    // The card's revision (its line's head) once; the folder's, before and after, from the status reads.
+    expect(ran.filter((c) => c === 'rev-parse --verify -q HEAD')).toHaveLength(1)
   })
 
   it('S58: shared folder: A submits its own newest commit; B\'s change excludes A\'s; A\'s run while B edits is uncounted, the isolated run counts; an untrailered commit is listed for the user', async () => {
