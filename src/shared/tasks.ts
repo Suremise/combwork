@@ -1,6 +1,6 @@
 import { msg, type Msg } from './i18n/msg'
 import { withAttachmentPaths, type CardAttachment } from './cardAttachments'
-import type { AgentInfo, BoardColumnId, BoardFold, ContextProblem, TaskCard, TaskColumn } from './types'
+import type { AgentInfo, BoardColumnId, BoardFold, ContextProblem, ProgressRun, TaskCard, TaskColumn } from './types'
 import { cardLabel, cardName, cardRef } from './projectKeys'
 
 /**
@@ -290,19 +290,54 @@ export function reviewWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'arc
 const minutesText = (min: number): string => (min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ''}`)
 
 /**
+ * A card's builder's job for it (HI-1993), as a review's stall reads it: running (its builder has a Progress run open
+ * for the card, or background tasks of its CLI going), and when the last of them ended (ms), where known.
+ */
+export interface BuilderJob {
+  running: boolean
+  endedAt: number | null
+}
+
+/**
+ * The card's builder's job for it (HI-1993): its agent's open Progress runs for the card (`card`), and its background
+ * tasks (`builder`: its session as it is, its tasks' count and when they last ended; a builder's tasks while its card
+ * is in Review are taken as that card's). Each is held to `limitMs` (Settings → Agents, the background task limit) from
+ * its start: a run that never ends counts as ended then. On 28 Oct a builder ran an agreed 50-run stress proof in the
+ * background and its reviewer, waiting on it, showed stalled. Null when it has had none.
+ */
+export function builderJobOf(card: Pick<TaskCard, 'number' | 'project' | 'agent'>, runs: Pick<ProgressRun, 'agentId' | 'projectPath' | 'card' | 'state' | 'staleReason' | 'startedAt' | 'finishedAt'>[], builder: { backgroundTasks?: number; backgroundEndedAt?: string } | null, limitMs: number, now = Date.now()): BuilderJob | null {
+  if (!card.agent) return null
+  const project = card.project.toLowerCase()
+  const mine = runs.filter((r) => r.agentId === card.agent && r.card === card.number && !!r.projectPath && baseName(r.projectPath).toLowerCase() === project)
+  // Open: running, or quiet (its process is still there: the sweep ends a run whose process is gone); not one whose agent stopped.
+  const open = (r: (typeof mine)[number]): boolean => r.finishedAt === null && (r.state === 'running' || (r.state === 'stale' && r.staleReason === 'quiet'))
+  const running = mine.some((r) => open(r) && now - r.startedAt < limitMs) || (builder?.backgroundTasks ?? 0) > 0
+  const ends = [...mine.map((r) => (open(r) ? r.startedAt + limitMs : (r.finishedAt ?? NaN))), Date.parse(builder?.backgroundEndedAt ?? '')].filter((t) => Number.isFinite(t) && t <= now)
+  if (!running && !ends.length) return null
+  return { running, endedAt: ends.length ? Math.max(...ends) : null }
+}
+
+/** The background task limit (Settings → Agents), in minutes, kept to the setting's range: how long a job counts (HI-1993). */
+export const backgroundTaskMinutes = (setting: unknown): number => Math.min(480, Math.max(10, Number(setting) || 60))
+
+const baseName = (p: string): string => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? p
+
+/**
  * Why a card in Review is stuck on a review that started and has no verdict (#843, the safety net behind #840): its
  * reviewer started reviewing it, gave no verdict, didn't block it with a question, and has only been watching it for
  * REVIEW_WAIT_STALL_MS: its own session is `watching` (its turn ended) with a card watch on this card, since the later
  * of its review's start and its watch's (each turn it takes, a comment included, ends its watch, so a reviewer at work
  * or answering a wake starts the clock again). On 14 Oct a reviewer asked the user in a comment and went back to
- * watching; nothing flagged it for 75 minutes. A reviewer working, or whose state is unknown, isn't. Null otherwise.
+ * watching; nothing flagged it for 75 minutes. A reviewer working, or whose state is unknown, isn't. Nor one waiting on
+ * its builder's job for the card (HI-1993, `job`: builderJobOf): the job counts as progress, and once it ends the clock
+ * starts again from its end. Null otherwise.
  */
-export function reviewVerdictWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'review' | 'blocked'>, watchers: { name: string; project: string; agentId: string; cards: number[]; status?: string; watchSince?: string }[], now = Date.now(), tr?: Tr): string | null {
-  if (card.archived || card.column !== 'review' || !card.review || card.blocked) return null
+export function reviewVerdictWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'review' | 'blocked'>, watchers: { name: string; project: string; agentId: string; cards: number[]; status?: string; watchSince?: string }[], now = Date.now(), tr?: Tr, job?: BuilderJob | null): string | null {
+  if (card.archived || card.column !== 'review' || !card.review || card.blocked || job?.running) return null
   const r = card.review
   const w = watchers.find((x) => x.project.toLowerCase() === card.project.toLowerCase() && x.agentId === r.agent && x.status === 'watching' && x.cards.includes(card.number))
   if (!w) return null
-  const times = [Date.parse(r.since), Date.parse(w.watchSince ?? '')].filter(Number.isFinite)
+  const times = [Date.parse(r.since), Date.parse(w.watchSince ?? ''), job?.endedAt ?? NaN].filter(Number.isFinite)
   const ms = times.length ? now - Math.max(...times) : NaN
   if (!(ms >= REVIEW_WAIT_STALL_MS)) return null
   const min = Math.round(ms / 60_000)

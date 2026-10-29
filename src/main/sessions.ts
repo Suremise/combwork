@@ -20,6 +20,7 @@ import { BrowserWindow, Notification, app, clipboard } from 'electron'
 import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
+import { backgroundTaskMinutes } from '../shared/tasks'
 import { assistantTools } from '../shared/assistantTools'
 import { HIVE_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
@@ -885,7 +886,7 @@ function autoName(projectPath: string, agent: Pick<AgentDef, 'name'>, count: num
 }
 
 /** How long a background task counts as running at most (Settings → Agents), in minutes. */
-const taskMinutes = (): number => Math.min(480, Math.max(10, Number(config.settings.agents.backgroundTaskMinutes) || 60))
+const taskMinutes = (): number => backgroundTaskMinutes(config.settings.agents.backgroundTaskMinutes)
 
 const liveId = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}#${agentId}`
 
@@ -4758,7 +4759,10 @@ class SessionManager {
     const minutes = taskMinutes()
     const dropped = l.tasks ? expireTasks(l.tasks, Date.now(), minutes) : []
     for (const id of dropped) log.info(`${userText(this.label(l.state))}: stopped counting background task ${id} after ${minutes} minutes`)
+    const had = l.state.backgroundTasks
     l.state.backgroundTasks = l.tasks?.size || undefined
+    // When they last ended (HI-1993): a review waiting on them starts its stall clock again from then.
+    if (had && !l.state.backgroundTasks) l.state.backgroundEndedAt = new Date().toISOString()
     return dropped.length > 0
   }
 

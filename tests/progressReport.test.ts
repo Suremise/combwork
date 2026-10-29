@@ -9,9 +9,10 @@ import { createRequire } from 'module'
 import { pathToFileURL } from 'url'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { estimateFor, evictionOrder, KEEP_KEYS, ProgressRun, progressTarget, recordTiming, wrappedLines } from '../src/main/progressReporters/report.mts'
-import { cmdEscapeArgument, commandEnv, commandLabel, isolatedPollDelay, parseArgs, parseProcessList, replyTimeoutMs, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, uncountedLine, wasInterrupted, type WrapperIo } from '../src/main/progressReporters/wrapper'
+import { cmdEscapeArgument, commandEnv, commandLabel, isolatedPollDelay, KEEPALIVE_MS, keepAliveDue, parseArgs, parseProcessList, replyTimeoutMs, runWrapped, spawnSpec, StepFilter, stepLine, timingKey, treeToEnd, uncountedLine, wasInterrupted, type WrapperIo } from '../src/main/progressReporters/wrapper'
 import { installShims, shimFiles, withBinOnPath } from '../src/main/progressReporters/shims'
 import { hiveInstructions, progressRule, wrapsLongCommands } from '../src/shared/hiveGuidance'
+import { STALE_GRACE_MS } from '../src/shared/progress'
 import { launchParts } from '../src/main/guidance'
 import { tempDir } from './tempDir'
 // A process by its identity (pid and start time), never by a remembered pid alone (#603).
@@ -538,6 +539,33 @@ describe('reporting a run', () => {
     expect(calls[0].body.estimateMs).toBeLessThanOrEqual(600_000)
     // Titled with the command line (clipped: the temporary folder's path is long).
     expect(commandLabel(ok).startsWith(String(calls[0].body.title).replace(/…$/, ''))).toBe(true)
+  })
+
+  it("a command's output tells Hive its run still goes, at most every keep-alive; a silent one sends nothing (HI-1993)", async () => {
+    // A stress loop with no step lines, printing as it goes: it ends once Hive has had a keep-alive (an empty update).
+    const loud = `const t = setInterval(() => console.log('run'), 20); seen((c) => c.some((x) => x.method === 'PATCH')).then(() => { clearInterval(t) })`
+    const r = await wrap(['--', ...seenNode, '-e', loud], env(), 0, dir, { resolveTimeoutMs: 1000, keepAliveMs: 50 })
+    expect(r.code).toBe(0)
+    const patches = calls.filter((c) => c.method === 'PATCH')
+    expect(patches.length).toBeGreaterThan(0)
+    expect(patches.every((c) => c.path === '/v1/progress/run-1' && Object.keys(c.body).length === 0)).toBe(true)
+    // A silent one: no keep-alive even with none due between them (an interval of 0), as only output sends one, so a
+    // command that stopped reporting still goes stale. It ends once its start is reported.
+    calls.length = 0
+    const quiet = `seen((c) => c.length > 0)`
+    await wrap(['--', ...seenNode, '-e', quiet], env(), 0, dir, { resolveTimeoutMs: 1000, keepAliveMs: 0 })
+    expect(calls.map((c) => c.method)).toEqual(['POST', 'POST'])
+  })
+
+  it('a keep-alive is due once its interval has passed since the last one, the start or a step, and not before (HI-1993)', () => {
+    expect(keepAliveDue(1000, 1000)).toBe(false)
+    expect(keepAliveDue(1000, 1000 + KEEPALIVE_MS - 1)).toBe(false)
+    expect(keepAliveDue(1000, 1000 + KEEPALIVE_MS)).toBe(true)
+    expect(keepAliveDue(1000, 1000 + 10 * KEEPALIVE_MS)).toBe(true)
+    // An interval of its own (tests), and one well within a quiet run's grace before it shows as stale.
+    expect(keepAliveDue(0, 49, 50)).toBe(false)
+    expect(keepAliveDue(0, 50, 50)).toBe(true)
+    expect(KEEPALIVE_MS).toBeLessThan(STALE_GRACE_MS)
   })
 
   it('a total given after the run started (no step line at first) is sent once, with the first update that has it (#145)', async () => {

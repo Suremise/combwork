@@ -100,7 +100,7 @@ import { flushMetrics } from './metrics'
 import { watchMainStalls } from './mainStalls'
 import { fileHolders } from './fileHolders'
 import { onAgentStartChange, startSeq } from './agentStarts'
-import { agentStartOf, withAgentStarts } from './cardStall'
+import { agentStartOf, setStallRuns, withAgentStarts } from './cardStall'
 import { createWorkspaceService, disposeWorkspaceService, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { closeWithCommand, quitCommandPlanned, quitRunsAny, runQuitCommand, type RunOutcome } from './closeCommand/closeCommands'
 import { journalSettingsOf } from './journalService'
@@ -1139,6 +1139,9 @@ app.whenReady().then(async () => {
     const tasks = sessions.agentNow(project, agent)?.backgroundTasks ?? 0
     return [...runs.map((r) => r.title), ...(tasks ? [`its background tasks (${tasks})`] : [])] // i18n-ignore: agent-facing: what a refused submit names
   })
+
+  // A review waiting on its builder's Progress run for the card isn't stalled (HI-1993).
+  setStallRuns((wsPath) => progress.list(wsPath))
 
   // The usage history (#1106): its tick for running sessions; each workspace's import starts as it opens.
   usageHistory.start()

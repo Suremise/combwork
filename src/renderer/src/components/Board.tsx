@@ -5,7 +5,7 @@ import { gitProblemText } from '@shared/gitTool'
 import { agentRuntime, hooksMissingText } from '@shared/runtime'
 import { LOOP_STEP_WAIT_MINUTES } from '@shared/lanes'
 import { projectInfoPreferences } from '@shared/workflow/preferences'
-import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stallAgentOf, stalledReason, startFailedReason, taskOverview, type BoardFoldChange, type LaneOrderView } from '@shared/tasks'
+import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, backgroundTaskMinutes, builderJobOf, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stallAgentOf, stalledReason, startFailedReason, taskOverview, type BoardFoldChange, type LaneOrderView } from '@shared/tasks'
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -140,7 +140,7 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
   if (looping) return { text: looping, kind: notWatchingAgent(c, loopers)?.untaken ? 'wake-untaken' : 'not-watching' }
   const waiting = reviewWaitReason(c, watchers, Date.now(), tr)
   if (!waiting) {
-    const verdict = reviewVerdictWaitReason(c, watchers, Date.now(), tr)
+    const verdict = reviewVerdictWaitReason(c, watchers, Date.now(), tr, reviewJob(c, agent))
     if (verdict) return { text: verdict, kind: 'review-verdict' }
     const order = laneOrderWaitReason(c, lane, watchers, Date.now(), tr)
     if (order) return { text: order, kind: 'lane-order' }
@@ -156,6 +156,16 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
   // The watcher reviewWaitReason names: its state unknown (silent) or not.
   const w = watchers.find((x) => x.project.toLowerCase() === c.project.toLowerCase() && x.agentId !== c.agent && x.cards.includes(c.number))
   return { text: waiting, kind: w?.silentMinutes !== undefined ? 'review-silent' : 'review-wait' }
+}
+
+/**
+ * A started review's builder's job for the card (HI-1993: its Progress run for the card, or its background tasks), as
+ * main's stall check reads it; null for a card it couldn't stall.
+ */
+function reviewJob(c: TaskCard, builder: AgentInfo | null | undefined): ReturnType<typeof builderJobOf> {
+  if (c.column !== 'review' || !c.review || !c.agent) return null
+  const st = get()
+  return builderJobOf(c, st.progressRuns, builder?.live ?? null, backgroundTaskMinutes(st.settings?.agents.backgroundTaskMinutes) * 60_000)
 }
 
 /** A stalled card's hover: what to do about it. */

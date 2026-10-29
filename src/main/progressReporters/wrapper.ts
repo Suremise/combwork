@@ -260,6 +260,8 @@ export interface WrapperIo {
   stdout: { write(b: Buffer | string): unknown }
   stderr: { write(b: Buffer | string): unknown }
   stdin?: 'inherit' | 'ignore'
+  /** For tests: how often at most output tells Hive the run still goes (default KEEPALIVE_MS). */
+  keepAliveMs?: number
   /** For tests: the API calls (report.mts's fetch) and the update interval. */
   fetch?: Fetch
   minIntervalMs?: number
@@ -337,6 +339,14 @@ export function isolatedPollDelay(waitedMs: number, lastMs: number, firstMs = IS
   return Math.max(firstMs, Math.min(ISOLATED_POLL_MAX_MS, Math.round(lastMs * 1.5)))
 }
 
+/** How often at most a command's output tells Hive its run still goes (HI-1993): well within a quiet run's grace (STALE_GRACE_MS). */
+export const KEEPALIVE_MS = 60_000
+
+/** Whether output at `now` tells Hive the run still goes: once `every` ms have passed since it last did (or since its start or last step). */
+export function keepAliveDue(lastAlive: number, now: number, every = KEEPALIVE_MS): boolean {
+  return now - lastAlive >= every
+}
+
 /**
  * The command's run as reported: it starts at the first step line that gives the total, or after `waitMs`, so steps
  * the command announces at once show as steps from the start. A run started without a total takes the first one given
@@ -354,9 +364,11 @@ class WrappedRun {
   private waiting = ''
   private waitStart = 0
   private waitedBefore = 0
+  /** When it last told Hive the command still goes (output), ms. */
+  private lastAlive = 0
   constructor(
     private readonly start: () => { title: string; command: string; titleFromCommand: boolean; estimateMs?: number; started: number; link: Partial<ProgressStart> },
-    private readonly opts: { fetch?: Fetch; minIntervalMs?: number; target: NonNullable<ReturnType<typeof progressTarget>>; startTimeoutMs?: number },
+    private readonly opts: { fetch?: Fetch; minIntervalMs?: number; target: NonNullable<ReturnType<typeof progressTarget>>; startTimeoutMs?: number; keepAliveMs?: number },
     waitMs: number
   ) {
     this.timer = setTimeout(() => this.begin(), waitMs)
@@ -367,8 +379,19 @@ class WrappedRun {
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
     const s = this.start()
+    this.lastAlive = Date.now()
     const left = s.estimateMs === undefined ? undefined : Math.max(0, s.estimateMs - (Date.now() - s.started))
     this.run = new ProgressRun(this.opts.target, { ...s.link, title: s.title, command: s.command, titleFromCommand: s.titleFromCommand, total: this.total, step: this.step, stepName: this.name, estimateMs: left, ...(this.waiting ? { waiting: this.waiting } : {}) }, { fetch: this.opts.fetch, minIntervalMs: this.opts.minIntervalMs, startTimeoutMs: this.opts.startTimeoutMs })
+  }
+
+  /**
+   * The command wrote output (HI-1993): the run is told it still goes, at most every KEEPALIVE_MS, so a long command with
+   * no step lines (a stress loop) isn't taken for one that stopped reporting. One silent for long still is.
+   */
+  output(now = Date.now()): void {
+    if (!this.run || !keepAliveDue(this.lastAlive, now, this.opts.keepAliveMs)) return
+    this.lastAlive = now
+    this.run.update({})
   }
 
   /** How long the command has waited in all (its wait lines), so far. */
@@ -399,6 +422,7 @@ class WrappedRun {
     }
     const late = this.total === undefined && u.total !== undefined && u.total > 0 ? u.total : undefined
     if (late !== undefined) this.total = late
+    this.lastAlive = Date.now()
     this.run.update({ ...(late !== undefined ? { total: late, step: this.step ?? 0 } : {}), ...(u.step !== undefined ? { step: this.step } : {}), ...(u.name !== undefined ? { stepName: u.name } : {}) })
   }
 
@@ -639,7 +663,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
     : {}
   const report = new WrappedRun(
     () => ({ title: title || label, command: label, titleFromCommand: !title, estimateMs: timings ? estimateFor(timings, key) : undefined, started, link: linked }),
-    { target, fetch: io.fetch, minIntervalMs: io.minIntervalMs, startTimeoutMs: replyMs },
+    { target, fetch: io.fetch, minIntervalMs: io.minIntervalMs, startTimeoutMs: replyMs, keepAliveMs: io.keepAliveMs },
     io.startWaitMs ?? 2000
   )
   let signalled = false
@@ -667,7 +691,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   const ended = { signal: null as NodeJS.Signals | null }
   // An isolated check (#1435): in its copy, its launcher put in the copy's job before the command exists.
   const isolated = link?.isolated && link.folder ? { folder: link.folder, assign: (a: { pid: number; after: number; before: number }) => assignIsolated(target, { lease: link!.isolated!.lease, ...a }, { fetch: io.fetch }) } : undefined
-  const code = await run(spec, env, io, (u) => report.onStep(u), (c) => (child = c), ended, forced, isolated)
+  const code = await run(spec, env, io, (u) => report.onStep(u), (c) => (child = c), ended, forced, isolated, () => report.output())
   for (const s of signals) process.off(s, onSignal)
   // Told to stop, it is stopped however it then ended (a server shutting down cleanly exits 0); a command that ended by
   // an interrupt of its own is stopped too. Its exit code is passed on as it was.
@@ -691,7 +715,8 @@ function run(
   onChild?: (c: ChildProcess) => void,
   ended?: { signal: NodeJS.Signals | null },
   forced?: { at: number },
-  isolated?: { folder: string; assign: (a: { pid: number; after: number; before: number }) => Promise<true | string> }
+  isolated?: { folder: string; assign: (a: { pid: number; after: number; before: number }) => Promise<true | string> },
+  onOutput?: () => void
 ): Promise<number> {
   return new Promise((resolve) => {
     let child: ChildProcess
@@ -739,7 +764,10 @@ function run(
         [child.stdout, io.stdout],
         [child.stderr, io.stderr]
       ] as const) {
-        const f = new StepFilter((b) => to.write(b), onStep)
+        const f = new StepFilter((b) => {
+          to.write(b)
+          onOutput?.()
+        }, onStep)
         filters.push(f)
         stream?.on('data', (d: Buffer) => f.push(d))
       }

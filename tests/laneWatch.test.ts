@@ -13,7 +13,8 @@ import { taskWaitText } from '../src/shared/toolReplies'
 import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
-import { LANE_NEXT_STALL_MS, laneNextWaitReason, RETURN_STALL_MS, returnedWaitReason, STALE_STALL_MS, staleWaitReason } from '../src/main/cardStall'
+import { LANE_NEXT_STALL_MS, laneNextWaitReason, RETURN_STALL_MS, returnedWaitReason, setStallRuns, STALE_STALL_MS, staleWaitReason } from '../src/main/cardStall'
+import type { ProgressRun } from '../src/shared/types'
 import { resetAgentStartsForTests, startBegun, startEnded } from '../src/main/agentStarts'
 /** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
 const { returns, stales } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>(), stales: new Map<number, { since: string; approved: string | null; current: string | null }>() }))
@@ -809,6 +810,53 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
     } finally {
       vi.useRealTimers()
+    }
+    expect(st.told[0]).toContain(`#${a} is stalled: "R1 started reviewing #${a} but has given no verdict, and has only been watching it for 16 min."`)
+    await disposeWorkspaceService(w)
+  })
+
+  it("a started review held for its builder's background job on the card: no stall while it runs, one once it has ended for the limit (HI-1993)", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    await inWorkspace(w, () => tasks.updateTask(a, { column: 'review' }, agent('b1')))
+    await inWorkspace(w, () => tasks.updateTask(a, { review: 'start' }, agent('r1')))
+    // R1 asked for a stress proof; B1 runs it through hive-progress for the card, then in a background shell.
+    const since = new Date().toISOString()
+    const t0 = Date.parse(since)
+    const run = { agentId: 'b1', projectPath: alpha, card: a, state: 'running', staleReason: null, startedAt: t0, finishedAt: null as number | null } as unknown as ProgressRun
+    const runs: ProgressRun[] = [run]
+    setStallRuns(() => runs)
+    let b1 = { projectPath: alpha, agentId: 'b1', agentName: 'B1', status: 'background', backgroundTasks: 0 as number | undefined, backgroundEndedAt: undefined as string | undefined }
+    const r1 = { projectPath: alpha, agentId: 'r1', agentName: 'R1', status: 'watching', watch: { cards: [a], changes: ['verdict', 'column'], column: 'review', label: '', since, limitAt: '' } }
+    Object.assign(sessions, { liveStates: () => [r1, b1] })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      await watchAll(w, home, st)
+      // Past the limit, its run still going: no stall.
+      vi.setSystemTime(t0 + REVIEW_WAIT_STALL_MS + 60_000)
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      // Its run ends; its background tasks go on: still none.
+      Object.assign(run, { state: 'passed', finishedAt: Date.now() })
+      b1 = { ...b1, backgroundTasks: 1 }
+      vi.setSystemTime(t0 + 2 * REVIEW_WAIT_STALL_MS + 60_000)
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(st.told).toEqual([])
+      // They end too, and R1 gives no verdict: stalled once it has waited the limit from their end.
+      b1 = { ...b1, status: 'watching', backgroundTasks: undefined, backgroundEndedAt: new Date().toISOString() }
+      vi.setSystemTime(Date.now() + REVIEW_WAIT_STALL_MS - 60_000)
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(st.told).toEqual([])
+      vi.setSystemTime(Date.now() + 2 * 60_000)
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    } finally {
+      vi.useRealTimers()
+      setStallRuns(null)
     }
     expect(st.told[0]).toContain(`#${a} is stalled: "R1 started reviewing #${a} but has given no verdict, and has only been watching it for 16 min."`)
     await disposeWorkspaceService(w)
