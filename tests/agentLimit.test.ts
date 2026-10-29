@@ -1,8 +1,9 @@
 // Maximum agents (HI-2001; #562 before it, Settings → Advanced → Agents per project): a workflow option, the user's team
 // size, set by the presets (Solo 1, Pair 2, Team and All off 12), resolved Hive's, the workspace's, then the project's.
 // The Assistant and the Agent API add agents only up to it, checked again under the project's lock, and are told where
-// the user raises it; the user adds more by hand, up to 24. A template's load likewise: the Assistant's is refused over
-// it, the user's goes past it. The old setting's values become Maximum agents. The note on what more agents cost, and
+// the user raises it; the user too (HI-2058, Darren's decision), told it in the window's words. A template's load
+// likewise: over it, the Assistant's is refused; the user's with its workflow saves the template's own maximum with its
+// agents (never under them), without it is refused, nothing changed. The old setting's values become Maximum agents. The note on what more agents cost, and
 // the agent watch's bound.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -188,7 +189,8 @@ describe('Hive keeps to it', () => {
   /** The workspace's own Maximum agents, for both platforms (null: inherited). */
   const setOwn = (v: number | null) => run(() => w.saveWorkspaceConfigWith(() => ({ workflow: v === null ? {} : { git: { maxAgents: v }, none: { maxAgents: v } } })))
   const reset = (p: string, n: number, prefix: string) => run(() => w.mutateProjectConfig(p, () => ({ agents: agentsOf(n, prefix), workflow: undefined })))
-  const refusedAt = (n: number) => `This project's workflow sets Maximum agents to ${n}, the user's team size, and the project has that many. Only the user goes past it: ask them to add the agent themselves, or to raise Maximum agents in Version Control → Workflow.`
+  const refusedAt = (n: number) => `This project's workflow sets Maximum agents to ${n}, the user's team size, and the project has that many. Ask the user to raise Maximum agents in Version Control → Workflow.`
+  const userRefusedAt = (n: number) => `This project’s workflow allows ${n} ${n === 1 ? 'agent' : 'agents'}: raise Maximum agents in Version Control → Workflow.`
 
   beforeAll(async () => {
     for (const [p, n, prefix] of [[alpha, 12, 'a'], [beta, 3, 'b']] as const) {
@@ -196,8 +198,14 @@ describe('Hive keeps to it', () => {
       writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: agentsOf(n, prefix) }))
     }
     mkdirSync(join(wsPath, '.hive', 'templates'), { recursive: true })
-    const crew = Array.from({ length: 14 }, (_, i) => ({ name: `T${i + 1}`, role: 'builder', provider: 'claude-code' }))
-    writeFileSync(join(wsPath, '.hive', 'templates', 'crew.json'), JSON.stringify({ version: 2, name: 'Crew', layout: 'auto', agents: crew }))
+    const crewOf = (n: number, prefix = 'T') => Array.from({ length: n }, (_, i) => ({ name: `${prefix}${i + 1}`, role: 'builder', provider: 'claude-code' }))
+    const write = (file: string, t: object) => writeFileSync(join(wsPath, '.hive', 'templates', file), JSON.stringify({ version: 2, layout: 'auto', ...t }))
+    write('crew.json', { name: 'Crew', agents: crewOf(14) })
+    // HI-2058: a template's own Maximum agents (20, for 12 agents), one with no maximum, one whose maximum is under its agents.
+    write('twenty.json', { name: 'Twenty', agents: crewOf(12, 'W'), workflow: { none: { preset: null, options: { maxAgents: 20 } } } })
+    write('nomax.json', { name: 'No max', agents: crewOf(14, 'N'), workflow: { none: { preset: null, options: { loopRounds: 5 } } } })
+    write('under.json', { name: 'Under', agents: crewOf(10, 'U'), workflow: { none: { preset: null, options: { maxAgents: 4 } } } })
+    write('toomany.json', { name: 'Too many', agents: crewOf(AGENT_LIMIT_MAX + 1, 'X') })
     advanced.load(join(base, 'profile'))
     w = createWorkspaceService()
     await w.open(wsPath)
@@ -231,7 +239,10 @@ describe('Hive keeps to it', () => {
     expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('client-error')
   })
 
-  it('the user adds past it by hand, up to 24', async () => {
+  it('the user keeps to it too (HI-2058); at 24, the most any project has', async () => {
+    expect(await outcome(add(alpha, 'user'))).toBe(userRefusedAt(12))
+    expect(count(alpha)).toBe(12)
+    await setOwn(24)
     await reset(alpha, 23, 'a')
     expect(await outcome(add(alpha, 'user'))).toBe('ok')
     expect(count(alpha)).toBe(24)
@@ -240,13 +251,13 @@ describe('Hive keeps to it', () => {
     await reset(alpha, 12, 'a')
   })
 
-  it("a project on Solo: the Assistant can't give it a second agent; the user can", async () => {
+  it("a project on Solo: neither the Assistant nor the user can give it a second agent", async () => {
     await reset(beta, 1, 'b')
     await run(() => w.mutateProjectConfig(beta, () => ({ workflow: { platform: w.info()!.projects.find((p) => p.path === beta)!.platform?.id ?? 'none', preset: 'solo', options: preset('none', 'solo') } as never })))
     expect(agentMax(beta, cfgOf(beta))).toBe(1)
     expect(await outcome(add(beta))).toBe(refusedAt(1))
-    expect(await outcome(add(beta, 'user'))).toBe('ok')
-    expect(count(beta)).toBe(2)
+    expect(await outcome(add(beta, 'user'))).toBe(userRefusedAt(1))
+    expect(count(beta)).toBe(1)
     await reset(beta, 3, 'b')
   })
 
@@ -277,12 +288,12 @@ describe('Hive keeps to it', () => {
     expect(count(alpha)).toBe(12)
   })
 
-  it("a template's load: the Assistant's plan is blocked over it and refused as it publishes if lowered; the user's goes past it", async () => {
+  it("a template's load: the Assistant's plan is blocked over it and refused as it publishes if lowered; the user's needs it raised", async () => {
     const english = await run(() => templates.templatePlanEnglish(beta, 'workspace', 'crew.json'))
     const over = "It has 14 agents, and this project's workflow allows 12 (Maximum agents, the user's team size, in Version Control → Workflow). The user can load it themselves, or raise Maximum agents first."
     expect(english.why).toEqual([over])
     expect(await outcome(run(() => templates.loadTemplateWith(beta, 'workspace', 'crew.json', english.plan.remove.map((a) => a.id))))).toMatch(/can't be loaded yet:\n• It has 14 agents/)
-    // The user's: not blocked, and it says how far over, for its dialog to offer raising it.
+    // The user's: not blocked, and it says how far over, for its dialog to say so.
     const mine = await run(() => templates.templatePlan(beta, 'workspace', 'crew.json'))
     expect(mine.blocked).toEqual([])
     expect(mine.maxAgents).toEqual({ now: 12, needs: 14 })
@@ -296,10 +307,94 @@ describe('Hive keeps to it', () => {
     }
     expect(await outcome(run(() => templates.loadTemplateWith(beta, 'workspace', 'crew.json', fits.plan.remove.map((a) => a.id))))).toBe("It has 14 agents, and this project's workflow allows 13 (Maximum agents, the user's team size, in Version Control → Workflow). The user can load it themselves, or raise Maximum agents first. Nothing was changed.")
     expect(cfgOf(beta).agents.map((a: AgentDef) => a.name)).toEqual(['B1', 'B2', 'B3'])
-    // The user's load goes past it, replacing the project's three.
+    // The user's load, at 14, replacing the project's three.
     templates.testHooks.staged = undefined
+    await setOwn(14)
     const done = await run(() => templates.loadTemplate(beta, 'workspace', 'crew.json', mine.remove.map((a) => a.id)))
     expect(done.created).toHaveLength(14)
     expect(count(beta)).toBe(14)
+    await setOwn(null)
+    await reset(beta, 3, 'b')
+  })
+
+  describe("the user's load (HI-2058)", () => {
+    const load = (file: string, applyWorkflow: boolean) => run(() => templates.loadTemplate(beta, 'workspace', file, cfgOf(beta).agents.map((a: AgentDef) => a.id), undefined, undefined, undefined, applyWorkflow))
+    const ownMax = () => cfgOf(beta).workflow?.options?.maxAgents
+    const names = () => cfgOf(beta).agents.map((a: AgentDef) => a.name)
+    beforeEach(async () => {
+      templates.testHooks.staged = undefined
+      await setOwn(8)
+      await reset(beta, 3, 'b')
+    })
+
+    it("with its workflow: the template's own maximum (20, for 12 agents) is saved with its agents, over the project's 8", async () => {
+      expect(agentMax(beta, cfgOf(beta))).toBe(8)
+      const done = await load('twenty.json', true)
+      expect(done.created).toHaveLength(12)
+      expect(ownMax()).toBe(20)
+      expect(agentMax(beta, cfgOf(beta))).toBe(20)
+      // Its other options aren't saved: the form fills them in, to save there.
+      expect(cfgOf(beta).workflow?.options?.loopRounds).toBeUndefined()
+      // The user's add keeps to the maximum saved.
+      expect(await outcome(add(beta, 'user'))).toBe('ok')
+    })
+
+    it('with its workflow and no maximum of its own: raised to its agents (14), never lowered', async () => {
+      await load('nomax.json', true)
+      expect(ownMax()).toBe(14)
+      expect(await outcome(add(beta, 'user'))).toBe(userRefusedAt(14))
+      // Into a project whose maximum is already higher: nothing saved.
+      await setOwn(20)
+      await reset(beta, 3, 'b')
+      await load('nomax.json', true)
+      expect(ownMax()).toBeUndefined()
+      expect(agentMax(beta, cfgOf(beta))).toBe(20)
+    })
+
+    it("with its workflow and a maximum under its agents (4 for 10): its agents' count, never under them", async () => {
+      await load('under.json', true)
+      expect(count(beta)).toBe(10)
+      expect(ownMax()).toBe(10)
+    })
+
+    it('without its workflow: over the maximum, refused, nothing changed (agents or options)', async () => {
+      const before = JSON.stringify(cfgOf(beta))
+      expect(await outcome(load('twenty.json', false))).toBe('It has 12 agents, and this project’s workflow allows 8 agents: raise Maximum agents in Version Control → Workflow first, or load it with its workflow. Nothing was changed.')
+      expect(JSON.stringify(cfgOf(beta))).toBe(before)
+      expect(names()).toEqual(['B1', 'B2', 'B3'])
+      // Raised first, it loads, and nothing of its workflow is saved.
+      await setOwn(12)
+      await load('twenty.json', false)
+      expect(count(beta)).toBe(12)
+      expect(ownMax()).toBeUndefined()
+    })
+
+    it('checked again under the lock: lowered while its agents are staged, the load without its workflow is refused, nothing written', async () => {
+      await setOwn(12)
+      const before = JSON.stringify(cfgOf(beta))
+      templates.testHooks.staged = async (name) => {
+        if (name === 'W12') await setOwn(11)
+      }
+      expect(await outcome(load('twenty.json', false))).toMatch(/allows 11 agents: raise Maximum agents .* Nothing was changed\.$/)
+      expect(JSON.stringify(cfgOf(beta))).toBe(before)
+    })
+
+    it('an agent added while its agents are staged: refused, nothing written', async () => {
+      const before = JSON.stringify(cfgOf(beta))
+      templates.testHooks.staged = async (name) => {
+        if (name === 'W12') await setOwn(9).then(() => add(beta, 'user'))
+      }
+      expect(await outcome(load('twenty.json', true))).toMatch(/changed while the template was loading/)
+      const now = cfgOf(beta)
+      expect(now.agents.map((a: AgentDef) => a.name).filter((n: string) => n.startsWith('W'))).toEqual([])
+      expect(now.agents).toHaveLength(4)
+      expect(now.workflow?.options?.maxAgents).toBe(JSON.parse(before).workflow?.options?.maxAgents)
+    })
+
+    it('more agents than any project can have: the template is refused as it is read, nothing changed', async () => {
+      const before = JSON.stringify(cfgOf(beta))
+      expect(await outcome(load('toomany.json', true))).toMatch(/25 agents|up to 24/)
+      expect(JSON.stringify(cfgOf(beta))).toBe(before)
+    })
   })
 })

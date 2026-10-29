@@ -129,8 +129,8 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
     desc: msg({ id: 'workflow.option.loopWakes.desc', defaultMessage: 'When a card with a reviewer arrives in Review, Hive wakes the reviewer, and on the review’s verdict the card’s builder; off, only the agents’ own card watches wake them.', description: 'What the workflow option “Wake reviewers and builders” does.' })
   },
   maxAgents: {
-    title: msg({ id: 'workflow.option.maxAgents.title', defaultMessage: 'Maximum agents', description: 'A workflow option (HI-2001): the most agents the project has, its team size. The Hive Assistant adds agents only up to it.' }),
-    desc: msg({ id: 'workflow.option.maxAgents.desc', defaultMessage: 'Your team size: the most agents the Assistant (and programs using the Agent API) add to this project, though you can add more yourself and lowering it removes none.', description: 'What the workflow option “Maximum agents” does. Agent API is the name of a Hive feature.' })
+    title: msg({ id: 'workflow.option.maxAgents.title', defaultMessage: 'Maximum agents', description: 'A workflow option (HI-2001): the most agents the project has, its team size. Nobody adds agents past it: the user, the Hive Assistant or a program (HI-2058).' }),
+    desc: msg({ id: 'workflow.option.maxAgents.desc', defaultMessage: 'Your team size: the most agents this project has, whoever adds them (you, the Assistant or a program using the Agent API), and lowering it removes none.', description: 'What the workflow option “Maximum agents” does (HI-2058: it binds the user too). Agent API is the name of a Hive feature.' })
   },
   loopRounds: {
     title: msg({ id: 'workflow.option.loopRounds.title', defaultMessage: 'Rounds', description: 'A workflow option, under Card loops: how many rounds (a build and its review) a card gets before its agents ask you.' }),

@@ -691,6 +691,14 @@
     "defaultMessage": "A project can have up to {most, number} agents.",
     "description": "Why another agent can't be added to a project: it has as many as Hive allows ({most}, 24)."
   },
+  "agents.limit.openWorkflow": {
+    "defaultMessage": "Open Workflow Options",
+    "description": "A button or link beside why another agent can't be added (HI-2058: the project is at its Maximum agents): opens the project's Version Control tab at Workflow, where Maximum agents is set."
+  },
+  "agents.limit.workflow": {
+    "defaultMessage": "This project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents in Version Control → Workflow.",
+    "description": "Why another agent can't be added to a project (HI-2058): its workflow option Maximum agents allows {max} and it has that many. Maximum agents, Version Control and Workflow are names in the window: as translated there."
+  },
   "agents.mcp.all": {
     "defaultMessage": "All of the project's",
     "description": "A choice of an agent's MCP servers (Agent Settings): every MCP server on in its project. Keep it short."

@@ -97,6 +97,7 @@
   "content.templates.noKeySave": "O Hive não conseguiu ler a chave de {project}, então os nomes não podem ser salvos com ela. Tente de novo ou salve sem “Usar a chave do projeto nos nomes”.",
   "content.templates.noWorkspace": "Abra um espaço de trabalho primeiro.",
   "content.templates.nothing": "{problem} Nada foi alterado.",
+  "content.templates.overMax": "Ele tem {count, number} agentes, e o fluxo de trabalho deste projeto permite {max, plural, one {# agente} other {# agentes}}: aumente primeiro o Máximo de agentes em Controle de versão → Fluxo de trabalho, ou carregue-o com o fluxo de trabalho dele. Nada foi alterado.",
   "content.templates.provider": "{problem, select, unknown {Este Hive não conhece o agente de código “{provider}” (atualize o Hive)} off {O {provider} está desativado (Configurações → Provedores)} other {O {provider} não está instalado (Configuração de provedores)}}",
   "content.templates.restoring": "Desfazer está devolvendo os agentes deste projeto a como estavam antes de um modelo ser carregado",
   "content.templates.running": "O agente {agent} está em execução ou iniciando: pare-o primeiro.",

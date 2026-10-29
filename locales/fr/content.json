@@ -97,6 +97,7 @@
   "content.templates.noKeySave": "Hive n’a pas pu lire la clé du projet {project}, donc les noms ne peuvent pas être enregistrés avec elle. Réessaie, ou enregistre sans « Utiliser la clé du projet dans les noms ».",
   "content.templates.noWorkspace": "Ouvre d’abord un espace de travail.",
   "content.templates.nothing": "{problem} Rien n’a été modifié.",
+  "content.templates.overMax": "Il a {count, number} agents, et le flux de travail de ce projet en permet {max, plural, one {# agent} many {# agents} other {# agents}} : augmente d’abord le Nombre maximal d’agents dans Gestion de versions → Flux de travail, ou charge-le avec son flux de travail. Rien n’a été modifié.",
   "content.templates.provider": "{problem, select, unknown {Cette version de Hive ne connaît pas l’agent de code « {provider} » (mets Hive à jour)} off {Le fournisseur {provider} est désactivé (Paramètres → Fournisseurs)} other {Le fournisseur {provider} n’est pas installé (Configuration des fournisseurs)}}",
   "content.templates.restoring": "L’annulation remet les agents de ce projet comme ils étaient avant le chargement d’un modèle",
   "content.templates.running": "L’agent {agent} est en cours d’exécution ou de démarrage : arrête-le d’abord.",

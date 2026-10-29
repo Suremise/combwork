@@ -157,6 +157,8 @@ async function saveLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlat
       if (change.base && JSON.stringify(sortedOf(change.base.options)) !== JSON.stringify(sortedOf({ ...c.workflow?.[platform] }))) throw new WorkflowStale()
       return { workflow: { ...c.workflow, [platform]: change.options } }
     })
+    // The windows' copy of the workspace's config follows (HI-2058: their Add Agent reads its Maximum agents from it).
+    void ws.refresh().catch((e: unknown) => log.warn('reading the workspace again after its workflow defaults changed', e))
   }
   log.info(`the ${level} workflow defaults for ${platform} changed: ${check.changed.join(', ') || 'none'}`)
   for (const p of check.projects ?? []) workflowChanged(reached(ws, level).find((w) => w.info()?.projects.some((x) => x.path === p.path)) ?? ws, p.path)

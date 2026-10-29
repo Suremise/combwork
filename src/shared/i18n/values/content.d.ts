@@ -99,6 +99,7 @@ interface HiveMessageValues {
   'content.templates.noKeySave': { project: string | number }
   'content.templates.noWorkspace': undefined
   'content.templates.nothing': { problem: string | number }
+  'content.templates.overMax': { count: number; max: number }
   'content.templates.provider': { problem: string; provider: string | number }
   'content.templates.restoring': undefined
   'content.templates.running': { agent: string | number }

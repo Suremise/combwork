@@ -172,6 +172,8 @@
   "agents.limit.many": "{limit}個を超えるエージェント：それぞれがCLIのコピーを1つずつ実行し、1つあたり約200～500MBのメモリを使います。このコンピューターのメモリは{total}で、空きは{free}です。すべてのエージェントがプランの使用量上限を共有するため、上限に早く達します。",
   "agents.limit.manyMeasured": "{limit}個を超えるエージェント：それぞれがCLIのコピーを1つずつ実行します。実行中の{running, plural, other {#個のエージェント}}は現在{used}を使っています（1つあたり約{each}）。このコンピューターのメモリは{total}で、空きは{free}です。すべてのエージェントがプランの使用量上限を共有するため、上限に早く達します。",
   "agents.limit.most": "1つのプロジェクトに置けるエージェントは{most, number}個までです。",
+  "agents.limit.openWorkflow": "ワークフローのオプションを開く",
+  "agents.limit.workflow": "このプロジェクトのワークフローで使えるエージェントは{max, plural, other {#個}}までです。「バージョン管理」→「ワークフロー」で最大エージェント数を上げてください。",
   "agents.mcp.all": "プロジェクトのすべて",
   "agents.mcp.its": "このエージェントのMCPサーバー",
   "agents.mcp.loading": "読み込み中…",
