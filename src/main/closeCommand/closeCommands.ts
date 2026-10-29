@@ -525,7 +525,11 @@ export async function runOpenCommands(ws: WorkspaceService): Promise<void> {
       return
     }
     if (plan.gone) log.info(`${name}'s open point picks ${plan.gone} command(s) no longer there: left out`)
-    const r = await runListInWindow(ws.window ?? null, 'open', ws.openPlace ?? ws.path.toLowerCase(), plan.steps, () => workspaceValues(ws, 'open'))
+    // Its projects from its folder: the open's first read of them (the window's view) may not have happened yet.
+    const known: Record<string, string> = {}
+    for (const p of await ws.listProjectPaths().catch(() => [])) known[basename(p).toLowerCase()] = p
+    if (!gate.held || ws.lifetime.aborted) return
+    const r = await runListInWindow(ws.window ?? null, 'open', ws.openPlace ?? ws.path.toLowerCase(), plan.steps, () => workspaceValues(ws, 'open', known))
     if (gate.settle(r === 'left' ? 'detached' : r === 'ok' ? 'done' : 'stopped')) log.info(`${name}'s open commands: its agents may start (${gate.end})`)
   } catch (e) {
     log.warn(`${name}'s open commands`, e)
@@ -537,9 +541,10 @@ export async function runOpenCommands(ws: WorkspaceService): Promise<void> {
 const hiveCommands = (): CommandsHive => config.settings.commands
 
 /** What a workspace's commands' placeholders stand for now: its folder, its name, why, and its projects by name. */
-export function workspaceValues(ws: WorkspaceService, reason: CommandReason): CommandValues {
+export function workspaceValues(ws: WorkspaceService, reason: CommandReason, known: Record<string, string> = {}): CommandValues {
   const path = ws.path ?? undefined
-  const projects: Record<string, string> = {}
+  // `known`: its projects read from its folder, for an open whose first read of them hasn't happened yet (HR2's round 1).
+  const projects: Record<string, string> = { ...known }
   for (const p of ws.info()?.projects ?? []) projects[p.name.toLowerCase()] = p.path
   return { workspace: path, name: path ? basename(path) : undefined, reason, projects }
 }

@@ -153,6 +153,7 @@ const M = {
   logNotFull: msg({ id: 'errors.log.notFullPath', defaultMessage: 'The run reported its log without a full path: {path}', description: "Progress panel: a run gave its log as a relative path, which Hive won't open. {path} is that path." }),
   logGone: msg({ id: 'errors.log.gone', defaultMessage: "The log isn't there any more: {path}", description: "Progress panel: a run's log file was deleted or moved. {path} is where it was." }),
   logNotText: msg({ id: 'errors.log.notText', defaultMessage: 'Hive opens only text logs and reports, not {file}: use Show in folder.', description: "Progress panel: a run's log isn't a text file, so Hive won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it." }),
+  commandsMoved: msg({ id: 'errors.commands.otherWorkspace', defaultMessage: "This window shows another workspace now, so the commands you changed weren't saved.", description: "An error: the user changed a workspace's commands in Settings (HI-1954), and the window switched to another workspace before the change was saved, so Hive didn't save it into the wrong one." }),
   notProjectPref: msg({ id: 'errors.pref.notProjectPref', defaultMessage: 'Not a project preference.', description: "Refusal of a call to save a per-project view setting that doesn't exist (a programming error, rarely seen)." }),
   notPrefValue: msg({ id: 'errors.pref.notValue', defaultMessage: 'Not a {pref} value.', description: "Refusal of a per-project view setting's value. {pref} is the setting's internal name." }),
   notTipsChange: msg({ id: 'errors.tips.notChange', defaultMessage: 'Not a tips change.', description: 'Refusal of a call to change which tips were seen (a programming error, rarely seen).' }),
@@ -476,8 +477,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'closeCommand:dismiss': (id) => dismiss(win(), String(id)),
     'closeCommand:control': (id, action, step, attempt) => controlRun(win(), String(id), action, step, attempt),
     // Only the user sets them, from the window (HI-1954, as HI-1368's): the Assistant proposes, the user confirms.
-    'commands:setWorkspace': async (commands) => {
+    'commands:setWorkspace': async (workspacePath, commands) => {
       const ws = currentWorkspace()
+      // To the workspace it was edited in: one switched away from meanwhile keeps its own (HR2's round 1).
+      if (!ws.path || typeof workspacePath !== 'string' || !samePlace(ws.path, workspacePath)) throw hiveError(M.commandsMoved, undefined, { kind: 'conflict' })
       const saved = cleanWorkspace(commands)
       await ws.saveWorkspaceConfigWith(() => ({ commands: saved }))
       ws.scheduleRefresh()

@@ -184,7 +184,7 @@ export interface HiveRequests {
   /** The panel's choice on a failed command (HI-1954), for that step's attempt only: a stale or repeated one does nothing. */
   'closeCommand:control': (id: string, action: 'rerun' | 'skip' | 'stop', step: number, attempt: number) => void
   /** Settings → Commands at the workspace's level (HI-1954): its commands and its open and close points, saved in workspace.json; returns them as saved. Only the user's window sets them. */
-  'commands:setWorkspace': (commands: CommandsWorkspace) => CommandsWorkspace
+  'commands:setWorkspace': (workspacePath: string, commands: CommandsWorkspace) => CommandsWorkspace
   /** Settings → Commands at Hive's level (HI-1954): Hive's commands and When Hive quits, run; returns them as saved. */
   'commands:setHive': (commands: CommandsHive) => CommandsHive
   /** Runs one command by hand in this window (HI-1954): its panel, as a point's, with one step. */

@@ -11,6 +11,10 @@
     "defaultMessage": "{file} isn't a file of {folder}.",
     "description": "Changes tab: opening a file outside the folder it shows. {file} is the file, {folder} the folder."
   },
+  "errors.commands.otherWorkspace": {
+    "defaultMessage": "This window shows another workspace now, so the commands you changed weren't saved.",
+    "description": "An error: the user changed a workspace's commands in Settings (HI-1954), and the window switched to another workspace before the change was saved, so Hive didn't save it into the wrong one."
+  },
   "errors.console.hidden": {
     "defaultMessage": "The developer console is hidden: turn on Settings → Advanced → Show developer features.",
     "description": "Opening the developer console while it is turned off. \"Settings → Advanced → Show developer features\" is the way to the setting: translate it as Settings shows it."

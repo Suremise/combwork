@@ -4,6 +4,7 @@ interface HiveMessageValues {
   'errors.assistantUndo.gone': undefined
   'errors.assistantUndo.which': undefined
   'errors.changes.notFile': { file: string | number; folder: string | number }
+  'errors.commands.otherWorkspace': undefined
   'errors.console.hidden': undefined
   'errors.console.notRecording': undefined
   'errors.console.notSource': undefined

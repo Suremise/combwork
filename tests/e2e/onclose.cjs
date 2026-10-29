@@ -38,6 +38,8 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
 /** A workspace's commands with its close point running `cmd` (HI-1954: a list of one), as Settings saves them. */
 const closeList = (cmd) => ({ list: [{ id: 'c-00000001', name: 'Close', command: cmd }], onOpen: { run: [] }, onClose: { run: [{ scope: 'workspace', id: 'c-00000001' }] } })
 /** Hive's commands with When Hive quits running `cmd`. */
+/** Saves a workspace's close commands (`cmd`) to the workspace its window shows (commands:setWorkspace names it). */
+const saveClose = async (i, cmd) => i('commands:setWorkspace', (await i('workspace:get')).path, closeList(cmd))
 const quitList = (cmd) => ({ list: [{ id: 'c-0000000f', name: 'Quit', command: cmd }], onQuit: { run: [{ scope: 'hive', id: 'c-0000000f' }] } })
 /** A failed command's choice in the panel (HI-1954): Rerun, Skip it and continue, Stop here. */
 const choose = (page, name) => page.locator('.close-command .dialog-footer button', { hasText: name }).click()
@@ -91,22 +93,25 @@ async function shots(page, name) {
     await dialog.getByLabel('Command', { exact: true }).fill(typed)
     await dialog.locator('button', { hasText: 'Save' }).click()
     const row = page.locator(`[data-setting="${point}"]`)
+    // The workspace's open point first, at once, from another control (HR2's round 1: a sibling's pending edit kept).
+    if (section === 'workspace') await page.locator('[data-setting="workspace.onOpen"] select').selectOption({ label: `typed ${section}` })
     await row.locator('select').selectOption({ label: `typed ${section}` })
     await row.locator('.close-command-update').click()
     const landed = await lib.until(async () => {
       const v = await saved()
       const c = v?.list?.find((x) => x.command === typed)
       const p = v?.[section === 'general' ? 'onQuit' : 'onClose']
-      return c && p?.run?.some((r) => r.id === c.id) && p.onUpdate === true ? v : null
+      const opened = section === 'general' || v?.onOpen?.run?.some((r) => r.id === c?.id)
+      return c && opened && p?.run?.some((r) => r.id === c.id) && p.onUpdate === true ? v : null
     }, HUNG_MS)
-    check(`${section}: a command added, picked for its point and the box ticked at once: all saved, in order`, !!landed, JSON.stringify(await saved()))
+    check(`${section}: a command added, picked for its points (each from its own control) and the box ticked at once: all saved, in order`, !!landed, JSON.stringify(await saved()))
     check('…and the rows still show them once the saves are in', (await page.locator(`[data-setting="${section}.commands"] .commands-row`, { hasText: `typed ${section}` }).count()) === 1 && (await row.locator('.close-command-update').isChecked()))
   }
   await inv('commands:setHive', quitList(command('global', 'quick', '-')))
 
   // --- 1. A switch: the panel while it runs, Don't wait, the next workspace opens, the command finishes by itself.
   const goA = path.join(marks, 'go-a')
-  const savedA = await inv('commands:setWorkspace', closeList(command('a-switch', `wait:${goA}`)))
+  const savedA = await saveClose(inv, command('a-switch', `wait:${goA}`))
   check('the commands are saved as given', savedA.list?.[0]?.command === command('a-switch', `wait:${goA}`) && savedA.onClose?.run?.length === 1, JSON.stringify(savedA))
   // The settings rows (Settings still open from step 0): the command's dialog says what it will run here, filled in.
   await page.locator('.settings-nav .row[data-section="workspace"]').click()
@@ -151,7 +156,7 @@ async function shots(page, name) {
   check('…the copy of hive.db opens cleanly, with the card made just before the close, and no WAL left', a?.integrity === 'ok' && a.titles?.includes('Made as the workspace closed') && a.walLeft === 0, JSON.stringify(a))
 
   // --- 2. Close Workspace with a failing command: the window waits on the failed panel until Close.
-  await inv('commands:setWorkspace', closeList(command('b-fail', 'fail')))
+  await saveClose(inv, command('b-fail', 'fail'))
   let closed = null
   const closing = inv('workspace:close').then((r) => (closed = r))
   check('a failed command: the panel says so, with its exit code and output', !!(await lib.until(async () => (await panel(page, 'failed').count()) === 1, HUNG_MS)) && /3/.test((await page.locator('.close-command #close-command-title, .close-command .dialog-header').first().textContent()) ?? '') && ((await page.locator('.close-command-output').textContent()) ?? '').includes('the backup target is missing'))
@@ -184,7 +189,7 @@ async function shots(page, name) {
   }
   await lib.openWorkspace(inv, page, wsB)
   const goB = path.join(marks, 'go-b')
-  await inv('commands:setWorkspace', closeList(command('b-switch', `wait:${goB}`)))
+  await saveClose(inv, command('b-switch', `wait:${goB}`))
   check('a dialog (About) open before the close', await openAbout())
   let switchedB = false
   const switchingB = lib.openWorkspace(inv, page, wsC, HUNG_MS * 2).then(() => (switchedB = true))
@@ -194,7 +199,7 @@ async function shots(page, name) {
   await switchingB
   fs.writeFileSync(goB, 'go')
   check('…the dialog still there once the panel has gone', switchedB && (await about.isVisible()))
-  await inv('commands:setWorkspace', closeList(command('c-fail', 'fail')))
+  await saveClose(inv, command('c-fail', 'fail'))
   let closedC = null
   const closingC = inv('workspace:close').then((r) => (closedC = r))
   check('…and the failed panel over it', !!(await lib.until(async () => (await panel(page, 'failed').count()) === 1, HUNG_MS)))
@@ -208,7 +213,7 @@ async function shots(page, name) {
   // --- 2c. The saving step (Darren's decisions, 28 Oct ~14:15 and ~15:30): no timer; the panel says it waits for the
   // workspace to finish saving, and Skip the command there means the command never runs (the close itself finishing).
   await lib.openWorkspace(inv, page, wsB)
-  await inv('commands:setWorkspace', closeList(command('b-held', 'quick')))
+  await saveClose(inv, command('b-held', 'quick'))
   fs.writeFileSync(holdDrain, 'hold')
   let switchedHeld = false
   const switchingHeld = lib.openWorkspace(inv, page, wsA, HUNG_MS * 2).then(() => (switchedHeld = true))
@@ -223,7 +228,7 @@ async function shots(page, name) {
 
   // --- 3. Quitting with two windows: each window's command, then When Hive quits after them; one left running.
   await lib.openWorkspace(inv, page, wsA)
-  await inv('commands:setWorkspace', closeList(command('a-quit', 'quick')))
+  await saveClose(inv, command('a-quit', 'quick'))
   const next = app.waitForEvent('window')
   await inv('window:new')
   const p2 = await next
@@ -231,7 +236,7 @@ async function shots(page, name) {
   const inv2 = invOn(p2)
   await lib.openWorkspace(inv2, p2, wsC)
   const goC = path.join(marks, 'go-c')
-  await inv2('commands:setWorkspace', closeList(command('c-quit', `chatty:${goC}`)))
+  await saveClose(inv2, command('c-quit', `chatty:${goC}`))
   const watch = await lib.quitWatch(app)
   void page.evaluate(() => window.hive.invoke('app:quit')).catch(() => undefined)
   check("quitting: the second window's panel runs its chatty command", !!(await lib.until(async () => (await panel(p2, 'running').count()) === 1 && /z{20}/.test((await p2.locator('.close-command-output').textContent().catch(() => '')) ?? ''), HUNG_MS)))

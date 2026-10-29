@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useReducer, useState } from 'react'
 import type { CommandPoint, CommandRef, CommandsHive, CommandsWorkspace, CustomCommand } from '@shared/types'
 import { EMPTY_HIVE, EMPTY_WORKSPACE, fillCommand, MAX_COMMAND, MAX_FOLDER, MAX_NAME, newCommandId, type CommandValues } from '@shared/commands'
 import { msg, tr } from '@shared/i18n'
@@ -55,27 +55,59 @@ const M = {
 }
 
 /**
- * A value edited here and saved whole, in order: the one shown is the saved one only once no save of this control's is
- * pending, so a reply or event for an older save never undoes a newer edit (as HI-1368's command, HR6's round 1).
+ * A scope's commands as this window edits them (Hive's, or a workspace's by its path), shared by every control of that
+ * scope (HR2's round 1: each control's own copy, saving the whole scope, dropped a sibling's pending edit). An edit is a
+ * change of the latest value, pending ones included; saves go one after another, in order; the value saved comes back
+ * from main and is taken as the shown one only once none of the scope's saves is pending, so a reply or event for an
+ * older save never undoes a newer edit.
  */
-function useSaved<T>(value: T, onSave: (next: T) => Promise<unknown>): [T, (next: T) => void] {
-  const [shown, setShown] = useState(value)
-  const pending = useRef(0)
-  const queue = useRef<Promise<unknown>>(Promise.resolve())
+interface Scope<T> {
+  /** The value shown while edits are pending or before main's copy has caught up; null: main's. */
+  edited: T | null
+  /** main's copy, as last seen: a new one, with nothing pending, is shown from then on. */
+  seen: T | null
+  pending: number
+  queue: Promise<unknown>
+  listeners: Set<() => void>
+}
+const scopes = new Map<string, Scope<unknown>>()
+const scopeOf = <T,>(key: string): Scope<T> => {
+  let s = scopes.get(key) as Scope<T> | undefined
+  if (!s) scopes.set(key, (s = { edited: null, seen: null, pending: 0, queue: Promise.resolve(), listeners: new Set() }))
+  return s
+}
+
+/** main's copy as rendered: a new one, with nothing pending, is shown from then on. */
+function adopt<T>(s: Scope<T>, saved: T): void {
+  if (saved === s.seen) return
+  s.seen = saved
+  if (!s.pending) s.edited = null
+}
+
+/** An edit of the latest value (pending ones included), shown at once and saved after the saves before it. */
+function edit<T>(s: Scope<T>, change: (current: T) => T, onSave: (next: T) => Promise<unknown>): void {
+  const next = change(s.edited ?? (s.seen as T))
+  s.edited = next
+  s.pending++
+  for (const l of s.listeners) l()
+  s.queue = s.queue
+    .then(() => onSave(next))
+    .catch(() => undefined)
+    .finally(() => {
+      s.pending--
+      for (const l of s.listeners) l()
+    })
+}
+
+function useScope<T>(key: string, saved: T, onSave: (next: T) => Promise<unknown>): [T, (change: (current: T) => T) => void] {
+  const s = scopeOf<T>(key)
+  adopt(s, saved)
+  const [, rerender] = useReducer((n: number) => n + 1, 0)
   useEffect(() => {
-    if (!pending.current) setShown(value)
-  }, [value])
-  const save = (next: T): void => {
-    setShown(next)
-    pending.current++
-    queue.current = queue.current
-      .then(() => onSave(next))
-      .catch(() => undefined)
-      .finally(() => {
-        pending.current--
-      })
-  }
-  return [shown, save]
+    s.listeners.add(rerender)
+    return () => void s.listeners.delete(rerender)
+  }, [s])
+  return [s.edited ?? saved, (change) => edit(s, change, onSave)]
 }
 
 const move = <T,>(list: T[], i: number, by: number): T[] => {
@@ -229,18 +261,19 @@ function PointPicker({ point, lists, values, update, onChange }: { point: Comman
 
 const runIt = (ref: CommandRef): void => void actions.attempt(tr(M.runFailed), () => call('commands:run', ref))
 
-/** Hive's commands, as saved (settings.commands), and its save. */
-function useHive(): [CommandsHive, (next: CommandsHive) => void] {
+/** Hive's commands, as saved (settings.commands), and its edit. */
+function useHive(): [CommandsHive, (change: (current: CommandsHive) => CommandsHive) => void] {
   const value = useStore((s) => s.settings?.commands ?? EMPTY_HIVE)
   // Every window gets settings-changed with what was saved.
-  return useSaved(value, (next) => actions.attempt(tr(M.saveFailed), () => call('commands:setHive', next)))
+  return useScope('hive', value, (next) => actions.attempt(tr(M.saveFailed), () => call('commands:setHive', next)))
 }
 
-/** The workspace's commands, as saved (workspace.json), and its save. */
-function useWorkspace(): [CommandsWorkspace, (next: CommandsWorkspace) => void] {
+/** The workspace's commands, as saved (workspace.json), and its edit: saved to that workspace, whatever the window shows by then. */
+function useWorkspace(): [CommandsWorkspace, (change: (current: CommandsWorkspace) => CommandsWorkspace) => void] {
+  const path = useStore((s) => s.workspace?.path ?? '')
   const value = useStore((s) => s.workspace?.config.commands ?? EMPTY_WORKSPACE)
   // The window gets workspace-changed with the saved config.
-  return useSaved(value, (next) => actions.attempt(tr(M.saveFailed), () => call('commands:setWorkspace', next)))
+  return useScope(`workspace:${path.toLowerCase()}`, value, (next) => actions.attempt(tr(M.saveFailed), () => call('commands:setWorkspace', path, next)))
 }
 
 /** Settings → General → Commands: Hive's own commands. Deleting one takes it off When Hive quits too. */
@@ -252,7 +285,7 @@ export function HiveCommands() {
       list={hive.list}
       values={values}
       run={(id) => runIt({ scope: 'hive', id })}
-      onChange={(list) => save({ list, onQuit: { ...hive.onQuit, run: hive.onQuit.run.filter((r) => list.some((c) => c.id === r.id)) } })}
+      onChange={(list) => save((cur) => ({ list, onQuit: { ...cur.onQuit, run: cur.onQuit.run.filter((r) => list.some((c) => c.id === r.id)) } }))}
     />
   )
 }
@@ -260,7 +293,7 @@ export function HiveCommands() {
 /** Settings → General → When Hive quits, run: Hive's commands, in order. */
 export function QuitPoint() {
   const [hive, save] = useHive()
-  return <PointPicker point={hive.onQuit} lists={{ hive: hive.list }} values={{ reason: 'quit' }} update onChange={(onQuit) => save({ ...hive, onQuit })} /> // i18n-ignore: {reason}'s value, as main fills it in
+  return <PointPicker point={hive.onQuit} lists={{ hive: hive.list }} values={{ reason: 'quit' }} update onChange={(onQuit) => save((cur) => ({ ...cur, onQuit }))} /> // i18n-ignore: {reason}'s value, as main fills it in
 }
 
 /** Settings → Workspace → Commands: the workspace's own. Deleting one takes it off its open and close points. */
@@ -270,7 +303,7 @@ export function WorkspaceCommands() {
   const values = useValues('manual')
   if (!path) return <div className="muted">{tr(M.noWorkspace)}</div>
   const keep = (list: CustomCommand[]) => (p: CommandPoint): CommandPoint => ({ ...p, run: p.run.filter((r) => r.scope === 'hive' || list.some((c) => c.id === r.id)) })
-  return <CommandList list={ws.list} values={values} run={(id) => runIt({ scope: 'workspace', id })} onChange={(list) => save({ list, onOpen: keep(list)(ws.onOpen), onClose: keep(list)(ws.onClose) })} />
+  return <CommandList list={ws.list} values={values} run={(id) => runIt({ scope: 'workspace', id })} onChange={(list) => save((cur) => ({ list, onOpen: keep(list)(cur.onOpen), onClose: keep(list)(cur.onClose) }))} />
 }
 
 /** Settings → Workspace → When this workspace opens, run, and When this workspace closes, run. */
@@ -280,5 +313,5 @@ export function WorkspacePoint({ which }: { which: 'onOpen' | 'onClose' }) {
   const [ws, save] = useWorkspace()
   const values = useValues(which === 'onOpen' ? 'open' : 'window') // i18n-ignore: {reason}'s values, as main fills them in
   if (!path) return <div className="muted">{tr(M.noWorkspace)}</div>
-  return <PointPicker point={ws[which]} lists={{ hive: hive.list, workspace: ws.list }} values={values} update={which === 'onClose'} onChange={(p) => save({ ...ws, [which]: p })} />
+  return <PointPicker point={ws[which]} lists={{ hive: hive.list, workspace: ws.list }} values={values} update={which === 'onClose'} onChange={(p) => save((cur) => ({ ...cur, [which]: p }))} />
 }

@@ -33,10 +33,12 @@ const mark = (label) => {
     return null
   }
 }
-const ids = { prep: 'c-0000000a', server: 'c-0000000b', seed: 'c-0000000c', long: 'c-0000000d' }
+const ids = { proj: 'c-0000000e', prep: 'c-0000000a', server: 'c-0000000b', seed: 'c-0000000c', long: 'c-0000000d' }
 /** The workspace's commands, its open point running `open` (their ids) in order. */
 const commandsFor = (open) => ({
   list: [
+    // Its label is a project's folder by its name (HR2's round 1: filled at the open's first command too).
+    { id: ids.proj, name: 'Project', command: `"${process.execPath}" "${COMMAND}" "${path.join(marks, 'proj.json')}" "{project:alpha}" {reason} - quick` },
     { id: ids.prep, name: 'Prep', command: command('prep', 'quick') },
     { id: ids.server, name: 'Server', command: command('server', `flag:${flag}`), needed: true },
     { id: ids.seed, name: 'Seed', command: command('seed', 'quick') },
@@ -67,7 +69,7 @@ async function shots(inv, page, name) {
   // The open point, as Settings would have saved it: Prep, Server (needed), Seed.
   fs.mkdirSync(path.join(ws, '.hive'), { recursive: true })
   const wsFile = path.join(ws, '.hive', 'workspace.json')
-  fs.writeFileSync(wsFile, JSON.stringify({ version: 1, commands: commandsFor([ids.prep, ids.server, ids.seed]) }))
+  fs.writeFileSync(wsFile, JSON.stringify({ version: 1, commands: commandsFor([ids.proj, ids.prep, ids.server, ids.seed]) }))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -87,11 +89,12 @@ async function shots(inv, page, name) {
   void openWs()
   check('opening: the dialog shows its commands, Hive dimmed behind', !!(await lib.until(async () => (await anyDialog(page).count()) === 1, HUNG_MS)))
   check('…Server fails, needed: the dialog says so, with its exit code', !!(await lib.until(async () => (await dialog(page, 'failed').count()) === 1, HUNG_MS)) && /Server.*3/.test((await page.locator('#close-command-title').textContent()) ?? ''))
-  check('…Prep ran first, its reason open', mark('prep')?.reason === 'open', JSON.stringify(mark('prep')))
+  check("…its first command had {project:alpha} filled with alpha's folder", mark('proj')?.label?.toLowerCase() === path.join(ws, 'alpha').toLowerCase(), JSON.stringify(mark('proj')))
+  check('…Prep ran before Server, its reason open', mark('prep')?.reason === 'open', JSON.stringify(mark('prep')))
   const lead = page.locator('.close-command .dialog-footer button.primary')
   check('…Stop here leads, and Skip carries the warning', ((await lead.textContent()) ?? '').includes('Stop here') && (await page.locator('.close-command-warn').count()) === 1)
   const steps = await page.locator('.close-command-step').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')))
-  check('…its list: Prep done, Server failed, Seed waiting', JSON.stringify(steps) === JSON.stringify(['ok', 'failed', 'waiting']), JSON.stringify(steps))
+  check('…its list: Project and Prep done, Server failed, Seed waiting', JSON.stringify(steps) === JSON.stringify(['ok', 'ok', 'failed', 'waiting']), JSON.stringify(steps))
   // Its agents held: a start as the Agent API, the Assistant or a lane asks, refused.
   const workspaceAlpha = path.join(ws, 'alpha')
   const agents = (await inv('agents:list', workspaceAlpha).catch(() => [])) ?? []
