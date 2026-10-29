@@ -4,6 +4,7 @@
 // runs, however many runners crash on the way; a folder of its own per lease; and every store write the queue makes
 // fenced by its lease. Hives are Node processes (tests/queueRunnerHost.ts) on one hive.db copy.
 import { spawn, type ChildProcess } from 'child_process'
+import { EventEmitter } from 'events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { basename, join } from 'path'
@@ -16,7 +17,7 @@ import { admitted } from './admitted'
 import { gitTestHooks } from '../src/main/git'
 import { FactStore, withoutWriteFence, withWriteFence } from '../src/main/workflow/factStore'
 import { fileTimeMs, parseJournal, queueHost, startLauncher } from '../src/main/workflow/queueJobs'
-import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunner } from '../src/main/workflow/queueRunner'
+import { isQueueFolder, LeaseLost, queueFolderName, queueFolderNeeded, QueueRunner, type RunResult } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed, type ProcessProbe } from '../src/main/workflow/queueProcs'
 import { commit, gitRepo, moved, R1, B1, setup, sh, type Env } from './workflow/harness'
 import { preset } from '../src/shared/workflow/options'
@@ -692,6 +693,62 @@ describe("a runner's processes and folders (#1360)", { timeout: 120_000 }, () =>
       await a.runner.release()
       await run.catch(() => {})
     }
+  })
+
+  /**
+   * HI-2043: a launcher standing in (no process: nothing to end), started through the runner's spawn and driven by `drive`;
+   * `kill` (its bound's end, through endTree) as `drive` sets it. The run's result, waited for within a bound inside the
+   * test's try (a run that never settles fails into its finally): released, closed and settled however it ends.
+   */
+  async function fakeLaunch(target: string, timeoutMs: number, drive: (cp: EventEmitter & { stdout: EventEmitter; stderr: EventEmitter; kill: () => void }) => void, check: (r: RunResult, cp: { kill: ReturnType<typeof vi.fn>; destroyed: () => number }) => void): Promise<void> {
+    const a = (await QueueRunner.acquire({ store: w.store, project: w.project, target, root: w.root, profile: 'A' })) as { ok: true; runner: QueueRunner }
+    let destroyed = 0
+    const stream = () => Object.assign(new EventEmitter(), { destroy: () => void destroyed++ })
+    const fake = Object.assign(new EventEmitter(), { stdout: stream(), stderr: stream(), pid: undefined, exitCode: null, signalCode: null, kill: vi.fn() })
+    vi.spyOn(a.runner, 'spawn').mockImplementation(async () => {
+      setImmediate(() => drive(fake))
+      return fake as unknown as ChildProcess
+    })
+    let result: RunResult | null = null
+    const run = a.runner.run('testMerge', process.execPath, ['-e', ''], { timeoutMs }).then((r) => (result = r))
+    try {
+      await vi.waitFor(() => expect(result).not.toBeNull(), { timeout: 30_000, interval: 100 })
+      check(result!, { kill: fake.kill, destroyed: () => destroyed })
+    } finally {
+      await a.runner.release()
+      fake.emit('close', 0, null)
+      await run.catch(() => {})
+    }
+  }
+
+  it('HI-2043: a launcher that exits before its bound, its output held open past it (by another process): its code and what came, never timed out', async () => {
+    await fakeLaunch('held', 50, (cp) => {
+      cp.stdout.emit('data', Buffer.from('said'))
+      cp.stderr.emit('data', Buffer.from('told'))
+      cp.emit('exit', 0, null)
+    }, (r, cp) => {
+      expect(r).toMatchObject({ ok: true, code: 0, out: 'said', err: 'told' })
+      expect(r.timedOut).toBeUndefined()
+      // Nothing ended (its bound stopped at its exit), and its output closed once quiet, as runGit closes a held one.
+      expect(cp.kill).not.toHaveBeenCalled()
+      expect(cp.destroyed()).toBe(2)
+    })
+  })
+
+  it('HI-2043: a launcher its bound ends: timed out, with what it had said at the bound, and what came after it', async () => {
+    await fakeLaunch('bounded', 50, (cp) => {
+      cp.stderr.emit('data', Buffer.from('waiting for a passphrase'))
+      cp.kill = vi.fn(() => {
+        cp.emit('exit', null, 'SIGTERM')
+        setImmediate(() => {
+          cp.stderr.emit('data', Buffer.from('; ended'))
+          cp.emit('close', null, 'SIGTERM')
+        })
+      })
+    }, (r) => {
+      expect(r).toMatchObject({ ok: false, timedOut: true, errAtTimeout: 'waiting for a passphrase', err: 'waiting for a passphrase; ended' })
+      expect(r.signal).toBeUndefined()
+    })
   })
 
   it('#1350: a run past its bound (a signer waiting for a passphrase, under git) is ended with its whole tree, and says it timed out', async () => {

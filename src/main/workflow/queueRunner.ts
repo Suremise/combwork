@@ -25,6 +25,7 @@ import { existsSync } from 'original-fs'
 import { basename, dirname, join } from 'path'
 import { removePath, samePlace } from '../fsutil'
 import { git, GIT_PREFIX } from '../git'
+import { onOutputSettled } from '../gitWorker'
 import { createLogger, userText } from '../logger'
 import { endTree } from '../progressReporters/wrapper'
 import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
@@ -411,15 +412,14 @@ export class QueueRunner {
     // HI-2042: the launcher itself ended by a signal (no code) is kept as one, apart from its bound's.
     let ended = null as string | null
     const code = await new Promise<number>((res) => {
-      child.once('close', (c, s) => {
+      // HI-2043: its output read whole, bounded once it has exited (its bound's end too: what it wrote meanwhile kept).
+      // Its bound is on the launcher, not its output: one that exited in time is never timed out by output still open.
+      child.once('exit', () => clearTimeout(timer))
+      onOutputSettled(child, (c, s) => {
         ended = c === null ? (s ?? 'unknown') : null
         res(c ?? 1)
       })
       child.once('error', () => res(-1))
-      // Ended at its bound: a descendant that got away may hold the output open, so its exit is enough.
-      child.once('exit', (c) => {
-        if (timedOut) setImmediate(() => res(c ?? 1))
-      })
     })
     clearTimeout(timer)
     const stderr = Buffer.concat(err).toString('utf8').trim()
