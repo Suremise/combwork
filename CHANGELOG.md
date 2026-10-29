@@ -133,6 +133,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 - **Hive's status line in place of yours** (Claude Code; off, your own runs after Hive's) and **Hive's guidance for agents**; on Codex, Hive's guidance now follows your own `developer_instructions` instead of replacing them (#1285).
 - **Ctrl+C and Ctrl+V go to the CLI**, **All keys go to the CLI** (but the command palette's shortcut), **A CLI putting text on the clipboard** (Allow, Ask each time or Block; a CLI never reads your clipboard), **Send prompts as typed**, **Clear the CLI's draft before Hive types**, **A card's start in its own words** and **The Assistant starts with Hive's start view** (#1286, #1292).
 - **Set Codex's terminal title**, **Don't let Copilot update itself**, **Include every MCP server's instructions**, **Resume the Assistant with its current instructions**, and right-click passed to Claude Code and Codex. On Codex, the Assistant pre-approves only the Hive tools its Control allows, as on Claude Code and Copilot (#1167, #1174).
+- **Sessions look the same however Hive was opened.** Each session's terminal now says it is `xterm-256color`, as Hive's terminal is, and no longer passes on Windows Terminal's `WT_SESSION`: Claude Code drew `>` instead of `❯` when Hive was opened from the Start menu. A `TERM` of your own is kept; **Sessions say their terminal is xterm-256color** in Settings → Advanced turns it off.
 
 ### Also new
 

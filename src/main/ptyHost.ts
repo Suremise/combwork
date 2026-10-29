@@ -5,6 +5,8 @@ import { argsForLog, createLogger, userText } from './logger'
 import { allProviders } from './providers'
 import { launchGate, type GateWord, type LaunchGate } from './launchGate'
 import { envWithCliFolders } from './freshPath'
+import { advanced } from './advanced'
+import { TERMINAL_TYPE } from '../shared/advanced'
 
 const log = createLogger('pty')
 const MAX_BUFFER = 512 * 1024
@@ -151,6 +153,24 @@ export function childEnv(extra: Record<string, string> = {}): Record<string, str
   return { ...envWithCliFolders(env), ...extra }
 }
 
+/**
+ * A session terminal's environment with its type named as Hive's terminal is (HI-2004, `hive.sessions.terminalType`):
+ * TERM=xterm-256color unless the environment names one already (the user's own, or the session's), and no
+ * WT_SESSION inherited from a Windows Terminal Hive was opened from. So the CLIs draw the same however Hive was opened.
+ * Off, the environment as given.
+ */
+export function withTerminalType(env: Record<string, string>, on = advanced.get<boolean>(TERMINAL_TYPE), platform: NodeJS.Platform = process.platform): Record<string, string> {
+  if (!on) return env
+  // Windows' names are case-insensitive (HR3's round 1): a `Term` or `wt_session` is the same variable, as PATH is (freshPath.ts).
+  const same = (k: string, name: string): boolean => (platform === 'win32' ? k.toUpperCase() === name : k === name)
+  const rest = Object.fromEntries(Object.entries(env).filter(([k]) => !same(k, 'WT_SESSION')))
+  const terms = Object.keys(rest).filter((k) => same(k, 'TERM'))
+  if (!terms.length) return { ...rest, TERM: 'xterm-256color' }
+  // One TERM, the last given: a session's or connection's own is spread over the one inherited, whatever its case.
+  for (const k of terms.slice(0, -1)) delete rest[k]
+  return rest
+}
+
 /** An argument as logged: bearer tokens hidden (Codex's hooks carry one), long values shortened. */
 export function forLog(arg: string): string {
   const safe = arg.replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi, '$1***').replace(/(HIVE_[A-Z_]*TOKEN=)\S+/g, '$1***')
@@ -162,7 +182,8 @@ export function spawnPty(key: string, opts: SpawnOptions): IPty {
   if (entries.has(key)) throw new Error(`A process is already running for ${key}`)
   log.info(`spawn ${userText(key)}: ${opts.file} ${JSON.stringify(typeof opts.args === 'string' ? userText(forLog(opts.args)) : argsForLog(opts.args.map(forLog)))}`)
   const size = startSize(key)
-  const gate = opts.track && process.platform === 'win32' ? launchGate(opts.file, opts.args, opts.env) : null
+  const env = withTerminalType(opts.env)
+  const gate = opts.track && process.platform === 'win32' ? launchGate(opts.file, opts.args, env) : null
   let proc: IPty
   try {
     proc = pty.spawn(gate?.file ?? opts.file, gate?.args ?? opts.args, {
@@ -170,7 +191,7 @@ export function spawnPty(key: string, opts: SpawnOptions): IPty {
       cols: opts.cols ?? size.cols,
       rows: opts.rows ?? size.rows,
       cwd: opts.cwd,
-      env: gate?.env ?? opts.env,
+      env: gate?.env ?? env,
       useConptyDll: false
     })
   } catch (e) {

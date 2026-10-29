@@ -450,6 +450,8 @@
   "settings.advanced.hive.restart.resumeAfterUpdate.title": "更新後にエージェントを再開",
   "settings.advanced.hive.restart.resumeReadySeconds.desc": "再起動後にHiveが再開したエージェントが準備完了になるまでの時間です。準備できなかったものは停止して「再開されていません」と表示し、次のエージェントを開始します。",
   "settings.advanced.hive.restart.resumeReadySeconds.title": "再起動後の再開：準備完了までの時間",
+  "settings.advanced.hive.sessions.terminalType.desc": "Hive は各セッションを、その端末どおり TERM=xterm-256color で、Windows Terminal の WT_SESSION なしで起動します。そのため、Hive をスタートメニューから開いても端末から開いても、CLI の表示は同じになります（Claude Code は > ではなく ❯ を表示します）。あなた自身の環境やセッションの環境にある TERM はそのまま使われます。オフにすると、セッションは Hive を開いたときの環境を受け取ります。",
+  "settings.advanced.hive.sessions.terminalType.title": "セッションの端末を xterm-256color として伝える",
   "settings.advanced.hive.showDeveloperFeatures.desc": "「ヘルプ」→「開発者コンソール」（Ctrl+Alt+J）を表示します。各CLIがHiveに送った内容と、Hiveがそれをどう解釈したかを並べて表示します。",
   "settings.advanced.hive.showDeveloperFeatures.title": "開発者向け機能を表示",
   "settings.advanced.hive.skills.removeIdleCopies.desc": "CodexとCopilotは、Hiveが各エージェントのフォルダーに置くコピー（.agents/skills/hive-…）からHiveのスキルを読みます。Claude Codeは起動ごとにスキルを受け取り、何も残しません。フォルダーでHiveの最後のエージェントが停止したら、Hiveはそのコピーを削除できます。そこで自分で実行するCLIにはコピーが見えなくなります。「スロットのみ」はスロットとエージェントのワークツリーから削除し、プロジェクトフォルダーからは削除しません。「すべて」はプロジェクトフォルダーからも削除します。「しない」はコピーを残します。削除されるのは、Hiveが作成し、その後だれも変更していないコピーだけです。自分のスキルは削除されません。",

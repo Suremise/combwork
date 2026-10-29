@@ -450,6 +450,8 @@
   "settings.advanced.hive.restart.resumeAfterUpdate.title": "更新后恢复智能体",
   "settings.advanced.hive.restart.resumeReadySeconds.desc": "Hive 在重启后恢复的智能体需在多长时间内就绪。未就绪的会被停止并列为未恢复，然后启动下一个。",
   "settings.advanced.hive.restart.resumeReadySeconds.title": "重启后恢复：就绪时限",
+  "settings.advanced.hive.sessions.terminalType.desc": "Hive 以 TERM=xterm-256color（与其终端一致）启动每个会话，且不带 Windows Terminal 的 WT_SESSION，因此无论 Hive 是从“开始”菜单还是从终端打开，各 CLI 的显示都相同（Claude Code 显示 ❯ 而不是 >）。你自己的环境或会话环境中的 TERM 会保留。关闭后，会话获得打开 Hive 时的环境。",
+  "settings.advanced.hive.sessions.terminalType.title": "会话声明其终端为 xterm-256color",
   "settings.advanced.hive.showDeveloperFeatures.desc": "显示“帮助”→“开发者控制台”（Ctrl+Alt+J）：每个 CLI 发给 Hive 的内容，以及 Hive 对它的解读。",
   "settings.advanced.hive.showDeveloperFeatures.title": "显示开发者功能",
   "settings.advanced.hive.skills.removeIdleCopies.desc": "Codex 和 Copilot 从 Hive 放在每个智能体文件夹中的副本（.agents/skills/hive-…）读取 Hive 的技能；Claude Code 在每次启动时获得技能，不留下任何东西。文件夹中 Hive 的最后一个智能体停止后，Hive 可以删除其副本，这样你自己在那里运行的 CLI 就看不到它们。“仅槽位”从槽位和智能体的工作树中删除，绝不从项目文件夹中删除。“所有位置”也从项目文件夹中删除。“从不”保留它们。只删除由 Hive 创建且之后无人改动的副本：绝不删除你自己的技能。",
