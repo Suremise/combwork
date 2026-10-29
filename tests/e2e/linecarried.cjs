@@ -254,8 +254,10 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     fs.writeFileSync(path.join(claudeHome, 'linecarried-go'), '')
     const moved2 = await until(async () => (await facts(c2)).find((f) => f.kind === 'LineMoved'), HUNG_MS)
     check('B1 idle and its worktree clean: its branch is brought to main, recorded (LineMoved)', !!moved2 && moved2.data?.to === main2 && git(wt, 'rev-parse', 'HEAD') === main2, JSON.stringify(moved2?.data))
+    // Hive may start card 3 itself first, once B1 is idle (HI-1990): B1's own start is then that start, even one whose
+    // checks Hive's write came between (HI-2029; HI-2039). Who started it is in the facts, said if it fails.
     const s3 = await start(c3)
-    check('card 3 starts on the moved branch: its base is main', s3.s.status === 200 && s3.base === main2, JSON.stringify(s3))
+    check('card 3 starts on the moved branch: its base is main', s3.s.status === 200 && s3.base === main2, JSON.stringify({ s3, main2, facts: (await facts(c3)).map((f) => [f.seq, f.kind, f.actor, f.data?.builder ?? f.data?.to ?? null]) }))
 
     // --- Card 3, the second squash: the worktree not clean, it waits; clean, it moves again, and card 4 starts there.
     await build(c3, 'three.txt')
