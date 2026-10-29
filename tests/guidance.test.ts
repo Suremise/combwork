@@ -472,8 +472,9 @@ describe('the skills follow the gates (#1524)', () => {
 
   // HI-2011's split added only each reference file's heading and SKILL.md's list of them: the rules were moved, not added.
   it('stay smaller than before P8 (work-on-card 8,991 and card-loop 15,776 characters), reference files and all (LF)', () => {
-    expect(catalog.get('work-on-card')!.text.replace(/\r/g, '').length).toBeLessThan(9800)
-    expect(catalog.get('card-loop')!.text.replace(/\r/g, '').length).toBeLessThan(11800)
+    // Round 2: each list also says where its files are (beside SKILL.md), as a model looked in its working folder.
+    expect(catalog.get('work-on-card')!.text.replace(/\r/g, '').length).toBeLessThan(9850)
+    expect(catalog.get('card-loop')!.text.replace(/\r/g, '').length).toBeLessThan(11850)
   })
 })
 
@@ -567,8 +568,8 @@ describe('the review and merge skills follow the gates (#1525)', () => {
 
   it('stay smaller than before P8 (review-agent-work 7,475 and merge-ready 5,291 characters, LF)', () => {
     // HI-2011's split added each reference file's heading and SKILL.md's list of them (7,475 and 5,291 before it).
-    expect(review().replace(/\r/g, '').length).toBeLessThan(8100)
-    expect(merge().replace(/\r/g, '').length).toBeLessThan(5500)
+    expect(review().replace(/\r/g, '').length).toBeLessThan(8150)
+    expect(merge().replace(/\r/g, '').length).toBeLessThan(5550)
   })
 })
 

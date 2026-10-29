@@ -31,6 +31,6 @@ Outside a card, or with no workflow: the user merges from Hive, or you when they
 
 ## Reference files
 
-Read one only when it applies:
+Read one only when it applies. Each is in this skill's own folder, beside this SKILL.md, not your working folder:
 
 - [merging.md](merging.md): when the merge is yours to make.

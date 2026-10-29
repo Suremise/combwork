@@ -9,7 +9,7 @@ metadata:
 
 Two agents take the same cards in turn: the **builder** does each card, commits it and submits it for review; the **reviewer** reviews it and fails it with findings, or passes it. Waiting for the other side costs nothing: you end your turn and Hive wakes you. Each step is a tool (work-on-card); what a step needs first is the project's rules, which Hive checks, and a refusal says what to do next.
 
-**Read your role's file now:** [builder.md](builder.md) or [reviewer.md](reviewer.md). It has how you register the lane, the watch you start and each step of yours.
+**Read your role's file now:** [builder.md](builder.md) or [reviewer.md](reviewer.md), beside this SKILL.md in this skill's folder. It has how you register the lane, the watch you start and each step of yours.
 
 ## Inputs
 
@@ -33,8 +33,7 @@ Report each card: its rounds, how it ended (Passed, Done once merged, waiting fo
 
 ## Reference files
 
-Read one only when it applies:
+Read one only when it applies. Each is in this skill's own folder, beside this SKILL.md, not your working folder:
 
-- [builder.md](builder.md), [reviewer.md](reviewer.md): your role's, always.
 - [waiting.md](waiting.md): ending a turn with no watch (a loop wake), another card, one that left your watch, a blocked one.
 - [rounds.md](rounds.md): a card failing again, a finding back or disputed, the round limit, stopping to ask the user.

@@ -43,7 +43,7 @@ Say how sure you are when you aren't certain. Then give the verdict, with what y
 
 ## Reference files
 
-Read one only when it applies:
+Read one only when it applies. Each is in this skill's own folder, beside this SKILL.md, not your working folder:
 
 - [other-targets.md](other-targets.md): not a card, a card with no workflow, a pool's card, work sent uncommitted.
 - [checks.md](checks.md): screenshots to look at, or the builder's run to check before running anything.

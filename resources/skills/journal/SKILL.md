@@ -39,6 +39,6 @@ Never store secrets, tokens or what the user asked you not to keep.
 
 ## Reference files
 
-Read one only when it applies:
+Read one only when it applies. Each is in this skill's own folder, beside this SKILL.md, not your working folder:
 
 - [upkeep.md](upkeep.md): when correcting an entry, the weekly digest, its scope, a fresh start or a handover.

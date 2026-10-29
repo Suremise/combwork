@@ -24,9 +24,9 @@ The card is the brief, and the board is how the user, the Hive Assistant and oth
 
 ## Reference files
 
-Read one only when it applies:
+Read one only when it applies. Each is in this skill's own folder, beside this SKILL.md, not your working folder:
 
-- [refused.md](refused.md): a step refused, a commit not asked for, the rules off, no workflow.
-- [inbox.md](inbox.md): Hive says your inbox has something.
-- [while-working.md](while-working.md): a question for the user, comments, decisions, tests, follow-ups, waiting, priorities.
-- [after-review.md](after-review.md): your card passed, is Done, or is back for more work.
+- [refused.md](refused.md): a refusal, an unasked commit, rules off, no workflow.
+- [inbox.md](inbox.md): your inbox has something.
+- [while-working.md](while-working.md): a question for the user, comments, decisions, tests, follow-ups, waits, order.
+- [after-review.md](after-review.md): your card passed, is Done, or is back.

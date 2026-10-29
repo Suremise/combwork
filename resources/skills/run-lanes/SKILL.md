@@ -20,7 +20,7 @@ Nothing wakes you but the user and a watch you started, so never leave lanes on 
 
 ## Reference files
 
-Read one only when it applies:
+Read one only when it applies. Each is in this skill's own folder, beside this SKILL.md, not your working folder:
 
 - [starting.md](starting.md): planning lanes by files and briefing them, before you start one.
 - [reviewers.md](reviewers.md): choosing a lane's reviewer, or the project reviews from a pool.

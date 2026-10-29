@@ -32,11 +32,11 @@ Say briefly what you did. Done means merged (for a no-code card, accepted; under
 
 ## Reference files
 
-Read one only when it applies:
+Read one only when it applies. Each is in this skill's own folder, beside this SKILL.md, not your working folder:
 
 - [cards.md](cards.md): planning work as cards, moving several, a decision of the user's, or "move AM-12 to Doing".
 - [lanes.md](lanes.md): a card to review, or a new lane (a builder and reviewer on cards, even one).
 - [following.md](following.md): a wake, an agent background or watching, a reply of the user's, an agent's request.
 - [setups.md](setups.md): the setup decides how work is split (one agent, a pair, a team, slots).
 - [hands-off.md](hands-off.md): before stepping into an agent's work, or deciding what Hive or the card decides.
-- [stalled.md](stalled.md): work handed between agents, or a stalled card.
+- [stalled.md](stalled.md): a hand-over, or a stalled card.
