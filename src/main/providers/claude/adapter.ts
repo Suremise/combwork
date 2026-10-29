@@ -10,7 +10,7 @@ import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwit
 import { providerSettings } from '../../../shared/providers'
 import { samePath } from '../../../shared/movePaths'
 import { config } from '../../config'
-import { claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
+import { claudeAutoMemory, claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
@@ -1095,7 +1095,9 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   }
 
   fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean {
-    return (homes ?? [claudeHome()]).some((home) => claudeFileAllowed(path, write, home))
+    // Auto memory is listed from the CLI's own projects folder (memorySources), which each connection's home links by a
+    // junction (HI-1755): its memory files by that path too, and nothing else of the CLI's home (HI-1999).
+    return (homes ?? [claudeHome()]).some((home) => claudeFileAllowed(path, write, home)) || (!!homes && claudeAutoMemory(path, claudeHome()))
   }
 
   skillRoots(home = claudeHome()): SkillRoots {

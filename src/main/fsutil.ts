@@ -1322,9 +1322,17 @@ export function claudeFileAllowed(path: string, write: boolean, home: string): b
   const parts = rel.split(/[\\/]/)
   if (!/\.md$/i.test(rel)) return false
   if (parts.length === 1) return parts[0].toLowerCase() === 'claude.md'
-  if (parts[0] === 'projects') return parts.length === 4 && parts[2] === 'memory'
+  if (parts[0] === 'projects') return claudeAutoMemory(path, home)
   if (parts[0] === 'skills' || parts[0] === 'plugins') return !write && parts[parts.length - 1].toLowerCase() === 'skill.md'
   return false
+}
+
+/** Whether a path is one of a project's auto memory files in Claude Code's config folder: `projects/<project>/memory/<name>.md`. */
+export function claudeAutoMemory(path: string, home: string): boolean {
+  const rel = relative(resolve(home), resolve(path))
+  if (!rel || rel.startsWith('..') || isAbsolute(rel) || !/\.md$/i.test(rel)) return false
+  const parts = rel.split(/[\\/]/)
+  return parts.length === 4 && parts[0] === 'projects' && parts[2] === 'memory'
 }
 
 /** Windows' "in use" errors: another program has the file open without sharing it. */
