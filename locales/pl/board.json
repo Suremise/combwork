@@ -521,6 +521,7 @@
   "board.lanes.queueState": "{state, select, done {Gotowa} doing {W toku} review {W przeglądzie} todo {Do zrobienia} waiting {Czeka na ciebie} gone {Usunięta} other {Niezapisana}}",
   "board.lanes.retryFresh": "Ponów nową rozmowę",
   "board.lanes.retryFreshFailed": "Nie udało się ponowić nowej rozmowy: {lane}",
+  "board.lanes.retryFreshShort": "Ponów: {agent}",
   "board.lanes.round": "r{round}",
   "board.lanes.show": "Pokaż tory",
   "board.lanes.slotLine": "Na gałęzi {line}",

@@ -369,9 +369,16 @@ const ancestor = (x, y) => {
     check('…brought up to date by the queue (strict): Updated, carried, from the reviewed revision', up?.data?.carried === true && up.data.from === two.rev, JSON.stringify(up))
     check("…merged with the user's commit kept, naming both revisions", git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Updated: ${up?.data?.to}`) && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Revision: ${two.rev}`) && ancestor(two.moved, 'main'))
     // The queue's update and merge leave the slot alone. Hive starts Three about a second after Two is Done (HI-1990), its
-    // line made in the slot: that change, and only that, may be there by now.
-    const threeTook = (await factsOf(c3, 'Started')).some((f) => f.actor === 'hive') && (await kinds(c3)).includes('SlotPrepared')
-    check("…the slot untouched by the merge (its HEAD and status as they were, or Three's start since)", (untouched(two.was) || threeTook) && !(await kinds(c2)).includes('LineMoved'), JSON.stringify({ now: worktreeNow(), was: two.was, threeTook, two: await kinds(c2) }))
+    // line made in the slot: the slot may be exactly as Three's start prepared it by now (HR1's round 2: its own
+    // SlotPrepared, on the lease Three was started with: that line checked out at that revision, nothing changed), and
+    // nothing else.
+    const started3 = (await factsOf(c3, 'Started')).find((f) => f.actor === 'hive')?.data ?? null
+    const prep3 = (await factsOf(c3, 'SlotPrepared')).at(-1)?.data ?? null
+    const asThree = (now, branch) => !!started3 && !!prep3 && prep3.lease === started3.lease && now.head === prep3.revision && now.status === '' && branch === prep3.line
+    const branchNow = git(wt, 'branch', '--show-current')
+    // …and it refuses anything else: another HEAD, a dirty file, another branch.
+    if (prep3) check('…a slot not as Three was prepared is not taken for it', !asThree({ head: two.was.head, status: '' }, prep3.line) && !asThree({ head: prep3.revision, status: ' M a.txt' }, prep3.line) && !asThree({ head: prep3.revision, status: '' }, 'main'))
+    check("…the slot untouched by the merge (its HEAD and status as they were, or exactly as Three's start prepared it)", (untouched(two.was) || asThree(worktreeNow(), branchNow)) && !(await kinds(c2)).includes('LineMoved'), JSON.stringify({ now: worktreeNow(), branch: branchNow, was: two.was, started3, prep3, two: await kinds(c2) }))
 
     // --- Three: main changes the same line while it is in review: returned (notUpToDate); B1 resumes cleanly.
     const s3 = await start(c3)

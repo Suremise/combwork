@@ -521,6 +521,7 @@
   "board.lanes.queueState": "{state, select, done {完了} doing {作業中} review {レビュー中} todo {未着手} waiting {あなたを待っています} gone {削除済み} other {記録なし}}",
   "board.lanes.retryFresh": "新しい会話を再試行",
   "board.lanes.retryFreshFailed": "{lane}の新しい会話を再試行できませんでした",
+  "board.lanes.retryFreshShort": "{agent}を再試行",
   "board.lanes.round": "R{round}",
   "board.lanes.show": "レーンを表示",
   "board.lanes.slotLine": "ブランチ：{line}",

@@ -521,6 +521,7 @@
   "board.lanes.queueState": "{state, select, done {已完成} doing {进行中} review {审查中} todo {待办} waiting {等你处理} gone {已移除} other {未记录}}",
   "board.lanes.retryFresh": "重试新对话",
   "board.lanes.retryFreshFailed": "无法重试 {lane} 的新对话",
+  "board.lanes.retryFreshShort": "重试 {agent}",
   "board.lanes.round": "第 {round} 轮",
   "board.lanes.show": "显示通道",
   "board.lanes.slotLine": "位于 {line}",

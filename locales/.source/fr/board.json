@@ -521,6 +521,7 @@
   "board.lanes.queueState": "{state, select, done {Done} doing {Doing} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}",
   "board.lanes.retryFresh": "Retry New Conversation",
   "board.lanes.retryFreshFailed": "Couldn't retry {lane}'s new conversation",
+  "board.lanes.retryFreshShort": "Retry {agent}",
   "board.lanes.round": "r{round}",
   "board.lanes.show": "Show the lanes",
   "board.lanes.slotLine": "On {line}",

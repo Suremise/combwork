@@ -447,6 +447,8 @@ const START_LANE = msg({ id: 'board.lanes.start', defaultMessage: 'Start Lane…
 
 const RETRY_FRESH = msg({ id: 'board.lanes.retryFresh', defaultMessage: 'Retry New Conversation', description: "A button in a lane's header (Progress panel) and an item of its menu (HI-2034): one of the lane's agents was owed a new conversation, and Hive stopped trying to start it (it wasn't free in time, Hive closed while starting it, or its start failed); this tries again, once the agent is free. Glossary: lane, conversation." })
 
+const RETRY_FRESH_SHORT = msg({ id: 'board.lanes.retryFreshShort', defaultMessage: 'Retry {agent}', description: "A lane's header in the Progress panel (HI-2034), after a refresh icon: a button that tries again to start the lane's agent {agent} (an agent's name) in a new conversation, which Hive stopped trying. Short: the panel is narrow; its tooltip says why in full." })
+
 /** Whether a lane's agent is owed its new conversation and no more is tried (HI-2034): the row offers Retry. */
 const freshBlocked = (l: Lane): boolean => l.status?.reason === 'startWait' && l.status.why === 'fresh' && !!l.status.freshBlocked && !l.frozen
 
@@ -674,7 +676,8 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
           )}
           <span className="progress-lane-pair">{pair}</span>
           {/* Its slot (#1446): "· slot-b", or its builder's carried slot ("· hb2"), linking to the slots in Branches & remotes. */}
-          {l.slot && !l.frozen && project && (
+          {/* Its slot steps aside while an agent's new conversation waits for the user's Retry (HI-2034): the row's hover still names it. */}
+          {l.slot && !l.frozen && project && !freshBlocked(l) && (
             <button
               type="button"
               className="link progress-lane-slot faint"
@@ -705,7 +708,23 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
           )}
           {/* Why it waits (#1279) takes the name's room (every lane keeps one height: the list shows whole lanes),
               cut short with its whole text in its title; a paused lane's in the paused colour, another's faint. */}
-          {why && waitsOn(l.status) && project ? (
+          {/* An agent's new conversation no more tried (HI-2034): its reason is the Retry itself, short enough for a narrow
+              panel ("⟳ Retry B1"), the whole reason its tooltip and accessible name (and Retry New Conversation in the menu). */}
+          {why && freshBlocked(l) ? (
+            <button
+              type="button"
+              className="link progress-lane-why paused progress-lane-retry"
+              data-action="lane-retry-fresh"
+              title={`${why}\n${tr(RETRY_FRESH)}`}
+              aria-label={`${why}. ${tr(RETRY_FRESH)}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                void retryFresh(l)
+              }}
+            >
+              <Icon name="refresh" /> {tr(RETRY_FRESH_SHORT, { agent: l.status?.agent ?? '' })}
+            </button>
+          ) : why && waitsOn(l.status) && project ? (
             // What it waits for, a click away (#1446): the slots in Branches & remotes, or the runs it waits on.
             <button
               type="button"
@@ -734,19 +753,6 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
             <span className={cx('faint', 'progress-lane-waited', wait!.long && 'long')} data-action="lane-waited" title={l.status?.atLeast ? tr(WAITED_AT_LEAST_TIP) : undefined}>
               {waited}
             </span>
-          )}
-          {freshBlocked(l) && (
-            <button
-              type="button"
-              className="btn small subtle progress-lane-retry"
-              data-action="lane-retry-fresh"
-              onClick={(e) => {
-                e.stopPropagation()
-                void retryFresh(l)
-              }}
-            >
-              {tr(RETRY_FRESH)}
-            </button>
           )}
           {stalled && (
             <Tooltip content={`${cardLabelOf({ tasks }, stalled.n)}: ${stalled.why}`}>

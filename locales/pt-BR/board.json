@@ -521,6 +521,7 @@
   "board.lanes.queueState": "{state, select, done {Concluído} doing {Em andamento} review {Em revisão} todo {A fazer} waiting {Esperando por você} gone {Removido} other {Não registrado}}",
   "board.lanes.retryFresh": "Tentar conversa nova de novo",
   "board.lanes.retryFreshFailed": "Não foi possível tentar de novo a conversa nova de {lane}",
+  "board.lanes.retryFreshShort": "Tentar {agent} de novo",
   "board.lanes.round": "r{round}",
   "board.lanes.show": "Mostrar as raias",
   "board.lanes.slotLine": "Em {line}",

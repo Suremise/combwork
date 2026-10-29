@@ -2087,6 +2087,10 @@
     "defaultMessage": "Couldn't retry {lane}'s new conversation",
     "description": "A toast's title (HI-2034): Retry New Conversation on a lane's row failed ({lane}: its builder / reviewer). The reason follows."
   },
+  "board.lanes.retryFreshShort": {
+    "defaultMessage": "Retry {agent}",
+    "description": "A lane's header in the Progress panel (HI-2034), after a refresh icon: a button that tries again to start the lane's agent {agent} (an agent's name) in a new conversation, which Hive stopped trying. Short: the panel is narrow; its tooltip says why in full."
+  },
   "board.lanes.round": {
     "defaultMessage": "r{round}",
     "description": "A card's round in a lane's cards (Progress panel → Lanes), short: r1 for its first, r3 after two failed reviews."

@@ -523,6 +523,7 @@ interface HiveMessageValues {
   'board.lanes.queueState': { state: string }
   'board.lanes.retryFresh': undefined
   'board.lanes.retryFreshFailed': { lane: string | number }
+  'board.lanes.retryFreshShort': { agent: string | number }
   'board.lanes.round': { round: string | number }
   'board.lanes.show': undefined
   'board.lanes.slotLine': { line: string | number }

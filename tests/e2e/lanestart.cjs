@@ -274,7 +274,14 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     if (!(await panel.count())) await page.locator('.progress-rail').click().catch(() => undefined)
     const owedRow = panel.locator(`.progress-tab-lanes .progress-lane[data-lane="${owedLane?.id}"]`)
     const retry = owedRow.locator('[data-action="lane-retry-fresh"]')
-    check("…its row says B1's new conversation didn't start, with Retry New Conversation", !!(await until(async () => (await retry.count()) === 1 && /B1’s new conversation didn’t start \(it wasn’t free in time\)/.test(await owedRow.innerText()), HUNG_MS)), await owedRow.innerText().catch(() => ''))
+    check("…its row offers to retry B1's new conversation, saying why", !!(await until(async () => (await retry.count()) === 1 && /B1’s new conversation didn’t start \(it wasn’t free in time\)/.test((await retry.getAttribute('aria-label')) ?? ''), HUNG_MS)), await owedRow.innerText().catch(() => ''))
+    // In the panel as it opens (narrow): the reason's place is the Retry itself, "⟳ Retry B1", whole inside the header,
+    // its whole reason its tooltip and accessible name, in both themes (HR1's round 2).
+    const top = await owedRow.locator('.progress-lane-top').boundingBox()
+    const rb = await retry.boundingBox()
+    const whole = await retry.evaluate((e) => e.scrollWidth <= e.clientWidth)
+    const label = (await retry.getAttribute('aria-label')) ?? ''
+    check('…Retry fits the header whole, saying whose, with the whole reason on hover', !!top && !!rb && rb.x >= top.x && rb.x + rb.width <= top.x + top.width + 0.5 && whole && (await retry.innerText()).trim() === 'Retry B1' && /B1’s new conversation didn’t start \(it wasn’t free in time\)/.test(label) && label.endsWith('Retry New Conversation') && label === ((await retry.getAttribute('title')) ?? '').replace('\n', '. '), JSON.stringify({ top, rb, whole, label, text: await retry.innerText() }))
     await shoot('lane-fresh-blocked', owedRow)
     await retry.click()
     const fresh = await until(async () => {
