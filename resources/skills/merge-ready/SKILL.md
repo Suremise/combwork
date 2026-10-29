@@ -20,7 +20,7 @@ In Hive a card's work is often on its own branch, in the slot (a working folder)
 ## Who merges
 
 Give the user the summary, saying plainly whether the branch is ready and, if not, what's in the way. For a card, how its work lands is the card's own rules: those it started under (unless the user applied changed options to it), never the project's options now, which (`hive_project_status`'s `workflow`, a lane's brief) say how new cards finish. Never infer the next step from the card's column: do the one Hive names.
-- **"Merge it and report the merge"** (Hive tells you once the merge is yours): merge it and report it (below); Hive checks the work is in the base before Done, refusing with what's missing.
+- **"Merge it and report the merge"** (Hive tells you once the merge is yours): merge it and report it (merging.md); Hive checks the work is in the base before Done, refusing with what's missing.
 - **A request waiting for the user** (For you: their review, their OK before merging, their acceptance): wait for their answer; Hive tells you what follows.
 - **The card's `merge`** (`hive_read_task`): Hive's merge queue has it, and merges it or returns it with why (fix and submit again). Don't merge it yourself: while the rules are enforced Hive refuses that. With them switched off the queue pauses (its `merge` says so) and the card is finished as before them: as your brief says, then `hive_report_merge`.
 - **Done**: nothing is left.
@@ -29,12 +29,8 @@ The ways a card finishes, for context: Hive merges; the agent merges (after a pa
 
 Outside a card, or with no workflow: the user merges from Hive, or you when they ask. Rebase, push, delete the branch or publish only when the user asks you to; for their OK on one (a push, a release), ask on the card with `hive_ask_user` (`kind: "approve"`).
 
-## Merging, when it is yours
+## Reference files
 
-What you merge must be what you checked, so merges into a base take turns through Hive's **merge slot**:
-1. **Claim the slot** for the base with `hive_merge_slot` (`claim`, with the cards you are merging). Still in line: claim again, keeping your place. Without Hive's tools, go on: step 4 still protects the merge.
-2. **Merge the base into the branch, note its commit** (`git rev-parse <base>`) **and run the checks** the combined change needs. Merge it into the branch, not the branch into the base with `--no-commit`: a failure is then fixed on the branch, and the base's checkout is never left mid-merge where others work. While you hold the slot nobody merges into the base through Hive, so one run is enough. The hold lasts 60 minutes: claim again to extend it.
-3. **If something fails**, release the slot (`release`) before fixing it, and claim it again once ready.
-4. **Just before merging, compare** the base's commit with the one you noted. If it moved anyway (a merge from outside Hive), merge the base in again, rerun the checks (all of them when the new commits touch shared code or test tooling) and compare again.
-5. **Merge** in the checkout where the base is (`git -C <that checkout> merge --no-ff <branch>`). An `index.lock` there means another merge is under way: wait and try again; never delete it.
-6. **Release the slot** once merged, and **report** the merge commit and the base commit your checks ran on: `hive_report_merge` for each card Hive told you to merge. A merge step you can't take within a rule (your CLI refused the commit, say) is `hive_cannot_within_rules` on the card (the rule, and why): it goes to the user.
+Read one only when it applies:
+
+- [merging.md](merging.md): when the merge is yours to make.

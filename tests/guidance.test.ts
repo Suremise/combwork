@@ -16,11 +16,19 @@ import type { Finisher, ReviewBy } from '../src/shared/workflow/options'
 
 const ROOT = join(__dirname, '..')
 const SKILLS = join(ROOT, 'resources', 'skills')
-const catalog = new Map<string, { audience: SkillAudience; description: string; text: string }>()
+/**
+ * Each bundled skill: its SKILL.md (`skill`), its reference files beside it (HI-2011: SKILL.md as a contents page, the
+ * rest read only when needed), and `text`, all of them together, which the checks of what the skills say read, so a
+ * rule moved into a reference file is still checked.
+ */
+const catalog = new Map<string, { audience: SkillAudience; description: string; skill: string; refs: Map<string, string>; others: string[]; text: string }>()
 for (const name of readdirSync(SKILLS)) {
-  const text = readFileSync(join(SKILLS, name, 'SKILL.md'), 'utf8')
-  const fm = parseSkillFrontmatter(text)
-  catalog.set(name, { audience: fm.audience!, description: fm.description ?? '', text })
+  const skill = readFileSync(join(SKILLS, name, 'SKILL.md'), 'utf8')
+  const fm = parseSkillFrontmatter(skill)
+  const entries = readdirSync(join(SKILLS, name), { withFileTypes: true }).filter((e) => e.name !== 'SKILL.md')
+  const refs = new Map(entries.filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => [e.name, readFileSync(join(SKILLS, name, e.name), 'utf8')]))
+  const others = entries.filter((e) => !(e.isFile() && e.name.endsWith('.md'))).map((e) => e.name)
+  catalog.set(name, { audience: fm.audience!, description: fm.description ?? '', skill, refs, others, text: [skill, ...refs.values()].join('\n\n') })
 }
 /** Every hive tool the MCP server defines. */
 const TOOLS = [...readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8').matchAll(/(?:name: |\bintent\(\s*)'(hive_\w+)'/g)].map((m) => m[1])
@@ -183,7 +191,7 @@ describe("the tools' descriptions", () => {
 describe('the bundled skills', () => {
   it('each names itself after its folder, says who it is for, and has a description that says when to use it', () => {
     for (const [name, s] of catalog) {
-      expect(parseSkillFrontmatter(s.text).name, name).toBe(name)
+      expect(parseSkillFrontmatter(s.skill).name, name).toBe(name)
       expect(['agents', 'assistant', 'all'], name).toContain(s.audience)
       expect(s.description.length, name).toBeGreaterThan(80)
       expect(s.description.length, name).toBeLessThan(260)
@@ -245,6 +253,31 @@ describe('the bundled skills', () => {
     }
   })
 
+  // HI-2011 (Darren, 29 Oct: one rule for every skill, so it scales): a CLI loads SKILL.md whenever the skill is used
+  // and its other files only when needed, deeper links being skimmed. So SKILL.md stays a short contents page, and
+  // what is needed only sometimes is in reference files it links, one level deep.
+  it('keep SKILL.md to 4,000 characters, with reference files beside it, each linked from SKILL.md and linking none', () => {
+    const links = (text: string): string[] => [...text.matchAll(/\]\(([^)#\s]+)(?:#[^)]*)?\)/g)].map((m) => m[1]).filter((t) => !/^[a-z]+:/i.test(t))
+    for (const [name, s] of catalog) {
+      expect(s.skill.replace(/\r\n/g, '\n').length, `${name}'s SKILL.md`).toBeLessThanOrEqual(4000)
+      // Only Markdown files at the top of the folder: no subfolders, nothing else.
+      expect(s.others, name).toEqual([])
+      const linked = links(s.skill).map((t) => t.replace(/^\.\//, ''))
+      const heads = new Set<string>()
+      for (const [file, text] of s.refs) {
+        expect(linked, `${name}: SKILL.md links ${file}`).toContain(file)
+        expect(links(text), `${name}/${file} links no file (one level deep)`).toEqual([])
+        // Its first line, a heading of its own: what a read of it is known by (the scenarios' skillRefsRead).
+        const head = text.split(/\r?\n/)[0]
+        expect(head, `${name}/${file} starts with a heading`).toMatch(/^# \S/)
+        expect(heads.has(head) || s.skill.split(/\r?\n/).includes(head), `${name}/${file}: its heading is its own`).toBe(false)
+        heads.add(head)
+      }
+    }
+    // card-loop by role: a builder never needs the reviewer's half.
+    expect([...catalog.get('card-loop')!.refs.keys()]).toEqual(expect.arrayContaining(['builder.md', 'reviewer.md']))
+  })
+
   // A question for the user blocks the card as well as telling them (#840): a lane watch wakes on a card becoming
   // blocked, never on a comment, so a reviewer's question left as a comment sat unseen for over an hour (#805).
   // Since #1274 (P4's intents): a question for the user is a request under For you (hive_ask_user), recorded and answered
@@ -302,10 +335,10 @@ describe('the bundled skills', () => {
     // In Git only (HR1's #1524 round 1 finding 1): a no-code card submits a summary, a project without version control its files' state.
     expect(line('1. Do its work')).toMatch(/for a code card in Git, commit each round's work and name the commit in its summary; a no-code card has nothing to commit/)
     expect(line('2. Review it')).toMatch(/`hive_start_review` names what to review \(a revision, or a no-code card's summary\)\. For a code card in Git, work that revision doesn't hold \(uncommitted, or no commit named\) isn't a failed round on that alone/)
-    expect(line('- builder, its card in Review: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
+    expect(line('Your watch, your card in Review: the card')).toMatch(/changes: \["verdict", "column", "comment"\]/)
     // #1639: after a submission or a failed verdict in a lane, Hive arms the watch and the reply says so.
     expect(text).toMatch(/After a submission or a failed verdict in your lane, Hive watches the card for you/)
-    expect(line('- reviewer, after asking the builder for something')).toMatch(/changes: \["comment"\]/)
+    expect(line('- after asking the builder for something')).toMatch(/changes: \["comment"\]/)
     // run-lanes' sample brief leaves the procedure to card-loop and the rules to Hive (a brief saying "commit once it
     // passes" undid it; since #1527 a submission's commit is Hive's to check, so the brief says nothing of it).
     const brief = catalog.get('run-lanes')!.text
@@ -314,7 +347,9 @@ describe('the bundled skills', () => {
     // A reviewer that reads only review-agent-work is pointed there (haiku passed uncommitted work so).
     // The revision start review names is the one reviewed (HR1's #1525 round 1 finding 1): a summary naming another
     // commit gets a question, never a review of that commit.
-    expect(catalog.get('review-agent-work')!.text).toMatch(/What start review names is what you review, and what your verdict is recorded against: if the builder's summary names another commit, ask the builder \(`hive_request_builder`\) rather than review that one\. For a code card in Git, work that revision doesn't hold \(sent uncommitted\) gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
+    expect(catalog.get('review-agent-work')!.text).toMatch(/What start review names is what you review, and what your verdict is recorded against: if the builder's summary names another commit, ask the builder \(`hive_request_builder`\) rather than review that one\./)
+    // Since HI-2011 in its reference file for edge cases (other-targets.md).
+    expect(catalog.get('review-agent-work')!.text).toMatch(/For a code card in Git, work that revision doesn't hold \(sent uncommitted\) gets a request for a commit \(`hive_request_builder`\), not a verdict \(card-loop, Reviewer\)\./)
   })
 })
 
@@ -435,9 +470,10 @@ describe('the skills follow the gates (#1524)', () => {
     expect(catalog.get('card-loop')!.text).toMatch(/`hive_inbox` first[^.]*act, then ack/)
   })
 
-  it('stay smaller than before P8 (work-on-card 8,991 and card-loop 15,776 characters)', () => {
-    expect(catalog.get('work-on-card')!.text.length).toBeLessThan(8991)
-    expect(catalog.get('card-loop')!.text.length).toBeLessThan(11000)
+  // HI-2011's split added only each reference file's heading and SKILL.md's list of them: the rules were moved, not added.
+  it('stay smaller than before P8 (work-on-card 8,991 and card-loop 15,776 characters), reference files and all (LF)', () => {
+    expect(catalog.get('work-on-card')!.text.replace(/\r/g, '').length).toBeLessThan(9800)
+    expect(catalog.get('card-loop')!.text.replace(/\r/g, '').length).toBeLessThan(11800)
   })
 })
 
@@ -489,7 +525,7 @@ describe('the review and merge skills follow the gates (#1525)', () => {
     // The next step is the one Hive names, never inferred from a column or a missing field (HR1's #1525 round 2, the
     // Assistant's m3822): the agent merges on Hive's word, waits on a request for the user, leaves the queue's card alone.
     expect(text).toMatch(/Never infer the next step from the card's column: do the one Hive names\./)
-    expect(way('"Merge it and report the merge"')).toMatch(/\(Hive tells you once the merge is yours\): merge it and report it \(below\); Hive checks the work is in the base before Done/)
+    expect(way('"Merge it and report the merge"')).toMatch(/\(Hive tells you once the merge is yours\): merge it and report it \(merging\.md\); Hive checks the work is in the base before Done/)
     // …and the report is for the cards Hive told it to merge, wherever they are (in Doing, with no review).
     expect(text).toMatch(/`hive_report_merge` for each card Hive told you to merge/)
     expect(text).not.toMatch(/Cards still in Review or Doing stay where they are/)
@@ -530,8 +566,9 @@ describe('the review and merge skills follow the gates (#1525)', () => {
   })
 
   it('stay smaller than before P8 (review-agent-work 7,475 and merge-ready 5,291 characters, LF)', () => {
-    expect(review().replace(/\r/g, '').length).toBeLessThan(7475)
-    expect(merge().replace(/\r/g, '').length).toBeLessThan(5291)
+    // HI-2011's split added each reference file's heading and SKILL.md's list of them (7,475 and 5,291 before it).
+    expect(review().replace(/\r/g, '').length).toBeLessThan(8100)
+    expect(merge().replace(/\r/g, '').length).toBeLessThan(5500)
   })
 })
 

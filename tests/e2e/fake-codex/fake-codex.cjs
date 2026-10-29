@@ -417,6 +417,20 @@ function readSkill(name) {
 }
 
 /**
+ * Follows a skill's link to one of its reference files (HI-2011), as Codex does: the link found in the delivered
+ * SKILL.md (its copy in .agents/skills), resolved against that folder, and the file read with a shell command.
+ */
+function readSkillRef(name, file) {
+  const dir = [name, `hive-${name}`].map((d) => path.join(process.cwd(), '.agents', 'skills', d)).find((d) => fs.existsSync(path.join(d, 'SKILL.md'))) ?? path.join(process.cwd(), '.agents', 'skills', name)
+  const skill = fs.existsSync(path.join(dir, 'SKILL.md')) ? fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8') : ''
+  const target = skill.includes(`](${file})`) || skill.includes(`](./${file})`) ? path.resolve(dir, file) : path.join(dir, `no-link-to-${file}`)
+  const id = `call_${randomUUID().slice(0, 8)}`
+  record({ type: 'function_call', name: 'shell', arguments: JSON.stringify({ command: ['powershell', '-Command', `Get-Content -Raw '${target}'`] }), call_id: id })
+  const text = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null
+  record({ type: 'function_call_output', call_id: id, output: text ?? 'Process exited with code 1: no such file' })
+}
+
+/**
  * The scenario steps the fake Claude Code takes too (tests/scenarios): "skill NAME", "boardmove N COLUMN", "boardreview N
  * ACTION [COLUMN]", "boardcomment N", "hive TOOL {json}" and "work N". Board changes go through the real hive MCP
  * server (hive_update_task), as a model's would. Whether the step was one of these.
@@ -425,6 +439,10 @@ async function scripted(step) {
   let any = false
   for (const m of step.matchAll(/\bskill\s+([a-z0-9][\w-]*)/gi)) {
     readSkill(m[1])
+    any = true
+  }
+  for (const m of step.matchAll(/\bskillref\s+([a-z0-9][\w-]*)\s+([\w.-]+\.md)/gi)) {
+    readSkillRef(m[1], m[2])
     any = true
   }
   const move = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step)

@@ -9,6 +9,7 @@
 //   edit PATH OLD NEW          Copilot's edit tool (PATH relative to the session's folder)
 //   write PATH TEXT…           its create tool
 //   view PATH                  its view tool (reads a file)
+//   skillref NAME FILE         its view tool on a skill's reference file, by the link in the SKILL.md it read (HI-2011)
 //   shell COMMAND…             its powershell tool
 //   question                   its ask_user tool (a question for the person)
 //   say TEXT…                  the turn's last reply (default: "Done.")
@@ -57,6 +58,7 @@ function actionsOf(prompt) {
     const step = raw.trim()
     let m
     for (const s of step.matchAll(/\bskill\s+([a-z0-9][\w-]*)/gi)) out.push({ tool: 'skill', args: { skill: s[1] } })
+    for (const s of step.matchAll(/\bskillref\s+([a-z0-9][\w-]*)\s+([\w.-]+\.md)/gi)) out.push({ tool: 'view', args: { path: `.agents/skills/hive-${s[1]}/${s[2]}` }, ref: { skill: s[1], file: s[2] } })
     if ((m = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step))) out.push({ tool: 'hive_update_task', args: { number: Number(m[1]), column: m[2].toLowerCase() } })
     if ((m = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(step))) out.push({ tool: 'hive_update_task', args: { number: Number(m[1]), review: m[2].toLowerCase(), ...(m[3] ? { column: m[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) } })
     if ((m = /\bboardcomment\s+(\d+)/i.exec(step))) out.push({ tool: 'hive_update_task', args: { number: Number(m[1]), comment: 'Fake: done, see the files.' } })
@@ -143,7 +145,11 @@ function decide(body) {
     if (a.say) continue
     if (n === done) {
       const name = offered(body.tools, a.tool)
-      return name ? { ...out, wait, tool: name, args: a.args } : { ...out, wait, text: `Fake Copilot: Copilot offers no tool ${a.tool}.` }
+      // A reference file: its link in SKILL.md as Copilot gave it (its skill tool says "loaded", and the skill comes as
+      // context of its own), else a path that isn't there.
+      const linked = !a.ref || msgs.some((m) => textOf(m).includes(`](${a.ref.file})`) || textOf(m).includes(`](./${a.ref.file})`))
+      const args = linked ? a.args : { path: `.agents/skills/hive-${a.ref.skill}/no-link-to-${a.ref.file}` }
+      return name ? { ...out, wait, tool: name, args } : { ...out, wait, text: `Fake Copilot: Copilot offers no tool ${a.tool}.` }
     }
     n++
   }
