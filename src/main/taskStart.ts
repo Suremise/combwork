@@ -127,7 +127,8 @@ async function startReserved(n: number, target: TaskStartTarget, actor: TaskActo
   } else {
     // 1.0 (#1451): a new agent gets no worktree of its own. Asking for one (the board's start, until #1442) is passed on so
     // addAgent refuses it with its note, never ignored.
-    const def = await addAgent(p, { name: target.name, location: target.worktree ? 'new-worktree' : 'project', provider: target.provider })
+    // The user's own Start goes past Maximum agents; an agent's or the Assistant's keeps to it (HI-2001).
+    const def = await addAgent(p, { name: target.name, location: target.worktree ? 'new-worktree' : 'project', provider: target.provider }, actor.kind === 'user' ? 'user' : 'agent')
     agentId = def.id
     agentName = def.name
   }

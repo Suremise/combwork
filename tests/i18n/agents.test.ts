@@ -66,7 +66,7 @@ describe('the agents area', () => {
   })
 
   it('in English, the functions agents and the window share read the same with or without tr', () => {
-    expect(agentLimitText(12, tr)).toBe(agentLimitText(12))
+    expect(agentLimitText(tr)).toBe(agentLimitText())
     for (const s of STATUSES) expect(mergeBlocked('B1', s, tr), s).toBe(mergeBlocked('B1', s))
     const branch = (ahead: number, dirty: number) => ({ ahead, dirty, base: 'main', branch: 'hive/b1' }) as never
     for (const [a, d] of [[0, 0], [1, 0], [3, 1], [0, 2]]) expect(unmergedWork(branch(a, d), tr), `${a}/${d}`).toEqual(unmergedWork(branch(a, d)))
@@ -88,7 +88,7 @@ describe('the agents area', () => {
     const window = [
       ...providerPairs().map(([, english, text]) => shownText(english, text, tr)),
       ...PROVIDERS.flatMap((d) => d.permissionModes.flatMap((m) => [permissionLabel(d.id, m.value, tr), modeDescription(d.id, m.value, tr)])),
-      agentLimitText(12, tr),
+      agentLimitText(tr),
       ...STATUSES.flatMap((s) => mergeBlocked('B1', s, tr) ?? []),
       unmergedWork({ ahead: 2, dirty: 1, base: 'main', branch: 'b' } as never, tr)!.text,
       agentNameProblem('', tr)!,
@@ -104,7 +104,7 @@ describe('the agents area', () => {
       keybindingProblem('K')!
     ]
     for (const t of window) expect(pseudo(t), t).toBe(true)
-    expect(agentLimitText(12)).toBe('A project can have up to 12 agents (Settings → Advanced → Agents per project).')
+    expect(agentLimitText()).toBe('A project can have up to 24 agents.')
     expect(mergeBlocked('B1', 'working')).toBe('B1 is working. Merge once it has finished.')
     expect(PROVIDERS[0].permissionModes[0].label).toBe('Manual')
     expect([permissionLabel('claude-code', 'auto'), modeDescription('claude-code', 'auto')]).toEqual(['Auto', 'A safety classifier approves low-risk actions itself and only asks about risky ones.'])

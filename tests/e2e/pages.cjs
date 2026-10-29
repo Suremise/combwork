@@ -1,9 +1,9 @@
 // Agent pages (#134): one layout for the project, and a page holds as many agents as the layout has panes, so pages
 // = agents ÷ panes. Automatic until chosen (up to a 3×2 grid, then pages of six). 4 agents in three columns are two
 // pages (the 4th alone on page 2); 6 in a grid of four are two; one at a time has no page buttons; switching the layout
-// changes the pages at once; the last page's spare panes are empty; up to twelve agents, and up to 24 with this
-// workspace's Agents per project raised (#562): pages, the most page buttons, the agents table, a template of 24 round
-// trip, a lower limit refusing a template and more agents but removing none.
+// changes the pages at once; the last page's spare panes are empty; up to 24 agents by hand, past the workflow's Maximum
+// agents of twelve (#562, HI-2001: it binds the Assistant): pages, the most page buttons, the agents table, a template of
+// 24 round trip past the maximum, its plan saying how far over, and a twenty-fifth refused.
 // Dev build, throwaway profile and workspace; no sessions are started.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -143,8 +143,8 @@ const check = (name, ok, extra = '') => {
   await remove('Agent 7')
   check('removing the only agent on page 2 goes to page 1', (await page.locator('.page-switch').count()) === 0 && (await panes()) >= 1)
 
-  // --- More than twelve (#562): Settings → Advanced → Agents per project, this workspace's own value, up to 24.
-  const setLimit = (v) => inv('advanced:set', 'hive.agents.perProject', v, 'workspace')
+  // --- More than twelve (#562, HI-2001): past the workflow's Maximum agents by hand, up to 24.
+  const setLimit = (v) => lib.setMaxAgents(inv, v, 'workspace')
   const agentsNow = async () => (await inv('workspace:refresh')).projects[0].agents
   const refusal = () => inv('agents:add', proj, { location: 'project', provider: 'claude-code' }).then(() => '', (e) => String(e.message ?? e))
   // + Add ▾'s Configure Agent and Add… (#975), greyed out at the limit.
@@ -157,15 +157,12 @@ const check = (name, ok, extra = '') => {
     return greyed
   }
   await add(12 - (await agentsNow()).length)
-  const at12 = await refusal()
-  check('back at twelve: a thirteenth is refused, naming the setting', /up to 12 agents \(Settings → Advanced → Agents per project\)/.test(at12), at12)
-  check("…and + Add ▾'s Configure Agent and Add… is greyed out", !!(await lib.until(addGreyed, HUNG_MS)))
-  await setLimit(24)
-  check('this workspace allows 24: it is back', !!(await lib.until(async () => !(await addGreyed()), HUNG_MS)))
+  check("at Maximum agents (twelve), + Add ▾'s Configure Agent and Add… isn't greyed out: the user adds past it", !!(await lib.until(async () => !(await addGreyed()), HUNG_MS)))
   await add(12)
   check('twenty-four agents', (await agentsNow()).length === 24, String((await agentsNow()).length))
   const at24 = await refusal()
-  check('a twenty-fifth is refused', /up to 24 agents/.test(at24), at24)
+  check('a twenty-fifth is refused', at24 === 'A project can have up to 24 agents.', at24)
+  check("…and + Add ▾'s Configure Agent and Add… is greyed out", !!(await lib.until(addGreyed, HUNG_MS)))
   await choose('Grid of six')
   check('24 in the grid of six: four pages', (await buttons()) === 4, String(await buttons()))
   await go(4)
@@ -225,22 +222,16 @@ const check = (name, ok, extra = '') => {
   check('a template of 24 is saved', saved?.saved?.agents?.length === 24, JSON.stringify(saved).slice(0, 200))
   for (const a of (await agentsNow()).slice(3)) await inv('agents:remove', proj, a.id, { deleteWorktree: false })
   check('down to three agents', (await agentsNow()).length === 3)
-  await setLimit(12)
-  const low = await inv('templates:plan', proj, 'project', saved.saved.file)
-  check("this workspace back to 12: the template's plan is blocked, saying why", low.blocked.some((b) => /It has 24 agents, and this project can have up to 12/.test(b)), JSON.stringify(low.blocked))
-  const lowLoad = await inv('templates:load', proj, 'project', saved.saved.file, low.remove.map((a) => a.id)).then(() => '', (e) => String(e.message ?? e))
-  check('…and loading it is refused, nothing changed', /up to 12/.test(lowLoad) && (await agentsNow()).length === 3, lowLoad)
-  await setLimit(24)
   const plan = await inv('templates:plan', proj, 'project', saved.saved.file)
-  check('at 24, its plan has 24 agents and nothing blocking', plan.create.length === 24 && plan.blocked.length === 0, JSON.stringify(plan.blocked))
-  const loaded = await inv('templates:load', proj, 'project', saved.saved.file, plan.remove.map((a) => a.id))
-  check('loaded: 24 agents again', loaded.created.length === 24 && (await agentsNow()).length === 24, `${loaded.created.length} / ${(await agentsNow()).length}`)
-  // Lowered with 24 agents: they all stay; none can be added.
+  check("at Maximum agents twelve, the user's plan has 24 agents and nothing blocking, saying how far over", plan.create.length === 24 && plan.blocked.length === 0 && JSON.stringify(plan.maxAgents) === '{"now":12,"needs":24}', JSON.stringify([plan.blocked, plan.maxAgents]))
+  await setLimit(24)
+  const fits = await inv('templates:plan', proj, 'project', saved.saved.file)
+  check('this workspace allows 24: nothing over', fits.maxAgents === null, JSON.stringify(fits.maxAgents))
   await setLimit(null)
-  check('the workspace value cleared (back to 12): the 24 agents stay', (await agentsNow()).length === 24)
+  const loaded = await inv('templates:load', proj, 'project', saved.saved.file, plan.remove.map((a) => a.id))
+  check('loaded past Maximum agents: 24 agents again', loaded.created.length === 24 && (await agentsNow()).length === 24, `${loaded.created.length} / ${(await agentsNow()).length}`)
   const after = await refusal()
-  check('…and none can be added', /up to 12 agents/.test(after), after)
-  check("…+ Add ▾'s Configure Agent and Add… greyed out", !!(await lib.until(addGreyed, HUNG_MS)))
+  check('…and a twenty-fifth is refused', after === 'A project can have up to 24 agents.', after)
 
   await app.close()
   process.exit(failed ? 1 : 0)

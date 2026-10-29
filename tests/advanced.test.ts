@@ -691,13 +691,9 @@ describe("the Assistant's settings catalog", () => {
     expect(settingValue(lanes, {} as never, null, {})).toBeNull()
     expect(checkSettingValue(lanes, 'inherit')).toEqual({ value: null })
     expect(settingPatch(lanes, 6)).toEqual({ advanced: { id: 'hive.progress.lanesShown', scope: 'workspace', value: 6 } })
-    // Agents per project (#562): Settings' and a workspace's own, 1–24.
-    const agents = settingEntry('workspace.advanced.hive.agents.perProject')!
-    expect(agents.scope).toBe('workspace')
-    expect(settingEntry('advanced.hive.agents.perProject')).toMatchObject({ min: 1, max: 24 })
-    expect(checkSettingValue(agents, 24)).toEqual({ value: 24 })
-    expect(checkSettingValue(agents, 25)).toMatchObject({ error: expect.any(String) })
-    expect(settingPatch(agents, 20)).toEqual({ advanced: { id: 'hive.agents.perProject', scope: 'workspace', value: 20 } })
+    // Agents per project (#562) is Maximum agents, a workflow option, since HI-2001 (agentLimit.test.ts).
+    expect(settingEntry('workspace.advanced.hive.agents.perProject')).toBeUndefined()
+    expect(settingEntry('advanced.hive.agents.perProject')).toBeUndefined()
     // The developer features switch keeps its key and entry in Hive's settings, with its advanced value's text.
     expect(settingEntry('advanced.showDeveloperFeatures')).toMatchObject({ hidden: true, type: 'boolean', title: def('hive.showDeveloperFeatures').title, desc: def('hive.showDeveloperFeatures').desc })
     expect(settingEntry('advanced.hive.showDeveloperFeatures')).toBeUndefined()

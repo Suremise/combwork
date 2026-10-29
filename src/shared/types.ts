@@ -1544,7 +1544,7 @@ export interface ProjectProviderConfig {
   use200kContext: Inherit<'on' | 'off'>
 }
 
-/** One of a project's agents (up to Agents per project, #562). Settings left undefined follow the project's. */
+/** One of a project's agents (up to 24, #562; the Assistant's up to Maximum agents, HI-2001). Settings left undefined follow the project's. */
 export interface AgentDef {
   /** Random and never reused, so session records of removed agents don't attach to new ones. */
   id: string
@@ -1628,6 +1628,11 @@ export interface TemplateLoadPlan {
   blocked: string[]
   /** Its workflow (HI-1910) as it meets this project's: null when it has none. */
   workflow: TemplateLoadWorkflow | null
+  /**
+   * More agents than the project's Maximum agents (HI-2001): `now` is it, `needs` the template's agents. The user's load
+   * goes ahead, and its dialog offers to raise the maximum; the Assistant's is refused (`blocked`). Null when they fit.
+   */
+  maxAgents: { now: number; needs: number } | null
 }
 
 /**

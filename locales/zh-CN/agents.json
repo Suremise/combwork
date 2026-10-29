@@ -171,7 +171,7 @@
   "agents.layout.single": "逐个显示",
   "agents.limit.many": "超过 {limit} 个智能体：每个智能体都运行自己的 CLI 副本，各占用约 200–500 MB 内存；这台电脑共有 {total} 内存，可用 {free}。它们共享你的方案用量限额，因此会更快达到上限。",
   "agents.limit.manyMeasured": "超过 {limit} 个智能体：每个智能体都运行自己的 CLI 副本。{running, plural, other {当前运行中的 # 个智能体占用}} {used}（每个约 {each}）；这台电脑共有 {total} 内存，可用 {free}。它们共享你的方案用量限额，因此会更快达到上限。",
-  "agents.limit.reached": "一个项目最多可有 {limit} 个智能体（“设置”→“高级”→“每个项目的智能体数”）。",
+  "agents.limit.most": "一个项目最多可以有 {most, number} 个智能体。",
   "agents.mcp.all": "项目的全部服务器",
   "agents.mcp.its": "它的 MCP 服务器",
   "agents.mcp.loading": "正在加载…",

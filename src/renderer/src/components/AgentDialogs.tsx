@@ -371,7 +371,7 @@ export function AddAgentDialog() {
         </>
       }
     >
-      {full && <div className="banner warn">{tr(msg({ id: 'agents.add.full', defaultMessage: '{limit} Remove one first.', description: "The Add Agent dialog when the project has as many agents as it may: why ({limit}, a sentence), then what to do." }), { limit: agentLimitText(limit, tr) })}</div>}
+      {full && <div className="banner warn">{tr(msg({ id: 'agents.add.full', defaultMessage: '{limit} Remove one first.', description: "The Add Agent dialog when the project has as many agents as it may: why ({limit}, a sentence), then what to do." }), { limit: agentLimitText(tr) })}</div>}
       <div className="agent-form">
         <label>{tr(NAME)}</label>
         <input

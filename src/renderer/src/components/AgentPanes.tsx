@@ -517,7 +517,7 @@ export function AddAgentButton({ project, className, label, iconOnly }: { projec
   const full = project.agents.length >= limit
   const templates = !isAssistantPath(project.path)
   const configure = (): void => set({ addAgentFor: project.path })
-  const tip = full ? agentLimitText(limit, tr) : tr(msg({ id: 'panes.add.tip', defaultMessage: 'Configure Agent and Add…: choose its provider, where it works and its settings', description: 'Tooltip of the Add Agent button (an empty project or pane). "Configure Agent and Add…" names the dialog it opens: use its translation.' }))
+  const tip = full ? agentLimitText(tr) : tr(msg({ id: 'panes.add.tip', defaultMessage: 'Configure Agent and Add…: choose its provider, where it works and its settings', description: 'Tooltip of the Add Agent button (an empty project or pane). "Configure Agent and Add…" names the dialog it opens: use its translation.' }))
   const fromTemplate = async (keyboard: boolean): Promise<void> => {
     const at = caret.current && below(caret.current)
     const all = await templatesStillHere(project.path)
@@ -1004,7 +1004,7 @@ export function SessionToolbar({ project, view }: { project: ProjectInfo; view: 
     addMenu.openAt(
       ...below(add.current),
       [
-        { label: tr(CONFIGURE_AGENT), icon: 'settings-gear', disabled: full, detail: full ? agentLimitText(limit, tr) : undefined, onClick: () => set({ addAgentFor: project.path }) },
+        { label: tr(CONFIGURE_AGENT), icon: 'settings-gear', disabled: full, detail: full ? agentLimitText(tr) : undefined, onClick: () => set({ addAgentFor: project.path }) },
         { label: tr(ADD_AGENT), icon: 'add', disabled: full, keybinding: quickKey ? formatKeybinding(quickKey) : undefined, detail: tr(msg({ id: 'panes.add.quickDetail', defaultMessage: 'At once, with your defaults', description: "The detail of + Add ▾'s Add Agent: it adds an agent at once, with the default provider and settings, working in the project folder. Keep it short." })), onClick: () => void actions.quickAddAgent(project.path) },
         ...(assistant
           ? []
@@ -1205,7 +1205,7 @@ export function SessionToolbar({ project, view }: { project: ProjectInfo; view: 
           ))}
         </div>
       )}
-      <Tooltip content={full ? agentLimitText(limit, tr) : tr(msg({ id: 'panes.add.menuTip', defaultMessage: 'Add an agent (Add Agent…: choose its provider, where it works and its settings), or save and load templates', description: "Tooltip of the session toolbar's + Add ▾ button. \"Add Agent…\" is its first menu item: use its translation." }))}>
+      <Tooltip content={full ? agentLimitText(tr) : tr(msg({ id: 'panes.add.menuTip', defaultMessage: 'Add an agent (Add Agent…: choose its provider, where it works and its settings), or save and load templates', description: "Tooltip of the session toolbar's + Add ▾ button. \"Add Agent…\" is its first menu item: use its translation." }))}>
         <button ref={add} className="btn subtle small add-menu" aria-haspopup="menu" aria-expanded={addMenu.shown} aria-label={addIcon ? tr(ADD) : undefined} onClick={(e) => openAdd(e.detail === 0)}>
           <Icon name="add" />
           {!addIcon && ` ${tr(ADD)}`}

@@ -25,18 +25,20 @@ const paired = (n: number): TemplatePair[] => Array.from({ length: n }, (_, i) =
 
 function hive(file: string, name: Msg, description: Msg, layout: PageLayout, agents: TemplateAgent[], suggestedPreset: SuggestedPreset, extra: { pairs?: TemplatePair[]; reviewerMode?: ReviewerMode } = {}): HiveTemplate {
   // Its name in English: what a copy is called before the window's language names it (main names copies in its own).
-  return { file, name, description, template: { version: TEMPLATE_VERSION, name: name.defaultMessage, savedAt: '', layout, description: description.defaultMessage, agents, suggestedPreset, ...extra, workflow: presetWorkflow(suggestedPreset, extra.reviewerMode) } }
+  return { file, name, description, template: { version: TEMPLATE_VERSION, name: name.defaultMessage, savedAt: '', layout, description: description.defaultMessage, agents, suggestedPreset, ...extra, workflow: presetWorkflow(suggestedPreset, extra.reviewerMode, agents.length) } }
 }
 
 /**
  * A preset as a template's sections (HI-1910: Hive's own carry their preset's), for None and Git, with its reviewer
- * mode on Git (Team 6 + pool's pool). Its checks are the preset's for no project (none): loading it into a project
- * makes them that project's (the plan reads the preset as the project's form offers it, `hiveSections`).
+ * mode on Git (Team 6 + pool's pool) and its size as Maximum agents (HI-2001: the team the template is). Its checks are
+ * the preset's for no project (none): loading it into a project makes them that project's (the plan reads the preset as
+ * the project's form offers it, `hiveSections`).
  */
-export function presetWorkflow(id: SuggestedPreset, reviewerMode?: ReviewerMode): TemplateWorkflows {
+export function presetWorkflow(id: SuggestedPreset, reviewerMode?: ReviewerMode, size?: number): TemplateWorkflows {
+  const team = size ? { maxAgents: size } : {}
   return {
-    none: templateWorkflowOf(preset('none', id), id),
-    git: templateWorkflowOf({ ...preset('git', id), ...(reviewerMode ? { reviewerMode } : {}) }, id)
+    none: templateWorkflowOf({ ...preset('none', id), ...team }, id),
+    git: templateWorkflowOf({ ...preset('git', id), ...(reviewerMode ? { reviewerMode } : {}), ...team }, id)
   }
 }
 

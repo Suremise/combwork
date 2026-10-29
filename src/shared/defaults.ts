@@ -1,5 +1,6 @@
 import type { AgentBranchStatus, AgentDef, AppConfig, AppSettings, CompactionEvent, KeybindingOverrides, FileLockMode, PageLayout, PlanLimit, PlanUsage, ProjectConfig, ProjectProviderConfig, ProviderId, ProviderSettings, SessionLayout, SessionRecord, SessionStatus, SessionView, WorkspaceConfig } from './types'
 import { CLAUDE_CODE } from './claude'
+import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from './agentLimits'
 import { DEFAULT_COLUMN_COLORS } from './tasks'
 import { formatDateTime } from './dates'
 import { formatGigabytes, formatSize } from './units'
@@ -170,32 +171,32 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
 /** The transcript viewer loads this many items at a time (the latest first, earlier ones as you scroll up). */
 export const TRANSCRIPT_WINDOW = 200
 
-/**
- * How many agents a project can have (#562): Settings → Advanced → Agents per project (`hive.agents.perProject`, a
- * workspace can set its own), this by default and at most AGENT_LIMIT_MAX. Read it with `agentLimit()` (main, per project)
- * or `useAgentLimit()` (renderer), never a constant.
- */
-export const AGENT_LIMIT_DEFAULT = 12
-/** The most the setting allows (Darren, 11 Oct: four pages of six; more than that should be another project). Templates hold at most this many. */
-export const AGENT_LIMIT_MAX = 24
-/** Why another agent can't be added: the project has `limit` already. */
-export const agentLimitText = (limit: number, tr?: Tr): string =>
+export { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX }
+/** Why the user can't add another agent by hand: the project has AGENT_LIMIT_MAX already. */
+export const agentLimitText = (tr?: Tr): string =>
   tr
-    ? tr(msg({ id: 'agents.limit.reached', defaultMessage: 'A project can have up to {limit} agents (Settings → Advanced → Agents per project).', description: "Why another agent can't be added to a project. {limit} is a number; \"Settings → Advanced → Agents per project\" is where the setting is: use its translated names." }), { limit })
-    : `A project can have up to ${limit} agents (Settings → Advanced → Agents per project).` // i18n-ignore: English for main's error (the window passes tr)
+    ? tr(msg({ id: 'agents.limit.most', defaultMessage: 'A project can have up to {most, number} agents.', description: "Why another agent can't be added to a project: it has as many as Hive allows ({most}, 24)." }), { most: AGENT_LIMIT_MAX })
+    : `A project can have up to ${AGENT_LIMIT_MAX} agents.` // i18n-ignore: English for main's error (the window passes tr)
+/**
+ * Why the Assistant or the Agent API can't add another agent (HI-2001): the project's workflow allows `max` (Maximum
+ * agents), and where the user raises it. Only agents read it (the user's own adds go past it), so it stays English.
+ */
+export const agentMaxText = (max: number): string =>
+  `This project's workflow sets Maximum agents to ${max}, the user's team size, and the project has that many. Only the user goes past it: ask them to add the agent themselves, or to raise Maximum agents in Version Control → Workflow.` // i18n-ignore: English for the Assistant and the Agent API (agents read it)
 /** Memory as the agents note says it: MB, or GB from 1 GB. */
 const memoryText = (n: number): string => (n >= 1024 ** 3 ? formatGigabytes(n) : formatSize(n))
 
 /**
- * Settings → Advanced's note once Agents per project goes over the default (Darren, 11 Oct): what more agents cost, in
+ * The note under Maximum agents (Version Control → Workflow, HI-2001; before, Settings → Advanced's Agents per project)
+ * once it goes over the default (Darren, 11 Oct): what more agents cost, in
  * the machine's own figures (the memory running agents take now, measured; the computer's), and the plans' limits.
  */
 export function manyAgentsNote(m: { running: { agents: number; bytes: number } | null; total: number; free: number }): string {
   const machine = { limit: AGENT_LIMIT_DEFAULT, total: memoryText(m.total), free: memoryText(m.free) }
   if (m.running && m.running.agents > 0) {
-    return trNow(msg({ id: 'agents.limit.manyMeasured', defaultMessage: "More than {limit} agents: each runs its own copy of its CLI. {running, plural, one {Your # running agent takes} other {Your # running agents take}} {used} now (about {each} each); this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.", description: "Settings → Advanced, under Agents per project once it is over the default ({limit}): what more agents cost. {running} agents run now and take {used} of memory ({each} each); {total} and {free} are the computer's memory (\"16.0 GB\")." }), { ...machine, running: m.running.agents, used: memoryText(m.running.bytes), each: memoryText(m.running.bytes / m.running.agents) })
+    return trNow(msg({ id: 'agents.limit.manyMeasured', defaultMessage: "More than {limit} agents: each runs its own copy of its CLI. {running, plural, one {Your # running agent takes} other {Your # running agents take}} {used} now (about {each} each); this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.", description: "Version Control → Workflow, under Maximum agents once it is over the default ({limit}): what more agents cost. {running} agents run now and take {used} of memory ({each} each); {total} and {free} are the computer's memory (\"16.0 GB\")." }), { ...machine, running: m.running.agents, used: memoryText(m.running.bytes), each: memoryText(m.running.bytes / m.running.agents) })
   }
-  return trNow(msg({ id: 'agents.limit.many', defaultMessage: "More than {limit} agents: each runs its own copy of its CLI, roughly 200–500 MB of memory each; this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.", description: "Settings → Advanced, under Agents per project once it is over the default ({limit}): what more agents cost. {total} and {free} are the computer's memory (\"16.0 GB\")." }), machine)
+  return trNow(msg({ id: 'agents.limit.many', defaultMessage: "More than {limit} agents: each runs its own copy of its CLI, roughly 200–500 MB of memory each; this computer has {total} of memory, {free} free. They all share your plans' usage limits, so they reach them sooner.", description: "Version Control → Workflow, under Maximum agents once it is over the default ({limit}): what more agents cost. {total} and {free} are the computer's memory (\"16.0 GB\")." }), machine)
 }
 /** An agent's role (#126) is at most this long. */
 export const ROLE_MAX = 60

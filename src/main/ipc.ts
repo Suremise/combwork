@@ -1059,7 +1059,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'session:planAttach': (p, sources, agentId) => sessions.planAttach(p, sources, agentId),
     'session:attach': (p, sources, agentId) => sessions.attach(p, sources, agentId),
 
-    'agents:add': (p, opts) => projectAgents.addAgent(p, opts),
+    // The user's own add (HI-2001): up to the most a project can have, past the workflow's Maximum agents.
+    'agents:add': (p, opts) => projectAgents.addAgent(p, opts, 'user'),
     'agents:testLegacy': (p, opts) => {
       if (app.isPackaged) throw new Error('agents:testLegacy is for test copies') // i18n-ignore: a test channel, never shown
       return projectAgents.addLegacyAgent(p, opts)
@@ -1089,7 +1090,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'templates:save': (p, scope, name, overwrite, usePatterns, includeWorkflow) => templates.saveTemplate(p, scope, name, overwrite, usePatterns === true, includeWorkflow !== false),
     'templates:plan': (p, scope, file, from, names) => templates.templatePlan(p, scope, file, from, names),
     'templates:load': (p, scope, file, expected, from, names, connections) => templates.loadTemplate(p, scope, file, expected, from, names, connections),
-    'templates:addAgent': (p, scope, file, index, from, name) => templates.addAgentFromTemplate(p, scope, file, index, from, name),
+    'templates:addAgent': (p, scope, file, index, from, name) => templates.addAgentFromTemplate(p, scope, file, index, from, name, 'user'),
     'templates:all': () => templates.listAllTemplates(),
     'templates:rename': (ref, name) => templates.renameTemplate(ref, name),
     'templates:update': (ref, edited, savedAt) => templates.updateTemplate(ref, edited, savedAt),

@@ -110,6 +110,7 @@ interface HiveMessageValues {
   'assistant.journal.yesterday': undefined
   'assistant.loadNames.blocked': undefined
   'assistant.loadNames.filledNote': { count: number; names: string | number; projects: string | number }
+  'assistant.loadNames.raiseMax': { now: number; needs: number }
   'assistant.loadNames.sameTwice': undefined
   'assistant.loadNames.taken': { project: string | number; name: string | number }
   'assistant.mcpSecret.argument': { start: string | number }
@@ -476,7 +477,6 @@ interface HiveMessageValues {
   'assistant.template.notTemplate': undefined
   'assistant.template.sameName': { name: string | number }
   'assistant.template.tooMany': { count: string | number; max: string | number }
-  'assistant.template.tooManyHere': { count: string | number; limit: string | number }
   'assistant.templateLoad.afterLoad': { removed: string }
   'assistant.templateLoad.createdHeading': undefined
   'assistant.templateLoad.createdLine': { name: string | number; hasRole: string; role: string | number; replaces: string; provider: string | number; settings: string | number }
@@ -582,7 +582,7 @@ interface HiveMessageValues {
   'assistant.templates.exportFailed': undefined
   'assistant.templates.exported': undefined
   'assistant.templates.exportedDetail': undefined
-  'assistant.templates.fullTip': { limit: string | number }
+  'assistant.templates.fullTip': { limit: number }
   'assistant.templates.gone': undefined
   'assistant.templates.hive': undefined
   'assistant.templates.hiveSummary': { count: number; layout: string | number }

@@ -9,6 +9,7 @@ import { msg, type Msg } from '../i18n/msg'
 import type { PlatformId } from '../platform/descriptors'
 import type { FileLockMode } from '../types'
 import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from '../loopLimits'
+import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX } from '../agentLimits'
 import type { StageId } from './facts'
 import type { ReviewerMode } from './roles'
 
@@ -124,6 +125,12 @@ export interface WorkflowOptions {
   loopStepWaitMinutes?: number
   /** File locks between agents in the same folder, outside a slot (HI-1766, before 1.0 Settings → Agents). */
   fileLocks?: FileLockMode
+  /**
+   * Maximum agents (HI-2001, before Settings → Advanced → Agents per project): the user's team size, the most agents the
+   * Assistant and the Agent API add to the project (the user adds more by hand, up to AGENT_LIMIT_MAX). Resolved like the
+   * preferences and not a rule, but set by the presets and All off (`PRESET_PREFERENCES`), never making them Custom.
+   */
+  maxAgents?: number
 }
 
 /** G20's picker and runner, in `commands` (HI-1367): reserved names, never a check's. */
@@ -135,14 +142,23 @@ export const NAME_OPTIONS: readonly OptionKey[] = ['stageNames']
 
 /**
  * How agents work together, not rules (HI-1766): left out of every ruleset (so a change applies at once and marks
- * nothing "old rules"), never set by a preset or All off, never making the options Custom. A lane keeps the rounds and
- * wait it registered with.
+ * nothing "old rules"), never set by a preset or All off (but Maximum agents, `PRESET_PREFERENCES`), never making the
+ * options Custom. A lane keeps the rounds and wait it registered with.
  */
-export const PREFERENCE_OPTIONS = ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes', 'fileLocks'] as const satisfies readonly OptionKey[]
+export const PREFERENCE_OPTIONS = ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes', 'fileLocks', 'maxAgents'] as const satisfies readonly OptionKey[]
 export type PreferenceKey = (typeof PREFERENCE_OPTIONS)[number]
 
+/**
+ * The preferences a preset and All off do set (HI-2001): Maximum agents, the team each is for. They still never make
+ * the options Custom: a team of another size works the same way.
+ */
+export const PRESET_PREFERENCES: readonly OptionKey[] = ['maxAgents']
+
 /** The options no preset sets (names and preferences): a choice of preset keeps a project's or level's own. */
-export const UNPRESET_OPTIONS: readonly OptionKey[] = [...NAME_OPTIONS, ...PREFERENCE_OPTIONS]
+export const UNPRESET_OPTIONS: readonly OptionKey[] = [...NAME_OPTIONS, ...PREFERENCE_OPTIONS.filter((k) => !PRESET_PREFERENCES.includes(k))]
+
+/** The options that never make a preset Custom: the names and every preference, Maximum agents too. */
+const NOT_CUSTOM: readonly OptionKey[] = [...NAME_OPTIONS, ...PREFERENCE_OPTIONS]
 
 /** A preset's or All off's own options, with the draft's own names and preferences kept (HI-1766, #1417). */
 export function withUnpreset(chosen: Partial<WorkflowOptions>, own: Partial<WorkflowOptions>): Partial<WorkflowOptions> {
@@ -199,7 +215,8 @@ const BASE: Omit<WorkflowOptions, 'platform'> = {
   sharedFolderWarning: false,
   reviewerMode: 'lane',
   excluded: ['node_modules', '.venv'],
-  commands: {}
+  commands: {},
+  maxAgents: AGENT_LIMIT_DEFAULT
 }
 
 /**
@@ -218,6 +235,12 @@ export function allOff(platform: PlatformId): WorkflowOptions {
 export const reviewerModeOf = (o: Pick<WorkflowOptions, 'reviewerMode'>): ReviewerMode => o.reviewerMode ?? 'lane'
 
 /**
+ * Each preset's Maximum agents (HI-2001, Darren's decision): the team it describes. Solo is one agent, Pair a builder
+ * and a reviewer, Team (and All off, `BASE`) the default of 12.
+ */
+export const PRESET_TEAM: Record<PresetId, number> = { solo: 1, pair: 2, pairAgent: 2, team: AGENT_LIMIT_DEFAULT }
+
+/**
  * The presets (§16.6.3, OP-3). `quick` and `tests` are the project's suggested check names (OP-24: suggested from its
  * scripts, never guessed silently), passed in by whoever offers the preset.
  */
@@ -226,12 +249,12 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
   // The commands of the checks it names (§16.13: a run counts as a check only as its command).
   const commandsOf = (names: string[]): Record<string, string> => Object.fromEntries(names.filter((n) => checks.commands?.[n]).map((n) => [n, checks.commands![n]]))
   if (platform === 'none') {
-    const solo: WorkflowOptions = { ...allOff('none'), dependenciesDone: true }
+    const solo: WorkflowOptions = { ...allOff('none'), dependenciesDone: true, maxAgents: PRESET_TEAM.solo }
     if (id === 'solo') return solo
-    if (id === 'pair' || id === 'pairAgent') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick, commands: commandsOf(checks.quick) }
-    return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests, commands: commandsOf(quickAndTests) }
+    if (id === 'pair' || id === 'pairAgent') return { ...solo, review: 'agent', noSelfReview: true, preChecks: checks.quick, commands: commandsOf(checks.quick), maxAgents: PRESET_TEAM.pair }
+    return { ...solo, review: 'agentThenYou', noSelfReview: true, preChecks: quickAndTests, commands: commandsOf(quickAndTests), maxAgents: PRESET_TEAM.team }
   }
-  if (id === 'solo') return { ...allOff('git'), finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true }
+  if (id === 'solo') return { ...allOff('git'), finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true, maxAgents: PRESET_TEAM.solo }
   // §16.19.1: a reviewer agent, the agent merges (merge-ready, then reported), each card in the agent's worktree, the
   // quick checks before review; the repository's default branch as the target.
   if (id === 'pairAgent')
@@ -248,7 +271,8 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
       dependenciesDone: true,
       slotsUpToDate: true,
       reviewerMode: 'lane',
-      commands: commandsOf(checks.quick)
+      commands: commandsOf(checks.quick),
+      maxAgents: PRESET_TEAM.pairAgent
     }
   // §16.6.3's Pair (#1355, at its full values since P7: #1445): Hive merges with the quick checks on the merged result,
   // each card in a slot brought up to date before it (G15), one reviewer per lane (G17). The target is the repository's
@@ -269,7 +293,8 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
     dependenciesDone: true,
     slotsUpToDate: true,
     reviewerMode: 'lane',
-    commands: commandsOf(checks.quick)
+    commands: commandsOf(checks.quick),
+    maxAgents: PRESET_TEAM.pair
   }
   if (id === 'pair') return pair
   // Team (#1361, Darren's point 1 on #1121): as Pair, with the unit tests too before review and on the merged result,
@@ -277,7 +302,7 @@ export function preset(platform: PlatformId, id: PresetId, checks: PresetInputs 
   // why), installed from scratch before every merge, and your OK for cards labelled ui or release. G15 and G17 as Pair's:
   // slots up to date, one reviewer per lane (a pool is the Team 6 + pool template's choice, §16.6.3).
   const focused = checks.focused?.run ? { [FOCUSED_RUN]: checks.focused.run, ...(checks.focused.pick ? { [FOCUSED_PICK]: checks.focused.pick } : {}) } : null
-  return { ...pair, preChecks: quickAndTests, mergeChecks: quickAndTests, mergeInstall: 'always', focusedTests: !!focused, okBefore: { mode: 'labels', labels: ['ui', 'release'] }, commands: { ...commandsOf(quickAndTests), ...focused } }
+  return { ...pair, preChecks: quickAndTests, mergeChecks: quickAndTests, mergeInstall: 'always', focusedTests: !!focused, okBefore: { mode: 'labels', labels: ['ui', 'release'] }, commands: { ...commandsOf(quickAndTests), ...focused }, maxAgents: PRESET_TEAM.team }
 }
 
 /** Why a combination of options can't be saved (§16.5.4's contradictions), each a whole sentence. */
@@ -425,7 +450,8 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   loopRounds: whole(LANE_MAX_ROUNDS),
   loopWaitHours: whole(LOOP_WAIT_MAX_HOURS),
   loopStepWaitMinutes: whole(LOOP_STEP_WAIT_MAX_MINUTES),
-  fileLocks: oneOf<FileLockMode>(['off', 'warn', 'block', 'ask'])
+  fileLocks: oneOf<FileLockMode>(['off', 'warn', 'block', 'ask']),
+  maxAgents: whole(AGENT_LIMIT_MAX)
 }
 
 /** The stage ids a project may name (N5), as stages.ts orders them (kept here so options.ts needs nothing of it). */
@@ -438,17 +464,18 @@ export const takesOption = (key: string, v: unknown): boolean => Object.hasOwn(O
 const LOOP_OPTIONS: OptionKey[] = ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes']
 
 /** The Workflow section's groups (#1418), each a heading with its options. */
-export type FormGroupId = 'review' | 'checks' | 'merging' | 'where' | 'work' | 'loops' | 'stages'
+export type FormGroupId = 'team' | 'review' | 'checks' | 'merging' | 'where' | 'work' | 'loops' | 'stages'
 
 /**
  * The Workflow section's groups for a platform, in order, and their options (SPEC §16.6.1, §16.6.2; #1418). Since P7
  * (#1445) Git's has every option: G17 beside G1b under Review, G15 under Where cards are built. The check commands
  * (`commands`) are edited with the checks that name them. File locks (N7) and Card loops are options of both since
- * HI-1766. Some rows show only where they apply (`formShows`). The slot and copy options aren't workflow
+ * HI-1766, and Maximum agents (HI-2001) heads both. Some rows show only where they apply (`formShows`). The slot and copy options aren't workflow
  * options (project.json `slots` and `copies`): the tab's Slots and copies group, beside these.
  */
 export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionKey[] }[]> = {
   git: [
+    { id: 'team', options: ['maxAgents'] },
     { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
     { id: 'checks', options: ['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall'] },
     { id: 'merging', options: ['finish', 'style', 'target', 'strict', 'pushTarget', 'commitMessage', 'dependenciesDone'] },
@@ -457,6 +484,7 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
     { id: 'stages', options: ['stageNames'] }
   ],
   none: [
+    { id: 'team', options: ['maxAgents'] },
     { id: 'review', options: ['review', 'noSelfReview'] },
     { id: 'checks', options: ['preChecks'] },
     { id: 'work', options: ['excluded', 'dependenciesDone', 'fileLocks'] },
@@ -467,11 +495,11 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
 
 /**
  * The rule options the form edits for a platform, in its order (the names, N5, and the preferences, HI-1766, aren't rules:
- * a preset leaves them, and they never make the options Custom).
+ * a preset leaves them, and they never make the options Custom; nor does Maximum agents, which a preset sets: HI-2001).
  */
 export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
-  git: FORM_GROUPS.git.flatMap((g) => g.options).filter((k) => !UNPRESET_OPTIONS.includes(k)),
-  none: FORM_GROUPS.none.flatMap((g) => g.options).filter((k) => !UNPRESET_OPTIONS.includes(k))
+  git: FORM_GROUPS.git.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k)),
+  none: FORM_GROUPS.none.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k))
 }
 
 /**

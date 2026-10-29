@@ -4,7 +4,7 @@ import { join, resolve } from 'path'
 import { parse, TYPE, type MessageFormatElement } from '@formatjs/icu-messageformat-parser'
 import { PSEUDO_LANGUAGE } from '../../src/shared/i18n/languages'
 import { setLanguage, setProblemReporter, tr, type Msg } from '../../src/shared/i18n'
-import { isAgentTemplate, readTemplate, shownProblem, templateLimitText } from '../../src/shared/templates'
+import { isAgentTemplate, readTemplate, shownProblem } from '../../src/shared/templates'
 import { englishText, shownText, type Text } from '../../src/shared/advanced'
 import { templateAgentParts, templateLoadDetail, templateLoadView } from '../../src/shared/templateLoad'
 import { findSecretWarnings } from '../../src/main/mcpSecrets'
@@ -105,8 +105,7 @@ describe('what Hive works out in shared code is in the language when it is worke
     const cases: [Text, string][] = [
       [problem('nope'), "It isn't a Hive agent template."],
       [problem({ version: 2, name: 'T', agents: [{ name: 'A', provider: 42 }] }), "A's coding agent isn't one Hive can use (none)."],
-      [problem({ version: 2, name: 'T', agents: [{ name: 'A', provider: 'claude-code', effort: 'x y' }] }), "A's effort isn't one Hive can use."],
-      [templateLimitText(24, 12), 'It has 24 agents, and this project can have up to 12 (Settings → Advanced → Agents per project).']
+      [problem({ version: 2, name: 'T', agents: [{ name: 'A', provider: 'claude-code', effort: 'x y' }] }), "A's effort isn't one Hive can use."]
     ]
     for (const [t, english] of cases) expect(shownText(t)).toBe(english)
     const empty = problem({ version: 2, name: 'T', agents: [] })

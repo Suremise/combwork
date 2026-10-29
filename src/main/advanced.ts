@@ -284,6 +284,15 @@ export class AdvancedStore {
     return LEGACY_ADVANCED.has(id) ? this.values[id] : undefined
   }
 
+  /** Drops a setting kept in advanced.json (LEGACY_ADVANCED) once it has moved (HI-2001); nothing while the file can't be read. */
+  dropLegacy(id: string): Promise<void> {
+    return this.serial(async () => {
+      if (!LEGACY_ADVANCED.has(id) || !(id in this.values) || this.fileError) return
+      const { [id]: _gone, ...values } = this.values
+      await this.write(values, this.madeFor)
+    })
+  }
+
   resetAll(): Promise<void> {
     return this.serial(async () => {
       if (this.fileError) throw hiveError(msg({ id: 'service.advanced.fixOrDelete', defaultMessage: '{problem} Fix or delete advanced.json first (Settings → Advanced → Open advanced.json).', description: "An error resetting every advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() }, { kind: 'conflict' })

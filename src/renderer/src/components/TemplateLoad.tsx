@@ -25,10 +25,11 @@ const M = {
   sameTwice: msg({ id: 'assistant.loadNames.sameTwice', defaultMessage: 'Another of its agents has this name.', description: "Load template, under a name box: another of the template's agents is given the same name." }),
   taken: msg({ id: 'assistant.loadNames.taken', defaultMessage: '{project} has an agent called {name}.', description: 'Load template, under a name box: an agent of another project has that name.' }),
   blocked: msg({ id: 'assistant.loadNames.blocked', defaultMessage: 'Agent names are unique across the workspace: change the marked names first.', description: "Load template: why its button can't be used yet." }),
+  raise: msg({ id: 'assistant.loadNames.raiseMax', defaultMessage: 'Also raise Maximum agents from {now, number} to {needs, number} (opens Version Control → Workflow with it set, to save there)', description: "Load template (HI-2001), a tick box: the template has more agents ({needs}) than the project's workflow option Maximum agents ({now}); ticked, the project's Version Control tab opens at Workflow with Maximum agents set to {needs}, not saved. Version Control → Workflow: use the translated names." }),
   takenNote: msg({ id: 'assistant.loadNames.filledNote', defaultMessage: 'Agent names are unique across the workspace, and {count, plural, one {this name is} other {these names are}} taken already: {names} (projects: {projects}). {count, plural, one {A free name is} other {Free names are}} filled in below. Change any name you like.', description: "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them. Each sentence whole, the verb never agreeing with a list (HI-1585: glossary §1 rules 3 and 4)." })
 }
 
-export function TemplateLoadNames({ path, scope, file, from, initial, onChange, onConnections, onWorkflow, onSetUpGit, onPlan }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void; onConnections?: (choices: Record<number, string | null>) => void; onWorkflow?: (apply: boolean) => void; onSetUpGit?: () => void; onPlan?: (plan: TemplateLoadPlan) => void }) {
+export function TemplateLoadNames({ path, scope, file, from, initial, onChange, onConnections, onWorkflow, onRaise, onSetUpGit, onPlan }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void; onConnections?: (choices: Record<number, string | null>) => void; onWorkflow?: (apply: boolean) => void; onRaise?: (raise: boolean) => void; onSetUpGit?: () => void; onPlan?: (plan: TemplateLoadPlan) => void }) {
   const project = useStore((s) => s.workspace?.projects.find((p) => p.path === path) ?? null)
   const projects = useStore((s) => s.workspace?.projects)
   const settings = useStore((s) => s.settings)
@@ -68,6 +69,13 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange, 
   // Its workflow applied, unless unticked (HI-1910).
   const [apply, setApply] = useState(true)
   useEffect(() => onWorkflow?.(apply), [apply, onWorkflow])
+  // More agents than its Maximum agents (HI-2001): the load goes ahead, and raising it is offered, on unless unticked.
+  // Not where the workflow applied already raises it that far.
+  const [raise, setRaise] = useState(true)
+  const over = plan.maxAgents
+  const sectionMax = apply && plan.workflow?.section ? plan.workflow.section.options.maxAgents : undefined
+  const offerRaise = !!over && !(sectionMax !== undefined && sectionMax >= over.needs)
+  useEffect(() => onRaise?.(offerRaise && raise), [offerRaise, raise, onRaise])
   const blocked = problems.some(Boolean) ? tr(M.blocked) : (planError ?? workflowBlocks(plan.workflow, apply))
   const key = names.join('\n')
   useEffect(() => onChange(key.split('\n')), [key, onChange])
@@ -112,6 +120,11 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange, 
       />
       {planError && <div className="field-error">{planError}</div>}
       {plan.workflow && <TemplateLoadWorkflowPart workflow={plan.workflow} apply={apply} onApply={setApply} onSetUpGit={() => onSetUpGit?.()} />}
+      {offerRaise && (
+        <label className="flex template-workflow-apply">
+          <input type="checkbox" checked={raise} data-raise-max="" onChange={(e) => setRaise(e.target.checked)} /> {tr(M.raise, { now: over!.now, needs: over!.needs })}
+        </label>
+      )}
     </>
   )
 }

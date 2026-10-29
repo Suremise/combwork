@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
 import { existsSync } from 'original-fs'
 import { basename, dirname, join } from 'path'
-import { ROLE_MAX, SESSION_LAYOUTS, agentLimitText, agentPtyKey, layoutPanes, mergeBlocked, moveAgentTo, projectAgents, projectLayout, slugify, swapAgentsIn } from '../shared/defaults'
+import { AGENT_LIMIT_MAX, ROLE_MAX, SESSION_LAYOUTS, agentLimitText, agentMaxText, agentPtyKey, layoutPanes, mergeBlocked, moveAgentTo, projectAgents, projectLayout, slugify, swapAgentsIn } from '../shared/defaults'
 import { orderByCells, placedCells } from '../shared/paneCells'
 import { forgetPtys } from './ptyHost'
 import { agentProvider, defaultProviderPending, isKnownProvider } from '../shared/providers'
@@ -31,8 +31,7 @@ import { assertConnectionHere, connectionProblem } from './accounts'
 import { assertNameFree, withAgentNames, workspaceAgents } from './agentNames'
 import { sameAgentName } from '../shared/agentNames'
 import { chooseSpace, hiveBranch, reusableBranches, type BranchHome } from '../shared/hiveBranches'
-import { AGENTS_PER_PROJECT } from '../shared/advanced'
-import { advanced } from './advanced'
+import { projectPreferences } from './workflow/preferences'
 import { legacyWorktree } from './agentFolders'
 import { legacySetupPending } from '../shared/agentFolders'
 
@@ -131,19 +130,32 @@ export function pendingSetupPatch(now: ProjectConfig, change: { add?: string[]; 
 }
 
 /**
- * How many agents this project can have (#562): its workspace's own Agents per project, else Settings → Advanced's, else
- * 12. Read afresh each time (under the project's lock too), so a change applies at once.
+ * The project's Maximum agents (HI-2001): its workflow option, the user's team size (Hive's, the workspace's, then its
+ * own; 12 when none sets it). Read afresh each time (under the project's lock too), so a change applies at once.
  */
-export function agentLimit(projectPath: string): number {
-  return advanced.get<number>(AGENTS_PER_PROJECT, workspaceOf(projectPath).config.advanced)
+export function agentMax(projectPath: string, cfg?: Pick<ProjectConfig, 'workflow' | 'platform'> | null): number {
+  return projectPreferences(workspaceOf(projectPath), projectPath, cfg).maxAgents
 }
 
-export async function addAgent(projectPath: string, opts: AddAgentOptions): Promise<AddedAgent> {
+/**
+ * Who adds an agent (HI-2001): the user by hand (the window), up to AGENT_LIMIT_MAX whatever Maximum agents is; or an
+ * agent, the Assistant or a program through the Agent API, up to the project's Maximum agents.
+ */
+export type AddedBy = 'user' | 'agent'
+
+/** Why `by` can't add another agent to a project that has `count` (`max`: its Maximum agents), or null when it can. */
+function noRoom(count: number, max: number, by: AddedBy): HiveError | null {
+  if (count >= AGENT_LIMIT_MAX) return helperError((t) => agentLimitText(t))
+  if (by === 'agent' && count >= max) return new HiveError({ lines: [agentMaxText(max)] }, { kind: 'conflict' })
+  return null
+}
+
+export async function addAgent(projectPath: string, opts: AddAgentOptions, by: AddedBy = 'agent'): Promise<AddedAgent> {
   projectPath = workspace.assertProject(projectPath)
   const cfg = await workspace.projectConfig(projectPath)
   const agents = projectAgents(cfg)
-  const limit = agentLimit(projectPath)
-  if (agents.length >= limit) throw helperError((t) => agentLimitText(limit, t))
+  const full = noRoom(agents.length, agentMax(projectPath, cfg), by)
+  if (full) throw full
   // Unique across the workspace (#702): the default "Agent n" too, numbered past the other projects' names.
   const everyone = await workspaceAgents(projectPath)
   let n = agents.length + 1
@@ -158,9 +170,9 @@ export async function addAgent(projectPath: string, opts: AddAgentOptions): Prom
       await assertNameFree(projectPath, name)
       await workspace.mutateProjectConfig(projectPath, (now) => {
         const list = projectAgents(now)
-        // The limit as it is now: Settings may have lowered it since the check above.
-        const max = agentLimit(projectPath)
-        if (list.length >= max) throw helperError((t) => agentLimitText(max, t))
+        // Maximum agents as it is now: the workflow may have lowered it since the check above.
+        const room = noRoom(list.length, agentMax(projectPath, now), by)
+        if (room) throw room
         if (list.some((a) => sameAgentName(a.name, name))) throw hiveError(msg({ id: 'worktrees.agent.nameTaken', defaultMessage: 'There is already an agent called "{name}".', description: 'An error: the project already has an agent with the name {name}.' }), { name }, { kind: 'conflict' })
         // Its connection as it is now (HI-1769): turned off or removed while it was being prepared, it isn't added.
         if (def.connection) assertConnectionHere(def.connection, def.provider!, projectPath, name)

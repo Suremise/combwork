@@ -4,14 +4,15 @@
 // Main reads them with workflow/preferences.ts; the window from the levels it has.
 
 import { LOOP_ROUNDS, LOOP_STEP_WAIT_MINUTES, LOOP_WAIT_HOURS } from '../loopLimits'
+import { AGENT_LIMIT_DEFAULT } from '../agentLimits'
 import type { PlatformId } from '../platform/descriptors'
 import type { ProjectConfig, WorkflowDefaults, WorkflowOptionOrigin } from '../types'
 import { PREFERENCE_OPTIONS, takesOption, type PreferenceKey, type WorkflowOptions } from './options'
 
 export type Preferences = Required<Pick<WorkflowOptions, PreferenceKey>>
 
-/** Each preference when no level sets it: as before 1.0's settings (wakes on, 10 rounds, 6 h, 30 min, Block). */
-export const PREFERENCE_DEFAULTS: Preferences = { loopWakes: true, loopRounds: LOOP_ROUNDS, loopWaitHours: LOOP_WAIT_HOURS, loopStepWaitMinutes: LOOP_STEP_WAIT_MINUTES, fileLocks: 'block' }
+/** Each preference when no level sets it: as before 1.0's settings (wakes on, 10 rounds, 6 h, 30 min, Block, 12 agents). */
+export const PREFERENCE_DEFAULTS: Preferences = { loopWakes: true, loopRounds: LOOP_ROUNDS, loopWaitHours: LOOP_WAIT_HOURS, loopStepWaitMinutes: LOOP_STEP_WAIT_MINUTES, fileLocks: 'block', maxAgents: AGENT_LIMIT_DEFAULT }
 
 /** The levels a project's preferences come from: Hive's and the workspace's defaults, and its own options. */
 export interface PreferenceLevels {
@@ -129,16 +130,42 @@ export function projectOwnPreferences(platform: PlatformId, cfg: Pick<ProjectCon
 }
 
 /**
- * A workspace.json as read, its card loop rounds and wait (`loops`) moved into its workflow defaults for None and Git,
- * each where that level doesn't set it already. Pure; the file changes when it is next saved.
+ * Settings → Advanced → Agents per project (`hive.agents.perProject`, #562) before HI-2001: Hive's (advanced.json, kept
+ * there as LEGACY_ADVANCED until main moves it) and a workspace's own (workspace.json's `advanced`). Each becomes its
+ * level's Maximum agents, for None and Git.
+ */
+export const AGENTS_PER_PROJECT = 'hive.agents.perProject'
+
+/**
+ * Workflow defaults (Hive's or a workspace's) with old values each platform's lacks: a value a level already sets wins.
+ * Pure: the caller writes it where it belongs.
+ */
+export function withOldDefaults(levels: WorkflowDefaults | null | undefined, old: Partial<WorkflowOptions>): WorkflowDefaults {
+  const out: WorkflowDefaults = { ...levels }
+  for (const p of ['none', 'git'] as const) out[p] = withMissing(levels?.[p], old)
+  return out
+}
+
+/**
+ * A workspace.json as read, its card loop rounds and wait (`loops`) and its own Agents per project (HI-2001) moved into
+ * its workflow defaults for None and Git, each where that level doesn't set it already. Pure; the file changes when it
+ * is next saved.
  */
 export function migrateWorkspacePreferences<T extends Record<string, any>>(raw: T): T {
-  if (!raw || typeof raw !== 'object' || !('loops' in raw)) return raw
+  const ownAdvanced = raw && typeof raw === 'object' && raw.advanced && typeof raw.advanced === 'object' && !Array.isArray(raw.advanced) ? (raw.advanced as Record<string, unknown>) : null
+  const perProject = !!ownAdvanced && AGENTS_PER_PROJECT in ownAdvanced
+  if (!raw || typeof raw !== 'object' || (!('loops' in raw) && !perProject)) return raw
   const { loops, ...rest } = raw as Record<string, any>
   const old: Partial<WorkflowOptions> = {}
   if (loops && typeof loops === 'object') {
     if (takesOption('loopRounds', loops.rounds)) old.loopRounds = loops.rounds
     if (takesOption('loopWaitHours', loops.waitHours)) old.loopWaitHours = loops.waitHours
+  }
+  // Its own Agents per project (Settings → Advanced, This workspace), Maximum agents since HI-2001.
+  if (perProject) {
+    const { [AGENTS_PER_PROJECT]: n, ...others } = ownAdvanced!
+    if (takesOption('maxAgents', n)) old.maxAgents = n as number
+    rest.advanced = others
   }
   if (!Object.keys(old).length) return rest as T
   const levels = rest.workflow && typeof rest.workflow === 'object' && !Array.isArray(rest.workflow) ? (rest.workflow as WorkflowDefaults) : {}

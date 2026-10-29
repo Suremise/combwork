@@ -602,7 +602,7 @@ export interface HiveRequests {
   /** Attaches files to the agent's running session: copies those planAttach says into .hive/attachments/<sessionId>; the paths to paste. */
   'session:attach': (projectPath: string, sources: string[], agentId?: string) => Attached[]
 
-  /** Adds an agent to the project (up to Agents per project, #562), creating its worktree if asked, or reusing one (#456: `reuse` says how). */
+  /** Adds an agent to the project (the user's: up to 24, past Maximum agents, #562, HI-2001), creating its worktree if asked, or reusing one (#456: `reuse` says how). */
   'agents:add': (projectPath: string, opts: AddAgentOptions) => AddedAgent
   /** Test copies only (#1451): an agent with a 0.9 worktree of its own, as an upgraded project has (1.0 adds none). */
   'agents:testLegacy': (projectPath: string, opts: AddAgentOptions) => AgentDef

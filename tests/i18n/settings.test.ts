@@ -190,7 +190,6 @@ describe("Settings → Advanced's text", () => {
     expect(advancedShown(reply, 300)).toBe('300 s')
     expect(advancedShown(advancedDef('hive.progress.lanesShown')!, 1)).toBe('1 lane')
     expect(advancedShown(advancedDef('hive.progress.lanesShown')!, 4)).toBe('4 lanes')
-    expect(advancedShown(advancedDef('hive.agents.perProject')!, 12)).toBe('12 agents')
     expect(advancedShown(advancedDef('hive.showDeveloperFeatures')!, true)).toBe('on')
     pseudo()
     expect(advancedShown(advancedDef('hive.progress.lanesShown')!, 4)).toMatch(/^\[4 ļáñéš/)

@@ -46,7 +46,7 @@ const check = (name, ok, extra = '') => {
     await page.locator('.project-row', { hasText: 'alpha' }).first().click()
     await lib.until(async () => (await page.locator('.project-header h1').innerText().catch(() => '')) === 'alpha', HUNG_MS)
     // More than the 12 agents a project has by default (#562).
-    await inv('advanced:set', 'hive.agents.perProject', 24, 'workspace')
+    await lib.setMaxAgents(inv, 24, 'workspace')
     const ids = {}
     for (const name of NAMES) ids[name] = (await lib.addAgent(inv, alpha, { name })).id
     for (const name of ['A', 'B', 'M']) await inv('session:start', alpha, { agentId: ids[name] })

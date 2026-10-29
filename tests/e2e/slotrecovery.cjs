@@ -128,7 +128,7 @@ const git = (dir, ...a) => lib.git(dir, a).trim()
     check('3. …restarted: the claim taken over, B3 placed once in its slot', !!(await until(async () => (await count(c3, 'BuilderPlaced')) === 1 && (await count(c3, 'PlacementClaimed')) === 2 && same((await live(b3.id))?.cwd, st3.folder), HUNG_MS)), JSON.stringify({ kinds: await kinds(c3), live: await live(b3.id) }))
 
     // --- 4. A lane waiting for a slot, through a restart and the rules switched off, starts once a slot is free.
-    await inv('advanced:set', 'hive.agents.perProject', 3)
+    await lib.setMaxAgents(inv, 3)
     const lane4 = await inv('lanes:start', alpha, { builder: b4.id, reviewer: r1.id, cards: [c4], note: 'Keep it small.' })
     check('4. the lane waits for a slot, its agents not started', !!lane4.waitingForSlot && lane4.started.length === 0 && !(await live(b4.id)), JSON.stringify(lane4))
     // An ordinary quit with B3 running in slot-c (card 3's): its run's writer released before Hive quit (HI-1801), so

@@ -57,10 +57,10 @@ export function canonical(v: unknown): string {
  * before P7 keeps its id. G18, pushing the target after a merge (#1179), isn't a rule: the queue reads it as the options
  * are when it pushes, so it is left out whatever its value (a ruleset's options have it off). G19, the merge's commit
  * message (HI-1697), likewise: read as the options are when the queue merges. The preferences (HI-1766: card loops,
- * file locks) aren't rules either: read as the options are when they're used.
+ * file locks; HI-2001: Maximum agents) aren't rules either: read as the options are when they're used.
  */
 export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
-  const { stageNames: _names, reviewerMode, pushTarget: _push, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, fileLocks: _locks, ...rules } = o
+  const { stageNames: _names, reviewerMode, pushTarget: _push, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, fileLocks: _locks, maxAgents: _max, ...rules } = o
   return (reviewerMode === 'pool' ? { ...rules, reviewerMode } : rules) as WorkflowOptions
 }
 

@@ -1355,14 +1355,6 @@
     "defaultMessage": "{title} takes text.",
     "description": "Why an advanced setting's new value isn't taken. {title} is the setting's title."
   },
-  "settings.advanced.hive.agents.perProject.desc": {
-    "defaultMessage": "How many agents a project can have (#562): {usual} unless you need more, up to {most}. Each agent runs its own copy of its CLI, so more agents take more memory, and they all share your plans' usage limits. Lowering it removes no agents: a project with more just can't add another. Templates and the Agent API keep to it too.",
-    "description": "What the advanced setting \"Agents per project\" is for (Settings → Advanced). {usual} and {most} are numbers of agents. #562 is an issue number: keep it."
-  },
-  "settings.advanced.hive.agents.perProject.title": {
-    "defaultMessage": "Agents per project",
-    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
-  },
   "settings.advanced.hive.assistant.startView.desc": {
     "defaultMessage": "While the Hive Assistant's journal is on, Hive gives it a short view of the workspace when it starts and after each compaction: what is under way and waiting, and the journal's recent entries. Turned off, it gets none from its next start or compaction on, a running Assistant too, and reads what it needs with its tools.",
     "description": "What the advanced setting \"The Assistant starts with Hive's start view\" does (Settings → Advanced, under Hive)."
@@ -4084,7 +4076,7 @@
     "description": "A badge on a model in a price table: a model the user added."
   },
   "settings.project.agents.desc": {
-    "defaultMessage": "Up to 12 agents can work on the project at once (up to 24 with Settings → Advanced → Agents per project), each in the project folder or a slot. Agents without their own settings use this project's.",
+    "defaultMessage": "The Assistant adds agents up to the project's Maximum agents (Version Control → Workflow), and you can add more yourself, up to 24, each working in the project folder or a slot. Agents without their own settings use this project's.",
     "description": "What the setting \"Agents\" does, under its title (Project Settings → Agents)."
   },
   "settings.project.agents.title": {

@@ -189,6 +189,7 @@ export const SUITES = [
   { name: 'longsession' },
   { name: 'loopwakes' },
   { name: 'loopwatch' },
+  { name: 'maxagents' },
   { name: 'mcp' },
   { name: 'mcpagents' },
   { name: 'mcpfile' },
