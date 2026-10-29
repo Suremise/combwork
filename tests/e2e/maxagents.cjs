@@ -118,7 +118,9 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     const again = await api('POST', '/v1/projects/solo/agents', { name: 'SO-X' })
     check("…and at 8 the Assistant's add is refused again", again.status === 409 && /Maximum agents to 8/.test(again.body?.error), JSON.stringify(again))
 
-    // --- Lowered in the form, under the agents it has: they all stay, and the row says so.
+    // --- Lowered in the form, under the agents it has: they all stay, and the row says so. Once the save has settled
+    // (the form read again: its box at 8, nothing to save), so the form's reload doesn't replace what is typed.
+    await until(async () => (await box.inputValue()) === '8' && (await page.locator('.workflow-actions [data-action="save"]').isDisabled()))
     await box.fill('2')
     await box.press('Enter')
     const over = row.locator('[data-note="over-max"]')
