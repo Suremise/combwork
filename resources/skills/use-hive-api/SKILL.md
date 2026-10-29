@@ -1,11 +1,13 @@
 ---
 name: use-hive-api
-description: "Call Hive's local HTTP API from a script or tool, or debug a hive tool against it. Use only when automating Hive over HTTP: for ordinary board, notes and handover work the hive tools are enough."
+description: "A hive tool's cases in detail (tools.md), and Hive's HTTP API for scripts. Use when a tool's description isn't enough, or to automate Hive over HTTP: board and notes work uses the tools."
 metadata:
-  audience: agents
+  audience: all
 ---
 
 # Use Hive's API
+
+**A hive tool in detail:** [tools.md](tools.md) has each tool's cases, defaults and mechanics, indexed at its top: read the section you need, then do the work with the tool, not the API.
 
 The hive tools wrap this API. Use HTTP only for what they don't cover: a script, a test harness, an integration, or debugging a tool.
 

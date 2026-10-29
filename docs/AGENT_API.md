@@ -849,6 +849,8 @@ Nothing private is added: no prompt or message text and no setting's value, the 
 
 When **Provide Hive tools to sessions** is on (the default), Hive adds an MCP server named `hive` to every session it starts, whatever its provider. It wraps the API above. Its replies are kept short, since everything a tool returns goes into the agent's context: a change confirms what changed and what the agent can't already know (a new card's number, where a card is now), a listing gives one line per item, and full detail comes from the matching read tool or on request (`hive_list_tasks` with `details: true`, `hive_read_task` with `history: true`, `hive_session_usage` with `days: true`). Structured reads such as `hive_project_status` are compact JSON; notes and handovers are read as their text.
 
+Its tools' descriptions are short too (HI-2012), since every session is given them all: what a tool does and the rule a caller can't guess, at most 300 characters (120 for each parameter's; `tests/e2e/toolLimits.cjs` holds the limits, checked by `replysize`). Each tool's cases, defaults and mechanics are in the bundled `use-hive-api` skill's `tools.md`, which agents and the Assistant read when they need them; this page keeps the routes.
+
 | Tool | Endpoint |
 |---|---|
 | `hive_list_projects` | `GET /v1/projects?view=short`, a line per project |
