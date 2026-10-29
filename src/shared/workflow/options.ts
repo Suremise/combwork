@@ -503,6 +503,21 @@ export const FORM_OPTIONS: Record<PlatformId, OptionKey[]> = {
 }
 
 /**
+ * What a preset's or All off's preview lists for a platform, in the form's order: the rule options, and the preferences
+ * a preset sets (HI-2001: Maximum agents), which never make the options Custom but do change when it is used.
+ */
+export const PREVIEW_OPTIONS: Record<PlatformId, OptionKey[]> = {
+  git: FORM_GROUPS.git.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k) || PRESET_PREFERENCES.includes(k)),
+  none: FORM_GROUPS.none.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k) || PRESET_PREFERENCES.includes(k))
+}
+
+/** A choice's preview (its options) against the options in force: the rows it shows, and those Use would change. */
+export function previewRows(options: WorkflowOptions, effective: WorkflowOptions): { keys: OptionKey[]; changed: OptionKey[] } {
+  const keys = PREVIEW_OPTIONS[options.platform].filter((k) => formShows(k, options))
+  return { keys, changed: keys.filter((k) => JSON.stringify(options[k]) !== JSON.stringify(effective[k])) }
+}
+
+/**
  * Whether the form shows an option's row for these options (#1355, #1418): G9's merge checks only when Hive merges, and
  * its install only when there are merge checks (with none, nothing is installed); G8 only when Hive merges; G16 only
  * with everyone in the project folder (the only place a commit can take in another agent's files).

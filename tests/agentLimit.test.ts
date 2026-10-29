@@ -13,7 +13,7 @@ import { advancedDef, LEGACY_ADVANCED } from '../src/shared/advanced'
 import { AGENT_WATCH_MAX_AGENTS, readSavedAgentCondition } from '../src/shared/agentWatch'
 import { isAgentTemplate, readTemplate } from '../src/shared/templates'
 import { englishText } from '../src/shared/advanced'
-import { allOff, FORM_OPTIONS, PRESET_TEAM, preset, takesOption, withUnpreset } from '../src/shared/workflow/options'
+import { allOff, FORM_OPTIONS, PRESET_TEAM, preset, previewRows, takesOption, withUnpreset } from '../src/shared/workflow/options'
 import { compile, ruleOptions } from '../src/shared/workflow/compile'
 import { AGENTS_PER_PROJECT, migrateWorkspacePreferences, preferencesOf } from '../src/shared/workflow/preferences'
 import { TEMPLATE_CARRIED } from '../src/shared/workflow/templateOptions'
@@ -60,6 +60,21 @@ describe('the option', () => {
     expect(ruleOptions({ ...preset('git', 'team'), maxAgents: 5 })).not.toHaveProperty('maxAgents')
     const id = (o: ReturnType<typeof preset>) => (compile(o) as { ruleset: { id: string } }).ruleset.id
     expect(id({ ...preset('git', 'team'), maxAgents: 3 })).toBe(id(preset('git', 'team')))
+  })
+
+  it("a preset's preview shows the Maximum agents it sets and counts it as a change (HR3's round 1)", () => {
+    for (const platform of ['git', 'none'] as const) {
+      // A project on Solo previewing Team and All off: 1 now, 12 with it.
+      const now = preset(platform, 'solo')
+      for (const choice of [preset(platform, 'team'), allOff(platform)]) {
+        const { keys, changed } = previewRows(choice, now)
+        expect(keys[0], platform).toBe('maxAgents')
+        expect(changed, platform).toContain('maxAgents')
+        expect([choice.maxAgents, now.maxAgents]).toEqual([12, 1])
+      }
+      // The same team: listed, not a change.
+      expect(previewRows(preset(platform, 'solo'), now).changed).not.toContain('maxAgents')
+    }
   })
 
   it('a template carries it (the team it is for)', () => {
@@ -129,6 +144,31 @@ describe('Agents per project becomes Maximum agents', () => {
       await migrateAgentsPerProject()
       expect(config.settings.workflow).toEqual({ git: { maxAgents: 5 }, none: { maxAgents: 18 } })
     } finally {
+      advanced.stop()
+      config.update((c) => void (c.settings.workflow = was))
+    }
+  })
+
+  it("the old value stays in advanced.json until config.json is saved with it, so a failed save loses nothing (HR3's round 1)", async () => {
+    const profile = join(base, 'migrate-fails')
+    mkdirSync(profile, { recursive: true })
+    writeFileSync(join(profile, 'advanced.json'), JSON.stringify({ format: 1, values: { [AGENTS_PER_PROJECT]: 4 } }))
+    const was = config.settings.workflow
+    advanced.load(profile)
+    const save = vi.spyOn(config, 'saveNow').mockResolvedValueOnce(false)
+    try {
+      config.update((c) => void (c.settings.workflow = {}))
+      await migrateAgentsPerProject()
+      expect(advanced.legacy(AGENTS_PER_PROJECT)).toBe(4)
+      expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values).toEqual({ [AGENTS_PER_PROJECT]: 4 })
+      // Restarted with config.json as it was on disk: the move runs again, and this time its save holds.
+      config.update((c) => void (c.settings.workflow = {}))
+      await migrateAgentsPerProject()
+      expect(save).toHaveBeenCalledTimes(2)
+      expect(config.settings.workflow).toEqual({ none: { maxAgents: 4 }, git: { maxAgents: 4 } })
+      expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values).toEqual({})
+    } finally {
+      save.mockRestore()
       advanced.stop()
       config.update((c) => void (c.settings.workflow = was))
     }

@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import type { PlatformId } from '@shared/platform/descriptors'
-import { allOff, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
+import { allOff, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX, FILE_LOCK_MODES } from '@shared/defaults'
 import { ManyAgentsNote } from './ManyAgentsNote'
@@ -716,8 +716,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
  * here marked with their value now; Use fills the form (saved only with Save…). All off lists what never turns off.
  */
 export function ChoicePreview({ choice, name, options, effective, valueText, onUse, onClose }: { choice: Choice; name: string; options: WorkflowOptions; effective: WorkflowOptions; valueText: (key: OptionKey, v: unknown) => string; onUse?: () => void; onClose?: () => void }) {
-  const keys = FORM_OPTIONS[options.platform].filter((k) => formShows(k, options))
-  const changed = keys.filter((k) => !same(options[k], effective[k]))
+  // The rules and what a preset sets beside them (HI-2001: Maximum agents), each change counted.
+  const { keys, changed } = previewRows(options, effective)
   return (
     <div className="workflow-preview" data-preview={choice} role="region" aria-label={tr(T.previewHead, { preset: name })}>
       <div className="workflow-preview-h">{tr(T.previewHead, { preset: name })}</div>
@@ -769,7 +769,7 @@ export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId
     return id ? tr(T.identityValue, { name: id.name, email: id.email }) : tr(T.off)
   }
   if (key === 'stageNames') return tr(T.stageNamesValue, { n: Object.keys((v as StageNames | undefined) ?? {}).length })
-  if (key === 'reviewers' || key === 'loopRounds') return fmt.number(v as number)
+  if (key === 'reviewers' || key === 'loopRounds' || key === 'maxAgents') return fmt.number(v as number)
   if (key === 'loopWaitHours') return tr(T.hoursValue, { n: v as number })
   if (key === 'loopStepWaitMinutes') return tr(T.minutesValue, { n: v as number })
   if (key === 'fileLocks') {

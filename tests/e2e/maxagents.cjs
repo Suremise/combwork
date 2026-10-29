@@ -3,7 +3,8 @@
 // Solo (Maximum agents 1, one agent): the Agent API's add is refused (409), naming Maximum agents and where the user
 // raises it; the user's own add goes past it. Hive's Team 6 + pool loaded by hand into it: the Load dialog says it is
 // over, and with its workflow unticked offers to raise the maximum (ticked); loading opens Version Control → Workflow
-// with Maximum agents at 8, unsaved until Save…; lowered again in the form, the note says the agents stay. Screenshots.
+// with Maximum agents at 8, unsaved until Save…; lowered again in the form, the note says the agents stay; Team's
+// preview shows the Maximum agents it sets against the value now. Screenshots.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -126,6 +127,12 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     const over = row.locator('[data-note="over-max"]')
     check('lowered to 2: the row says the 8 agents stay and the Assistant adds none', !!(await until(async () => /This project has 8 agents: none is removed, but the Assistant can’t add another until it has fewer than 2\./.test(await text(over)))), await text(row))
     await shoot('3-over', () => row)
+
+    // --- A preset's preview shows the Maximum agents it sets, with the value now (HR3's round 1).
+    await page.locator('.vc-view .workflow-choice[data-choice="team"]').click()
+    const previewRow = page.locator('.vc-view .workflow-preview li[data-option="maxAgents"]')
+    check("Team's preview lists Maximum agents: 12, a change from 2 now", !!(await until(async () => (await previewRow.count()) === 1 && /Maximum agents: 12/.test(await text(previewRow)) && /Now: 2/.test(await text(previewRow)) && /changes/.test((await previewRow.getAttribute('class')) ?? ''))), await text(page.locator('.vc-view .workflow-preview')))
+    await shoot('4-preview', () => page.locator('.vc-view .workflow-preview'))
   } catch (e) {
     check('the suite threw', false, e.stack)
   } finally {
