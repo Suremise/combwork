@@ -2778,7 +2778,7 @@ module.exports.SCENARIOS = [
       c.head = c.git('rev-parse', 'HEAD').trim()
     },
     prompt: (c) => `Card #${c.cards.s} is yours, in Doing, and its work is done in this folder. Submit it for review now with hive_submit.`,
-    fake: (c) => `skill work-on-card then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."} then Nothing is committed yet: shall I commit the card's work so it can be submitted for review?`,
+    fake: (c) => `skill work-on-card then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."} then say Nothing is committed yet: shall I commit the card's work so it can be submitted for review?`,
     expect: (o, c) => {
       const n = c.cards.s
       const submits = called(o, 'hive_submit').filter((x) => isCard(argsOf(x).card, n))
