@@ -665,9 +665,68 @@ export const movedSummary = (plan: MovePlan | null): WorkspaceMoved | null =>
  * On opening a workspace: records the folders of those opened for the first time, and works out whether anything
  * moved. A move with nothing to repair is simply recorded; otherwise the window's banner offers Repair….
  */
+/**
+ * What Hive's profile keeps by a workspace's folder follows it when it moves (HI-2007): its window's pin, its close
+ * command's runs, and its Assistant's old token file goes. A move is recorded (`profileMoves`) as it is first seen, only
+ * when the old folder is gone (a copy's original keeps its own), and tried at each open and Repair until all of it has
+ * followed, whatever Repair's plan says: a run still going is carried once it has ended (HR2's round 1). A step that
+ * fails goes in `report` (Repair isn't complete), or the log.
+ */
+async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<void> {
+  const here = ws.path
+  if (!here) return
+  const gone = (p: string): boolean => !existsSync(join(p, HIVE_DIR)) && !workspaceFor(p)
+  const from = ws.movedFrom
+  if (from && !samePath(from, here) && gone(from)) {
+    config.update((c) => {
+      const list = c.profileMoves ?? []
+      if (!list.some((m) => samePath(m.from, from) && samePath(m.to, here))) c.profileMoves = [...list, { from, to: here }].slice(-20)
+    })
+  }
+  for (const m of (config.get().profileMoves ?? []).filter((x) => samePath(x.to, here))) {
+    // A workspace at the old folder again (moved back, or another one there): its records are its own now.
+    let done = !gone(m.from)
+    if (!done) {
+      if (carryPin(m.from, here)) {
+        const win = ws.window
+        if (win && !win.isDestroyed() && !win.isAlwaysOnTop()) {
+          win.setAlwaysOnTop(true)
+          emitTo(win, { type: 'window-state', maximized: win.isMaximized(), focused: win.isFocused(), alwaysOnTop: true })
+        }
+        log.info(`The window's pin follows the workspace from ${userText(m.from)}`)
+      }
+      const errors: string[] = []
+      let left = 0
+      try {
+        const r = await carryWorkspaceRuns([placeKey(m.from), resolve(m.from).toLowerCase()], ws.openPlace ?? placeKey(here))
+        if (r.moved) log.info(`${r.moved} close-command run(s) follow the workspace from ${userText(m.from)}`)
+        if (r.left > r.errors.length) log.info(`${r.left - r.errors.length} close-command run(s) still going at ${userText(m.from)}: carried once ended`)
+        left = r.left
+        errors.push(...r.errors)
+      } catch (e) {
+        errors.push((e as Error).message)
+      }
+      try {
+        await rm(assistantTokenFile(m.from), { force: true })
+      } catch (e) {
+        errors.push((e as Error).message)
+      }
+      for (const why of errors) {
+        if (report) say(report, 'failed', tr(msg({ id: 'main.move.closeRunsFailed', defaultMessage: "Hive's records of the workspace's close command couldn't all follow it from the old folder ({why}). Hive tries again.", description: "A line of Repair's report, after a workspace moved to another folder: the output Hive keeps of the workspace's close command (or its Hive Assistant's old token file) couldn't be moved from the old folder's records. {why} is the system's message." }), { why }), { what: { kind: 'closeRuns' }, result: tr(R.failedWhy, { why }) })
+        else log.warn(`carrying the profile's records from ${userText(m.from)}: ${userText(why)}`)
+      }
+      done = left === 0 && !errors.length
+    }
+    if (done) config.update((c) => {
+      c.profileMoves = (c.profileMoves ?? []).filter((x) => !(samePath(x.from, m.from) && samePath(x.to, m.to)))
+    })
+  }
+}
+
 export async function checkMoved(ws: WorkspaceService): Promise<void> {
   const path = ws.path
   if (!path) return
+  await carryProfile(ws).catch((e) => log.warn("carrying the profile's records of a moved workspace", e))
   await recordNew(ws, await projectFolders(ws))
   const plan = await movePlan(ws)
   if (ws.path !== path) return
@@ -726,6 +785,7 @@ async function adoptSaved(ws: WorkspaceService, report: MoveReport): Promise<voi
 
 async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveReport> {
   const report: MoveReport = { done: [], skipped: [], failed: [], rows: [], complete: false }
+  await carryProfile(ws, report)
   const plan = await movePlan(ws, opts)
   if (!plan || !moveHasWork(plan)) {
     // What a Repair before couldn't give its project (#514): tried again, and it isn't done until that is.
@@ -1063,26 +1123,6 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
     })
     recentChanged()
     say(report, 'done', tr(msg({ id: 'main.move.recent', defaultMessage: 'Open Recent lists {to} instead of {from}.', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner). Open Recent is a menu (File → Open Recent): use its name as shown. {to} is the workspace folder now, {from} where it was." }), { to: plan.to, from }), { what: { kind: 'recent' }, was: from, now: plan.to, result: tr(R.recent) })
-  }
-  // What Hive's profile keeps by the workspace's folder follows it (HI-2007): its window's pin, its close command's runs,
-  // and its Assistant's old token file goes. Only when the old folder is gone: a copy's original keeps its own.
-  if (plan.from && !existsSync(join(plan.from, HIVE_DIR)) && !workspaceFor(plan.from)) {
-    const from = plan.from
-    if (carryPin(from, plan.to)) {
-      const win = ws.window
-      if (win && !win.isDestroyed() && !win.isAlwaysOnTop()) {
-        win.setAlwaysOnTop(true)
-        emitTo(win, { type: 'window-state', maximized: win.isMaximized(), focused: win.isFocused(), alwaysOnTop: true })
-      }
-      log.info(`Repair: the window's pin follows the workspace from ${userText(from)}`)
-    }
-    try {
-      const n = await carryWorkspaceRuns([placeKey(from), resolve(from).toLowerCase()], ws.openPlace ?? placeKey(plan.to))
-      if (n) log.info(`Repair: ${n} close-command run(s) follow the workspace from ${userText(from)}`)
-    } catch (e) {
-      log.warn('moving the close-command runs', e)
-    }
-    await rm(assistantTokenFile(from), { force: true }).catch((e) => log.warn("removing the Assistant's old token file", e))
   }
   if (plan.working.length) {
     config.update((c) => {

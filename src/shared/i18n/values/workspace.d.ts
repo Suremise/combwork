@@ -377,6 +377,7 @@ interface HiveMessageValues {
   'workspace.repair.choose': { gone: string }
   'workspace.repair.chooseFolder': { kind: string; gone: string }
   'workspace.repair.chooseShort': undefined
+  'workspace.repair.closeRuns': undefined
   'workspace.repair.conversations': { provider: string | number }
   'workspace.repair.copy': { count: number; stays: string }
   'workspace.repair.createShort': undefined

@@ -374,6 +374,7 @@
   "workspace.repair.choose": "{gone, select, yes {其分支也已不在：新建、定位或删除链接} other {重新创建、定位或删除链接}}",
   "workspace.repair.chooseFolder": "{kind, select, home {定位或忘记} other {{gone, select, yes {其分支也已不存在：定位或释放} other {重建、定位或释放}}}}",
   "workspace.repair.chooseShort": "请选择",
+  "workspace.repair.closeRuns": "关闭时命令的输出",
   "workspace.repair.conversations": "{provider} 的对话和记忆",
   "workspace.repair.copy": "{count, plural, other {复制 # 个文件}}{stays, select, yes {；旧文件保留} other {}}",
   "workspace.repair.createShort": "新建",

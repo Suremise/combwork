@@ -572,6 +572,11 @@ export interface AppConfig {
   /** Always on Top: the workspaces (lowercased paths) whose window was left pinned. This machine's, never in .hive. */
   alwaysOnTop?: Record<string, true>
   /**
+   * Moved workspaces whose records here (by folder: the pin, the close command's runs, the Assistant's token file) are
+   * still to follow them (HI-2007): kept until all have, tried at each open and Repair (workspaceMove.ts carryProfile).
+   */
+  profileMoves?: { from: string; to: string }[]
+  /**
    * Antivirus scanning (#316), this machine's: the exclusions Hive added (resolved paths), Defender's list as last read
    * with administrator rights, and per workspace (lowercased path) the last suggestion (its folders, when and how many
    * times; a plain string is #316's form, the folders only) and "Don't ask again".
@@ -2465,7 +2470,7 @@ export type MoveReportWhat =
   | { kind: 'sessions' }
   | { kind: 'copy'; provider: ProviderId }
   | { kind: 'board'; from: string }
-  | { kind: 'saved' | 'recent' | 'working' | 'defender' }
+  | { kind: 'saved' | 'recent' | 'working' | 'defender' | 'closeRuns' }
 
 /** A step of Repair's report as a table row (#1313): what, where it was and is, and how it went in a few words. */
 export interface MoveReportRow {

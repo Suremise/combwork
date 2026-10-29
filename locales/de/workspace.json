@@ -374,6 +374,7 @@
   "workspace.repair.choose": "{gone, select, yes {auch sein Branch fehlt: neu anlegen, suchen oder Verknüpfung entfernen} other {neu anlegen, suchen oder Verknüpfung entfernen}}",
   "workspace.repair.chooseFolder": "{kind, select, home {Ort angeben oder vergessen} other {{gone, select, yes {sein Branch ist auch weg: Ort angeben oder freigeben} other {neu anlegen, Ort angeben oder freigeben}}}}",
   "workspace.repair.chooseShort": "auswählen",
+  "workspace.repair.closeRuns": "Ausgabe des Befehls beim Schließen",
   "workspace.repair.conversations": "Unterhaltungen und Gedächtnis von {provider}",
   "workspace.repair.copy": "{count, plural, one {# Datei kopieren} other {# Dateien kopieren}}{stays, select, yes {; die alten bleiben} other {}}",
   "workspace.repair.createShort": "Anlegen",

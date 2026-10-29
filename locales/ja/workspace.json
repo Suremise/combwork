@@ -374,6 +374,7 @@
   "workspace.repair.choose": "{gone, select, yes {ブランチもありません：作成、場所の指定、リンクの削除から選択} other {再作成、場所の指定、リンクの削除から選択}}",
   "workspace.repair.chooseFolder": "{kind, select, home {場所を指定するか忘れる} other {{gone, select, yes {ブランチもありません：場所を指定するか解放} other {再作成、場所の指定、または解放}}}}",
   "workspace.repair.chooseShort": "選択してください",
+  "workspace.repair.closeRuns": "終了時コマンドの出力",
   "workspace.repair.conversations": "{provider}の会話とメモリ",
   "workspace.repair.copy": "{count, plural, other {#件のファイルをコピー}}{stays, select, yes {（古いものは残ります）} other {}}",
   "workspace.repair.createShort": "作成",

@@ -374,6 +374,7 @@
   "workspace.repair.choose": "{gone, select, yes {its branch is gone too: create, locate or remove its link} other {recreate, locate or remove its link}}",
   "workspace.repair.chooseFolder": "{kind, select, home {locate or forget it} other {{gone, select, yes {its branch is gone too: locate or release it} other {recreate, locate or release it}}}}",
   "workspace.repair.chooseShort": "choose",
+  "workspace.repair.closeRuns": "The close command's output",
   "workspace.repair.conversations": "{provider}'s conversations and memory",
   "workspace.repair.copy": "{count, plural, one {copy # file} other {copy # files}}{stays, select, yes {; the old ones stay} other {}}",
   "workspace.repair.createShort": "Create",

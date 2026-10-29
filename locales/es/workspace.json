@@ -374,6 +374,7 @@
   "workspace.repair.choose": "{gone, select, yes {su rama tampoco está: crear, localizar o quitar su vínculo} other {volver a crear, localizar o quitar su vínculo}}",
   "workspace.repair.chooseFolder": "{kind, select, home {búscalo u olvídalo} other {{gone, select, yes {su rama también desapareció: búscalo o libéralo} other {vuelve a crearlo, búscalo o libéralo}}}}",
   "workspace.repair.chooseShort": "elegir",
+  "workspace.repair.closeRuns": "Salida del comando al cerrar",
   "workspace.repair.conversations": "Conversaciones y memoria de {provider}",
   "workspace.repair.copy": "{count, plural, one {copiar # archivo} many {copiar # archivos} other {copiar # archivos}}{stays, select, yes {; los antiguos se conservan} other {}}",
   "workspace.repair.createShort": "Crear",

@@ -169,6 +169,7 @@ const T = {
   needsAdmin: msg({ id: 'workspace.repair.needsAdmin', defaultMessage: "Defender shows its exclusions only to administrators: these states are what Hive knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.", description: "Repair's plan, under the table: Defender hides its exclusion list without administrator rights." }),
   readingDefender: msg({ id: 'workspace.repair.readingDefender', defaultMessage: "Reading Defender's exclusions…", description: "Repair's plan, under the table, while Hive reads Microsoft Defender's state of the old and new folders." }),
   result: msg({ id: 'workspace.repair.result', defaultMessage: 'Result', description: "Repair's report, a column heading: how each step went (done, a problem and why, or a choice still to make)." }),
+  closeRuns: msg({ id: 'workspace.repair.closeRuns', defaultMessage: "The close command's output", description: "Repair's report, the What column: the output Hive keeps of the workspace's close command (Settings → Workspace → When this workspace closes, run), moved from the old folder's records to the new one's (HI-2007)." }),
   saved: msg({ id: 'workspace.repair.saved', defaultMessage: 'Handovers and kept comparisons', description: "Repair's report, the What column: handovers and Performance → Compare's kept comparisons saved under a project's earlier name." }),
   sentence: msg({ id: 'workspace.repair.sentence', defaultMessage: '{what}{hasWas, select, yes {: was {was}} other {}}{hasNow, select, yes {, now {now}} other {}}; will {does}', description: "Repair's plan, a row read by a screen reader as one sentence: what it is about, where it was and is (full paths), and what Repair will do. Each part comes from the row's columns." })
 }
@@ -437,6 +438,8 @@ function reportWhat(w: MoveReportWhat): string {
       return tr(T.workingOn)
     case 'defender':
       return tr(T.defender)
+    case 'closeRuns':
+      return tr(T.closeRuns)
   }
 }
 

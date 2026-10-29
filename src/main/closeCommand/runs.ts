@@ -184,22 +184,36 @@ function runEnded(dir: string): boolean {
   }
 }
 
+/** What carrying a moved workspace's runs did: how many moved, how many are left under the old prefixes, and why not. */
+export interface RunsCarried {
+  moved: number
+  /** Still under an old prefix: one going (its runner writes there), or one that couldn't be renamed (`errors`). */
+  left: number
+  errors: string[]
+}
+
 /**
  * A moved workspace's runs (HI-2007): the ended ones kept under its old place's prefixes take its new place's, and the
- * newest KEEP_RUNS of them all are kept. One still going stays where it is, as its runner writes there. Returns how many
- * were moved.
+ * newest KEEP_RUNS of them all are kept. One still going stays where it is, as its runner writes there: `left` counts
+ * it, for the caller to try again once it has ended.
  */
-export async function carryRuns(root: string, fromPrefixes: readonly string[], toPrefix: string, keep = KEEP_RUNS): Promise<number> {
-  if (!existsSync(root)) return 0
-  let moved = 0
-  for (const prefix of new Set(fromPrefixes)) {
-    if (prefix === toPrefix) continue
+export async function carryRuns(root: string, fromPrefixes: readonly string[], toPrefix: string, keep = KEEP_RUNS): Promise<RunsCarried> {
+  const out: RunsCarried = { moved: 0, left: 0, errors: [] }
+  if (!existsSync(root)) return out
+  const olds = [...new Set(fromPrefixes)].filter((p) => p !== toPrefix)
+  for (const prefix of olds) {
     for (const n of runsOf(root, prefix).filter((x) => runEnded(join(root, x)))) {
       const to = join(root, toPrefix + n.slice(prefix.length))
       if (existsSync(to)) continue
-      if (await rename(join(root, n), to).then(() => true, () => false)) moved++
+      try {
+        await rename(join(root, n), to)
+        out.moved++
+      } catch (e) {
+        out.errors.push((e as Error).message)
+      }
     }
   }
   await pruneRuns(root, toPrefix, keep)
-  return moved
+  out.left = olds.reduce((n, p) => n + runsOf(root, p).length, 0)
+  return out
 }

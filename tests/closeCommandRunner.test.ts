@@ -206,7 +206,8 @@ describe('the runs kept', () => {
     Array.from({ length: 2 }, (_, i) => made(B, i + 10, ended))
     const C = 'd:/three/work'
     const other = made(C, 1, ended)
-    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toBe(4)
+    // The one still going is left, for the caller to carry once it has ended.
+    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toEqual({ moved: 4, left: 1, errors: [] })
     const left = readdirSync(root)
     // Under the old place: only the run still going. Under the new: the newest five (two of its own, three carried).
     expect(left.filter((f) => f.startsWith(runPrefix('workspace', A)))).toEqual([running])
@@ -214,7 +215,7 @@ describe('the runs kept', () => {
     expect(now.map((f) => f.slice(runPrefix('workspace', B).length))).toEqual([2, 3, 4, 10, 11].map((i) => `${new Date(Date.UTC(2026, 9, 28, 12, 0, i)).toISOString().replace(/[:.]/g, '-')}-0000000${i}`))
     expect(left).toContain(other)
     // Again: nothing more to move.
-    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toBe(0)
+    expect(await carryRuns(root, [runPrefix('workspace', A)], runPrefix('workspace', B))).toEqual({ moved: 0, left: 1, errors: [] })
   })
 
   it('two workspaces of the same name: their runs apart, by their real places', () => {

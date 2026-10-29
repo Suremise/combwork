@@ -374,6 +374,7 @@
   "workspace.repair.choose": "{gone, select, yes {brak też jego gałęzi: utwórz, wskaż lub usuń powiązanie} other {odtwórz, wskaż lub usuń powiązanie}}",
   "workspace.repair.chooseFolder": "{kind, select, home {wskaż albo zapomnij} other {{gone, select, yes {gałęzi też nie ma: wskaż albo zwolnij} other {odtwórz, wskaż albo zwolnij}}}}",
   "workspace.repair.chooseShort": "do wyboru",
+  "workspace.repair.closeRuns": "Wynik polecenia przy zamykaniu",
   "workspace.repair.conversations": "Rozmowy i pamięć: {provider}",
   "workspace.repair.copy": "{count, plural, one {skopiuj # plik} few {skopiuj # pliki} many {skopiuj # plików} other {skopiuj # pliku}}{stays, select, yes {; stare zostają} other {}}",
   "workspace.repair.createShort": "Utwórz",

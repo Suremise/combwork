@@ -1503,6 +1503,10 @@
     "defaultMessage": "choose",
     "description": "Repair's plan, the Will do column, in the warning colour: a missing worktree waits for one of the row's buttons (Recreate, Locate…, Remove link; its tooltip says so in full)."
   },
+  "workspace.repair.closeRuns": {
+    "defaultMessage": "The close command's output",
+    "description": "Repair's report, the What column: the output Hive keeps of the workspace's close command (Settings → Workspace → When this workspace closes, run), moved from the old folder's records to the new one's (HI-2007)."
+  },
   "workspace.repair.conversations": {
     "defaultMessage": "{provider}'s conversations and memory",
     "description": "Repair's plan, the What column: what a coding agent ({provider}: Claude Code) keeps per folder."
