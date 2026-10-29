@@ -204,6 +204,7 @@ export async function runListInWindow(win: BrowserWindow | null, point: NonNulla
     try {
       dir = startRun(root, runFolderName(prefix, new Date()), { list: true, steps: steps.slice(from), values: values(), home }, home, { exec: process.execPath, script: runnerScript(), env: checkEnv(childEnv()) })
       writeFileSync(join(dir, 'observer'), '')
+      if (unwatched) detach()
       log.info(`${said} started at step ${from + 1} (${userText(dir)})`)
     } catch (e) {
       dir = null
@@ -243,15 +244,21 @@ export async function runListInWindow(win: BrowserWindow | null, point: NonNulla
       }
     }
   })
-  void panel.ended.then((how) => {
-    if (how === 'left' && dir) {
-      try {
-        writeFileSync(join(dir, 'control-detach.json'), JSON.stringify({ action: 'detach' }))
-      } catch (e) {
-        log.warn(`${said}: couldn't tell the runner nobody waits`, e)
-      }
+  // Don't wait, or no window to ask (none, or it went): nobody waits, so the runner settles failures by its rule now.
+  let unwatched = false
+  const detach = (): void => {
+    if (!dir) return
+    try {
+      writeFileSync(join(dir, 'control-detach.json'), JSON.stringify({ action: 'detach' }))
+    } catch (e) {
+      log.warn(`${said}: couldn't tell the runner nobody waits`, e)
     }
-    settle(how === 'left' ? 'left' : 'gone')
+  }
+  void panel.ended.then((how) => {
+    unwatched = true
+    detach()
+    // A launch that failed with nobody to ask: it failed, as a command that couldn't start always has.
+    settle(how === 'left' ? 'left' : launchFailed ? 'failed' : 'gone')
   })
   launch()
   // Followed until it ends, the user stops waiting, or the window goes; watched, so the runner waits for a choice.
