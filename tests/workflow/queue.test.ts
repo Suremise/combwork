@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { B1, commit, moved, R1, refusedBy, setup, sh, type Env } from './harness'
+import { B1, commit, GIT_HEAVY_MS, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
 import { MAX_RETESTS, MergeQueue } from '../../src/main/workflow/mergeQueue'
@@ -154,8 +154,11 @@ describe('the merge queue', () => {
   })
 
   // One case each (#1380: both in one test took 16.7 s alone, 138 gits, and timed out at 20 s under a loaded full run).
+  // GIT_HEAVY_MS, for both (one test, two cases): a card tested twice through the queue as the target moves after its
+  // first test, 65 and 69 git processes. In HI-2025's run beside three other full runs, the project-folder case passed
+  // 20 s and the other took 14.8 s.
   for (const checkedOut of [false, true]) {
-    it(`S27: the target moves between the test and the advance → tested again, never an untested advance (${checkedOut ? 'in the project folder' : 'checked out nowhere'})`, async () => {
+    it(`S27: the target moves between the test and the advance → tested again, never an untested advance (${checkedOut ? 'in the project folder' : 'checked out nowhere'})`, { timeout: GIT_HEAVY_MS }, async () => {
       const e = team()
       if (!checkedOut) sh(e.project, 'checkout', '-q', '--detach')
       const { card } = await queued(e)
@@ -179,7 +182,9 @@ describe('the merge queue', () => {
     })
   }
 
-  it('S52: the target moves during every test → after MAX_RETESTS retests the entry pauses (targetMovesFast), nothing advanced by Hive', async () => {
+  // GIT_HEAVY_MS: a card tested MAX_RETESTS + 1 times as the target moves after each test, 108 git processes; past 20 s in
+  // HI-2025's run beside three other full runs.
+  it('S52: the target moves during every test → after MAX_RETESTS retests the entry pauses (targetMovesFast), nothing advanced by Hive', { timeout: GIT_HEAVY_MS }, async () => {
     const e = team()
     sh(e.project, 'checkout', '-q', '--detach')
     const { card } = await queued(e)
@@ -261,7 +266,9 @@ describe('the merge queue', () => {
     expect(red).not.toHaveProperty('code')
   })
 
-  it('S33: restarts — a removed entry never merges; a wake is delivered once; an advance before Integrated is reconciled, never merged twice', async () => {
+  // GIT_HEAVY_MS: three cards (one removed, one woken, one merged through a crash) and three restarts with recovery, 78 git
+  // processes; past 20 s in HI-2025's baseline run and its run beside three other full runs.
+  it('S33: restarts — a removed entry never merges; a wake is delivered once; an advance before Integrated is reconciled, never merged twice', { timeout: GIT_HEAVY_MS }, async () => {
     const e = team({}, { autoRun: false })
     sh(e.project, 'checkout', '-q', '--detach')
     // (a) Remove from queue, then a restart: the rebuilt queue skips it.
@@ -309,7 +316,9 @@ describe('the merge queue', () => {
     r.store.close()
   })
 
-  it('S57 (e, f): a decision after the checks and before the advance stops it; after IntegrationStarted it merges, then For you; a no-review Merging card returns to Active', async () => {
+  // GIT_HEAVY_MS: three cards through the queue across two set-ups (two decisions, then a no-review card), 97 git processes;
+  // past 20 s in HI-2025's run beside three other full runs.
+  it('S57 (e, f): a decision after the checks and before the advance stops it; after IntegrationStarted it merges, then For you; a no-review Merging card returns to Active', { timeout: GIT_HEAVY_MS }, async () => {
     const e = team()
     sh(e.project, 'checkout', '-q', '--detach')
     const { card } = await queued(e)
