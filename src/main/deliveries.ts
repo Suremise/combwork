@@ -693,6 +693,10 @@ function set(store: Store, d: Draft, r: DeliveryRecord, to: DeliveryState, detai
     d.after.push(() => assistant.record(ws, { kind: 'message-agent', project: basename(store.host), agent: { id: r.agentId, name: r.agentName ?? r.agentId }, ...(r.card ? { card: r.card } : {}) }, `A message for ${r.agentName ?? r.agentId} (${r.id}) was ${to === 'stale' ? 'dropped as stale' : 'refused'}`, detail ?? 'its sender may no longer send it', { reason: to === 'stale' ? 'Dropped as stale' : 'Refused' }))
   }
   if (to === 'refused' || to === 'expired' || to === 'cancelled' || to === 'uncertain' || to === 'stale') d.after.push(() => log.info(`Delivery ${r.id} for ${userText(r.agentName ?? r.agentId)} ${to}${detail ? `: ${userText(detail)}` : ''}`))
+  // Its receipt and ack (HI-2036: only "queued" was logged, so a message read through hive_inbox at once read as queued
+  // for hours): once each, as saved (a move not allowed, a read or ack again, returned above; one not saved never runs
+  // its `after`), with how it was received. Never its text.
+  if (to === 'received' || to === 'acked') d.after.push(() => log.info(`Delivery ${r.id} for ${userText(r.agentName ?? r.agentId)} ${to}${out.receivedVia && (to === 'received' || !r.received) ? ` (${out.receivedVia})` : ''}`))
   if ((to === 'received' || to === 'acked') && !r.received) tell(store, d, out, 'received')
   // Read after the line that rang for it was marked not taken (#1514: Codex took it as queued input, late): that line was
   // taken, so its mark goes, in the launch it was offered into; a mark of another line's stays (round 1 finding).
