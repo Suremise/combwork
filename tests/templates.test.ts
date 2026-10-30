@@ -48,6 +48,7 @@ const tasks = await import('../src/main/tasks')
 const { addAgent, claimMark, removedSince, reserveForRemoval } = await import('../src/main/projectAgents')
 // Paths compared as places: git lists the long names of folders Hive may know by short (8.3) ones, as on CI (#389).
 const { placeKey } = await import('../src/main/fsutil')
+const { worktreesRoot } = await import('../src/main/worktrees')
 
 /** A template file as 1.0 writes it (version 2): its agents builders unless given a role. */
 const v2 = (t: Record<string, unknown> & { agents: Record<string, unknown>[] }): Record<string, unknown> => ({ version: TEMPLATE_VERSION, savedAt: '', layout: 'auto', ...t, agents: t.agents.map((a) => ({ role: 'builder', ...a })) })
@@ -333,9 +334,11 @@ describe('saving and loading templates', () => {
   /**
    * An agent with a 0.9 worktree, as a project upgraded from 0.9 has one (#1451: 1.0 adds none): a worktree on its own
    * branch from main, and the agent written into project.json with it (its setup still to run when the project has one).
+   * In the worktrees folder beside the workspace, where 0.9 made them (HI-2142): one in the workspace folder is taken for
+   * a project, so each refresh its root watch starts writes Hive's files into it while the test works there.
    */
   const legacyAgent = (p: string, name: string, branch = `hive/legacy-${++legacyNo}`): StoredAgent => {
-    const path = join(p, '..', `${basename(p)}-wt-${legacyNo}-${name.replace(/\W+/g, '-').toLowerCase()}`)
+    const path = join(worktreesRoot(wsPath), basename(p), `wt-${legacyNo}-${name.replace(/\W+/g, '-').toLowerCase()}`)
     git(p, 'worktree', 'add', '-q', '-b', branch, path, 'main')
     const cfg = cfgOf(p)
     const def: StoredAgent = { id: `a-legacy${legacyNo}`, name, provider: 'claude-code', worktree: { path, branch, base: 'main' }, ...(cfg.worktreeSetup?.trim() ? { needsSetup: true } : {}) }
@@ -898,37 +901,39 @@ describe('saving and loading templates', () => {
   gitIt("Remove Agent keeping a 0.9 worktree keeps a setup that never ran (#319); a done one isn't, a deleted one is forgotten (#1451: none is added in one)", async () => {
     const { removeAgent } = await import('../src/main/projectAgents')
     const pending = (): string[] => (cfgOf(beta).setupPending ?? []).map((p: string) => placeKey(p))
+    // Each check says what beta's project.json and the removal had (HI-2142: a failure under load named no reason).
+    const state = (removed?: unknown): string => JSON.stringify({ removed, setupPending: cfgOf(beta).setupPending, agents: cfgOf(beta).agents.map((a: StoredAgent) => [a.id, a.name, a.needsSetup, a.worktree?.path]) })
     expect(cfgOf(beta).worktreeSetup).toBe('npm install')
     // Never started: its setup is still to run. Removed, its worktree kept: remembered.
     const keeper = legacyAgent(beta, 'Keeper')
     expect(keeper.needsSetup).toBe(true)
-    await run(() => removeAgent(beta, keeper.id, { deleteWorktree: false }))
-    expect(pending()).toContain(placeKey(keeper.worktree!.path))
+    const keeperGone = await run(() => removeAgent(beta, keeper.id, { deleteWorktree: false }))
+    expect(pending(), state(keeperGone)).toContain(placeKey(keeper.worktree!.path))
     // Its setup done: removed, its worktree kept, nothing remembered.
     const done = legacyAgent(beta, 'Done')
     writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: cfgOf(beta).agents.map((a: StoredAgent) => (a.id === done.id ? { ...a, needsSetup: false } : a)) }))
-    await run(() => removeAgent(beta, done.id, { deleteWorktree: false }))
-    expect(pending()).not.toContain(placeKey(done.worktree!.path))
+    const doneGone = await run(() => removeAgent(beta, done.id, { deleteWorktree: false }))
+    expect(pending(), state(doneGone)).not.toContain(placeKey(done.worktree!.path))
     // A worktree another agent still works in is that agent's: nothing is remembered for it.
     const shared = legacyAgent(beta, 'Sharer')
     writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), agents: [...cfgOf(beta).agents, { ...shared, id: 'a-twin', name: 'Twin' }] }))
-    await run(() => removeAgent(beta, shared.id, { deleteWorktree: false }))
-    expect(pending()).not.toContain(placeKey(shared.worktree!.path))
+    const sharedGone = await run(() => removeAgent(beta, shared.id, { deleteWorktree: false }))
+    expect(pending(), state(sharedGone)).not.toContain(placeKey(shared.worktree!.path))
     // Remove All (#291): one with work of its own is kept, so remembered; a merged, clean one is deleted, and forgotten.
     const busy = legacyAgent(beta, 'Busy')
     writeFileSync(join(busy.worktree!.path, 'own.txt'), 'work')
     git(busy.worktree!.path, 'add', '.')
     git(busy.worktree!.path, 'commit', '-qm', 'own work')
     const busyGone = await run(() => removeAgent(beta, busy.id, { deleteWorktree: 'merged-clean', mergedInto: 'main' }))
-    expect(busyGone.worktree?.deleted).toBe(false)
-    expect(pending()).toContain(placeKey(busy.worktree!.path))
+    expect(busyGone.worktree?.deleted, state(busyGone)).toBe(false)
+    expect(pending(), state(busyGone)).toContain(placeKey(busy.worktree!.path))
     const neat = legacyAgent(beta, 'Neat')
     // (Listed, as a worktree kept from before would be: deleting it takes it off the list.)
     writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfgOf(beta), setupPending: [...(cfgOf(beta).setupPending ?? []), neat.worktree!.path] }))
-    expect(pending()).toContain(placeKey(neat.worktree!.path))
+    expect(pending(), state()).toContain(placeKey(neat.worktree!.path))
     const neatGone = await run(() => removeAgent(beta, neat.id, { deleteWorktree: 'merged-clean', mergedInto: 'main' }))
-    expect(neatGone.worktree?.deleted, `kept, and why (HI-1812): ${JSON.stringify(neatGone.worktree)}`).toBe(true)
-    expect(pending()).not.toContain(placeKey(neat.worktree!.path))
+    expect(neatGone.worktree?.deleted, `kept, and why (HI-1812): ${state(neatGone)}`).toBe(true)
+    expect(pending(), state(neatGone)).not.toContain(placeKey(neat.worktree!.path))
   })
 
   it("names from the project's key (#1440): saved as patterns, loaded with another project's key, one agent added under a chosen name", async () => {
