@@ -783,6 +783,51 @@ export interface StartLane {
    * when the change would apply at once anyway.
    */
   applyNow?: boolean
+  /**
+   * A new card placed on the builder's lane as it is made (HI-2167, hive_create_task's lane): the list is the running
+   * lane's, as read under the lock (its queued list when it has one), with the card added last or `next` (before its first
+   * card still in Todo); with no running lane, a new lane of the card alone, or refused when `needsLane`. `cards` is
+   * ignored.
+   */
+  place?: LanePlace
+}
+
+/** Where a new card goes on its builder's lane (HI-2167). */
+export interface LanePlace {
+  card: number
+  position?: 'last' | 'next'
+  /** Placed only on a running lane (hive_create_task's lane: "<builder>"): never starts one. */
+  needsLane?: boolean
+}
+
+/** How recently a card was made for hive_lane start to ask whether it is the one meant (HI-2167). */
+export const FRESH_CARD_MS = 2 * 60_000
+
+/**
+ * hive_lane start's safety net (HI-2167): a card in its list made in the last FRESH_CARD_MS by someone else than the
+ * caller may be a guessed key (a create batched with the start, another agent's card taking the number). Null for none.
+ */
+export async function freshCardsNote(ws: WorkspaceService, cards: readonly number[], by: string, at = Date.now()): Promise<string | null> {
+  const board = await cardsNow(ws, cards)
+  const fresh = cards.flatMap((n) => {
+    const c = board.get(n)
+    const made = c?.createdAt ? Date.parse(c.createdAt) : NaN
+    return c && c.createdBy && c.createdBy !== by && at - made >= 0 && at - made < FRESH_CARD_MS ? [{ n, ago: Math.max(1, Math.round((at - made) / 1000)), who: c.createdBy }] : []
+  })
+  if (!fresh.length) return null
+  return withCardNames(ws, () => `Warning: ${fresh.map((f) => `${cardRef(f.n)} was created ${f.ago} s ago by ${f.who}`).join('; ')}: is it the card you meant? To put a new card on a lane, create it with hive_create_task's lane, never by its guessed key.`) // i18n-ignore: hive_lane's reply (agents)
+}
+
+/** A lane's list with a new card placed on it (HI-2167): last, or before its first card still in Todo (`next`). */
+async function placed(ws: WorkspaceService, was: LaneRecord | undefined, p: LanePlace): Promise<number[]> {
+  const list = (was ? (was.pending ?? was.cards) : []).filter((n) => n !== p.card)
+  if (p.position !== 'next') return [...list, p.card]
+  const board = await cardsNow(ws, list)
+  const at = list.findIndex((n) => {
+    const c = board.get(n)
+    return !!c && !c.archived && c.column === 'todo'
+  })
+  return at < 0 ? [...list, p.card] : [...list.slice(0, at), p.card, ...list.slice(at)]
 }
 
 /**
@@ -926,22 +971,25 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     if (put && (!bound || !running(bound))) throw new LaneError(409, `${put.putBack} was put back in Todo (its work stays on its branch), but the lane was ended meanwhile: its list wasn't changed and nothing was started. hive_lane list shows the lanes.`) // i18n-ignore: hive_lane's refusal (agents)
     if (put && bound && (!sameList(bound.cards, put.cards) || !sameList(bound.pending ?? [], put.pending ?? []))) throw new LaneError(409, `${put.putBack} was put back in Todo (its work stays on its branch), but the lane's list changed meanwhile: this list wasn't applied. hive_lane list shows it now.`) // i18n-ignore: hive_lane's refusal (agents)
     const was = bound ?? lanes.find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
-    shared = sharedCards(ws, lanes, s.project, builder.id, s.cards)
+    // A new card placed on the lane (HI-2167): its list as it is under this lock, so a change made meanwhile is kept.
+    if (s.place?.needsLane && !was) throw new LaneError(409, `${builder.name} has no running lane in ${s.project}: the card was made but not placed. Start one with hive_lane start (its key is in this reply), or pass lane as { builder, reviewer } to start one as you create a card.`) // i18n-ignore: hive_create_task's refusal (agents)
+    const cards = s.place ? await placed(ws, was, s.place) : s.cards
+    shared = sharedCards(ws, lanes, s.project, builder.id, cards)
     // As it was under this lock, for the Assistant's change (#1282): recorded with the save, in its transaction.
     const before = was ? laneValues(was) : null
     const t = now()
     // With rules on, any new list for the builder's running lane is an edit of that lane (HR6's #1270 round 1), so a card
     // in flight is never left behind; with them off, a list sharing no card is another loop, as before 1.0.
-    if (was && (was.cards.some((n) => s.cards.includes(n)) || on)) {
+    if (was && (was.cards.some((n) => cards.includes(n)) || on)) {
       // Hive owns the list (#1270, §16.11.1): a change while a card is in flight is queued for the next card boundary,
       // never refused; between cards it applies now. With rules off, at once, as before.
-      const change = on && !sameList(was.cards, s.cards) ? listChange((await views(ws, [was]))[0], was.cards, s.cards) : null
+      const change = on && !sameList(was.cards, cards) ? listChange((await views(ws, [was]))[0], was.cards, cards) : null
       if (change && change.behind !== null) {
         queuedAfter = change.behind
-        was.pending = [...s.cards]
+        was.pending = [...cards]
       } else {
         if (change) checks.push(stillBetweenCards(ws, was, change.check))
-        was.cards = s.cards
+        was.cards = cards
         delete was.pending
       }
       Object.assign(was, {
@@ -974,9 +1022,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     // Given no brief, it carries that lane's brief and name; a card already Done is left out of the new list.
     const just = was ? undefined : justEnded(lanes, s.project, builder.id)
     carried = just && s.brief === undefined ? just : null
-    const board = await cardsNow(ws, s.cards)
-    const done = s.cards.filter((n) => board.get(n)?.column === 'done')
-    if (done.length && done.length === s.cards.length) throw new LaneError(409, withCardNames(ws, () => `${done.map(cardRef).join(', ')} ${done.length > 1 ? 'are' : 'is'} already Done: no lane started.`)) // i18n-ignore: hive_lane's refusal (agents)
+    const board = await cardsNow(ws, cards)
+    const done = cards.filter((n) => board.get(n)?.column === 'done')
+    if (done.length && done.length === cards.length) throw new LaneError(409, withCardNames(ws, () => `${done.map(cardRef).join(', ')} ${done.length > 1 ? 'are' : 'is'} already Done: no lane started.`)) // i18n-ignore: hive_lane's refusal (agents)
     leftOut = done
     const rec: LaneRecord = {
       id: newId(),
@@ -984,7 +1032,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       name: s.name ?? carried?.name ?? null,
       builder,
       reviewer: reviewer ?? null,
-      cards: s.cards.filter((n) => !done.includes(n)),
+      cards: cards.filter((n) => !done.includes(n)),
       rounds: s.rounds ?? defaults.rounds,
       waitMinutes: s.waitMinutes ?? defaults.waitHours * 60,
       state: 'active',
@@ -1014,7 +1062,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     }
   }
   const [lane, replaced] = await views(ws, [r.rec, ...(r.replaced ? [r.replaced] : [])])
-  log.info(`Lane ${r.rec.id} ${r.did} for ${userText(builder.name)} in ${userText(s.project)}: ${s.cards.map((n) => `#${n}`).join(', ')}`)
+  log.info(`Lane ${r.rec.id} ${r.did} for ${userText(builder.name)} in ${userText(s.project)}: ${(r.rec.pending ?? r.rec.cards).map((n) => `#${n}`).join(', ')}`)
   if (r.replaced) laneFact(ws, r.replaced)
   if (r.did === 'started') laneFact(ws, r.rec)
   tellEnded(ws, ended)

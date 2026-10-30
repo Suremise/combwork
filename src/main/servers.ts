@@ -64,7 +64,7 @@ import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, 
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
 import { checkLanePool, launchRecordedLane, recordedLaneNote, resumeLaneBuilder, retryFreshStart } from './laneStart'
-import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber } from '../shared/lanes'
+import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber, type LaneChange } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { writePty } from './ptyHost'
@@ -2024,80 +2024,87 @@ route('GET', '/v1/lanes/:id', async ({ params }) =>
   })
 )
 
-route('POST', '/v1/lanes', async ({ body }) =>
-  laneCall(async () => {
-    const ws = requireWorkspace()
-    const p = laneProject(body?.project)
-    const args = laneArgs(body)
-    if (!args.cards) throw new HttpError(400, 'cards must be the card numbers, in order (at least one)')
-    const a = agentCaller()
-    // A project agent registers its own lane: it is the builder.
-    const builder = a ? (body?.builder !== undefined && body.builder !== '' && (await agentParam(p, body.builder)) !== a.agentId ? null : a.agentId) : await agentParam(p, body?.builder)
-    if (!builder) throw new HttpError(403, "An agent starts its own lane, as its builder: a reviewer joins its builder's lane (join)")
-    // A reviewer Hive doesn't know isn't a reason to refuse: the lane starts without one, and its reviewer can join it.
-    let reviewer: string | null | undefined
-    let note: string | undefined
-    if (body?.reviewer === null || body?.reviewer === '') reviewer = null
-    else if (body?.reviewer !== undefined) {
-      reviewer = await agentParam(p, body.reviewer).catch(() => null)
-      if (!reviewer) note = `No agent "${String(body.reviewer)}" in ${basename(p)}: the lane has no reviewer until one joins it.`
+route('POST', '/v1/lanes', async ({ body }) => laneCall(() => laneStartCall(body)))
+
+/**
+ * hive_lane start (POST /v1/lanes), and a new card placed on a lane as it is made (HI-2167, `place`: POST /v1/tasks with
+ * lane): one path, the same rules, launches and the Assistant's change for both.
+ */
+async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneChange> {
+  const ws = requireWorkspace()
+  const p = laneProject(body?.project)
+  const args = laneArgs(body)
+  if (place) args.cards = [place.card]
+  if (!args.cards) throw new HttpError(400, 'cards must be the card numbers, in order (at least one)')
+  const a = agentCaller()
+  // A project agent registers its own lane: it is the builder.
+  const builder = a ? (body?.builder !== undefined && body.builder !== '' && (await agentParam(p, body.builder)) !== a.agentId ? null : a.agentId) : await agentParam(p, body?.builder)
+  if (!builder) throw new HttpError(403, "An agent starts its own lane, as its builder: a reviewer joins its builder's lane (join)")
+  // A reviewer Hive doesn't know isn't a reason to refuse: the lane starts without one, and its reviewer can join it.
+  let reviewer: string | null | undefined
+  let note: string | undefined
+  if (body?.reviewer === null || body?.reviewer === '') reviewer = null
+  else if (body?.reviewer !== undefined) {
+    reviewer = await agentParam(p, body.reviewer).catch(() => null)
+    if (!reviewer) note = `No agent "${String(body.reviewer)}" in ${basename(p)}: the lane has no reviewer until one joins it.`
+  }
+  // Reviewed by the project's reviewer pool (HI-1581, G17), the Assistant's and a script's: refused as Start Lane…
+  // refuses it (the rules have no pool, nobody but the builder reviews), and with a reviewer of its own.
+  if (body?.pool !== undefined && typeof body.pool !== 'boolean') throw new HttpError(400, 'pool must be true or false')
+  const pool = body?.pool === true
+  // A changed list applied now, its card in flight put back (HI-1995).
+  if (body?.applyNow !== undefined && typeof body.applyNow !== 'boolean') throw new HttpError(400, 'applyNow must be true or false')
+  const applyNow = body?.applyNow === true
+  if (pool && a) throw new HttpError(403, "A lane reviewed by the pool is started by the Assistant or the user (Start Lane): an agent's own lane names its reviewer")
+  if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, 'A lane reviewed by the pool has no reviewer of its own: leave reviewer out')
+  if (pool) await checkLanePool(ws, p, builder)
+  const start = async () => {
+    // Hive's own start of the lane's card waits for this one to launch its agents (HI-2029); a builder registering its
+    // own loop is at work already.
+    const release = a ? null : lanes.holdLaneStart(ws, basename(p), builder)
+    try {
+      return await started()
+    } finally {
+      release?.()
     }
-    // Reviewed by the project's reviewer pool (HI-1581, G17), the Assistant's and a script's: refused as Start Lane…
-    // refuses it (the rules have no pool, nobody but the builder reviews), and with a reviewer of its own.
-    if (body?.pool !== undefined && typeof body.pool !== 'boolean') throw new HttpError(400, 'pool must be true or false')
-    const pool = body?.pool === true
-    // A changed list applied now, its card in flight put back (HI-1995).
-    if (body?.applyNow !== undefined && typeof body.applyNow !== 'boolean') throw new HttpError(400, 'applyNow must be true or false')
-    const applyNow = body?.applyNow === true
-    if (pool && a) throw new HttpError(403, "A lane reviewed by the pool is started by the Assistant or the user (Start Lane): an agent's own lane names its reviewer")
-    if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, 'A lane reviewed by the pool has no reviewer of its own: leave reviewer out')
-    if (pool) await checkLanePool(ws, p, builder)
-    const start = async () => {
-      // Hive's own start of the lane's card waits for this one to launch its agents (HI-2029); a builder registering its
-      // own loop is at work already.
-      const release = a ? null : lanes.holdLaneStart(ws, basename(p), builder)
-      try {
-        return await started()
-      } finally {
-        release?.()
-      }
-    }
-    const started = async () => {
-      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}) })
-      // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
-      // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
-      const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
-      const briefed = args.brief !== undefined || (r.did === 'started' && !!rec?.brief)
-      const told = briefed ? await briefNote(ws, rec ?? { project: basename(p) }) : null
-      if (briefed) await settleLaneBriefs(ws)
-      // Started for its builder by the Assistant or a script (HI-1900: a lane over stopped agents sat active, nothing lent,
-      // nobody working it): its stopped agents started as Start Lane… starts them, its slot lent for a stopped builder; a
-      // running one is left as it is, and the reply says to tell it (HI-1934). A builder registering its own loop is
-      // already at work. A running lane updated while its builder isn't running: its builder started on it.
-      let launched = ''
-      if (!a && r.did === 'started') launched = recordedLaneNote(await launchRecordedLane(ws, p, r.lane.id))
-      else if (!a && r.did === 'updated') launched = await resumeLaneBuilder(p, r.lane)
-      // The lane's own note first (an "Applied now:" stays its start; HI-2097's carried brief and Done cards left out).
-      const notes = [r.note, note, told, launched].filter(Boolean).join(' ')
-      return notes ? { ...r, note: notes } : r
-    }
-    if (!assistantCaller()) return start()
-    const builderAct = await knownAgent(basename(p), builder)
-    return assistantChange('agents', `start a lane in ${basename(p)}`, { kind: 'lane-start', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(builderAct ? { agent: builderAct } : {}) }, async () => {
-      // Recorded for undo by lanes.ts, from the lane as read under its lock, in its save (#1282).
-      const r = await start()
-      // #402: a lane the Assistant starts but doesn't watch goes unfollowed ("they'll tell you"): its reply says so. A
-      // lane watch (#531) on every running lane, or on this one, follows it.
-      const w = sessions.watchFor(ws.assistantHome, ASSISTANT_AGENT_ID)
-      const followed = !!w?.lanes && (w.lanes.includes('all') || w.lanes.includes(r.lane.id))
-      const nudge = followed ? '' : 'No watch of yours follows this lane: watch the lanes (hive_wait_for_tasks with lanes ["all"], wake) to follow it to its end.'
-      const result = nudge ? { ...r, note: [r.note, nudge].filter(Boolean).join(' ') } : r
-      // A reorder applied now put a card back and gave the lane a card to start next (HI-1995): neither is undone.
-      const putBack = applyNow && (r.note ?? '').startsWith('Applied now: ')
-      return { done: `Lane ${r.lane.id} ${r.did} in ${basename(p)}: ${r.lane.builder.name} / ${r.lane.reviewer?.name ?? 'no reviewer'}, ${r.lane.cards.map((c) => cardRef(c.number)).join(', ')}${putBack ? ` (${r.note!.replace(/^Applied now: /, 'applied now: ')})` : ''}`, act: laneAct(r.lane), result, ...(putBack ? { stays: UNDO_FINAL.laneReorderNow } : {}) }
-    })
+  }
+  const started = async () => {
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}) })
+    // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
+    // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
+    const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
+    const briefed = args.brief !== undefined || (r.did === 'started' && !!rec?.brief)
+    const told = briefed ? await briefNote(ws, rec ?? { project: basename(p) }) : null
+    if (briefed) await settleLaneBriefs(ws)
+    // Started for its builder by the Assistant or a script (HI-1900: a lane over stopped agents sat active, nothing lent,
+    // nobody working it): its stopped agents started as Start Lane… starts them, its slot lent for a stopped builder; a
+    // running one is left as it is, and the reply says to tell it (HI-1934). A builder registering its own loop is
+    // already at work. A running lane updated while its builder isn't running: its builder started on it.
+    let launched = ''
+    if (!a && r.did === 'started') launched = recordedLaneNote(await launchRecordedLane(ws, p, r.lane.id))
+    else if (!a && r.did === 'updated') launched = await resumeLaneBuilder(p, r.lane)
+    // The lane's own note first (an "Applied now:" stays its start; HI-2097's carried brief and Done cards left out).
+    // A card in its list made moments ago by someone else (HI-2167): a guessed key, perhaps; a placed card is its own.
+    const fresh = place ? null : await lanes.freshCardsNote(ws, args.cards!, await laneBy())
+    const notes = [r.note, note, told, launched, fresh].filter(Boolean).join(' ')
+    return notes ? { ...r, note: notes } : r
+  }
+  if (!assistantCaller()) return start()
+  const builderAct = await knownAgent(basename(p), builder)
+  return assistantChange('agents', `start a lane in ${basename(p)}`, { kind: 'lane-start', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(builderAct ? { agent: builderAct } : {}) }, async () => {
+    // Recorded for undo by lanes.ts, from the lane as read under its lock, in its save (#1282).
+    const r = await start()
+    // #402: a lane the Assistant starts but doesn't watch goes unfollowed ("they'll tell you"): its reply says so. A
+    // lane watch (#531) on every running lane, or on this one, follows it.
+    const w = sessions.watchFor(ws.assistantHome, ASSISTANT_AGENT_ID)
+    const followed = !!w?.lanes && (w.lanes.includes('all') || w.lanes.includes(r.lane.id))
+    const nudge = followed ? '' : 'No watch of yours follows this lane: watch the lanes (hive_wait_for_tasks with lanes ["all"], wake) to follow it to its end.'
+    const result = nudge ? { ...r, note: [r.note, nudge].filter(Boolean).join(' ') } : r
+    // A reorder applied now put a card back and gave the lane a card to start next (HI-1995): neither is undone.
+    const putBack = applyNow && (r.note ?? '').startsWith('Applied now: ')
+    return { done: `Lane ${r.lane.id} ${r.did} in ${basename(p)}: ${r.lane.builder.name} / ${r.lane.reviewer?.name ?? 'no reviewer'}, ${r.lane.cards.map((c) => cardRef(c.number)).join(', ')}${putBack ? ` (${r.note!.replace(/^Applied now: /, 'applied now: ')})` : ''}`, act: laneAct(r.lane), result, ...(putBack ? { stays: UNDO_FINAL.laneReorderNow } : {}) }
   })
-)
+}
 
 route('POST', '/v1/lanes/join', async ({ body }) =>
   laneCall(async () => {
@@ -2879,12 +2886,53 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   return query.get('history') === 'false' ? withoutHistory(told) : told
 })
 
+/** A new card's lane (HI-2167, POST /v1/tasks `lane`): a builder's name or id, or { builder, reviewer, brief, name, position }. */
+interface LanePlacement {
+  body: Record<string, unknown>
+  position: 'last' | 'next'
+  needsLane: boolean
+}
+
+/**
+ * A new card's `lane`, checked before the card is made (its shape, the builder an agent of the card's project, an agent's
+ * own lane only, the card made in Todo), so a refusal here makes no card. Null when it has none.
+ */
+async function lanePlacement(v: unknown, input: { project?: unknown; column?: TaskColumn }): Promise<LanePlacement | null> {
+  if (v === undefined || v === null) return null
+  const o: Record<string, unknown> = typeof v === 'string' ? { builder: v } : typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
+  if (typeof o.builder !== 'string' || !o.builder.trim()) throw new HttpError(400, 'lane is the builder whose running lane takes the card ("HB1"), or { builder, reviewer, brief, name, position } to start one if it has none')
+  for (const k of Object.keys(o)) if (!['builder', 'reviewer', 'brief', 'name', 'position'].includes(k)) throw new HttpError(400, `lane takes builder, reviewer, brief, name and position, not ${k}`)
+  if (o.position !== undefined && o.position !== 'last' && o.position !== 'next') throw new HttpError(400, "lane's position is last (the default) or next (before its first card still in Todo)")
+  if (input.column !== undefined && input.column !== 'todo') throw new HttpError(400, 'A card placed on a lane is made in Todo: leave column out')
+  const project = typeof input.project === 'string' && input.project ? input.project : null
+  if (!project) throw new HttpError(400, 'A card placed on a lane needs its project')
+  const p = laneProject(project)
+  const builder = await agentParam(p, o.builder.trim())
+  const a = agentCaller()
+  if (a && builder !== a.agentId) throw new HttpError(403, "An agent places a new card on its own lane only, as its builder: another builder's lane is theirs, the Assistant's or the user's")
+  laneArgs(o)
+  const { position, ...rest } = o
+  return { body: { ...rest, project, builder: o.builder.trim() }, position: position === 'next' ? 'next' : 'last', needsLane: typeof v === 'string' }
+}
+
+/** A new card placed on its lane (HI-2167): the lane's change, or why it wasn't placed (the card stays, its key named). */
+async function placeOnLane(l: LanePlacement, card: number): Promise<{ lane: LaneChange } | { laneRefused: string }> {
+  try {
+    return { lane: await laneCall(() => laneStartCall(l.body, { card, position: l.position, needsLane: l.needsLane })) }
+  } catch (e) {
+    return { laneRefused: (e as Error).message }
+  }
+}
+
 route('POST', '/v1/tasks', async ({ body }) => {
   requireWorkspace()
   const title = String(body?.title ?? '').trim()
   if (!title) throw new HttpError(400, 'title is required')
   const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}) }
   const actor = await taskActor()
+  // Placed on a lane as it is made (HI-2167): checked before the card is made; placed after, through hive_lane start's
+  // own path, so nobody guesses its key.
+  const lane = await lanePlacement(body?.lane, input)
   // Files to keep with it (HI-1700): the list checked now; copied inside the operation that makes the card, once its
   // project is known to be allowed, and published with it.
   const paths = attachmentList(body)
@@ -2892,15 +2940,17 @@ route('POST', '/v1/tasks', async ({ body }) => {
   // A long title is kept, with a line suggesting a shorter one (HI-1872), or one with what belongs in the description (HI-2061).
   const nudge = titleNudge(title, actor, titleKeys())
   const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(nudge ? { nudge } : {}) })
-  if (actor.kind !== 'assistant') return reply(await create())
+  // Placed once it is made (the Assistant's: its own change, as hive_lane start is), never inside the card's own change.
+  const placing = async <R extends { number: number }>(r: R) => (lane ? { ...r, ...(await placeOnLane(lane, r.number)) } : r)
+  if (actor.kind !== 'assistant') return placing(await reply(await create()))
   const project = typeof input.project === 'string' && input.project ? input.project : null
   // Made in Doing with nobody on it (HI-2062): refused before the user is asked to approve it (checked again as it is made).
   if (project && input.column === 'doing' && !input.agent) throw new tasks.TaskConflictError(tasks.DOING_NOBODY_NEW)
   const given = await knownAgent(project, input.agent)
-  return assistantChange('agents', `add the task "${clip(title, 60)}" to the board`, { kind: 'create-task', ...(project ? { project } : {}), ...(given ? { agent: given } : {}) }, async () => {
+  return placing(await assistantChange('agents', `add the task "${clip(title, 60)}" to the board`, { kind: 'create-task', ...(project ? { project } : {}), ...(given ? { agent: given } : {}) }, async () => {
     const c = await create()
     return { done: `Added ${cardName(c)} to the board${c.project ? ` (${c.project})` : ''}: ${clip(c.title, 80)}`, act: { card: c.number, column: c.column, ...(c.project ? { project: c.project } : {}), agent: await cardAgent(c) }, result: await reply(c) }
-  })
+  }))
 })
 
 route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {

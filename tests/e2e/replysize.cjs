@@ -324,6 +324,13 @@ const prose = (seed, n) => {
   measure('hive_lane (join)', tool('hive_lane', { action: 'join', builder: 'Tester', cards: [todo[3]] }, 'own'), 400)
   const laneList = measure('hive_lane (list)', tool('hive_lane', { action: 'list' }, 'own'), 600)
   check('lanes listed a line each', laneList.split('\n').length === 2 && laneList.includes(laneId), laneList)
+  // HI-2167: a new card placed on the builder's own lane as it is made: the card, then the lane's change, by key; another
+  // builder's lane is refused before any card is made.
+  const placed = measure('hive_create_task (on a lane)', tool('hive_create_task', { title: 'Placed card', description: prose(702, 300), lane: 'Coder' }, 'own'), 700)
+  const placedKey = /^([A-Z]{2,4}-\d+) created in Todo/.exec(placed)?.[1]
+  check('a card made on a lane: its key, then the lane updated with it', !!placedKey && placed.split('\n').length === 2 && placed.split('\n')[1].startsWith('Lane updated: Coder / Tester (alpha) measured lane: ') && placed.split('\n')[1].includes(placedKey), placed)
+  const elsewhere = tool('hive_create_task', { title: 'Not placed', lane: 'Tester' }, 'own')
+  check("…another builder's lane: refused, no card made", elsewhere.isError && /its own lane only/.test(elsewhere.text) && !(await inv('tasks:list')).some((c) => c.title === 'Not placed'), elsewhere.text)
   check('a lane ended', measure('hive_lane (end)', tool('hive_lane', { action: 'end', lane: laneId, abandoned: true }), 400).startsWith('Lane abandoned: '), texts['hive_lane (end)'])
   tool('hive_wait_for_tasks', { cancel: true }, 'own')
   check('…and no longer waits once it has ended', !!(await until(async () => ['ready', 'finished'].includes((await live(alpha, coder.id))?.status), HUNG_MS)), (await live(alpha, coder.id))?.status)
