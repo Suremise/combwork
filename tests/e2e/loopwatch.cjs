@@ -195,6 +195,22 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', c2, { column: 'passed' })
   check('a card that has moved on (Passed) is no longer stalled', !!(await until(async () => !(await stalledOf(c2)), 8000)))
 
+  // --- 4. HI-2080: a builder that asks the user on its card (hive_ask_user) and ends its turn with no watch waits for
+  // the user, never stalled; once the user answers, the usual rule applies again.
+  const c3 = (await inv('tasks:create', { title: 'Asks the user', project: 'alpha' })).number
+  const started = await inv('tasks:move', c3, 'doing', { agent: builder.id })
+  check('#3 starts on the builder', !!started.moved, JSON.stringify(started))
+  script('Builder', [`hive hive_ask_user ${JSON.stringify({ card: `#${c3}`, kind: 'decide', text: 'Keep the old greeting?' })}`])
+  await say(builder.id, wait(c3, { changes: ['comment'] }))
+  check('the builder watches #3', !!(await until(async () => (await live(builder.id))?.status === 'watching', HUNG_MS)), await why(builder.id))
+  await inv('tasks:comment', c3, 'Which greeting should it keep?')
+  const question = async () => (await inv('tasks:forYou', 'alpha')).items.find((i) => i.card === c3 && i.asker === builder.id)
+  check('…is woken, asks the user and ends its turn with no watch', !!(await until(async () => !!(await question()) && ['ready', 'finished'].includes((await live(builder.id))?.status) && !(await live(builder.id))?.watch, 15000)), `${JSON.stringify((await inv('tasks:forYou', 'alpha')).items)} ${await why(builder.id)}`)
+  await lib.sleep(4500) // on purpose: longer than the grace, to see no flag comes
+  check('waiting on its own question: never flagged (HI-2080)', !(await stalledOf(c3)) && !((await live(builder.id))?.notWatching ?? []).includes(c3), JSON.stringify({ stalled: await stalledOf(c3), mark: (await live(builder.id))?.notWatching }))
+  await inv('tasks:answer', c3, (await question()).request, { outcome: 'answered', reply: 'Keep it.' })
+  check('once the user answers, its card is the builder\'s move again: flagged after the grace', !!(await until(async () => ((await stalledOf(c3)) ?? '').startsWith("Builder isn't watching #"), 20000)), String(await stalledOf(c3)))
+
   await inv('session:stop', alpha)
   await until(async () => (await inv('session:live')).length === 0, 15000)
   await app.close()

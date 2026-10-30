@@ -4,6 +4,7 @@ import { agentRuntime } from '../shared/runtime'
 import { backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, type LaneOrderView, type StallAgent } from '../shared/tasks'
 import type { AgentInfo, AgentStart, LaneStatus, ProgressRun, TaskCard } from '../shared/types'
 import { LOOP_STEP_WAIT_MINUTES, laneStatusText } from '../shared/lanes'
+import { forYouOfCards } from './workflow/cardWork'
 import { projectPreferences } from './workflow/preferences'
 import { queueReturnOf, staleApprovalOf } from './queueReturn'
 import { isResuming } from './restartResume'
@@ -155,6 +156,16 @@ export function withAgentStarts<T extends { agents: AgentInfo[] }>(projectPath: 
   }
 }
 
+/** Whether the card has an open For you request this agent asked (HI-2080): the user's answer is what it waits for. */
+function ownQuestionOpen(wsPath: string, c: TaskCard, agentId: string): boolean {
+  try {
+    return (forYouOfCards(workspaceOf(join(wsPath, c.project)), [c.number]).get(c.number) ?? []).some((r) => r.asker === agentId)
+  } catch {
+    // The board unreadable now: the stall stands, as before.
+    return false
+  }
+}
+
 /**
  * Why a card is stalled, given its agent as it is now (null: removed; its name, whether it runs, why its start failed),
  * its workspace's folder, its running lane (none: no lane's deadlock is looked for), and how long a design waits for its
@@ -168,7 +179,13 @@ export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: stri
   const back = now ? (returnedWaitReason(c, returned, now) ?? staleWaitReason(c, stale, now)) : null
   // A started review's builder's job for the card (HI-1993): only read for a card it could stall.
   const job = c.column === 'review' && c.review && c.agent && wsPath ? builderJobOf(c, runsOf?.(wsPath) ?? [], live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project.toLowerCase()) ?? null, backgroundTaskMinutes(config.settings.agents.backgroundTaskMinutes) * 60_000) : null
-  return startFailedReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? reviewVerdictWaitReason(c, watchers, Date.now(), undefined, job) ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs) ?? laneNext(c, lane, live, agentNow) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
+  // HI-2080: a reviewer waiting on its own question to the user (For you) isn't stalled for only watching the card; the
+  // board is read only for a card that would be.
+  const verdictWait = (): string | null => {
+    const why = reviewVerdictWaitReason(c, watchers, Date.now(), undefined, job)
+    return why && wsPath && c.review && ownQuestionOpen(wsPath, c, c.review.agent) ? null : why
+  }
+  return startFailedReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? verdictWait() ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs) ?? laneNext(c, lane, live, agentNow) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
 }
 
 /**

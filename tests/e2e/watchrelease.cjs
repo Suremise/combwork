@@ -169,6 +169,17 @@ const check = (name, ok, extra = '') => {
   await inv('tasks:update', c3, { blocked: 'Should the icon be a bee?' })
   check('…until its question blocks the card', !!(await until(async () => (await marker.count()) === 0, 15000)))
 
+  // HI-2080: unblocked, it is stalled again; asking the user instead (For you, hive_ask_user) and watching again, the
+  // reviewer waits on its own question, which isn't a stall.
+  await inv('tasks:update', c3, { blocked: '' })
+  check('unblocked, the lane says it is stalled again', !!(await until(async () => (await marker.count()) === 1, 15000)))
+  await until(() => idle(reviewer.id), 15000)
+  await say(reviewer.id, `hive hive_ask_user ${JSON.stringify({ card: `#${c3}`, kind: 'decide', text: 'Should the icon be a bee?' })}`)
+  check('the reviewer asks the user (For you)', !!(await until(async () => (await inv('tasks:forYou', 'alpha')).items.some((i) => i.card === c3 && i.asker === reviewer.id), 15000)), JSON.stringify((await inv('tasks:forYou', 'alpha')).items))
+  await until(() => idle(reviewer.id), 15000)
+  await say(reviewer.id, watch([c3], { changes: ['verdict'] }))
+  check('…and watching the card again while it waits for the answer, it isn\'t stalled (HI-2080)', !!(await until(async () => (await live(reviewer.id))?.status === 'watching' && (await marker.count()) === 0, 15000)), String(await marker.count()))
+
   await app.close()
   console.log(failed ? `\n${failed} FAILED` : '\nALL PASSED')
   process.exit(failed ? 1 : 0)
