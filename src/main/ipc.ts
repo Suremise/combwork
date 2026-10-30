@@ -1230,7 +1230,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'activity:turns': (p, id, known) => transcripts.turns(p, id, known),
     'activity:sessions': (p, hours) => sessions.activitySessions(workspace.assertSessionHost(p), Math.max(1, Math.min(24 * 7, Number(hours) || 24))),
     'activity:detail': (p, id, itemId) => transcripts.detail(p, id, Number(itemId)),
-    'activity:endProcess': (p, agentId, pid, created) => endAgentProcess(workspace.assertSessionHost(p), String(agentId), Number(pid), String(created)),
+    // The asking window's own workspace only, as team:endProcess (HI-2096): the `workspace` proxy would find another
+    // window's by the path, so its process would end from here.
+    'activity:endProcess': (p, agentId, pid, created) => endAgentProcess(contextWorkspace()!.assertSessionHost(String(p)), String(agentId), Number(pid), String(created)),
     'transcript:image': (p, id, imageId) => transcripts.image(p, id, imageId),
     'transcript:search': (p, query, id) => transcripts.search(p, query, id),
     'transcript:compactions': (p, id) => transcripts.compactions(p, id),
