@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'async_hooks'
 import { join, resolve, sep } from 'path'
 import { SHARE_ENV, Worker } from 'worker_threads'
 import { lstat, readFile, readlink } from 'original-fs/promises'
@@ -55,13 +56,45 @@ export interface GitRunOptions {
   timeout?: number
 }
 
-/** A seam for unit tests: told of each git command as it starts (#732 counts a template plan's and load's). */
+/**
+ * A seam for unit tests: told of each git command as it starts on git's worker thread (#732 counts a template plan's
+ * and load's), not of one a route runs (HI-2078).
+ */
 export const gitTestHooks: { started?: (cwd: string, args: readonly string[]) => void } = {}
 
+/** HI-2078: where a scope's git runs instead of the worker: the request as the worker gets it, its outcome as execFile's. */
+export type GitRoute = (m: Omit<GitRequest, 'id'>) => Promise<GitOutcome>
+
+/** A route's scope: its route, while what it wraps runs (active), and not after. */
+type RouteScope = { route: GitRoute; active: boolean }
+const routes = new AsyncLocalStorage<RouteScope | null>()
+
+/**
+ * HI-2078: runs `fn` with every git() it makes run by `route` (the merge queue's run: its lease's git host, in its job),
+ * until `fn` settles. Work started inside it and still going after (a timer, a listener) runs git on the worker again,
+ * as a completed step's answers go (gitStep). Inside, `route` answers for itself: it never falls back to the worker.
+ */
+export async function withGitRoute<T>(route: GitRoute, fn: () => Promise<T>): Promise<T> {
+  const scope: RouteScope = { route, active: true }
+  try {
+    return await routes.run(scope, fn)
+  } finally {
+    scope.active = false
+  }
+}
+
+/** HI-2078: runs `fn` outside any route (a runner's own release and clean-up, whoever started it). */
+export function withoutGitRoute<T>(fn: () => T): T {
+  return routes.run(null, fn)
+}
+
 export async function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
-  gitTestHooks.started?.(cwd, args)
-  // Started off main's thread (HI-1783): gitWorker.ts runs it as this always did, and its outcome is read here.
-  const o = await thread.run({ cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) })
+  const m = { cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) }
+  const scope = routes.getStore()
+  // HI-2078: a route's scope runs it there; else it starts off main's thread (HI-1783): gitWorker.ts runs it as this
+  // always did. Either way its outcome is read here.
+  if (!scope?.active) gitTestHooks.started?.(cwd, args)
+  const o = scope?.active ? await scope.route(m) : await thread.run(m)
   if (o.held) log.warn(`git ${args[0]}'s output stayed open after it exited, held by another process (HI-1854): taken as read`)
   const buf = Buffer.from(o.stdout.buffer, o.stdout.byteOffset, o.stdout.byteLength)
   const err = o.error

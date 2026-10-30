@@ -14,7 +14,7 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { FactStore } from '../src/main/workflow/factStore'
-import { FRAME_MAX, FrameDecoder, GitHost, HOST, OUT_CHUNK, REQUEST_MAX, startGitHost, type Frame, type FrameKind, type HostResult } from '../src/main/workflow/gitHost'
+import { FRAME_MAX, FrameDecoder, GitHost, HOST, OUT_CHUNK, REQUEST_MAX, startGitHost, type Frame, type FrameKind } from '../src/main/workflow/gitHost'
 import { endLeaseJob, queueHost } from '../src/main/workflow/queueJobs'
 import { LeaseLost, QueueRunner } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed } from '../src/main/workflow/queueProcs'
@@ -107,7 +107,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     const dirs = [tempDir('gh-a-'), tempDir('gh-b-'), tempDir('gh-c-')]
     const code = `process.stdin.pipe(process.stdout); process.stderr.write(process.cwd() + '|' + process.env.HI2079); process.stdin.on('end', () => { process.exitCode = Number(process.env.HI2079) })`
     const rs = await Promise.all(dirs.map((d, i) => host.request(node(d, code, { env: { ...baseEnv(), HI2079: String(i + 2) }, input: `in ${i}` }))))
-    rs.forEach((r, i) => expect(r).toEqual({ out: `in ${i}`, err: `${dirs[i]}|${i + 2}`, code: i + 2 }))
+    rs.forEach((r, i) => expect(r).toMatchObject({ out: `in ${i}`, err: `${dirs[i]}|${i + 2}`, code: i + 2 }))
     expect(lost).toEqual([])
   })
 
@@ -127,7 +127,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     const r = await host.request({ command: 'no-such-command-hi2079', args: [], cwd: tempDir('gh-'), env: baseEnv() })
     expect(r).toMatchObject({ code: null, notRun: 'ENOENT' })
     expect(r.err).toMatch(/ENOENT/)
-    expect(await host.request(node(tempDir('gh-'), 'process.exit(1)'))).toEqual({ out: '', err: '', code: 1 })
+    expect(await host.request(node(tempDir('gh-'), 'process.exit(1)'))).toMatchObject({ out: '', err: '', code: 1 })
     expect(lost).toEqual([])
   })
 
@@ -137,7 +137,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     const { host } = own({ ...baseEnv(), NODE_OPTIONS: `--require "${preload}"`, HIVE_GIT_HOST_TEST_SIGNAL: '1' })
     expect(await host.request(node(tempDir('gh-'), 'setInterval(() => {}, 1000)'))).toMatchObject({ code: null, signal: 'SIGTERM' })
     const plain = await host.request(node(tempDir('gh-'), `process.stderr.write('said'); process.exit(1)`))
-    expect(plain).toEqual({ out: '', err: 'said', code: 1 })
+    expect(plain).toMatchObject({ out: '', err: 'said', code: 1 })
   })
 
   it('output a descendant keeps open after the command exited: told after the quiet, and what it writes later never framed', async () => {
@@ -150,11 +150,11 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     const later = `const fs = require('fs'); process.stdout.on('error', () => {}); setTimeout(() => process.exit(0), 60000); const t = setInterval(() => { if (!fs.existsSync(${JSON.stringify(go)})) return; clearInterval(t); process.stdout.write('late', () => { fs.writeFileSync(${JSON.stringify(mark)}, String(process.pid)); process.exit(0) }) }, 50)`
     // Hidden, in the test's own environment (the command's, from baseEnv).
     const code = `const k = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(later)}], { stdio: ['ignore', 'inherit', 'inherit'], detached: true, windowsHide: true, env: process.env }); k.unref(); process.stdout.write('p')`
-    expect(await host.request(node(dir, code))).toEqual({ out: 'p', err: '', code: 0 })
+    expect(await host.request(node(dir, code))).toMatchObject({ out: 'p', err: '', code: 0 })
     writeFileSync(go, '')
     await vi.waitFor(() => expect(existsSync(mark)).toBe(true), { timeout: 30_000, interval: 100 })
     // Written to a pipe the host no longer reads: nothing framed, nothing lost, and the host goes on.
-    expect(await host.request(node(dir, `process.stdout.write('next')`))).toEqual({ out: 'next', err: '', code: 0 })
+    expect(await host.request(node(dir, `process.stdout.write('next')`))).toMatchObject({ out: 'next', err: '', code: 0 })
     expect(lost).toEqual([])
   })
 
@@ -162,7 +162,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     const { host, lost } = own()
     const r = await host.request({ ...node(tempDir('gh-'), ''), input: 'x'.repeat(REQUEST_MAX) })
     expect(r).toMatchObject({ code: null, notRun: 'E2BIG' })
-    expect(await host.request(node(tempDir('gh-'), `process.stdout.write('ok')`))).toEqual({ out: 'ok', err: '', code: 0 })
+    expect(await host.request(node(tempDir('gh-'), `process.stdout.write('ok')`))).toMatchObject({ out: 'ok', err: '', code: 0 })
     expect(lost).toEqual([])
   })
 
@@ -177,7 +177,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     await identify(Number(readFileSync(pidFile, 'utf8')))
     await windowsProbe.end([await identify(child.pid!)])
     expect(await waiting).toMatchObject({ code: null, lost: expect.any(String) })
-    expect(told).toEqual({ out: 'done', err: '', code: 0 })
+    expect(told).toMatchObject({ out: 'done', err: '', code: 0 })
     expect(lost).toHaveLength(1)
     expect(host.usable).toBe(false)
     expect(await host.request(node(dir, ''))).toMatchObject({ code: null, lost: lost[0] })
@@ -332,7 +332,7 @@ describe("what a git host says that it shouldn't (HI-2079)", () => {
     child.emit('exit', 0, null)
     // The frames it wrote before it exited arrive after.
     child.stdout!.end(frame('X', 1, '0'))
-    expect(await a).toEqual({ out: 'out', err: '', code: 0 } satisfies HostResult)
+    expect(await a).toMatchObject({ out: 'out', err: '', code: 0, outBuf: Buffer.from('out') })
     expect(await b).toMatchObject({ lost: expect.stringMatching(/ended/) })
     expect(lost).toHaveLength(1)
   })

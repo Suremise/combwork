@@ -25,7 +25,7 @@ import { detect } from '../platform/registry'
 import { boardRead, boardReadOnly, boardWrite, onBoardUpgraded } from '../boardStore'
 import { onHiveEvent } from '../events'
 import { exitBy } from '../exitLog'
-import { git } from '../git'
+import { git, withGitRoute } from '../git'
 import { createLogger, userText } from '../logger'
 import { processSupervisor } from '../agentProcesses'
 import { advanced } from '../advanced'
@@ -235,14 +235,16 @@ async function runHost(h: Host): Promise<void> {
         // Each queue recovers its target's begun entries first: what to run again is the queue's own (an entry recovered to
         // run again by an earlier queue, paused meanwhile, is found again here, not left Merging).
         const q = new MergeQueue(wf, queueConfig(h, r))
-        const recovered = await q.recover(h.target)
+        // HI-2078: every git the queue's work runs (the platform's reads too) runs in its lease's git host, in its job.
+        const route = (m: Parameters<QueueRunner['gitOutcome']>[0]) => r.gitOutcome(m)
+        const recovered = await withGitRoute(route, () => q.recover(h.target))
         for (const o of recovered) if (o.outcome === 'integrated' || o.outcome === 'failed') await dropQueuePin(h.projectPath, o.card)
         // Rules off: open entries wait (paused) before their advance; recovery above finished any advance begun.
         if (!workflowEnforced()) {
           await pauseForRulesOff(wf, q, h.target)
           return
         }
-        const outcomes = await q.drain(h.target)
+        const outcomes = await withGitRoute(route, () => q.drain(h.target))
         for (const o of outcomes) if (o.outcome !== 'paused') await dropQueuePin(h.projectPath, o.card)
       } catch (e) {
         // Its git host failed it part way: what it was doing is uncertain, never a card's outcome (its writes refused).

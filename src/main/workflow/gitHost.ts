@@ -17,9 +17,12 @@ export const REQUEST_MAX = 1 << 20
 export const FRAME_MAX = 1 << 20
 export const OUT_CHUNK = 64 * 1024
 
-/** The frames' kinds: started (pid), out, err, exit (code), signal (name), notStarted (Node's code). */
-export type FrameKind = 'S' | 'O' | 'E' | 'X' | 'K' | 'N'
-const KINDS = new Set<string>(['S', 'O', 'E', 'X', 'K', 'N'])
+/**
+ * The frames' kinds: started (pid), out, err, exit (code), signal (name), notStarted (Node's code), bounded (HI-2078:
+ * `maxBuffer` or `timeout`, `:alive` when its child couldn't be ended).
+ */
+export type FrameKind = 'S' | 'O' | 'E' | 'X' | 'K' | 'N' | 'B'
+const KINDS = new Set<string>(['S', 'O', 'E', 'X', 'K', 'N', 'B'])
 /** kind (1 byte), id (u32), length (u32), then the payload. */
 const HEAD = 9
 
@@ -66,26 +69,54 @@ function run(s) {
     c.once('error', (e) => { frame('E', s.id, String(e && e.message)); frame('N', s.id, String((e && e.code) || 'error')) })
     return
   }
-  const r = { c, exited: null, quiet: null, over: false, wait: () => {} }
+  const r = { c, exited: null, quiet: null, timer: null, over: false, wait: () => {} }
   live.set(s.id, r)
   c.on('error', () => {})
   c.stdin.on('error', () => {})
   c.stdin.end(s.input || '')
   frame('S', s.id, String(c.pid))
   if (blocked) { c.stdout.pause(); c.stderr.pause() }
+  // HI-2078: its bounds, as execFile's (git()'s): each output's bytes counted as they come, and its time. Past one, nothing
+  // more of it is framed, its own child is ended by its handle (as execFile does: what it started stays in the job),
+  // and B says which (':alive' when the kill failed). Nothing is framed after.
+  const max = s.maxBuffer > 0 ? s.maxBuffer : Infinity
+  const sizes = { O: 0, E: 0 }
+  const bound = (why) => {
+    if (r.over) return
+    r.over = true
+    clearTimeout(r.quiet); clearTimeout(r.timer)
+    live.delete(s.id)
+    c.stdout.removeAllListeners('data'); c.stderr.removeAllListeners('data')
+    c.stdout.destroy(); c.stderr.destroy()
+    let killed = false
+    try { killed = c.kill() } catch {}
+    frame('B', s.id, killed ? why : why + ':alive')
+    done()
+  }
+  const take = (kind) => (d) => {
+    if (r.over) return
+    sizes[kind] += d.length
+    if (sizes[kind] <= max) return data(kind, s.id)(d)
+    // As execFile keeps it: what came up to the bound, then the end.
+    const room = max - (sizes[kind] - d.length)
+    if (room > 0) data(kind, s.id)(d.subarray(0, room))
+    bound('maxBuffer')
+  }
+  if (s.timeout > 0) r.timer = setTimeout(() => bound('timeout'), s.timeout)
   // HI-2043, as onOutputSettled: told once the output has closed, all of it read; once the command has exited, an
   // output kept open (a descendant that got away) is closed after QUIET ms with nothing more, the quiet counted only
   // while its output flows (never while the runner holds it back), and what is already buffered framed first. Nothing
   // is framed after.
-  const out = data('O', s.id), err = data('E', s.id)
+  const out = take('O'), err = take('E')
   const settle = () => {
     if (r.over) return
-    r.over = true
-    clearTimeout(r.quiet)
-    live.delete(s.id)
     c.stdout.removeAllListeners('data'); c.stderr.removeAllListeners('data')
-    for (let b; (b = c.stdout.read()) !== null; ) out(b)
-    for (let b; (b = c.stderr.read()) !== null; ) err(b)
+    for (let b; !r.over && (b = c.stdout.read()) !== null; ) out(b)
+    for (let b; !r.over && (b = c.stderr.read()) !== null; ) err(b)
+    if (r.over) return
+    r.over = true
+    clearTimeout(r.quiet); clearTimeout(r.timer)
+    live.delete(s.id)
     c.stdout.destroy(); c.stderr.destroy()
     const [code, signal] = r.exited
     if (code !== null) frame('X', s.id, String(code))
@@ -114,15 +145,33 @@ process.stdin.on('error', () => {})
 process.stdin.on('end', () => { if (!gated) end(70); closing = true; done() })
 `
 
-/** A request's result, as the host told it. `lost`: the host went (or said something it shouldn't) before its end. */
+/**
+ * A request's result, as the host told it, its output as text and as bytes. `lost`: the host went (or said something it
+ * shouldn't) before its end. `bounded` (HI-2078): ended at its bound (`alive`: its child couldn't be ended).
+ */
 export interface HostResult {
   out: string
   err: string
+  outBuf: Buffer
+  errBuf: Buffer
   code: number | null
   signal?: string
   notRun?: string
   lost?: string
+  bounded?: 'maxBuffer' | 'timeout'
+  alive?: boolean
 }
+
+/** A request's bounds (HI-2078, as git()'s execFile): each output's bytes, and its time in ms. */
+export interface HostBounds {
+  maxBuffer?: number
+  timeout?: number
+}
+
+const NONE = Buffer.alloc(0)
+type Told = Omit<HostResult, 'out' | 'err' | 'outBuf' | 'errBuf'>
+/** A result with nothing read: the request never reached a command. */
+const nothing = (r: Told & { err?: string }): HostResult => ({ ...r, out: '', outBuf: NONE, err: r.err ?? '', errBuf: Buffer.from(r.err ?? '') })
 
 /** One frame, decoded. */
 export interface Frame {
@@ -170,7 +219,14 @@ export function startGitHost(base: NodeJS.ProcessEnv = process.env): { child: Ch
   return { child, after, before: Date.now() }
 }
 
-type Pending = { out: Buffer[]; err: Buffer[]; started: boolean; done: (r: HostResult) => void }
+type Pending = { out: Buffer[]; err: Buffer[]; sizes: { out: number; err: number }; max: number; started: boolean; done: (r: HostResult) => void }
+
+/** What a request has read so far, as a result. */
+const read = (p: Pending, r: Told): HostResult => {
+  const outBuf = Buffer.concat(p.out)
+  const errBuf = Buffer.concat(p.err)
+  return { ...r, out: outBuf.toString('utf8'), err: errBuf.toString('utf8'), outBuf, errBuf }
+}
 
 /**
  * The runner's side of a host: its requests and what comes back. Once the host goes (its exit, a pipe's error) or says
@@ -243,16 +299,18 @@ export class GitHost {
   }
 
   /**
-   * Runs a command in it: its output and end. A request over REQUEST_MAX is never sent (notRun 'E2BIG'); one sent while
-   * or before the host goes is lost, never taken for an answer.
+   * Runs a command in it: its output and end, within its bounds (HI-2078: the host ends it there). A request over
+   * REQUEST_MAX is never sent (notRun 'E2BIG'); one sent while or before the host goes is lost, never taken for an answer.
+   * A host that sends more of an output than its bound allows is lost too (what is read here stays bounded).
    */
-  request(spec: { command: string; args: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; input?: string }): Promise<HostResult> {
-    if (this.why) return Promise.resolve({ out: '', err: '', code: null, lost: this.why })
+  request(spec: { command: string; args: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; input?: string } & HostBounds): Promise<HostResult> {
+    if (this.why) return Promise.resolve(nothing({ code: null, lost: this.why }))
     const id = this.next++
     const line = JSON.stringify({ id, ...spec }) + '\n'
-    if (Buffer.byteLength(line) > REQUEST_MAX) return Promise.resolve({ out: '', err: `the command is too long for the merge queue's git host (${Buffer.byteLength(line)} bytes)`, code: null, notRun: 'E2BIG' }) // i18n-ignore: the command's side of an error, in English as git's messages are
+    if (Buffer.byteLength(line) > REQUEST_MAX) return Promise.resolve(nothing({ err: `the command is too long for the merge queue's git host (${Buffer.byteLength(line)} bytes)`, code: null, notRun: 'E2BIG' })) // i18n-ignore: the command's side of an error, in English as git's messages are
+    const max = spec.maxBuffer && spec.maxBuffer > 0 ? spec.maxBuffer : Infinity
     return new Promise((done) => {
-      this.pending.set(id, { out: [], err: [], started: false, done })
+      this.pending.set(id, { out: [], err: [], sizes: { out: 0, err: 0 }, max, started: false, done })
       try {
         this.child.stdin!.write(line)
       } catch (e) {
@@ -270,32 +328,38 @@ export class GitHost {
       p.started = true
       return
     }
-    if (f.kind === 'E' && !p.started) {
-      // A start that failed says why before it says so (N).
-      p.err.push(f.payload)
+    if (f.kind === 'O' || f.kind === 'E') {
+      // Its output, bounded here too: a start that failed says why before it says so (N); else only after its start.
+      if (f.kind === 'O' && !p.started) return this.lose(`O for ${f.id} before its start`) // i18n-ignore: a reason, logged
+      const which = f.kind === 'O' ? 'out' : 'err'
+      p.sizes[which] += f.payload.length
+      if (p.sizes[which] > p.max) return this.lose(`more ${which} for ${f.id} than its bound`) // i18n-ignore: a reason, logged
+      p[which].push(f.payload)
       return
     }
     if (f.kind === 'N') {
       if (p.started) return this.lose(`a failed start for ${f.id}, which started`) // i18n-ignore: a reason, logged
       this.pending.delete(f.id)
-      return p.done({ out: '', err: Buffer.concat(p.err).toString('utf8'), code: null, notRun: text() || 'error' })
+      return p.done(read(p, { code: null, notRun: text() || 'error' }))
     }
     if (!p.started) return this.lose(`${f.kind} for ${f.id} before its start`) // i18n-ignore: a reason, logged
-    if (f.kind === 'O') p.out.push(f.payload)
-    else if (f.kind === 'E') p.err.push(f.payload)
-    else {
-      const code = f.kind === 'X' ? Number(text()) : null
-      if (f.kind === 'X' && !Number.isInteger(code)) return this.lose(`an exit that isn't a number for ${f.id}`) // i18n-ignore: a reason, logged
+    if (f.kind === 'B') {
+      const [why, still] = text().split(':')
+      if ((why !== 'maxBuffer' && why !== 'timeout') || (still !== undefined && still !== 'alive')) return this.lose(`a bound that isn't one for ${f.id}`) // i18n-ignore: a reason, logged
       this.pending.delete(f.id)
-      p.done({ out: Buffer.concat(p.out).toString('utf8'), err: Buffer.concat(p.err).toString('utf8'), code, ...(f.kind === 'K' ? { signal: text() || 'unknown' } : {}) })
+      return p.done(read(p, { code: null, bounded: why, ...(still ? { alive: true } : {}) }))
     }
+    const code = f.kind === 'X' ? Number(text()) : null
+    if (f.kind === 'X' && !Number.isInteger(code)) return this.lose(`an exit that isn't a number for ${f.id}`) // i18n-ignore: a reason, logged
+    this.pending.delete(f.id)
+    p.done(read(p, { code, ...(f.kind === 'K' ? { signal: text() || 'unknown' } : {}) }))
   }
 
   /** The host gone, or not to be trusted: each request still waiting lost, once; `lost` told once; nothing sent after. */
   private lose(why: string): void {
     if (this.why) return
     this.why = why
-    for (const [, p] of this.pending) p.done({ out: Buffer.concat(p.out).toString('utf8'), err: Buffer.concat(p.err).toString('utf8'), code: null, lost: why })
+    for (const [, p] of this.pending) p.done(read(p, { code: null, lost: why }))
     this.pending.clear()
     this.lost(why)
   }

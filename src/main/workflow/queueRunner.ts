@@ -24,8 +24,9 @@ import { createHash, randomBytes } from 'crypto'
 import { existsSync } from 'original-fs'
 import { basename, dirname, join } from 'path'
 import { removePath, samePlace } from '../fsutil'
-import { git, GIT_PREFIX } from '../git'
-import { onOutputSettled } from '../gitWorker'
+import { access } from 'original-fs/promises'
+import { git, GIT_PREFIX, withoutGitRoute } from '../git'
+import { onOutputSettled, type GitOutcome, type GitRequest } from '../gitWorker'
 import { createLogger, userText } from '../logger'
 import { endTree } from '../progressReporters/wrapper'
 import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
@@ -481,12 +482,40 @@ export class QueueRunner {
    * fails the runner (`fail`): what was waiting is lost, never an answer (`signal: 'hostLost'`, HI-2054's again).
    */
   private async hostGit(cwd: string, args: string[], env: NodeJS.ProcessEnv): Promise<RunResult> {
-    if (!this.admits()) throw new LeaseLost(this.target)
-    const host = this.gitHost ?? (await (this.hostStart ??= this.startHost().finally(() => (this.hostStart = null))))
-    if (!(host instanceof GitHost)) return toRunResult('git', host)
-    if (!this.admits() || this.gitHost !== host || !this.cfg.store.holdsQueueLease(this.lease, this.token)) throw new LeaseLost(this.target)
+    const r = await this.inHost({ command: 'git', args, cwd, env })
+    if (!r) throw new LeaseLost(this.target)
+    return toRunResult('git', r)
+  }
+
+  /**
+   * HI-2078: the route of git() in the queue's run (withGitRoute, queueHost's runHost): each git its steps run (the
+   * platform's reads too) in the lease's host, within git()'s bounds (the host ends it there), its outcome as the
+   * worker's execFile gives it, so git() reads it as it reads the worker's. Once the runner no longer admits (released,
+   * failed, its lease another's), nothing starts: an outcome that never ran (`leaseLost`), never an answer.
+   */
+  async gitOutcome(m: Omit<GitRequest, 'id'>): Promise<GitOutcome> {
+    const r = await this.inHost({ command: 'git', args: m.args, cwd: m.cwd, env: m.env ?? process.env, ...(m.input !== undefined ? { input: m.input } : {}), maxBuffer: m.maxBuffer, ...(m.timeout ? { timeout: m.timeout } : {}) })
+    return r ? outcomeOf(r, m.cwd) : { stdout: NO_BYTES, stderr: NO_BYTES, error: { code: 'leaseLost', killed: false, signal: null }, cwdExists: true }
+  }
+
+  /**
+   * A request in the lease's git host, started first if need be; null, with nothing sent, once the runner doesn't admit
+   * (released, failed, or its lease another's: read just before it is sent), checked again after every wait.
+   */
+  private async inHost(spec: Parameters<GitHost['request']>[0]): Promise<HostResult | null> {
+    if (!this.admits()) return null
+    let host: GitHost | HostResult
+    try {
+      host = this.gitHost ?? (await (this.hostStart ??= this.startHost().finally(() => (this.hostStart = null))))
+    } catch (e) {
+      if (e instanceof LeaseLost) return null
+      throw e
+    }
+    if (!(host instanceof GitHost)) return host
+    if (!this.admits() || this.gitHost !== host || !this.cfg.store.holdsQueueLease(this.lease, this.token)) return null
     await this.cfg.hooks?.beforeHostSend?.()
-    return toRunResult('git', await host.request({ command: 'git', args, cwd, env }))
+    if (!this.admits() || this.gitHost !== host) return null
+    return host.request(spec)
   }
 
   /**
@@ -500,7 +529,7 @@ export class QueueRunner {
     const host = new GitHost(child, (why) => this.fail(`its git host ${child.pid ?? ''} stopped: ${why}`)) // i18n-ignore: a reason, logged
     if (!child.pid) {
       const start = await new Promise<Error>((res) => child.once('error', res))
-      return { out: '', err: start.message, code: null, notRun: String((start as NodeJS.ErrnoException).code ?? 'error') }
+      return { out: '', err: start.message, outBuf: NO_BYTES, errBuf: Buffer.from(start.message), code: null, notRun: String((start as NodeJS.ErrnoException).code ?? 'error') }
     }
     try {
       const job = this.job
@@ -547,7 +576,8 @@ export class QueueRunner {
   release(): Promise<void> {
     if (this.releasing) return this.releasing
     if (this.released) return Promise.resolve()
-    return (this.releasing = this.releaseOnce())
+    // HI-2078: its own git (removing its folder) runs on git's worker, outside the queue's route it may be called from.
+    return (this.releasing = withoutGitRoute(() => this.releaseOnce()))
   }
 
   private async releaseOnce(): Promise<void> {
@@ -783,6 +813,27 @@ function toRunResult(command: string, r: HostResult): RunResult {
   if (r.signal) return { ok: false, code: -1, out: r.out, err: err || endedBy(command, r.signal), signal: r.signal }
   const code = r.code ?? -1
   return { ok: code === 0, code, out: r.out, err }
+}
+
+const NO_BYTES = Buffer.alloc(0)
+
+/**
+ * HI-2078: a git host's result as the worker's execFile gives its outcome (git() maps both alike): its exit code, a
+ * start that failed (Node's code, and whether its folder is there), an end by a signal, its bounds as execFile's
+ * (`ERR_CHILD_PROCESS_STDIO_MAXBUFFER`, or killed by its timeout), and lost with its host (`hostLost`): the raw bytes kept.
+ */
+export async function outcomeOf(r: HostResult, cwd: string): Promise<GitOutcome> {
+  const o = { stdout: r.outBuf, stderr: r.errBuf, cwdExists: true }
+  const failed = (code: unknown, killed = false, signal: string | null = null): GitOutcome => ({ ...o, error: { code, killed, signal } })
+  if (r.lost !== undefined) return failed('hostLost')
+  // A start that failed: execFile's stderr is empty then (git() says why itself); its folder looked at as the worker does.
+  if (r.notRun) return { ...failed(r.notRun), stderr: NO_BYTES, cwdExists: await access(cwd).then(() => true, () => false) }
+  if (r.bounded) {
+    if (r.alive) log.warn(`A merge queue git past its ${r.bounded} couldn't be ended: its job ends it with the lease`)
+    return r.bounded === 'maxBuffer' ? failed('ERR_CHILD_PROCESS_STDIO_MAXBUFFER', true, 'SIGTERM') : failed(null, true, 'SIGTERM')
+  }
+  if (r.signal) return failed(null, false, r.signal)
+  return r.code === 0 ? { ...o, error: null } : failed(r.code ?? 'error')
 }
 
 /** Runs `fn` under the config's lock (the app's boardWrite), else as it is. */
