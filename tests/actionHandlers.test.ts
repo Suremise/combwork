@@ -203,6 +203,61 @@ describe('loop wakes from the facts (#1266)', () => {
   })
 })
 
+describe("the merge queue's comment on a card it returned (HI-2087)", () => {
+  /** Writes a `comment` action, as the queue's return does (its own connection). */
+  const commentAction = (ws: string, card: number): number => {
+    const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
+    try {
+      return own.tx((tx) => tx.action(card, 'comment', { text: `alpha-${card} came back from the merge queue: a conflict with main in a.txt. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).`, shown: { id: 'tasks.history.queueReturned', values: { reason: 'conflict', target: 'main', check: '', files: 'a.txt' } } }, null))
+    } finally {
+      own.close()
+    }
+  }
+  const stateOf = (ws: string, id: number): string => (store.workspaceDb(ws).reader.prepare('SELECT state FROM card_actions WHERE id = ?').get(id) as { state: string }).state
+  const hiveComments = async (w: WS, c: number) => (await inWorkspace(w, () => tasks.getTask(c))).comments.filter((x) => x.by === 'Hive')
+
+  it('written once on the card, its English and its message; a run again (after a restart) writes nothing more', async () => {
+    const { w, ws } = await open()
+    const c = await newCard(w)
+    const id = commentAction(ws, c)
+    await worker.runActions(w)
+    await worker.actionsSettled()
+    expect(stateOf(ws, id)).toBe('done')
+    const said = await hiveComments(w, c)
+    expect(said).toHaveLength(1)
+    expect(said[0]).toMatchObject({ id: `action-${id}`, text: expect.stringMatching(/^alpha-\d+ came back from the merge queue: a conflict with main in a\.txt\./), hiveText: { id: 'tasks.history.queueReturned' } })
+    // As a restart would find it: pending again, run again. Its comment is there already (its id): none more.
+    store.workspaceDb(ws).writer.prepare("UPDATE card_actions SET state = 'pending' WHERE id = ?").run(id)
+    await worker.runActions(w)
+    await worker.actionsSettled()
+    expect(stateOf(ws, id)).toBe('done')
+    expect(await hiveComments(w, c)).toHaveLength(1)
+  })
+
+  it("a write that fails: the action is recorded failed, never done without its comment; an archived card's is done with none", async () => {
+    const { w, ws } = await open()
+    const failing = await newCard(w)
+    const id = commentAction(ws, failing)
+    notices.noticeTestHooks.commentFails = true
+    try {
+      await worker.runActions(w)
+      await worker.actionsSettled()
+    } finally {
+      notices.noticeTestHooks.commentFails = undefined
+    }
+    expect(stateOf(ws, id)).toBe('failed')
+    expect(await hiveComments(w, failing)).toHaveLength(0)
+    // Archived since: nothing to say it on, done.
+    const c = await newCard(w)
+    await inWorkspace(w, () => tasks.archiveTask(c, true))
+    const gone = commentAction(ws, c)
+    await worker.runActions(w)
+    await worker.actionsSettled()
+    expect(stateOf(ws, gone)).toBe('done')
+    expect(await hiveComments(w, c)).toHaveLength(0)
+  })
+})
+
 describe('delivered once (#1266, S33(b))', () => {
   it('two runs of the actions at once (two windows on one board) make one delivery; after a restart, a run again makes none', async () => {
     const { w, ws, alpha } = await open()

@@ -474,6 +474,12 @@ export const ANSWER_MAX = 4000
  * `next`: for a builder's card Done in its lane (HI-1990), what comes next in the lane, in its words (laneNextWords),
  * told in place of carrying on with the card.
  */
+/**
+ * HI-2087: whether a loop wake is Hive's note that the merge queue returned the card (queueState's returnedText: a note
+ * is only ever Hive's own words, never an agent's), so its line leads with it and its delivery is marked so.
+ */
+export const isReturnNote = (kind: LoopWakeKind, text?: string): boolean => kind === 'note' && !!text && text.replace(/\s+/g, ' ').includes(` ${CAME_BACK}: `)
+
 export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: string, next?: string): string {
   const who =
     kind === 'done' && next ? next : kind === 'review' ? 'You review this card in its loop: carry on with it' : kind === 'step'
@@ -489,7 +495,7 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
   const tail = `. ${who} (hive_read_task with latestComment for the comment in full).`
   // HI-2087: Hive's note that the merge queue returned the card leads the line, as a watch's does: its column and the
   // review's pass first made HB2 take HI-2046 for merged.
-  if (kind === 'note' && said.join('').includes(` ${CAME_BACK}: `)) return lineOf({ ...change, about: { owner: null, verdict: null, ...change.about, queueReturn: said.slice(0, max).join('') } }, tail)
+  if (isReturnNote(kind, text)) return lineOf({ ...change, about: { owner: null, verdict: null, ...change.about, queueReturn: said.slice(0, max).join('') } }, tail)
   const what = !said.length ? '' : `. ${whose}: "${said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('')}"`
   return lineOf(change, `${what}${tail}`)
 }
@@ -539,7 +545,7 @@ export type LoopWakeKind = (typeof LOOP_WAKE_KINDS)[number]
 
 function lineOf(change: CardChange, tail: string): string {
   // HI-2087: a card the merge queue returned leads with the return and its reason (its words name the card).
-  if (change.about?.queueReturn) return `[Hive] ${change.about.queueReturn.replace(/\.$/, '')}${tail}`
+  if (change.about?.queueReturn) return returnLine(change.about.queueReturn, (t) => `[Hive] ${t}${tail}`)
   const head = `[Hive] ${cardRef(change.number)}${whereNow(change)}`
   if (!change.comment) return head + tail
   // The card, its state and what to do always fit (names are short); the comment's first line gives way, cut with "…".
@@ -549,6 +555,43 @@ function lineOf(change: CardChange, tail: string): string {
   if (jsonBytes(line(false)) <= WAKE_MAX_BYTES) return line(false)
   while (text.length && jsonBytes(line(true)) > WAKE_MAX_BYTES) text = text.slice(0, -1)
   return line(true)
+}
+
+/**
+ * HI-2087: a return's words in a line `wrap` makes, within WAKE_MAX_BYTES (JSON, UTF-8: an output's last lines in
+ * another script take three bytes a character), one line. Its first sentence (the card, that it came back, why) and its
+ * last (what to do next) are kept; what is between (the log's path, the output's last lines) gives way first, cut with
+ * "…"; then the first sentence's end (its files); then, only past that, the rest.
+ */
+function returnLine(back: string, wrap: (t: string) => string): string {
+  const whole = back.replace(/\s+/g, ' ').trim().replace(/\.$/, '')
+  if (jsonBytes(wrap(whole)) <= WAKE_MAX_BYTES) return wrap(whole)
+  const first = whole.indexOf('. ', whole.indexOf(CAME_BACK))
+  const last = whole.lastIndexOf('. ')
+  // Cut from its end until it fits: the most of `xs` kept (one search, the line measured each time).
+  const fitting = (xs: string[], make: (kept: string[]) => string): string | null => {
+    let lo = 0
+    let hi = xs.length
+    if (jsonBytes(make([])) > WAKE_MAX_BYTES) return null
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2)
+      if (jsonBytes(make(xs.slice(0, mid))) <= WAKE_MAX_BYTES) lo = mid
+      else hi = mid - 1
+    }
+    return make(xs.slice(0, lo))
+  }
+  const cut = (kept: string[], all: string[]): string => (kept.length < all.length ? `${kept.join('').trimEnd()}…` : kept.join(''))
+  if (first >= 0 && last > first) {
+    const head = [...whole.slice(0, first)]
+    const mid = [...whole.slice(first + 2, last)]
+    const next = whole.slice(last + 2)
+    const withMid = fitting(mid, (m) => wrap(`${head.join('')}.${m.length ? ` ${cut(m, mid)}` : ''} ${next}`))
+    if (withMid !== null) return withMid
+    const withHead = fitting(head, (h) => wrap(`${cut(h, head)}. ${next}`))
+    if (withHead !== null) return withHead
+  }
+  const all = [...whole]
+  return fitting(all, (k) => wrap(cut(k, all))) ?? wrap('')
 }
 
 /**

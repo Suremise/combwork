@@ -11,6 +11,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { alreadyThere, loopWakeLine, changesBetween, decodeSince, encodeSince, limitLine, markOf, movedIntoSince, readCondition, returnRound, WAKE_MAX_BYTES, wakeAbout, wakeLine, wakeLines, carriedOver, changesSince, entryWithin, seenOf, watchLabel, cardChange, LANES_RUNNING_TAIL, withLanesTail, brief, handoffsSince, hearsHandoffs } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
+import { returnedWake } from '../src/main/workflow/queueState'
 import { hookStep } from '../src/main/hookStatus'
 import type { TaskCard } from '../src/shared/types'
 import type { WatchCondition } from '../src/shared/watch'
@@ -306,6 +307,15 @@ describe('what counts as a change', () => {
     const passed = { ...cardChange(7, c, ['column']), about: { owner: null, verdict: { passed: true, by: 'HR1 (hive)' } } }
     const note = loopWakeLine(passed, 'note', back)
     expect(note).toBe(`[Hive] ${back.slice(0, -1)}. This is your card in its loop: carry on (hive_read_task with latestComment for the comment in full).`)
+    // Within the wake's bytes (HR3's round 1 finding 2), whatever the return carries: output in another script (three
+    // bytes a character), paths with quotes and backslashes (escaped in JSON). The card, why and what to do stay whole.
+    const failed = { entry: 'HI-7/e1', revision: 'a', target: 'main', reason: 'checks' as const, transient: false, check: 'typecheck', logPath: 'C:\\logs\\"quoted"\\check.log', log: `型エラー: "x" \\ y ${'型'.repeat(150)}\n`.repeat(20) }
+    const big = returnedWake('HI-7', failed)
+    for (const l of [wakeLine({ ...returned, about: { owner: null, verdict: null, queueReturn: big } }), loopWakeLine(passed, 'note', big)]) {
+      expect(Buffer.byteLength(JSON.stringify(l))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
+      expect(l).not.toMatch(/\n/)
+      expect(l).toMatch(/^\[Hive\] HI-7 came back from the merge queue: the merge check typecheck failed on the merged result\. .*… Fix it in your worktree, commit and submit again \(hive_submit\)\. (Your card watch has ended|This is your card in its loop)/)
+    }
     // Another note of Hive's (a stale pass) is quoted after where the card is, as before.
     expect(loopWakeLine(passed, 'note', '#7: its pass is stale')).toMatch(/^\[Hive\] #7 is in Doing: HR1 \(hive\) passed it; latest comment by HR1 \(hive\): "Round 2: PASSED — no findings"\. Hive: "#7: its pass is stale"/)
   })

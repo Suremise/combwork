@@ -59,12 +59,22 @@ describe('delivery records (#647)', () => {
   it("HI-2087: a card's events with the merge queue's return among them lead with the return and its reason", () => {
     const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
     const back = '[Hive] HI-46 came back from the merge queue: a conflict with main in src/main/bundledHistory.json. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).'
-    const items = inboxItems([
-      rec({ id: 'm1', seq: 1, kind: 'card-event', from: hive, card: 46, body: '[Hive] HI-46 is in Passed: HR1 passed it' }),
-      rec({ id: 'm2', seq: 2, kind: 'card-event', from: hive, card: 46, body: back }),
-      rec({ id: 'm3', seq: 3, kind: 'card-event', from: hive, card: 46, body: '[Hive] HI-46 is in Doing; latest comment by HR1: "Round 2: PASSED"' })
-    ])
-    expect(items.map((i) => i.text)).toEqual([`${back} (with 2 more changes: read the card)`])
+    // Its lines as their makers mark them: the queue's return (a loop wake's note, or a watch's line leading with it),
+    // a watch's line telling only a comment, and anything else unmarked.
+    const ev = (seq: number, body: string, meta?: Record<string, boolean>) => rec({ id: `m${seq}`, seq, kind: 'card-event', from: hive, card: 46, body, ...(meta ? { meta } : {}) })
+    const returned = (seq: number) => ev(seq, back, { queueReturn: true })
+    const commented = (seq: number) => ev(seq, '[Hive] HI-46 is in Doing; latest comment by Hive: "HI-46 came back from the merge queue: …"', { commentOnly: true })
+    const text = (...events: DeliveryRecord[]) => inboxItems(events).map((i) => i.text)
+    // Before it, a pass; after it, only its own comment: the return leads.
+    expect(text(ev(1, '[Hive] HI-46 is in Passed: HR1 passed it'), returned(2), commented(3))).toEqual([`${back} (with 2 more changes: read the card)`])
+    // Newer than the return: submitted again (Review), merged (Done), gone. The count, never the old instruction.
+    expect(text(returned(1), ev(2, '[Hive] HI-46 is in Review'))).toEqual(['2 changes, read the card'])
+    expect(text(returned(1), commented(2), ev(3, '[Hive] HI-46 is in Done: its work merged'))).toEqual(['3 changes, read the card'])
+    expect(text(returned(1), ev(2, '[Hive] HI-46 is gone from your board'))).toEqual(['2 changes, read the card'])
+    // Two cycles: back, resubmitted, back again: the latest return leads.
+    expect(text(returned(1), ev(2, '[Hive] HI-46 is in Review'), { ...returned(3), body: `${back} (2)` })).toEqual([`${back} (2) (with 2 more changes: read the card)`])
+    // A line that only quotes the words (an agent's comment, unmarked) is no return.
+    expect(text(ev(1, '[Hive] HI-46 is in Doing'), ev(2, `[Hive] HI-46 is in Doing; latest comment by B1: "${back}"`))).toEqual(['2 changes, read the card'])
   })
 
   it("coalesces a card's events into one item, where its first one was; a message stays its own", () => {

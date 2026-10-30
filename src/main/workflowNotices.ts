@@ -103,7 +103,11 @@ async function commentFromAction(a: ActionRow, ws: WorkspaceService): Promise<vo
   const text = typeof a.payload.text === 'string' ? a.payload.text : ''
   const shown = a.payload.shown as StoredText | undefined
   if (!ws.path || !text) return
-  await commentAsHive(a.card, shown ? { text, shown } : text, ws, undefined, `action-${a.id}`).catch((e) => log.warn('commenting on a card the merge queue returned', e))
+  // A card archived or gone since: nothing to say it on (done). A write that fails throws (HR3's round 1 finding 3):
+  // the worker records the action failed, never done without its comment; one stopped by its workspace closing waits
+  // for the next run there, which writes it (or finds it written: its id is the action's).
+  if (noticeTestHooks.commentFails) throw new Error('the board refused the change (a test)') // i18n-ignore: a test's error, logged
+  await commentAsHive(a.card, shown ? { text, shown } : text, ws, undefined, `action-${a.id}`)
 }
 
 /** How much of an agent's question a request's notice shows (its first sentence or two). */
@@ -306,8 +310,11 @@ export const lastActionId = (ws: WorkspaceService): number => {
   }
 }
 
-/** For tests: `hold` keeps the lanes from being looked at on a change or the tick (a restart before the look, say). */
-export const noticeTestHooks: { hold: boolean } = { hold: false }
+/**
+ * For tests: `hold` keeps the lanes from being looked at on a change or the tick (a restart before the look, say).
+ * `commentFails` (HI-2087): a queue return's comment whose write fails (a board that refuses the change).
+ */
+export const noticeTestHooks: { hold: boolean; commentFails?: boolean } = { hold: false }
 
 /** A workspace's lanes looked at soon: one look at a time, a change during it looked at again after. */
 function checkSoon(ws: WorkspaceService): void {
