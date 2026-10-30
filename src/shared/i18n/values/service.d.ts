@@ -234,6 +234,7 @@ interface HiveMessageValues {
   'service.workspace.agentGone': undefined
   'service.workspace.badName': { chars: string | number }
   'service.workspace.closed': undefined
+  'service.workspace.connectionGone': { agent: string | number }
   'service.workspace.folderExists': { name: string | number }
   'service.workspace.holdsOpen': { workspace: string | number; folder: string | number; name: string | number }
   'service.workspace.insideOpen': { folder: string | number; workspace: string | number }

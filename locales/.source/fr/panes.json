@@ -46,7 +46,7 @@
   "panes.failed.title": "Couldn't start:",
   "panes.footer.compactionHistory": "Click to view compaction history",
   "panes.footer.compactions": "{n, plural, one {# compaction so far} other {# compactions so far}}{over, select, yes { — consider compacting} other {}}",
-  "panes.footer.connectionChanged": "Its login changed since it was added: see Settings → Connections.",
+  "panes.footer.connectionChanged": "Its login changed since it was added: see Settings → Accounts & Connections.",
   "panes.footer.connectionEmail": "Signed in as {email}.",
   "panes.footer.connectionOff": "The connection chosen for it is off in this workspace, so it runs on the workspace's default.",
   "panes.footer.connectionSwitching": "switches once its turn is over",

@@ -570,7 +570,7 @@ export const STATUS_TEXT: Readonly<Record<SessionStatus | 'idle', string>> = Obj
 /** A server connection's refused key (HI-1772), where a sign-in connection's agent needs sign-in. */
 const KEY_REFUSED = {
   status: msg({ id: 'shell.status.keyRefused', defaultMessage: 'Key refused', description: "An agent's status: its server connection's API key was refused by the server (where a signed-in connection would need sign-in)." }),
-  carryOn: msg({ id: 'shell.keyRefused.then', defaultMessage: "{name}'s key was refused. Replace it in Settings → Connections, then Resume in the project's header carries on the agents it stopped.", description: "Tooltip of an agent whose server connection's ({name}) API key was refused, its second line. Settings → Connections names a section; Resume is a button in the project's header." }),
+  carryOn: msg({ id: 'shell.keyRefused.then', defaultMessage: "{name}'s key was refused. Replace it in Settings → Accounts & Connections, then Resume in the project's header carries on the agents it stopped.", description: "Tooltip of an agent whose server connection's ({name}) API key was refused, its second line. Settings → Accounts & Connections names a section; Resume is a button in the project's header." }),
   stopped: msg({ id: 'shell.keyRefused.stopped', defaultMessage: "Its turn stopped when {name}'s key was refused. Resume in the project's header carries it on.", description: "Tooltip of an agent whose turn stopped because its server connection's ({name}) API key was refused." })
 }
 
@@ -658,7 +658,7 @@ export function signInNote(live: Pick<LiveSessionState, 'status' | 'signIn' | 'p
   // Hive's own message in the window's language (#847), else what the CLI said, as it said it.
   const message = live.signIn.messageText ? shownText(live.signIn.messageText) : live.signIn.message
   const said = message.length > 160 ? `${message.slice(0, 160)}…` : message
-  // On a server connection (HI-1772): its key was refused, replaced in Settings → Connections (no sign-in).
+  // On a server connection (HI-1772): its key was refused, replaced in Settings → Accounts & Connections (no sign-in).
   const server = live.launchedConnection?.server ? live.launchedConnection.name : null
   if (server && live.status === 'signin') return [tr(msg({ id: 'shell.signIn.said', defaultMessage: '{provider} says: {said}', description: "Tooltip of an agent that needs sign-in, its first line. {provider} is the coding agent's name; {said} what its CLI said, as it said it." }), { provider: d.name, said }), tr(KEY_REFUSED.carryOn, { name: server })].join('\n')
   if (server && (live.status === 'ready' || live.status === 'finished')) return tr(KEY_REFUSED.stopped, { name: server })

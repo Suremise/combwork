@@ -55,7 +55,7 @@
   "session.inUse.reserved": "Hive 已在归档、删除或清理此会话。",
   "session.inUse.running": "它正在运行。请先停止它。",
   "session.inUse.writing": "它的 CLI 仍在写入会话记录。请稍后重试。",
-  "session.keyRefused.body": "请在“设置 → 连接”中替换 {name} 的密钥，然后用项目标题栏中的“继续”让它们继续。",
+  "session.keyRefused.body": "请在“设置 → 账号与连接”中替换 {name} 的密钥，然后用项目标题栏中的“继续”让它们继续。",
   "session.keyRefused.title": "{n, plural, =1 {{agent} 已停止：{name} 的密钥被拒绝} other {{n, number} 个代理已停止：{name} 的密钥被拒绝}}",
   "session.leftovers.body": "{processes}。{n, plural, =1 {该进程由智能体启动，可能占用项目的文件夹或端口。} other {这些进程由智能体启动，可能占用项目的文件夹或端口。}}",
   "session.leftovers.end": "结束进程",

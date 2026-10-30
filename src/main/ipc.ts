@@ -19,7 +19,8 @@ import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
-import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, keepNewLogin, removeAccount, renameAccount, moveConnection, setAccountOn, setConnectionDefaults, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
+import { connectionInput, type ConnectionPatch } from '../shared/accounts'
+import { accountsView, addAccount, addConnection, connectionHomes, duplicateConnection, moveConnectionInAccount, removeConnection, updateConnection, dismissConnectionsIntro, keepNewLogin, removeAccount, renameAccount, moveConnection, setAccountOn, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
 import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
@@ -1713,9 +1714,13 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:keepLogin': (id) => keepNewLogin(id),
     'connections:setOn': (id, on) => setAccountOn(id, on),
     'connections:move': (id, index) => moveConnection(id, Number(index)),
+    'connection:add': (account, input) => addConnection(String(account), connectionInput(input) as ConnectionPatch & { name: string }),
+    'connection:update': (id, patch) => updateConnection(String(id), connectionInput(patch)),
+    'connection:duplicate': (id) => duplicateConnection(String(id)),
+    'connection:remove': (id) => removeConnection(String(id)),
+    'connection:move': (id, index) => moveConnectionInAccount(String(id), Number(index)),
     'connections:setAssistant': (provider, id) => setAssistantAccount(workspace, provider, id),
     'connections:switchAffected': () => sessions.switchAffected(workspace.path!),
-    'connections:setDefaults': (id, patch) => setConnectionDefaults(id, patch),
     'connections:notice': () => movedNotice(workspace),
     'connections:dismissNotice': (keys) => dismissMovedNotice(workspace, Array.isArray(keys) ? keys.filter((k) => typeof k === 'string') : []),
     'connections:dismissIntro': () => dismissConnectionsIntro(),

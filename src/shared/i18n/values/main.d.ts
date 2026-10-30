@@ -37,9 +37,12 @@ interface HiveMessageValues {
   'main.branchMerge.cardWork': { branch: string | number; card: string | number }
   'main.branchMerge.notBranch': { branch: string | number }
   'main.branchMerge.same': { branch: string | number }
+  'main.connections.badMode': { cli: string | number; mode: string | number }
+  'main.connections.beingRemoved': { name: string | number }
   'main.connections.choice.missing': { agent: string | number }
   'main.connections.choice.off': { name: string | number; agent: string | number }
   'main.connections.choice.otherCli': { name: string | number; agent: string | number }
+  'main.connections.inUse': { name: string | number; users: string | number }
   'main.connections.launch.changedAgain': { agent: string | number }
   'main.connections.launch.changing': { name: string | number; agent: string | number }
   'main.connections.launch.deleted': { agent: string | number }
@@ -49,6 +52,10 @@ interface HiveMessageValues {
   'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
   'main.connections.launch.signedOut': { name: string | number; agent: string | number }
   'main.connections.moveFailed': { project: string | number }
+  'main.connections.nameTaken': { account: string | number; name: string | number }
+  'main.connections.noName': undefined
+  'main.connections.notFound': undefined
+  'main.connections.userIn': { agent: string | number; project: string | number }
   'main.console.noWorkspace': undefined
   'main.console.title': { workspace: string | number }
   'main.corrupt.damaged': { file: string | number }

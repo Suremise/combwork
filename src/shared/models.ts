@@ -50,7 +50,7 @@ export function serverModelLabel(id: string, as: readonly ModelAlias[], tr?: Tr,
       : msg({ id: 'agents.models.serverCloud', defaultMessage: '{model} (cloud)', description: "A model of a server connection that its server runs in the cloud rather than on this PC (an Ollama cloud model). {model} is the model id (\"glm-4.6:cloud\")." })
     return tr ? tr(c, { model: id, names: fmt.list(names) }) : `${id} (cloud${as.length ? `, as ${names.join(', ')}` : ''})` // i18n-ignore: English without tr
   }
-  const m = msg({ id: 'agents.models.serverAs', defaultMessage: '{model} (as {names})', description: "A model of a server connection (Settings → Connections), with the Claude model names it stands in for. {model} is the server's model id (\"deepseek-flash\"); {names} the Claude names, joined (\"Opus, Sonnet\")." })
+  const m = msg({ id: 'agents.models.serverAs', defaultMessage: '{model} (as {names})', description: "A model of a server connection (Settings → Accounts & Connections), with the Claude model names it stands in for. {model} is the server's model id (\"deepseek-flash\"); {names} the Claude names, joined (\"Opus, Sonnet\")." })
   return tr ? tr(m, { model: id, names: fmt.list(names) }) : `${id} (as ${names.join(', ')})` // i18n-ignore: English without tr
 }
 

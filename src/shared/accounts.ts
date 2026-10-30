@@ -34,6 +34,34 @@ export function connectionReadiness(c: { setUp?: boolean | null; trust?: Connect
   return 'done'
 }
 
+/** Who uses a connection (HI-2107): an agent of an open workspace's project, or its Assistant (`assistant`). */
+export interface ConnectionUser {
+  projectPath: string
+  project: string
+  agentId: string
+  agent: string
+  assistant?: true
+}
+
+/**
+ * A connection as Settings → Accounts & Connections shows it (HI-2107): who uses it in the open workspaces, and
+ * `effortUnusable` when its effort is one its model no longer takes (decision E: left by a CLI's later catalogue, not
+ * passed at launch).
+ */
+export type ConnectionRow = Connection & { users: ConnectionUser[]; effortUnusable?: true }
+
+/** A connection's values as a patch sets them (HI-2107): each null or '' leaves it to the CLI. */
+export type ConnectionPatch = { name?: string } & { [K in keyof LaunchValues]?: LaunchValues[K] | null }
+
+/** A patch as a caller sent it (IPC, the Agent API), with only its known fields of the right types kept. */
+export function connectionInput(raw: unknown): ConnectionPatch {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+  for (const k of ['name', 'model', 'effort', 'permissionMode', 'extraArgs'] as const) if (typeof r[k] === 'string' || r[k] === null) out[k] = r[k]
+  if (typeof r.use200kContext === 'boolean' || r.use200kContext === null) out.use200kContext = r.use200kContext
+  return out as ConnectionPatch
+}
+
 /** What Settings → Accounts shows (accounts:list): the connections, and the asking window's workspace's choice of them. */
 export interface ConnectionsView {
   /** The providers that can have connections (capabilities.connections) and are on in Settings. */
@@ -59,6 +87,14 @@ export interface ConnectionsView {
    * Masking Data); `gap`, a reset lost some (strict for good, since `gapSince`); `full`, near the most keys it keeps.
    */
   masking?: { state: 'none' | 'pending' | 'ready' | 'unavailable'; gap: boolean; gapSince?: string; full: boolean }
+  /**
+   * Every account in the one order (HI-2107, decision A), the CLI's own homes too (Copilot's sign-in: decision C), by
+   * id; `connections` has Hive's folders only, and `homes` the rest.
+   */
+  order: string[]
+  homes: Account[]
+  /** The connections (HI-2106), in their accounts' order and then their own, with who uses each. */
+  connectionRows: ConnectionRow[]
 }
 
 /** An account as today's screens show it (ConnectionsView's). */
@@ -171,6 +207,21 @@ export function movedConnection<T extends Pick<Account, 'id' | 'provider'>>(conn
   let i = 0
   // Each slot its CLI held keeps holding one of its connections, in the new order.
   return connections.map((a) => (a.provider === c.provider ? order[i++] : a))
+}
+
+/**
+ * A list with one item moved to `index` among those of its group (HI-2107: an account in the one order, all one group;
+ * a connection among its account's), the others left in their places. An index past the end puts it last.
+ */
+export function movedInGroup<T extends { id: string }>(items: readonly T[], id: string, index: number, group: (t: T) => string = () => ''): T[] {
+  const c = items.find((a) => a.id === id)
+  if (!c) return [...items]
+  const g = group(c)
+  const own = items.filter((a) => group(a) === g && a.id !== id)
+  const to = Math.max(0, Math.min(index, own.length))
+  const order = [...own.slice(0, to), c, ...own.slice(to)]
+  let i = 0
+  return items.map((a) => (group(a) === g ? order[i++] : a))
 }
 
 /**
@@ -315,7 +366,8 @@ export function connectionName(account: Pick<Account, 'name' | 'provider'>, valu
   if (base && !sameValues(values, base)) {
     if (label) parts.push(label)
     else {
-      if ((values.model ?? '') !== (base.model ?? '')) parts.push(values.model ?? 'Default model') // i18n-ignore: a connection's name, the user's data once made
+      // The model by its name ("Haiku", as the row's summary says it), a server's or an unknown one as its id.
+      if ((values.model ?? '') !== (base.model ?? '')) parts.push(values.model ? providerDescriptor(account.provider).modelLabel(values.model) : 'Default model') // i18n-ignore: a connection's name, the user's data once made
       if ((values.effort ?? '') !== (base.effort ?? '')) parts.push(values.effort ? effortWord(values.effort) : 'Default effort') // i18n-ignore: a connection's name, the user's data once made
       if (!!values.use200kContext !== !!base.use200kContext) parts.push(values.use200kContext ? '200K' : '1M') // i18n-ignore: a connection's name (token counts)
       if ((values.permissionMode ?? '') !== (base.permissionMode ?? '')) parts.push(permissionLabel(account.provider, values.permissionMode ?? providerDescriptor(account.provider).defaultPermissionMode))

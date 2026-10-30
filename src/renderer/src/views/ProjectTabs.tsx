@@ -13,10 +13,8 @@ import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUs
 import { agentLimitText, contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
 import { useAdvancedValue, useAgentLimit } from '../advanced'
 import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } from '@shared/inboxSwitches'
-import { PROVIDERS, contextLines, defaultProviderLabel, inProviderOrder, isProviderEnabled, modeDescription, offeredModes, orderedProviders, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
+import { PROVIDERS, contextLines, inProviderOrder, isProviderEnabled, orderedProviders, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
 import { instructionsStarter } from '@shared/projectTabs'
-import { EffortPicker, ModelPicker } from '../components/ModelPicker'
-import { effortText, runsAsName } from '@shared/models'
 import { PROJECT_KEY_DESC, PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { shownText } from '@shared/advanced'
 import { NumberField } from '../components/NumberField'
@@ -24,7 +22,6 @@ import { CardCleanupSetting, StorageView } from '../components/Storage'
 import { CARD_CLEANUP_DEFAULT } from '@shared/cardCleanup'
 import { TaskStrip } from '../components/Board'
 import { ProviderIcon } from '../components/ProviderIcon'
-import { confirmDangerousMode } from '../components/PermissionMode'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { DocEditor } from '../components/DocEditor'
@@ -159,7 +156,7 @@ const M = {
   planLimits: msg({ id: 'project.limit.heading', defaultMessage: '{plan, select, none {Plan limits, account-wide, as of {when}} other {Plan limits ({plan}), account-wide, as of {when}}}', description: "Above the plan limits. {plan} is the plan's name (none when unknown); {when} how long ago they were reported." }),
   limitTipConnection: msg({ id: 'project.limit.tipConnection', defaultMessage: "How much of the plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used on {name}, across all its sessions (not just Hive's).", description: 'The (i) beside a plan limit of one connection (HI-1756): {name} is the connection, a sign-in the user named ("Max 1").' }),
   noConnectionLimits: msg({ id: 'project.limit.noneConnection', defaultMessage: 'Its limits appear after the next message in a session on {name}.', description: 'Under a connection ({name}: "Max 1", a sign-in the user named) in the plan limits (HI-1756), before any of its limits were reported.' }),
-  noConnectionsOn: msg({ id: 'project.limit.noConnections', defaultMessage: 'No {provider} connection is on in this workspace. Turn one on in Settings → Connections to see its plan limits here.', description: 'In place of the plan limits (HI-1756) when the workspace has no connection on for the coding agent ({provider}). Settings → Connections names a section.' }),
+  noConnectionsOn: msg({ id: 'project.limit.noConnections', defaultMessage: 'No {provider} account is on in this workspace. Turn one on in Settings → Accounts & Connections to see its plan limits here.', description: 'In place of the plan limits (HI-1756) when the workspace has no account on for the coding agent ({provider}). Settings → Accounts & Connections names a section.' }),
   noLimits: msg({ id: 'project.limit.none', defaultMessage: "{provider} reports your plan’s limits while a session runs; they appear here after the next message in any {provider} session. Accounts that use an API key have no plan limits.", description: 'In place of the plan limits before any were reported.' })
 }
 
@@ -284,7 +281,6 @@ const S = {
   keyAliases: msg({ id: 'project.key.aliases', defaultMessage: 'Its old keys, which still find its cards: {keys}', description: "Under the project key box (Project Settings): the project's earlier keys, joined (AM and AMB), which still name its cards." }),
   keyNone: msg({ id: 'project.key.none', defaultMessage: 'Hive gives it a key once its board is open.', description: "Project Settings, in place of the project key box: the project has no key yet (its board hasn't been opened or upgraded)." }),
   overrides: msg({ id: 'project.settings.overrides', defaultMessage: 'Overrides the global default', description: 'Tooltip on the mark beside a project setting that is not Inherit.' }),
-  now: msg({ id: 'project.settings.now', defaultMessage: '{desc} Now: {current}', description: "A setting's description followed by what the value in use does. {desc} is the description; {current} what is in use." }),
   turnedOff: msg({ id: 'project.agents.turnedOff', defaultMessage: '{provider} is turned off in Settings → Providers', description: "Tooltip on an agent's provider icon when the provider is turned off." }),
   off: msg({ id: 'project.agents.off', defaultMessage: '{provider} (off)', description: "A provider's name when it is turned off in Settings → Providers (an agent's provider, and the Provider list)." }),
   projectFolder: msg({ id: 'project.agents.projectFolder', defaultMessage: 'project folder', description: 'Where an agent works when it has no worktree.' }),
@@ -302,14 +298,12 @@ const S = {
   saveFailed: msg({ id: 'project.settings.saveFailed', defaultMessage: 'Could not save project settings', description: 'Title of an error notification.' }),
   never: msg({ id: 'project.settings.never', defaultMessage: 'never', description: 'A global setting turned off, shown in "Inherit (never)".' }),
   megabytes: msg({ id: 'project.settings.megabytes', defaultMessage: '{count, number} MB', description: 'A size in megabytes.' }),
-  providerDefault: msg({ id: 'project.settings.providerDefault', defaultMessage: '{provider} default', description: "The provider's own default model, in \"Inherit (Claude Code default)\"." }),
   inherit: msg({ id: 'project.settings.inherit', defaultMessage: 'Inherit ({value})', description: 'The choice that takes the global (or workspace) setting. {value} is what that is now.' }),
   inheritNewline: msg({ id: 'project.settings.inheritList', defaultMessage: 'Inherit:\n{value}', description: "Placeholder of a box that takes a list when it is empty: Inherit, then the global list on the lines after it. Keep the line break." }),
   on: msg({ id: 'project.settings.on', defaultMessage: 'On', description: 'A choice: on.' }),
   offChoice: msg({ id: 'project.settings.off', defaultMessage: 'Off', description: 'A choice: off.' }),
   onLower: msg({ id: 'project.settings.onLower', defaultMessage: 'on', description: 'A global setting that is on, shown in "Inherit (on)".' }),
   offLower: msg({ id: 'project.settings.offLower', defaultMessage: 'off', description: 'A global setting that is off, shown in "Inherit (off)".' }),
-  sessionsIn: msg({ id: 'project.settings.sessionsIn', defaultMessage: 'Sessions in {project} will run every command, edit and network call without asking.', description: "The confirmation before choosing a no-guardrails permission mode for a project's sessions ({project}: the project's name)." }),
   compactAbove: msg({ id: 'project.settings.compactAbove', defaultMessage: 'Suggest compacting above', description: 'Accessible name of the number box of tokens above which compacting is suggested.' }),
   neverChoice: msg({ id: 'project.settings.neverChoice', defaultMessage: 'Never', description: 'A choice: the warning or suggestion is off.' }),
   warnOver: msg({ id: 'project.settings.warnOver', defaultMessage: 'Warn when a transcript is over', description: 'Accessible name of the number box of megabytes above which a transcript is flagged.' }),
@@ -1716,7 +1710,7 @@ function SettingRow({ title, desc, tip, children, modified }: { title: string; d
   )
 }
 
-type ProjectSection = 'general' | 'agents' | 'sessions' | 'storage' | 'keys' | 'advanced' | `provider:${string}`
+type ProjectSection = 'general' | 'agents' | 'sessions' | 'storage' | 'keys' | 'advanced'
 
 const PROJECT_SECTION_ICONS: Record<string, string> = { general: 'settings-gear', agents: 'organization', sessions: 'history', storage: 'database', keys: 'keyboard', advanced: 'tools' }
 
@@ -1743,13 +1737,6 @@ interface ProjectSettingDef {
   modified?: boolean
   wide?: boolean
   render: () => React.ReactNode
-}
-
-/** A text or number field that saves when it loses focus (or on Enter). */
-function DraftInput({ value, onCommit, ...rest }: { value: string; onCommit: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
-  return <input {...rest} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => draft !== value && onCommit(draft)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
 }
 
 function AgentList({ project }: { project: ProjectInfo }) {
@@ -1877,7 +1864,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
   // Its sections and rows are formatted here: a change of language shows them in it at once.
   useLanguage()
   const settings = useStore((s) => s.settings)
-  const installs = useStore((s) => s.providers)
   const [section, setSection] = useState<ProjectSection>('general')
   const [query, setQuery] = useState('')
   // Opened on a section from elsewhere (Settings → Workspace's Storage links).
@@ -1902,98 +1888,9 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
     await actions.attempt(tr(S.saveFailed), () => call('project:updateConfig', project.path, patch))
     await actions.refreshWorkspace()
   }
-  const globalDefault = defaultProviderLabel(settings, tr)
   const globalCompact = settings.sessions.compactSuggestTokens ? fmt.number(settings.sessions.compactSuggestTokens) : tr(S.never)
   const globalWarn = settings.sessions.transcriptWarnMB ? tr(S.megabytes, { count: settings.sessions.transcriptWarnMB }) : tr(S.never)
   const inherit = (value: string | number): string => tr(S.inherit, { value })
-
-  /** A project's model, effort, mode and arguments for one provider. */
-  const providerDefs = (id: ProviderId): ProjectSettingDef[] => {
-    const p = providerDescriptor(id)
-    const pc = projectProviderConfig(cfg, id)
-    const g = providerSettings(settings, id)
-    const sect = `provider:${id}` as ProjectSection
-    const save = (patch: Partial<typeof pc>): Promise<void> => actions.updateProjectProvider(project.path, id, patch)
-    const globalModel = g.defaultModel ? runsAsName(id, g.defaultModel, installs[id]) : tr(S.providerDefault, { provider: p.name })
-    // The model this project's agents run unless they choose one, whose effort levels the picker offers (#125).
-    const runModel = (pc.model && pc.model !== 'inherit' ? pc.model : g.defaultModel) || installs[id]?.defaultModel || null
-    const globalEffort = effortText(id, g.defaultEffort, runModel, installs[id], settings, tr)
-    const modes = offeredModes(id, settings)
-    const mode = pc.permissionMode === 'inherit' ? g.defaultPermissionMode : pc.permissionMode
-    // A CLI with connections has no project model, effort or context (HI-1770, HI-1774: each connection's, and the agents' own).
-    const ownModel = !p.capabilities.connections
-    return [
-      ...(ownModel
-        ? [
-            {
-              section: sect,
-              key: `${id}.model`,
-              ...rowText(`project.${id}.model`),
-              modified: pc.model !== 'inherit',
-              render: () => <ModelPicker provider={id} value={pc.model} base={{ value: 'inherit', label: inherit(globalModel) }} onChange={(v) => void save({ model: v })} />
-            },
-            {
-              section: sect,
-              key: `${id}.effort`,
-              ...rowText(`project.${id}.effort`),
-              modified: pc.effort !== 'inherit',
-              render: () => <EffortPicker provider={id} model={runModel} value={pc.effort} base={{ value: 'inherit', label: inherit(globalEffort) }} onChange={(v) => void save({ effort: v })} />
-            }
-          ]
-        : []),
-      {
-        section: sect,
-        key: `${id}.permissionMode`,
-        ...rowText(`project.${id}.permissionMode`),
-        // What the mode in use does, after what the setting is.
-        desc: tr(S.now, { desc: rowText(`project.${id}.permissionMode`).desc, current: modeDescription(id, mode, tr) }),
-        modified: pc.permissionMode !== 'inherit',
-        render: () => (
-          <select
-            className="select"
-            value={modes.some((m) => m.value === pc.permissionMode) ? pc.permissionMode : 'inherit'}
-            onChange={async (e) => {
-              const v = e.target.value
-              if (v !== 'inherit' && !(await confirmDangerousMode(id, v, { message: tr(S.sessionsIn, { project: project.name }) }))) return
-              await save({ permissionMode: v })
-            }}
-          >
-            <option value="inherit">{inherit(permissionLabel(id, g.defaultPermissionMode, tr))}</option>
-            {modes.map((m) => (
-              <option key={m.value} value={m.value}>
-                {permissionLabel(id, m.value, tr)}
-              </option>
-            ))}
-          </select>
-        )
-      },
-      ...(p.capabilities.contextLimit && ownModel
-        ? [
-            {
-              section: sect,
-              key: `${id}.use200kContext`,
-              ...rowText(`project.${id}.use200kContext`),
-              modified: (pc.use200kContext ?? 'inherit') !== 'inherit',
-              render: () => (
-                <select className="select" value={pc.use200kContext ?? 'inherit'} onChange={(e) => void save({ use200kContext: e.target.value as 'inherit' | 'on' | 'off' })}>
-                  <option value="inherit">{inherit(tr(g.use200kContext ? S.on : S.offChoice))}</option>
-                  <option value="on">{tr(S.on)}</option>
-                  <option value="off">{tr(S.offChoice)}</option>
-                </select>
-              )
-            }
-          ]
-        : []),
-      {
-        section: sect,
-        key: `${id}.extraArgs`,
-        ...rowText(`project.${id}.extraArgs`),
-        modified: !!pc.extraArgs,
-        // i18n-ignore: an example of the CLI's own arguments
-        render: () => <DraftInput className="input mono" value={pc.extraArgs} placeholder="--add-dir ../lib" onCommit={(v) => void save({ extraArgs: v })} />
-      }
-    ]
-  }
 
   const defs: ProjectSettingDef[] = [
     {
@@ -2004,23 +1901,6 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
       desc: tr(PROJECT_KEY_DESC, { example: `${ownKey ?? 'AM'}-12` }),
       render: () => <ProjectKeyField project={project} />
     },
-    {
-      section: 'general',
-      key: 'defaultProvider',
-      ...rowText('project.defaultProvider'),
-      modified: cfg.defaultProvider !== 'inherit',
-      render: () => (
-        <select className="select" value={cfg.defaultProvider} onChange={(e) => void update({ defaultProvider: e.target.value })}>
-          <option value="inherit">{inherit(globalDefault)}</option>
-          {orderedProviders(settings).map((p) => (
-            <option key={p.id} value={p.id}>
-              {isProviderEnabled(settings, p.id) ? p.name : tr(S.off, { provider: p.name })}
-            </option>
-          ))}
-        </select>
-      )
-    },
-    ...orderedProviders(settings).flatMap((p) => providerDefs(p.id)),
     {
       section: 'sessions',
       key: 'compactSuggestTokens',
@@ -2148,7 +2028,7 @@ export function ProjectSettingsTab({ project }: { project: ProjectInfo }) {
           className="btn subtle"
           onClick={async () => {
             if (await confirm({ title: tr(S.resetTitle), message: tr(S.resetMessage), confirmLabel: tr(S.reset) }))
-              void update({ defaultProvider: 'inherit', providers: {}, chime: 'inherit', suggestFreshStart: 'inherit', inboxCheckpoints: 'inherit', inboxStopContinuation: 'inherit', inboxIdleWakes: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null, loopStepWaitMinutes: null })
+              void update({ chime: 'inherit', suggestFreshStart: 'inherit', inboxCheckpoints: 'inherit', inboxStopContinuation: 'inherit', inboxIdleWakes: 'inherit', compactSuggestTokens: null, transcriptWarnMB: null, fileLocks: 'inherit', worktreeCopy: null, worktreeSetup: '', loopWakes: true, loopRounds: null, loopWaitHours: null, loopStepWaitMinutes: null })
           }}
         >
           <Icon name="discard" /> {tr(S.resetButton)}

@@ -30,14 +30,14 @@ const LIST_TIMEOUT_MS = 10_000
 const LIST_MAX_BYTES = 1024 * 1024
 
 const URL_PROBLEM: Record<BaseUrlProblem, Msg> = {
-  invalid: msg({ id: 'main.server.url.invalid', defaultMessage: "That isn't a URL Hive can use: write it in full, such as https://api.example.com.", description: "An error saving a server connection's base URL (Settings → Connections): it can't be read as a URL." }),
+  invalid: msg({ id: 'main.server.url.invalid', defaultMessage: "That isn't a URL Hive can use: write it in full, such as https://api.example.com.", description: "An error saving a server connection's base URL (Settings → Accounts & Connections): it can't be read as a URL." }),
   scheme: msg({ id: 'main.server.url.scheme', defaultMessage: 'The URL must start with https:// (or http:// for a server on this PC).', description: "An error saving a server connection's base URL: it isn't http or https." }),
   userinfo: msg({ id: 'main.server.url.userinfo', defaultMessage: "The URL can't hold a user name or password: give the key in its own field.", description: "An error saving a server connection's base URL: it has user:password@ in it, which Hive won't keep." }),
   extra: msg({ id: 'main.server.url.extra', defaultMessage: "The URL can't have a query (?…) or a fragment (#…): give the key in its own field.", description: "An error saving a server connection's base URL: it has a query string or a fragment, which Hive won't keep (a key could be in it)." }),
   remoteHttp: msg({ id: 'main.server.url.remoteHttp', defaultMessage: 'A server on another computer needs https://. Plain http:// is only for a server on this PC (localhost).', description: "An error saving a server connection's base URL: it uses http:// to a server that isn't on this computer, which would send the key unencrypted." })
 }
 const KEY_PROBLEM = {
-  chars: msg({ id: 'main.server.key.chars', defaultMessage: 'A key has no spaces or special characters outside plain ASCII. Check what was pasted.', description: "An error saving a server connection's API key (Settings → Connections): it has spaces, line breaks or non-ASCII characters. The key itself is never shown." }),
+  chars: msg({ id: 'main.server.key.chars', defaultMessage: 'A key has no spaces or special characters outside plain ASCII. Check what was pasted.', description: "An error saving a server connection's API key (Settings → Accounts & Connections): it has spaces, line breaks or non-ASCII characters. The key itself is never shown." }),
   length: msg({ id: 'main.server.key.length', defaultMessage: 'A key is between {min, number} and {max, number} characters long. Check what was pasted.', description: "An error saving a server connection's API key: it is too short or too long. {min} and {max} are numbers. The key itself is never shown." })
 }
 const KEY_IN = msg({ id: 'main.server.key.inField', defaultMessage: 'The key appears in the {field, select, name {name} url {base URL} other {model list}}: take it out of there first. Nothing was saved.', description: "An error saving a server connection's API key: the key was also typed into another field ({field}: its name, its base URL or its models), where it would be kept unencrypted." })
@@ -286,7 +286,7 @@ export async function setUpServerConnection(id: string, folder?: string): Promis
     await connectionInternals.assertUsable(a)
     const b = checkedUrl(server.baseUrl)
     const got = await withKey(id, b.origin)
-    if (!got && !b.local) throw hiveError(msg({ id: 'main.server.setUp.noKey', defaultMessage: '{name} has no key yet. Add its key first, then set it up.', description: "An error opening Set Up for a server connection ({name}, its name in Settings → Connections): its server needs an API key and none is saved." }), { name: a.name }, { kind: 'conflict' })
+    if (!got && !b.local) throw hiveError(msg({ id: 'main.server.setUp.noKey', defaultMessage: '{name} has no key yet. Add its key first, then set it up.', description: "An error opening Set Up for a server connection ({name}, its name in Settings → Accounts & Connections): its server needs an API key and none is saved." }), { name: a.name }, { kind: 'conflict' })
     const homeEnv = providerDescriptor(a.provider).capabilities.connections!.homeEnv
     // Once it ends, its set-up state is read again (HI-1870).
     return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => (void readSetUp(id), rereadTrust(id)), { env: serverEnv(caps, server, got?.key ?? null), cwd: folder ?? accountFolder(id) })

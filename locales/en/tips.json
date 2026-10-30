@@ -636,12 +636,20 @@
     "description": "A tip's title."
   },
   "tips.connectionOrder.text": {
-    "defaultMessage": "Drag each CLI's connections into your order in Settings → Connections: new agents use the first one that's on in the workspace. Make Default moves one to the top without turning it on; running agents keep theirs.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Make Default is a button)."
+    "defaultMessage": "Drag accounts into your order in Settings → Accounts & Connections: a new agent gets the first connection of the first account that's on in the workspace. Running agents keep theirs.",
+    "description": "A tip (HI-2107). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
   },
   "tips.connectionOrder.title": {
-    "defaultMessage": "Put your connections in order",
-    "description": "A tip's title."
+    "defaultMessage": "Put your accounts in order",
+    "description": "A tip's title (HI-2107): the one order of accounts, for every coding agent CLI."
+  },
+  "tips.connectionSetups.text": {
+    "defaultMessage": "Add Connection under an account in Settings → Accounts & Connections makes another setup on the same sign-in, say \"Claude · High\" beside \"Claude · Medium\". Agents choose a connection, so one edit changes every agent on it.",
+    "description": "A tip (HI-2107). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Add Connection is a button). \"Claude · High\" and \"Claude · Medium\" are example names of connections."
+  },
+  "tips.connectionSetups.title": {
+    "defaultMessage": "Several setups on one sign-in",
+    "description": "A tip's title (HI-2107): connections, several on one account."
   },
   "tips.connectionTrust.text": {
     "defaultMessage": "A new connection's Set Up asks Claude Code once, in the workspace folder, to trust every project in it. Codex agents never ask: each trusts its own folder for that launch (Settings → Advanced → Codex).",
@@ -652,8 +660,8 @@
     "description": "A tip's title."
   },
   "tips.connections.text": {
-    "defaultMessage": "Settings → Connections keeps several Claude Code and Codex sign-ins, or a server such as Ollama on this PC. Each workspace chooses which are on, new agents use the first one on in your order, and any agent can run on its own: pick it in Agent Settings.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Ollama is a product's name."
+    "defaultMessage": "Settings → Accounts & Connections keeps several Claude Code and Codex sign-ins, or a server such as Ollama on this PC. Each workspace chooses which accounts are on, and each agent runs on the connection it chose: pick another in Agent Settings.",
+    "description": "A tip (HI-2107). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Ollama is a product's name."
   },
   "tips.connections.title": {
     "defaultMessage": "Run agents on different sign-ins",
@@ -721,14 +729,6 @@
   },
   "tips.dateFormat.title": {
     "defaultMessage": "Dates your way",
-    "description": "A tip's title."
-  },
-  "tips.defaultProvider.text": {
-    "defaultMessage": "Default provider is Automatic unless you choose one: new agents use the first coding agent that is turned on and installed, so Codex or GitHub Copilot alone works without Claude Code. Choose one in Settings → Providers to always use it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
-  },
-  "tips.defaultProvider.title": {
-    "defaultMessage": "New agents use what you have installed",
     "description": "A tip's title."
   },
   "tips.designCheck.text": {

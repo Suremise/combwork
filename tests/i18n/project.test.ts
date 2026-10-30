@@ -180,6 +180,5 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(tr(m('project.apply.new'), { live: 'yes' })).toBe('Changes apply to new sessions — restart the running session to apply them.')
     expect(tr(m('project.skills.assistantOnly'), { count: 1 })).toBe("1 Hive skill is for the Hive Assistant only, so it isn't listed: this project's agents don't get it.")
     expect(tr(m('project.settings.inherit'), { value: 'on' })).toBe('Inherit (on)')
-    expect(tr(m('project.settings.now'), { desc: 'Locks files.', current: 'Off.' })).toBe('Locks files. Now: Off.')
   })
 })
