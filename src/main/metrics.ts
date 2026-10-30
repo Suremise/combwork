@@ -128,9 +128,9 @@ function drop(b: Bucket, owner: string, n = 1): void {
 const SKILL_COUNTS = ['sharedScans', 'hits', 'misses', 'invalidations', 'tooLarge', 'files', 'bytes', 'headerBytes', 'entries'] as const
 const emptySkills = (): SkillServiceSeries => ({ scans: emptyTimed(), sharedScans: 0, hits: 0, misses: 0, invalidations: 0, tooLarge: 0, files: 0, bytes: 0, headerBytes: 0, entries: 0 })
 const GUIDANCE_COUNTS = ['launches', 'guidanceBytes', 'guidanceChars', 'customBytes', 'customChars', 'roleBytes', 'roleChars', 'modeBytes', 'modeChars', 'skills', 'skillCatalogBytes', 'skillBytes', 'skillsNotDelivered', 'skillsUnmeasured'] as const
-const CATALOG_COUNTS = ['starts', 'tools', 'toolsBytes', 'toolsChars', 'charStarts'] as const
+const CATALOG_COUNTS = ['starts', 'tools', 'toolsBytes', 'toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars'] as const
 const newBucket = (start: number, span: Bucket['span']): Bucket => ({ start, span, projects: dict(), workspace: emptyPart(), skills: emptySkills(), dropped: 0, droppedBy: dict(), series: 0 })
-const emptyCatalog = (role: CatalogSeries['role'], workflow: CatalogSeries['workflow']): CatalogSeries => ({ role, workflow, starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0 })
+const emptyCatalog = (role: CatalogSeries['role'], workflow: CatalogSeries['workflow']): CatalogSeries => ({ role, workflow, starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0 })
 const emptyGuidance = (provider: string, role: GuidanceSeries['role'], workflow: GuidanceSeries['workflow']): GuidanceSeries => ({ provider, role, workflow, launches: 0, guidanceBytes: 0, guidanceChars: 0, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 })
 
 // ---------------------------------------------------------------------------
@@ -254,9 +254,9 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
     if (g) for (const k of GUIDANCE_COUNTS) g[k] += c[k]
   })
   each(o.catalog, (s) => {
-    // Saved before HI-2049: bytes only, so none of its starts has its characters.
-    const c = readCounts(s, CATALOG_COUNTS, ['toolsChars', 'charStarts'])
-    if (!c || (s.role !== 'agent' && s.role !== 'assistant') || c.charStarts > c.starts) return
+    // Saved before HI-2049: bytes only, so none of its starts has its characters; before HI-2063, none has their parts.
+    const c = readCounts(s, CATALOG_COUNTS, ['toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars'])
+    if (!c || (s.role !== 'agent' && s.role !== 'assistant') || c.charStarts > c.starts || c.partStarts > c.charStarts || c.partToolsChars > c.toolsChars || c.descriptionChars + c.paramChars > c.partToolsChars) return
     const workflow = workflowOf(s.workflow)
     const key = `${s.role} ${workflow}`
     const g = part.catalog[key] ?? (room() ? (part.catalog[key] = emptyCatalog(s.role, workflow)) : null)
@@ -954,13 +954,21 @@ export function recordMcp(h: MetricsHandle | null, project: string | null, role:
 /**
  * The bridge's tool list as one session start sent it to its CLI, on the workflow side of the launch it reported for
  * (HI-2049: that launch's own, `unknown` when Hive doesn't know it). A bridge from before HI-2049 sends no `toolsChars`:
- * its start counts in `starts`, not `charStarts`.
+ * its start counts in `starts`, not `charStarts`; one from before HI-2063 sends no parts: in `charStarts`, not
+ * `partStarts`. Parts come both or neither, with the characters, and add up to no more than them.
  */
-export function recordCatalog(h: MetricsHandle | null, project: string | null, role: CatalogSeries['role'], workflow: CatalogSeries['workflow'], c: { tools: unknown; toolsBytes: unknown; toolsChars?: unknown }): boolean {
+export function recordCatalog(h: MetricsHandle | null, project: string | null, role: CatalogSeries['role'], workflow: CatalogSeries['workflow'], c: { tools: unknown; toolsBytes: unknown; toolsChars?: unknown; descriptionChars?: unknown; paramChars?: unknown }): boolean {
+  const int = (v: unknown): number | null => {
+    const n = count(v, 10_000_000)
+    return n !== null && Number.isInteger(n) ? n : null
+  }
   const tools = count(c.tools, MCP_REPORT_LIMITS.tools)
-  const toolsBytes = count(c.toolsBytes, 10_000_000)
-  const toolsChars = c.toolsChars === undefined ? undefined : count(c.toolsChars, 10_000_000)
-  if (tools === null || toolsBytes === null || toolsChars === null || !Number.isInteger(tools) || !Number.isInteger(toolsBytes) || (toolsChars !== undefined && !Number.isInteger(toolsChars))) return false
+  const toolsBytes = int(c.toolsBytes)
+  const toolsChars = c.toolsChars === undefined ? undefined : int(c.toolsChars)
+  if (tools === null || toolsBytes === null || toolsChars === null || !Number.isInteger(tools)) return false
+  const hasParts = c.descriptionChars !== undefined || c.paramChars !== undefined
+  const parts = hasParts ? { description: int(c.descriptionChars), param: int(c.paramChars) } : null
+  if (parts && (toolsChars === undefined || parts.description === null || parts.param === null || parts.description + parts.param > toolsChars)) return false
   try {
     const at = bucketOf(h)
     if (!at) return true
@@ -979,6 +987,12 @@ export function recordCatalog(h: MetricsHandle | null, project: string | null, r
       if (toolsChars !== undefined) {
         s.toolsChars += toolsChars
         s.charStarts++
+      }
+      if (parts && toolsChars !== undefined) {
+        s.partStarts++
+        s.partToolsChars += toolsChars
+        s.descriptionChars += parts.description!
+        s.paramChars += parts.param!
       }
     }
     at.store.changed()

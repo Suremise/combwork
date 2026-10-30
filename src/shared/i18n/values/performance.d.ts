@@ -389,8 +389,16 @@ interface HiveMessageValues {
   'performance.stalls.tip': { kept: number }
   'performance.stalls.waiting': undefined
   'performance.stalls.when': undefined
-  'performance.toolList': { list: string | number }
-  'performance.toolList.item': { role: string; tools: number; size: string | number }
+  'performance.toolList.bytes': undefined
+  'performance.toolList.chars': undefined
+  'performance.toolList.descriptions': undefined
+  'performance.toolList.empty': undefined
+  'performance.toolList.heading': undefined
+  'performance.toolList.params': undefined
+  'performance.toolList.schemas': undefined
+  'performance.toolList.starts': undefined
+  'performance.toolList.tip': undefined
+  'performance.toolList.tools': undefined
   'performance.tools.calls': undefined
   'performance.tools.chars': undefined
   'performance.tools.detail': undefined
