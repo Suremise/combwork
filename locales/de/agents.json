@@ -172,6 +172,8 @@
   "agents.limit.many": "Mehr als {limit} Agenten: Jeder führt eine eigene Kopie seiner CLI aus, mit jeweils etwa 200–500 MB Arbeitsspeicher; dieser Computer hat {total} Arbeitsspeicher, davon {free} frei. Alle teilen sich die Nutzungslimits deiner Pläne und erreichen sie daher früher.",
   "agents.limit.manyMeasured": "Mehr als {limit} Agenten: Jeder führt eine eigene Kopie seiner CLI aus. {running, plural, one {Dein # laufender Agent belegt} other {Deine # laufenden Agenten belegen}} gerade {used} (etwa {each} pro Agent); dieser Computer hat {total} Arbeitsspeicher, davon {free} frei. Alle teilen sich die Nutzungslimits deiner Pläne und erreichen sie daher früher.",
   "agents.limit.most": "Ein Projekt kann bis zu {most, number} Agenten haben.",
+  "agents.limit.openWorkflow": "Workflow-Optionen öffnen",
+  "agents.limit.workflow": "Der Workflow dieses Projekts erlaubt {max, plural, one {# Agenten} other {# Agenten}}: Erhöhe die Höchstzahl an Agenten unter Versionsverwaltung → Workflow.",
   "agents.mcp.all": "Alle des Projekts",
   "agents.mcp.its": "MCP-Server des Agenten",
   "agents.mcp.loading": "Wird geladen…",

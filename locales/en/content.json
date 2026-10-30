@@ -391,6 +391,10 @@
     "defaultMessage": "{problem} Nothing was changed.",
     "description": "An error loading a template, nothing changed: {problem} is why, a sentence of its own (how many agents a project can have)."
   },
+  "content.templates.overMax": {
+    "defaultMessage": "It has {count, number} agents, and this project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents in Version Control → Workflow first, or load it with its workflow. Nothing was changed.",
+    "description": "An error loading a template (HI-2058): its agents ({count}) are more than the project's workflow option Maximum agents ({max}), and its workflow, which would raise it, isn't applied. Maximum agents, Version Control and Workflow are names in the window: as translated there."
+  },
   "content.templates.provider": {
     "defaultMessage": "{problem, select, unknown {This Hive doesn't know the coding agent \"{provider}\" (update Hive)} off {{provider} is turned off (Settings → Providers)} other {{provider} isn't installed (Provider Setup)}}",
     "description": "Why a template can't be loaded: a coding agent CLI it needs. {problem} is why: unknown ({provider} is the id the template gives, which this version of Hive doesn't know), off (turned off in Settings → Providers), or not installed (Provider Setup is a Help window). {provider} is otherwise its name (\"Codex\")."

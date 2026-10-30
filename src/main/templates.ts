@@ -1,7 +1,7 @@
 import { existsSync } from 'original-fs'
 import { mkdir, readFile, readdir, stat } from 'original-fs/promises'
 import { basename, join, resolve } from 'path'
-import { HIVE_DIR, projectAgents } from '../shared/defaults'
+import { AGENT_LIMIT_MAX, HIVE_DIR, agentLimitText, projectAgents } from '../shared/defaults'
 import { agentProvider, isKnownProvider, isProviderEnabled, orderedProviders, providerDescriptor } from '../shared/providers'
 import {
   exportable,
@@ -33,9 +33,10 @@ import {
 } from '../shared/templates'
 import { HIVE_TEMPLATES, hiveTemplate, type HiveTemplate } from '../shared/templateDefaults'
 import type { AgentBranchStatus, AgentDef, ConnectionProblem, PageLayout, ProjectConfig, ProviderId, TemplateLoadPlan, TemplateLoadWorkflow } from '../shared/types'
-import { hasWorkflow, overlayTemplateWorkflow, readTemplateWorkflow, templateWorkflowOf, TEMPLATE_PLATFORMS, type TemplateWorkflow, type TemplateWorkflows } from '../shared/workflow/templateOptions'
+import { hasWorkflow, loadedMaxAgents, overlayTemplateWorkflow, readTemplateWorkflow, templateWorkflowOf, TEMPLATE_PLATFORMS, type TemplateWorkflow, type TemplateWorkflows } from '../shared/workflow/templateOptions'
 import type { PlatformId } from '../shared/platform/descriptors'
-import { workflowForm } from './workflow/optionsForm'
+import { ownPreferenceChange, workflowForm } from './workflow/optionsForm'
+import { workflowChanged } from './workflow/rulesets'
 import { config } from './config'
 import { placeKey, readKeptJson, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
@@ -87,6 +88,7 @@ const M = {
   needsIt: msg({ id: 'content.templates.needsIt', defaultMessage: '{problem, select, unknown {This Hive doesn\'t know the coding agent "{provider}" (update Hive): {agent} needs it.} off {{provider} is turned off (Settings → Providers): {agent} needs it.} other {{provider} isn\'t installed (Provider Setup): {agent} needs it.}}', description: "An error adding one agent from a template: the coding agent CLI it needs. {agent} is its name; {problem} and {provider} as in the reason a template can't be loaded." }),
   taken: msg({ id: 'content.templates.taken', defaultMessage: '{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}.', description: "Why a template can't be loaded: agents of other projects ({projects}) have its agents' names {names} ({count} of them). {names} and {projects} are lists, in the language's way (\"B1 and R1\")." }),
   takenNothing: msg({ id: 'content.templates.takenNothing', defaultMessage: '{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}. Nothing was changed.', description: "An error loading a template: agents of other projects ({projects}) took its agents' names {names} ({count} of them) while it loaded, so nothing changed. {names} and {projects} are lists, in the language's way (\"B1 and R1\")." }),
+  overMax: msg({ id: 'content.templates.overMax', defaultMessage: 'It has {count, number} agents, and this project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents in Version Control → Workflow first, or load it with its workflow. Nothing was changed.', description: "An error loading a template (HI-2058): its agents ({count}) are more than the project's workflow option Maximum agents ({max}), and its workflow, which would raise it, isn't applied. Maximum agents, Version Control and Workflow are names in the window: as translated there." }),
   nothing: msg({ id: 'content.templates.nothing', defaultMessage: '{problem} Nothing was changed.', description: "An error loading a template, nothing changed: {problem} is why, a sentence of its own (how many agents a project can have)." }),
   noKey: msg({ id: 'content.templates.noKey', defaultMessage: "Hive couldn't read {project}'s key, and this template's agent names are made from it. Try again, or check the key in Project Settings → General.", description: "An error loading a template, or adding one of its agents, whose names hold the project's key (HI-B1 in a project whose key is HI): the key of the project ({project}, its name) couldn't be read. Project Settings → Agents is where the key is changed: use its translation." }),
   noKeySave: msg({ id: 'content.templates.noKeySave', defaultMessage: "Hive couldn't read {project}'s key, so the names can't be saved with it. Try again, or save without Use the project key in names.", description: "An error saving a project's agents as a template with \"Use the project key in names\" ticked: the key of the project ({project}, its name) couldn't be read. \"Use the project key in names\" is the tick box's label: use its translation." }),
@@ -622,7 +624,8 @@ async function planWorkflow(projectPath: string, t: Pick<TemplateEntry, 'scope' 
     sections,
     dropped: t.workflowDropped ?? [],
     section,
-    overlay: section ? overlayTemplateWorkflow(section, form) : null,
+    // Its Maximum agents isn't one of the changes it fills in: the user's load saves it with the agents (HI-2058).
+    overlay: section ? overlayTemplateWorkflow({ ...section, options: Object.fromEntries(Object.entries(section.options).filter(([k]) => k !== 'maxAgents')) as TemplateWorkflow['options'] }, form) : null,
     needsGit: form.platform === 'none' && !section && sections.includes('git'),
     alsoGit: form.platform === 'none' && !!section && sections.includes('git')
   }
@@ -690,8 +693,8 @@ export interface TemplateLoaded {
  * - The template's suggested preset is only offered (the window opens the Workflow section with it), never applied here;
  *   so is its workflow (HI-1910): returned as this load read it, for the window to fill in the Workflow form with.
  */
-export async function loadTemplate(projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>): Promise<{ created: string[]; removed: string[]; workflow: TemplateWorkflow | null }> {
-  const r = await loadTemplateWith(projectPath, scope, file, expected, { from, names, connections, by: 'user' })
+export async function loadTemplate(projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>, applyWorkflow = false): Promise<{ created: string[]; removed: string[]; workflow: TemplateWorkflow | null }> {
+  const r = await loadTemplateWith(projectPath, scope, file, expected, { from, names, connections, by: 'user', applyWorkflow })
   return { created: r.created, removed: r.removed, workflow: r.workflow }
 }
 
@@ -701,9 +704,9 @@ export async function loadTemplate(projectPath: string, scope: TemplateScope, fi
  * plan's workflow is the same read of the template as the agents it loads; `guard` runs at the publish itself, under the
  * project file's lock (its throw publishes nothing); `taken` words a refusal for names another project's agent has, in the
  * plan or at the names lock (the window's words without it); the result has the agents and layout before and after, for
- * undo.
+ * undo. `applyWorkflow` (the user's, its workflow ticked): its Maximum agents is saved with its agents (HI-2058).
  */
-export async function loadTemplateWith(projectPath: string, scope: TemplateScope, file: string, expected: string[], o: { from?: string; names?: string[]; connections?: Record<number, string | null>; check?: (plan: TemplateLoadPlan) => Promise<void>; guard?: () => void; taken?: Taken; by?: AddedBy } = {}): Promise<TemplateLoaded> {
+export async function loadTemplateWith(projectPath: string, scope: TemplateScope, file: string, expected: string[], o: { from?: string; names?: string[]; connections?: Record<number, string | null>; check?: (plan: TemplateLoadPlan) => Promise<void>; guard?: () => void; taken?: Taken; by?: AddedBy; applyWorkflow?: boolean } = {}): Promise<TemplateLoaded> {
   const by = o.by ?? 'agent'
   projectPath = workspace.assertProject(projectPath)
   return whileReplacing(projectPath, M.fenced, async () => {
@@ -724,7 +727,7 @@ export async function loadTemplateWith(projectPath: string, scope: TemplateScope
       if (e && typeof e === 'object') fromCaller.add(e)
       return e
     }
-    let before: { agents: AgentDef[]; layout: PageLayout }
+    let before: { agents: AgentDef[]; layout: PageLayout; maxAgents?: number }
     try {
       for (const [i, a] of plan.create.entries()) {
         const opts = { name: a.name, role: a.note, workflowRole: a.role, provider: a.provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext, mcpServers: a.mcpServers, connection: connectionAt(i), location: 'project' as const }
@@ -739,10 +742,13 @@ export async function loadTemplateWith(projectPath: string, scope: TemplateScope
         b.pairedWith = r.name
         r.pairedWith = b.name
       }
+      // Its workflow applied by the user (HI-2058): the section's Maximum agents, saved with the agents in the same write.
+      const section = by === 'user' && o.applyWorkflow ? (plan.workflow?.section ?? null) : null
       before = await replaceProjectAgents(projectPath, {
         next: staged.map((s) => s.def),
         layout: plan.layout,
         by,
+        ...(section && plan.workflow ? { loadedMax: { m: section.options.maxAgents, platform: plan.workflow.platform } } : {}),
         check: (list) => {
           // The caller's guard (the Assistant's control and launch, HI-1502) at the write itself, under the lock.
           try {
@@ -760,7 +766,8 @@ export async function loadTemplateWith(projectPath: string, scope: TemplateScope
       // failure making the agents is said as one.
       throw e instanceof HiveError || fromCaller.has(e as object) ? e : refusal(msg({ id: 'content.templates.failed', defaultMessage: 'Nothing was changed: {error}', description: "An error loading a template: making its agents failed, so nothing changed; {error} is why (often git's own words)." }), { error: errorText(e) })
     }
-    log.info(`Loaded template ${userText(plan.name)} into ${userText(projectPath)}: ${before.agents.length} agents removed, ${staged.length} created${plan.swaps.length ? `, ${plan.swaps.length} on another provider` : ''}`)
+    log.info(`Loaded template ${userText(plan.name)} into ${userText(projectPath)}: ${before.agents.length} agents removed, ${staged.length} created${plan.swaps.length ? `, ${plan.swaps.length} on another provider` : ''}${before.maxAgents !== undefined ? `, Maximum agents ${before.maxAgents}` : ''}`)
+    if (before.maxAgents !== undefined) workflowChanged(workspaceOf(projectPath), projectPath)
     await agentsGone(projectPath, before.agents.map((a) => a.id))
     // The workflow section of the template as this load read it (HR5's HI-1910 round 1): the window applies it only if it
     // is the one it showed, never one read before the template changed.
@@ -791,12 +798,14 @@ async function whileReplacing<T>(projectPath: string, fenceWhy: Msg, fn: () => P
  * names checked against the other projects' agents holding the workspace's names lock (#702: another project may have
  * taken one meanwhile; `taken` words the refusal, never a name made up), then one write under the project file's lock,
  * only if `check` passes on the agents as they are now (the caller's: those it expects), none of them runs or is
- * starting, an agent's load fits Maximum agents as it is now (HI-2001) and each one's connection can be used here (HI-1769). A
- * removed agent's worktree whose setup never ran is remembered for the next agent given it (#289). Returns the agents and
- * layout it replaced; what follows a removal (`agentsGone`) is the caller's, once it is published.
+ * starting, the new list fits Maximum agents as it is now (HI-2001; the user's too, HI-2058, or as the load saves it with
+ * `loadedMax`, its workflow applied; `anyMax`, undo putting agents back, only the most any project has) and each one's
+ * connection can be used here (HI-1769). A removed agent's worktree whose setup never ran is remembered for the next agent
+ * given it (#289). Returns the agents and layout it replaced, and the Maximum agents it saved; what follows a removal
+ * (`agentsGone`) is the caller's, once it is published.
  */
-async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; layout: PageLayout; by: AddedBy; check: (list: AgentDef[], now: ProjectConfig) => void; taken: Taken }): Promise<{ agents: AgentDef[]; layout: PageLayout }> {
-  let before: { agents: AgentDef[]; layout: PageLayout } | null = null
+async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; layout: PageLayout; by: AddedBy; loadedMax?: { m: unknown; platform: PlatformId }; anyMax?: boolean; check: (list: AgentDef[], now: ProjectConfig) => void; taken: Taken }): Promise<{ agents: AgentDef[]; layout: PageLayout; maxAgents?: number }> {
+  let before: { agents: AgentDef[]; layout: PageLayout; maxAgents?: number } | null = null
   await withAgentNames(projectPath, async () => {
     const others = (await workspaceAgents(projectPath)).filter((a) => a.project.toLowerCase() !== basename(projectPath).toLowerCase())
     const clash = r.next.flatMap((d) => {
@@ -808,15 +817,22 @@ async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; 
       const list = projectAgents(now)
       r.check(list, now)
       if (list.some((a) => busy(projectPath, a.id))) throw refusal(msg({ id: 'content.templates.started', defaultMessage: 'An agent started meanwhile: nothing was changed. Stop it first.', description: "An error loading a template: one of the project's agents started while it loaded, so nothing changed." }), undefined, 'conflict')
-      // Maximum agents as it is now, for an agent's load (HI-2001): the workflow may have lowered it since the plan.
+      // Maximum agents as it is now (HI-2001), the final list against it: the workflow may have lowered it, or an agent been
+      // added, since the plan. The user's load with its workflow saves the template's (HI-2058) and is checked against that.
+      const n = r.next.length
+      if (n > AGENT_LIMIT_MAX) throw refusal(M.nothing, { problem: agentLimitText(tr) })
       const max = agentMax(projectPath, now)
-      if (r.by === 'agent' && r.next.length > max) throw refusal(M.nothing, { problem: templateLimitText(r.next.length, max) })
+      const saves = r.loadedMax ? loadedMaxAgents(r.loadedMax.m, n, max) : null
+      const limit = saves ?? max
+      if (!r.anyMax && n > limit) throw r.by === 'agent' ? refusal(M.nothing, { problem: templateLimitText(n, limit) }) : refusal(M.overMax, { count: n, max: limit })
       // Each one's connection as it is now (HI-1769): one turned off or removed while they were prepared stops it.
       for (const def of r.next) if (def.connection) assertConnectionHere(def.connection, def.provider!, projectPath, def.name)
-      // The layout as kept (auto when none was chosen), so undo puts back exactly what was there.
-      before = { agents: list, layout: now.layout ?? 'auto' }
+      // The layout as kept (auto when none was chosen), so undo puts back exactly what was there. The template's own maximum
+      // is saved even when it equals the one inherited now, so a later change to the defaults doesn't move this team's.
+      const saved = saves !== null && r.loadedMax ? saves : undefined
+      before = { agents: list, layout: now.layout ?? 'auto', ...(saved !== undefined ? { maxAgents: saved } : {}) }
       const pending = [...(Array.isArray(now.setupPending) ? now.setupPending.filter((p) => typeof p === 'string') : []), ...list.filter((a) => legacySetupPending(a)).map((a) => legacyWorktree(a)!.path)]
-      return { agents: r.next, layout: r.layout, setupPending: [...new Map(pending.map((p) => [placeKey(p), p])).values()].slice(-50) }
+      return { agents: r.next, layout: r.layout, setupPending: [...new Map(pending.map((p) => [placeKey(p), p])).values()].slice(-50), ...(saved !== undefined && r.loadedMax ? ownPreferenceChange(now, r.loadedMax.platform, 'maxAgents', saved) : {}) }
     })
   })
   return before!
@@ -832,7 +848,7 @@ export async function restoreProjectAgents(projectPath: string, back: { agents: 
   projectPath = workspace.assertProject(projectPath)
   await whileReplacing(projectPath, M.restoring, async () => {
     // What was there before: put back whatever Maximum agents is now (HI-2001), as the user's own agents were.
-    const was = await replaceProjectAgents(projectPath, { next: back.agents, layout: back.layout, by: 'user', check, taken })
+    const was = await replaceProjectAgents(projectPath, { next: back.agents, layout: back.layout, by: 'user', anyMax: true, check, taken })
     const kept = new Set(back.agents.map((a) => a.id))
     await agentsGone(projectPath, was.agents.filter((a) => !kept.has(a.id)).map((a) => a.id))
   })

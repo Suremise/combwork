@@ -527,7 +527,7 @@ export interface GoneEvidence {
 export function goneWriterStill(evidence: GoneEvidence): () => void {
   const { run, helper } = evidence
   return () => {
-    if (helper !== null && !keeperStillBound(run, helper)) throw new Error(`the slot writer ${run}'s helper ${helper} was revoked`)
+    if (helper !== null && !keeperStillBound(run, helper)) throw new Error(`the slot writer ${run}'s helper ${helper} was revoked`) // i18n-ignore: caught by its callers, never shown
   }
 }
 

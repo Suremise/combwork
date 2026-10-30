@@ -152,6 +152,17 @@ export interface TemplateWorkflowOverlay {
 }
 
 /**
+ * The Maximum agents the user's load of a template saves with its agents (HI-2058, Darren's decision: the template
+ * raises it by itself), its workflow applied: the section's own (`m`, read as the option takes it) when it has one, never
+ * under the `n` agents loaded; one with none, or none it can take, raises the project's (`now`) to `n` and never lowers
+ * it. Null: none saved, the project's own as it is. A load past AGENT_LIMIT_MAX is refused before this is asked.
+ */
+export function loadedMaxAgents(m: unknown, n: number, now: number): number | null {
+  if (OPTION_TAKES.maxAgents(m)) return Math.max(m as number, n)
+  return n > now ? n : null
+}
+
+/**
  * A section laid over a project's options (the Load template dialog's preview, then the Workflow form's draft): each
  * carried option its platform has, from the section; everything else the project's own as it is, its target, commands
  * and identity among them. The identity on is this project's git identity, never another's: none here, it stays off.

@@ -65,6 +65,16 @@ const levelsOf = (ws: WorkspaceService, own: Partial<WorkflowOptions> | null, fo
 const ownOf = (cfg: Pick<ProjectConfig, 'workflow'>, platform: PlatformId): Partial<WorkflowOptions> => (cfg.workflow?.platform === platform ? cfg.workflow.options : cfg.workflow ? {} : legacyPreferences(cfg))
 
 /**
+ * The project config's change that sets one of a project's preferences as its own (HI-2058: a template's load sets
+ * Maximum agents with its agents, in the same write), its other options and preset kept as a save keeps them. For a
+ * `mutateProjectConfig` the caller holds; the windows are told by `workflowChanged` once it is written.
+ */
+export function ownPreferenceChange<K extends 'maxAgents'>(cfg: ProjectConfig, platform: PlatformId, key: K, value: WorkflowOptions[K]): Partial<ProjectConfig> {
+  const options = { ...ownOf(cfg, platform), [key]: value }
+  return { workflow: writeWorkflow(cfg.workflow, { platform, preset: cfg.workflow?.platform === platform ? cfg.workflow.preset : null, options }), ...LEGACY_CONSUMED }
+}
+
+/**
  * What a preset fills in from the project (OP-24: suggested from its scripts, never guessed silently, and shown in the
  * form before it is saved): `typecheck` and `lint` as the quick checks and `test` as the tests, when its package.json
  * has them, the commit identity its git config has (G12), and its default branch as Pair's and Team's target (G7).

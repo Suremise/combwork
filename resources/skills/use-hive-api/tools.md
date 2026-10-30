@@ -73,7 +73,7 @@ Texts are clipped: the task to 300 characters, the reply to 500, the last 3 tool
 
 ## Adding cards (`hive_create_task`)
 
-- A title of about 70 characters: the outcome wanted or the problem, in words. Evidence, numbers, file names, paths and people's names go in the description.
+- A title of about 70 characters: the outcome wanted or the problem, in words, and no people's names. Past Settings → Advanced's length, or naming a path, a file, a card or a measurement, the reply's last line says so (the title is kept).
 - The description says what to do and how to tell it is done, in full: whoever starts it reads only the card.
 - A project agent's card is its project's (another project's or the workspace's: tell the user); created in doing without an agent, it is given to you. The Assistant's card without a project is about the workspace and can't be started on an agent.
 - `kind: no-code`: work with no commits (a decision, a write-up, a trial), finished by its summary; an agent's proposal of it, and of `skipReview`, waits for the user to confirm.

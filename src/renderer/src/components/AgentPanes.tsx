@@ -514,11 +514,11 @@ export function AddAgentButton({ project, className, label, iconOnly }: { projec
   useLanguage()
   const menu = useContextMenu()
   const caret = useRef<HTMLButtonElement>(null)
-  const limit = useAgentLimit()
+  const limit = useAgentLimit(project)
   const full = project.agents.length >= limit
   const templates = !isAssistantPath(project.path)
   const configure = (): void => set({ addAgentFor: project.path })
-  const tip = full ? agentLimitText(tr) : tr(msg({ id: 'panes.add.tip', defaultMessage: 'Configure Agent and Add…: choose its provider, where it works and its settings', description: 'Tooltip of the Add Agent button (an empty project or pane). "Configure Agent and Add…" names the dialog it opens: use its translation.' }))
+  const tip = full ? agentLimitText(tr, limit) : tr(msg({ id: 'panes.add.tip', defaultMessage: 'Configure Agent and Add…: choose its provider, where it works and its settings', description: 'Tooltip of the Add Agent button (an empty project or pane). "Configure Agent and Add…" names the dialog it opens: use its translation.' }))
   const fromTemplate = async (keyboard: boolean): Promise<void> => {
     const at = caret.current && below(caret.current)
     const all = await templatesStillHere(project.path)
@@ -706,7 +706,7 @@ const layoutName = (l: PageLayout): string =>
 /** Add Agent from Template: each usable template's agents, under its name and scope (#126). */
 function addFromTemplateItems(project: ProjectInfo, list: TemplateEntry[]): MenuEntry[] {
   const all = list.filter((t) => !t.problem)
-  const full = project.agents.length >= agentLimit()
+  const full = project.agents.length >= agentLimit(project)
   return all.length
     ? all.flatMap((t) => [
         { header: true, label: tr(msg({ id: 'panes.template.heading', defaultMessage: '{template} · {scope, select, hive {Hive} workspace {workspace} other {this project}}', description: "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)." }), { template: templateTitle(t), scope: t.scope }) },
@@ -946,7 +946,7 @@ export function SessionToolbar({ project, view }: { project: ProjectInfo; view: 
   const dragging = useAgentDrag(project)
   const removing = useStore((s) => s.running)
   const tasks = useStore((s) => s.tasks)
-  const limit = useAgentLimit()
+  const limit = useAgentLimit(project)
   const full = project.agents.length >= limit
   const assistant = isAssistantPath(project.path)
   const [dropPage, setDropPage] = useState<number | null>(null)
@@ -1005,7 +1005,7 @@ export function SessionToolbar({ project, view }: { project: ProjectInfo; view: 
     addMenu.openAt(
       ...below(add.current),
       [
-        { label: tr(CONFIGURE_AGENT), icon: 'settings-gear', disabled: full, detail: full ? agentLimitText(tr) : undefined, onClick: () => set({ addAgentFor: project.path }) },
+        { label: tr(CONFIGURE_AGENT), icon: 'settings-gear', disabled: full, detail: full ? agentLimitText(tr, limit) : undefined, onClick: () => set({ addAgentFor: project.path }) },
         { label: tr(ADD_AGENT), icon: 'add', disabled: full, keybinding: quickKey ? formatKeybinding(quickKey) : undefined, detail: tr(msg({ id: 'panes.add.quickDetail', defaultMessage: 'At once, with your defaults', description: "The detail of + Add ▾'s Add Agent: it adds an agent at once, with the default provider and settings, working in the project folder. Keep it short." })), onClick: () => void actions.quickAddAgent(project.path) },
         ...(assistant
           ? []
@@ -1206,7 +1206,7 @@ export function SessionToolbar({ project, view }: { project: ProjectInfo; view: 
           ))}
         </div>
       )}
-      <Tooltip content={full ? agentLimitText(tr) : tr(msg({ id: 'panes.add.menuTip', defaultMessage: 'Add an agent (Add Agent…: choose its provider, where it works and its settings), or save and load templates', description: "Tooltip of the session toolbar's + Add ▾ button. \"Add Agent…\" is its first menu item: use its translation." }))}>
+      <Tooltip content={full ? agentLimitText(tr, limit) : tr(msg({ id: 'panes.add.menuTip', defaultMessage: 'Add an agent (Add Agent…: choose its provider, where it works and its settings), or save and load templates', description: "Tooltip of the session toolbar's + Add ▾ button. \"Add Agent…\" is its first menu item: use its translation." }))}>
         <button ref={add} className="btn subtle small add-menu" aria-haspopup="menu" aria-expanded={addMenu.shown} aria-label={addIcon ? tr(ADD) : undefined} onClick={(e) => openAdd(e.detail === 0)}>
           <Icon name="add" />
           {!addIcon && ` ${tr(ADD)}`}
@@ -1889,7 +1889,7 @@ function EmptyCell({ project, cell, canAdd }: { project: ProjectInfo; cell: numb
 function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectInfo; a: AgentInfo | null; hasTerminal: boolean; single: boolean; cell: number }) {
   useLanguage()
   const failure = useStartFailure(project, a)
-  const limit = useAgentLimit()
+  const limit = useAgentLimit(project)
   const startBlocked = useStartBlocked()
   // From the click until the session runs (#1177).
   const starting = useStarting(project.path, a?.id ?? null)

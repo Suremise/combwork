@@ -97,6 +97,7 @@
   "content.templates.noKeySave": "Hive konnte den Schlüssel von {project} nicht lesen, daher können die Namen nicht damit gespeichert werden. Versuche es erneut oder speichere ohne „Projektschlüssel in Namen verwenden“.",
   "content.templates.noWorkspace": "Öffne zuerst einen Arbeitsbereich.",
   "content.templates.nothing": "{problem} Es wurde nichts geändert.",
+  "content.templates.overMax": "Sie hat {count, number} Agenten, und der Workflow dieses Projekts erlaubt {max, plural, one {# Agenten} other {# Agenten}}: Erhöhe zuerst die Höchstzahl an Agenten unter Versionsverwaltung → Workflow, oder lade sie mit ihrem Workflow. Es wurde nichts geändert.",
   "content.templates.provider": "{problem, select, unknown {Diese Hive-Version kennt den Coding-Agenten „{provider}“ nicht (Hive aktualisieren)} off {{provider} ist deaktiviert (Einstellungen → Anbieter)} other {{provider} ist nicht installiert (Anbieter-Einrichtung)}}",
   "content.templates.restoring": "Rückgängig stellt die Agenten dieses Projekts so wieder her, wie sie vor dem Laden einer Vorlage waren",
   "content.templates.running": "Agent {agent} läuft oder startet gerade: Zuerst stoppen.",

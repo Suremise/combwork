@@ -97,6 +97,7 @@
   "content.templates.noKeySave": "Hive couldn't read {project}'s key, so the names can't be saved with it. Try again, or save without Use the project key in names.",
   "content.templates.noWorkspace": "Open a workspace first.",
   "content.templates.nothing": "{problem} Nothing was changed.",
+  "content.templates.overMax": "It has {count, number} agents, and this project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents in Version Control → Workflow first, or load it with its workflow. Nothing was changed.",
   "content.templates.provider": "{problem, select, unknown {This Hive doesn't know the coding agent \"{provider}\" (update Hive)} off {{provider} is turned off (Settings → Providers)} other {{provider} isn't installed (Provider Setup)}}",
   "content.templates.restoring": "Undo is putting this project's agents back as they were before a template was loaded",
   "content.templates.running": "{agent} is running or starting: stop it first.",

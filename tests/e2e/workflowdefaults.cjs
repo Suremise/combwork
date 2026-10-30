@@ -131,6 +131,20 @@ const check = (name, ok, extra = '') => {
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
     check('saved in workspace.json', !!(await lib.until(async () => wsJson().workflow?.git?.style === 'squash', HUNG_MS)), JSON.stringify(wsJson().workflow))
+    // Maximum agents (HI-2058): staged as it is typed, before the box loses focus, so Save lights at once; Discard drops
+    // it, nothing written; saved, it is the workspace's.
+    const maxBox = row('maxAgents').locator('input')
+    await maxBox.fill('18')
+    check('Maximum agents typed at the workspace’s level: Save lights and the row is marked before the box loses focus', !!(await lib.until(async () => (await form.locator('[data-action="save"]').isEnabled()) && (await row('maxAgents').locator('.modified').count()) === 1, HUNG_MS)) && (await maxBox.evaluate((e) => e === document.activeElement)))
+    await form.getByRole('button', { name: 'Discard Changes' }).click()
+    check('…Discard Changes drops it, nothing written', !!(await lib.until(async () => !(await form.locator('[data-action="save"]').isEnabled()) && (await maxBox.inputValue()) === '', HUNG_MS)) && wsJson().workflow?.git?.maxAgents === undefined, JSON.stringify(wsJson().workflow))
+    await maxBox.fill('18')
+    await lib.until(async () => form.locator('[data-action="save"]').isEnabled(), HUNG_MS)
+    await form.locator('[data-action="save"]').click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    check('…saved, it is the workspace’s, in workspace.json', !!(await lib.until(async () => wsJson().workflow?.git?.maxAgents === 18, HUNG_MS)), JSON.stringify(wsJson().workflow))
     await shots('workspace', level.locator('.workflow-level-head'))
 
     // --- The project: inherits it, its origin the workspace; its next card starts under it.
@@ -189,6 +203,16 @@ const check = (name, ok, extra = '') => {
     check('…and Discard Changes drops it, nothing written, its mark gone', !!(await lib.until(async () => !(await form.locator('[data-action="save"]').isEnabled()) && (await unsaved()).length === 0, HUNG_MS)) && wsJson().workflow?.git?.stopOwnRuns === undefined)
     await tab('workflow.defaults').click()
     check('the project inherits Hive’s default, under the workspace’s (style still its own)', !!form2 && form2.options.dependenciesDone === true && form2.origins.style === 'project', JSON.stringify(form2?.origins))
+    // Maximum agents at Hive's level (HI-2058): staged as typed, and saved in Hive's settings, not the workspace's.
+    const hiveMax = hiveRow('maxAgents').locator('input')
+    await hiveMax.fill('20')
+    check('Maximum agents typed at Hive’s level: Save lights before the box loses focus', !!(await lib.until(async () => hive.locator('[data-action="save"]').isEnabled(), HUNG_MS)))
+    await hive.locator('[data-action="save"]').click()
+    await dialog.waitFor({ timeout: HUNG_MS })
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+    await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    const hiveLevel = () => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).settings?.workflow
+    check('…saved in Hive’s settings, the workspace’s own 18 kept', !!(await lib.until(async () => hiveLevel()?.git?.maxAgents === 20, HUNG_MS)) && wsJson().workflow?.git?.maxAgents === 18, JSON.stringify({ hive: hiveLevel(), workspace: wsJson().workflow }))
     await shots('hive', hive.locator('.workflow-level-head'))
     // Hive's files copied into new slots (HI-1765), with Git's options: the default, .env*, until set here.
     const hiveCopy = hive.locator('[data-slot-default="copy"][data-level="global"]')

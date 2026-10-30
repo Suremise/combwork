@@ -630,13 +630,24 @@ export async function pin(repo: string, ref: string, rev: string): Promise<boole
   return (await git(repo, ['update-ref', ref, rev])).ok
 }
 
-/** The repository's configured commit identity, or null when none is set. */
+/**
+ * The repository's configured commit identity, or null when none is set. HI-2050: both keys in one git, as `git config
+ * <key>` answers each: NUL-separated records, a key split from its value at its first newline (none: a key with no
+ * value, ''), the last value of a key taken.
+ */
 export async function identity(repo: string): Promise<Maybe<{ name: string; email: string } | null>> {
-  const n = await git(repo, ['config', 'user.name'])
-  const e = await git(repo, ['config', 'user.email'])
-  // HI-2019: `git config <key>` exits 1 when the key isn't set; any other failure is a read git couldn't make, never "no
-  // identity" (the merge queue paused `identity` on one that failed for a moment).
-  const failed = [n, e].find((r) => !r.ok && r.code !== 1)
-  if (failed) return withDetail(unknown(U.state, { folder: repo }), failed.err)
-  return n.ok && e.ok && n.out.trim() && e.out.trim() ? { name: n.out.trim(), email: e.out.trim() } : null
+  const r = await git(repo, ['config', '--null', '--get-regexp', '^user\\.(name|email)$'])
+  // HI-2019: `git config` exits 1 when nothing it asks for is set; any other failure is a read git couldn't make, never
+  // "no identity" (the merge queue paused `identity` on one that failed for a moment).
+  if (!r.ok && r.code !== 1) return withDetail(unknown(U.state, { folder: repo }), r.err)
+  const set = new Map<string, string>()
+  if (r.ok)
+    for (const record of r.out.split('\0')) {
+      if (!record) continue
+      const nl = record.indexOf('\n')
+      set.set(nl < 0 ? record : record.slice(0, nl), nl < 0 ? '' : record.slice(nl + 1))
+    }
+  const name = set.get('user.name')?.trim()
+  const email = set.get('user.email')?.trim()
+  return name && email ? { name, email } : null
 }

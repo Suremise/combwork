@@ -62,7 +62,7 @@ type Kind = 'session' | 'conversation'
 
 export function SessionsTab({ project, assistant = false }: { project: ProjectInfo; assistant?: boolean }) {
   const { items, othersLoading, reload, error: listError, loadedAt } = useSessions(project)
-  const limit = useAgentLimit()
+  const limit = useAgentLimit(project)
   const listWidth = usePaneSize('sessions', 320)
   const [showArchived, setShowArchived] = useState(false)
   const [cleaningUp, setCleaningUp] = useState(false)

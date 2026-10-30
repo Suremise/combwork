@@ -435,13 +435,17 @@
     "defaultMessage": "Agent names are unique across the workspace, and {count, plural, one {this name is} other {these names are}} taken already: {names} (projects: {projects}). {count, plural, one {A free name is} other {Free names are}} filled in below. Change any name you like.",
     "description": "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them. Each sentence whole, the verb never agreeing with a list (HI-1585: glossary §1 rules 3 and 4)."
   },
-  "assistant.loadNames.raiseMax": {
-    "defaultMessage": "Also raise Maximum agents from {now, number} to {needs, number} (opens Version Control → Workflow with it set, to save there)",
-    "description": "Load template (HI-2001), a tick box: the template has more agents ({needs}) than the project's workflow option Maximum agents ({now}); ticked, the project's Version Control tab opens at Workflow with Maximum agents set to {needs}, not saved. Version Control → Workflow: use the translated names."
+  "assistant.loadNames.overMax": {
+    "defaultMessage": "It has {count, number} agents, and this project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents first, or load it with its workflow.",
+    "description": "Load template (HI-2058), why its button can't be used: the template's agents ({count}) are more than the project's Maximum agents ({max}), and its workflow, which would raise it, isn't applied. Maximum agents is a name in the window: as translated there."
   },
   "assistant.loadNames.sameTwice": {
     "defaultMessage": "Another of its agents has this name.",
     "description": "Load template, under a name box: another of the template's agents is given the same name."
+  },
+  "assistant.loadNames.savesMax": {
+    "defaultMessage": "Maximum agents goes from {now, number} to {next, number} for this project, saved with its agents.",
+    "description": "Load template (HI-2058), with its workflow applied: the template's own Maximum agents ({next}) is saved with its agents, in place of the project's ({now}). Maximum agents is a name in the window: as translated there."
   },
   "assistant.loadNames.taken": {
     "defaultMessage": "{project} has an agent called {name}.",

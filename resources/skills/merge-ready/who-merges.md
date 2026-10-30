@@ -7,8 +7,6 @@ For a card, how its work lands is the card's own rules: those it started under (
 - **A request waiting for the user** (For you: their review, their OK before merging, their acceptance): wait for their answer; Hive tells you what follows.
 - **The card's `merge`** (`hive_read_task`): Hive's merge queue has it, and merges it or returns it with why (fix and submit again). Don't merge it yourself: while the rules are enforced Hive refuses that. With them switched off the queue pauses (its `merge` says so) and the card is finished as before them: as your brief says, then `hive_report_merge`.
 
-The ways a card finishes, for context: Hive merges; the agent merges (after a passing review where there is one, after the user's OK where the rules ask for it, else straight after its submission, the card staying in Doing); merges not checked (once it passes, merged as the brief says and reported, nothing checked); committed is done, and no-code cards (Done once passed or submitted); no version control (accepted, after the user's approval where the rules ask for it).
-
 Outside a card, or with no workflow: the user merges from Hive, or you when they ask. Rebase, push, delete the branch or publish only when the user asks you to; for their OK on one (a push, a release), ask on the card with `hive_ask_user` (`kind: "approve"`).
 
 ## Edge cases

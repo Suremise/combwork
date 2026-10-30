@@ -106,7 +106,8 @@ describe('modes', () => {
       const lines = (p.summary ?? '').split('\n').filter(Boolean)
       expect(lines.length, f).toBeGreaterThanOrEqual(3)
       expect(lines.length, f).toBeLessThanOrEqual(5)
-      expect(p.body, f).toMatch(/## Put first[\s\S]+## How you work[\s\S]+## What you hand back/)
+      // How you work only where a mode has habits its skills don't own (HI-2010: Coordinator's are run-lanes' and coordinate-agents').
+      expect(p.body, f).toMatch(/## Put first[\s\S]+(## How you work[\s\S]+)?## What you hand back/)
       // How to use Hive's tools and what the Assistant may do are Hive's (its rules and skills), not a mode's.
       expect(`${p.body}\n${p.summary}`, f).not.toMatch(/hive_\w+|as Hive allows|you may|you can (add|start|stop)|permission/i)
     }
