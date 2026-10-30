@@ -66,6 +66,11 @@ interface Row {
   danger?: boolean
   /** Takes the full width under its title (e.g. a table). */
   wide?: boolean
+  /**
+   * Its section's only content (HI-2107: Accounts & Connections): drawn without a title or description of its own, which
+   * would repeat the section's; its tip goes beside the section's description. Its text stays for search and the tools.
+   */
+  untitled?: true
   confirmOn?: { title: Text; message: Text; detail?: Text }
   /** Why it can't be changed now (another setting it depends on is off), shown under it; null when it can. */
   disabledBy?: (s: AppSettings) => Text | null
@@ -195,7 +200,7 @@ export const SETTINGS_SECTIONS: SettingsSectionInfo<SettingsSection>[] = [
     )
   ),
   // Accounts & Connections (HI-2107, HI-2105's design): the accounts, and the connections agents choose on them.
-  sectionInfo('accounts', msg({ id: 'settings.section.accounts.label', defaultMessage: 'Accounts & Connections', description: "A section of Settings, in its list on the left (HI-2107): accounts, the sign-ins and servers Hive's agents reach their models through, and connections, the named setups on them (model, effort, mode) that agents choose." }), msg({ id: 'settings.section.accounts.desc', defaultMessage: "An account is a sign-in Hive keeps (signed in through the CLI's own sign-in) or a server such as DeepSeek or Ollama, reached by its base URL and key. A connection is a setup on an account: its model, effort, context, permission mode and extra arguments. Agents and the Assistant each choose a connection, and every account shares your conversations.", description: 'Under the heading of the section "Accounts & Connections" of Settings (HI-2107): what it holds.' })),
+  sectionInfo('accounts', msg({ id: 'settings.section.accounts.label', defaultMessage: 'Accounts & Connections', description: "A section of Settings, in its list on the left (HI-2107): accounts, the sign-ins and servers Hive's agents reach their models through, and connections, the named setups on them (model, effort, mode) that agents choose." }), msg({ id: 'settings.section.accounts.desc', defaultMessage: "An account is a sign-in Hive keeps (signed in through the CLI's own sign-in) or a server such as DeepSeek or Ollama, reached by its base URL and key. A connection is a setup on an account: its model, effort, context, permission mode and extra arguments. Agents and the Assistant each choose a connection, and every account shares your conversations. Drag accounts into your order: a new agent gets the first connection of the first account that's on here.", description: 'Under the heading of the section "Accounts & Connections" of Settings (HI-2107): what it holds, and what the order of accounts decides.' })),
   sectionInfo('notifications', msg({ id: 'settings.section.notifications.label', defaultMessage: 'Notifications', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.notifications.desc', defaultMessage: 'Chimes and desktop notifications when agents finish or need you.', description: 'Under the heading of the section "Notifications" of Settings: what it holds.' })),
   sectionInfo('sessions', msg({ id: 'settings.section.sessions.label', defaultMessage: 'Sessions', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.sessions.desc', defaultMessage: 'Transcript backups, cache estimates and session behaviour.', description: 'Under the heading of the section "Sessions" of Settings: what it holds.' })),
   sectionInfo('assistant', msg({ id: 'settings.section.assistant.label', defaultMessage: 'Assistant', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.assistant.desc', defaultMessage: "The Hive Assistant's defaults: the side panel's overseer of each workspace (Ctrl+Alt+I). Each workspace can change them in the panel's Assistant Settings.", description: 'Under the heading of the section "Assistant" of Settings: what it holds.' })),
@@ -414,7 +419,8 @@ const APP_ROWS: Row[] = [
     desc: msg({ id: 'settings.accounts.list.desc', defaultMessage: "Add an account (signed in, or a server) and the connections agents choose on it, and turn accounts on in this workspace. Drag accounts into your order: a new agent gets the first connection of the first account that's on here.", description: 'What the list "Accounts & Connections" does, under its title (Settings → Accounts & Connections, HI-2107: one order of accounts for every coding agent CLI; a new agent gets the first connection of the first account on in the workspace).' }),
     tip: msg({ id: 'settings.accounts.list.tip', defaultMessage: "A sign-in account is a folder of its own that Hive made, signed in with the CLI's own sign-in in your browser: Hive never sees or keeps its login. Its conversations and memory are shared with your other accounts through a link to the CLI's projects folder. Removing an account deletes its folder and its login on this PC, never your conversations. GitHub Copilot signs in once for the whole PC, in Provider Setup: its account is that sign-in.", description: 'The info tip of the list "Accounts & Connections" (Settings → Accounts & Connections, HI-2107): more on what it does and when it applies. Provider Setup names a dialog.' }),
     type: 'custom',
-    wide: true
+    wide: true,
+    untitled: true
   },
   // Assistant
   {

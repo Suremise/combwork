@@ -1007,10 +1007,6 @@
     "defaultMessage": "On",
     "description": "A choice of an agent's Use 200K context setting. Keep it short."
   },
-  "agents.overrides.projects": {
-    "defaultMessage": "Project's",
-    "description": "An agent's model, effort, mode or context choice that follows the project's: the first choice of each, before the project's value in brackets (\"Project's (Opus 5.5)\"). Keep it short."
-  },
   "agents.permission.agentNewSessions": {
     "defaultMessage": "{agent}: mode for new sessions",
     "description": "The heading of a stopped agent's permission mode menu, when the agent has its own mode ({agent}: its name)."
@@ -1375,9 +1371,9 @@
     "defaultMessage": "New agent (template)",
     "description": "Title of Agent Settings for a new agent of a template, from the template editor."
   },
-  "agents.template.note": {
-    "defaultMessage": "For the template \"{template}\": Save saves it in the template. Settings left as \"{projects}\" follow the project it is loaded into.",
-    "description": "Under Agent Settings for a template's agent: Save (a button) saves it in the template ({template}); {projects} is the first choice of each setting (\"Project's\")."
+  "agents.template.noteSuggest": {
+    "defaultMessage": "For the template \"{template}\": Save saves it in the template. Its coding agent is only a suggestion: the connection each agent runs on is chosen when the template is loaded.",
+    "description": "Under Agent Settings for a template's agent (HI-2109): Save (a button) saves it in the template ({template}). A template keeps no connection, model or effort: its coding agent CLI only preselects a connection in the Load template dialog."
   },
   "agents.template.title": {
     "defaultMessage": "{agent} settings (template)",

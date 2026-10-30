@@ -34,6 +34,24 @@ export function connectionReadiness(c: { setUp?: boolean | null; trust?: Connect
   return 'done'
 }
 
+/** One item of the status bar's plan usage (HI-2119): an account's own limits, or a CLI's for one without accounts here. */
+export type PlanUsageItem = { kind: 'account'; id: string; provider: ProviderId; name: string } | { kind: 'cli'; provider: ProviderId }
+
+/**
+ * The status bar's plan usage items (HI-2107, HI-2119; decision A): one per account a session of the window's workspace
+ * runs on, in the one order of accounts across every CLI (one not in it, last), by its name now; then, in `clis`' order,
+ * one for each CLI turned on whose accounts don't apply here (`byAccounts` leaves it out), its CLI-wide limits.
+ */
+export function planUsageItems(clis: readonly ProviderId[], byAccounts: ReadonlySet<ProviderId>, inUse: readonly { id: string; name: string; provider: ProviderId }[], order: readonly string[], nameNow: (id: string) => string | undefined): PlanUsageItem[] {
+  const place = (id: string): number => (order.includes(id) ? order.indexOf(id) : order.length)
+  const seen = new Set<string>()
+  const accounts = inUse
+    .filter((c) => byAccounts.has(c.provider) && clis.includes(c.provider) && !seen.has(c.id) && !!seen.add(c.id))
+    .sort((a, b) => place(a.id) - place(b.id))
+    .map((c): PlanUsageItem => ({ kind: 'account', id: c.id, provider: c.provider, name: nameNow(c.id) ?? c.name }))
+  return [...accounts, ...clis.filter((p) => !byAccounts.has(p)).map((p): PlanUsageItem => ({ kind: 'cli', provider: p }))]
+}
+
 /** Who uses a connection (HI-2107): an agent of an open workspace's project, or its Assistant (`assistant`). */
 export interface ConnectionUser {
   projectPath: string
@@ -366,7 +384,8 @@ export function connectionName(account: Pick<Account, 'name' | 'provider'>, valu
   if (base && !sameValues(values, base)) {
     if (label) parts.push(label)
     else {
-      if ((values.model ?? '') !== (base.model ?? '')) parts.push(values.model ?? 'Default model') // i18n-ignore: a connection's name, the user's data once made
+      // The model by its name ("Haiku", as the row's summary says it), a server's or an unknown one as its id.
+      if ((values.model ?? '') !== (base.model ?? '')) parts.push(values.model ? providerDescriptor(account.provider).modelLabel(values.model) : 'Default model') // i18n-ignore: a connection's name, the user's data once made
       if ((values.effort ?? '') !== (base.effort ?? '')) parts.push(values.effort ? effortWord(values.effort) : 'Default effort') // i18n-ignore: a connection's name, the user's data once made
       if (!!values.use200kContext !== !!base.use200kContext) parts.push(values.use200kContext ? '200K' : '1M') // i18n-ignore: a connection's name (token counts)
       if ((values.permissionMode ?? '') !== (base.permissionMode ?? '')) parts.push(permissionLabel(account.provider, values.permissionMode ?? providerDescriptor(account.provider).defaultPermissionMode))

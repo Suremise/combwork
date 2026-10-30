@@ -36,6 +36,7 @@
   "main.branchMerge.notBranch": "{branch} n’est pas une branche locale du projet.",
   "main.branchMerge.same": "La branche {branch} ne peut pas être fusionnée dans elle-même.",
   "main.connections.badMode": "{cli} n’a pas de mode d’autorisation {mode}.",
+  "main.connections.beingRemoved": "{name} est déjà en cours de suppression.",
   "main.connections.choice.missing": "La connexion choisie pour {agent} n’existe plus. Choisis-en une autre, ou celle par défaut de l’espace de travail.",
   "main.connections.choice.off": "{name} n’est pas activée dans cet espace de travail. Active-la dans Paramètres → Comptes et connexions, ou choisis-en une autre pour {agent}.",
   "main.connections.choice.otherCli": "{name} est pour une autre CLI que celle de {agent}. Choisis une connexion de sa CLI.",

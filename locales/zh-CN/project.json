@@ -1,5 +1,6 @@
 {
   "project.agents.add": "添加智能体",
+  "project.agents.chooseConnections": "选择连接…",
   "project.agents.merge": "合并…",
   "project.agents.off": "{provider}（已关闭）",
   "project.agents.ownMcp": "MCP 服务器 {servers}",

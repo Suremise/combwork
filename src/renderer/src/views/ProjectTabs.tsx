@@ -1734,6 +1734,8 @@ interface ProjectSettingDef {
   render: () => React.ReactNode
 }
 
+const CHOOSE_CONNECTIONS = msg({ id: 'project.agents.chooseConnections', defaultMessage: 'Choose Connections…', description: "Button on Project Settings → Agents (HI-2109): opens a dialog choosing the connections (named setups on accounts: model, effort, mode) of the project's agents, by role or one by one, nothing else changed." })
+
 function AgentList({ project }: { project: ProjectInfo }) {
   const settings = useStore((s) => s.settings)
   // Its connection as a start resolves it (HI-2108, decision H), whose values its row sums up.
@@ -1796,6 +1798,12 @@ function AgentList({ project }: { project: ProjectInfo }) {
           <Icon name="add" /> {tr(S.addAgent)}
         </button>
       </Tooltip>
+      {/* HI-2109: the template picker over these agents, changing only their connections. */}
+      {project.agents.length > 0 && (
+        <button className="btn subtle small" data-action="choose-connections" onClick={() => void actions.chooseConnections(project.path)}>
+          <Icon name="plug" /> {tr(CHOOSE_CONNECTIONS)}
+        </button>
+      )}
     </div>
   )
 }

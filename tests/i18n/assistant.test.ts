@@ -6,13 +6,13 @@ import { PSEUDO_LANGUAGE } from '../../src/shared/i18n/languages'
 import { setLanguage, setProblemReporter, tr, type Msg } from '../../src/shared/i18n'
 import { isAgentTemplate, readTemplate, shownProblem } from '../../src/shared/templates'
 import { englishText, shownText, type Text } from '../../src/shared/advanced'
-import { templateAgentParts, templateLoadDetail, templateLoadView } from '../../src/shared/templateLoad'
+import { connectionValues, templateLoadDetail } from '../../src/shared/templateLoad'
+import type { ConnectionOption } from '../../src/shared/templateConnections'
 import { findSecretWarnings } from '../../src/main/mcpSecrets'
 import { LEVEL_NAME } from '../../src/main/assistantControl'
 import { assistantStatusLine } from '../../src/shared/assistantStatus'
 import { installSourceText } from '../../src/shared/providers'
-import type { AppSettings, ProjectConfig } from '../../src/shared/types'
-import type { ModelInfo } from '../../src/shared/models'
+import type { AppSettings } from '../../src/shared/types'
 
 // #806: the `assistant` area (the Assistant's panel and view, its modes, the Skills, Templates, Shared Notes, MCP and
 // Projects sidebars, the template dialogs, and the template and MCP secret texts Hive works out). Its messages are read
@@ -59,9 +59,7 @@ function sampleValues(message: string): Record<string, string | number> {
   return out
 }
 
-const cfg = { providers: {}, defaultProvider: undefined } as unknown as Pick<ProjectConfig, 'providers' | 'defaultProvider'>
 const settings = { defaultProvider: 'claude-code', providers: { 'claude-code': { enabled: true, defaultModel: '', defaultEffort: '', defaultPermissionMode: 'default' } } } as unknown as AppSettings
-const info: ModelInfo = { defaultModel: 'claude-opus-5-5', catalog: { source: 'cli', version: null, at: '', models: [{ value: 'opus', resolved: 'claude-opus-5-5', label: 'Opus 5.5', efforts: ['low', 'medium', 'high'], defaultEffort: 'medium' }] } } as unknown as ModelInfo
 
 describe('the assistant area', () => {
   it('has its messages, each with a note for translators, all under assistant.', () => {
@@ -104,8 +102,8 @@ describe('what Hive works out in shared code is in the language when it is worke
     }
     const cases: [Text, string][] = [
       [problem('nope'), "It isn't a Hive agent template."],
-      [problem({ version: 2, name: 'T', agents: [{ name: 'A', provider: 42 }] }), "A's coding agent isn't one Hive can use (none)."],
-      [problem({ version: 2, name: 'T', agents: [{ name: 'A', provider: 'claude-code', effort: 'x y' }] }), "A's effort isn't one Hive can use."]
+      [problem({ version: 2, name: 'T', agents: [{ name: 'A', provider: 'claude-code', role: 'boss' }] }), "A's role in the workflow isn't builder, reviewer, either or generalist."],
+      [problem({ version: 2, name: 'T', agents: [{ name: 'A', mcpServers: 'all' }] }), "A's MCP servers aren't a list Hive can use."]
     ]
     for (const [t, english] of cases) expect(shownText(t)).toBe(english)
     const empty = problem({ version: 2, name: 'T', agents: [] })
@@ -134,36 +132,18 @@ describe('what Hive works out in shared code is in the language when it is worke
       remove: [{ id: 'a', name: 'Dev', running: false, dirty: 0, worktree: { path: 'D:/x/site/dev', branch: 'hive/dev' } }],
       create: [{ name: 'Dev', role: 'builder' as const, provider: 'claude-code' as const }]
     }
-    const text = templateLoadDetail(plan, cfg, settings, () => info)
+    const high: ConnectionOption = { id: 'c-1', name: 'Claude · High', account: 'a-1', accountName: 'Personal', cli: 'claude-code', model: 'opus', effort: 'high' }
+    const text = templateLoadDetail(plan, () => high, settings)
     expect(text).toContain('Removed:\n• Dev (its worktree and branch hive/dev stay): replaced by a new agent with the same name\n')
-    expect(text).toContain('• Dev — Builder (new): Claude Code, Opus 5.5 (default) · Medium (default)')
+    expect(text).toContain('• Dev — Builder (new): Claude · High (opus · High)')
     expect(text).toMatch(/\n\nTheir conversations stay in the Sessions tab, and their open cards go back \(Active ones to Todo\)\. The layout becomes the template's\.$/)
   })
 
-  it("marks the defaults from the values, never from a label's words: the same in any language", () => {
-    const agents = [
-      { name: 'Own', role: 'builder' as const, provider: 'claude-code' as const, model: 'opus', effort: 'high' as const, permissionMode: 'acceptEdits' as const },
-      { name: 'Left', role: 'reviewer' as const, provider: 'claude-code' as const }
-    ]
-    const marks = (): boolean[][] => agents.map((a) => Object.values(templateAgentParts(a, cfg, settings, info)).map((s) => !!s?.isDefault))
-    const english = marks()
-    expect(english).toEqual([
-      [false, false, false],
-      [true, true, true]
-    ])
-    // A language whose default mark is other words: the marks, and the setting's own name without them, stay.
-    setLanguage('pl', { 'assistant.templateLoad.isDefault': '{setting} (domyślnie)' }, 'pl-PL')
-    expect(marks()).toEqual(english)
-    const left = templateLoadView({ remove: [], create: [agents[1]] }, cfg, settings, () => info).created[0]
-    expect(left.model.text).toBe('Opus 5.5')
-    expect(templateLoadDetail({ remove: [], create: [agents[1]] }, cfg, settings, () => info)).toContain('Opus 5.5 (domyślnie) · Medium (domyślnie)')
-  })
-
-  it("names the permission mode in the language shown (#889: it said Auto in a Japanese window)", () => {
+  it("names a connection's permission mode in the language shown (#889: it said Auto in a Japanese window)", () => {
     setLanguage(PSEUDO_LANGUAGE, {})
-    const parts = templateAgentParts({ name: 'Own', role: 'builder', provider: 'claude-code', permissionMode: 'acceptEdits' }, cfg, settings, info)
-    expect(parts.mode?.text).toContain('[')
-    expect(parts.mode?.text).not.toContain('Accept edits')
+    const shown = connectionValues({ id: 'c-1', name: 'Own', account: 'a-1', accountName: 'Personal', cli: 'claude-code', permissionMode: 'acceptEdits' }, settings)
+    expect(shown).toContain('[')
+    expect(shown).not.toContain('Accept edits')
   })
 })
 

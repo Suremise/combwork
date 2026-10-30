@@ -253,7 +253,6 @@ interface HiveMessageValues {
   'agents.name.tooLong': { max: string | number }
   'agents.overrides.off': undefined
   'agents.overrides.on': undefined
-  'agents.overrides.projects': undefined
   'agents.permission.agentNewSessions': { agent: string | number }
   'agents.permission.answerFirst': undefined
   'agents.permission.badgeTip': { live: string; mode: string | number; note: string; key: string; cycles: string; plan: string }
@@ -345,7 +344,7 @@ interface HiveMessageValues {
   'agents.switch.title': { agent: string | number; cli: string | number }
   'agents.template.nameTaken': { name: string | number }
   'agents.template.new': undefined
-  'agents.template.note': { template: string | number; projects: string | number }
+  'agents.template.noteSuggest': { template: string | number }
   'agents.template.title': { agent: string | number }
   'agents.tested.newer': undefined
   'agents.tested.older': undefined

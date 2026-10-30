@@ -156,6 +156,24 @@ export interface ProjectSeen {
 /** For unit tests (#1382): an agent leaving the project, its change about to wait for the board's lock. */
 export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void; beforeConfigWrite?: (projectPath: string) => Promise<void> } = {}
 
+/**
+ * Whether an agent may be given a connection now (HI-2107; accounts.ts sets it): it exists and isn't being removed. Asked
+ * in mutateProjectConfig's lock for each agent whose connection a write changes, so a removal, which reads every
+ * project's agents under the same lock, never misses a connection given while it ran.
+ */
+let connectionAssignable: (id: string) => boolean = () => true
+export function setConnectionGuard(fn: (id: string) => boolean): void {
+  connectionAssignable = fn
+}
+
+const CONNECTION_GONE = msg({ id: 'service.workspace.connectionGone', defaultMessage: "The connection chosen for {agent} was removed, or is being removed. Choose another.", description: "An error saving an agent (HI-2107): the connection chosen for it ({agent}, the agent's name) was removed from Settings → Accounts & Connections meanwhile." })
+
+/** Refuses a write giving an agent a connection that is gone or being removed (an agent keeping its own is never refused). */
+function assertConnectionsAssignable(before: readonly AgentDef[], after: readonly AgentDef[]): void {
+  const was = new Map(before.map((a) => [a.id, a.connection]))
+  for (const a of after) if (a.connection && a.connection !== was.get(a.id) && !connectionAssignable(a.connection)) throw hiveError(CONNECTION_GONE, { agent: a.name ?? a.id }, { kind: 'conflict' })
+}
+
 /** What a project.json gives (kept by its stat, HI-1814): its config over the defaults, and the view fields it still has. */
 const projectFileConfig = (raw: Record<string, unknown>): { cfg: ProjectConfig; viewKeys: string[] } => ({
   cfg: mergeDefaults(structuredClone(DEFAULT_PROJECT_CONFIG), migrateProjectConfig(raw)),
@@ -1330,6 +1348,8 @@ export class WorkspaceService {
         let updated = { ...cfg, ...patch }
         // 0.9.3's agent fields (#1452): an agent written again without them keeps what is stored.
         if ('agents' in patch && Array.isArray(updated.agents)) updated = { ...updated, agents: carryLegacyAgentFields(projectAgents(cfg), updated.agents) }
+        // An agent given a connection removed (or being removed) meanwhile: refused, nothing written (HI-2107).
+        if ('agents' in patch) assertConnectionsAssignable(projectAgents(cfg), projectAgents(updated))
         // An agent leaving, outside this workspace's board change: nothing written, so it runs again inside one.
         if (board && !inBoardWrite(board) && 'agents' in patch) {
           const now = new Set(projectAgents(updated).map((a) => a.id))

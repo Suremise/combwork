@@ -78,6 +78,7 @@ export const SUITES = [
   { name: 'changescompare' },
   { name: 'changesleftovers' },
   { name: 'changespicker' },
+  { name: 'chooseconnections' },
   { name: 'claude-real', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudehome', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudesettings', needs: ['claude'], claudeHome: 'own' },

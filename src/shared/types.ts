@@ -10,6 +10,7 @@ import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { TipsState } from './tips'
 import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
+import type { ConnectionOption } from './templateConnections'
 import type { KeepAwakeSetting } from './keepAwake'
 import type { DateFormat, TimeFormat } from './dates'
 import type { ProjectPref } from './uiPrefs'
@@ -1794,8 +1795,8 @@ export interface TemplateLoadPlan {
   remove: { id: string; name: string; running: boolean; dirty: number; worktree?: { path: string; branch: string } }[]
   /**
    * The agents it creates, with the names chosen in the dialog (#702) when it gave some, its patterns expanded with the
-   * project's key (#1123 names), and the provider each runs (another than the template's when that one can't run here:
-   * `swaps`). Each works in the project folder (#1436): where an agent works is the card's or lane's, not the template's.
+   * project's key (#1123 names), each with the CLI it suggests (HI-2109: its connection, chosen in the dialog, says the
+   * one it runs). Each works in the project folder (#1436): where an agent works is the card's or lane's, not the template's.
    */
   create: TemplateAgent[]
   /** The template's own names for them, by `create`'s order, expanded with the project's key: what a prefix goes in front of (#702). */
@@ -1804,23 +1805,16 @@ export interface TemplateLoadPlan {
   taken: { name: string; project: string }[]
   /** Builders and their reviewers among `create`, by their indexes (#1436): kept as the agents' `pairedWith`. */
   pairs: { builder: number; reviewer: number }[]
-  /**
-   * Hive's own templates only (#1436): an agent whose provider can't run here (off or not installed) runs another that
-   * can, said on its row; by `create`'s index. A template of the workspace's or a project's is refused instead (`missing`).
-   */
-  swaps: { index: number; from: ProviderId; to: ProviderId; problem: 'off' | 'notInstalled' }[]
   /** The preset it suggests (#1436), when the project's options didn't start from it: the dialog offers to switch. */
   suggestedPreset: SuggestedPreset | null
   /** G17's choice it suggests (#1436), offered once the Workflow section has it (#1443, #1445); never written by the load. */
   reviewerMode: ReviewerMode | null
-  /** Providers the template needs that are off or not installed, and which of its agents need each. */
-  missing: { provider: ProviderId; reason: string; agents: string[]; problem?: 'unknown' | 'off' | 'notInstalled' }[]
   /**
-   * Agents whose own connection can't be used here (HI-1769), by `create`'s index: removed or never
-   * on this machine (`missing`), another CLI's, or off in this workspace. The dialog asks for each (the same CLI's
-   * default preselected, which inherits) and the load takes its answers by these indexes. `name` is for display.
+   * The connections its agents can be given (HI-2109): those usable in the project's workspace, in the order (its account
+   * on there, its CLI on and installed). Its agents' `provider` is only the CLI they suggest, which preselects one. None
+   * usable: they are made on the CLI they suggest, and get a connection once an account is (as Add Agent's).
    */
-  connections: { index: number; id: string; name?: string; problem: ConnectionProblem }[]
+  options: ConnectionOption[]
   /** Why it can't be loaded now (empty: it can). */
   blocked: string[]
   /** Its workflow (HI-1910) as it meets this project's: null when it has none. */

@@ -1,7 +1,8 @@
 // Agent templates (#126, #286, #975): + Add ▾ → Templates ▸ → Save Template… in the session toolbar (a name; the workspace
 // scope ticked; replacing asks), loading into another project from Templates ▸ (the warning lists who goes and who comes;
-// refused while an agent runs, while a worktree agent has uncommitted work, and while a provider the template needs is
-// off), the layout, roles in the workflow, notes and pairs recreated (#1436: every agent in the project folder), the
+// refused while an agent runs and while a worktree agent has uncommitted work; HI-2109: a CLI it suggests that's off
+// only changes which connection is offered, and the Connections section chooses them: Same for all, per role, per agent,
+// in both themes), the layout, roles in the workflow, notes and pairs recreated (#1436: every agent in the project folder), the
 // removed worktree kept, + Add ▾ → Add Agent from Template (a taken name numbered), with the mouse, the keyboard and the
 // palette, and the toolbar's controls at narrow widths in both themes,
 // every one reachable, in the order Panes | Tiles, the summary chip, pages, layouts, + Add ▾ (#292), with one page and two. #702: agent names unique across the
@@ -156,13 +157,15 @@ const check = (name, ok, extra = '') => {
   await blocked.getByRole('button', { name: 'OK' }).click()
   check('nothing changed', JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Old","Tree"]')
 
-  // A provider the template needs is off: refused, saying which.
+  // A CLI it suggests that's off (HI-2109): only a suggestion, so never a refusal (the agents still run and their work is
+  // still there here: it's those that refuse it).
   fs.mkdirSync(path.join(ws, '.hive', 'templates'), { recursive: true })
   fs.writeFileSync(path.join(ws, '.hive', 'templates', 'codex-pair.json'), JSON.stringify({ version: 2, name: 'Codex pair', savedAt: new Date().toISOString(), layout: 'auto', agents: [{ name: 'Coder', role: 'builder', provider: 'codex' }] }))
   await loadMenu()
   await item('Codex pair').click()
   await shown(blocked, 'blocked')
-  check('refused while a provider it needs is off, saying which', /Codex is turned off.*needed by Coder/.test(await blocked.innerText()), await blocked.innerText())
+  const codexWhy = await blocked.innerText()
+  check('a CLI it suggests that is off stops nothing: only the running agent and the work do', !/turned off|installed|Codex is/.test(codexWhy) && /Old is running/.test(codexWhy), codexWhy)
   await blocked.getByRole('button', { name: 'OK' }).click()
 
   // Stopped, and the work cleaned up: the warning lists who goes and who comes; loading replaces them.
@@ -175,7 +178,8 @@ const check = (name, ok, extra = '') => {
   const warn = page.locator('.dialog', { hasText: 'Load "pair"?' })
   await shown(warn, 'warn')
   // The plan as one table (#511, #1315): an agent's Change (replaced, new or removed, and what becomes of an old agent's
-  // worktree), a row and its cells, by column: Agent, Change, Role, Coding agent, Model, Effort, Mode (#1436: no Where).
+  // worktree), a row and its cells, by column: Agent, Change, Role, Connection (#1436: no Where; HI-2109: no model, effort
+  // or mode of its own: the connection's).
   // (A removed agent's worktree note is across its row's settings; a replaced one's on the line under its row.)
   const removedLine = async (d, name) =>
     (
@@ -242,11 +246,34 @@ const check = (name, ok, extra = '') => {
   await shown(treesWarn, 'treesWarn')
   const tw = await treesWarn.innerText()
   check('the warning marks Builder replaced by a new agent of the same name, Helper new, Reviewer removed', (await stateOf(treesWarn, 'Builder')) === 'replaced' && /^replaced\b/.test(await removedLine(treesWarn, 'Builder')) && (await stateOf(treesWarn, 'Helper')) === 'new' && (await stateOf(treesWarn, 'Reviewer')) === 'removed' && /^removed\b/.test(await removedLine(treesWarn, 'Reviewer')) && (await treesWarn.locator('.template-plan-table tbody tr[data-agent="Builder"]').count()) === 1, tw)
-  // Agent, Change, Role, Coding agent, Model, Effort, Mode; what the template leaves to the defaults marked "(default)".
+  // Agent, Change, Role, Connection (HI-2109): each on its role's preselected connection, with what it runs under it; the
+  // template's model and effort (from before HI-2109) dropped as it was read.
   const builderCells = await cells(treesWarn, 'Builder')
   const helperCells = await cells(treesWarn, 'Helper')
-  check("…gives each new agent's role, pairing and settings in a row (inherited ones as their default)", builderCells[0] === 'Builder' && builderCells[2] === 'Builder paired: Helper' && builderCells[3] === 'Claude Code' && builderCells[4] === 'Opus 5.5' && builderCells[5] === 'High' && builderCells[6].endsWith(' (default)') && helperCells[0] === 'Helper checks UI' && helperCells[2] === 'Reviewer paired: Builder' && helperCells[4] === 'Opus 5.5 (default)' && helperCells[6].endsWith(' (default)'), JSON.stringify([builderCells, helperCells]))
-  check('…and nothing of worktrees for the new agents: no Where column, no setup command', (await treesWarn.locator('.template-plan-table thead th').allInnerTexts()).join().toLowerCase() === 'agent,change,role,coding agent,model,effort,mode' && !/own worktree|setup command/.test(tw), tw)
+  const connOf = (d, name) => planRow(d, name).locator('.template-plan-connection').getAttribute('data-connection')
+  const firstConn = await connOf(treesWarn, 'Builder')
+  check("…gives each new agent's role, pairing and connection in a row", builderCells[0] === 'Builder' && builderCells[2] === 'Builder paired: Helper' && !!firstConn && builderCells.length === 4 && helperCells[0] === 'Helper checks UI' && helperCells[2] === 'Reviewer paired: Builder' && (await connOf(treesWarn, 'Helper')) === firstConn && !/opus|high/i.test(builderCells[3]), JSON.stringify([builderCells, helperCells]))
+  check('…and nothing of worktrees for the new agents: no Where column, no setup command', (await treesWarn.locator('.template-plan-table thead th').allInnerTexts()).join().toLowerCase() === 'agent,change,role,connection' && !/own worktree|setup command/.test(tw), tw)
+  // The Connections section (HI-2109): a row per role, each saying the CLI the template suggests; Same for all one picker;
+  // Per agent a row per agent, over its role's. The table follows what is chosen.
+  const section = treesWarn.locator('[data-template-connections]')
+  const roleRows = async () => section.locator('.template-connections-form [data-connection-for]').evaluateAll((l) => l.map((x) => x.dataset.connectionFor))
+  check('the Connections section has a row per role, each saying the CLI it suggests', JSON.stringify(await roleRows()) === JSON.stringify(['*', 'builder', 'reviewer']) && (await section.locator('[data-connection-for="builder"] .template-connections-suggests').innerText()) === 'suggests Claude Code', JSON.stringify(await roleRows()))
+  await section.locator('[data-per-agent]').click()
+  check('…Per agent unfolds a choice for each agent', !!(await lib.until(async () => (await section.locator('.template-connections-agents [data-connection-for="Helper"] select').count()) === 1, HUNG_MS)))
+  for (const theme of ['dark', 'light']) {
+    await themed(theme)
+    await section.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(lib.WORK, `templates-7-connections-${theme}.png`) })
+  }
+  await themed('dark')
+  await section.locator('[data-same-for-all]').check()
+  check('…Same for all: one choice, no role rows or Per agent', !!(await lib.until(async () => (await section.locator('[data-connection-for="*"] select').count()) === 1 && (await section.locator('[data-connection-for="builder"]').count()) === 0 && (await section.locator('[data-per-agent]').count()) === 0, HUNG_MS)))
+  for (const theme of ['dark', 'light']) {
+    await themed(theme)
+    await page.screenshot({ path: path.join(lib.WORK, `templates-8-same-for-all-${theme}.png`) })
+  }
+  await themed('dark')
   const planBox = treesWarn.locator('.detail.rich')
   check('the table fits the dialog: no scrolling sideways', await planBox.evaluate((el) => el.scrollWidth <= el.clientWidth + 1))
   for (const theme of ['dark', 'light']) {

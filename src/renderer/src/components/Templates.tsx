@@ -2,7 +2,7 @@ import { Children, useCallback, useEffect, useState } from 'react'
 import { SESSION_LAYOUTS } from '@shared/defaults'
 import { useAgentLimit } from '../advanced'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
-import { isKnownProvider, providerDescriptor, providerName } from '@shared/providers'
+import { isKnownProvider, providerName } from '@shared/providers'
 import { TEMPLATE_DESCRIPTION_MAX, TEMPLATE_NAME_MAX, pairIndex, pairNames, shownProblem, templateAgentNames, type TemplatePair, uniqueName, unknownProviders, type TemplateAgent, type TemplateDest, type TemplateEntry, type TemplateRef } from '@shared/templates'
 import { templateDescription, templateTitle } from '@shared/templateDefaults'
 import { WORKFLOW_ROLE_TEXT, buildsWork, reviewsWork } from '@shared/workflow/roles'
@@ -86,7 +86,7 @@ const M = {
   cantBeUsed: msg({ id: 'assistant.templates.cantBeUsed', defaultMessage: "Can't be used", description: "A badge on a template that can't be used (damaged, made by a newer Hive…)." }),
   unknownAgent: msg({ id: 'assistant.templates.unknownAgent', defaultMessage: 'Unknown agent', description: "A badge on a template one of whose agents uses a coding agent this Hive doesn't know." }),
   rowDesc: msg({ id: 'assistant.templates.rowDesc', defaultMessage: '{count, plural, one {# agent} other {# agents}} · {layout} layout', description: 'Under a template in a list: its agents and its layout ({layout}: "Two columns").' }),
-  default: msg({ id: 'assistant.templates.default', defaultMessage: 'Default', description: "A template's agent's model, effort or mode when it is left to the project's or Hive's defaults." }),
+
   saved: msg({ id: 'assistant.templates.saved', defaultMessage: 'Template saved', description: "A notice after a template was saved; its name and agents follow." }),
   agentSaved: msg({ id: 'assistant.templates.agentSaved', defaultMessage: '"{name}": {agent} saved in it.', description: "Under Template saved: an agent's settings were saved in the template." }),
   savedDetail: msg({ id: 'assistant.templates.savedDetail', defaultMessage: '"{name}": {count, plural, one {# agent} other {# agents}}, {layout}.', description: 'Under Template saved: its agents and layout ({layout}: "two columns layout").' }),
@@ -114,13 +114,12 @@ const M = {
   addAgent: msg({ id: 'assistant.templates.addAgent', defaultMessage: 'Add Agent…', description: "A button in the template editor: adds an agent in the Agent Settings dialog." }),
   colAgent: msg({ id: 'assistant.templates.colAgent', defaultMessage: 'Agent', description: "A template's table: the agents' names." }),
   colRole: msg({ id: 'assistant.templates.colRole', defaultMessage: 'Role', description: "A template's table: each agent's role." }),
-  colCodingAgent: msg({ id: 'assistant.templates.colCodingAgent', defaultMessage: 'Coding agent', description: "A template's table: each agent's CLI (Claude Code, Codex…)." }),
-  colModel: msg({ id: 'assistant.templates.colModel', defaultMessage: 'Model', description: "A template's table: the column of each agent's model." }),
-  colEffort: msg({ id: 'assistant.templates.colEffort', defaultMessage: 'Effort', description: "A template's table: a column (the model's reasoning effort)." }),
-  colMode: msg({ id: 'assistant.templates.colMode', defaultMessage: 'Mode', description: "A template's table: a column (the permission mode)." }),
+  colSuggests: msg({ id: 'assistant.templates.colSuggests', defaultMessage: 'Suggests', description: "A template's table (HI-2109): the coding agent CLI each agent suggests (Claude Code, Codex…), which only preselects a connection on it when the template is loaded. A short column heading." }),
+  suggestsTip: msg({ id: 'assistant.templates.suggestsTip', defaultMessage: 'A template keeps no connection, model or effort: loading it offers the first connection on this coding agent, and you choose.', description: "Tooltip on the Suggests column heading of a template's table (HI-2109)." }),
+  noSuggestion: msg({ id: 'assistant.templates.noSuggestion', defaultMessage: 'Any', description: "A template's table, the Suggests column (HI-2109): the agent suggests no coding agent CLI (the first connection in the order is offered)." }),
   colActions: msg({ id: 'assistant.templates.colActions', defaultMessage: 'Actions', description: "The template editor's table: the accessible name of the column of buttons." }),
   unknownProvider: msg({ id: 'assistant.templates.unknownProvider', defaultMessage: '{provider} (unknown)', description: "A template's table: a coding agent this Hive doesn't know ({provider}: its id)." }),
-  context200k: msg({ id: 'assistant.templates.context200k', defaultMessage: '200K context', description: "A template's table, after the model: the agent uses the model's 200K-token context. Keep 200K." }),
+
   mcpServers: msg({ id: 'assistant.templates.mcpServers', defaultMessage: 'MCP servers: {servers}', description: "A template's table, under an agent's coding agent: the MCP servers it chose." }),
   editAgent: msg({ id: 'assistant.templates.editAgent', defaultMessage: 'Edit {name}…', description: "The template editor: a button on an agent's row." }),
   cantEdit: msg({ id: 'assistant.templates.cantEdit', defaultMessage: "This Hive doesn't know its coding agent: it can be moved or removed, not edited", description: "The template editor: the edit button of an agent whose coding agent isn't known here." }),
@@ -393,12 +392,24 @@ function TemplateRow({ t, selected, onSelect, showScope }: { t: TemplateEntry; s
   )
 }
 
-function settingText(a: TemplateAgent, k: 'effort' | 'permissionMode'): string {
-  if (!a[k]) return tr(M.default)
-  if (!isKnownProvider(a.provider)) return a[k]!
-  const d = providerDescriptor(a.provider)
-  return k === 'effort' ? (d.effortLevels.find((e) => e.value === a.effort)?.label ?? a.effort!) : (d.permissionModes.find((m) => m.value === a.permissionMode)?.label ?? a.permissionMode!)
+/** The CLI a template's agent suggests (HI-2109), with the MCP servers it chose under it. */
+function SuggestsCell({ a }: { a: TemplateAgent }) {
+  return (
+    <td data-suggests={a.provider ?? ''}>
+      {!a.provider ? <span className="faint">{tr(M.noSuggestion)}</span> : isKnownProvider(a.provider) ? providerName(a.provider) : <span className="badge warn">{tr(M.unknownProvider, { provider: a.provider })}</span>}
+      {agentChoosesMcp(a) && <div className="faint">{tr(M.mcpServers, { servers: agentMcpText(a) })}</div>}
+    </td>
+  )
 }
+
+/** The Suggests column's heading, saying what a suggestion does. */
+const SuggestsHeading = () => (
+  <th>
+    <Tooltip content={tr(M.suggestsTip)}>
+      <span>{tr(M.colSuggests)}</span>
+    </Tooltip>
+  </th>
+)
 
 /** Opens the Agent Settings dialog for a template's agent (#271): the agent as saved there, or null (cancelled). */
 let agentRequests = 0
@@ -572,30 +583,19 @@ function TemplateEditor({ t, project, onDone }: { t: TemplateEntry; project?: Pr
             <tr>
               <th>{tr(M.colAgent)}</th>
               <th>{tr(M.colRole)}</th>
-              <th>{tr(M.colCodingAgent)}</th>
-              <th>{tr(M.colModel)}</th>
-              <th>{tr(M.colEffort)}</th>
-              <th>{tr(M.colMode)}</th>
+              <SuggestsHeading />
               <th aria-label={tr(M.colActions)} />
             </tr>
           </thead>
           <tbody>
             {agents.map((a, i) => {
-              const known = isKnownProvider(a.provider)
+              // A CLI this Hive doesn't know can't be chosen in the dialog: edited only once it is replaced.
+              const known = !a.provider || isKnownProvider(a.provider)
               return (
                 <tr key={`${i}|${a.name}`} data-agent={a.name}>
                   <td>{a.name}</td>
                   <RoleCell a={a} />
-                  <td>
-                    {known ? providerName(a.provider) : <span className="badge warn">{tr(M.unknownProvider, { provider: a.provider })}</span>}
-                    {agentChoosesMcp(a) && <div className="faint">{tr(M.mcpServers, { servers: agentMcpText(a) })}</div>}
-                  </td>
-                  <td>
-                    {a.model ?? tr(M.default)}
-                    {a.use200kContext && <> · {tr(M.context200k)}</>}
-                  </td>
-                  <td>{settingText(a, 'effort')}</td>
-                  <td>{settingText(a, 'permissionMode')}</td>
+                  <SuggestsCell a={a} />
                   <td className="template-agent-actions">
                     <IconButton icon="edit" title={known ? tr(M.editAgent, { name: a.name }) : tr(M.cantEdit)} disabled={!known || busy} onClick={() => void edit(i)} />
                     <IconButton icon="copy" title={tr(M.copyAgent, { name: a.name })} disabled={!known || full || busy} onClick={() => void edit(i, true)} />
@@ -700,10 +700,7 @@ export function TemplateDetail({ t: entry, project, onGone, onSelect }: { t: Tem
                 <tr>
                   <th>{tr(M.colAgent)}</th>
                   <th>{tr(M.colRole)}</th>
-                  <th>{tr(M.colCodingAgent)}</th>
-                  <th>{tr(M.colModel)}</th>
-                  <th>{tr(M.colEffort)}</th>
-                  <th>{tr(M.colMode)}</th>
+                  <SuggestsHeading />
                 </tr>
               </thead>
               <tbody>
@@ -711,16 +708,7 @@ export function TemplateDetail({ t: entry, project, onGone, onSelect }: { t: Tem
                   <tr key={a.name} data-agent={a.name}>
                     <td>{a.name}</td>
                     <RoleCell a={a} partner={partnerOf(t, a.name)} />
-                    <td>
-                      {isKnownProvider(a.provider) ? providerName(a.provider) : <span className="badge warn">{tr(M.unknownProvider, { provider: a.provider })}</span>}
-                      {agentChoosesMcp(a) && <div className="faint">{tr(M.mcpServers, { servers: agentMcpText(a) })}</div>}
-                    </td>
-                    <td>
-                      {a.model ?? tr(M.default)}
-                      {a.use200kContext && <> · {tr(M.context200k)}</>}
-                    </td>
-                    <td>{settingText(a, 'effort')}</td>
-                    <td>{settingText(a, 'permissionMode')}</td>
+                    <SuggestsCell a={a} />
                   </tr>
                 ))}
               </tbody>

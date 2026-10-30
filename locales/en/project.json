@@ -3,6 +3,10 @@
     "defaultMessage": "Add Agent",
     "description": "Button: adds an agent to the project."
   },
+  "project.agents.chooseConnections": {
+    "defaultMessage": "Choose Connections…",
+    "description": "Button on Project Settings → Agents (HI-2109): opens a dialog choosing the connections (named setups on accounts: model, effort, mode) of the project's agents, by role or one by one, nothing else changed."
+  },
   "project.agents.merge": {
     "defaultMessage": "Merge…",
     "description": "Tooltip on a worktree agent's merge button."

@@ -36,6 +36,7 @@
   "main.branchMerge.notBranch": "{branch} 不是项目的本地分支。",
   "main.branchMerge.same": "{branch} 不能合并到自身。",
   "main.connections.badMode": "{cli} 没有权限模式 {mode}。",
+  "main.connections.beingRemoved": "{name} 已在移除中。",
   "main.connections.choice.missing": "为 {agent} 选择的连接已不存在。请另选一个，或选择工作区的默认连接。",
   "main.connections.choice.off": "{name} 在此工作区中未启用。请在“设置”→“账号与连接”中启用它，或为 {agent} 另选一个。",
   "main.connections.choice.otherCli": "{name} 属于另一个 CLI，而不是 {agent} 的 CLI。请选择它自己 CLI 的连接。",

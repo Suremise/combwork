@@ -3,6 +3,30 @@
     "defaultMessage": "No {cli} account is on in this workspace, so the Assistant can't start. Add one and sign it in.",
     "description": "Banner in the Assistant panel when its coding agent CLI ({cli}: \"Claude Code\") has no account (a sign-in or server) on in the workspace (HI-1774; HI-2108): it can't start until one is."
   },
+  "assistant.chooseConnections.agent": {
+    "defaultMessage": "Agent",
+    "description": "Choose Connections' table (HI-2109): the column of the project's agents."
+  },
+  "assistant.chooseConnections.next": {
+    "defaultMessage": "After",
+    "description": "Choose Connections' table (HI-2109): the connection each agent gets with the choices below (the same as Now when kept)."
+  },
+  "assistant.chooseConnections.now": {
+    "defaultMessage": "Now",
+    "description": "Choose Connections' table (HI-2109): the connection each agent has now."
+  },
+  "assistant.chooseConnections.otherCli": {
+    "defaultMessage": "{agent} runs: another coding agent’s connection only while it is stopped",
+    "description": "Why a connection is greyed out in Choose Connections (HI-2109): the agent ({agent}) is running and that connection is another coding agent CLI's (its conversations stay with its CLI)."
+  },
+  "assistant.chooseConnections.role": {
+    "defaultMessage": "Role",
+    "description": "Choose Connections' table (HI-2109): each agent's role in the workflow (glossary: workflow role)."
+  },
+  "assistant.chooseConnections.running": {
+    "defaultMessage": "running",
+    "description": "Choose Connections' table (HI-2109), under a running agent's name: it runs now (it keeps its old connection until it restarts). Lower case."
+  },
   "assistant.hiveTemplates.pair": {
     "defaultMessage": "Pair",
     "description": "Name of one of Hive's own agent templates: a builder and a reviewer. Like the preset Pair."
@@ -48,8 +72,8 @@
     "description": "Description of Hive's template Team 6 + pool (glossary: builder, reviewer)."
   },
   "assistant.hiveTemplates.team6Text": {
-    "defaultMessage": "Six builders (Claude Code, medium effort), each with its own reviewer (Codex), on two pages.",
-    "description": "Description of Hive's template Team 6×6 (glossary: builder, reviewer, effort)."
+    "defaultMessage": "Six builders (Claude Code), each with its own reviewer (Codex), on two pages.",
+    "description": "Description of Hive's template Team 6×6 (glossary: builder, reviewer)."
   },
   "assistant.journal.allKinds": {
     "defaultMessage": "All kinds",
@@ -1875,10 +1899,6 @@
     "defaultMessage": "Agent {n} has no name (or one over 60 characters).",
     "description": "Why a template file can't be used: its agent number {n} (1, 2…) has no usable name."
   },
-  "assistant.template.badContext": {
-    "defaultMessage": "{name}'s context setting isn't one Hive can use.",
-    "description": "Why a template file can't be used: an agent's 200K context setting isn't on or off."
-  },
   "assistant.template.badMcp": {
     "defaultMessage": "{name}'s MCP servers aren't a list Hive can use.",
     "description": "Why a template file can't be used: an agent's list of MCP servers."
@@ -1891,17 +1911,9 @@
     "defaultMessage": "Its pairs of builders and reviewers name agents it doesn’t have, or an agent twice.",
     "description": "Why a template file can't be used: its list of builders paired with reviewers (glossary: builder, reviewer) doesn't match its agents."
   },
-  "assistant.template.badProvider": {
-    "defaultMessage": "{name}'s coding agent isn't one Hive can use ({given, select, yes {{provider}} other {none}}).",
-    "description": "Why a template file can't be used: an agent's coding agent (Claude Code, Codex…) is no id Hive could know. {name} is the agent; {provider} what the file says; none when it says nothing."
-  },
   "assistant.template.badRole": {
     "defaultMessage": "{name}'s role in the workflow isn't builder, reviewer, either or generalist.",
     "description": "Why a template file can't be used: an agent's role in the workflow (glossary: builder, reviewer, either) is none of the three. Keep builder, reviewer and either as they are (the file's values)."
-  },
-  "assistant.template.badSetting": {
-    "defaultMessage": "{name}'s {setting, select, model {model} effort {effort} other {permissionMode}} isn't one Hive can use.",
-    "description": "Why a template file can't be used: an agent's model, effort or permission mode is no value a coding agent takes. Keep permissionMode as it is (the file's field)."
   },
   "assistant.template.badToken": {
     "defaultMessage": "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).",
@@ -1939,21 +1951,77 @@
     "defaultMessage": "It has {count} agents; a project can have up to {max}.",
     "description": "Why a template file can't be used: more agents than any project can have."
   },
+  "assistant.templateConnections.all": {
+    "defaultMessage": "all agents",
+    "description": "Stands for {who} in \"Connection for {who}\" (HI-2109): the Same for all choice. Lower case."
+  },
+  "assistant.templateConnections.gone": {
+    "defaultMessage": "A connection that can’t be used here",
+    "description": "A choice of connection (HI-2109) that was removed, or whose account is off in this workspace: shown so nothing changes silently."
+  },
+  "assistant.templateConnections.heading": {
+    "defaultMessage": "Connections",
+    "description": "Heading of the Load template and Choose Connections dialogs' section choosing which connection (a named setup on an account: model, effort, mode) the agents run on (HI-2109)."
+  },
+  "assistant.templateConnections.keep": {
+    "defaultMessage": "Keep each one’s",
+    "description": "Choose Connections (HI-2109): the first choice of a role's (or all agents') connection: each agent keeps the connection it has."
+  },
+  "assistant.templateConnections.keepOwn": {
+    "defaultMessage": "Keep its own ({name})",
+    "description": "Choose Connections (HI-2109), an agent's own row: it keeps the connection it has ({name})."
+  },
+  "assistant.templateConnections.label": {
+    "defaultMessage": "Connection for {who}",
+    "description": "Accessible name of a connection choice in the Connections section (HI-2109): {who} is all agents, a role's agents (\"Builders\") or an agent's name."
+  },
+  "assistant.templateConnections.none": {
+    "defaultMessage": "No connection is usable in this workspace yet: agents get one once you add an account in Settings → Accounts & Connections.",
+    "description": "The Connections section (HI-2109) when no connection is usable in this workspace: agents loaded now are made without one, and get one once an account is added. Settings → Accounts & Connections names a section: use its translated names."
+  },
+  "assistant.templateConnections.perAgent": {
+    "defaultMessage": "Per agent",
+    "description": "A disclosure in the Connections section (HI-2109): opens a connection choice for each agent, over its role's."
+  },
+  "assistant.templateConnections.roleChoice": {
+    "defaultMessage": "Same as its role",
+    "description": "The first choice of an agent's own connection (Per agent, HI-2109): it takes the connection chosen for its role."
+  },
+  "assistant.templateConnections.roleRow": {
+    "defaultMessage": "{role, select, builder {Builders} reviewer {Reviewers} either {Either} other {Generalists}}",
+    "description": "A row of the Connections section (HI-2109): the agents of one role in the workflow (glossary: builder, reviewer, either, generalist), as a plural group. either: the agents that build or review."
+  },
+  "assistant.templateConnections.same": {
+    "defaultMessage": "Same for all",
+    "description": "A tick box in the Connections section (HI-2109): one connection for every agent, in place of one per role."
+  },
+  "assistant.templateConnections.suggests": {
+    "defaultMessage": "suggests {cli}",
+    "description": "Beside a role's connection choice in Load template (HI-2109): the coding agent CLI the template suggests for that role ({cli}: \"Codex\"), which chose the connection first offered. Lower case."
+  },
   "assistant.templateLoad.afterLoad": {
     "defaultMessage": "{removed, select, yes {Their conversations stay in the Sessions tab, and their open cards go back (Active ones to Todo). The layout becomes the template's.} other {The layout becomes the template's.}}",
     "description": "Load template, the last note: what happens to the agents that go (when some do) and to the project's layout. Sessions, Active and Todo as Hive names them."
+  },
+  "assistant.templateLoad.cliDefaults": {
+    "defaultMessage": "{cli} defaults",
+    "description": "What a connection runs (HI-2109) when it sets no model, effort or mode of its own: its coding agent CLI's ({cli}: \"Claude Code\") defaults."
+  },
+  "assistant.templateLoad.connectionLine": {
+    "defaultMessage": "{name} ({values})",
+    "description": "A connection (HI-2109) with what it runs, in brackets: {name} is its name (\"Claude · High\"), {values} its model, effort and mode (\"Opus · High · Auto\"). Japanese and Chinese: full-width brackets, no space before them."
   },
   "assistant.templateLoad.createdHeading": {
     "defaultMessage": "Created:",
     "description": "Load template's confirmation, as text: the heading over the template's agents."
   },
-  "assistant.templateLoad.createdLine": {
-    "defaultMessage": "{name}{hasRole, select, yes { — {role}} other {}}{replaces, select, yes { (new)} other {}}: {provider}, {settings}",
-    "description": "Load template's confirmation, as text: an agent the template brings, after a bullet: its role, (new) when it replaces an agent of the same name, its coding agent ({provider}) and its model · effort · mode ({settings})."
+  "assistant.templateLoad.createdOn": {
+    "defaultMessage": "{name}{hasRole, select, yes { — {role}} other {}}{replaces, select, yes { (new)} other {}}: {connection}",
+    "description": "Load template's confirmation, as text (HI-2109): an agent the template brings, after a bullet: its role, (new) when it replaces an agent of the same name, and the connection it is given ({connection}: its name and what it runs, \"Claude · High (Opus · High · Auto)\")."
   },
-  "assistant.templateLoad.isDefault": {
-    "defaultMessage": "{setting} (default)",
-    "description": "A new agent's model, effort or mode that the template leaves to the project's or Hive's defaults: {setting} is what it comes to here (\"Opus 5.5\", \"High\")."
+  "assistant.templateLoad.noConnection": {
+    "defaultMessage": "no connection",
+    "description": "Load template's confirmation (HI-2109), in place of an agent's connection: none can run it here. Lower case."
   },
   "assistant.templateLoad.oldKept": {
     "defaultMessage": "its worktree and branch {branch} stay{hasWhy, select, yes {: {why}} other {}}",
@@ -1975,69 +2043,17 @@
     "defaultMessage": "{role}{paired, select, yes { (paired: {name})} other {}}",
     "description": "Load template's confirmation, as text: an agent's role in the workflow ({role}: Builder, Reviewer, Either) and the agent it is paired with ({name}). The name after a colon (glossary §1 rule 4)."
   },
-  "assistant.templateLoad.swapped": {
-    "defaultMessage": "{problem, select, off {{from} is turned off (Settings → Providers): {to} instead.} other {{from} isn’t installed: {to} instead.}}",
-    "description": "Load template, on the row of an agent of one of Hive's own templates: the coding agent the template gives it ({from}, \"Codex\") can't run here, so it gets another ({to}, \"Claude Code\"). {problem} is why: off (turned off in Settings → Providers) or not installed."
-  },
   "assistant.templatePlan.agent": {
     "defaultMessage": "Agent",
     "description": "Load template's table: the column of the agents' names."
   },
-  "assistant.templatePlan.codingAgent": {
-    "defaultMessage": "Coding agent",
-    "description": "Load template's table: the column of each agent's CLI (Claude Code, Codex…)."
-  },
   "assistant.templatePlan.connection": {
     "defaultMessage": "Connection",
-    "description": "Load template's table (HI-1769, with Connections on): the column of the connection each agent runs on (a login or service its coding agent CLI uses)."
-  },
-  "assistant.templatePlan.connectionDefault": {
-    "defaultMessage": "Workspace's default ({name})",
-    "description": "Load template's table, the Connection column (HI-1769): the agent follows the workspace's default connection for its CLI ({name}); also the first choice of the box for an agent whose own connection can't be used here."
-  },
-  "assistant.templatePlan.connectionLabel": {
-    "defaultMessage": "Connection of {agent}",
-    "description": "Load template's table (HI-1769): the accessible name of the box choosing the connection of the agent {agent}."
-  },
-  "assistant.templatePlan.connectionMissing": {
-    "defaultMessage": "{name}: no connection with that id here",
-    "description": "Load template's table, the Connection column (HI-1769): the template's agent ran on a connection ({name}, its name when saved) that this machine doesn't have (never matched by name). The box under it chooses another."
-  },
-  "assistant.templatePlan.connectionNone": {
-    "defaultMessage": "Workspace's default (none on: it can't start)",
-    "description": "Load template's table, the Connection column (HI-1769): the agent follows the workspace's default connection for its CLI, but none is on, so it can't start until one is."
-  },
-  "assistant.templatePlan.connectionOff": {
-    "defaultMessage": "{name}: off in this workspace",
-    "description": "Load template's table, the Connection column (HI-1769): the template's agent ran on a connection ({name}) that is off in this workspace. The box under it chooses another."
-  },
-  "assistant.templatePlan.connectionOtherCli": {
-    "defaultMessage": "{name}: another CLI's connection",
-    "description": "Load template's table, the Connection column (HI-1769): the template's agent names a connection ({name}) of another coding agent CLI than its own. The box under it chooses one of its own CLI's."
-  },
-  "assistant.templatePlan.connectionUnnamed": {
-    "defaultMessage": "Its connection",
-    "description": "Load template's table, the Connection column (HI-1769): stands for the name of a template agent's connection when the template doesn't say it, before \": no connection with that id here\"."
-  },
-  "assistant.templatePlan.default": {
-    "defaultMessage": "(default)",
-    "description": "Load template's table, after a model, effort or mode: the template leaves it to the project's or Hive's defaults."
-  },
-  "assistant.templatePlan.effort": {
-    "defaultMessage": "Effort",
-    "description": "Load template's table: a column (the model's reasoning effort)."
+    "description": "Load template's table (HI-2109): the column of the connection each agent runs on (a named setup on an account: model, effort, mode), as chosen in the Connections section under it."
   },
   "assistant.templatePlan.fromTip": {
     "defaultMessage": "Its name in the template",
     "description": "Load template's table: tooltip on an agent's name as the template has it, beside the box for its new name."
-  },
-  "assistant.templatePlan.mode": {
-    "defaultMessage": "Mode",
-    "description": "Load template's table: a column (the permission mode)."
-  },
-  "assistant.templatePlan.model": {
-    "defaultMessage": "Model",
-    "description": "Load template's table: a column."
   },
   "assistant.templatePlan.nameLabel": {
     "defaultMessage": "Name of agent {n}",
@@ -2078,10 +2094,6 @@
   "assistant.templatePlan.stateReplacedTip": {
     "defaultMessage": "A new agent with these settings replaces the agent of the same name.",
     "description": "Load template's table: tooltip on replaced."
-  },
-  "assistant.templatePlan.withNote": {
-    "defaultMessage": "{thing} <faint>{note}</faint>",
-    "description": "Load template: a name or a setting ({thing}), then a note about it in brackets ({note}, which brings its brackets: \"(default)\"), greyed. Keep the <faint> tags around {note}. Japanese and Chinese: no space before full-width brackets."
   },
   "assistant.templateWorkflow.alsoGit": {
     "defaultMessage": "It has a workflow for Git too, used once this project uses Git.",
@@ -2207,29 +2219,13 @@
     "defaultMessage": "Agent",
     "description": "A template's table: the agents' names."
   },
-  "assistant.templates.colCodingAgent": {
-    "defaultMessage": "Coding agent",
-    "description": "A template's table: each agent's CLI (Claude Code, Codex…)."
-  },
-  "assistant.templates.colEffort": {
-    "defaultMessage": "Effort",
-    "description": "A template's table: a column (the model's reasoning effort)."
-  },
-  "assistant.templates.colMode": {
-    "defaultMessage": "Mode",
-    "description": "A template's table: a column (the permission mode)."
-  },
-  "assistant.templates.colModel": {
-    "defaultMessage": "Model",
-    "description": "A template's table: the column of each agent's model."
-  },
   "assistant.templates.colRole": {
     "defaultMessage": "Role",
     "description": "A template's table: each agent's role."
   },
-  "assistant.templates.context200k": {
-    "defaultMessage": "200K context",
-    "description": "A template's table, after the model: the agent uses the model's 200K-token context. Keep 200K."
+  "assistant.templates.colSuggests": {
+    "defaultMessage": "Suggests",
+    "description": "A template's table (HI-2109): the coding agent CLI each agent suggests (Claude Code, Codex…), which only preselects a connection on it when the template is loaded. A short column heading."
   },
   "assistant.templates.continue": {
     "defaultMessage": "Continue",
@@ -2238,10 +2234,6 @@
   "assistant.templates.copyAgent": {
     "defaultMessage": "Copy {name}",
     "description": "The template editor: a button on an agent's row."
-  },
-  "assistant.templates.default": {
-    "defaultMessage": "Default",
-    "description": "A template's agent's model, effort or mode when it is left to the project's or Hive's defaults."
   },
   "assistant.templates.delete": {
     "defaultMessage": "Delete",
@@ -2495,6 +2487,10 @@
     "defaultMessage": "No projects",
     "description": "A notice: Load into Project with no projects in the workspace."
   },
+  "assistant.templates.noSuggestion": {
+    "defaultMessage": "Any",
+    "description": "A template's table, the Suggests column (HI-2109): the agent suggests no coding agent CLI (the first connection in the order is offered)."
+  },
   "assistant.templates.noWorkspace": {
     "defaultMessage": "Open a workspace to see its templates.",
     "description": "The Templates view with no workspace open."
@@ -2606,6 +2602,10 @@
   "assistant.templates.suggests": {
     "defaultMessage": "Suggests the {preset} preset: loading it offers to switch the project’s workflow options to it.{pool, select, yes { Its reviewers are a pool shared by every builder.} other {}}",
     "description": "Over a template's agents: the workflow preset it suggests ({preset}: Solo, Pair, Team); pool when its reviewers are shared by all builders rather than one per lane. Glossary: preset, workflow, reviewer, builder, lane."
+  },
+  "assistant.templates.suggestsTip": {
+    "defaultMessage": "A template keeps no connection, model or effort: loading it offers the first connection on this coding agent, and you choose.",
+    "description": "Tooltip on the Suggests column heading of a template's table (HI-2109)."
   },
   "assistant.templates.summary": {
     "defaultMessage": "{count, plural, one {# agent} other {# agents}}, {layout}{hasSaved, select, yes {, saved {when}} other {}}. Kept in {scope, select, workspace {the workspace, for every project} other {{project}, for that project only}}. Change it with <b>Edit…</b>, or save a project's agents again under the same name.",

@@ -931,6 +931,10 @@
     "defaultMessage": "The workspace was closed",
     "description": "An error: the workspace was closed (or the window opened another) while the action was under way."
   },
+  "service.workspace.connectionGone": {
+    "defaultMessage": "The connection chosen for {agent} was removed, or is being removed. Choose another.",
+    "description": "An error saving an agent (HI-2107): the connection chosen for it ({agent}, the agent's name) was removed from Settings → Accounts & Connections meanwhile."
+  },
   "service.workspace.folderExists": {
     "defaultMessage": "A folder named \"{name}\" already exists",
     "description": "An error making a project: the workspace already has a folder called {name}."

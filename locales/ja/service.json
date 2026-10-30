@@ -232,6 +232,7 @@
   "service.workspace.agentGone": "そのエージェントはもう存在しません。",
   "service.workspace.badName": "プロジェクト名は「.」で始めることも、{chars}を含めることもできません",
   "service.workspace.closed": "ワークスペースが閉じられました",
+  "service.workspace.connectionGone": "{agent}に選んだ接続は削除されたか、削除中です。別の接続を選んでください。",
   "service.workspace.folderExists": "「{name}」という名前のフォルダーがすでにあります",
   "service.workspace.holdsOpen": "別のウィンドウで開いているワークスペース{workspace}が{folder}の中にあります。{name}をワークスペースとして開くには、先にそれを閉じてください。",
   "service.workspace.insideOpen": "{folder}は、別のウィンドウで開いているワークスペース{workspace}の中にあります。先にそのワークスペースを閉じるか、そちらからこのフォルダーのプロジェクトを開いてください。",

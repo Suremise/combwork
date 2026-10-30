@@ -232,6 +232,7 @@
   "service.workspace.agentGone": "That agent no longer exists.",
   "service.workspace.badName": "Project names cannot start with \".\" or contain {chars}",
   "service.workspace.closed": "The workspace was closed",
+  "service.workspace.connectionGone": "The connection chosen for {agent} was removed, or is being removed. Choose another.",
   "service.workspace.folderExists": "A folder named \"{name}\" already exists",
   "service.workspace.holdsOpen": "The workspace {workspace}, open in another window, is inside {folder}. Close it first to open {name} as a workspace.",
   "service.workspace.insideOpen": "{folder} is inside the workspace {workspace}, which is open in another window. Close that workspace first, or open this folder's projects from there.",

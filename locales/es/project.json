@@ -1,5 +1,6 @@
 {
   "project.agents.add": "Agregar agente",
+  "project.agents.chooseConnections": "Elegir conexiones…",
   "project.agents.merge": "Fusionar…",
   "project.agents.off": "{provider} (desactivado)",
   "project.agents.ownMcp": "servidores MCP {servers}",

@@ -32,6 +32,17 @@ interface HiveMessageValues {
   'actions.cards.leave': { cards: number }
   'actions.cards.release': { cards: number }
   'actions.cards.title': { agents: number; agent: string | number; cards: number }
+  'actions.chooseConnections.busy': undefined
+  'actions.chooseConnections.confirm': undefined
+  'actions.chooseConnections.failed': undefined
+  'actions.chooseConnections.later': undefined
+  'actions.chooseConnections.message': undefined
+  'actions.chooseConnections.restartMessage': { agents: string | number; count: number }
+  'actions.chooseConnections.restartTitle': undefined
+  'actions.chooseConnections.skipped': { count: number }
+  'actions.chooseConnections.skippedWhy': { agent: string | number; why: string }
+  'actions.chooseConnections.switch': undefined
+  'actions.chooseConnections.title': { project: string | number }
   'actions.delete.busy': undefined
   'actions.delete.confirm': undefined
   'actions.delete.message': { folder: string; name: string | number }
@@ -244,14 +255,11 @@ interface HiveMessageValues {
   'actions.stopFirst.title': { what: string; agent: string | number }
   'actions.template.addAgentFailed': undefined
   'actions.template.addConfirm': undefined
-  'actions.template.addDefaultModel': undefined
-  'actions.template.addMessage': { role: string | number; provider: string | number; model: string | number }
   'actions.template.addName': undefined
+  'actions.template.addSuggests': { role: string | number; hasCli: string; cli: string | number }
   'actions.template.addTitle': undefined
   'actions.template.blockedMessage': { project: string }
   'actions.template.blockedTitle': { name: string | number }
-  'actions.template.connectionFallback': { agent: string | number }
-  'actions.template.connectionFallbackWhy': { name: string | number; problem: string }
   'actions.template.everyProject': undefined
   'actions.template.includeWorkflow': { platform: string | number }
   'actions.template.load': undefined
@@ -265,9 +273,6 @@ interface HiveMessageValues {
   'actions.template.noAgents': undefined
   'actions.template.noAgentsMessage': undefined
   'actions.template.ok': undefined
-  'actions.template.openSetup': undefined
-  'actions.template.providerOff': undefined
-  'actions.template.providerOffMessage': undefined
   'actions.template.readFailed': undefined
   'actions.template.replace': undefined
   'actions.template.replaceDetail': undefined

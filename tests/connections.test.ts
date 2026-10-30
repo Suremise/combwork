@@ -34,7 +34,7 @@ const { config } = await import('../src/main/config')
 const { advanced } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
-const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace, setNewWorkspaceExtras } = await import('../src/main/workspace')
+const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace, setConnectionGuard, setNewWorkspaceExtras } = await import('../src/main/workspace')
 const { runSwitch } = await import('../src/main/connectionSwitch')
 const { authScope, sessions } = await import('../src/main/sessions')
 const moves = await import('../src/main/connectionMoves')
@@ -841,7 +841,7 @@ describe('an agent’s own connection, checked with the write that saves it (HI-
   })
 })
 
-describe('templates’ connections (HI-1769; HI-2106: dropped as they are read)', () => {
+describe('templates’ connections (HI-1769; HI-2106: dropped as they are read; HI-2109: chosen when loaded)', () => {
   const gamma = join(wsPath, 'gamma')
   const tplDir = join(wsPath, '.hive', 'templates')
   /** A template from before HI-2106: T1 on Personal (its id), T2 on a connection this machine never had, T3 on none of its own. */
@@ -856,24 +856,23 @@ describe('templates’ connections (HI-1769; HI-2106: dropped as they are read)'
   const ids = async () => (await w.projectConfig(gamma)).agents.map((a) => a.id)
   const byName = async (n: string) => (await w.projectConfig(gamma)).agents.find((a) => a.name === n)
 
-  it('the plan flags none: every agent gets its CLI’s first usable connection here', async () => {
+  it('the plan offers the connections on here, in the order; with no answers every agent gets the first on the CLI it suggests', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
-    await signedInConnection('Work', 'work@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
     writeTemplate('flags.json', a.id)
     const plan = await here(() => templates.templatePlan(gamma, 'workspace', 'flags.json'))
-    expect(plan.connections).toEqual([])
+    expect(plan.options.map((o) => [o.id, o.accountName, o.cli])).toEqual([[baseOf(a.id), 'Personal', 'claude-code'], [baseOf(b.id), 'Work', 'claude-code']])
     expect(plan.create.some((x) => 'connection' in x || 'connectionName' in x)).toBe(false)
     const before = await ids()
     await here(() => templates.loadTemplate(gamma, 'workspace', 'flags.json', before))
     for (const n of ['T1', 'T2', 'T3']) expect((await byName(n))?.connection).toBe(baseOf(a.id))
   })
 
-  it('one agent added from a template: its CLI’s first usable connection, and no fallback to say', async () => {
+  it('one agent added from a template: its CLI’s first usable connection', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     writeTemplate('one.json', a.id)
     const t2 = await here(() => templates.addAgentFromTemplate(gamma, 'workspace', 'one.json', 1, undefined, 'One T2'))
     expect(t2.connection).toBe(baseOf(a.id))
-    expect(t2.connectionFallback).toBeUndefined()
   })
 
   it('saved: no connection, nor its name', async () => {
@@ -1348,7 +1347,7 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
       expect(await outcome(Promise.resolve().then(() => accounts.removeConnection(c.id)))).toMatch(/Still in use, so Used was kept: Builder \(cr1\)/)
       writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [] }))
       await w.refresh()
-      accounts.removeConnection(c.id)
+      await accounts.removeConnection(c.id)
       expect(accounts.getConnection(c.id)).toBeUndefined()
     } finally {
       writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
@@ -1359,6 +1358,85 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
     accounts.moveConnection(x.id, 0)
     expect(accounts.allAccounts().filter((y) => !y.home).map((y) => y.name)).toEqual(['Codex One', 'Personal'])
     expect(here(() => accounts.accountsView()).order.filter((id) => id === x.id || id === a.id)).toEqual([x.id, a.id])
+  })
+
+  describe("remove reads each project's agents as saved, under the lock their writes take (HR1, round 1)", () => {
+    const p = join(wsPath, 'cr2')
+    const file = join(p, '.hive', 'project.json')
+    const agentOn = (connection?: string) => ({ version: 2, migrations: { accounts1: { at: '' } }, agents: [{ id: 'g1', name: 'Gamma', provider: 'claude-code', ...(connection ? { connection } : {}) }] })
+    beforeAll(async () => {
+      mkdirSync(join(p, '.hive'), { recursive: true })
+      writeFileSync(file, JSON.stringify(agentOn()))
+      await w.refresh()
+      // As Hive's start sets it (initConnections).
+      setConnectionGuard(accounts.connectionAssignable)
+    })
+    afterAll(() => writeFileSync(file, JSON.stringify({ version: 2, agents: [] })))
+    afterEach(() => {
+      accounts.accountTestHooks.beforeUsersRead = undefined
+      writeFileSync(file, JSON.stringify(agentOn()))
+    })
+    const saved = (): string | undefined => JSON.parse(readFileSync(file, 'utf8')).agents[0].connection
+
+    it("an agent given it just before, the window's snapshot not read again: refused, the connection kept", async () => {
+      const a = await signedInConnection('Personal', 'me@example.com')
+      const c = accounts.addConnection(a.id, { name: 'Fresh' })
+      // Saved through the write every assignment takes (project:updateConfig's), with no refresh of the window's view.
+      await w.mutateProjectConfig(p, (now) => ({ agents: now.agents.map((x) => ({ ...x, connection: c.id })) }))
+      expect(await outcome(accounts.removeConnection(c.id))).toMatch(/Still in use, so Fresh was kept: Gamma \(cr2\)/)
+      expect(accounts.getConnection(c.id)).toBeDefined()
+      expect(saved()).toBe(c.id)
+    })
+
+    it('a write holding the lock as the removal starts: the removal waits for it, then reads it and refuses', async () => {
+      const a = await signedInConnection('Personal', 'me@example.com')
+      const c = accounts.addConnection(a.id, { name: 'Held' })
+      let release!: () => void
+      const held = withFileLock(file, () => new Promise<void>((r) => (release = r)))
+      await vi.waitFor(() => expect(fileLockDepth(file)).toBe(1), { timeout: HUNG_MS })
+      const removal = outcome(accounts.removeConnection(c.id))
+      await vi.waitFor(() => expect(fileLockDepth(file)).toBe(2), { timeout: HUNG_MS })
+      // The write under way finishes giving it to Gamma, then lets go.
+      writeFileSync(file, JSON.stringify(agentOn(c.id)))
+      release()
+      await held
+      expect(await removal).toMatch(/Still in use, so Held was kept: Gamma/)
+      expect(accounts.getConnection(c.id)).toBeDefined()
+    })
+
+    it('a write giving it to an agent while the removal reads: refused, nothing written; the removal goes through', async () => {
+      const a = await signedInConnection('Personal', 'me@example.com')
+      const c = accounts.addConnection(a.id, { name: 'Going' })
+      let go!: () => void
+      let reached!: () => void
+      const atRead = new Promise<void>((r) => (reached = r))
+      accounts.accountTestHooks.beforeUsersRead = () => {
+        reached()
+        return new Promise<void>((r) => (go = r))
+      }
+      const removal = accounts.removeConnection(c.id)
+      await atRead
+      expect(await outcome(w.mutateProjectConfig(p, (now) => ({ agents: now.agents.map((x) => ({ ...x, connection: c.id })) })))).toMatch(/The connection chosen for Gamma was removed, or is being removed/)
+      expect(saved()).toBeUndefined()
+      go()
+      await removal
+      expect(accounts.getConnection(c.id)).toBeUndefined()
+      // Gone: still refused afterwards; an agent keeping a connection it already has is never refused.
+      expect(await outcome(w.mutateProjectConfig(p, (now) => ({ agents: now.agents.map((x) => ({ ...x, connection: c.id })) })))).toMatch(/was removed, or is being removed/)
+      writeFileSync(file, JSON.stringify(agentOn('c-gone0000')))
+      expect(await outcome(w.mutateProjectConfig(p, (now) => ({ agents: now.agents.map((x) => ({ ...x, name: 'Gamma' })) })))).toBe('ok')
+    })
+  })
+
+  it('extra arguments with a bare "--" are refused before anything is saved; --option=-- is kept (HR1, round 1)', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    expect(await outcome(Promise.resolve().then(() => accounts.addConnection(a.id, { name: 'Dashes', extraArgs: '--verbose -- task' })))).toMatch(/Hive passes the task after "--"/)
+    expect(accounts.allConnections().some((c) => c.name === 'Dashes')).toBe(false)
+    const first = baseOf(a.id)
+    const was = structuredClone(accounts.getConnection(first))
+    expect(await outcome(Promise.resolve().then(() => accounts.updateConnection(first, { extraArgs: '--' })))).toMatch(/Hive passes the task after "--"/)
+    expect(accounts.getConnection(first)).toEqual(was)
+    expect(accounts.updateConnection(first, { extraArgs: '--append-system-prompt=--' }).extraArgs).toBe('--append-system-prompt=--')
   })
 })
 

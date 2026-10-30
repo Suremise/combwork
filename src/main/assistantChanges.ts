@@ -413,6 +413,23 @@ export function noteLaneIn(db: Db['writer'], workspacePath: string, before: Reco
 export const PROVIDER_DEPENDENTS = ['connection', 'lastSessionId'] as const
 
 /**
+ * An agent's connection by its id (HI-2109, Choose Connections…), as a change records it: never the adapter's
+ * `connection` (an account's id), so two connections with the same values are told apart.
+ */
+export const CONNECTION_ID = 'connectionId'
+
+/**
+ * An agent's change of connection the Assistant made (HI-2109): its connection's id, and its CLI and last conversation
+ * when they changed with it, from the agent as saved just before and after; undone together (assistantUndo.ts).
+ */
+export async function noteConnection(ws: WorkspaceService, project: string, was: AgentDef, now: AgentDef): Promise<void> {
+  if ((was.connection ?? null) === (now.connection ?? null)) return
+  const fields: FieldChange[] = [{ field: CONNECTION_ID, old: was.connection ?? null, new: now.connection ?? null }]
+  if ((was.provider ?? null) !== (now.provider ?? null)) fields.push({ field: 'provider', old: was.provider ?? null, new: now.provider ?? null }, { field: 'lastSessionId', old: was.lastSessionId ?? null, new: now.lastSessionId ?? null })
+  await noteChange(ws, { kind: 'agent', project, target: now.id, fields })
+}
+
+/**
  * An agent's settings the Assistant changed (as saved under the project's lock just before, and after), recorded for
  * undo: those that changed; with a provider change, everything it resets too.
  */

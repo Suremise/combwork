@@ -1,6 +1,7 @@
 // Hive's own agent templates (#1436, OP-19; Darren's 19 Oct decision on #1123: templates from 0.9 are wiped and Hive
 // ships these instead). Read-only, listed under the Hive scope; Duplicate… copies one into the workspace or a project to
-// change it. Models are left to the provider's default, so they don't go stale; names are patterns of the project's key
+// change it. They suggest a CLI per role and never a connection or model (HI-2109, decision G): the user picks
+// connections when one is loaded. Names are patterns of the project's key
 // (`{key}-B{n}`, #1123 names, #1440), made where the template is loaded (HI-B1…); the layout fits the count.
 import { msg, type Msg } from './i18n/msg'
 import { tr } from './i18n'
@@ -18,7 +19,7 @@ export interface HiveTemplate {
   template: AgentTemplate
 }
 
-const builders = (n: number, extra: Partial<TemplateAgent> = {}): TemplateAgent[] => Array.from({ length: n }, () => ({ name: '{key}-B{n}', role: 'builder', provider: 'claude-code', ...extra }))
+const builders = (n: number): TemplateAgent[] => Array.from({ length: n }, () => ({ name: '{key}-B{n}', role: 'builder', provider: 'claude-code' }))
 const reviewers = (n: number, provider = 'codex'): TemplateAgent[] => Array.from({ length: n }, () => ({ name: '{key}-R{n}', role: 'reviewer', provider }))
 /** Builder n with reviewer n, for each n both have (by their numbered names, `pairNames`). */
 const paired = (n: number): TemplatePair[] => Array.from({ length: n }, (_, i) => ({ builder: `{key}-B${i + 1}`, reviewer: `{key}-R${i + 1}` }))
@@ -82,9 +83,9 @@ export const HIVE_TEMPLATES: readonly HiveTemplate[] = [
   hive(
     'team-6x6.json',
     msg({ id: 'assistant.hiveTemplates.team6', defaultMessage: 'Team 6×6', description: "Name of one of Hive's own agent templates: six builders and six reviewers. Keep 6×6." }),
-    msg({ id: 'assistant.hiveTemplates.team6Text', defaultMessage: 'Six builders (Claude Code, medium effort), each with its own reviewer (Codex), on two pages.', description: "Description of Hive's template Team 6×6 (glossary: builder, reviewer, effort)." }),
+    msg({ id: 'assistant.hiveTemplates.team6Text', defaultMessage: 'Six builders (Claude Code), each with its own reviewer (Codex), on two pages.', description: "Description of Hive's template Team 6×6 (glossary: builder, reviewer)." }),
     'grid6',
-    [...builders(6, { effort: 'medium' }), ...reviewers(6)],
+    [...builders(6), ...reviewers(6)],
     'team',
     { pairs: paired(6) }
   ),

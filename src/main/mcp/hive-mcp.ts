@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, STOP_ASK_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, connectionListText, connectionChangedText, type ConnectionPublic, templateListText, templatePlanText, templateLoadedText, type TemplatePlanPublic, type TemplateLoadPublic, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, teamText, type TeamPublic, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, connectionListText, connectionChangedText, type ConnectionPublic, templateListText, templatePlanText, templateLoadedText, connectionsAppliedText, type TemplatePlanPublic, type TemplateLoadPublic, type ConnectionsAppliedPublic,agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, teamText, type TeamPublic, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
@@ -735,16 +735,17 @@ const tools: Tool[] = [
   {
     name: 'hive_template',
     description:
-      "A project's agent templates: list, plan (what loading one would do, changing nothing) and load (replaces every agent of the project, and sets its workflow options). Only when the user asked for it. (detail: use-hive-api, tools.md)",
+      "A project's agent templates: list, plan (what loading one would do, changing nothing), load (replaces every agent of the project and sets its workflow options), apply (only its agents' connections). Only when the user asked for it. (detail: use-hive-api, tools.md)",
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['list', 'plan', 'load'] },
+        action: { type: 'string', enum: ['list', 'plan', 'load', 'apply'] },
         project: projectArg,
         template: { type: 'string', description: 'plan, load: its file or name, as list gives them.' },
         scope: { type: 'string', enum: ['hive', 'workspace', 'project'], description: 'When a name is in several.' },
         from: { type: 'string', description: "A project's template kept in another project: that project." },
         names: { type: 'object', additionalProperties: { type: 'string' }, description: 'New names for its agents: place ("1") or name → the name.' },
+        connections: { type: 'object', additionalProperties: { type: 'string' }, description: '"*", a role, or an agent\'s place ("1") or name → a connection\'s id or name (agent over role over "*").' },
         workflow: { type: 'boolean', description: 'Set its workflow options (default true).' }
       },
       required: ['action', 'project']
@@ -753,8 +754,9 @@ const tools: Tool[] = [
       if (typeof a.project !== 'string' || !a.project) throw new Error('project is required')
       const base = `/v1/projects/${enc(a.project)}/templates`
       if (a.action === 'list') return templateListText((await api('GET', base)) as Parameters<typeof templateListText>[0])
-      if (a.action !== 'plan' && a.action !== 'load') throw new Error('action must be list, plan or load')
-      const body = Object.fromEntries(['template', 'scope', 'from', 'names', 'workflow'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      if (a.action === 'apply') return connectionsAppliedText((await api('POST', `${base}/apply`, a.connections !== undefined ? { connections: a.connections } : {})) as ConnectionsAppliedPublic)
+      if (a.action !== 'plan' && a.action !== 'load') throw new Error('action must be list, plan, load or apply')
+      const body = Object.fromEntries(['template', 'scope', 'from', 'names', 'connections', 'workflow'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
       if (a.action === 'plan') return templatePlanText((await api('POST', `${base}/plan`, body)) as TemplatePlanPublic)
       return templateLoadedText((await api('POST', `${base}/load`, body)) as TemplateLoadPublic)
     }

@@ -36,6 +36,7 @@
   "main.branchMerge.notBranch": "{branch} nie jest lokalną gałęzią projektu.",
   "main.branchMerge.same": "Gałęzi {branch} nie można scalić z samą sobą.",
   "main.connections.badMode": "{cli} nie ma trybu uprawnień {mode}.",
+  "main.connections.beingRemoved": "Usuwanie {name} już trwa.",
   "main.connections.choice.missing": "Połączenie wybrane dla agenta {agent} już nie istnieje. Wybierz inne albo domyślne połączenie obszaru roboczego.",
   "main.connections.choice.off": "{name} nie jest włączone w tym obszarze roboczym. Włącz je w Ustawienia → Konta i połączenia albo wybierz inne dla agenta {agent}.",
   "main.connections.choice.otherCli": "{name} jest dla innego CLI niż CLI agenta {agent}. Wybierz połączenie jego CLI.",

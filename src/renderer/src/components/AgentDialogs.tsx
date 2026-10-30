@@ -36,7 +36,6 @@ const BOLD = (chunks: ReactNode[]): ReactNode => <strong key={String(chunks)}>{c
 const CANCEL = msg({ id: 'agents.dialog.cancel', defaultMessage: 'Cancel', description: "Button: closes an agent dialog without changing anything." })
 const NAME = msg({ id: 'agents.dialog.name', defaultMessage: 'Name', description: "Label of an agent's name (Add Agent, Agent Settings)." })
 const CODING_AGENT = msg({ id: 'agents.dialog.codingAgent', defaultMessage: 'Coding agent', description: 'A heading in Add Agent and Agent Settings, above the choice of provider (Claude Code, Codex, GitHub Copilot).' })
-const PROJECTS = msg({ id: 'agents.overrides.projects', defaultMessage: "Project's", description: "An agent's model, effort, mode or context choice that follows the project's: the first choice of each, before the project's value in brackets (\"Project's (Opus 5.5)\"). Keep it short." })
 const NOTE = msg({ id: 'agents.settings.note', defaultMessage: 'Note', description: "Label of an agent's note (Agent Settings): what it is for, in the user's own words. Not its role in the workflow, which is a separate choice." })
 const NOTE_NONE = msg({ id: 'agents.settings.noteNone', defaultMessage: 'Optional: what it is for, in your words', description: "Placeholder of an agent's empty note (Agent Settings)." })
 const MCP_SERVERS = msg({ id: 'agents.dialog.mcpServers', defaultMessage: 'MCP servers', description: "A heading in Agent Settings, above the agent's MCP servers." })
@@ -628,7 +627,7 @@ export function TemplateAgentDialog() {
       mcpProject={null}
       mcpWhere="workspace"
       suggestOnly
-      note={tr(msg({ id: 'agents.template.note', defaultMessage: 'For the template "{template}": Save saves it in the template. Settings left as "{projects}" follow the project it is loaded into.', description: "Under Agent Settings for a template's agent: Save (a button) saves it in the template ({template}); {projects} is the first choice of each setting (\"Project's\")." }), { template: req.template, projects: tr(PROJECTS) })}
+      note={tr(msg({ id: 'agents.template.noteSuggest', defaultMessage: 'For the template "{template}": Save saves it in the template. Its coding agent is only a suggestion: the connection each agent runs on is chosen when the template is loaded.', description: "Under Agent Settings for a template's agent (HI-2109): Save (a button) saves it in the template ({template}). A template keeps no connection, model or effort: its coding agent CLI only preselects a connection in the Load template dialog." }), { template: req.template })}
       nameProblem={(n) => (!n.includes('{n}') && req.others.some((o) => o.name.toLowerCase() === n.toLowerCase()) ? tr(msg({ id: 'agents.template.nameTaken', defaultMessage: 'Another agent of the template is called "{name}".', description: "Why a template's agent can't take a name ({name}): another agent of the template has it." }), { name: n }) : null)}
       save={async (f) => {
         const note = f.role.replace(/\s+/g, ' ').trim()

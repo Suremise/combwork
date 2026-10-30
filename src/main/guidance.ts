@@ -125,8 +125,11 @@ async function scanRevisions(): Promise<SkillRevision[]> {
  * split by guesswork.
  */
 export function launchParts(guidance: string, role: 'agent' | 'assistant', project: string, assistant: { text: string; modeText: string } | null, notes = ''): { guidanceBytes: number; guidanceChars: number; customBytes: number; customChars: number; roleBytes: number; roleChars: number; modeBytes: number; modeChars: number } {
-  // The contract as the session got it: with long commands wrapped or not (Settings → General).
-  const contract = guidance ? [true, false].map((p) => hiveInstructions(role === 'assistant' ? '' : project, role, p)).find((c) => guidance.startsWith(c)) : ''
+  // The contract as the session got it: with long commands wrapped or not (Settings → General), and for the Assistant
+  // with its journal's skills line when the journal is on (withJournal, HI-2048), whose rule after it is then custom.
+  const contracts = [true, false].map((p) => hiveInstructions(role === 'assistant' ? '' : project, role, p))
+  const candidates = role === 'assistant' ? contracts.flatMap((c) => [c, c.replace(assistantSkillsLine(false), assistantSkillsLine(true))]) : contracts
+  const contract = guidance ? candidates.find((c) => guidance.startsWith(c)) : ''
   const core = contract || guidance
   const custom = guidance.slice(core.length) + notes.trim()
   const text = assistant?.text ?? ''

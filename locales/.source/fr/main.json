@@ -36,6 +36,7 @@
   "main.branchMerge.notBranch": "{branch} is not a local branch of the project.",
   "main.branchMerge.same": "{branch} can't be merged into itself.",
   "main.connections.badMode": "{cli} has no permission mode {mode}.",
+  "main.connections.beingRemoved": "{name} is being removed already.",
   "main.connections.choice.missing": "The connection chosen for {agent} no longer exists. Choose another, or the workspace's default.",
   "main.connections.choice.off": "{name} isn't on in this workspace. Turn it on in Settings → Accounts & Connections, or choose another for {agent}.",
   "main.connections.choice.otherCli": "{name} is for another CLI than {agent}'s. Choose one of its own.",
