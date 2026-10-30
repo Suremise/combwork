@@ -26,7 +26,8 @@ import { basename, dirname, join } from 'path'
 import { removePath, samePlace } from '../fsutil'
 import { access } from 'original-fs/promises'
 import { git, GIT_PREFIX, withoutGitRoute } from '../git'
-import { onOutputSettled, type GitOutcome, type GitRequest } from '../gitWorker'
+import { onOutputSettled, withLauncherEnv, type GitOutcome, type GitRequest } from '../gitWorker'
+import { gitExe, gitExeGone, PATH_GIT, type GitExe } from '../gitTool'
 import { createLogger, userText } from '../logger'
 import { endTree } from '../progressReporters/wrapper'
 import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
@@ -469,11 +470,22 @@ export class QueueRunner {
   /**
    * git in a folder of the runner's (its own worktree, or the project for a ref), as Hive runs git (GIT_PREFIX); `opts`
    * its environment and bound (the queue's merge commits, #1350; a push). HI-2079: one with no bound runs in the lease's
-   * git host (no Node start of its own); a bounded one through `run`'s launcher, whose bound ends its tree.
+   * git host (no Node start of its own); a bounded one through `run`'s launcher, whose bound ends its tree. HI-2137: the
+   * git Hive starts (gitExe), once more with PATH's when that one couldn't start.
    */
   git(cwd: string, args: string[], what: Launched = 'testMerge', opts: { env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}): Promise<RunResult> {
-    if (opts.timeoutMs) return this.run(what, 'git', [...GIT_PREFIX, ...args], { cwd, ...opts })
-    return this.hostGit(cwd, [...GIT_PREFIX, ...args], opts.env ?? process.env)
+    return this.gitAs(gitExe(), cwd, args, what, opts)
+  }
+
+  private async gitAs(use: GitExe, cwd: string, args: string[], what: Launched, opts: { env?: NodeJS.ProcessEnv; timeoutMs?: number }): Promise<RunResult> {
+    const env = use.launcherEnv ? withLauncherEnv(opts.env ?? process.env, use.launcherEnv) : opts.env
+    const r = opts.timeoutMs ? await this.run(what, use.exe, [...GIT_PREFIX, ...args], { cwd, ...opts, env }) : await this.hostGit(cwd, [...GIT_PREFIX, ...args], env ?? process.env, use.exe)
+    // As git() does: the real git gone, this command once more with PATH's, whichever command found it gone first.
+    if (r.notRun === 'ENOENT' && use.exe !== PATH_GIT.exe && existsSync(cwd)) {
+      gitExeGone(use.exe)
+      return this.gitAs(PATH_GIT, cwd, args, what, opts)
+    }
+    return r
   }
 
   /**
@@ -481,8 +493,8 @@ export class QueueRunner {
    * longer holds (released, failed, or its lease another's: read just before it is sent). A host that goes or misbehaves
    * fails the runner (`fail`): what was waiting is lost, never an answer (`signal: 'hostLost'`, HI-2054's again).
    */
-  private async hostGit(cwd: string, args: string[], env: NodeJS.ProcessEnv): Promise<RunResult> {
-    const r = await this.inHost({ command: 'git', args, cwd, env })
+  private async hostGit(cwd: string, args: string[], env: NodeJS.ProcessEnv, command: string): Promise<RunResult> {
+    const r = await this.inHost({ command, args, cwd, env })
     if (!r) throw new LeaseLost(this.target)
     return toRunResult('git', r)
   }
@@ -496,7 +508,9 @@ export class QueueRunner {
   async gitOutcome(m: Omit<GitRequest, 'id'>): Promise<GitOutcome> {
     // As execFile checks its bound (the worker's path throws so too): a number, 0 or more (0: no output at all).
     if (typeof m.maxBuffer !== 'number' || Number.isNaN(m.maxBuffer) || m.maxBuffer < 0) throw Object.assign(new RangeError(`The value of "maxBuffer" is out of range. It must be >= 0. Received ${String(m.maxBuffer)}`), { code: 'ERR_OUT_OF_RANGE' }) // i18n-ignore: Node's own error, as execFile throws it
-    const r = await this.inHost({ command: 'git', args: m.args, cwd: m.cwd, env: m.env ?? process.env, ...(m.input !== undefined ? { input: m.input } : {}), maxBuffer: m.maxBuffer, ...(m.timeout ? { timeout: m.timeout } : {}) })
+    // HI-2137: the git git() names (gitExe), with its PATH as the worker gives it.
+    const env = m.launcherEnv ? withLauncherEnv(m.env ?? process.env, m.launcherEnv) : (m.env ?? process.env)
+    const r = await this.inHost({ command: m.exe ?? 'git', args: m.args, cwd: m.cwd, env, ...(m.input !== undefined ? { input: m.input } : {}), maxBuffer: m.maxBuffer, ...(m.timeout ? { timeout: m.timeout } : {}) })
     return r ? outcomeOf(r, m.cwd) : { stdout: NO_BYTES, stderr: NO_BYTES, error: { code: 'leaseLost', killed: false, signal: null }, cwdExists: true }
   }
 

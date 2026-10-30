@@ -4,9 +4,9 @@
 // launcher, and a host that goes failing the runner, which releases (its job ended) and admits nothing more.
 import { spawn, type ChildProcess } from 'child_process'
 import { EventEmitter } from 'events'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
-import { join } from 'path'
+import { join, win32 } from 'path'
 import { PassThrough } from 'stream'
 import { runInNewContext } from 'vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -18,6 +18,8 @@ import { FRAME_MAX, frameOf, FrameDecoder, GitHost, HOST, OUT_CHUNK, REQUEST_MAX
 import { endLeaseJob, queueHost } from '../src/main/workflow/queueJobs'
 import { LeaseLost, QueueRunner } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed } from '../src/main/workflow/queueProcs'
+import { checkGit, gitExe, gitTool, realGitBehind, setGitToolForTests } from '../src/main/gitTool'
+import { git as hiveGit, withGitRoute } from '../src/main/git'
 import { gitRepo, put, sh } from './workflow/harness'
 
 const req = createRequire(import.meta.url)
@@ -613,6 +615,55 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
     } finally {
       await runner.release()
       w.store.dropQueueLease('successor', 'successor')
+      w.close()
+    }
+  })
+
+  it('HI-2137: the git Hive starts (gitExe), in the host and through the launcher; one gone, PATH git once more', async () => {
+    // As checkGit resolves it, from the launcher: before anything is acquired, so nothing is left open where it can't.
+    const execPath = win32.normalize(sh(tempDir('qgh-exec-'), '--exec-path'))
+    const top = join(execPath, '..', '..', '..')
+    const resolved = realGitBehind(join(top, 'cmd', 'git.exe'), execPath)
+    if (!resolved) return // Not Git for Windows: nothing of this applies.
+    const real = resolved.exe
+    const trace = tempDir('qgh-trace2-')
+    // No Git folder on PATH but the launcher's: what the real git's children find comes from its launcher environment.
+    const env = { ...baseEnv(), PATH: `${join(top, 'cmd')};${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`, GIT_TRACE2_EVENT: trace }
+    // Each git's argv[0], as trace2 has it: the executable as it was started (a path, or "git" found on PATH).
+    const started = (): string[] => readdirSync(trace).flatMap((f) => readFileSync(join(trace, f), 'utf8').split('\n').filter((l) => l.includes('"event":"start"')).map((l) => (JSON.parse(l) as { argv: string[] }).argv[0]))
+    const w = world()
+    let runner: QueueRunner | null = null
+    try {
+      runner = await acquire(w)
+      setGitToolForTests({ state: 'ok', version: '2.51.0' }, resolved)
+      // The launcher's MSYSTEM and its shell tools, seen by an alias through sh.
+      const alias = ['-c', 'alias.hivemsys=!echo "$MSYSTEM $(command -v sed)"', 'hivemsys']
+      expect(await runner.git(w.project, alias, 'testMerge', { env })).toMatchObject({ ok: true, out: `${resolved.launcherEnv!.msystem} /usr/bin/sed\n` })
+      expect(await runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env, timeoutMs: 60_000 })).toMatchObject({ ok: true })
+      await vi.waitFor(() => expect(started().filter((a) => a.toLowerCase() === real.toLowerCase())).toHaveLength(2), { timeout: 10_000, interval: 50 })
+      // The real git gone (uninstalled, moved): the command runs with PATH's git, which is what Hive starts from then on.
+      const gone = join(tempDir('qgh-gone-'), 'git.exe')
+      setGitToolForTests({ state: 'ok', version: '2.51.0' }, { exe: gone })
+      // Several at once, in the host and through the launcher: each once more from PATH, whichever found it gone first.
+      const rs = await Promise.all([
+        runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env }),
+        runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env }),
+        runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env, timeoutMs: 60_000 })
+      ])
+      for (const r of rs) expect(r).toMatchObject({ ok: true })
+      expect(gitExe().exe).not.toBe(gone)
+      // And git() in the queue's route (the host, through gitOutcome), several at once: the same.
+      setGitToolForTests({ state: 'ok', version: '2.51.0' }, { exe: gone })
+      const held = runner
+      const routed = await withGitRoute((m) => held.gitOutcome(m), () => Promise.all([1, 2, 3].map(() => hiveGit(w.project, ['rev-parse', 'HEAD'], undefined, undefined, { env }))))
+      for (const r of routed) expect(r).toMatchObject({ ok: true })
+      expect(gitTool().state).not.toBe('missing')
+      // Its check again, settled before the next test.
+      await checkGit()
+      expect(gitExe().exe).not.toBe(gone)
+    } finally {
+      setGitToolForTests({ state: 'unknown' })
+      await runner?.release()
       w.close()
     }
   })

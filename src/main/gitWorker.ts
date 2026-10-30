@@ -1,5 +1,6 @@
 import { execFile, type ChildProcess } from 'child_process'
-import { existsSync } from 'original-fs'
+import { existsSync, statSync } from 'original-fs'
+import { delimiter, join } from 'path'
 import { parentPort } from 'worker_threads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
 
@@ -22,6 +23,21 @@ export interface GitRequest {
   input?: string
   env?: NodeJS.ProcessEnv
   timeout?: number
+  /** HI-2137: the git it starts (gitTool's gitExe()): PATH's `git` when not given. */
+  exe?: string
+  /** HI-2137: the environment Git for Windows' launcher would have given it (gitExe()). */
+  launcherEnv?: LauncherEnv
+}
+
+/**
+ * HI-2137: what Git for Windows' launcher (`<root>\cmd\git.exe`) gives the real git it starts, which Hive gives it when
+ * it starts that git itself (withLauncherEnv): its MSYSTEM (`msystem`: MINGW64, CLANGARM64 or MINGW32, as its folder),
+ * and its folders before PATH (`pathFirst`: `<root>\<mingw>\bin` and `<root>\usr\bin`). The real git, given MSYSTEM,
+ * leaves PATH as it is; without it, it would put `~\bin` first itself.
+ */
+export interface LauncherEnv {
+  pathFirst: string
+  msystem: string
 }
 
 /** execFile's outcome: its output, and its error's code (a number: git's exit code; a string: Node's), killed and signal. */
@@ -63,7 +79,8 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Pr
     let held = false
     let exited = false
     let quiet: ReturnType<typeof setTimeout> | undefined
-    const child = execFile('git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(m.env ? { env: m.env } : {}), ...(m.timeout ? { timeout: m.timeout } : {}) }, (err, stdout, stderr) => {
+    const env = m.launcherEnv ? withLauncherEnv(m.env ?? process.env, m.launcherEnv) : m.env
+    const child = execFile(m.exe ?? 'git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(env ? { env } : {}), ...(m.timeout ? { timeout: m.timeout } : {}) }, (err, stdout, stderr) => {
       clearTimeout(quiet)
       const e = err as (Error & { code?: unknown; killed?: boolean; signal?: string | null }) | null
       res({
@@ -94,6 +111,47 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Pr
     // What the command reads (update-ref --stdin's transaction).
     if (m.input !== undefined) child.stdin?.end(m.input)
   })
+}
+
+/**
+ * HI-2137: `env` as Git for Windows' launcher gives it to the git it starts (git-wrapper.c's setup_environment), a copy,
+ * each variable found whatever its case (a spread environment's keys are as Windows spelled them): MSYSTEM its own,
+ * whatever was set; PLINK_PROTOCOL `ssh` unless set; HOME, unless set, `%HOMEDRIVE%%HOMEPATH%` when that is a folder
+ * other than the system folder, else `%USERPROFILE%`; and PATH after its folders and `%HOME%\bin`.
+ */
+export function withLauncherEnv(env: NodeJS.ProcessEnv, l: LauncherEnv): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = { ...env }
+  const keyOf = (name: string): string => Object.keys(out).find((k) => k.toUpperCase() === name) ?? name
+  const get = (name: string): string | undefined => out[keyOf(name)] || undefined
+  const set = (name: string, value: string): void => {
+    delete out[keyOf(name)]
+    out[name] = value
+  }
+  set('MSYSTEM', l.msystem)
+  if (!get('PLINK_PROTOCOL')) set('PLINK_PROTOCOL', 'ssh')
+  let home = get('HOME')
+  if (!home) {
+    home = launcherHome(get) ?? get('USERPROFILE')
+    if (home) set('HOME', home)
+  }
+  const path = get('PATH')
+  const first = home ? `${l.pathFirst}${delimiter}${join(home, 'bin')}` : l.pathFirst
+  out[keyOf('PATH')] = path ? `${first}${delimiter}${path}` : first
+  return out
+}
+
+/** The launcher's home from HOMEDRIVE and HOMEPATH (a roaming profile's), when that is a folder and not the system's. */
+function launcherHome(get: (name: string) => string | undefined): string | undefined {
+  const homePath = get('HOMEPATH')
+  if (!homePath) return undefined
+  const home = `${get('HOMEDRIVE') ?? ''}${homePath}`
+  const root = get('SYSTEMROOT') ?? get('WINDIR')
+  if (root && home.toLowerCase() === join(root, 'System32').toLowerCase()) return undefined
+  try {
+    return statSync(home).isDirectory() ? home : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**
