@@ -164,7 +164,7 @@ export function InboxPopover() {
     )
   return createPortal(
     <div className="inbox-panel" ref={ref} role="dialog" aria-label={tr(msg({ id: 'board.inbox.panel', defaultMessage: 'What needs you', description: "The inbox popover's accessible name (above the status bar): requests on cards and agents waiting for the user, and agents that finished." }))}>
-      <div className="inbox-section">{count ? tr(msg({ id: 'board.inbox.needYouHeading', defaultMessage: 'Need you ({n})', description: 'Heading in the inbox popover above what waits for the user (requests on cards, agents stopped in their panes), with how many ({n}).' }), { n: count }) : tr(msg({ id: 'board.inbox.needYouEmptyHeading', defaultMessage: 'Need you', description: 'Heading in the inbox popover above what waits for the user, when nothing does.' }))}</div>
+      <div className="inbox-section">{count ? tr(msg({ id: 'board.inbox.needYouHeading', defaultMessage: 'Need you ({n, number})', description: 'Heading in the inbox popover above what waits for the user (requests on cards, agents stopped in their panes), with how many ({n}).' }), { n: count }) : tr(msg({ id: 'board.inbox.needYouEmptyHeading', defaultMessage: 'Need you', description: 'Heading in the inbox popover above what waits for the user, when nothing does.' }))}</div>
       {count ? (
         <>
           {grouped.cards.map(card)}
@@ -175,7 +175,7 @@ export function InboxPopover() {
       )}
       {finished.length > 0 && (
         <>
-          <div className="inbox-section">{tr(msg({ id: 'board.inbox.finishedHeading', defaultMessage: 'Finished ({n})', description: 'Heading in the inbox popover above the agents that finished since the user last looked, with how many ({n}). Not something that waits for the user.' }), { n: finished.length })}</div>
+          <div className="inbox-section">{tr(msg({ id: 'board.inbox.finishedHeading', defaultMessage: 'Finished ({n, number})', description: 'Heading in the inbox popover above the agents that finished since the user last looked, with how many ({n}). Not something that waits for the user.' }), { n: finished.length })}</div>
           {finished.map((a) => row(a))}
         </>
       )}

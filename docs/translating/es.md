@@ -19,8 +19,8 @@ Hive's English is plain and direct: short sentences, everyday words, *you* for t
 Translate the meaning, not the words, and keep the result as short and plain.
 
 - **Neutral international Spanish:** words understood from Mexico to Spain. No *vosotros* and no *vos*: the plural
-  "you" is *ustedes*. Prefer *archivo* (not *fichero*), *agregar* (not *añadir*), *equipo* or *PC* (not *ordenador*
-  or *computadora*), *costo* (not *coste*), *hacer clic*, *pegar*, *usar*.
+  "you" is *ustedes*. Prefer *archivo* (not *fichero*), *agregar* (not *añadir*), *PC* (not *equipo*, *ordenador*
+  or *computadora*: see Terms), *costo* (not *coste*), *hacer clic*, *pegar*, *usar*.
 - **Addressing the reader:** the informal *tú* (*Elige un proyecto*, *tus agentes*), as Spanish software usually does.
   Never *usted*. *Tú* is written in lower case.
 - **Tone:** friendly and direct, never casual. Prefer active sentences: *Hive guarda la sesión*, not *La sesión es
@@ -105,6 +105,8 @@ English, it says so.
 | Version Control (the tab) / version control | Control de versiones / control de versiones | |
 | workflow / workflow options | flujo de trabajo / opciones del flujo de trabajo | |
 | preset (Solo, Pair, Team, Custom) | ajuste predefinido (Individual, Pareja, Equipo, Personalizado) | |
+| computer / PC / this machine | PC | Masculine: *el PC*, *este PC*, *tu PC*, *reinicia el PC*. Never *equipo*, which is the team (the Team preset, *Pausar el equipo*), nor *ordenador* or *computadora*. |
+| team | equipo | Only the agents' team or the Team preset, never the computer. |
 | None (no version control) | Ninguno | |
 | rule / old rules | regla / reglas anteriores | |
 | refused / override / Move anyway | rechazado / excepción / Mover de todos modos | |

@@ -1077,7 +1077,7 @@ interface HiveMessageValues {
   'settings.prices.unlisted': { provider: string | number }
   'settings.prices.unlistedTip': { provider: string | number }
   'settings.prices.yours': undefined
-  'settings.project.agents.desc': undefined
+  'settings.project.agents.desc': { max: number }
   'settings.project.agents.title': undefined
   'settings.project.cardAttachmentCleanup.desc': undefined
   'settings.project.cardAttachmentCleanup.option.3': undefined

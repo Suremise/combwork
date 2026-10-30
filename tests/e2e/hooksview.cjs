@@ -111,7 +111,7 @@ const check = (name, ok, extra = '') => {
     // The tab opens frozen (HI-1743): Play shows what changes.
     await page.locator('button', { hasText: 'Play' }).click()
     const blockRow = page.locator('.activity-row[data-block="blocked"]')
-    check('the Activity tab shows the block, live', !!(await lib.until(async () => (await blockRow.count()) === 1 && /x.txt is locked by Holder/.test(await blockRow.innerText()), HUNG_MS)), await blockRow.allInnerTexts().then(String))
+    check('the Activity tab shows the block, live', !!(await lib.until(async () => (await blockRow.count()) === 1 && /x.txt is locked by agent Holder/.test(await blockRow.innerText()), HUNG_MS)), await blockRow.allInnerTexts().then(String))
     const themed = async (name) => {
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })

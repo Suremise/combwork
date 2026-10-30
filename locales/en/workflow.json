@@ -1104,7 +1104,7 @@
     "description": "The next step after a refused merge of a card the merge queue returned to its builder (a conflict, failed checks, a hook)."
   },
   "workflow.refused.merge.hiveMerges.nextStale": {
-    "defaultMessage": "Its pass is stale: its line changed since it was approved (it is at {current}). Submit it again for review; it is queued once that is approved.",
+    "defaultMessage": "Its pass is stale: its line changed since it passed review (it is at {current}). Submit it again for review; it is queued once it passes again.",
     "description": "The next step after a refused merge of a card Hive merges, approved but its pass stale: its branch has commits the review didn't cover. {current} is a commit's short hash."
   },
   "workflow.refused.merge.hiveMerges.nextTesting": {

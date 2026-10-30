@@ -72,6 +72,7 @@ The words Chinese uses for Hive's terms ([glossary.md](glossary.md)). Use them e
 | agent | 智能体 | |
 | provider | 提供方 | Claude Code, Codex or Copilot. |
 | session | 会话 | |
+| turn (an agent's: a prompt and its work until it stops) | 回合 | “上一回合”, “回合结束后切换”. Never 本轮 / 一轮 / 轮次, which are a card loop's round. *In turn* / *take turns* (one after another) is 轮流 / 依次. |
 | the Assistant | 助手 | The full name *Hive Assistant* stays in English. |
 | persona / mode (the Assistant's) | 人设 / 模式 | |
 | role (an agent's) | 角色 | |
@@ -131,6 +132,8 @@ The words Chinese uses for Hive's terms ([glossary.md](glossary.md)). Use them e
 | watch (a card watch) | 监视 | |
 | verdict | 结论 | |
 | redacted / masked | 已脱敏 / 已遮盖 | Never 已编辑, which means edited. |
+| masking / masking data (API keys', Settings → Accounts & Connections) | 遮盖 / 遮盖数据 | “重置遮盖数据…”. Never 屏蔽, which reads as blocking. |
+| account / connection / Set Up (a connection's) | 账号 / 连接 / 初始设置 | Its states: 已完成初始设置 / 需要初始设置. 设置 alone is Settings. Provider Setup is 配置提供方. |
 | Storage (a project's) / Clean Up… | 存储 / 清理… | |
 | Repair (a moved workspace) | 修复 | |
 | Recycle Bin / File Explorer | 回收站 / 文件资源管理器 | |

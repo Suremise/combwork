@@ -174,7 +174,7 @@
   "panes.session.showAttachments": "Anhänge der Sitzung zeigen",
   "panes.session.starting": "{kind, select, resume {Wird fortgesetzt…} other {Wird gestartet…}}",
   "panes.stopped.label": "Gestoppt · {time}",
-  "panes.stopped.line": "Gestoppt · {time} · {why, select, you {von dir gestoppt} assistant {vom Assistenten gestoppt} agent {von einem Agenten gestoppt} lane {ihre Lane ist beendet} closed {sein Arbeitsbereich wurde geschlossen} quit {Hive wurde beendet} exited {seine CLI hat sich beendet} crashed {seine CLI hat sich mit Code {code} beendet} other {gestoppt}}",
+  "panes.stopped.line": "Gestoppt · {time} · {why, select, you {von dir gestoppt} assistant {vom Assistenten gestoppt} agent {von einem Agenten gestoppt} lane {seine Lane ist beendet} closed {sein Arbeitsbereich wurde geschlossen} quit {Hive wurde beendet} exited {seine CLI hat sich beendet} crashed {seine CLI hat sich mit Code {code} beendet} other {gestoppt}}",
   "panes.tab.failed": "Start fehlgeschlagen: {why}",
   "panes.tab.mcp": "MCP-Server: {servers}",
   "panes.tab.notRunning": "läuft nicht",

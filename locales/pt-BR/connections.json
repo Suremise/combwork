@@ -16,8 +16,8 @@
   "connections.mark.none": "Nenhuma conexão",
   "connections.mark.noneUsable": "Nenhuma conta do {cli} está ativada neste espaço de trabalho: o agente não pode ser iniciado até que uma esteja (Configurações → Contas e conexões).",
   "connections.mark.offHere": "{wanted} está em uma conta desativada neste espaço de trabalho: o agente roda em {name}, a primeira conexão utilizável da CLI dele",
-  "connections.mark.offNoDefault": "{wanted} está desativada aqui",
-  "connections.mark.offNoDefaultUsable": "{wanted} está desativada neste espaço de trabalho, e nenhuma outra conta do {cli} está ativada: o agente não pode ser iniciado até que uma esteja (Configurações → Contas e conexões).",
+  "connections.mark.offNoDefault": "A conexão {wanted} está desativada aqui",
+  "connections.mark.offNoDefaultUsable": "A conexão {wanted} está desativada neste espaço de trabalho, e nenhuma outra conta do {cli} está ativada: o agente não pode ser iniciado até que uma esteja (Configurações → Contas e conexões).",
   "connections.mark.other": "Roda em {running} até reiniciar. Escolhida agora: {chosen}",
   "connections.mark.own": "{name}: escolhida para ele",
   "connections.mark.removed": "A conexão escolhida para ele foi removida: ele roda em {name}, a primeira conexão utilizável da CLI dele, até você escolher outra nas Configurações do agente dele"

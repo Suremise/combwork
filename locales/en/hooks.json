@@ -124,7 +124,7 @@
     "description": "The Hooks dialog's button that reads the agent's hooks again."
   },
   "hooks.response": {
-    "defaultMessage": "{response, select, none {Nothing to say} context {Sent context} allowed {Allowed} warned {Allowed, with a warning} asked {Asked the user} blocked {Blocked} error {Error} other {Unknown}}",
+    "defaultMessage": "{response, select, none {Nothing to say} context {Sent context} allowed {Allowed} warned {Allowed, with a warning} asked {Asked you} blocked {Blocked} error {Error} other {Unknown}}",
     "description": "Hive's reply to a hook, in the Hooks dialog's Hive's reply column. Allowed is only what Hive answered, not any other hook's answer."
   },
   "hooks.source": {

@@ -1111,7 +1111,7 @@
   "settings.prices.unlisted": "not in {provider}'s list",
   "settings.prices.unlistedTip": "{provider} doesn't list this model now; its price stays for older sessions.",
   "settings.prices.yours": "yours",
-  "settings.project.agents.desc": "The Assistant adds agents up to the project's Maximum agents (Version Control → Workflow), and you can add more yourself, up to 24, each working in the project folder or a slot. Agents without their own settings use this project's.",
+  "settings.project.agents.desc": "The Assistant adds agents up to the project's Maximum agents (Version Control → Workflow), and you can add more yourself, up to {max, number}, each working in the project folder or a slot. Agents without their own settings use this project's.",
   "settings.project.agents.title": "Agents",
   "settings.project.cardAttachmentCleanup.desc": "Files kept with this project's cards go to the Recycle Bin this long after a card is archived. Open and Done cards keep theirs.",
   "settings.project.cardAttachmentCleanup.option.3": "3 days after archiving",

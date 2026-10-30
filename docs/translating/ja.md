@@ -57,8 +57,9 @@ Translate the meaning, not the words, and keep the result as short and plain.
   quote the whole list, 「AとB」): where a message offers `{quotedNames}`, write that, which quotes each name (「A」と「B」).
 - **Colon and parentheses:** full-width ：and （） in Japanese text; half-width : and () only around code, numbers or
   English alone (「Ctrl+K」, 「(--lang)」).
-- **Spaces:** no space between Japanese and Latin letters or numbers (「Claude Codeのセッション」, 「5分」), except where
-  the English already has one inside a name or command.
+- **Spaces:** no space between Japanese and Latin letters or numbers (「Claude Codeのセッション」, 「5分」), nor between
+  Japanese and a placeholder (「{card}の」, 「#件」, 「{n, number}個」), except where the English already has one inside a
+  name or command.
 - **Apostrophe:** Japanese has none. Before `{`, `}` or `#`, a straight apostrophe starts an ICU quotation: keep the
   English's `'{'` exactly as it is.
 - **Numbers, dates, money, durations:** formatted by Hive in the Japanese way. Never write them into a message.
@@ -137,7 +138,7 @@ The words Japanese uses for Hive's terms ([glossary.md](glossary.md)). Use them 
 | the Assistant's modes | コーディネーター、プランナー、QAトリアージ担当、リリースマネージャー | |
 | hook / timeout | フック / タイムアウト | |
 | Session tab / Sessions tab | 「セッション」タブ / 「セッション履歴」タブ | Japanese has no plural, so the Sessions tab (past conversations) is セッション履歴. |
-| Agent Settings / Project Settings | エージェント設定 / プロジェクト設定 | |
+| Agent Settings / Project Settings | エージェント設定 / プロジェクト設定 | Wherever a message names Project Settings (menus, titles, 「プロジェクト設定」→「…」, running text); never プロジェクトの設定 for it. |
 | Settings sections | 全般、外観、通知、セッション、エージェントとワークツリー、プロバイダー、アシスタント、ボード、ワークスペース、キーボードショートカット、更新、詳細、Agent API | Cited as 「設定」→「全般」→「…」. |
 | menus | ファイル、編集、表示、プロジェクト、セッション、ヘルプ | |
 | Finished (an agent's status) | 作業終了 | Never 完了, which is the Done column. |

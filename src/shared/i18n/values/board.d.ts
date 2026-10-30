@@ -386,12 +386,12 @@ interface HiveMessageValues {
   'board.inbox.failedWhy': { message: string | number }
   'board.inbox.finished': undefined
   'board.inbox.finishedCount': { n: number }
-  'board.inbox.finishedHeading': { n: string | number }
+  'board.inbox.finishedHeading': { n: number }
   'board.inbox.finishedTip': undefined
   'board.inbox.merge': undefined
   'board.inbox.needYouCount': { n: number }
   'board.inbox.needYouEmptyHeading': undefined
-  'board.inbox.needYouHeading': { n: string | number }
+  'board.inbox.needYouHeading': { n: number }
   'board.inbox.needYouThings': { agents: number; cards: number }
   'board.inbox.needsInput': undefined
   'board.inbox.needsInputWhat': { message: string | number }

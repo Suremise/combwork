@@ -45,7 +45,7 @@
   "files.attachments.tabs": "Adjuntos",
   "files.attachments.title": "Adjuntos",
   "files.attachments.total": "{host, select, assistant {{total, number} en {groups, plural, one {# conversación} many {# conversaciones} other {# conversaciones}}} other {{total, number} en {groups, plural, one {# sesión} many {# sesiones} other {# sesiones}}}}",
-  "files.attachments.totalWithCards": "{total, plural, one {# archivo} other {# archivos}} · {cards, number} en tarjetas, {sessions, number} en {groups, plural, one {# sesión} other {# sesiones}}",
+  "files.attachments.totalWithCards": "{total, plural, one {# archivo} many {# archivos} other {# archivos}} · {cards, number} en tarjetas, {sessions, number} en {groups, plural, one {# sesión} many {# sesiones} other {# sesiones}}",
   "files.attachments.unnamed": "{host, select, assistant {Conversación {id}} other {Sesión {id}}}",
   "files.attachments.view": "Ver",
   "files.collapseAll": "Contraer todo",

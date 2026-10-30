@@ -4304,8 +4304,8 @@
     "description": "A badge on a model in a price table: a model the user added."
   },
   "settings.project.agents.desc": {
-    "defaultMessage": "The Assistant adds agents up to the project's Maximum agents (Version Control → Workflow), and you can add more yourself, up to 24, each working in the project folder or a slot. Agents without their own settings use this project's.",
-    "description": "What the setting \"Agents\" does, under its title (Project Settings → Agents)."
+    "defaultMessage": "The Assistant adds agents up to the project's Maximum agents (Version Control → Workflow), and you can add more yourself, up to {max, number}, each working in the project folder or a slot. Agents without their own settings use this project's.",
+    "description": "What the setting \"Agents\" does, under its title (Project Settings → Agents). {max} is the most agents a project can have (24)."
   },
   "settings.project.agents.title": {
     "defaultMessage": "Agents",
