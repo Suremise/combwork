@@ -342,6 +342,8 @@
   "tips.paneCells.title": "Umieść agenta w dowolnym panelu",
   "tips.pasteScreenshot.text": "Naciśnij Ctrl+V w terminalu agenta, mając obraz w schowku, albo upuść na niego obraz: agent go zobaczy, a Hive zachowa kopię.",
   "tips.pasteScreenshot.title": "Wklej zrzut ekranu do sesji",
+  "tips.pauseTeam.text": "Wstrzymaj zespół, w Torach panelu Postęp, sprawia, że tory nie rozpoczynają kart, a agenci nie są budzeni, każe każdemu agentowi zaparkować i pokazuje, co nadal działa, dopóki instalacja nie będzie bezpieczna: wtedy Zainstaluj teraz.",
+  "tips.pauseTeam.title": "Wstrzymaj zespół przed aktualizacją",
   "tips.perfCompare.text": "Wydajność → Porównaj: zachowaj bieżący widok przed zmianą i ponownie po niej i sprawdź, czy ruch Hive spadł, a praca nadal została wykonana.",
   "tips.perfCompare.title": "Przed zmianą i po niej",
   "tips.performance.text": "Wydajność na pasku aktywności pokazuje, ile kosztowały API, narzędzia i instrukcje Hive w ostatnim dniu, tygodniu lub miesiącu: w całym obszarze roboczym lub w jednym projekcie. Każdy projekt ma też własną zakładkę Wydajność.",

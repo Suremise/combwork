@@ -12,7 +12,7 @@ import { sessions } from './sessions'
 import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 
 /**
- * Pausing the team before an update (HI-2081, SPEC §16.10.8; HR1's design checks s8, s10 and s12). A workspace's pause
+ * Pausing the team before an update (HI-2081, SPEC §16.10.9; HR1's design checks s8, s10 and s12). A workspace's pause
  * is saved in its `.hive/team-pause.json` before it holds anything (a failed save holds and tells nothing), and read
  * once per workspace into memory, where every gate asks it (`pausedFor`, `teamPauseOf`): lane starts, the new
  * conversations Hive starts by itself, the reviewer pool, the merge queue's next entry, and the deliveries of Hive's own

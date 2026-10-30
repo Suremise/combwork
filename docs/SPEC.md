@@ -4562,6 +4562,60 @@ decided again in it):
   0.9.3 carries on with worktrees, sessions or lanes once slots have moved them; the upgrade's ask says "Back up first:
   there's no going back to 0.9.3 once your agents' worktrees become slots."
 
+#### 16.10.9 Pausing the team before an update
+
+**Built [HI-2081]** (HR1's design checks s8, s10, s12). Seen at three installs in a day: the Assistant asked every builder
+to park, and Hive's own automation started two of them again (a lane's next card, a verdict's loop wake), while someone
+checked every agent and process by hand.
+
+- **The pause** is a workspace's, saved in `.hive/team-pause.json` (`{ pauseId, since, by }`) before anything is held or
+  told (a failed save holds and tells nothing), read once into memory, and asked by every gate; pause, resume and the gates'
+  final checks take the workspace's lock. **Pause the Team** (the Progress panel's Lanes, the command palette, Help → Check
+  for Updates' *Pause the Team First*) pauses every open workspace with one id, kept in the profile too, so a workspace
+  opened while it lasts is held by it; a workspace whose save fails is named, and the app is never parked while one isn't
+  paused. The Assistant's `hive_team` (Control agents, through `assistantChange`) pauses and resumes its own workspace only;
+  its status names another open workspace only as one line, with none of its agents; project agents are refused (`403`).
+  The same hold with the workflow rules off: it is about not starting new work.
+- **What it holds** (each at its last step, and never dropping anything):
+  - lane starts (a paused workspace's running lanes show *paused: the team is pausing*, a pausing reason, which `laneStartDue`
+    and the start's own write check both read); Hive's new conversations for a lane (fresh starts, a lane that waited for a
+    slot); a lane card's placement on its builder (`allowed` at the spawn); the reviewer pool's pass and its launches;
+    outage resume's carry-on; restart recovery's resumes (pending until the resume); the merge queue's next entry
+    (`teamPaused`, also checked in the advance's write: `held`, nothing written);
+  - deliveries of Hive's own wakes and hand-outs (`loop`, `watch`, `pool-review`; never the user's answer, and never the
+    Assistant's own): a separate admission gate (`pauseHeld`) beside a delivery's validity, asked at the offer, before each
+    key and Enter (a half-typed line is put back), at `hive_inbox`'s read, by the notices' count and at an ack. Their expiry
+    stands still while held, and is moved on by the pause's length at the resume, when each source's refresh decides what is
+    still due (offered once) and what is stale (cancelled);
+  - Start Lane (the window, `POST /v1/lanes`, `hive_lane start`) is refused (`409`, *resume the team first*). The user's own
+    actions still go: starting one agent, typing, a card's Start, Deliver Now; one that makes an agent work unparks it.
+  - No stall is reported for a paused workspace's cards (parking is what was asked), and the Assistant's unwatched-lanes
+    line (HI-2069) isn't added; after the resume each timed stall needs its own wait since the resume too.
+- **Telling the agents:** each running project agent gets one `control` delivery per pause (source `teamPause`, ref the id):
+  *The team is pausing for an update. Finish this turn, end the runs you started (tests, builds, dev servers, test copies of
+  Hive), commit your work, then end your turn. Until the team resumes Hive starts no card and sends you no card events or
+  watch wakes; a message or an answer can still reach you.*
+- **Parked** (`teamParked.ts`, a fresh scan of every open workspace each time): every agent stopped, or idle (ready, finished,
+  watching) or at a question for the user (a permission prompt, a sign-in) with nothing of its own left: no background task,
+  no open Progress run (a test run, a check in a copy, a merge, a slot's warming), no held slot writer, no process in its job
+  beyond its CLI's own. The CLI's own, by its recorded identity: the launch's gate, the CLI the gate started, and the CLI's
+  direct children that are Hive's hive server (by its script) or started with the CLI (within 2 minutes: its own MCP servers,
+  whose config Hive doesn't read); each alone, never what it started. A status Hive can't read, an unknown turn, a job that
+  can't be listed (or listed cut short), or a scan that fails is *can't be checked*, never parked. The Assistant's own turn
+  isn't counted; what it started is. A stopped agent's leftovers count.
+- **The window:** the Lanes section's band, *Pausing the team: 3 still running* with each named (*B1: npm run e2e (a run)*,
+  *R1: node (process 4120)*, *its slot slot-b is still held*), **End It…** on a process (after a question: it and what it
+  started, found again by pid and start time, never the CLI's own), or *All parked: safe to install* with **Install Now**
+  once an update is ready. Install Now scans every open workspace again in main, under their locks, and installs only if
+  each is paused and parked. The Updates dialog shows the same band. The status bar says *Team paused* (or *Team parked*).
+- **Resume** lifts the pause (the user's resumes every open workspace and the profile's): lanes look again, the pool and the
+  merge queue pass, held deliveries are rebased and offered, restart recovery resumes what waited. **After an update's
+  restart** the pause is lifted before anything reads it only when the closing record (`team-pause-closing.json`, written as
+  Hive closes, replacing any earlier one, read and removed at the next start) says the close was an install or an update and
+  names this very pause; a crash, a plain quit or an older record keeps it, and the window says *The team is still paused*
+  with **Resume the Team**.
+- **Not here:** pausing the user's own sessions (they stop with the install as before), or a pause of one project.
+
 ### 16.11 Lanes, with or without the Assistant
 
 #### 16.11.1 Hive owns the lane's card list

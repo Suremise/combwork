@@ -1,5 +1,5 @@
 /**
- * Pausing the team before an update (HI-2081, SPEC §16.10.8): a workspace's hold on Hive's own automation (lane starts,
+ * Pausing the team before an update (HI-2081, SPEC §16.10.9): a workspace's hold on Hive's own automation (lane starts,
  * loop and watch wakes, the reviewer pool's hand-outs, the new conversations Hive starts by itself, the merge queue's
  * next entry), and what still runs before it is safe to install. No imports: hive-mcp.js and the window read it too.
  */

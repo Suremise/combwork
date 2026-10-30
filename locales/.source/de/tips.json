@@ -342,6 +342,8 @@
   "tips.paneCells.title": "Put an agent in any pane",
   "tips.pasteScreenshot.text": "Press Ctrl+V in an agent's terminal with an image on the clipboard, or drop an image onto it: the agent sees it, and Hive keeps a copy.",
   "tips.pasteScreenshot.title": "Paste a screenshot into a session",
+  "tips.pauseTeam.text": "Pause the Team, in the Progress panel's Lanes, stops lanes starting cards and agents being woken, tells each agent to park, and lists what still runs until it's safe to install: then Install Now.",
+  "tips.pauseTeam.title": "Pause the team before an update",
   "tips.perfCompare.text": "Performance → Compare: keep the current view before a change and again after it, and see whether Hive’s traffic fell while the work still got done.",
   "tips.perfCompare.title": "Before and after a change",
   "tips.performance.text": "Performance, in the activity bar, shows what Hive's API, tools and guidance cost for the last day, week or month: the whole workspace or one project. Each project has its own Performance tab too.",

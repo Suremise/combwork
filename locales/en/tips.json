@@ -1371,6 +1371,14 @@
     "defaultMessage": "Paste a screenshot into a session",
     "description": "A tip's title."
   },
+  "tips.pauseTeam.text": {
+    "defaultMessage": "Pause the Team, in the Progress panel's Lanes, stops lanes starting cards and agents being woken, tells each agent to park, and lists what still runs until it's safe to install: then Install Now.",
+    "description": "A tip (HI-2081). Pause the Team, the Progress panel, Lanes and Install Now are names in Hive: keep them as Hive shows them."
+  },
+  "tips.pauseTeam.title": {
+    "defaultMessage": "Pause the team before an update",
+    "description": "A tip's title (HI-2081). 'The team' is every agent of the workspace."
+  },
   "tips.perfCompare.text": {
     "defaultMessage": "Performance → Compare: keep the current view before a change and again after it, and see whether Hive’s traffic fell while the work still got done.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
