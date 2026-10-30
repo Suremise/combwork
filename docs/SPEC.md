@@ -4465,8 +4465,9 @@ repeating them (#533) [note §8].
     `connection` and `connectionName` whatever they hold (never a refusal), and a `provider` that isn't a provider's id is
     no suggestion (before: refused). An unknown but well-formed one (a newer Hive's) is kept and flagged, never used.
     Hive's own suggest Claude Code for builders and Codex for reviewers; Team 6×6's builders lost their medium effort.
-  - **The picker** (`shared/templateConnections.ts`; the window's `TemplateConnections.tsx`, a stand-in with HI-2108's
-    `ConnectionChoice` props until that one lists connections): the options are `connectionOptions(project)`, every
+  - **The picker** (`shared/templateConnections.ts`; the window's `TemplateConnections.tsx`, each choice HI-2108's
+    `ConnectionChoice` since HI-2118, with its `empty` first choice, "Keep each one's" or "Same as its role", and the
+    connection's values under it; one the plan doesn't offer is greyed out): the options are `connectionOptions(project)`, every
     connection of each account usable in the project's workspace (on there, or the CLI's own home) whose CLI is on and
     installed, in the order (accounts', then within each); a test copy's CLI test home gets its account as an agent's
     start would. **Same for all** (`*`), else a choice per role the agents have (builder, reviewer, either, generalist),
