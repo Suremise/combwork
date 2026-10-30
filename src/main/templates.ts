@@ -827,8 +827,9 @@ async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; 
       if (!r.anyMax && n > limit) throw r.by === 'agent' ? refusal(M.nothing, { problem: templateLimitText(n, limit) }) : refusal(M.overMax, { count: n, max: limit })
       // Each one's connection as it is now (HI-1769): one turned off or removed while they were prepared stops it.
       for (const def of r.next) if (def.connection) assertConnectionHere(def.connection, def.provider!, projectPath, def.name)
-      // The layout as kept (auto when none was chosen), so undo puts back exactly what was there.
-      const saved = saves !== null && saves !== max && r.loadedMax ? saves : undefined
+      // The layout as kept (auto when none was chosen), so undo puts back exactly what was there. The template's own maximum
+      // is saved even when it equals the one inherited now, so a later change to the defaults doesn't move this team's.
+      const saved = saves !== null && r.loadedMax ? saves : undefined
       before = { agents: list, layout: now.layout ?? 'auto', ...(saved !== undefined ? { maxAgents: saved } : {}) }
       const pending = [...(Array.isArray(now.setupPending) ? now.setupPending.filter((p) => typeof p === 'string') : []), ...list.filter((a) => legacySetupPending(a)).map((a) => legacyWorktree(a)!.path)]
       return { agents: r.next, layout: r.layout, setupPending: [...new Map(pending.map((p) => [placeKey(p), p])).values()].slice(-50), ...(saved !== undefined && r.loadedMax ? ownPreferenceChange(now, r.loadedMax.platform, 'maxAgents', saved) : {}) }

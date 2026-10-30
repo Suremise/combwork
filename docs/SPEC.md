@@ -2412,7 +2412,8 @@ need to be in Advanced. A new user asking the Assistant to "get this done fast" 
 - **Templates carry it** (`TEMPLATE_CARRIED`): a saved template's workflow has its project's; Hive's own carry their
   size (Team 6 + pool: 8). **A load raises it by itself** (HI-2058, Darren's decision): the user's load with its
   workflow applied saves the template's own Maximum agents (`loadedMaxAgents`: the section's value, never under the
-  agents loaded; with none it can take, the agents' count, only ever raising the project's) with the agents, in the same
+  agents loaded, as the project's own even when it equals the inherited one, so a later change to the defaults leaves it;
+  with none it can take, the agents' count, only ever raising the project's) with the agents, in the same
   write of project.json, checked under its lock against the final list. The Load dialog says *Maximum agents goes from n
   to m for this project, saved with its agents*; the rest of its workflow is filled in for Save… as before (the option
   isn't in that overlay, so Discard Changes keeps it). Without its workflow, a load with more agents than the maximum is

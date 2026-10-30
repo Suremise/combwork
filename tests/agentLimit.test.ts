@@ -339,6 +339,15 @@ describe('Hive keeps to it', () => {
       expect(await outcome(add(beta, 'user'))).toBe('ok')
     })
 
+    it("with its workflow, its own maximum equal to the one inherited (20): saved as the project's, so lowering the defaults keeps it", async () => {
+      await setOwn(20)
+      expect(agentMax(beta, cfgOf(beta))).toBe(20)
+      await load('twenty.json', true)
+      expect(ownMax()).toBe(20)
+      await setOwn(8)
+      expect(agentMax(beta, cfgOf(beta))).toBe(20)
+    })
+
     it('with its workflow and no maximum of its own: raised to its agents (14), never lowered', async () => {
       await load('nomax.json', true)
       expect(ownMax()).toBe(14)
