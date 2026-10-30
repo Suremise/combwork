@@ -126,11 +126,24 @@ describe('the session contract', () => {
   it("adds the journal's rule and scope while the journal is on, and nothing while it is off (#1032)", () => {
     expect(withJournal(assistant, null)).toBe(assistant)
     const on = withJournal(assistant, ['decision', 'plan'])
-    expect(on.startsWith(assistant)).toBe(true)
-    const rule = on.slice(assistant.length)
+    // HI-2048 (K12): its skills line leaves out handover while the journal is on; the rest is as it was.
+    const skillsOff = assistant.split('\n').find((l) => l.startsWith("Hive's skills cover"))!
+    expect(skillsOff).toMatch(/, handover, pick-up and workspace-note\.$/)
+    const skillsOn = on.split('\n').find((l) => l.startsWith("Hive's skills cover"))!
+    expect(skillsOn).toMatch(/, pick-up and workspace-note\.$/)
+    expect(skillsOn).not.toMatch(/handover/)
+    const base = assistant.replace(skillsOff, skillsOn)
+    expect(on.startsWith(base)).toBe(true)
+    const rule = on.slice(base.length)
     expect(rule).toMatch(/the journal skill/)
     expect(rule).toMatch(/Its scope \(what the user lets you store\): decision, plan, and weekly digests/)
-    expect(rule).toMatch(/It replaces your handovers: asked for one, say why it isn't needed/)
+    // Only the case where the user still wants one; saying why it isn't needed is the journal skill's (#989).
+    expect(rule).toMatch(/It replaces your handovers: one the user still wants \(for another agent or a person\) is the handover skill's\./)
+    expect(rule).not.toMatch(/isn't needed/)
+    expect(catalog.get('journal')?.text).toMatch(/asked for one, say so in a line/)
+    // An agent's contract has no such line: it only gains the rule.
+    const agentContract = hiveInstructions('web')
+    expect(withJournal(agentContract, ['decision']).startsWith(agentContract)).toBe(true)
     expect(catalog.get('journal')?.audience).toBe('assistant')
     for (const t of toolsNamed(rule)) expect(assistantTools('projects', false, true), t).toContain(t)
     expect(journalRule(['decision', 'plan', 'event', 'incident', 'insight', 'preference', 'moment']).length).toBeLessThan(600)
