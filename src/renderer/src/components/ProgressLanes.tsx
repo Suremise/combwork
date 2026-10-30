@@ -281,15 +281,19 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
     if (row) watch.observe(row)
     return () => watch.disconnect()
   }, [open, lanes, width, full])
+  // No lanes: the paused team's band still shows (HI-2095: Show Its Window brings forward a workspace with none, to End It there).
   if (!lanes.length)
     return full ? (
       <div className="pane-empty progress-empty">
+        <TeamPauseBand />
         <p>{tr(msg({ id: 'board.lanes.none', defaultMessage: 'No lanes. When a builder and a reviewer work through cards in turn (a card loop), their lane shows here with each card.', description: "The Progress panel's Lanes tab when there are no lanes. Glossary: lane." }))}</p>
         <button type="button" className="btn small progress-lanes-start" onClick={() => openLaneStart(null)}>
           <Icon name="add" /> {tr(START_LANE)}
         </button>
       </div>
-    ) : null
+    ) : (
+      <TeamPauseBand />
+    )
   const { chosen, shown, min, max } = laneRowsNow(kept, lanes.length, room, pitch, fallback)
   // The legend (#1421): the stages the lanes shown have (old rules' too), by category, on the Lanes bar's hover and focus.
   const legend = laneLegend(legendSources(lanes, (p) => stages.get(p.toLowerCase()), badges), tr)

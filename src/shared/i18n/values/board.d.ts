@@ -888,10 +888,13 @@ interface HiveMessageValues {
   'board.team.pauseFirst': undefined
   'board.team.pausing': { n: number }
   'board.team.resume': undefined
+  'board.team.showWindow': undefined
+  'board.team.showWindowTitle': undefined
   'board.team.stillPaused': undefined
   'board.team.stillPausedBody': undefined
   'board.team.stillPausedResume': undefined
   'board.team.thisWorkspace': undefined
+  'board.team.windowGone': { name: string | number }
   'board.toolbar.archived': { n: number }
   'board.toolbar.forYou': { n: number }
   'board.toolbar.more': undefined
