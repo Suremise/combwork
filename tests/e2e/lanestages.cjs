@@ -38,8 +38,9 @@ const beta = path.join(fx.ws, 'beta')
     // Pair-like, Hive merges into integration, your OK for cards labelled ui (so one waits in Approved).
     const options = q.queueOptions(fx, { okBefore: { mode: 'labels', labels: ['ui'] } })
     await inv('workflow:setOptions', fx.alpha, { preset: 'pair', options })
+    // Solo, its Maximum agents raised to 2 as a user would (HI-2091): beta's two lanes below each add an agent.
     const soloOptions = (await inv('workflow:form', beta)).presets.find((p) => p.id === 'solo')?.options
-    await inv('workflow:setOptions', beta, { preset: 'solo', options: soloOptions })
+    await inv('workflow:setOptions', beta, { preset: 'solo', options: { ...soloOptions, maxAgents: 2 } })
     const workspaceToken = JSON.parse(fs.readFileSync(path.join(fx.userData, 'agent-api.json'), 'utf8')).token
     const api = async (method, route, body) => {
       const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
