@@ -3,7 +3,8 @@
 // (`POST /v1/lanes` `brief`), then its first card: Hive places it in its slot in a new conversation, and that
 // conversation's first prompt carries the card and the brief. Then, in its turn, it edits the brief and moves on to the
 // next card; Hive is quit with that card's placement owed (B1 busy), and the next start resumes B1's conversation there
-// (HI-1746) with the card and the edited brief.
+// (HI-1746) with the card and the edited brief. A list change racing a lane's end (HI-2097): a script's start just after
+// B2's lane ended carries its brief and name, leaves out the Done card, and POST /v1/lanes' note says so.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -129,7 +130,27 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     }, HUNG_MS)
     check('2. …that same conversation, in its slot', back?.sessionId === working.sessionId, JSON.stringify(back))
     check("2. …its prompt carries card two and the edited brief", !!(await until(async () => /LANE-BRIEF-TWO: card two now\./.test(await transcript(working.sessionId)), HUNG_MS)), (await transcript(working.sessionId)).slice(-800))
-  } catch (e) {
+
+    // --- 3. A list change racing its lane's end (HI-2097): B2's lane ends as its card is Done; a script's start for B2
+    // with that card and a new one, no brief, makes a new lane with the ended lane's brief and name, the Done card left
+    // out, and POST /v1/lanes' note says both, beside where the brief goes and the running builder left as it is.
+    const b2 = await lib.addAgent(inv, alpha, { name: 'B2', workflowRole: 'builder' })
+    // Card three already Done (the merged one), card four still to do.
+    const c3 = (await inv('tasks:create', { title: 'Brief three', project: 'alpha', column: 'done' })).number
+    const c4 = await create('Brief four')
+    const t3 = await tokenOf(b2.id)
+    const first = await api(t3, '/v1/lanes', { cards: [c4], name: 'Race lane', brief: 'LANE-BRIEF-THREE: two heavy slots.' })
+    check('3. B2 starts its lane with a brief and a name', first.status === 200, JSON.stringify(first.body))
+    const firstId = first.body?.data?.lane?.id ?? first.body?.lane?.id
+    // Ended (not abandoned) by the user, as a lane ends once its cards merge.
+    await inv('lanes:end', firstId, false)
+    check('3. …and it ends', !!(await until(async () => (await inv('lanes:list')).find((l) => l.id === firstId && l.state === 'ended'), HUNG_MS)), JSON.stringify((await inv('lanes:list')).find((l) => l.id === firstId)))
+    const scriptToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
+    const raced = await api(scriptToken, '/v1/lanes', { project: 'alpha', builder: 'B2', cards: [c3, c4] })
+    const r3 = raced.body?.data ?? raced.body
+    const note3 = r3?.note ?? ''
+    check("3. a script's start just after: a new lane, the Done card left out", raced.status === 200 && r3?.did === 'started' && r3?.lane?.id !== firstId && r3?.lane?.name === 'Race lane' && JSON.stringify(r3?.lane?.cards?.map((c) => c.number)) === JSON.stringify([c4]), JSON.stringify(raced.body))
+    check("3. …its note says the brief and name were carried and the Done card left out, beside where the brief goes and who runs", /had just ended \(all merged\): started a new lane with its brief and name/.test(note3) && /is already Done: left out/.test(note3) && /Its brief is given with each of its cards/.test(note3) && /B2 is running/.test(note3), note3)  } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
   } finally {
     await h?.app.close().catch(() => {})

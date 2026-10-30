@@ -1983,7 +1983,8 @@ route('POST', '/v1/lanes', async ({ body }) =>
       let launched = ''
       if (!a && r.did === 'started') launched = recordedLaneNote(await launchRecordedLane(ws, p, r.lane.id))
       else if (!a && r.did === 'updated') launched = await resumeLaneBuilder(p, r.lane)
-      const notes = [note, told, launched].filter(Boolean).join(' ')
+      // The lane's own note first (an "Applied now:" stays its start; HI-2097's carried brief and Done cards left out).
+      const notes = [r.note, note, told, launched].filter(Boolean).join(' ')
       return notes ? { ...r, note: notes } : r
     }
     if (!assistantCaller()) return start()
