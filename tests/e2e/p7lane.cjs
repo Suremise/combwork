@@ -756,13 +756,15 @@ async function gallery(h, kept) {
   check(`${b3.name}'s pane says "in slot-a"`, !!(await until(async () => (await place.innerText().catch(() => '')) === 'in slot-a', HUNG_MS)), JSON.stringify({ shown: await place.innerText().catch(() => null), place: await placeNow() }))
   await shoot('pane-in-slot', { loc: lib.paneHeader(page, b3.name) })
   await lib.showAgent(page, b1.name, HUNG_MS)
-  const refused = page.locator('.toast').last()
   await shoot('resume-refused', {
-    open: async () => {
+    open: async (lang) => {
       await clearToasts()
-      const before = await page.locator('.toast').count()
       await lib.paneHeader(page, b1.name).locator('button.act-resume').first().click()
-      await until(async () => (await page.locator('.toast').count()) > before, HUNG_MS)
+      // HI-2125: the refusal itself, by its title, not the last notice to come: another (a 6 s one) could raise the
+      // count and be gone before the shot, which then waited for a notice that wasn't there.
+      const title = lang === 'de' ? german['actions.resume.heldTitle'] : "Can't resume here now"
+      const refused = page.locator('.toast', { has: page.locator('.toast-title', { hasText: title }) }).last()
+      if (!(await until(async () => (await refused.count()) > 0, HUNG_MS))) throw new Error(`the resume refusal wasn't shown; the notices: ${JSON.stringify(await page.locator('.toast').allInnerTexts())}`)
       return refused
     }
   })
