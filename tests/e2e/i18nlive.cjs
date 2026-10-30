@@ -3,9 +3,10 @@
 // no command a clash with itself, and two commands whose names translate alike still show a real clash. A stopped
 // session's transcript, open, shows Hive's own notices in the new language at once, with its file unchanged (#797).
 // Project Settings opened in another language shows its sections (the list, the heading and its description) and its
-// rows in it, and follows a change of language while it is open (#793, E1's catalogue in lane C's view); its provider
-// section's permission mode row says what the mode does, and names its choices, in it too, their values the ids (#861). An
-// agent whose sign-in expired says how to sign in with its provider's message in the window's language (#847). A card on
+// rows in it, and follows a change of language while it is open (#793, E1's catalogue in lane C's view). A connection's
+// dialog names its permission modes in it, their values the ids, and a running agent's mode menu says what a mode does
+// in it (#861; modes are a connection's since HI-2107). An agent whose sign-in expired says how to sign in with its
+// provider's message in the window's language (#847). A card on
 // the Task Board, drawn only when what it shows changes, follows a change of language with the card unchanged (HI-1806). The
 // window is sent language-changed as main sends it, with a small catalogue of test translations. Throwaway profile and
 // workspace.
@@ -117,25 +118,37 @@ const check = (name, ok, extra = '') => {
     await speak('en', {})
     check('…and follows a change of language while it is open', !!(await shows({ label: 'General', desc: 'The project’s key, which names its cards, and the provider its new agents use.', row: 'Project key' })), await seen())
 
-    // Its provider section (#861): the permission mode row says what the mode in use does, and names its choices, in the
-    // window's language, following a change while it is open; the choices' values stay the modes' ids.
+    // A Claude Code connection's permission mode (#861; a connection's since HI-2107, in Settings → Accounts &
+    // Connections): its choices named in the window's language, the CLI default's naming the mode it is, following a
+    // change while the dialog is open; the choices' values stay the modes' ids. A test copy on its CLI test home lists no
+    // account (that home isn't shown in Settings), so one is added for it, never signed in; Settings lists the accounts of
+    // the CLIs turned on, so Claude Code is turned on.
     const DE_MODES = { 'agents.claude.auto': 'Automatisch', 'agents.claude.autoDescription': 'Ein Klassifikator genehmigt risikoarme Aktionen selbst.', 'agents.claude.manual': 'Manuell' }
     await speak('de', DE_MODES)
-    await page.locator('.settings-nav .row', { hasText: 'Claude Code' }).first().click()
-    const modeSelect = page.locator('.settings-content select:has(option[value="acceptEdits"])')
-    const modes = async () => ({ text: await content.innerText().catch(() => ''), options: await modeSelect.locator('option').evaluateAll((os) => os.map((o) => [o.value, o.textContent.trim()])).catch(() => []) })
+    await inv('settings:update', { providers: { 'claude-code': { enabled: true, checkUpdatesOnLaunch: false } } })
+    const account = (await inv('connections:list')).connections.find((a) => a.provider === 'claude-code') ?? (await inv('connections:add', 'claude-code', 'Modes in two languages'))
+    await command('settings.accounts')
+    const connectionRow = page.locator(`[data-connections-of="${account.id}"] [data-connection]`).first()
+    check("Settings → Accounts & Connections lists the account's connection", !!(await lib.until(async () => (await connectionRow.count()) === 1, HUNG_MS)))
+    await connectionRow.locator('[data-action="connection-menu"]').click({ timeout: HUNG_MS })
+    await page.locator('.menu .menu-item', { hasText: 'Edit…' }).first().click({ timeout: HUNG_MS })
+    const form = page.locator('[data-connection-form]')
+    const modeSelect = form.locator('select[data-mode]')
+    const modes = async () => ({ options: await modeSelect.locator('option').evaluateAll((os) => os.map((o) => [o.value, o.textContent.trim()])).catch(() => []) })
     const modesIn = (want) => lib.until(async () => {
       const m = await modes()
       const label = Object.fromEntries(m.options)
-      return m.text.includes(want.desc) && label.manual === want.manual && label.auto === want.auto && label.inherit?.includes(want.auto) ? m : null
+      return label.manual === want.manual && label.auto === want.auto && label['']?.includes(want.auto) ? m : null
     }, HUNG_MS)
-    const inGerman = await modesIn({ desc: DE_MODES['agents.claude.autoDescription'], manual: 'Manuell', auto: 'Automatisch' })
-    check('the provider section says what the permission mode does, and names its choices, in German', !!inGerman, JSON.stringify(await modes()))
+    const inGerman = await modesIn({ manual: 'Manuell', auto: 'Automatisch' })
+    check("a connection's dialog names its permission modes, and the CLI default's, in German", !!inGerman, JSON.stringify(await modes()))
     await speak('en', {})
-    const inEnglish = await modesIn({ desc: 'A safety classifier approves low-risk actions itself and only asks about risky ones.', manual: 'Manual', auto: 'Auto' })
+    const inEnglish = await modesIn({ manual: 'Manual', auto: 'Auto' })
     check('…and follows a change of language while it is open', !!inEnglish, JSON.stringify(await modes()))
     const ids = (m) => JSON.stringify(m?.options.map(([v]) => v))
     check('…its choices keep the modes’ ids', !!inGerman && ids(inGerman) === ids(inEnglish) && inEnglish.options.some(([v]) => v === 'manual') && inEnglish.options.some(([v]) => v === 'auto'), `${ids(inGerman)} ${ids(inEnglish)}`)
+    await page.locator('.dialog').last().getByRole('button', { name: 'Cancel' }).click()
+    await form.waitFor({ state: 'detached', timeout: HUNG_MS })
 
     // An agent whose sign-in expired (#847): its tab's hover says how to sign in with the provider's own message in the
     // window's language, not its English, and in English again after a change of language. Its state is sent as main
@@ -157,6 +170,25 @@ const check = (name, ok, extra = '') => {
     check("an agent that needs sign-in: its hover says how to sign in in the window's language", !!(await tipSays(help)))
     await speak('en', {})
     check('…and in English after a change of language', !!(await tipSays('Type /login in one of its agents’ terminals')))
+
+    // Running in Manual, its mode menu (#861: where a mode's description is shown since HI-2107) says what Auto does in
+    // the window's language, following a change while the menu is open. Sent as main sends it, again until the badge
+    // shows it running, in case a refresh replaced it.
+    const running = { ...signedOut, runId: 'i18nlive-running', status: 'ready', runtime: { lifecycle: 'running', maintenance: null, attention: null, composer: 'free' }, permissionMode: 'manual', signIn: undefined }
+    const badge = page.locator('.agent-pane').filter({ has: page.locator('.pane-header-bar .agent-name', { hasText: /^Signer$/ }) }).locator('.pane-footer-bar .mode-badge')
+    const menuText = async () => (await page.locator('.menu .menu-item').allInnerTexts().catch(() => [])).join(' | ')
+    await speak('de', DE_MODES)
+    const opened = await lib.until(async () => {
+      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state: running })
+      if (!(await badge.evaluate((b) => b.classList.contains('live')).catch(() => false))) return false
+      if (!(await page.locator('.menu').count())) await badge.click().catch(() => undefined)
+      return (await menuText()).includes(DE_MODES['agents.claude.autoDescription'])
+    }, HUNG_MS)
+    check("a running agent's mode menu says what Auto does in German", !!opened, await menuText())
+    await speak('en', {})
+    check('…and follows a change of language while it is open', !!(await lib.until(async () => (await menuText()).includes('A safety classifier approves low-risk actions itself and only asks about risky ones.'), HUNG_MS)), await menuText())
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await page.locator('.menu').count()) === 0, HUNG_MS)
 
     // A closed row in the Progress panel's Runs tab (#1309), drawn only when its run changes (#1108), follows a change
     // of language with nothing clicked and its run unchanged: a script's run, ended.
