@@ -3391,6 +3391,10 @@
     "defaultMessage": "{status}. Choose it once it's idle.",
     "description": "Under a busy agent in the Start dialog, which can't take the card yet: what it is doing ({status}: \"Working\")."
   },
+  "board.start.checkingConnection": {
+    "defaultMessage": "Finding out which coding agents are installed, to choose the first connection that can run…",
+    "description": "Under the new agent's choice of connection in the Start dialog (HI-2121) while Hive still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Start waits until then."
+  },
   "board.start.idle": {
     "defaultMessage": "{status}: gets the card as its next message.",
     "description": "Under an idle agent in the Start dialog: what it is doing ({status}: \"Ready\", \"Finished\"), and that the card is typed to it next."
@@ -3427,17 +3431,9 @@
     "defaultMessage": "OK",
     "description": "Button: closes the Start dialog of a card that has no project."
   },
-  "board.start.projectDefault": {
-    "defaultMessage": "Project default ({provider})",
-    "description": "The Start dialog's provider choice: the project's default CLI ({provider}, its name)."
-  },
   "board.start.projectGone": {
     "defaultMessage": "{project} isn't a project in this workspace.",
     "description": "Why a card can't start: its project ({project}) isn't in the workspace."
-  },
-  "board.start.provider": {
-    "defaultMessage": "Provider",
-    "description": "A field label in the Start dialog: the new agent's CLI (Claude Code, Codex…)."
   },
   "board.start.providerOff": {
     "defaultMessage": "{provider} is turned off.",

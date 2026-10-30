@@ -4,7 +4,8 @@
 // never a folder; another one asked after by id or name is 404 to an agent); the Assistant adds and changes agents by
 // connection name or id (two sharing a name: 409; unknown: 404; one whose account is off here: 409), provider, model,
 // effort, mode and context200k refused naming the connections to use (decision D), an unrelated change keeping it and
-// null giving its CLI's first usable one; hive_connection makes and changes a connection only with Change settings on;
+// null giving its CLI's first usable one; a card started on a new agent takes connection the same way, provider refused
+// (HI-2121); hive_connection makes and changes a connection only with Change settings on;
 // the status shows the chosen connection and the account it runs on. The fake Claude Code signs in, no browser.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -140,6 +141,19 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('…null: its CLI’s first usable one (HI-2106, decision H)', (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Vianame')?.connection?.id === c1)
     const projectAgent = await api('POST', '/v1/projects/alpha/agents', { name: 'Sneaky', connection: 'Max 1' }, agentToken)
     check('a project agent may not add agents (403), connection or not', projectAgent.status === 403, JSON.stringify(projectAgent))
+
+    // --- hive_start_task on a new agent (HI-2121): connection as hive_add_agent takes it; provider refused (decision D).
+    const card = (await api('POST', '/v1/tasks', { title: 'Started by connection', project: 'alpha' })).body?.number
+    const column = async () => (await api('GET', `/v1/tasks/${card}`)).body?.column
+    const oldStart = await asAssistant('POST', `/v1/tasks/${card}/start`, { name: 'Bystart', provider: 'claude-code' })
+    check("a start on a new agent with provider: 400, naming the first usable account's connections; nothing added or moved", oldStart.status === 400 && /provider/.test(oldStart.body?.error ?? '') && /On Max 1: Max 1/.test(oldStart.body?.error ?? '') && (await column()) === 'todo' && !(await api('GET', '/v1/projects/alpha')).body?.agents?.some((a) => a.name === 'Bystart'), JSON.stringify(oldStart))
+    const withAgent = await asAssistant('POST', `/v1/tasks/${card}/start`, { agent: 'One', connection: 'Max 2' })
+    check('…a connection with an existing agent: 400, nothing moved', withAgent.status === 400 && /new agent/.test(withAgent.body?.error ?? '') && (await column()) === 'todo', JSON.stringify(withAgent))
+    const offStart = await asAssistant('POST', `/v1/tasks/${card}/start`, { name: 'Bystart', connection: 'Other' })
+    check('…a connection not usable here: 404, nothing moved', offStart.status === 404 && (await column()) === 'todo', JSON.stringify(offStart))
+    const started = await asAssistant('POST', `/v1/tasks/${card}/start`, { name: 'Bystart', connection: 'max 2', reply: 'short' })
+    const starter = (await api('GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.name === 'Bystart')
+    check('…by connection name: a new agent on Max 2, its CLI Claude Code, the card in Doing', started.status === 200 && started.body?.added === true && starter?.connection?.id === c2 && starter?.provider === 'claude-code' && (await column()) === 'doing', JSON.stringify({ status: started.status, body: started.body?.error ?? starter }))
 
     // --- hive_connection (HI-2108): the Assistant makes and changes a connection, only with Change settings on.
     const before = (await inv('connections:list')).connectionRows.length

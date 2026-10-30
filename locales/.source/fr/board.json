@@ -847,6 +847,7 @@
   "board.stalled.startFailed": "{agent}'s start failed: {why}",
   "board.stalled.wakeUntaken": "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.",
   "board.start.busy": "{status}. Choose it once it's idle.",
+  "board.start.checkingConnection": "Finding out which coding agents are installed, to choose the first connection that can run…",
   "board.start.idle": "{status}: gets the card as its next message.",
   "board.start.intro": "The agent gets the card as its prompt (title and description), and the card moves to Active. A stopped agent starts a new conversation; an idle one gets it as its next message.",
   "board.start.name": "Name",
