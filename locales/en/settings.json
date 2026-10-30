@@ -1499,6 +1499,14 @@
     "defaultMessage": "Lanes: let the builder finish when its lane ends",
     "description": "An advanced setting's title (Settings → Advanced), listed under Hive. A lane is a card loop: a builder and a reviewer taking cards in turn."
   },
+  "settings.advanced.hive.lanes.unwatchedNotice.desc": {
+    "defaultMessage": "When the Hive Assistant is about to end its turn while lanes are running and no watch of its covers them, Hive keeps it going once to say so, naming the lanes' builders, so it watches them before it finishes. Turned off, its turn ends as its CLI ends it, and nothing wakes it about those lanes until it watches them again.",
+    "description": "What the advanced setting \"Lanes: remind the Assistant to watch them\" does (Settings → Advanced, under Hive). A lane is a card loop; a watch is what wakes an agent when the cards or lanes it follows change."
+  },
+  "settings.advanced.hive.lanes.unwatchedNotice.title": {
+    "defaultMessage": "Lanes: remind the Assistant to watch them",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. A lane is a card loop: a builder and a reviewer taking cards in turn; the Assistant is the Hive Assistant."
+  },
   "settings.advanced.hive.lanes.waitReviewerMinutes.desc": {
     "defaultMessage": "After how long a lane whose card waits in Review with nobody reviewing it has its wait marked in the Progress panel's Lanes. Too short marks every review; too long, a card can sit unreviewed.",
     "description": "What the advanced setting \"Lanes: a long wait for a reviewer\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

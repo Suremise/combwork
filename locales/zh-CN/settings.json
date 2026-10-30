@@ -376,6 +376,8 @@
   "settings.advanced.hive.lanes.endWaitMinutes.title": "通道：通道结束等待构建者的最长时间",
   "settings.advanced.hive.lanes.gentleEnd.desc": "当通道的最后一张卡片合并（或通道被放弃）时，Hive 会等待其构建者的回合结束，告诉它通道已完成并附上每张卡片的合并提交，然后用该 CLI 自己的退出命令结束它的 CLI，只有在它不退出时才强制结束。在此之前槽位仍归它所有。关闭后，Hive 会像以前一样，在构建者的会话第一次空闲时就停止它。",
   "settings.advanced.hive.lanes.gentleEnd.title": "通道：通道结束时让构建者完成",
+  "settings.advanced.hive.lanes.unwatchedNotice.desc": "当 Hive Assistant 要结束回合，而有通道在运行且它的监视都没有覆盖这些通道时，Hive 会让它继续一次并告诉它这一点，列出这些通道的构建者，让它在结束前监视它们。关闭后，它的回合按其 CLI 的方式结束，在它重新监视之前，没有任何东西会因这些通道唤醒它。",
+  "settings.advanced.hive.lanes.unwatchedNotice.title": "通道：提醒助手监视它们",
   "settings.advanced.hive.lanes.waitReviewerMinutes.desc": "卡片在审查中等待但无人审查的通道，在“进度”面板的“通道”中等待多久后被标出。太短会标出每次审查；太长则卡片可能一直无人审查。",
   "settings.advanced.hive.lanes.waitReviewerMinutes.title": "通道：等审查者太久",
   "settings.advanced.hive.lanes.waitYouMinutes.desc": "等你处理的通道（“给你”中的请求，或达到轮次上限的卡片）在“进度”面板的“通道”中等待多久后被标出。太短会标出每次等待；太长则通道可能停着无人察觉。",
