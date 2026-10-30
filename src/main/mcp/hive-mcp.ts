@@ -917,7 +917,7 @@ const tools: Tool[] = [
       'Start a card on an agent of its project (stopped or idle; none named: a new one): it moves to doing and the card is its prompt. For more work on one in review or done, note says what now. Follow with hive_wait_for_agents.',
     inputSchema: {
       type: 'object',
-      properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: 'What to do now, added to the card in the prompt.' }, name: { type: 'string', description: "A new agent's name." }, connection: { type: 'string', description: "A new agent's connection, by id or name (hive_connection): its model, effort, mode and CLI. Default: the first usable here." } },
+      properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: 'What to do now, added to the card in the prompt.' }, name: { type: 'string', description: "A new agent's name." }, connection: { type: 'string', description: "A new agent's connection, by id or name (hive_connection): model, effort, mode and CLI. Default: the first usable here." } },
       required: ['number']
     },
     run: async (a) => {
