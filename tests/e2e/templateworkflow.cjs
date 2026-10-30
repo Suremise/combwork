@@ -125,7 +125,9 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     await loadButton(load).click()
     const banner = page.locator('[data-from-template="Team A"]')
     check('loaded: Version Control → Workflow opens with it filled in, saying so, the missing command flagged', !!(await until(async () => (await banner.count()) === 1 && (await banner.locator('[data-template-no-command]').getAttribute('data-template-no-command')) === 'unit')), await text(page.locator('.vc-view')))
-    check('…and nothing saved yet', JSON.stringify(workflowOf(gitb)) === gitbBefore, JSON.stringify(workflowOf(gitb)))
+    // Only its Maximum agents is saved, with its agents (HI-2058): gita's 12, as gitb's own even though it inherits 12.
+    const withoutMax = (w) => (w ? { ...w, options: Object.fromEntries(Object.entries(w.options ?? {}).filter(([k]) => k !== 'maxAgents')) } : w)
+    check('…and nothing else saved yet: its Maximum agents saved with its agents', JSON.stringify(withoutMax(workflowOf(gitb))) === JSON.stringify(withoutMax(gitbBefore === undefined ? undefined : JSON.parse(gitbBefore))) && workflowOf(gitb)?.options?.maxAgents === 12, JSON.stringify(workflowOf(gitb)))
     await shoot('3-filled', () => page.locator('.vc-view'))
     await page.locator('.workflow-actions [data-action="save"]').click()
     const confirmSave = page.locator('.dialog', { hasText: 'Save' }).last()
@@ -243,6 +245,63 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     writeRounds(9)
     await loadButton(again2).click()
     check('changed after the dialog last read it: the load says so, and fills nothing in', !!(await until(async () => (await page.locator('.toast', { hasText: 'changed while it loaded' }).count()) === 1)) && (await page.locator('[data-from-template]').count()) === 0)
+
+    // --- HI-2067 (HI-2033's fix): a preset chosen while the template's read of the form waits stays chosen. main's
+    // workflow:form for gitb answers from the form as it is now, each read held until the test lets it go (as
+    // workflowoptions' late reads); the form's own first read let through, the template's held, Team chosen and used,
+    // then the template's answered: it is dropped, and Save… saves Team with gitb's target and command. Last here: the
+    // handler stays replaced until the app closes.
+    const lateFile = path.join(ws, '.hive', 'templates', 'late.json')
+    fs.writeFileSync(lateFile, JSON.stringify({ version: 2, name: 'Late', savedAt: new Date().toISOString(), layout: 'auto', agents: [{ name: 'LT-B1', role: 'builder', provider: 'claude-code' }], workflow: { git: { preset: null, options: { loopRounds: 7 } } } }))
+    await inv('templates:list', gitb)
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
+    const model = await inv('workflow:form', gitb)
+    const others = { [gita.toLowerCase()]: await inv('workflow:form', gita), [plain.toLowerCase()]: await inv('workflow:form', plain) }
+    await app.evaluate(({ ipcMain }, [p, m, o]) => {
+      globalThis.__late = { hold: false, held: [] }
+      ipcMain.removeHandler('workflow:form')
+      ipcMain.handle('workflow:form', (_e, x) => {
+        const s = globalThis.__late
+        if (String(x).toLowerCase() !== p.toLowerCase()) return o[String(x).toLowerCase()]
+        return s.hold ? new Promise((r) => s.held.push(r)) : m
+      })
+    }, [gitb, model, others])
+    const hold = (on) => app.evaluate((_, v) => void (globalThis.__late.hold = v), on)
+    const heldNow = () => app.evaluate(() => globalThis.__late.held.length)
+    const release = () => app.evaluate((_, m) => void globalThis.__late.held.splice(0).forEach((r) => r(m)), model)
+    await hold(true)
+    await lib.addMenuRun(page, 'Templates')
+    if (!(await until(async () => (await menuItems()).includes('Late')))) {
+      await page.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
+      await lib.addMenuRun(page, 'Templates')
+      await until(async () => (await menuItems()).includes('Late'))
+    }
+    await item('Late').click()
+    const late = loadDialog('Late')
+    await until(async () => (await loadButton(late).count()) === 1 && (await loadButton(late).isEnabled()))
+    await loadButton(late).click()
+    // The form's first read let through; once the form shows, the template's own read is the one held.
+    const team = page.locator('.workflow-form .workflow-choice[data-choice="team"]')
+    check("Late loaded: the form's first read is held", !!(await until(async () => (await heldNow()) > 0)))
+    await release()
+    check("…let through, the form shows while the template's read is held, nothing filled in yet", !!(await until(async () => (await team.count()) === 1 && (await heldNow()) > 0)) && (await page.locator('[data-from-template]').count()) === 0)
+    await team.click()
+    const teamPreview = page.locator('.workflow-form .workflow-preview')
+    await teamPreview.waitFor({ timeout: HUNG_MS })
+    await teamPreview.locator('[data-action="use-choice"]').click()
+    await teamPreview.waitFor({ state: 'detached', timeout: HUNG_MS })
+    await release()
+    await hold(false)
+    // A read of the window's own answered after it: the held answer has been taken (or dropped) by then.
+    await inv('workflow:form', gitb)
+    check("Team chosen while the template's read waited stays chosen: the read's answer is dropped, nothing of Late filled in", !!(await until(async () => (await page.locator('.workflow-form .workflow-choice.current[data-choice="team"]').count()) === 1)) && (await page.locator('[data-from-template]').count()) === 0 && (await page.locator('[data-option="loopRounds"] input').inputValue().catch(() => '')) !== '7', JSON.stringify({ current: await page.locator('.workflow-form .workflow-choice.current').getAttribute('data-choice').catch(() => null), filled: await text(page.locator('[data-from-template]')) }))
+    await page.locator('.workflow-actions [data-action="save"]').click()
+    const confirmLate = page.locator('.dialog', { hasText: 'Save' }).last()
+    await until(async () => (await confirmLate.getByRole('button', { name: 'Save', exact: true }).count()) === 1)
+    await confirmLate.getByRole('button', { name: 'Save', exact: true }).click()
+    check("…saved as Team, with gitb's target and command, never Late's rounds", !!(await until(() => workflowOf(gitb)?.preset === 'team' && saved().finish === 'hiveMerges')) && saved().target === 'main' && saved().commands?.lint === 'pnpm lint' && saved().loopRounds !== 7, JSON.stringify(workflowOf(gitb)))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

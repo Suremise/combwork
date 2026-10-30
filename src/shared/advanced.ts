@@ -229,6 +229,8 @@ export const LANES_GENTLE_END = 'hive.lanes.gentleEnd'
 
 /** The longest a lane's end waits for its builder's turn to end, in minutes (HI-1706): read by main's slotsApp. */
 export const LANES_END_WAIT_MINUTES = 'hive.lanes.endWaitMinutes'
+/** The longest Hive keeps trying to start a lane's busy agent in its new conversation, in minutes (HI-2034): read by main's laneStarts. */
+export const LANES_FRESH_START_WAIT_MINUTES = 'hive.lanes.freshStartWaitMinutes'
 
 /**
  * Settings Hive no longer has, dropped quietly from advanced.json as it is read (and so at its next write), never listed
@@ -975,6 +977,22 @@ const SOURCES: readonly AdvancedSource[] = [
       id: 'settings.advanced.hive.lanes.endWaitMinutes.desc',
       defaultMessage: "How long, from a lane's end, Hive waits for its builder to finish its turn and read that the lane is finished. Past it, Hive ends the builder's CLI anyway: with its exit command, or killed when that can't be typed (your draft is in its prompt) or doesn't end it.",
       description: 'What the advanced setting "Lanes: longest a lane\'s end waits for its builder" does (Settings → Advanced, under Hive). A lane is a card loop.'
+    }),
+    kind: 'number',
+    default: 10,
+    min: 1,
+    max: 120,
+    unit: 'min',
+    applies: 'now'
+  },
+  {
+    id: LANES_FRESH_START_WAIT_MINUTES,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lanes.freshStartWaitMinutes.title', defaultMessage: "Lanes: longest Hive waits to start a busy agent afresh", description: "An advanced setting's title (Settings → Advanced), listed under Hive, followed by its value in minutes (\"10 min\"). A lane is a card loop: a builder and a reviewer taking cards in turn." }),
+    desc: msg({
+      id: 'settings.advanced.hive.lanes.freshStartWaitMinutes.desc',
+      defaultMessage: "A lane starts its agents in new conversations. One that is busy as the lane starts (in a turn, or reading a message Hive just gave it) is started once it is free, for up to this long. After that Hive stops trying: the lane's row says so, and you retry it there or end the lane. Hive never interrupts a turn for it, and never gives the lane's cards to the old conversation.",
+      description: 'What the advanced setting "Lanes: longest Hive waits to start a busy agent afresh" does (Settings → Advanced, under Hive). A lane is a card loop.'
     }),
     kind: 'number',
     default: 10,

@@ -1,14 +1,17 @@
 // Start lane… in main (#1280): each agent is checked free where it is launched, with no await before its conversation
-// is replaced (HR6's round 1): one that started work after the lane was recorded keeps it, reported as not started,
-// and the lane stays. The session layer, deliveries, the lane record and the board are stand-ins.
+// is replaced (HR6's round 1): one that started work after the lane was recorded keeps it, and is owed its new
+// conversation (HI-2034: `deferred`, recorded with the lane), the lane staying. The session layer, deliveries, the lane
+// record and the board are stand-ins.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type Live = { status: string; sessionId: string }
-const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void) }))
+const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), pending: new Set<string>(), owed: [] as unknown[] }))
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
     liveFor: (_p: string, id: string) => state.live.get(id) ?? null,
+    // A prompt Hive typed that its CLI hasn't taken yet (HI-2034): `state.pending`.
+    agentNow: (_p: string, id: string) => (state.live.has(id) ? { pending: state.pending.has(id) } : null),
     start: async (_p: string, o: { agentId: string }) => {
       state.calls.push(`start ${o.agentId}`)
       state.onStart?.(o.agentId)
@@ -42,6 +45,9 @@ vi.mock('../src/main/lanes', () => ({
     // Its rounds as recorded (HI-1805: what its agents' briefs say, whatever today's default).
     return { lane: { id: 'lane-1', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, rounds: 3 }, did: 'started', replaced: null }
   },
+  holdLaneStart: () => () => undefined,
+  // A new conversation owed (HI-2034), as recorded.
+  oweFreshStart: async (_ws: unknown, lane: string, agent: string, role: string, oldSession: string | null, note = '') => void state.owed.push({ lane, agent, role, oldSession, ...(note ? { note } : {}) }),
   rawLanes: async () => {
     await state.lanesHeld
     return state.lanes
@@ -58,6 +64,8 @@ vi.mock('../src/main/slotCards', () => ({
     return state.lend
   }
 }))
+// No line of Hive's on its way (HI-2034: its own conditions are lineWriter's).
+vi.mock('../src/main/lineWriter', () => ({ whyNoLine: () => null }))
 vi.mock('../src/main/tasks', () => ({
   getTask: async (n: number) => (state.onGetTask?.(), { number: n, key: `AL-${n}`, title: `Card ${n}`, project: 'alpha', column: 'todo', archived: false })
 }))
@@ -75,6 +83,8 @@ const ws = {
 
 beforeEach(() => {
   state.live.clear()
+  state.pending.clear()
+  state.owed.length = 0
   state.calls.length = 0
   state.afterRecord = null
   state.enforced = false
@@ -167,14 +177,39 @@ describe('Start lane… in main (#1280)', () => {
     expect(state.calls).toEqual([])
   })
 
-  it("a reviewer that starts work after the lane is recorded keeps it: not replaced, reported as not started, the lane kept (HR6's round 1)", async () => {
+  it("a reviewer that starts work after the lane is recorded keeps it: not replaced, owed its new conversation, the lane kept (HR6's round 1, HI-2034)", async () => {
     state.live.set('r1', { status: 'ready', sessionId: 'old-r1' })
     state.afterRecord = () => state.live.set('r1', { status: 'working', sessionId: 'old-r1' })
     const r = await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: 'r1', cards: [1] })
     expect(state.calls).toEqual(['record', 'start b1'])
     expect(state.live.get('r1')).toEqual({ status: 'working', sessionId: 'old-r1' })
     expect(r.lane.id).toBe('lane-1')
-    expect(r.started.find((s) => s.name === 'R1')).toMatchObject({ how: 'failed', why: expect.stringMatching(/R1 is working/) })
+    expect(r.started.find((s) => s.name === 'R1')).toMatchObject({ how: 'deferred' })
+    expect(state.owed).toEqual([{ lane: 'lane-1', agent: 'r1', role: 'reviewer', oldSession: 'old-r1' }])
+  })
+
+  it("an idle builder with a prompt not taken yet (HI-2034: p5lane's lane A end notice as lane B starts): not replaced, owed its new conversation, never failed", async () => {
+    state.live.set('b1', { status: 'ready', sessionId: 'old-b1' })
+    state.pending.add('b1')
+    const r = await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: null, cards: [1] })
+    expect(state.calls).toEqual(['record'])
+    expect(r.started).toEqual([{ agentId: 'b1', name: 'B1', role: 'builder', how: 'deferred' }])
+    expect(state.owed).toEqual([{ lane: 'lane-1', agent: 'b1', role: 'builder', oldSession: 'old-b1' }])
+  })
+
+  it("owed with the user's Start Lane note (HR1 round 1, finding 2): its later launch's brief says the same", async () => {
+    state.live.set('b1', { status: 'ready', sessionId: 'old-b1' })
+    state.pending.add('b1')
+    await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: null, cards: [1], note: 'Use the staging database' })
+    expect(state.owed).toEqual([{ lane: 'lane-1', agent: 'b1', role: 'builder', oldSession: 'old-b1', note: 'Use the staging database' }])
+  })
+
+  it('an agent asked to sign in again is refused, not owed (that does not pass by itself)', async () => {
+    state.live.set('r1', { status: 'signin', sessionId: 'old-r1' })
+    const r = await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: 'r1', cards: [1] }).catch((e: Error) => e)
+    // Refused up front, as busy (the dialog's Wait and Start), with nothing owed.
+    expect(r).toBeInstanceOf(Error)
+    expect(state.owed).toEqual([])
   })
 
   it('a reviewer that turns busy while the builder starts is caught where it is launched', async () => {
@@ -186,12 +221,20 @@ describe('Start lane… in main (#1280)', () => {
     }
     const r = await startLaneFromWindow(ws, 'D:\\ws\\alpha', { builder: 'b1', reviewer: 'r1', cards: [1] })
     expect(state.calls).not.toContain('newConversation r1')
-    expect(r.started.find((s) => s.name === 'R1')?.how).toBe('failed')
+    expect(r.started.find((s) => s.name === 'R1')?.how).toBe('deferred')
   })
 })
 
 describe('a lane waiting for a slot, started as Hive quits (#1628)', () => {
   const waiting = (): void => void (state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1], rounds: 3 }])
+
+  it("lent its slot with its builder not free: owed its new conversation with the slot wait's note (HR1 round 1, finding 2), never failed", async () => {
+    state.lanes = [{ id: 'lane-1', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: null, cards: [1], rounds: 3, slotWait: { since: new Date().toISOString(), note: 'Use the staging database' } }]
+    state.live.set('b1', { status: 'ready', sessionId: 'old-b1' })
+    state.pending.add('b1')
+    expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false)).toBe(true)
+    expect(state.owed).toEqual([{ lane: 'lane-1', agent: 'b1', role: 'builder', oldSession: 'old-b1', note: 'Use the staging database' }])
+  })
 
   it('quitting while its lane is read: nothing is started, and it keeps waiting (false)', async () => {
     waiting()
@@ -291,7 +334,11 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     state.live.set('r1', { status: 'working', sessionId: 's-r1' })
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual([])
-    expect(recordedLaneNote(l)).toBe('B2 and R1 are running, so Hive left them as they are: tell them about the lane.')
+    // The rules on: Hive gives the builder its first card itself (HI-2029), so the caller tells only the reviewer (HR1).
+    expect(recordedLaneNote(l)).toBe("B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it. R1 is running, so Hive left it as it is: tell it about the lane.")
+    // The rules off: nothing starts the builder's card, so the caller tells both.
+    state.enforced = false
+    expect(recordedLaneNote(await launchRecordedLane(ws, ALPHA, 'lane-9'))).toBe('B2 and R1 are running, so Hive left them as they are: tell them about the lane.')
   })
 
   it('its builder running and its reviewer stopped: only the reviewer starts, with no slot lent for the builder', async () => {
@@ -301,7 +348,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual(['start r1'])
     expect(state.live.get('b2')?.sessionId).toBe('s-b2')
-    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: tell it about the lane.")
+    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.")
   })
 
   it('its builder stopped and its reviewer idle: the builder starts in its slot, the reviewer keeps its conversation', async () => {
@@ -330,7 +377,7 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     state.onGetTask = () => void state.live.delete('b2')
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual(['start r1'])
-    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: tell it about the lane.")
+    expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.")
   })
 
   for (const status of ['working', 'watching']) {

@@ -22,7 +22,7 @@ import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/ass
 import { timeLeft } from '../shared/progress'
 import { ProgressError, admitReport, type ProgressCaller } from './progress'
 import { progress, progressGate } from './progressService'
-import { cardOfRef, isCardRef, withCardNames } from './projectKeys'
+import { cardOfRef, isCardRef, keysForSearch, withCardNames } from './projectKeys'
 import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, resolveRunLink, type RunLink, type RunLinkDeps } from './workflow/runLink'
 import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, isolatedRunEnded, takeStopped } from './copiesApp'
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
@@ -63,7 +63,7 @@ import { listMcp } from './mcp'
 import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, readNote, writeNote } from './notes'
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
-import { checkLanePool, launchRecordedLane, recordedLaneNote, resumeLaneBuilder } from './laneStart'
+import { checkLanePool, launchRecordedLane, recordedLaneNote, resumeLaneBuilder, retryFreshStart } from './laneStart'
 import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
@@ -427,6 +427,9 @@ function requestWorkspace(req: IncomingMessage, url: URL): WorkspaceService | nu
   return open.length === 1 ? open[0] : null
 }
 
+/** The workspace's project keys, current and old, for a title naming a card (HI-2061). */
+const titleKeys = (): string[] => keysForSearch(requireWorkspace()).flatMap((k) => [k.key, ...k.aliases])
+
 /** The request's workspace, for calls about a whole workspace (shared notes, MCP servers…). */
 function requireWorkspace(): WorkspaceService {
   const w = contextWorkspace()
@@ -637,6 +640,7 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'reorder-tasks': UNDO_FINAL.cardsOrder,
   'cancel-messages': UNDO_FINAL.withdrawn,
   'lane-end': UNDO_FINAL.laneEnded,
+  'lane-fresh-start': UNDO_FINAL.freshRetried,
   'queue-pause': UNDO_FINAL.queuePaused,
   'queue-resume': UNDO_FINAL.queueResumed,
   'release-slot': UNDO_FINAL.slotReleased
@@ -1946,6 +1950,16 @@ route('POST', '/v1/lanes', async ({ body }) =>
     if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, 'A lane reviewed by the pool has no reviewer of its own: leave reviewer out')
     if (pool) await checkLanePool(ws, p, builder)
     const start = async () => {
+      // Hive's own start of the lane's card waits for this one to launch its agents (HI-2029); a builder registering its
+      // own loop is at work already.
+      const release = a ? null : lanes.holdLaneStart(ws, basename(p), builder)
+      try {
+        return await started()
+      } finally {
+        release?.()
+      }
+    }
+    const started = async () => {
       const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}) })
       // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
       const told = args.brief !== undefined ? await briefNote(ws, (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id) ?? { project: basename(p) }) : null
@@ -2012,6 +2026,24 @@ route('POST', '/v1/lanes/:id/end', async ({ params, body }) =>
     return assistantChange('agents', laneId ? `end lane ${laneId}` : 'end a lane', { kind: 'lane-end', ...(laneId ? { lane: laneId } : {}) }, async () => {
       const l = await end()
       return { done: `Lane ${l.id} in ${l.project}: ${l.state}`, act: laneAct(l), result: l }
+    })
+  })
+)
+
+// A lane agent's new conversation no more tried, tried again (HI-2034): the user's (the lane's row) and the Assistant's
+// within Settings → Assistant → Control, never a project agent's (it would restart another agent).
+route('POST', '/v1/lanes/:id/fresh-start', async ({ params }) =>
+  laneCall(async () => {
+    notAgents("retry a lane's new conversations")
+    const ws = requireWorkspace()
+    const id = decodeURIComponent(params[0])
+    const lane = (await lanes.rawLanes(ws)).find((l) => l.id === id)
+    if (!lane) throw new HttpError(404, `No lane ${id}`)
+    const retry = async () => ({ retried: await retryFreshStart(ws, id) })
+    if (!assistantCaller()) return retry()
+    return assistantChange('agents', `retry lane ${id}'s new conversations`, { kind: 'lane-fresh-start', lane: id, project: lane.project }, async () => {
+      const r = await retry()
+      return { done: r.retried ? `Lane ${id}: ${r.retried} new conversation${r.retried > 1 ? 's' : ''} tried again` : `Lane ${id}: no new conversation was waiting to be retried`, result: r }
     })
   })
 )
@@ -2679,8 +2711,8 @@ route('POST', '/v1/tasks', async ({ body }) => {
   // project is known to be allowed, and published with it.
   const paths = attachmentList(body)
   const create = () => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor)))
-  // A long title is kept, with a line suggesting a shorter one (HI-1872).
-  const nudge = titleNudge(title, actor)
+  // A long title is kept, with a line suggesting a shorter one (HI-1872), or one with what belongs in the description (HI-2061).
+  const nudge = titleNudge(title, actor, titleKeys())
   const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(nudge ? { nudge } : {}) })
   if (actor.kind !== 'assistant') return reply(await create())
   const project = typeof input.project === 'string' && input.project ? input.project : null
@@ -2740,7 +2772,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     changes.push(...attachedLines(c))
     return c
   }
-  const nudge = patch.title === undefined ? null : titleNudge(patch.title, actor)
+  const nudge = patch.title === undefined ? null : titleNudge(patch.title, actor, titleKeys())
   const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, changes) : await taskView(c)), ...(nudge ? { nudge } : {}) })
   if (actor.kind !== 'assistant') {
     const c = await apply()

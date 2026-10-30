@@ -28,7 +28,7 @@ const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'Wi
 export type HostFailure = { kind: 'test' } | { kind: 'noPowerShell'; error: string } | { kind: 'slowHelper'; seconds: number } | { kind: 'refused' } | { kind: 'helperFailed'; why: string }
 
 /** The host's requests (HiveJobs.Answer). */
-export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow'
+export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow' | 'keeper'
 
 export interface JobHostOptions {
   /** How long it gets to start, and then to answer each request. */
@@ -190,6 +190,26 @@ public static class HiveJobs {
    * Swept as each process of a job ends (so a shell that starts something and exits at once is caught), before listing
    * or ending a job, and every ${SWEEP_MS} ms (for an escaped child's own children).
    */
+  /**
+   * What sweeps couldn't be sure of (HI-2055): a snapshot or a job's listing that failed, or a process of a job's whose
+   * escaped child it couldn't check (a call Windows refused, not one that says the child has gone or isn't one). The
+   * keeper counts a job empty only after a sweep with none: an escaped child neither adopted nor followed would be missed.
+   */
+  public static int uncertain = 0;
+  /** The unit tests: while this file exists, every sweep's snapshot fails, as Windows refusing one would, each noted in <file>.failed. */
+  public static string FailSnapshotsWhile = null;
+  static bool SnapshotFailsForTests() {
+    if (FailSnapshotsWhile == null || !System.IO.File.Exists(FailSnapshotsWhile)) return false;
+    try { System.IO.File.AppendAllText(FailSnapshotsWhile + ".failed", "x"); } catch { }
+    return true;
+  }
+  /** The unit tests: while this file exists, every sweep's enumeration of its snapshot stops after its first entry, failing. */
+  public static string FailEnumerationWhile = null;
+  static bool EnumerationFailsForTests() {
+    if (FailEnumerationWhile == null || !System.IO.File.Exists(FailEnumerationWhile)) return false;
+    try { System.IO.File.AppendAllText(FailEnumerationWhile + ".failed", "x"); } catch { }
+    return true;
+  }
   public static int Sweep() {
     lock (turn) {
       if (jobs.Count == 0) return 0;
@@ -197,14 +217,28 @@ public static class HiveJobs {
       // Taken before the snapshot: a process created after it can't be one the snapshot saw.
       long at; GetSystemTimeAsFileTime(out at);
       // TH32CS_SNAPPROCESS
-      IntPtr snap = CreateToolhelp32Snapshot(2, 0);
-      if (snap == IntPtr.Zero || snap == new IntPtr(-1)) return 0;
+      IntPtr snap = SnapshotFailsForTests() ? IntPtr.Zero : CreateToolhelp32Snapshot(2, 0);
+      if (snap == IntPtr.Zero || snap == new IntPtr(-1)) { uncertain++; return 0; }
+      // A snapshot read whole, or not used (HR2's round 2): an enumeration that fails, at its first entry or part way
+      // (anything but ERROR_NO_MORE_FILES at its end), would miss the processes after it.
       try {
         var e = new ProcessEntry(); e.size = (uint)Marshal.SizeOf(typeof(ProcessEntry));
-        for (bool more = Process32FirstW(snap, ref e); more; more = Process32NextW(snap, ref e)) if (e.pid != 0) parents[(int)e.pid] = (int)e.parent;
+        if (!Process32FirstW(snap, ref e)) { uncertain++; return 0; }
+        bool cut = EnumerationFailsForTests();
+        for (bool more = true; more; ) {
+          if (e.pid != 0) parents[(int)e.pid] = (int)e.parent;
+          if (cut) { uncertain++; return 0; }
+          more = Process32NextW(snap, ref e);
+        }
+        if (Marshal.GetLastWin32Error() != 18) { uncertain++; return 0; }
       } finally { CloseHandle(snap); }
+      int unsure = uncertain;
       var owner = new Dictionary<int, string>();
-      foreach (var j in jobs) foreach (int pid in List(j.Key)) owner[pid] = j.Key;
+      foreach (var j in jobs) {
+        int[] listed = ListChecked(j.Key);
+        if (listed == null) { uncertain++; continue; }
+        foreach (int pid in listed) owner[pid] = j.Key;
+      }
       foreach (var h in held) if (jobs.ContainsKey(h.Value.job)) owner[h.Key] = h.Value.job;
       foreach (var f in followed) if (jobs.ContainsKey(f.Value.job)) owner[f.Key] = f.Value.job;
       var tried = new HashSet<int>();
@@ -223,10 +257,14 @@ public static class HiveJobs {
           found = true;
         }
       }
-      // Followed processes that have ended: their children were looked at above, while their ids were still held.
+      // Followed processes that have ended: their children were looked at above, while their ids were still held. Only
+      // after a sweep sure of everything (HR2's round 2: one that wasn't may not have found them yet), and never one
+      // whose state can't be read: it stays followed, unknown.
+      if (uncertain != unsure) return n;
       foreach (int pid in new List<int>(followed.Keys)) {
         uint code;
-        if (GetExitCodeProcess(followed[pid].h, out code) && code == 259) continue;
+        if (!GetExitCodeProcess(followed[pid].h, out code)) { uncertain++; continue; }
+        if (code == 259) continue;
         CloseHandle(followed[pid].h);
         followed.Remove(pid);
       }
@@ -245,22 +283,28 @@ public static class HiveJobs {
       if (!jobs.TryGetValue(id, out job)) return false;
       // PROCESS_TERMINATE | PROCESS_SET_QUOTA | PROCESS_QUERY_LIMITED_INFORMATION
       IntPtr c = OpenProcess(0x0001 | 0x0100 | 0x1000, false, pid);
-      if (c == IntPtr.Zero) return false;
+      // ERROR_INVALID_PARAMETER: no such process (gone). Anything else (access denied): it may be one, unchecked.
+      if (c == IntPtr.Zero) { if (Marshal.GetLastWin32Error() != 87) uncertain++; return false; }
       bool keep = false;
       try {
         bool inJob, inAny; uint code; long cc, pc, x, k, u;
-        if (!IsProcessInJob(c, job, out inJob) || inJob) return false;
-        if (!GetExitCodeProcess(c, out code) || code != 259) return false;
-        if (!GetProcessTimes(c, out cc, out x, out k, out u) || cc > at) return false;
-        if (!Started(parent, at, out pc) || pc > cc) return false;
+        if (!IsProcessInJob(c, job, out inJob)) { uncertain++; return false; }
+        if (inJob) return false;
+        if (!GetExitCodeProcess(c, out code)) { uncertain++; return false; }
+        if (code != 259) return false;
+        if (!GetProcessTimes(c, out cc, out x, out k, out u)) { uncertain++; return false; }
+        if (cc > at) return false;
+        bool sure;
+        if (!Started(parent, at, out pc, out sure)) { if (!sure) uncertain++; return false; }
+        if (pc > cc) return false;
         // Only a process in no job joins: one in another job is followed (#659). Windows would nest the jobs: the Store's
         // PowerShell's is its package's, which every Store PowerShell started later joins, and when it had no parent it
         // became this launch's, so the next ones (any agent's or app's) were listed and ended with this launch. A packaged
         // app's process is followed even in no job: Windows puts it in its package's job only once it has started (a few
         // ms, more under load), and one assigned before then nests that job in this one just the same (#678).
-        if (!IsProcessInJob(c, IntPtr.Zero, out inAny)) return false;
+        if (!IsProcessInJob(c, IntPtr.Zero, out inAny)) { uncertain++; return false; }
         if (!inAny && !Packaged(c) && AssignProcessToJobObject(job, c)) return true;
-        if (!FollowHeld(id, pid, c, cc)) return false;
+        if (!FollowHeld(id, pid, c, cc)) { uncertain++; return false; }
         keep = true;
         return true;
       } finally { if (!keep) CloseHandle(c); }
@@ -273,14 +317,20 @@ public static class HiveJobs {
     return GetPackageFullName(proc, ref len, null) != 15700;
   }
   /** When a job's process started: held (its id kept), or looked up now, if created before "at". */
-  static bool Started(int pid, long at, out long created) {
+  static bool Started(int pid, long at, out long created) { bool sure; return Started(pid, at, out created, out sure); }
+  /** sure: false when it couldn't be told (the parent couldn't be opened or read), true when the answer is Windows'. */
+  static bool Started(int pid, long at, out long created, out bool sure) {
     Held h;
+    sure = true;
     if (held.TryGetValue(pid, out h) || followed.TryGetValue(pid, out h)) { created = h.created; return true; }
     created = 0;
     IntPtr p = OpenProcess(0x1000, false, pid);
-    if (p == IntPtr.Zero) return false;
+    if (p == IntPtr.Zero) { sure = false; return false; }
     long x, k, u;
-    try { return GetProcessTimes(p, out created, out x, out k, out u) && created <= at; } finally { CloseHandle(p); }
+    try {
+      if (!GetProcessTimes(p, out created, out x, out k, out u)) { sure = false; return false; }
+      return created <= at;
+    } finally { CloseHandle(p); }
   }
   /**
    * Holds a process the port says joined job id, if it is in that job: a notification read late may carry an id that
@@ -481,6 +531,10 @@ public static class HiveJobs {
   }
   /** Exits gathered for the next Settle: each pid with the entry held for it as its exit was read (null: none). */
   static List<KeyValuePair<int, Held>> exits = new List<KeyValuePair<int, Held>>();
+  /** At most this many exits are kept for a sure sweep (Settle); past it, their jobs' ancestry is lost (ancestryLost). */
+  const int MAX_PENDING_EXITS = 4096;
+  /** Jobs whose exited processes were let go before a sure sweep (HI-2055): never "ended" by the keeper. */
+  static HashSet<string> ancestryLost = new HashSet<string>();
   /** When the gathered exits are settled (on clock), ${EXIT_BATCH_MS} ms after the first of them. */
   static readonly System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
   static long due = 0;
@@ -509,8 +563,16 @@ public static class HiveJobs {
    */
   public static void Settle() {
     lock (turn) {
+      // A sweep that wasn't sure keeps what was held for the exits (HR2's round 2): an exited parent's identity is what
+      // ties its escaped children to its job, so it is let go only after a sweep that was; tried again in a moment.
+      int before = uncertain;
+      try { Sweep(); } catch { uncertain++; }
+      if (uncertain != before) {
+        if (exits.Count <= MAX_PENDING_EXITS) { due = clock.ElapsedMilliseconds + ${EXIT_BATCH_MS}; return; }
+        // Kept too long (sweeps unsure for hours): let go, and their jobs can never be told complete by the keeper.
+        foreach (var e in exits) if (e.Value != null) ancestryLost.Add(e.Value.job);
+      }
       try {
-        Sweep();
         foreach (var e in exits) {
           Held h;
           if (e.Value == null || !held.TryGetValue(e.Key, out h) || !ReferenceEquals(h, e.Value) || WaitForSingleObject(h.h, 0) != 0) continue;
@@ -621,6 +683,125 @@ public static class HiveJobs {
     foreach (var k in new List<ulong>(byKey.Keys)) if (byKey[k] == id) byKey.Remove(k);
     foreach (var pid in new List<int>(held.Keys)) if (held[pid].job == id) { CloseHandle(held[pid].h); held.Remove(pid); }
     foreach (var pid in new List<int>(followed.Keys)) if (followed[pid].job == id) { CloseHandle(followed[pid].h); followed.Remove(pid); }
+  }
+  [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern bool MoveFileExW(string from, string to, uint flags);
+  /**
+   * The keeper (HI-2055): once its Hive has gone (its input ended: a quit, a crash), this helper stays while an agent's
+   * launch job it holds still has a process, the only one that can tell those jobs complete, and writes each one's state
+   * to keepDir as keeper-<job>.json: "live" with its members (by id, start time and name: no command line, which can
+   * hold a secret) while it has any, "ended" once it is seen empty, then lets it go; it exits once it holds none. Nothing
+   * is ended by it. The next Hive frees a slot's writer only by an "ended" from the helper its run was bound to. Unset
+   * (keepDir null), it exits at the end of its input as before.
+   */
+  static string keepDir;
+  static string keepHive;
+  static string keepSelf;
+  /** Configures the keeper: its Hive's identity ("pid:started", as its slot writers name it) and the folder. Its own identity, "pid:created". */
+  public static string Keeper(string hive, string dir) {
+    int me = System.Diagnostics.Process.GetCurrentProcess().Id;
+    keepHive = hive;
+    keepDir = dir;
+    keepSelf = me + ":" + CreatedOf(me);
+    return keepSelf;
+  }
+  /** The job's processes, or null when Windows couldn't say (never taken for empty). */
+  static int[] ListChecked(string id) {
+    IntPtr job;
+    if (!jobs.TryGetValue(id, out job)) return null;
+    for (int n = 256; n <= 65536; n *= 4) {
+      int size = 2 * 4 + IntPtr.Size * n;
+      IntPtr buf = Marshal.AllocHGlobal(size);
+      try {
+        if (!QueryInformationJobObject(job, 3, buf, size, IntPtr.Zero)) { if (Marshal.GetLastWin32Error() == 234) continue; return null; }
+        int count = Marshal.ReadInt32(buf, 4);
+        int[] r = new int[count];
+        for (int i = 0; i < count; i++) r[i] = (int)Marshal.ReadIntPtr(buf, 8 + i * IntPtr.Size).ToInt64();
+        return r;
+      } finally { Marshal.FreeHGlobal(buf); }
+    }
+    return null;
+  }
+  /** Its whole membership as Members gives it (the job's and the running processes it follows), or null when unreadable. Under the turn. */
+  static int[] MembersChecked(string id) {
+    var listed = ListChecked(id);
+    if (listed == null) return null;
+    var members = new List<int>(listed);
+    foreach (var f in followed) {
+      if (f.Value.job != id) continue;
+      uint code;
+      if (!GetExitCodeProcess(f.Value.h, out code)) return null;
+      if (code == 259) members.Add(f.Key);
+    }
+    return members.ToArray();
+  }
+  /** A job's state written whole (a temp file, then replaced through to the disk): whether it was. */
+  static bool WriteState(string id, string state, int[] members) {
+    if (keepDir == null || !System.Text.RegularExpressions.Regex.IsMatch(id, "^[A-Za-z0-9_-]{1,64}$")) return false;
+    var b = new StringBuilder("{\"v\":1,\"run\":" + Q(id) + ",\"helper\":" + Q(keepSelf) + ",\"hive\":" + Q(keepHive) + ",\"state\":" + Q(state) + ",\"observed\":\"complete\",\"total\":" + members.Length + ",\"members\":[");
+    for (int i = 0; i < members.Length && i < ${MAX_LISTED}; i++) {
+      string name = "";
+      try { using (var p = System.Diagnostics.Process.GetProcessById(members[i])) name = p.ProcessName; } catch { }
+      b.Append(i > 0 ? "," : "").Append("{\"pid\":").Append(members[i]).Append(",\"created\":\"").Append(CreatedOf(members[i])).Append("\",\"name\":").Append(Q(name)).Append("}");
+    }
+    b.Append("],\"at\":").Append(DateTime.UtcNow.ToFileTimeUtc()).Append("}");
+    string path = System.IO.Path.Combine(keepDir, "keeper-" + id + ".json");
+    string tmp = path + "." + System.Diagnostics.Process.GetCurrentProcess().Id + ".tmp";
+    try {
+      System.IO.Directory.CreateDirectory(keepDir);
+      using (var f = new System.IO.FileStream(tmp, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None, 4096, System.IO.FileOptions.WriteThrough)) {
+        byte[] bytes = Encoding.UTF8.GetBytes(b.ToString());
+        f.Write(bytes, 0, bytes.Length);
+        f.Flush(true);
+      }
+      // MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+      if (MoveFileExW(tmp, path, 0x1 | 0x8)) return true;
+    } catch { }
+    try { System.IO.File.Delete(tmp); } catch { }
+    return false;
+  }
+  /**
+   * Its input has ended (HI-2055): the merge queue's jobs close at once, ending what is in them as before (#1360), and,
+   * configured, it keeps each agent launch's job it still holds, sweeping as it did, until each is seen empty (an
+   * "ended" state, written once), then exits. A job it can't read is looked at again; one whose "ended" can't be
+   * written is let go with none (its slot stays held). It says "keeping" once, so a quitting Hive stops waiting for it.
+   */
+  public static void Keep() {
+    List<string> mine;
+    lock (turn) {
+      foreach (var id in new List<string>(closing.Keys)) Forget(id);
+      mine = keepDir == null ? new List<string>() : new List<string>(jobs.Keys);
+    }
+    if (mine.Count == 0) return;
+    try { Console.Out.WriteLine("keeping"); Console.Out.Flush(); Console.Out.Close(); } catch { }
+    Notices = null;
+    var last = new Dictionary<string, string>();
+    while (mine.Count > 0) {
+      foreach (var id in new List<string>(mine)) {
+        int[] m;
+        // Its membership only after a sweep that was sure of everything (a failed one could miss an escaped child).
+        lock (turn) {
+          uncertain = 0;
+          try { Sweep(); } catch { uncertain++; }
+          m = uncertain == 0 ? MembersChecked(id) : null;
+        }
+        if (m == null) continue;
+        if (m.Length == 0) {
+          bool lost;
+          lock (turn) lost = ancestryLost.Contains(id);
+          // Its ancestry let go unsure: never told complete, so no "ended" (its last "live" stays, and its slot held).
+          if (!lost) for (int tries = 0; tries < 3 && !WriteState(id, "ended", m); tries++) System.Threading.Thread.Sleep(200);
+          lock (turn) Forget(id);
+          mine.Remove(id);
+          continue;
+        }
+        Array.Sort(m);
+        string seen = string.Join(",", m);
+        string before;
+        if (last.TryGetValue(id, out before) && before == seen) continue;
+        if (WriteState(id, "live", m)) last[id] = seen;
+      }
+      if (mine.Count > 0) System.Threading.Thread.Sleep(${SWEEP_MS});
+    }
   }
   /** A JSON string. */
   public static string Q(string s) {
@@ -790,6 +971,8 @@ public static class HiveJobs {
         case "assign": r = Q(Assign(a[2], int.Parse(a[3]), long.Parse(a[4]), long.Parse(a[5]))); break;
         case "empty": r = Empty(a[2]) ? "true" : "false"; break;
         case "hasjob": r = Q(HasJob(a[2])); break;
+        // Its Hive's identity, and the folder in base64url (HI-2055): its own identity back.
+        case "keeper": r = Q(Keeper(a[2], a.Length > 3 ? Encoding.UTF8.GetString(Convert.FromBase64String(a[3].Replace('-', '+').Replace('_', '/').PadRight(a[3].Length + (4 - a[3].Length % 4) % 4, '='))) : null)); break;
         // Tests only (the host refuses to send it otherwise): follows a process, as Take does a packaged app's.
         case "follow": r = Follow(a[2], int.Parse(a[3]), 0x0001 | 0x100000) ? "true" : "false"; break;
         default: r = Q("unknown command"); break;
@@ -813,6 +996,7 @@ Add-Type -ReferencedAssemblies System.Management -TypeDefinition ([Text.Encoding
 [HiveJobs]::Notices = [Console]::Out
 [Console]::Out.WriteLine('ready')
 while ($null -ne ($line = [Console]::In.ReadLine())) { [Console]::Out.WriteLine([HiveJobs]::Answer($line)); [HiveJobs]::TellQueue() }
+[HiveJobs]::Keep()
 `
 const HOST_INPUT = Buffer.from(HOST_SOURCE, 'utf8').toString('base64') + '\n'
 /** Test copies' helper that is ready but never answers (HIVE_TEST_PROCESS_TRACKER=mute): it notes each request it reads. */
@@ -843,7 +1027,10 @@ export class JobHost {
   private failed = false
   /** Closed (Hive quitting): no helper starts again, not even for a request already on its way (a refresh's next look). */
   private closed = false
-  /** Every helper started that hasn't exited yet (one being replaced too), with whether it said it was ready. */
+  /**
+   * Every helper started that hasn't exited yet (one being replaced too), with whether it said it was ready; `gone` also
+   * resolves once it says it is keeping its jobs past its Hive (HI-2055): closing waits for that, never for them to end.
+   */
   private alive = new Map<ChildProcessWithoutNullStreams, { up: boolean; gone: Promise<void> }>()
 
   /** Told of each process a kill-on-close job couldn't journal and ended (onUnowned). */
@@ -898,7 +1085,14 @@ export class JobHost {
       }
       this.proc = p
       this.helpers++
-      const state = { up: false, gone: new Promise<void>((r) => p.once('exit', () => r())) }
+      let keeping = (): void => undefined
+      const state = {
+        up: false,
+        gone: new Promise<void>((r) => {
+          keeping = r
+          p.once('exit', () => r())
+        })
+      }
       // A helper that never started (no pid) has nothing to wait for.
       if (p.pid === undefined) state.gone = Promise.resolve()
       this.alive.set(p, state)
@@ -935,6 +1129,11 @@ export class JobHost {
           }
           if (line === 'new') {
             this.opts.onJoined()
+            continue
+          }
+          // Its input ended (closing), and it stays for its agents' jobs (HI-2055): it answers nothing more.
+          if (line === 'keeping') {
+            keeping()
             continue
           }
           // A process a kill-on-close job (a merge queue's) couldn't journal, and ended at once: its owner pauses.

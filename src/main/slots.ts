@@ -121,6 +121,9 @@ export interface SlotWriter {
   started: number
 }
 
+/** What settled a gone Hive's writer (agentFolders.ts' GoneEvidence), or false: not settled. */
+export type GoneSettled = false | { readonly run: string; readonly helper: string | null }
+
 export interface SlotLease {
   id: string
   project: string
@@ -985,9 +988,11 @@ export interface PoolDeps {
   writerOver?: (w: SlotWriter) => boolean | Promise<boolean>
   /**
    * Whether a writer of a Hive that has gone is settled (HI-1886): its run's processes were seen to end (kept in Hive's
-   * profile). Otherwise it stays held until the user releases the slot. `cleared`: told once a refresh has cleared it.
+   * profile, or by its keeper, HI-2055). Otherwise it stays held until the user releases the slot. `settles` gives what
+   * settled it (false: not settled), which only that attempt's clear carries: `still`, checked inside the clear's write,
+   * throws when it no longer holds (a revoked helper); `cleared`, told once a refresh has cleared it, is given it too.
    */
-  writerGone?: { settles: (w: SlotWriter) => boolean | Promise<boolean>; cleared: (run: string) => void }
+  writerGone?: { settles: (w: SlotWriter) => GoneSettled | Promise<GoneSettled>; cleared: (run: string, evidence: Exclude<GoneSettled, false>) => void; still?: (evidence: Exclude<GoneSettled, false>) => () => void }
   /** Removes Hive's own unchanged skill copies from a folder (skillCopies.ts removeCopiesIn), before a slot goes (#1500). */
   removeSkillCopies?: (folder: string) => Promise<unknown>
   /** A rename's steps (#1441); none: slots aren't renamed. */
@@ -1398,9 +1403,18 @@ export class SlotPool {
    */
   private async settleGone(s: Slot): Promise<boolean> {
     const w = s.writer
-    if (!w || !this.deps.writerGone || !(await this.deps.writerGone.settles(w))) return false
-    if (await this.store.clearWriter(s.name, w.run)) {
-      this.deps.writerGone.cleared(w.run)
+    if (!w || !this.deps.writerGone) return false
+    const evidence = await this.deps.writerGone.settles(w)
+    if (!evidence) return false
+    let clear: boolean
+    try {
+      clear = await this.store.clearWriter(s.name, w.run, this.deps.writerGone.still?.(evidence))
+    } catch {
+      // What settled it no longer holds (HI-2055): it stays held.
+      return false
+    }
+    if (clear) {
+      this.deps.writerGone.cleared(w.run, evidence)
       await this.drained(s.name)
     }
     return true

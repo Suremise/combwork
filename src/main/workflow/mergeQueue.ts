@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
 import { git, GIT_PREFIX } from '../git'
+import { onOutputSettled } from '../gitWorker'
 import { endTree } from '../progressReporters/wrapper'
 import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type Fact, type FactData, type FocusedReturn, type QueueEntry } from '../../shared/workflow/facts'
 import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, focusedCheckName, readResults, reviewProved, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
@@ -28,7 +29,7 @@ import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import * as G from '../platform/git'
 import { isUnknown, type Maybe, type Unknown } from '../platform/types'
 import { withWriteFence, type CardRecord } from './factStore'
-import { LeaseLost } from './queueRunner'
+import { endedBy, LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
 import { leftWake, returnedWake } from './queueState'
 import { readConflicts } from './conflictRead'
@@ -188,6 +189,11 @@ export interface QueueGitResult {
   errAtTimeout?: string
   /** HI-2020: git never started (Node's code for why): nothing ran, so nothing to classify; the entry goes round again. */
   notRun?: string
+  /**
+   * HI-2042: git was ended by a signal (its name), code -1: what it did is unknown, so nothing to classify (no conflict,
+   * no hook); put back, and the entry goes round again, as for notRun.
+   */
+  signal?: string
 }
 
 export type QueueOutcome =
@@ -291,7 +297,7 @@ const PUSH_REJECTED = /\[rejected\]|non-fast-forward|fetch first/i
 /** What a pass of an entry reads once (HI-2019: made afresh for each pass, so a pass that goes round again reads again). */
 interface EntryReads {
   identity?: Promise<Maybe<{ name: string; email: string } | null>>
-  signs?: Promise<boolean>
+  signs?: Promise<boolean | Again>
 }
 
 /** What an advance came to (advanceRef, advanceCheckedOut); `again` only before anything was touched. */
@@ -478,9 +484,9 @@ function commitEnv(): NodeJS.ProcessEnv {
 /**
  * git as Hive runs it, with no input (no terminal to prompt on), in an environment and within a bound: at the bound its
  * whole tree (git, a hook, a signer) is ended, and the result says so. The queue's git when its config gives none (tests;
- * the app runs it through the runner's recorded spawn).
+ * the app runs it through the runner's recorded spawn). Exported for its tests (HI-2043: its bound against its output).
  */
-function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<QueueGitResult> {
+export function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<QueueGitResult> {
   return new Promise((res) => {
     const out: Buffer[] = []
     const err: Buffer[] = []
@@ -503,19 +509,22 @@ function gitTree(cwd: string, args: string[], opts: QueueGitOptions): Promise<Qu
     child.stdout?.on('data', (d: Buffer) => out.push(d))
     child.stderr?.on('data', (d: Buffer) => err.push(d))
     let settled = false
-    const done = (code: number, notRun?: string): void => {
+    const done = (code: number, notRun?: string, signal?: string): void => {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}), ...(notRun ? { notRun } : {}) })
+      res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim() || (signal ? endedBy('git', signal) : ''), ...(timedOut ? { timedOut, errAtTimeout: atTimeout } : {}), ...(notRun ? { notRun } : {}), ...(signal ? { signal } : {}) })
     }
     child.once('error', (e) => {
       err.push(Buffer.from(e.message))
       // HI-2020: an error with no pid is a start that failed (EAGAIN on a loaded machine): nothing ran.
       done(-1, child.pid ? undefined : String((e as NodeJS.ErrnoException).code ?? 'error'))
     })
-    // `exit`, not `close`: a descendant that got away may hold the output open.
-    child.once('exit', (c) => setImmediate(() => done(c ?? 1)))
+    // HI-2043: its output read whole before it is told (a hook's refusal by git's trace at its end), bounded once git has
+    // exited. HI-2042: ended by a signal (no code of its own) is -1, never 1 (git's "no"); one its bound ended stays timed out.
+    // Its bound is on git, not its output: a git that exited in time is never timed out by output still open after it.
+    child.once('exit', () => clearTimeout(timer))
+    onOutputSettled(child, (c, sig) => (c === null && !timedOut ? done(-1, undefined, sig ?? 'unknown') : done(c ?? 1)))
   })
 }
 
@@ -547,6 +556,17 @@ const again = (message?: string): Again => ({ again: message?.trim() ? { message
 const isAgain = (v: unknown): v is Again => !!v && typeof v === 'object' && 'again' in v
 /** An unknown's own words for the pause: what git said, else what couldn't be read. */
 const gitSaid = (u: Unknown): string => u.detail ?? u.what
+/**
+ * HI-2054: a `git config --get` as git answered it: its value, '' when git says the key isn't set (its own exit 1), or
+ * `{ failed }` with git's words for a read git couldn't make (as src/main/platform/git's identity, HI-2019). A git that
+ * never started, was ended by a signal or by its bound is never an answer, whatever its code or partial output.
+ */
+const configRead = (r: QueueGitResult): string | { failed: string } => {
+  const answered = !r.timedOut && !r.notRun && !r.signal
+  if (answered && r.ok) return r.out.trim()
+  if (answered && r.code === 1) return ''
+  return { failed: r.err.trim() || `git exited with code ${r.code}` } // i18n-ignore: git's side of a pause's message, in English as git's are
+}
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
 const refSafe = (id: string): string => id.replace(/[^A-Za-z0-9._-]/g, '-')
@@ -767,6 +787,8 @@ export class MergeQueue {
       await this.clearOwed(target, owed.result, this.notPushed(pending, 'off'))
       return null
     }
+    // HI-2054: where to push couldn't be read: unreadable, as the reads above (in Hive's own words), never "no remote".
+    if (dest === 'unreadable') return this.pausePush(target, owed, 'pushUnreadable')
     if (!dest) return this.pausePush(target, owed, 'pushNoRemote')
     // The head read above, by its commit (HI-1924): what was pushed is exactly what the settled merges are checked against.
     const pushed = head as string
@@ -779,19 +801,22 @@ export class MergeQueue {
     return this.pausePush(target, owed, !r.timedOut && PUSH_REJECTED.test(said) ? 'pushRejected' : 'pushFailed', said)
   }
 
-  /** Where a target is pushed: its upstream (`branch.<target>.remote` and `.merge`), else the only remote or origin. */
-  private async pushDest(target: string): Promise<{ remote: string; ref: string } | null> {
-    const get = async (key: string): Promise<string> => {
-      const r = await this.git(this.project, ['config', '--get', key])
-      return r.ok ? r.out.trim() : ''
-    }
+  /**
+   * Where a target is pushed: its upstream (`branch.<target>.remote` and `.merge`), else the only remote or origin.
+   * HI-2054: a read git couldn't make is 'unreadable', never "nowhere to push" (nor a guessed ref).
+   */
+  private async pushDest(target: string): Promise<{ remote: string; ref: string } | null | 'unreadable'> {
+    const get = async (key: string) => configRead(await this.git(this.project, ['config', '--get', key]))
     const remote = await get(`branch.${target}.remote`)
+    if (typeof remote !== 'string') return 'unreadable'
     if (remote && remote !== '.') {
       const merge = await get(`branch.${target}.merge`)
+      if (typeof merge !== 'string') return 'unreadable'
       return { remote, ref: merge.startsWith('refs/heads/') ? merge : `refs/heads/${target}` }
     }
     const list = await this.git(this.project, ['remote'])
-    const remotes = list.ok ? list.out.split(/\r?\n/).map((x) => x.trim()).filter(Boolean) : []
+    if (!list.ok) return 'unreadable'
+    const remotes = list.out.split(/\r?\n/).map((x) => x.trim()).filter(Boolean)
     const only = remotes.length === 1 ? remotes[0] : remotes.includes('origin') ? 'origin' : null
     return only ? { remote: only, ref: `refs/heads/${target}` } : null
   }
@@ -1096,9 +1121,15 @@ export class MergeQueue {
     return this.wf.cfg.options().identity ?? (await (reads.identity ??= G.identity(this.project)))
   }
 
-  /** Whether the repository signs commits, as git reads it in the queue's folder. */
-  private signs(reads: EntryReads, f: string): Promise<boolean> {
-    return (reads.signs ??= this.git(f, ['config', '--type=bool', '--get', 'commit.gpgsign']).then((r) => r.out.trim() === 'true'))
+  /**
+   * Whether the repository signs commits, as git reads it in the queue's folder. HI-2054: a read git couldn't make is
+   * `again` with git's words (the round's reads are new each time round, so it is read again), never "unsigned".
+   */
+  private signs(reads: EntryReads, f: string): Promise<boolean | Again> {
+    return (reads.signs ??= this.git(f, ['config', '--type=bool', '--get', 'commit.gpgsign']).then((r) => {
+      const v = configRead(r)
+      return typeof v === 'string' ? v === 'true' : again(v.failed)
+    }))
   }
 
   /**
@@ -1169,6 +1200,8 @@ export class MergeQueue {
     const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
     const rebase = this.wf.rulesetOf(card, s).options.style === 'squash'
     const signs = await this.signs(reads, f)
+    // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
+    if (isAgain(signs)) return signs
     const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
     const target = entry.target
     const message = updateMessage(this.commitMessage(), target, card.key, revision)
@@ -1176,8 +1209,9 @@ export class MergeQueue {
     // 1: with the repository's `rebase.updateRefs` on, git would move the builder's branch, or a user's, to the update).
     // Overridden for this command only; the repository's config is left as it is.
     const u = rebase ? await this.git(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await this.git(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
-    // HI-2020: git never started (nothing ran): the worktree put back as after any failure, and the entry goes round again.
-    if (u.notRun) {
+    // HI-2020: git never started (nothing ran), or HI-2042 a signal ended it (what it did unknown): the worktree put back as
+    // after any failure, and the entry goes round again.
+    if (u.notRun || u.signal) {
       await this.git(f, rebase ? ['rebase', '--abort'] : ['merge', '--abort'])
       await this.folderAt(expected)
       return again(u.err)
@@ -1228,6 +1262,8 @@ export class MergeQueue {
     // Signed as the repository says (never overridden), within a bound when it signs: a signer waiting for a passphrase
     // is ended with the rest of the commit's tree.
     const signs = await this.signs(reads, f)
+    // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
+    if (isAgain(signs)) return signs
     const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
     const clean = async (): Promise<void> => {
       await this.git(f, ['merge', '--abort'])
@@ -1236,8 +1272,9 @@ export class MergeQueue {
     }
     // Its output read with git's own trace in it (commitEnv), so a failure is told by who said what, never by words.
     const m = await this.git(f, [...who, 'merge', squash ? '--squash' : '--no-ff', ...(squash ? [] : ['--no-edit', '-m', message]), revision], opts)
-    // HI-2020: git never started (nothing ran, so nothing to tell a hook or a conflict from): put back, and again.
-    if (m.notRun) {
+    // HI-2020: git never started (nothing ran, so nothing to tell a hook or a conflict from), or HI-2042 a signal ended it
+    // (no answer of git's to tell them from): put back, and again.
+    if (m.notRun || m.signal) {
       await clean()
       return again(m.err)
     }
@@ -1254,7 +1291,7 @@ export class MergeQueue {
       const c = await this.git(f, [...who, 'commit', '-q', '-m', message], opts)
       if (!c.ok) {
         await clean()
-        return c.notRun ? again(c.err) : commitFailed(c, signs)
+        return c.notRun || c.signal ? again(c.err) : commitFailed(c, signs)
       }
     }
     const h = await G.head(f)
@@ -1288,10 +1325,12 @@ export class MergeQueue {
     if (!linear || onTop.code !== 0) {
       const who = ['-c', `user.name=${id.name}`, '-c', `user.email=${id.email}`]
       const signs = await this.signs(reads, f)
+      // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
+      if (isAgain(signs)) return signs
       const opts: QueueGitOptions = { env: commitEnv(), ...(signs ? { timeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS } : {}) }
       const u = await this.git(f, [...who, '-c', 'rebase.rebaseMerges=false', '-c', 'rebase.updateRefs=false', 'rebase', '--no-rebase-merges', '--no-update-refs', '--no-autostash', ...(linear ? [] : ['--force-rebase']), '--onto', expected, base], opts)
-      // HI-2020: git never started: put back, and again.
-      if (u.notRun) {
+      // HI-2020: git never started, or HI-2042 a signal ended it: put back, and again.
+      if (u.notRun || u.signal) {
         await this.git(f, ['rebase', '--abort'])
         await this.folderAt(expected)
         return again(u.err)

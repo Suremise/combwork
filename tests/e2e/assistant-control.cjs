@@ -74,7 +74,8 @@ const check = (name, ok, extra = '') => {
   check("the Assistant's hive tools use its token and role", mcp?.env.HIVE_API_TOKEN_FILE === tokenFile && mcp.env.HIVE_ROLE === 'assistant' && mcp.env.HIVE_ASSISTANT_CONTROL === 'projects', JSON.stringify(mcp?.env))
   // Its skills: the workspace's skills for the Assistant (coordinate-agents and the shared ones), none for agents only.
   const assistantSkills = fs.readdirSync(path.join(home, '.hive', 'launch-assistant', 'plugin', 'skills')).sort()
-  check('the Assistant gets the skills for it', ['coordinate-agents', 'handover', 'pick-up', 'split-work', 'workspace-note'].every((n) => assistantSkills.includes(n)) && !['work-on-card', 'review-agent-work', 'merge-ready', 'use-hive-api'].some((n) => assistantSkills.includes(n)), assistantSkills.join(','))
+  // use-hive-api is for both (HI-2012): its tools.md, the hive tools' detail, is copied with it.
+  check('the Assistant gets the skills for it', ['coordinate-agents', 'handover', 'pick-up', 'split-work', 'workspace-note', 'use-hive-api'].every((n) => assistantSkills.includes(n)) && fs.existsSync(path.join(home, '.hive', 'launch-assistant', 'plugin', 'skills', 'use-hive-api', 'tools.md')) && !['work-on-card', 'review-agent-work', 'merge-ready'].some((n) => assistantSkills.includes(n)), assistantSkills.join(','))
   // Its instructions: its control level and boundaries, the skill that says how, then the mode.
   const told = fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8')
   check('its instructions give its control level and point to coordinate-agents, before the mode', /Control agents and create projects/.test(told) && told.indexOf('coordinate-agents skill') > 0 && told.indexOf('coordinate-agents skill') < told.indexOf('# Your mode'), told.slice(0, 300))
@@ -300,10 +301,11 @@ const check = (name, ok, extra = '') => {
   const wasLive = await live(alpha, builderId)
   const unwatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('a lane started with no watch following it: the reply says to watch the lanes', unwatched.status === 200 && /No watch of yours follows this lane/.test(unwatched.body?.note ?? ''), JSON.stringify(unwatched.body))
-  // HI-1934 (Darren's option (a) of HI-1900): Builder running, it is left as it is (no new conversation), and the reply says to tell it.
+  // HI-1934 (Darren's option (a) of HI-1900): Builder running, it is left as it is (no new conversation); the rules on, the reply says
+  // Hive gives it the lane's first card and not to prompt it (HI-2029, HR1: a prompt would race Hive's start).
   // The reply comes once the lane's launch is over, so a new conversation would show by now.
   const nowLive = await live(alpha, builderId)
-  check("…its builder, running, is left as it is, and the reply says to tell it (HI-1934)", !!wasLive?.sessionId && nowLive?.sessionId === wasLive.sessionId && nowLive?.runId === wasLive.runId && /Builder is running, so Hive left it as it is: tell it about the lane\./.test(unwatched.body?.note ?? ''), JSON.stringify({ note: unwatched.body?.note, before: wasLive?.sessionId, after: nowLive?.sessionId }))
+  check("…its builder, running, is left as it is, and the reply says Hive gives it its first card (HI-1934, HI-2029)", !!wasLive?.sessionId && nowLive?.sessionId === wasLive.sessionId && nowLive?.runId === wasLive.runId && /Builder is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it\./.test(unwatched.body?.note ?? ''), JSON.stringify({ note: unwatched.body?.note, before: wasLive?.sessionId, after: nowLive?.sessionId }))
   const watching = await api('POST', '/v1/tasks/wait', { lanes: ['all'], wake: true })
   const rewatched = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', cards: [o1, o2] })
   check('…and with one, no nudge', watching.status === 200 && rewatched.status === 200 && !/No watch of yours/.test(rewatched.body?.note ?? ''), JSON.stringify({ watching: watching.body, rewatched: rewatched.body }))

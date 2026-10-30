@@ -10,7 +10,7 @@ import { agentChoosesMcp, agentGetsMcp, agentMcpText, serverOnIn } from '@shared
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import { UnusedHeading, UnusedWorkNotice, UnusedWorktreesLine, UnusedWorktreesSection, useUnusedWorktrees } from '../components/UnusedWorktrees'
 import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUsage, type DayTotal, type Period, type Totals } from '@shared/usageTotals'
-import { contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
+import { agentLimitText, contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
 import { useAdvancedValue, useAgentLimit } from '../advanced'
 import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } from '@shared/inboxSwitches'
 import { PROVIDERS, contextLines, defaultProviderLabel, inProviderOrder, isProviderEnabled, modeDescription, offeredModes, orderedProviders, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
@@ -1747,7 +1747,7 @@ function AgentList({ project }: { project: ProjectInfo }) {
     const r = resolveConnection({ connections: connections.workspace }, provider, a.connection, connections.connections)
     return r.ok ? (connections.connections.find((c) => c.id === r.id) ?? null) : null
   }
-  const limit = useAgentLimit()
+  const limit = useAgentLimit(project)
   const providers = useStore((s) => s.providers)
   const cfg = project.config
   return (
@@ -1802,9 +1802,12 @@ function AgentList({ project }: { project: ProjectInfo }) {
           </div>
         )
       })}
-      <button className="btn subtle small" disabled={project.agents.length >= limit} onClick={() => set({ addAgentFor: project.path })}>
-        <Icon name="add" /> {tr(S.addAgent)}
-      </button>
+      {/* At its Maximum agents (HI-2058): disabled, saying why and where it is raised. */}
+      <Tooltip content={project.agents.length >= limit ? agentLimitText(tr, limit) : null}>
+        <button className="btn subtle small" disabled={project.agents.length >= limit} onClick={() => set({ addAgentFor: project.path })}>
+          <Icon name="add" /> {tr(S.addAgent)}
+        </button>
+      </Tooltip>
     </div>
   )
 }

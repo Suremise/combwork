@@ -178,15 +178,29 @@ describe('one owner per rule', () => {
 // project's options (no version control, review off, merges not checked, a shared folder); #1346's text fixes.
 describe("the tools' descriptions", () => {
   const tools = readFileSync(join(ROOT, 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+  const toolsDetail = readFileSync(join(ROOT, 'resources', 'skills', 'use-hive-api', 'tools.md'), 'utf8')
   it('describe moves as the intents, with no workflow stated as the rule', () => {
-    // The old moves are one sentence of hive_update_task's: translated where the rules apply, as asked elsewhere.
-    expect(tools).toMatch(/Moves are the intent tools' \(hive_start_card, hive_submit, hive_start_review, hive_verdict, hive_report_merge, hive_put_back\): where the project's workflow rules apply, column and review here are translated into those intents/)
+    // The old moves are one sentence of hive_update_task's (HI-2012: its cases in use-hive-api's tools.md): translated
+    // where the rules apply, as asked elsewhere.
+    expect(tools).toMatch(/Moves are the intent tools' \(hive_start_card, hive_submit, hive_verdict…\): a column here is taken as one, and the reply names it\./)
+    expect(toolsDetail).toMatch(/moves are the intent tools' \(`hive_start_card`, `hive_submit`, `hive_start_review`, `hive_verdict`, `hive_report_merge`, `hive_put_back`\)\. Where the project's workflow rules apply, `column` and `review` here are taken as those intents/)
     // A revision isn't always a commit, nor the folder's head (a shared folder, no version control, a no-code card).
     expect(tools).not.toMatch(/the head of the card's folder|The revision it is about \(a commit\)/)
     expect(tools).toMatch(/Report a card's work merged, where its agent merges it or merges aren't checked/)
   })
+  it("point to use-hive-api's tools.md for their detail, which names only tools there are (HI-2012)", () => {
+    const names = new Set([...tools.matchAll(/name: '(hive_\w+)'|intent\(\s*'(hive_\w+)'/g)].map((m) => m[1] ?? m[2]))
+    const named = new Set([...toolsDetail.matchAll(/`(hive_\w+)`/g)].map((m) => m[1]))
+    expect(names.size).toBeGreaterThan(40)
+    for (const n of named) expect(names, n).toContain(n)
+    // Each tool whose description sends the caller to tools.md has its detail there.
+    const pointing = [...tools.matchAll(/name: '(hive_\w+)',\s*description:[^\n]*\n?[^\n]*\(detail: use-hive-api, tools\.md\)/g)].map((m) => m[1])
+    expect(pointing.length).toBeGreaterThan(5)
+    for (const n of pointing) expect(named, n).toContain(n)
+  })
   it("carry #1346's text fixes: a lane watch takes lanes only; a decision nudges the Assistant's journal", () => {
-    expect(tools).toMatch(/For a lane, pass lanes only: adding its cards wakes you on every move\./)
+    expect(tools).toMatch(/for a lane, pass lanes only, not its cards\./)
+    expect(toolsDetail).toMatch(/For a lane, pass `lanes` only:\*\* adding its cards wakes you on every move\./)
     expect(tools).toMatch(/ASSISTANT && JOURNAL && typeof a\.decision === 'string'[^\n]*Note it in your journal \(hive_journal_write\)\./)
   })
 })
@@ -202,7 +216,8 @@ describe('the bundled skills', () => {
     }
     // Every session sees the name and description of each skill for it (agents', or the Assistant's): together they stay small.
     // HI-686's generalist skill added about 120 to the agents' (the shortest description the rules above allow says it).
-    for (const role of ['agent', 'assistant'] as const) expect([...catalog.values()].filter((s) => skillFor(s.audience, role)).reduce((n, s) => n + s.description.length, 0), role).toBeLessThan(2100)
+    // HI-2012 gave the Assistant use-hive-api (the hive tools' detail, moved out of their descriptions): about 190 more.
+    for (const [role, max] of [['agent', 2100], ['assistant', 2200]] as const) expect([...catalog.values()].filter((s) => skillFor(s.audience, role)).reduce((n, s) => n + s.description.length, 0), role).toBeLessThan(max)
   })
 
   it('name only skills that exist and reach the same audience', () => {
@@ -578,10 +593,14 @@ describe('the other bundled skills follow the gates (#1526)', () => {
 
   it('state no rule a gate owns, and stay at or under their size before P8', () => {
     for (const [name, size] of Object.entries(BEFORE)) {
-      const text = catalog.get(name)!.text
+      const { text, skill } = catalog.get(name)!
       for (const [rule, re] of GATE_RULES) expect(text, `${name}: ${rule}`).not.toMatch(re)
-      expect(text.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size)
+      // use-hive-api's tools.md is the hive tools' detail, moved out of their descriptions (HI-2012) and read only
+      // when needed: its SKILL.md stays at its size plus the pointer to it, and tools.md has a bound of its own.
+      if (name === 'use-hive-api') expect(skill.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size + 250)
+      else expect(text.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size)
     }
+    expect(catalog.get('use-hive-api')!.refs.get('tools.md')!.replace(/\r/g, '').length).toBeLessThanOrEqual(23000)
   })
 
   it("split-work plans by files around the project's own option for where cards are built, and leaves the order to blockedBy", () => {

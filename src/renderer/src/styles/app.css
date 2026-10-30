@@ -3119,6 +3119,20 @@ p.hint {
   color: var(--fg-strong);
   margin-bottom: 6px;
 }
+/* The command itself (HI-2031): at most two lines, cut with an ellipsis; the whole line is its tooltip. */
+.close-command-line {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-width: 0;
+  line-height: 1.5;
+}
+.tip.close-command-tip {
+  max-width: 520px;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
 .close-command-output {
   margin: 8px 0 0;
   padding: 6px 8px;
@@ -13367,6 +13381,13 @@ button.progress-lane-why:focus-visible,
 /* Its tooltip's wrap keeps the tag whole beside a long "why it waits". */
 .progress-lane-top > .tip-wrap:has(> .progress-lane-state) {
   flex-shrink: 0;
+}
+/* Retry an agent's new conversation (HI-2034): the reason's own place, kept whole (short: "⟳ Retry B1"); the project's name gives way. */
+button.progress-lane-retry {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .progress-lane-state.old-rules:focus-visible {
   outline: 1px solid var(--accent);

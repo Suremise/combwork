@@ -341,8 +341,9 @@ describe('workflow scenarios, Git', () => {
     })
   })
 
-  it('S9: a clean rebase onto a newer target carries the pass over; with "Exact revision only" it goes stale', async () => {
-    for (const sameness of ['change', 'exact'] as const) {
+  // One test a case: each is a whole card approved and rebased (HI-2018: both in one test passed 20 s under load).
+  for (const sameness of ['change', 'exact'] as const) {
+    it(`S9: a clean rebase onto a newer target ${sameness === 'change' ? 'carries the pass over' : 'goes stale with "Exact revision only"'}`, async () => {
       const e = agentMerges({ sameness })
       const { card, folder } = await approved(e)
       commit(e.project, { 'other.txt': 'target moved\n' }, 'target moves')
@@ -357,10 +358,8 @@ describe('workflow scenarios, Git', () => {
         expect(s.stale?.why).toBe('exact')
       }
       expect(s.stage).toBe('approved')
-      e.close()
-      env = null
-    }
-  })
+    })
+  }
 
   it('S10: a rebase whose conflict resolution changes the change goes stale', async () => {
     const e = agentMerges()

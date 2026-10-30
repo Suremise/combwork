@@ -435,13 +435,17 @@
     "defaultMessage": "Agent names are unique across the workspace, and {count, plural, one {this name is} other {these names are}} taken already: {names} (projects: {projects}). {count, plural, one {A free name is} other {Free names are}} filled in below. Change any name you like.",
     "description": "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them. Each sentence whole, the verb never agreeing with a list (HI-1585: glossary §1 rules 3 and 4)."
   },
-  "assistant.loadNames.raiseMax": {
-    "defaultMessage": "Also raise Maximum agents from {now, number} to {needs, number} (opens Version Control → Workflow with it set, to save there)",
-    "description": "Load template (HI-2001), a tick box: the template has more agents ({needs}) than the project's workflow option Maximum agents ({now}); ticked, the project's Version Control tab opens at Workflow with Maximum agents set to {needs}, not saved. Version Control → Workflow: use the translated names."
+  "assistant.loadNames.overMax": {
+    "defaultMessage": "It has {count, number} agents, and this project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents first, or load it with its workflow.",
+    "description": "Load template (HI-2058), why its button can't be used: the template's agents ({count}) are more than the project's Maximum agents ({max}), and its workflow, which would raise it, isn't applied. Maximum agents is a name in the window: as translated there."
   },
   "assistant.loadNames.sameTwice": {
     "defaultMessage": "Another of its agents has this name.",
     "description": "Load template, under a name box: another of the template's agents is given the same name."
+  },
+  "assistant.loadNames.savesMax": {
+    "defaultMessage": "Maximum agents goes from {now, number} to {next, number} for this project, saved with its agents.",
+    "description": "Load template (HI-2058), with its workflow applied: the template's own Maximum agents ({next}) is saved with its agents, in place of the project's ({now}). Maximum agents is a name in the window: as translated there."
   },
   "assistant.loadNames.taken": {
     "defaultMessage": "{project} has an agent called {name}.",
@@ -1728,7 +1732,7 @@
     "description": "What a skill that ships with Hive (tune-settings) is for: under its name in the Skills view and a project's Skills tab."
   },
   "assistant.skills.shipped.useHiveApi": {
-    "defaultMessage": "Call Hive's local HTTP API from a script or tool, or debug a hive tool against it. Use only when automating Hive over HTTP: for ordinary board, notes and handover work the hive tools are enough.",
+    "defaultMessage": "A hive tool's cases in detail (tools.md), and Hive's HTTP API for scripts. Use when a tool's description isn't enough, or to automate Hive over HTTP: board and notes work uses the tools.",
     "description": "What a skill that ships with Hive (use-hive-api) is for: under its name in the Skills view and a project's Skills tab. Keep HTTP and API; hive tools are the tools Hive gives agents (hive_…), keep hive in lower case."
   },
   "assistant.skills.shipped.workOnCard": {
@@ -2814,6 +2818,10 @@
   "assistant.undo.why.declarePaths": {
     "defaultMessage": "The paths it declared stay with the card.",
     "description": "What of the Assistant declaring a card's paths stays when it is undone."
+  },
+  "assistant.undo.why.freshRetried": {
+    "defaultMessage": "A lane agent's new conversation tried again isn't stopped by undo: end the lane if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2034): it retried a lane agent's new conversation, which Hive had stopped trying to start. Glossary: lane, conversation."
   },
   "assistant.undo.why.handOver": {
     "defaultMessage": "A hand-over can't be undone: the work went to the other agent.",

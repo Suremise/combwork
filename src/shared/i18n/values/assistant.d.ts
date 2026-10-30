@@ -110,8 +110,9 @@ interface HiveMessageValues {
   'assistant.journal.yesterday': undefined
   'assistant.loadNames.blocked': undefined
   'assistant.loadNames.filledNote': { count: number; names: string | number; projects: string | number }
-  'assistant.loadNames.raiseMax': { now: number; needs: number }
+  'assistant.loadNames.overMax': { count: number; max: number }
   'assistant.loadNames.sameTwice': undefined
+  'assistant.loadNames.savesMax': { now: number; next: number }
   'assistant.loadNames.taken': { project: string | number; name: string | number }
   'assistant.mcpSecret.argument': { start: string | number }
   'assistant.mcpSecret.named': { where: string; key: string | number; ref: string | number }
@@ -705,6 +706,7 @@ interface HiveMessageValues {
   'assistant.undo.why.context': undefined
   'assistant.undo.why.decision': undefined
   'assistant.undo.why.declarePaths': undefined
+  'assistant.undo.why.freshRetried': undefined
   'assistant.undo.why.handOver': undefined
   'assistant.undo.why.laneEnded': undefined
   'assistant.undo.why.laneReorderNow': undefined

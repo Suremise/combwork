@@ -174,6 +174,8 @@ interface HiveMessageValues {
   'agents.limit.many': { limit: string | number; total: string | number; free: string | number }
   'agents.limit.manyMeasured': { limit: string | number; running: number; used: string | number; each: string | number; total: string | number; free: string | number }
   'agents.limit.most': { most: number }
+  'agents.limit.openWorkflow': undefined
+  'agents.limit.workflow': { max: number }
   'agents.mcp.all': undefined
   'agents.mcp.its': undefined
   'agents.mcp.loading': undefined

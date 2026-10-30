@@ -172,6 +172,8 @@
   "service.laneStart.sameAgent": "Der Bearbeiter kann nicht sein eigener Reviewer sein.",
   "service.laneStart.starting": "Die Lane von Agent {agent} wird bereits gestartet.",
   "service.laneStart.unknownAgent": "{agent} ist kein Agent von {project}.",
+  "service.laneStarts.freshBlockedBody": "{why, select, timeout {Der Agent war nicht innerhalb von {minutes, plural, one {# Minute} other {# Minuten}} frei.} uncertain {Hive wurde beim Start geschlossen, er ist also eventuell nicht gestartet.} other {{reason}}} Versuche es über die Zeile der Lane im Fortschrittspanel erneut oder beende die Lane. Bis dahin warten ihre Karten.",
+  "service.laneStarts.freshBlockedTitle": "Die neue Unterhaltung von {agent} ist nicht gestartet",
   "service.lanes.noWorkspace": "Kein Arbeitsbereich geöffnet",
   "service.lanes.unknown": "Unbekannte Lane {id}",
   "service.metrics.badProvider": "provider muss die ID eines Anbieters sein",

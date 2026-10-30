@@ -392,8 +392,8 @@
     "description": "A button beside the note that workflow rules aren’t enforced: opens Settings → Advanced."
   },
   "workflow.form.overMax": {
-    "defaultMessage": "This project has {count, plural, one {# agent} other {# agents}}: none is removed, but the Assistant can’t add another until it has fewer than {max, number}.",
-    "description": "Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max})."
+    "defaultMessage": "This project has {count, plural, one {# agent} other {# agents}}: none is removed, but no agent can be added until it has fewer than {max, number}.",
+    "description": "Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max}): nobody can add one (HI-2058), neither the user nor the Assistant."
   },
   "workflow.form.paste": {
     "defaultMessage": "Paste JSON…",
@@ -688,12 +688,12 @@
     "description": "A workflow option, under Card loops: Hive wakes the agents of a card loop for its handoffs (glossary: card loop)."
   },
   "workflow.option.maxAgents.desc": {
-    "defaultMessage": "Your team size: the most agents the Assistant (and programs using the Agent API) add to this project, though you can add more yourself and lowering it removes none.",
-    "description": "What the workflow option “Maximum agents” does. Agent API is the name of a Hive feature."
+    "defaultMessage": "Your team size: the most agents this project has, whoever adds them (you, the Assistant or a program using the Agent API), and lowering it removes none.",
+    "description": "What the workflow option “Maximum agents” does (HI-2058: it binds the user too). Agent API is the name of a Hive feature."
   },
   "workflow.option.maxAgents.title": {
     "defaultMessage": "Maximum agents",
-    "description": "A workflow option (HI-2001): the most agents the project has, its team size. The Hive Assistant adds agents only up to it."
+    "description": "A workflow option (HI-2001): the most agents the project has, its team size. Nobody adds agents past it: the user, the Hive Assistant or a program (HI-2058)."
   },
   "workflow.option.mergeChecks.desc": {
     "defaultMessage": "Hive’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.",

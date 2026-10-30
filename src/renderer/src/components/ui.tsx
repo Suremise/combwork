@@ -202,6 +202,12 @@ export function OneLineTitle({ text, className }: { text: string; className?: st
 const TipParent = createContext<((inner: boolean) => void) | null>(null)
 
 /**
+ * HI-2052: the hover tooltip showing now, so only one shows at a time: another one showing hides it, unless it is
+ * around the new one (an outer tooltip gives way to an inner one by TipParent, and shows again when the inner one goes).
+ */
+let hovered: { wrap: HTMLElement; hide: () => void } | null = null
+
+/**
  * Two sentences one after the other, each with its own full stop, spaced as the language does: a space in English,
  * none in Japanese or Chinese (#893). Either can be markup.
  */
@@ -231,11 +237,20 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
     return () => parent(false)
   }, [parent, shown])
   const timer = useRef<number | undefined>(undefined)
-  const show = (): void => {
+  // Shown by the pointer (else by the keyboard's focus): only then does the pointer's leaving close it.
+  const byHover = useRef(false)
+  const show = (how: 'hover' | 'focus'): void => {
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
-      const r = ref.current?.getBoundingClientRect()
-      if (!r) return
+      const wrap = ref.current
+      const r = wrap?.getBoundingClientRect()
+      if (!wrap || !r) return
+      byHover.current = how === 'hover'
+      if (byHover.current) {
+        // HI-2052: one hover tooltip at a time (an outer one stays, given way to this one by TipParent).
+        if (hovered && hovered.wrap !== wrap && !hovered.wrap.contains(wrap)) hovered.hide()
+        hovered = { wrap, hide }
+      }
       setPlaced(null)
       setFit('normal')
       setAnchor({ left: r.left, top: r.top, right: r.right, bottom: r.bottom })
@@ -243,11 +258,28 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
   }
   const hide = (): void => {
     window.clearTimeout(timer.current)
+    if (hovered?.wrap === ref.current) hovered = null
     setAnchor(null)
     setPlaced(null)
     setFit('normal')
   }
-  useEffect(() => () => window.clearTimeout(timer.current), [])
+  useEffect(
+    () => () => {
+      window.clearTimeout(timer.current)
+      if (hovered?.wrap === ref.current) hovered = null
+    },
+    []
+  )
+  // HI-2052: shown by the pointer, it closes once the pointer is over anything but what it wraps, however that got away
+  // from under it (moved, re-laid out: no mouseleave comes for a still pointer). The tip itself takes no pointer events.
+  useEffect(() => {
+    if (!shown || !byHover.current) return
+    const moved = (e: PointerEvent): void => {
+      if (!ref.current?.contains(e.target as Node)) hide()
+    }
+    document.addEventListener('pointermove', moved, { capture: true, passive: true })
+    return () => document.removeEventListener('pointermove', moved, { capture: true })
+  }, [shown])
   // Shown, Esc hides it (WCAG 1.4.13: dismissable without moving the pointer or the focus), as the lanes' legend needs (#1421).
   useEffect(() => {
     if (!shown) return
@@ -276,10 +308,10 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
       className="tip-wrap"
       style={block ? { display: 'flex' } : undefined}
       ref={ref}
-      onMouseEnter={show}
+      onMouseEnter={() => show('hover')}
       onMouseLeave={hide}
       onMouseDown={hide}
-      onFocus={focus ? (e) => (e.target as Element).matches(':focus-visible') && show() : undefined}
+      onFocus={focus ? (e) => (e.target as Element).matches(':focus-visible') && show('focus') : undefined}
       onBlur={focus ? hide : undefined}
     >
       <TipParent.Provider value={setInner}>{children}</TipParent.Provider>

@@ -1144,13 +1144,25 @@ export class WorkspaceService {
   /** Creates <project>/.hive with defaults and excludes it from git. Idempotent. */
   async ensureProject(projectPath: string): Promise<void> {
     const h = join(projectPath, HIVE_DIR)
+    // Never the project's own folder (HI-2045): each folder and file is made only inside one that is there, so a project
+    // deleted or moved out meanwhile, at any step (as when a refresh that listed it before reads it after), fails with
+    // ENOENT rather than coming back as a bare `.hive`. The Assistant's home is Hive's, made with its parents.
+    const made = (dir: string): Promise<void> =>
+      mkdir(dir).then(
+        () => undefined,
+        (e: NodeJS.ErrnoException) => {
+          if (e.code !== 'EEXIST') throw e
+        }
+      )
+    if (this.isAssistantHome(projectPath)) await mkdir(projectPath, { recursive: true })
+    await made(h)
     // Its folders and its exclusion from git at once (HI-1705).
     await whenAll([
       this.ensureGitExclude(projectPath),
       (async () => {
-        await whenAll([mkdir(join(h, 'sessions'), { recursive: true }), mkdir(join(h, 'archive'), { recursive: true })])
+        await whenAll([made(join(h, 'sessions')), made(join(h, 'archive'))])
         // Its platform is recorded as it is made, from what detection finds (SPEC §16.3.5): never switched silently after.
-        if (!existsSync(join(h, 'project.json'))) await writeKeptJson(join(h, 'project.json'), withoutView({ ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform }))
+        if (!existsSync(join(h, 'project.json'))) await writeKeptJson(join(h, 'project.json'), withoutView({ ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform }), { existing: true })
         // 0.1's launch folder for Agent 1; every agent now has launch-<id>.
         if (existsSync(join(h, 'launch'))) await removePath(join(h, 'launch')).catch(() => undefined)
       })()

@@ -653,7 +653,7 @@ export interface HiveRequests {
   /** What loading a template would do, and what stops it now. `from`: the project a project's template is kept in, if not this one. */
   'templates:plan': (projectPath: string, scope: TemplateScope, file: string, from?: string, names?: string[]) => TemplateLoadPlan
   /** Replaces the project's agents and layout with a template's; `expected` is the agents' ids as the user saw them. */
-  'templates:load': (projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>) => { created: string[]; removed: string[]; workflow: TemplateWorkflow | null }
+  'templates:load': (projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>, applyWorkflow?: boolean) => { created: string[]; removed: string[]; workflow: TemplateWorkflow | null }
   /** Adds one agent of a template (the `index`-th), the others left alone. */
   'templates:addAgent': (projectPath: string, scope: TemplateScope, file: string, index: number, from?: string, name?: string) => AgentDef & { connectionFallback?: { name: string; problem: ConnectionProblem } }
   /** Every template of the workspace (#127, the Templates view): Hive's own (#1436), the workspace's, then each project's. */
@@ -817,6 +817,10 @@ export interface HiveRequests {
   'lanes:list': () => LaneInfo[]
   /** The user ends a lane (abandoned: unmerged); returns it as it is now. */
   'lanes:end': (laneId: string, abandoned?: boolean) => LaneInfo
+  /** The user retries a lane's new conversations no more tried (HI-2034: an agent busy as the lane started): how many. */
+  'lanes:retryFresh': (laneId: string) => number
+  /** Test copies only (HI-2034): a lane agent owed its new conversation, as a busy start leaves it, `minutesAgo` since. */
+  'lanes:test': (op: { op: 'oweFresh'; lane: string; role: 'builder' | 'reviewer'; minutesAgo?: number }) => boolean
   /**
    * Start lane… (#1280): records a lane of a project's cards in order and starts its builder and reviewer, each in a
    * fresh conversation with the generated brief. Refused (nothing recorded) while either agent is busy.

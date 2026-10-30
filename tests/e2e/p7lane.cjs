@@ -33,6 +33,14 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
+/** A check the rest of its part builds on (HI-2033): failed, the part stops there rather than carry a null on. */
+class Stopped extends Error {}
+const must = (name, ok, extra = '') => {
+  check(name, ok, extra)
+  if (!ok) throw new Stopped(name)
+}
+/** A part's exception, a check it stopped at already said. */
+const caught = (what, e) => (e instanceof Stopped ? console.log(`(${what} stopped at: ${e.message})`) : check(`${what}no exception`, false, e?.stack ?? String(e)))
 const until = (fn, ms) => lib.until(fn, ms, 250)
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
 const slash = (p) => p.replace(/\\/g, '/')
@@ -146,6 +154,19 @@ function helpers(h) {
     }
     return res
   }
+  /**
+   * Its start review: under load the copy's setup can outlast the first wait, answered "Waiting for a review copy" and
+   * told later (HI-2024, as lanesslots for HI-1955). Once a copy is leased to it for the card, starting again answers with
+   * its folder. The reply, and the copy's folder (or null).
+   */
+  const startReview = async (p, a, n) => {
+    let s = await intent(p, a, n, 'start-review')
+    if ((s.body?.data?.reviewCopy ?? '').startsWith('Waiting for a review copy')) {
+      await until(async () => (await inv('copies:list', p)).some((c) => c.state === 'leased' && c.lease?.kind === 'review' && c.lease.card === n && c.lease.agent === a.id && !c.lease.returned), HUNG_MS)
+      s = await intent(p, a, n, 'start-review')
+    }
+    return { s, copy: (s.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null }
+  }
   /** A line the agent's shell runs (the fakes' "shell:" step), typed until its CLI has taken it: its record, or null. */
   const shell = async (p, a, cmd) => {
     const file = path.join(a.provider === 'codex' ? codexHome : fx.claudeHome, 'fake-shell.jsonl')
@@ -237,7 +258,7 @@ function helpers(h) {
     await listed.click()
   }
   const command = (id) => h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args: [] })
-  return { live, idle, tokenOf, intent, shell, card, facts, kinds, fact, done, lane, slots, slotOfLane, create, runs, shoot, showBoard, startLane, panel, showTab, laneTop, text, toProject, command }
+  return { live, idle, tokenOf, intent, startReview, shell, card, facts, kinds, fact, done, lane, slots, slotOfLane, create, runs, shoot, showBoard, startLane, panel, showTab, laneTop, text, toProject, command }
 }
 
 ;(async () => {
@@ -295,7 +316,7 @@ function helpers(h) {
       const f = await inv('workflow:form', alpha)
       return f?.preset === 'team' ? f.options : null
     }, HUNG_MS)
-    check('Team saved from the tab: Hive merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'hiveMerges' && opts.target === 'main' && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
+    must('Team saved from the tab: Hive merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'hiveMerges' && opts.target === 'main' && !!opts.commands?.typecheck && !!opts.commands?.test && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
     await inv('project:updateConfig', alpha, { slots: { setup: `node "${path.join(fx.tools, 'setup.js')}"` } })
 
     // --- Two lanes from the window at once, each lent a slot, its builder started there in a new conversation.
@@ -329,9 +350,9 @@ function helpers(h) {
       return { ok, line, why: JSON.stringify({ s: s.body, branch: git(slot.folder, 'branch', '--show-current') }) }
     }
     const s1 = await startIn(b1, a1, slotA)
-    check(`${key}-B1's first card starts in slot-a on its own line from main's head`, s1.ok, s1.why)
+    must(`${key}-B1's first card starts in slot-a on its own line from main's head`, s1.ok, s1.why)
     const s3 = await startIn(b2, c1, slotB)
-    check(`${key}-B2's card starts in slot-b on its own line from main's head`, s3.ok && s3.line !== s1.line, s3.why)
+    must(`${key}-B2's card starts in slot-b on its own line from main's head`, s3.ok && s3.line !== s1.line, s3.why)
     Object.assign(kept, { line3: s3.line })
 
     // --- Lane 1's first card: counted checks in the slot, submitted.
@@ -343,16 +364,15 @@ function helpers(h) {
       return until(async () => ((await counted(n)).length >= 2 ? counted(n) : null), HUNG_MS)
     }
     const rev1 = commitIn(slotA.folder, { 'one.txt': 'one\n' }, 'Lane one: first')
-    check("the first card's two checks are counted, run in slot-a", !!(await checksIn(b1, a1)), JSON.stringify(await inv('tasks:work', a1)))
-    check('…submitted', (await x.intent(alpha, b1, a1, 'submit', { summary: 'first: ready' })).status === 200)
+    must("the first card's two checks are counted, run in slot-a", !!(await checksIn(b1, a1)), JSON.stringify(await inv('tasks:work', a1)))
+    must('…submitted', (await x.intent(alpha, b1, a1, 'submit', { summary: 'first: ready' })).status === 200)
 
     // --- Its reviewer, in the project folder, reviews in a review copy at the revision; its check there is of it.
     await inv('session:start', alpha, { agentId: r1.id }).catch(() => undefined)
     const rs = await until(() => x.live(alpha, r1.id), HUNG_MS)
     check(`${key}-R1 runs in the project folder`, same(rs?.cwd, alpha), JSON.stringify(rs))
-    const review = await x.intent(alpha, r1, a1, 'start-review')
-    const copy = (review.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null
-    check(`…start review leases it a review copy at the revision (${rev1.slice(0, 7)})`, review.status === 200 && !!copy && fs.existsSync(copy) && git(copy, 'rev-parse', 'HEAD') === rev1, JSON.stringify(review.body))
+    const { s: review, copy } = await x.startReview(alpha, r1, a1)
+    must(`…start review leases it a review copy at the revision (${rev1.slice(0, 7)})`, review.status === 200 && !!copy && fs.existsSync(copy) && git(copy, 'rev-parse', 'HEAD') === rev1, JSON.stringify(review.body))
     check("…its session stays in the project folder", same((await x.live(alpha, r1.id))?.cwd, alpha))
     q.steer(fx, 'pass')
     const ran = await x.shell(alpha, r1, `cd /d "${copy}" && hive-progress --check typecheck`)
@@ -460,7 +480,7 @@ function helpers(h) {
     check(`${key}-B3's card starts in slot-a`, s4.ok, s4.why)
     Object.assign(kept, { d1, l3: l3?.id, ok: true })
   } catch (e) {
-    check('no exception', false, e?.stack ?? String(e))
+    caught('', e)
   } finally {
     await h.app.close().catch(() => undefined)
   }
@@ -495,23 +515,23 @@ function helpers(h) {
       check('…merged: Done, the lane ended', (await x.done(kept.c1)) && !!(await until(async () => !!(await x.lane(kept.l2))?.endedAt, HUNG_MS)))
     }
   } catch (e) {
-    check('restart: no exception', false, e?.stack ?? String(e))
+    caught('restart: ', e)
   }
   try {
     await pool(h)
   } catch (e) {
-    check('the pool: no exception', false, e?.stack ?? String(e))
+    caught('the pool: ', e)
   }
   try {
     await everyoneInTheFolder(h)
   } catch (e) {
-    check('everyone in the project folder: no exception', false, e?.stack ?? String(e))
+    caught('everyone in the project folder: ', e)
   }
   if (kept.ok)
     try {
       await gallery(h, kept)
     } catch (e) {
-      check('the gallery: no exception', false, e?.stack ?? String(e))
+      caught('the gallery: ', e)
     }
   await h.app.close().catch(() => undefined)
   console.log(`Screenshots: ${fx.shots}`)
@@ -571,8 +591,7 @@ async function pool(h) {
   const review = async (r, n, rev, pass = true) => {
     await until(async () => (await assignedOf(x, n)).includes(r.id), HUNG_MS)
     await x.idle(beta, r.id)
-    const s = await x.intent(beta, r, n, 'start-review')
-    const copy = (s.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null
+    const { s, copy } = await x.startReview(beta, r, n)
     const atRev = !!copy && fs.existsSync(copy) && git(copy, 'rev-parse', 'HEAD') === rev
     const inFolder = same((await x.live(beta, r.id))?.cwd, beta)
     const v = pass ? await x.intent(beta, r, n, 'verdict', { pass: true, comment: `${r.name}: passed` }) : { status: 200 }
@@ -581,11 +600,11 @@ async function pool(h) {
 
   // --- The first card, reviewed by both pooled reviewers (G1b = 2), while E1 builds: E1 is never given it.
   const one = await build(b1, l1.id, p1, 'p1.txt')
-  check(`${b1.name} builds and submits its card in its slot`, one.ok, one.why)
+  must(`${b1.name} builds and submits its card in its slot`, one.ok, one.why)
   const ra = await review(r1, p1, one.rev)
-  check(`${r1.name} reviews it in a review copy at its revision, from the project folder`, ra.ok, ra.why)
+  must(`${r1.name} reviews it in a review copy at its revision, from the project folder`, ra.ok, ra.why)
   const rb = await review(r2, p1, one.rev)
-  check(`…then ${r2.name}, the second reviewer`, rb.ok, rb.why)
+  must(`…then ${r2.name}, the second reviewer`, rb.ok, rb.why)
   check('…both pass it: merged, Done', await x.done(p1))
   check(`E1, building in its lane's slot, was given no review`, JSON.stringify(await assignedOf(x, p1)) === JSON.stringify([r1.id, r2.id]) && !!(await x.slotOfLane(beta, l3.id)), JSON.stringify(await assignedOf(x, p1)))
 
@@ -662,9 +681,8 @@ async function everyoneInTheFolder(h) {
     commitIn(gamma, { 'later.txt': `after ${key}\n` }, `after ${title}`)
     await until(async () => (await assignedOf(x, n)).includes(gr.id), HUNG_MS)
     await x.idle(gamma, gr.id)
-    const r = await x.intent(gamma, gr, n, 'start-review')
-    const copy = (r.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null
-    check(`G-R1 reviews it from the pool in a review copy at ${rev.slice(0, 7)}`, r.status === 200 && !!copy && git(copy, 'rev-parse', 'HEAD') === rev && same((await x.live(gamma, gr.id))?.cwd, gamma), JSON.stringify(r.body))
+    const { s: r, copy } = await x.startReview(gamma, gr, n)
+    must(`G-R1 reviews it from the pool in a review copy at ${rev.slice(0, 7)}`, r.status === 200 && !!copy && git(copy, 'rev-parse', 'HEAD') === rev && same((await x.live(gamma, gr.id))?.cwd, gamma), JSON.stringify(r.body))
     check('…passes it: Done (committed)', (await x.intent(gamma, gr, n, 'verdict', { pass: true, comment: 'passed' })).status === 200 && (await x.done(n)))
   }
   check('no slot was lent in gamma', (await x.slots(gamma)).length === 0, JSON.stringify(await x.slots(gamma)))

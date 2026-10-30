@@ -3581,7 +3581,7 @@ export interface LaneInfo {
  * the lane has no slot yet (every one is lent), so its builder can't start; it pauses the lane until one is free.
  * `preparing` (#1446): its slot is being prepared (G15's warming: its setup or an install), which doesn't pause it.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait'
 
 /**
  * A running lane's slot as its row shows it (#1446): its name, whether the lane works in its builder's carried slot (a
@@ -3620,7 +3620,8 @@ export interface LaneStartInfo {
 /** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */
 export interface LaneStartResult {
   lane: LaneInfo
-  started: { agentId: string; name: string; role: 'builder' | 'reviewer'; how: 'started' | 'fresh' | 'failed'; why?: string }[]
+  /** `deferred` (HI-2034): in a turn or with a prompt it hadn't taken, so it starts in a new conversation once free (the lane's `freshStart`). */
+  started: { agentId: string; name: string; role: 'builder' | 'reviewer'; how: 'started' | 'fresh' | 'failed' | 'deferred'; why?: string }[]
   /** Its slot (#1438), or, with none free, why it waits: its agents start once one is. */
   slot?: string
   waitingForSlot?: string
@@ -3634,8 +3635,13 @@ export interface LaneStatus {
   blocked?: string
   /** you: what the user is asked for (the open request's kind, #1279). */
   ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
-  /** hooks: the agent whose hooks aren't arriving, by name. */
+  /** hooks: the agent whose hooks aren't arriving, by name; startWait: the builder. */
   agent?: string
+  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
+  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh'
+  /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */
+  freshBlocked?: 'timeout' | 'uncertain' | 'failed'
+  freshWhy?: string
   /** preparing (#1446): the slot being prepared. */
   slot?: string
   /**

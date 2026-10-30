@@ -138,15 +138,15 @@ export function agentMax(projectPath: string, cfg?: Pick<ProjectConfig, 'workflo
 }
 
 /**
- * Who adds an agent (HI-2001): the user by hand (the window), up to AGENT_LIMIT_MAX whatever Maximum agents is; or an
- * agent, the Assistant or a program through the Agent API, up to the project's Maximum agents.
+ * Who adds an agent (HI-2001): the user by hand (the window), or an agent, the Assistant or a program through the Agent
+ * API. Both keep to the project's Maximum agents (HI-2058, Darren's decision); each is told it in its own words.
  */
 export type AddedBy = 'user' | 'agent'
 
 /** Why `by` can't add another agent to a project that has `count` (`max`: its Maximum agents), or null when it can. */
 function noRoom(count: number, max: number, by: AddedBy): HiveError | null {
   if (count >= AGENT_LIMIT_MAX) return helperError((t) => agentLimitText(t))
-  if (by === 'agent' && count >= max) return new HiveError({ lines: [agentMaxText(max)] }, { kind: 'conflict' })
+  if (count >= max) return by === 'agent' ? new HiveError({ lines: [agentMaxText(max)] }, { kind: 'conflict' }) : helperError((t) => agentLimitText(t, max))
   return null
 }
 

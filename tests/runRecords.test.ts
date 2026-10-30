@@ -2,7 +2,7 @@
 // runs whose processes it saw end (their jobs seen empty), also those whose releases couldn't be written. Read back by
 // the next start (a new module, as a restarted Hive), kept forward until settled, and never offered as leftovers. No job
 // host: no launch is running, so nothing is listed (the quit's look at running launches is agentProcesses.test.ts's).
-import { readFileSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
@@ -17,12 +17,22 @@ const jobs = vi.hoisted(() => ({
   instance: 1 as number | null,
   listed: [] as string[],
   onList: (_run: string) => undefined as void,
-  lose: (): void => undefined
+  lose: (): void => undefined,
+  /** Jobs still holding a process (HI-2055), as the helper holding them lists them; any other lists empty. */
+  members: new Set<string>(),
+  /** The last helper lost: the next one started is the one after it (each its own identity, HI-2055). */
+  last: 1,
+  /** Told as a helper is made ready (`ensure`), before it answers (HI-2055: a loss then). */
+  onEnsure: () => undefined as void,
+  /** Told as a launch's job is made (`add`), before it answers (HI-2055: a loss then). */
+  onAdd: () => undefined as void
 }))
 vi.mock('../src/main/processSupervisor', async (orig) => {
+  const next = (): number => Math.max(2, jobs.last + 1)
   class JobHost {
     constructor(private readonly opts: { onLost: (why: string) => void }) {
       jobs.lose = () => {
+        jobs.last = jobs.instance ?? jobs.last
         jobs.instance = null
         this.opts.onLost('the helper ended (test)')
       }
@@ -37,6 +47,9 @@ vi.mock('../src/main/processSupervisor', async (orig) => {
       return true
     }
     async ensure(): Promise<boolean> {
+      // As a request, it starts a helper when none runs.
+      jobs.onEnsure()
+      if (jobs.instance === null) jobs.instance = next()
       return true
     }
     close(): Promise<void> {
@@ -44,13 +57,20 @@ vi.mock('../src/main/processSupervisor', async (orig) => {
     }
     async request(cmd: string, run?: string): Promise<unknown> {
       // A request with no helper starts a new one.
-      if (jobs.instance === null) jobs.instance = 2
+      if (cmd === 'add') jobs.onAdd()
+      if (jobs.instance === null) jobs.instance = next()
       if (cmd === 'add') return 'ok'
+      // Asked to end its processes: only asked (they end when the test says, `members`).
+      if (cmd === 'kill' || cmd === 'forget') return true
+      // Configured as a keeper (HI-2055): each helper its own identity.
+      if (cmd === 'keeper') return `${4000 + jobs.instance}:1`
       if (cmd !== 'list') return null
       jobs.listed.push(run!)
       jobs.onList(run!)
       if (jobs.instance === null) return null
-      return { processes: [], more: 0, adopted: 0 }
+      // A helper started since holds none of the old jobs: it lists each as empty.
+      const held = jobs.instance === 1 && jobs.members.has(run!)
+      return { processes: held ? [{ pid: 7001, name: 'node.exe', cmd: 'node server.js', created: '133000000000000000' }] : [], total: held ? 1 : 0, adopted: 0 }
     }
   }
   return { ...((await orig()) as object), JobHost }
@@ -136,5 +156,238 @@ describe("a run's record for its slot writer (HI-1886)", () => {
     jobs.onList = () => undefined
     await m.recordEndedLaunches()
     expect(await m.endedEarlier('s-1')).toBe(false)
+  })
+
+  /**
+   * HI-2055: a launch whose CLI exited leaving processes, which Hive quitting then ends (Settings → Agents): asked to end,
+   * its job is looked at until seen empty (`confirming`). The quit's look waits for it as for a running launch, by the same
+   * rules: kept as ended only once the helper that held its job sees it empty.
+   */
+  describe('leftovers Hive ended as it quits (HI-2055)', () => {
+    const track = async (m: typeof import('../src/main/agentProcesses'), runId: string) => expect(await m.trackLaunch({ runId, projectPath: profile.dir, agentId: runId, agentName: runId }, 100)).toEqual({ tracked: true })
+    /** A launch that left a process running, ended by Hive quitting: asked, not yet seen gone. */
+    async function endedAtQuit(runId: string): Promise<typeof import('../src/main/agentProcesses')> {
+      writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))
+      jobs.instance = 1
+      jobs.onList = () => undefined
+      const m = await restarted()
+      await track(m, runId)
+      jobs.members.add(runId)
+      expect((await m.launchEnded(runId))?.processes).toHaveLength(1)
+      expect(await m.settleAllLeftovers('end')).toBe(1)
+      expect(m.runOutcome(runId)).toBeNull()
+      return m
+    }
+
+    it.runIf(process.platform === 'win32')('seen gone during the look: kept as ended, so its writer settles after the restart', async () => {
+      const m = await endedAtQuit('c-gone')
+      jobs.members.delete('c-gone')
+      await m.recordEndedLaunches()
+      await m.leftoversSaved()
+      expect(await (await restarted()).endedEarlier('c-gone')).toBe(true)
+    })
+
+    it.runIf(process.platform === 'win32')('settled ended meanwhile (its own poll saw it gone): kept', async () => {
+      const m = await endedAtQuit('c-polled')
+      jobs.onList = (run) => {
+        if (run === 'c-polled') m.settleRunForTests('c-polled', 'ended')
+      }
+      await m.recordEndedLaunches()
+      await m.leftoversSaved()
+      expect(await (await restarted()).endedEarlier('c-polled')).toBe(true)
+    })
+
+    it.runIf(process.platform === 'win32')('still running when the look gives up: not kept, so its writer stays held', async () => {
+      const m = await endedAtQuit('c-stays')
+      await m.recordEndedLaunches()
+      await m.leftoversSaved()
+      expect(await (await restarted()).endedEarlier('c-stays')).toBe(false)
+    }, 20_000)
+
+    it.runIf(process.platform === 'win32')('its helper lost during the look, and the next one lists it empty: not kept', async () => {
+      const m = await endedAtQuit('c-lost')
+      jobs.onList = (run) => {
+        if (run === 'c-lost') jobs.lose()
+      }
+      await m.recordEndedLaunches()
+      expect(m.runOutcome('c-lost')).toBe('unknown')
+      await m.leftoversSaved()
+      expect(await (await restarted()).endedEarlier('c-lost')).toBe(false)
+    })
+  })
+
+  /**
+   * HI-2055: a run bound to the helper that holds its job, kept in the profile, so the next start takes that helper's
+   * keeper's state (keeper-<run>.json) for it, and nothing else: whole, its own run and Hive, a helper bound and not
+   * revoked. A lost helper is revoked before its replacement is given a launch, kept before it is.
+   */
+  describe("a keeper's state (HI-2055)", () => {
+    const HIVE = '100:5'
+    const keeperFile = (run: string) => join(profile.dir, 'keeper', `keeper-${run}.json`)
+    const state = (run: string, o: Record<string, unknown> = {}) => ({ v: 1, run, helper: '4001:1', hive: HIVE, state: 'ended', observed: 'complete', total: 0, members: [], at: 1, ...o })
+    const plantState = (run: string, data: unknown) => {
+      mkdirSync(join(profile.dir, 'keeper'), { recursive: true })
+      writeFileSync(keeperFile(run), typeof data === 'string' ? data : JSON.stringify(data))
+    }
+    /** A Hive started now, tracking with the first helper (4001:1). */
+    async function tracking(): Promise<typeof import('../src/main/agentProcesses')> {
+      writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))
+      jobs.instance = 1
+      jobs.last = 1
+      jobs.onList = () => undefined
+      jobs.onEnsure = () => undefined
+      jobs.onAdd = () => undefined
+      const m = await restarted()
+      m.setHiveIdentity(async () => HIVE)
+      return m
+    }
+    const failWrites = (m: typeof import('../src/main/agentProcesses')) => {
+      m.testHooks.write = async () => {
+        throw new Error('disk full (test)')
+      }
+    }
+    const track = async (m: typeof import('../src/main/agentProcesses'), runId: string) => (await m.trackLaunch({ runId, projectPath: profile.dir, agentId: runId, agentName: runId }, 100)).tracked
+
+    it.runIf(process.platform === 'win32')('its binding outlives a crash: the next start takes its "ended", and lists its "live" members', async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-run')).toBe(true)
+      await m.leftoversSaved()
+      // Hive gone without quitting: a new start reads the binding back.
+      const next = await restarted()
+      plantState('k-run', state('k-run'))
+      expect(await next.keeperState('k-run', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
+      plantState('k-run', state('k-run', { state: 'live', total: 2, members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] }))
+      expect(await next.keeperState('k-run', HIVE)).toMatchObject({ state: 'live', helper: '4001:1', members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] })
+    })
+
+    it.runIf(process.platform === 'win32')("none taken unless whole and its own: another helper, Hive or run, a version, an incomplete or non-empty \"ended\", a bad member, malformed or too large", async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-bad')).toBe(true)
+      const bad: unknown[] = [
+        state('k-bad', { helper: '4999:1' }),
+        state('k-bad', { hive: '100:6' }),
+        state('k-bad', { run: 'k-other' }),
+        state('k-bad', { v: 2 }),
+        state('k-bad', { observed: undefined }),
+        state('k-bad', { total: 1 }),
+        state('k-bad', { members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] }),
+        state('k-bad', { state: 'gone' }),
+        state('k-bad', { state: 'live', total: 1, members: [{ pid: 7001, created: '0', name: 'node' }] }),
+        state('k-bad', { state: 'live', total: 0, members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] }),
+        '{"v":1,"run":"k-bad",',
+        state('k-bad', { pad: 'x'.repeat(70 * 1024) })
+      ]
+      for (const b of bad) {
+        plantState('k-bad', b)
+        expect(await m.keeperState('k-bad', HIVE), JSON.stringify(b).slice(0, 120)).toBeNull()
+      }
+      // A run never bound (tracked before this change, or by no keeper): none.
+      plantState('k-unbound', state('k-unbound'))
+      expect(await m.keeperState('k-unbound', HIVE)).toBeNull()
+      // The good one, for contrast.
+      plantState('k-bad', state('k-bad'))
+      expect(await m.keeperState('k-bad', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
+    })
+
+    it.runIf(process.platform === 'win32')('a lost helper is revoked at once, and kept before its replacement is given a launch; a receipt it writes later frees nothing', async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-old')).toBe(true)
+      plantState('k-old', state('k-old'))
+      expect(m.keeperStillBound('k-old', '4001:1')).toBe(true)
+      jobs.lose()
+      // Known at once (a clear's guard reads it), before anything is written.
+      expect(m.keeperStillBound('k-old', '4001:1')).toBe(false)
+      expect(await m.keeperState('k-old', HIVE)).toBeNull()
+      // The next launch goes to the new helper, bound to it, once the revocation is kept.
+      expect(await track(m, 'k-new')).toBe(true)
+      expect(m.keeperStillBound('k-new', '4002:1')).toBe(true)
+      await m.leftoversSaved()
+      const kept = JSON.parse(readFileSync(file, 'utf8')) as { revoked?: string[]; helpers?: Record<string, string> }
+      expect(kept.revoked).toEqual(['4001:1'])
+      // The revoked helper's binding went with its revocation.
+      expect(kept.helpers).toEqual({ 'k-new': '4002:1' })
+      // After a restart too.
+      expect(await (await restarted()).keeperState('k-old', HIVE)).toBeNull()
+    })
+
+    it.runIf(process.platform === 'win32')('a revocation never lapses: after more losses than the revoked list keeps, the first helper still frees nothing, after a restart too (HR2\'s round 1)', async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-oldest')).toBe(true)
+      plantState('k-oldest', state('k-oldest'))
+      for (let i = 0; i < 55; i++) {
+        jobs.lose()
+        expect(await track(m, `k-${i}`)).toBe(true)
+      }
+      expect(await m.keeperState('k-oldest', HIVE)).toBeNull()
+      await m.leftoversSaved()
+      const kept = JSON.parse(readFileSync(file, 'utf8')) as { revoked?: string[]; helpers?: Record<string, string> }
+      // The list kept is bounded, the binding went with the revocation.
+      expect(kept.revoked).not.toContain('4001:1')
+      expect(kept.helpers?.['k-oldest']).toBeUndefined()
+      expect(await (await restarted()).keeperState('k-oldest', HIVE)).toBeNull()
+    })
+
+    it.runIf(process.platform === 'win32')("a helper lost while the launch's helper is made ready, its revocation not kept: the launch isn't tracked", async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-before')).toBe(true)
+      await m.leftoversSaved()
+      failWrites(m)
+      jobs.onEnsure = () => {
+        jobs.onEnsure = () => undefined
+        jobs.lose()
+      }
+      try {
+        expect(await track(m, 'k-during-ensure')).toBe(false)
+      } finally {
+        m.testHooks.write = null
+      }
+      expect(m.keeperStillBound('k-before', '4001:1')).toBe(false)
+      // Kept now: tracked by the new helper, bound to it.
+      expect(await track(m, 'k-after')).toBe(true)
+      expect(m.keeperStillBound('k-after', '4002:1')).toBe(true)
+    })
+
+    it.runIf(process.platform === 'win32')("a helper lost while the launch's job is made: its revocation not kept, the launch isn't tracked; kept, it is tracked but bound to no helper", async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-first')).toBe(true)
+      await m.leftoversSaved()
+      failWrites(m)
+      jobs.onAdd = () => {
+        jobs.onAdd = () => undefined
+        jobs.lose()
+      }
+      try {
+        expect(await track(m, 'k-during-add')).toBe(false)
+      } finally {
+        m.testHooks.write = null
+      }
+      // The same, the revocation kept: its job was made by a helper its keeper wasn't configured on, so no binding.
+      jobs.onAdd = () => {
+        jobs.onAdd = () => undefined
+        jobs.lose()
+      }
+      expect(await track(m, 'k-across-add')).toBe(true)
+      for (const h of ['4001:1', '4002:1', '4003:1', '4004:1']) expect(m.keeperStillBound('k-across-add', h)).toBe(false)
+    })
+
+    it.runIf(process.platform === 'win32')("the revocation can't be kept: no launch is given to the new helper (untracked, said), until it can", async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-first')).toBe(true)
+      await m.leftoversSaved()
+      failWrites(m)
+      try {
+        jobs.lose()
+        const refused = await m.trackLaunch({ runId: 'k-refused', projectPath: profile.dir, agentId: 'k', agentName: 'k' }, 100)
+        expect(refused).toMatchObject({ tracked: false })
+        expect(m.runOutcome('k-refused')).toBeNull()
+      } finally {
+        m.testHooks.write = null
+      }
+      // Kept now: the next launch is tracked, by the new helper.
+      expect(await track(m, 'k-later')).toBe(true)
+      expect(m.keeperStillBound('k-later', '4002:1')).toBe(true)
+      await m.leftoversSaved()
+      expect((JSON.parse(readFileSync(file, 'utf8')) as { revoked?: string[] }).revoked).toEqual(['4001:1'])
+    })
   })
 })

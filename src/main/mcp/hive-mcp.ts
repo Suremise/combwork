@@ -116,40 +116,41 @@ const waitReplyMs = (seconds: unknown, fallback: number, max: number): number =>
 
 const projectArg = {
   type: 'string',
-  description: `Project name. Defaults to the current project${PROJECT ? ` ("${PROJECT}")` : ''}.`
+  description: PROJECT ? `Default: "${PROJECT}".` : 'Default: this project.'
 }
 /** A card (#1219; HI-1661: named by its key, an old number still taken). */
 /** A reply worded with the card names the API sent with it (#1219: its `names`). */
 const named = <T>(r: T, text: (r: T) => string): string => namedBy(namesFrom((r as { names?: Record<string, string> } | null)?.names), () => text(r))
-const cardArg = { type: ['number', 'string'], description: 'The card: its key ("HI-12").' }
-const agentArg = { type: 'string', description: "The agent's name (e.g. \"Agent 2\") or id. Optional when the project has one agent." }
+const cardArg = { type: ['number', 'string'], description: 'Its key ("HI-12").' }
+const agentArg = { type: 'string', description: 'Its name or id; optional when the project has one agent.' }
+// Values from hive_list_providers; empty follows the project (HI-2012: the cases are in use-hive-api's tools.md).
 const settingsArgs = {
-  provider: { type: 'string', description: 'Provider id (hive_list_providers). Default: the project\'s default provider.' },
-  model: { type: 'string', description: 'Model (hive_list_providers). Empty follows the project.' },
-  effort: { type: 'string', description: 'Effort level (hive_list_providers). Empty follows the project.' },
-  mode: { type: 'string', description: 'Permission mode (hive_list_providers). Empty follows the project.' },
-  context200k: { type: 'string', enum: ['on', 'off', ''], description: "Use a 200K context window instead of the model's 1M one, for providers with context200k (hive_list_providers). Empty follows the project." },
-  mcpServers: { type: 'array', items: { type: 'string' }, description: "Only these of the project's MCP servers (names), [] none, [\"*\"] all (the default). The hive server is always given." },
-  connection: { type: 'string', description: "The connection it runs on, by id or name (hive_list_providers lists those on here); its CLI is the provider. Empty: its CLI's default connection. A name two share is refused: use the id." }
+  provider: { type: 'string', description: "Provider id; default: the project's." },
+  model: { type: 'string', description: 'Empty follows the project.' },
+  effort: { type: 'string', description: 'Empty follows the project.' },
+  mode: { type: 'string', description: 'Permission mode; empty follows the project.' },
+  context200k: { type: 'string', enum: ['on', 'off', ''], description: "A 200K context instead of the model's 1M; empty follows the project." },
+  mcpServers: { type: 'array', items: { type: 'string' }, description: 'The project\'s MCP servers it gets: [] none, ["*"] all (default). hive is always given.' },
+  connection: { type: 'string', description: "Its connection, by id or name; empty: its CLI's default." }
 }
-const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist'], description: 'Its side in the workflow: builds cards, reviews them, either (never its own), or generalist (does what it is asked in its pane; never in a lane or the reviewer pool). Default: guessed from its name.' }
+const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist'], description: 'Builds cards, reviews them, either (never its own), or generalist (never in a lane). Default: from its name.' }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
 /** Which agent is changing a card, for its history (Hive fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
 /** The Assistant's override of a card's workflow rules for a move (#1265, SPEC §16.8.4): why, recorded on the card. */
-const overrideArg = { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'], description: "Moves the card across the workflow rules the move skips: reason is the user's own why (recorded on the card with the rules), given with the request or after you told them what it skips; never made up." }
+const overrideArg = { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'], description: "Moves it past the rules the move skips: reason is the user's own why, never made up." }
 const cardsArg = (what: string) => ({ type: 'array', items: { type: ['number', 'string'] }, description: `${what} Each its key ("HI-12").` })
 /** Files kept with a card (HI-1700): local paths, copied in. */
 const attachmentsArg = (where: string) => ({
   type: 'array',
   items: { type: 'string' },
-  description: `Files to keep with the card (screenshots, logs): local paths, ${ASSISTANT ? "in the workspace, your pasted files' or the temp folder" : 'in your project, its slots or the temp folder'}; at most 10 and 100 MB in all, each copied in (the same file once) and ${where}. hive_read_task lists them by path.`
+  description: `Files to keep with it (${ASSISTANT ? 'the workspace, pasted files or the temp folder' : 'your project, its slots or the temp folder'}; at most 10, 100 MB), ${where}.`
 })
 /** Numbers that aren't cards (a console's events). */
 const numbersArg = (what: string) => ({ type: 'array', items: { type: 'number' }, description: what })
 
 /** The card of an intent (#1267, S48): its key (an old #number is still taken; a plain number is refused). */
-const intentCardArg = { type: 'string', description: 'The card: its key ("HI-12").' }
+const intentCardArg = { type: 'string', description: 'Its key ("HI-12").' }
 
 /**
  * A card's intents (#1267, SPEC §16.8.1), a tool each: the caller says what it did or wants, and Hive moves the card by
@@ -163,34 +164,34 @@ function intentTools(): Tool[] {
     inputSchema: { type: 'object', properties: { card: intentCardArg, ...properties }, required: ['card', ...required] },
     run: async (a) => intentText((await api('POST', `/v1/tasks/${enc(String(a.card))}/${path}`, body(a))) as IntentDone)
   })
-  const revision = { type: 'string', description: 'The revision submitted; default: the card\'s current one, as Hive reads it (its commit, or its files\' hash without version control).' }
-  const submission = { type: 'number', description: 'The submission it is about; default: the latest.' }
+  const revision = { type: 'string', description: "Default: the card's current revision (its commit, or its files' hash)." }
+  const submission = { type: 'number', description: 'Default: the latest.' }
   return [
     intent('hive_start_card', 'start', "Start work on a card in Todo yourself: it moves to Doing and is yours. Replies with its folder, and its line, base and target where it has them.", {}, []),
     intent('hive_put_back', 'put-back', 'Put a card in Doing back in Todo, unstarted. why is written as a comment.', { why: { type: 'string', description: 'Why it goes back.' } }, ['why'], (a) => ({ why: a.why })),
     intent(
       'hive_submit',
       'submit',
-      'Submit a card in Doing for review: hands its committed work to review (a code card in Git needs its work committed; submitting never commits), and it moves on (to Review, or past it where its project has no review). Writes summary as a comment. A revision already reviewed needs note (what is different). In Review, a commit asked for while it is reviewed goes in with followUp. As a lane\'s builder, Hive then watches it for you, for its review. Replies with warnings (files outside its paths, other agents\' changes in a shared folder) and the watch.',
-      { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'For a revision already reviewed: what this submission adds (an explanation).' }, paths: { type: 'array', items: { type: 'string' }, description: 'The files the work changed, relative to the project, for a project with no version control.' }, followUp: { type: 'boolean', description: 'Its builder, the card in Review: a commit its reviewer asked for becomes the revision under review. It stays in Review, no round counted; its reviewer is woken to start its review again.' }, tests: { type: 'array', items: { type: ['string', 'object'] }, description: "Where the project runs each card's focused tests at merge: tests the change needs beyond those its picker chooses, or, when it can't choose, all of them (reviewed with the change). Each the project's test id, or { id, needs } (needs: unit, fake, real, packaged)." } },
+      "Submit a card in Doing for review: its committed work (submitting never commits), summary written as a comment. A revision already reviewed needs note. Replies with where it went and any warnings.",
+      { summary: { type: 'string', description: 'What was done, a line first.' }, revision, note: { type: 'string', description: 'What this submission adds to one already reviewed.' }, paths: { type: 'array', items: { type: 'string' }, description: 'Without version control: the files it changed.' }, followUp: { type: 'boolean', description: 'In Review: a commit its reviewer asked for becomes the revision reviewed, no round counted.' }, tests: { type: 'array', items: { type: ['string', 'object'] }, description: 'Focused tests its merge runs beyond those picked: test ids, or { id, needs }.' } },
       ['summary'],
       (a) => ({ summary: a.summary, revision: a.revision, note: a.note, paths: a.paths, followUp: a.followUp, tests: a.tests })
     ),
-    intent('hive_declare_paths', 'declare-paths', "Declare the paths a card's work will change (relative to the project), for a folder shared with other agents. Moves nothing.", { paths: { type: 'array', items: { type: 'string' } } }, ['paths'], (a) => ({ paths: a.paths })),
-    intent('hive_start_review', 'start-review', "Start reviewing a card in Review: you are its reviewer; it stays where it is. Replies with the revision, base and files to review, and the review copy to read and run commands in, when the project has them.", { submission }, [], (a) => ({ submission: a.submission })),
+    intent('hive_declare_paths', 'declare-paths', "Declare the paths a card's work will change, in a folder shared with other agents. Moves nothing.", { paths: { type: 'array', items: { type: 'string' } } }, ['paths'], (a) => ({ paths: a.paths })),
+    intent('hive_start_review', 'start-review', "Start reviewing a card in Review (it stays there). Replies with what to review and the review copy to work in, when there is one.", { submission }, [], (a) => ({ submission: a.submission })),
     intent(
       'hive_verdict',
       'verdict',
-      "Give your verdict on the card you review: comment is written on it. A pass moves it on (to Passed, or to its merge) once its reviews are in; a fail sends it back to Doing for its builder, a round counted, and as a lane's reviewer Hive then watches it for you, for its next round.",
-      { pass: { type: 'boolean' }, comment: { type: 'string', description: 'The verdict, a line first; findings numbered.' }, failKind: { type: 'string', enum: ['content', 'explanation'], description: 'A fail: the work itself (content) or only how it was explained (explanation).' }, submission },
+      "Give your verdict on the card you review, comment written on it: a pass moves it on, a fail sends it back to Doing for its builder (a round counted).",
+      { pass: { type: 'boolean' }, comment: { type: 'string', description: 'A line first; findings numbered.' }, failKind: { type: 'string', enum: ['content', 'explanation'], description: 'A fail of the work (content) or only of how it was explained.' }, submission },
       ['pass', 'comment'],
       (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, submission: a.submission })
     ),
     intent(
       'hive_focused_skip',
       'focused-skip',
-      "As a card's reviewer, decide on focused tests its merge skipped for their environment (a usage limit, a sign-in, the network), when Hive asks you: merge true merges it with them skipped, false returns it to its builder. why is recorded; the user can override.",
-      { request: { type: 'string', description: 'The request Hive named ("HI-12/r40").' }, merge: { type: 'boolean' }, why: { type: 'string', description: 'Why, in a sentence.' } },
+      "As its reviewer, when Hive asks: merge a card whose focused tests were skipped for their environment (merge true), or return it to its builder (false).",
+      { request: { type: 'string', description: 'As Hive named it ("HI-12/r40").' }, merge: { type: 'boolean' }, why: { type: 'string', description: 'Why, in a sentence.' } },
       ['request', 'merge', 'why'],
       (a) => ({ request: a.request, merge: a.merge, why: a.why })
     ),
@@ -198,16 +199,16 @@ function intentTools(): Tool[] {
     intent(
       'hive_ask_user',
       'ask',
-      'Ask the user something about a card: it shows under For you with the card; no round is counted and it is not a stall. The answer comes to your inbox. When the answer is something only the user can do on the card (move it to Done, make it no code, unblock it, skip its review), offer it in actions: one click does it.',
+      "Ask the user something about a card, under For you; the answer comes to your inbox. When the answer is something only the user can do (Done, no code, unblock, skip review), offer it in actions.",
       {
         kind: { type: 'string', enum: ['approve', 'decide', 'test', 'signIn', 'other'] },
         text: { type: 'string', description: 'The question, in full.' },
-        revision: { type: 'string', description: 'The revision it is about; default: the card\'s latest submission.' },
-        checklist: { type: 'array', items: { type: 'string' }, description: 'For test: the steps to try, in order (at most 20).' },
+        revision: { type: 'string', description: "Default: the card's latest submission." },
+        checklist: { type: 'array', items: { type: 'string' }, description: 'For test: the steps to try (at most 20).' },
         actions: {
           type: 'array',
-          items: { type: 'object', properties: { kind: { type: 'string', enum: ['done', 'noCode', 'unblock', 'skipReview'] }, reason: { type: 'string', description: 'Your suggested reason, recorded with it.' } }, required: ['kind'] },
-          description: 'Up to 3, each kind once: buttons under the question. Its answer says which the user chose.'
+          items: { type: 'object', properties: { kind: { type: 'string', enum: ['done', 'noCode', 'unblock', 'skipReview'] }, reason: { type: 'string', description: 'Your suggested reason.' } }, required: ['kind'] },
+          description: 'Up to 3, each kind once: buttons under the question.'
         }
       },
       ['text'],
@@ -216,17 +217,17 @@ function intentTools(): Tool[] {
     intent(
       'hive_cannot_within_rules',
       'cannot',
-      "Report that a card can't go on within a workflow rule: a decision for the user under For you, never a failed round or a stall.",
+      "Report that a card can't go on within a workflow rule: the user decides, under For you.",
       { rule: { type: 'string', description: 'The rule, as a refusal named it.' }, why: { type: 'string' } },
       ['rule', 'why'],
       (a) => ({ rule: a.rule, why: a.why })
     ),
-    intent('hive_request_builder', 'request', "Ask a card's builder for something while you review it (a commit, a run): written as a comment; its builder is woken.", { text: { type: 'string' } }, ['text'], (a) => ({ text: a.text })),
+    intent('hive_request_builder', 'request', "Ask a card's builder for something while you review it (a commit, a run); it is woken.", { text: { type: 'string' } }, ['text'], (a) => ({ text: a.text })),
     intent(
       'hive_loop_step',
       'loop-step',
-      "A card loop's step between builder and reviewer that moves nothing: text is written as a comment and the other side is woken. Builder: design (posted for the card's reviewer to check, the card in Doing; replies with its design id and until, when the check is due), proceed (no answer by then: building as posted; refused before), followUp (a follow-up asked of reviewed work, such as a screenshot change, ready for its reviewer's check, the card in Review or Passed; replies with its id; no proceed). Reviewer: ok or gaps, its answer. Refused with no reviewer to check it.",
-      { step: { type: 'string', enum: [...LOOP_STEPS] }, text: { type: 'string', description: 'The design or follow-up, the answer (gaps: what is missing), or a line.' }, design: { type: 'string', description: 'ok, gaps, proceed: the design or follow-up they are about, as its reply or wake names it ("HI-12/s40").' } },
+      "A card loop's step that moves nothing: text is a comment, and the other side is woken. Builder: design, proceed (no answer by its until), followUp. Reviewer: ok or gaps. (detail: use-hive-api, tools.md)",
+      { step: { type: 'string', enum: [...LOOP_STEPS] }, text: { type: 'string', description: 'The design or follow-up, or the answer (gaps: what is missing).' }, design: { type: 'string', description: 'ok, gaps, proceed: the id it is about ("HI-12/s40").' } },
       ['step', 'text'],
       (a) => ({ step: a.step, text: a.text, design: a.design })
     )
@@ -260,25 +261,25 @@ const docQuery = (a: Record<string, any>): string => {
   return `path=${enc(String(a.path ?? ''))}${p ? `&project=${enc(p)}` : ''}${a.from === 'project' ? '&from=project' : ''}`
 }
 /** Which copy of a project file (#818): the agent's own folder's by default, or the project folder's. */
-const fromArg = { type: 'string', enum: ['project'], description: "project: read the project folder's copy, not the one in the folder you work in (as a card's Read first references are given)." }
+const fromArg = { type: 'string', enum: ['project'], description: "project: the project folder's copy, as a card's Read first references are given." }
 
 /** A card's context (#818): the doc sections its agent reads first, given in its start prompt. */
 const contextArg = {
   type: 'array',
   items: { type: 'string' },
-  description: 'Doc sections to read first, by file and heading slug (as hive_doc_outline lists them), never line numbers: "docs/PLAN.md#setup", "shared:plans/notes.md#open-questions", or a whole file. Replaces the list; [] clears it.'
+  description: 'Doc sections to read first: "docs/PLAN.md#setup" (a heading slug), "shared:notes.md", a whole file. Replaces the list.'
 }
 
 const tools: Tool[] = [
   {
     name: 'hive_list_projects',
-    description: 'List all projects in the open Hive workspace: one line each with whether it is on, its branch, and its agents with their provider and status (working, waiting, idle, stopped). hive_project_status gives one project in full.',
+    description: "The workspace's projects, a line each: on or off, branch, agents and their status. hive_project_status gives one in full.",
     inputSchema: { type: 'object', properties: {} },
     run: async () => projectListText((await api('GET', '/v1/projects?view=short')) as ProjectRow[])
   },
   {
     name: 'hive_project_status',
-    description: "One project's status and settings, its workflow options in force (workflow: which the project, the workspace or Hive's settings set), and its agents (each with its folder: a slot, the project folder or a retired home; and its workflowRole: builder, reviewer or either) with their ids, branches and running sessions, and pairs: its builder and reviewer pairs (each running lane's, then by name, byName), as JSON.",
+    description: "One project as JSON: its settings, workflow options in force, agents (folder, role, session) and builder and reviewer pairs.",
     inputSchema: { type: 'object', properties: { project: projectArg } },
     run: async (a) => projectStatusReply(await api('GET', `/v1/projects/${proj(a)}`))
   },
@@ -293,7 +294,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_list_shared_notes',
-    description: 'List the shared notes, instructions and handovers stored in the workspace (.hive/shared): one path per line, with the date it last changed. hive_read_shared_note reads one.',
+    description: "The workspace's shared notes and handovers (.hive/shared): a path and date a line. hive_read_shared_note reads one.",
     inputSchema: { type: 'object', properties: {} },
     run: async () => notesListText((await api('GET', '/v1/shared')) as NoteEntry[])
   },
@@ -306,20 +307,20 @@ const tools: Tool[] = [
   {
     name: 'hive_doc_outline',
     description:
-      'The headings of a Markdown document, each with its slug and its section\'s size in characters (subsections included), to read only the sections you need with hive_read_section. path: a file of your project, relative to the folder you work in ("docs/PLAN.md"), or a shared note as "shared:<path>" ("shared:plans/i18n.md"). from: "project" reads the project folder\'s copy instead of the one in the folder you work in. depth: only headings down to that level (2: # and ##).',
+      'A Markdown document\'s headings, each with its slug and size, to read only the sections you need (hive_read_section). path: a file of your project ("docs/PLAN.md") or a shared note ("shared:i18n.md").',
     inputSchema: { type: 'object', properties: { path: { type: 'string' }, depth: { type: 'number' }, from: fromArg, project: projectArg }, required: ['path'] },
     run: async (a) => docOutlineText((await api('GET', `/v1/docs/outline?${docQuery(a)}`)) as { path: string; size: number; headings: DocHeadingRow[] }, Number(a.depth) || undefined)
   },
   {
     name: 'hive_read_section',
     description:
-      'One section of a Markdown document, with its subsections. path: as for hive_doc_outline. heading: "#" and a slug from the outline ("#core-contracts"; two "Setup" headings are "#setup" and "#setup-1"), or the heading\'s text (several sections with that text: it lists their slugs). An unknown heading replies with the closest ones; no heading reads the whole document. A section over 30,000 characters comes as its text before its subsections and their outline; full=true gives all of it. from: as for hive_doc_outline.',
+      'One section of a Markdown document, with its subsections. path: as for hive_doc_outline; heading: "#" and its slug from the outline, or its text; none: the whole document. (detail: use-hive-api, tools.md)',
     inputSchema: { type: 'object', properties: { path: { type: 'string' }, heading: { type: 'string' }, full: { type: 'boolean' }, from: fromArg, project: projectArg }, required: ['path'] },
     run: async (a) => docSectionText((await api('GET', `/v1/docs/section?${docQuery(a)}${a.heading ? `&heading=${enc(a.heading)}` : ''}${a.full ? '&full=true' : ''}`)) as Parameters<typeof docSectionText>[0])
   },
   {
     name: 'hive_write_shared_note',
-    description: "Create or overwrite a shared note (markdown) in .hive/shared; append=true adds to the end. expectedRevision (from reading it): written only if the note hasn't changed since, else refused with its current revision. \"Workspace notes.md\", which Hive gives every agent at launch, only the user and the Assistant write. Replies with the path, size and new revision.",
+    description: "Create or overwrite a shared note (.hive/shared); append=true adds to its end. expectedRevision: written only if unchanged since you read it. \"Workspace notes.md\" is the user's and the Assistant's to write.",
     inputSchema: {
       type: 'object',
       properties: { path: { type: 'string' }, content: { type: 'string' }, append: { type: 'boolean' }, expectedRevision: { type: 'string' } },
@@ -345,7 +346,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_create_handover',
-    description: "Save a handover in the workspace's shared notes for a project (this one by default). Hive writes its header (title, project, author, session, date): content starts at the first heading. Replies with its path.",
+    description: "Save a handover in the shared notes for a project (this one by default). Hive writes its header: content starts at the first heading.",
     inputSchema: {
       type: 'object',
       properties: { title: { type: 'string' }, content: { type: 'string' }, project: projectArg },
@@ -361,14 +362,14 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_notify',
-    description: 'Show the user a notification in Hive. Levels: info (default), success, warning, error. When it is about one agent (one waiting for the user, say) or one card, give it as target: a click on the notification then opens that agent\'s pane or the card.',
+    description: 'Show the user a notification in Hive. About one agent or one card: give it as target, and a click opens it.',
     inputSchema: {
       type: 'object',
       properties: {
         title: { type: 'string' },
         message: { type: 'string' },
         level: { type: 'string', enum: ['info', 'success', 'warning', 'error'] },
-        target: { type: 'object', description: 'What a click opens: { agent, project } (its name or id; project defaults to yours) or { card } (its key, "HI-12").', properties: { agent: { type: 'string' }, project: { type: 'string' }, card: { type: 'string' } } }
+        target: { type: 'object', description: 'What a click opens: { agent, project } or { card } (its key).', properties: { agent: { type: 'string' }, project: { type: 'string' }, card: { type: 'string' } } }
       },
       required: ['title']
     },
@@ -379,8 +380,8 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_inbox',
-    description: `What Hive has for you to read (messages left for you, tasks, the user's decisions, card events), oldest first: each with its id, who it is from and its card; a card's events come as one item. Listing them marks them received. Once you have read and acted on a message, task, handover or decision, ack it (ack: its ids, as listed; one not read yet isn't acked): not acked ${OVERDUE_MINUTES} minutes after it was made, it shows as overdue to the user and the Assistant; a card event needs no ack. Three forms: no ack reads; ack alone acks and lists nothing; ack with read=true acks, then reads in the same call (for when more has come in while you acted: what it lists is received, not acked). Ack the ids you've acted on in your next hive_inbox call, not in a call of their own. Replies with what is new, and the ids received before and not acked.`,
-    inputSchema: { type: 'object', properties: { ack: { type: 'array', items: { type: 'string' }, description: 'Ids to ack ("m12") once you have acted on them.' }, read: { type: 'boolean', description: 'With ack: also read what is new, in the same call.' } } },
+    description: `What Hive has for you (messages, tasks, the user's decisions, card events), oldest first, with ids. Read, act, then ack what you acted on in your next call, with read=true to read on in it (card events need no ack): one not acked within ${OVERDUE_MINUTES} minutes shows as overdue. (detail: use-hive-api, tools.md)`,
+    inputSchema: { type: 'object', properties: { ack: { type: 'array', items: { type: 'string' }, description: 'Ids you have acted on ("m12"). Alone, it acks and lists nothing.' }, read: { type: 'boolean', description: 'With ack: acks, then reads what is new, in the same call.' } } },
     run: async (a) => {
       if (Array.isArray(a.ack) && a.ack.length) {
         // #1531: with read, the ack and then the read, in one call; what the read lists is received, never acked.
@@ -395,25 +396,25 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_list_providers',
-    description: 'The coding-agent providers: whether each is on and installed, and the models, effort levels, permission modes and the connections on here to use when adding or changing agents (JSON).',
+    description: 'The coding-agent providers as JSON: on, installed, and the models, effort levels, modes and connections to use for agents.',
     inputSchema: { type: 'object', properties: {} },
     run: () => api('GET', '/v1/providers')
   },
   {
     name: 'hive_agent_activity',
-    description: `What one agent is doing: status, model and effort it runs with, retryWaits (this launch's waits for its CLI to retry a throttled or failed request: count, seconds, latest), its folder (a slot, the project folder or a retired home; launchFolder: where a new conversation would start, when that differs) and branch, background tasks, transcript size (transcriptMB; past transcriptWarnMB it slows down, so suggest a handover to a new conversation), the start of the task it was last given and of its latest reply, its last tool calls this turn, safeguard (its CLI's safety classifier stopped a response or switched its model since: when, the model, the names of the tool calls before it; "not detected" for a CLI Hive can't tell), locked files, how long ago the user typed in its terminal, and what was left for it (hive_message_agent): inbox, with unread, overdue (not acked ${OVERDUE_MINUTES} minutes after it was made) and its latest deliveries (5; 20 with detail), each with its id, state (queued, offered: its line typed into it, received: it read it with hive_inbox, acked, cancelled, refused, expired, stale: its card moved on), times and why it ended. Texts are clipped: the task to 300 characters, the reply to 500, the last 3 tool calls (100 characters each); detail=true raises that to 2000, 3000 and the last 10 calls (200 each). toolCalls is how many calls this turn had, and clipped gives the whole length of a text that was cut. Hive gives no more of a conversation than that: for the rest, the card's comments or the agent itself.`,
+    description: "What one agent is doing, as JSON: status, model and effort, its folder, its task and latest reply (clipped), last tool calls, retry waits and its inbox. detail=true clips less. (detail: use-hive-api, tools.md)",
     inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, detail: { type: 'boolean' } } },
     run: (a) => api('GET', `${agentPath(a)}/activity${a.detail ? '?detail=true' : ''}`)
   },
   {
     name: 'hive_wait_for_agents',
     description:
-      `Wait until agents stop working (finished, idle, waiting for the user or stopped); without agents, every busy agent in the workspace. Background tasks an agent started (status background) count as working unless ignoreBackground=true; an agent watching cards (status watching) doesn't. wake=true (an agent watch, rather than waiting call after call): replies at once, then Hive types one line into this session when one finishes its turn, waits for the user or stops, with the start of its reply${ASSISTANT ? " (and when the user sends one a prompt from its pane, with its first line)" : ''}, or after limitMinutes (default 120) if none does; agents not working now are the reply instead. End your turn after it: nothing runs, and no other work is given to you, meanwhile. It is your one watch (a card watch replaces it, and it one); cancel=true ends it. Without wake it waits here up to timeoutSeconds (default 50, at most ${AGENT_WAIT_MAX}) and replies with each one's status and whether it timed out: call again to keep waiting.`,
+      `Wait until agents stop working (all busy ones if none named). wake=true: an agent watch, your one watch (a card watch replaces it); Hive types a line here when one finishes. End your turn after it. (detail: use-hive-api, tools.md)`,
     inputSchema: {
       type: 'object',
       properties: {
         agents: { type: 'array', items: { type: 'object', properties: { project: { type: 'string' }, agent: { type: 'string' } }, required: ['project'] } },
-        timeoutSeconds: { type: 'number' },
+        timeoutSeconds: { type: 'number', description: `Without wake: how long it waits here (default 50, at most ${AGENT_WAIT_MAX}).` },
         ignoreBackground: { type: 'boolean' },
         wake: { type: 'boolean' },
         limitMinutes: { type: 'number' },
@@ -446,7 +447,7 @@ const tools: Tool[] = [
   {
     name: 'hive_add_agent',
     description:
-      "Add an agent to a project. It starts in the project folder; a card or lane it builds is lent a slot. With prompt it starts at once on that task; with start and no prompt it starts idle. Replies with its name, id, provider, folder and status.",
+      "Add an agent to a project. With prompt it starts at once on that task; with start and no prompt it starts idle.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -455,7 +456,7 @@ const tools: Tool[] = [
         workflowRole: workflowRoleArg,
         ...settingsArgs,
         start: { type: 'boolean' },
-        prompt: { type: 'string', description: 'The first task, in full: it reads nothing else from you.' }
+        prompt: { type: 'string', description: 'Its first task, in full: it reads nothing else from you.' }
       },
       required: ['project']
     },
@@ -473,13 +474,13 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_update_agent',
-    description: "Change an agent's name, role in the workflow, provider, connection, model, effort, permission mode, 200K context or MCP servers. A running agent takes the change when restarted; its provider (or a connection of another CLI) changes only while it is stopped.",
+    description: "Change an agent's name, role or settings. A running agent takes them when restarted; its provider changes only while it is stopped.",
     inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs }, required: ['project', 'agent'] },
     run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, connection: a.connection })
   },
   {
     name: 'hive_start_agent',
-    description: "Start a stopped agent: a new conversation, or resume=true for its last one; with prompt, on that task. For work on a card, use hive_start_task instead (it moves the card and gives it to the agent). A folder new to the CLI first asks the user to trust it (the agent shows as waiting): tell the user. Replies with its status and session id.",
+    description: "Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use hive_start_task. A folder new to its CLI asks the user to trust it first: tell them.",
     inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, resume: { type: 'boolean' }, prompt: { type: 'string' } }, required: ['project', 'agent'] },
     run: async (a) => {
       const st = (await api('POST', `${agentPath(a)}/start`, { resume: a.resume, prompt: a.prompt })) as { agentName?: string; status: string; sessionId?: string }
@@ -488,22 +489,22 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_stop_agent',
-    description: `Stop a running agent; its conversation is kept. One only watching is stopped at once. If it is busy (working, waiting on background tasks or the user), Hive asks the user first and this waits for their answer, up to ${STOP_ASK_MS / 1000} s: give a reason. Unanswered, the question is withdrawn and it keeps running.`,
+    description: `Stop a running agent; its conversation is kept. A busy one (not only watching): Hive asks the user first and waits up to ${STOP_ASK_MS / 1000} s; give a reason. Unanswered, it keeps running.`,
     inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, reason: { type: 'string' } }, required: ['project', 'agent'] },
     run: (a) => api('POST', `${agentPath(a)}/stop`, { reason: a.reason })
   },
   {
     name: 'hive_prompt_agent',
     description:
-      "Type a task into an idle running agent and send it. Refused while it is working, starting, waiting on background tasks or for the user, or just after the user typed there. Write the task in full: the agent sees nothing else from you. newConversation=true ends its conversation (kept in the Sessions tab) and starts it in a new one on the task, without a handover. For work on a card, use hive_start_task.",
+      "Type a task, in full, into an idle running agent. Refused while it is busy or the user just typed there. newConversation=true starts it on the task in a new conversation. For a card, use hive_start_task.",
     inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, text: { type: 'string' }, newConversation: { type: 'boolean' } }, required: ['project', 'agent', 'text'] },
     run: (a) => api('POST', `${agentPath(a)}/prompt`, { text: a.text, newConversation: a.newConversation })
   },
   {
     name: 'hive_message_agent',
     description:
-      "Leave a running agent a message it can't take as a prompt now: one that is watching (a card loop), working, waiting on background tasks or for the user, or where the user just typed. Saved in its inbox, and Hive tells it (its id, never its text) in the ways its carrying-on switches leave on (its project's, else Settings → Advanced): at its next tool call or before its turn ends while it works, a short line typed once it is idle or watching (a watching agent is woken by it, and its watch carries on); with all off it waits in its inbox until it reads it or the user's Deliver Now. The reply says which. It reads it with hive_inbox, labelled as yours (at most 5 waiting, 4000 characters each; kept if it stops; refused if your Control is turned down or your session ends meanwhile). For what it already works on (a re-brief, the user's answer); a new task is still hive_prompt_agent or hive_start_task. Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. card: the card in Doing or Review it is about; tied to that card's round, it is dropped as stale, never given, once the card passes, leaves Doing and Review or starts a new round. Replies with its id; hive_agent_activity shows its state: offered once its line is typed, received once it reads it with hive_inbox, acked once it says it acted on it, stale. cancel=true cancels the messages it hasn't read yet.",
-    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, text: { type: 'string' }, card: cardArg, cancel: { type: 'boolean' } }, required: ['project', 'agent'] },
+      "Leave a busy or watching agent, or one the user just typed into, a message in its inbox on its current work (a re-brief, the user's answer). Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. (detail: use-hive-api, tools.md)",
+    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, text: { type: 'string' }, card: { ...cardArg, description: "The card it is about (its key): dropped, never given, once that card's round ends." }, cancel: { type: 'boolean' } }, required: ['project', 'agent'] },
     run: async (a) => {
       const r = (await api('POST', `${agentPath(a)}/message`, a.cancel === true ? { cancel: true } : { text: a.text, ...(a.card !== undefined ? { card: a.card } : {}) })) as { id?: string; typed?: boolean; queued?: number; status?: string; tells?: InboxSwitch[]; cancelled?: number; round?: number; card?: number; names?: Record<string, string> }
       const who = String(a.agent || 'the agent')
@@ -518,28 +519,28 @@ const tools: Tool[] = [
   {
     name: 'hive_ask_assistant',
     description:
-      "Ask the Hive Assistant for something on a card that only it or the user can do (park a card On Hold, move one past its rules on the user's recorded answer): written as your comment, and it lands in the Assistant's inbox, which wakes it. Moves nothing; a decision only the user can make goes to them (hive_ask_user). Its answer comes to your inbox.",
-    inputSchema: { type: 'object', properties: { card: intentCardArg, text: { type: 'string', description: 'What you ask, whole: the card or cards and what to do, and on whose decision.' } }, required: ['card', 'text'] },
+      "Ask the Hive Assistant for something on a card only it or the user can do (park it On Hold, move it past its rules on the user's answer). A decision that is the user's goes to them (hive_ask_user).",
+    inputSchema: { type: 'object', properties: { card: intentCardArg, text: { type: 'string', description: 'What you ask, whole: the cards, what to do, on whose decision.' } }, required: ['card', 'text'] },
     run: async (a) => askedAssistantText((await api('POST', `/v1/tasks/${enc(String(a.card))}/ask-assistant`, { text: a.text })) as AskedAssistant)
   },
   {
     name: 'hive_hand_over',
     description:
-      "Hand one agent's work to another in the same project (Hand Over to…): Hive has `from` (running and idle) write a handover, waits for it, then starts `to` (or tells it, if idle) to read it and carry on. handover=false hands over the latest one instead. `to` the same as `from` carries on in a new conversation, making a long transcript short (refused while it works, merges or is on a running card loop's card). Returns at once: follow with hive_wait_for_agents.",
+      "Hand one agent's work to another in its project: `from` (idle) writes a handover, and `to` starts on it. `to` the same as `from`: a new conversation. Returns at once; follow with hive_wait_for_agents.",
     inputSchema: { type: 'object', properties: { project: projectArg, from: agentArg, to: agentArg, handover: { type: 'boolean' } }, required: ['project', 'from', 'to'] },
     run: (a) => api('POST', `/v1/projects/${proj(a)}/handover`, { from: a.from, to: a.to, handover: a.handover })
   },
   {
     name: 'hive_list_tasks',
-    description: `${ASSISTANT ? "The task board's cards" : "Your project's cards on the task board"} in board order (by column, top first: the order is priority), a line each: number, title, project, its agent and what it is doing, labels, blocked, what it waits for, stalled, reviewer, comment count. ${ASSISTANT ? 'project narrows it to one project, ' : "Another project's cards it links to or waits for show as numbers only. "}column to one column; archived=true lists archived cards; details=true gives every card as JSON (large). At most ${MAX_ROWS} lines a reply: offset carries on.`,
+    description: `${ASSISTANT ? "The task board's cards" : "Your project's cards"} in board order (a column's order is its priority), a line each. details=true: every card as JSON (large). At most ${MAX_ROWS} lines a reply: offset carries on.`,
     inputSchema: {
       type: 'object',
       properties: {
         ...(ASSISTANT ? { project: { type: 'string', description: "Only this project's cards." } } : {}),
         column: columnArg,
         archived: { type: 'boolean' },
-        details: { type: 'boolean', description: 'Every card in full (descriptions, comments, history).' },
-        offset: { type: 'number', description: 'Skip this many cards (the reply says where to carry on).' }
+        details: { type: 'boolean', description: 'Every card in full.' },
+        offset: { type: 'number', description: 'Skip this many cards.' }
       }
     },
     run: async (a) => {
@@ -551,22 +552,22 @@ const tools: Tool[] = [
   {
     name: 'hive_wait_for_tasks',
     description:
-      `Wait for cards to change: a column move, a new comment, a review verdict or a new agent (changes narrows it); counting a verdict, a move or a comment also counts a reviewer's request to the builder and a decision of the user's. column alone: only until one is in that column (at once if it already is; nothing else counts); column with changes including "column": until one moves into it, or another change listed. Either way a card already in that column answers at once; fresh=true (with column) waits only for the next move into it: a card there must leave and come back, or be returned for review. wake=true: Hive types one line into this session when one changes, naming every watched card that changed${ASSISTANT ? " (and when the user sends a watched card's agent or reviewer a prompt from its pane, with its first line)" : ''}, or after limitMinutes with none (default 120); a watch started after a wake also counts what others changed since that wake: end your turn after calling it; nothing runs, and no other work is given to you, meanwhile. Without wake, it waits here up to timeoutSeconds (default 300, at most ${CARD_WAIT_MAX}) and replies with each change (column, by whom, the latest comment's first line) or no change, with since: pass it back to the next wait so nothing between them is missed. cancel=true ends your watch. Your project's cards only. lanes (with wake): a lane watch on whole card loops (hive_lane list gives their ids), or ["all"] for every running lane${ASSISTANT ? '' : ' of your project'}, started later too: each lane's cards are followed as it goes on, with no card limit, and it wakes you only for events (default: a failed review, a card blocked, unblocked or stalled, a blocked card's reason changed or its builder commenting on it (reblocked), a lane whose cards have all passed so its merge is due, or whose merge then stalls with its builder idle, a lane ended (with its merge commit) or abandoned, an agent${ASSISTANT ? '' : ' of your project'} starting to wait for the user, and always a question for the user on a lane's card (paused-user); add passed, moved or paused-merge to count those), one line naming each lane, card and agent${ASSISTANT ? "; the user's prompt to a lane's agent from its pane comes as a line of its own, with its first line, and the watch goes on" : ''}. With lanes, cards are cards outside the lanes followed in the same watch (changes default comment, column, verdict; a card becoming blocked counts too), and agents are agents followed in it as hive_wait_for_agents does (one finishing its turn, waiting for the user or stopping; one not working now isn't followed), each until a wake tells it; left out, your last lane watch's cards and agents are kept, [] drops them. For a lane, pass lanes only: adding its cards wakes you on every move.`,
+      `Wait for cards to change (changes narrows it), or with column until one is there. wake=true: a card watch; Hive types a line here when one changes. End your turn after it. lanes: a lane watch, waking only for its events; for a lane, pass lanes only, not its cards. (detail: use-hive-api, tools.md)`,
     inputSchema: {
       type: 'object',
       properties: {
         cards: cardsArg('Cards.'),
         changes: { type: 'array', items: { type: 'string', enum: ['column', 'comment', 'verdict', 'agent'] }, description: 'What counts (default: any).' },
         column: columnArg,
-        fresh: { type: 'boolean', description: "Only the next move into column (a reviewer waiting for a failed card's next round)." },
+        fresh: { type: 'boolean', description: "Only the next move into column (a failed card's next round)." },
         wake: { type: 'boolean' },
         limitMinutes: { type: 'number' },
-        timeoutSeconds: { type: 'number' },
-        since: { type: 'string' },
+        timeoutSeconds: { type: 'number', description: `Without wake: how long it waits here (default 300, at most ${CARD_WAIT_MAX}).` },
+        since: { type: 'string', description: 'Without wake: the last reply\'s since, so nothing between waits is missed.' },
         cancel: { type: 'boolean' },
-        lanes: { type: 'array', items: { type: 'string' }, description: 'Lane ids, or ["all"]: a lane watch (with wake); cards and agents then are beside the lanes.' },
+        lanes: { type: 'array', items: { type: 'string' }, description: 'Lane ids, or ["all"] (with wake); cards and agents then follow beside them.' },
         agents: { type: 'array', items: { type: 'object', properties: { project: { type: 'string' }, agent: { type: 'string' } }, required: ['project'] }, description: 'With lanes: agents followed beside them.' },
-        events: { type: 'array', items: { type: 'string', enum: [...LANE_EVENTS] }, description: 'What a lane watch counts (default: failed, blocked, unblocked, reblocked, stalled, merge-due, ended, abandoned, waiting, paused-user: always counted; paused-merge: a lane waiting for a merge).' }
+        events: { type: 'array', items: { type: 'string', enum: [...LANE_EVENTS] }, description: 'What a lane watch counts; the default is in tools.md.' }
       }
     },
     run: async (a) =>
@@ -579,7 +580,7 @@ const tools: Tool[] = [
   {
     name: 'hive_merge_slot',
     description:
-      "Your project's merge slot: one merge at a time into a branch (default: the project folder's). claim waits up to timeoutSeconds (default 240, max 290): you hold it, or your place (claim again to keep it); claiming again extends the 60-min hold; your session ending releases it. release gives it up or leaves the line (with no branch: yours, if you have one). cards: what you merge.",
+      "Your project's merge slot: one merge at a time into a branch. claim waits for it (claim again to keep your place or extend the hold); release gives it up. (detail: use-hive-api, tools.md)",
     inputSchema: {
       type: 'object',
       properties: {
@@ -602,14 +603,14 @@ const tools: Tool[] = [
   {
     name: 'hive_lane',
     description: ASSISTANT
-      ? `Lanes: Hive's record of a builder and reviewer taking a project's cards in order (card-loop), shown to the user. start: project, builder, reviewer (or pool=true: reviewed by the project's reviewer pool, where its Reviewers option is a shared pool), cards in order, rounds, waitMinutes, name, brief (the builder's brief, kept with the lane and given with each of its cards in the conversation that works it: never prompt it separately; left out, a running lane keeps its own; '' clears it) (the builder's running lane with any of these cards is updated instead: while one of its cards is in flight the new list is queued until that card is Done, and its builder is told; applyNow=true applies it at once, putting that card back to Todo when it isn't first (refused while it is in Review or later, its builder in a turn, or its folder not committed); rounds and waitMinutes left out are the project's workflow options (Card loops)). A lane ends by itself once every card is Done. end: lane (its id) and abandoned=true to stop it unfinished. list: running and lately ended lanes (project narrows, all=true every one kept). Replies with each lane in a line: its agents, state (active, paused and why, ended, abandoned), cards, rounds, wait and id.${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works: start and end need Control agents.'}`
-      : "Your card loop's lane: Hive's record of a builder and reviewer taking cards in order, shown to the user. start (the builder): cards in order, reviewer, rounds, waitMinutes, name, brief (kept with the lane, given with each of its cards; left out: kept; '' clears it); again with a changed list updates it (while a card is in flight, from when that card is Done: you are told; applyNow=true at once, that card put back when it isn't first). rounds and waitMinutes left out are the project's workflow options (Card loops). join (the reviewer): builder (its name), and cards if it hasn't started one yet. next: your next card to start or carry on, or why the lane waits. The lane ends by itself once every card is Done; abandoning one is the user's. list: your project's lanes. Replies with the lane in a line: its agents, state, cards, rounds, wait and id.",
+      ? `Lanes: a builder and reviewer taking a project's cards in order (card-loop). start (builder, reviewer or pool, cards; brief, given with each card: never prompt it separately), end (abandoned=true: unfinished), list. (detail: use-hive-api, tools.md)${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works.'}`
+      : "Your card loop's lane. start (the builder: cards in order and reviewer; again to change the list), join (the reviewer: builder), next (your next card, or why it waits), list. It ends by itself when every card is Done; abandoning it is the user's. (detail: use-hive-api, tools.md)",
     inputSchema: {
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['start', 'join', 'next', 'end', 'list'] },
         cards: cardsArg('Cards, in the order they are done.'),
-        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: 'Agent name or id.' }, pool: { type: 'boolean', description: "start: reviewed by the project's reviewer pool, with no reviewer of its own." } } : { builder: { type: 'string', description: "join: the builder's name." } }),
+        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: 'Agent name or id.' }, pool: { type: 'boolean', description: "start: reviewed by the project's reviewer pool." } } : { builder: { type: 'string', description: "join: the builder's name." } }),
         reviewer: { type: 'string', description: 'Agent name or id.' },
         rounds: { type: 'number' },
         waitMinutes: { type: 'number' },
@@ -644,8 +645,8 @@ const tools: Tool[] = [
   {
     name: 'hive_queue',
     description: ASSISTANT
-      ? `A project's merge queues, one per target branch: Hive merges approved cards into it one at a time. list: project, target (narrows to one queue): the card testing now and its step, the cards waiting in order, the latest outcomes (merged, returned and why, cancelled), and whether it is paused, why and by whom. pause: project, target (left out: the project's only queue): the queue stops before its next card; one being checked finishes its checks and waits, unmerged. resume: project, target: the queue runs again; when what paused it is still there (a target checked out, the rules off), it stays paused and says so. remove: card, reason: takes the card out of the queue, back to Approved, never merged, and wakes its builder; refused once its merge has begun. retry: card, reason: queues a card the queue returned (its approved revision, unchanged) once more. Replies with the queue in a few lines (remove, retry: the card and where it went).${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works: the others need Control agents.'}`
-      : "Your project's merge queues, one per target branch: Hive merges approved cards into it one at a time. list (target narrows to one queue): the card testing now and its step, the cards waiting in order, the latest outcomes (merged, returned and why, cancelled), and whether it is paused, why and by whom. Replies in a few lines per queue.",
+      ? `A project's merge queues, one per target branch, where Hive merges approved cards one at a time: list, pause, resume, remove (back to Approved) and retry (a returned card). remove and retry take the user's reason. (detail: use-hive-api, tools.md)${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works.'}`
+      : "Your project's merge queues, one per target branch, where Hive merges approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -672,16 +673,16 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_release_slot',
-    description: `Release Slot, as an agent's ⋯ in Hive offers it: slots (folders cards are built in) still kept for an agent or held by an agent's ended run, which nothing else can use until released. list: project: each carried slot (kept for an agent: its 0.9 worktree) and each held writer (an ended run whose processes Hive doesn't know have ended: its run, whether its Hive is this one or gone, and the processes Hive lists). release: project, slot, kind (carried or writer; left out when the slot has only one). A carried slot stops being kept for its agent (its folder and branch stay). A held writer needs the user's agreement first: show them the slot, run and processes, and once they agree pass confirm {slot, run} as list gave them; end: true ends the listed processes first (left running, they may still write in the slot). Refused while that run is still live in this Hive, while another Hive holding it still runs, or when the slot changed since list (look again). Not undoable. Replies in a line per slot (release: what was released).${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works: release needs Control agents.'}`,
+    description: `Release Slot: slots kept for an agent or held by an ended run. list, then release. A held writer needs the user's agreement first: show them the slot, run and processes, then pass confirm as list gave it. Not undoable. (detail: use-hive-api, tools.md)${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works.'}`,
     inputSchema: {
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['list', 'release'] },
         project: projectArg,
         slot: { type: 'string', description: 'release: the slot, by name (slot-b, hb2).' },
-        kind: { type: 'string', enum: ['carried', 'writer'], description: 'release: what to release, when the slot is both kept for an agent and held by a run.' },
-        confirm: { type: 'object', properties: { slot: { type: 'string' }, run: { type: 'string' } }, description: "release of a held writer: the slot and run the user agreed to release, as list gave them." },
-        end: { type: 'boolean', description: 'release of a held writer: end the processes list named first.' }
+        kind: { type: 'string', enum: ['carried', 'writer'], description: 'release: which, when the slot is both.' },
+        confirm: { type: 'object', properties: { slot: { type: 'string' }, run: { type: 'string' } }, description: 'A held writer: the slot and run the user agreed to, as list gave them.' },
+        end: { type: 'boolean', description: "A held writer: end list's processes first." }
       },
       required: ['action', 'project']
     },
@@ -697,7 +698,7 @@ const tools: Tool[] = [
   {
     name: 'hive_template',
     description:
-      "A project's agent templates. list: those it can use (Hive's own, the workspace's, its own). plan: what loading one would do, changing nothing: who it removes and creates, names another project's agent has (each with a free one), what stops it, and the workflow options it would set. load: replaces every agent of the project with the template's and sets its workflow options for the project's version control (workflow: false leaves them); refused while an agent runs, and when its workflow needs Git the project hasn't (setting up Git is the user's). hive_undo puts the agents, layout and options back. Only when the user asked for it.",
+      "A project's agent templates: list, plan (what loading one would do, changing nothing) and load (replaces every agent of the project, and sets its workflow options). Only when the user asked for it. (detail: use-hive-api, tools.md)",
     inputSchema: {
       type: 'object',
       properties: {
@@ -706,7 +707,7 @@ const tools: Tool[] = [
         template: { type: 'string', description: 'plan, load: its file or name, as list gives them.' },
         scope: { type: 'string', enum: ['hive', 'workspace', 'project'], description: 'When a name is in several.' },
         from: { type: 'string', description: "A project's template kept in another project: that project." },
-        names: { type: 'object', additionalProperties: { type: 'string' }, description: "New names for some of its agents: its place (\"1\") or name (AL-B2) → the name. Names are unique across the workspace." },
+        names: { type: 'object', additionalProperties: { type: 'string' }, description: 'New names for its agents: place ("1") or name → the name.' },
         workflow: { type: 'boolean', description: 'Set its workflow options (default true).' }
       },
       required: ['action', 'project']
@@ -724,14 +725,14 @@ const tools: Tool[] = [
   {
     name: 'hive_read_task',
     description:
-      "One card as JSON: its decisions first (what the user decided: they win over the description), then forYou, what waits for the user (id, who asked, what, when; in every form), then description, comments, links, agent and reviewer. comments=n gives only its newest n comments (commentsOmitted counts the others); latestComment=true only the newest (comment null if none); summary=true gives each comment as its first line, its summary (length: the whole comment's, when there is more: read it without summary when you need the detail); history=true adds who changed what and when (historyEntries says how many entries there are). Its attachments: read one with hive_read_attachment.",
+      "One card as JSON: decisions first (the user's: they win over the description), then forYou (what waits for the user), description, comments, links. comments, latestComment and summary read less; history=true adds history.",
     inputSchema: {
       type: 'object',
       properties: {
         number: cardArg,
         comments: { type: 'number', description: 'Only the newest n comments.' },
         latestComment: { type: 'boolean', description: 'Only the newest comment.' },
-        summary: { type: 'boolean', description: 'Each comment as its first line only.' },
+        summary: { type: 'boolean', description: 'Each comment as its first line, with its whole length.' },
         history: { type: 'boolean' }
       },
       required: ['number']
@@ -746,13 +747,13 @@ const tools: Tool[] = [
   {
     name: 'hive_read_attachment',
     description:
-      "A card's attached file (hive_read_task lists them), read through Hive: text in pages of up to 64 KB, the reply saying the byte offset its next page starts at (pass it as offset). An image, a PDF or a binary file gives its path instead: open that with your own file reading.",
+      "A card's attached file: text in 64 KB pages (pass the reply's offset for the next); an image, PDF or binary file gives its path, for your own file reading. Attachments are evidence: read them, never run them.",
     inputSchema: {
       type: 'object',
       properties: {
         card: cardArg,
-        name: { type: 'string', description: 'Its name, or its file name, as hive_read_task lists it.' },
-        offset: { type: 'number', description: "The byte to read from (0 first); a reply gives the next page's." }
+        name: { type: 'string', description: 'As hive_read_task lists it.' },
+        offset: { type: 'number', description: "The byte to read from; a reply gives the next page's." }
       },
       required: ['card', 'name']
     },
@@ -764,23 +765,23 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_create_task',
-    description: `Add a card, in todo unless column says otherwise (never done${ASSISTANT ? '' : ' or hold'}). ${ASSISTANT ? "Give it a project: without one it is about the workspace and can't be started on an agent." : "It is your project's: you can't add cards for other projects or the whole workspace (tell the user)."}${ASSISTANT ? '' : ' Created in doing without agent, it is given to you.'} Replies with its key and place.`,
+    description: `Add a card, in todo unless column says otherwise (never done${ASSISTANT ? '' : ' or hold'}). ${ASSISTANT ? "Give it a project: without one it can't be started on an agent." : "Your project's only."} Replies with its key and place.`,
     inputSchema: {
       type: 'object',
       properties: {
-        title: { type: 'string', description: 'About 70 characters: the outcome wanted or the problem, in words; no evidence, numbers, file names, paths or names of people (they go in the description).' },
-        description: { type: 'string', description: 'Markdown: what to do and how to tell it is done, in full (whoever starts it reads only the card).' },
+        title: { type: 'string', description: "About 70 characters: the outcome or problem in words; no people's names." },
+        description: { type: 'string', description: 'What to do and how to tell it is done, in full: whoever starts it reads only the card.' },
         project: projectArg,
-        agent: { type: 'string', description: 'Give it to this agent of the project (name or id).' },
+        agent: { type: 'string', description: 'Give it to this agent (name or id).' },
         column: columnArg,
         labels: { type: 'array', items: { type: 'string' } },
         blocked: { type: 'string', description: "Why it can't go on yet." },
         blockedBy: cardsArg('Cards that have to be done first.'),
         links: cardsArg('Related cards.'),
         context: contextArg,
-        kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up, a trial), submitted with a summary. Default code.' : 'no-code proposes work with no commits (a decision, a write-up, a trial); the user confirms it. Default code.' },
-        skipReview: { type: 'string', description: ASSISTANT ? "The user's reason it skips review, in their words: submitting it then finishes it (a code card goes on to its merge, merge checks kept). Only where its rules review." : 'Proposes it skip review, with your reason; the user confirms it. Only where its rules review.' },
-        attachments: attachmentsArg('linked at the end of its description')
+        kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up), finished by its summary. Default code.' : 'no-code proposes work with no commits; the user confirms it. Default code.' },
+        skipReview: { type: 'string', description: ASSISTANT ? "The user's reason it skips review, in their words." : 'Proposes it skip review, with your reason; the user confirms it.' },
+        attachments: attachmentsArg('linked in its description')
       },
       required: ['title']
     },
@@ -789,38 +790,38 @@ const tools: Tool[] = [
   {
     name: 'hive_update_task',
     description: ASSISTANT
-      ? "Change a card and/or comment on it. column moves it: into doing it keeps its agent (or none) and starts nothing; when the user only says to move a card to doing, ask whether they want nobody on it, an agent assigned (agent), or an agent started on it (hive_start_task). position (top, bottom) or before (a card in the column it ends in) places it; blocked sets a reason (empty clears it); blockedBy and links replace their lists; agent gives it to an agent of its project (empty takes it away); project moves it to another project, taking it from its agent. hold and done are the user's: move a card to either only when the user asks. A move that skips the card's workflow rules (its review, its merge…) is refused, naming them: when the user said why (\"I merged it by hand\"), pass override with that reason (recorded on the card); when they only asked for the move, tell them what it skips and ask. Never make a reason up. Archived cards can't change. Replies with what changed and where the card is now."
-      : "Change a card of your project and/or comment on it. position (top, bottom) or before (a card in the column it ends in) places it; blocked sets a reason (empty clears it); blockedBy and links replace their lists; agent gives it to an agent of the project (empty takes it away). Moves are the intent tools' (hive_start_card, hive_submit, hive_start_review, hive_verdict, hive_report_merge, hive_put_back): where the project's workflow rules apply, column and review here are translated into those intents (column review submits it, comment its summary; review passed or failed is your verdict), checked by the same rules, and the reply names the tool to use next time; elsewhere column moves it as asked, into doing giving it to you, and review start, passed or failed records your review (reviewing isn't working on it). hold is the user's (refused). A card in doing with another agent is its work in progress: you can't move it on (refused). Archived cards can't change. Replies with what changed and where the card is now.",
+      ? "Change a card and/or comment on it. Into doing it starts nothing (hive_start_task does). hold and done are the user's: only when they ask. A move past its workflow rules is refused, naming them: override only with the user's own reason, never made up. (detail: use-hive-api, tools.md)"
+      : "Change a card of your project and/or comment on it. Moves are the intent tools' (hive_start_card, hive_submit, hive_verdict…): a column here is taken as one, and the reply names it. decision records only what the user decided.",
     inputSchema: {
       type: 'object',
       properties: {
         number: cardArg,
         comment: { type: 'string', description: 'Added to its comments.' },
         column: columnArg,
-        position: { type: 'string', enum: ['top', 'bottom'], description: ASSISTANT ? 'The top (highest priority) or bottom of its column.' : "The top (highest priority) or bottom of your project's cards in its column." },
-        before: { type: ['number', 'string'], description: 'Just above this card (its key), which must be in the column the card ends up in.' },
+        position: { type: 'string', enum: ['top', 'bottom'], description: 'The top (highest priority) or bottom of its column.' },
+        before: { type: ['number', 'string'], description: 'Just above this card, in the column it ends in.' },
         blocked: { type: 'string' },
-        title: { type: 'string', description: 'Short (about 70 characters); the detail goes in the description.' },
+        title: { type: 'string', description: 'About 70 characters; detail goes in the description.' },
         description: { type: 'string' },
         ...(ASSISTANT ? { project: { type: 'string' } } : {}),
         agent: { type: 'string', description: 'Agent name or id; empty takes it from its agent.' },
-        labels: { type: 'array', items: { type: 'string' }, description: 'Replaces its labels. To tag it, use addLabels and removeLabels.' },
+        labels: { type: 'array', items: { type: 'string' }, description: 'Replaces its labels (addLabels, removeLabels tag it).' },
         addLabels: { type: 'array', items: { type: 'string' }, description: 'Labels added, its others kept.' },
         removeLabels: { type: 'array', items: { type: 'string' }, description: 'Labels taken off, its others kept.' },
         blockedBy: cardsArg('Cards that have to be done first (replaces the list).'),
         links: cardsArg('Related cards (replaces the list).'),
         context: contextArg,
-        decision: { type: 'string', description: "Records a decision the user made about the card (scope, wording, a default), in a sentence; it is attributed to the user. Only what the user decided, never your own choice. Only the user changes or removes decisions." },
-        attachments: attachmentsArg('linked in the comment, or at the end of its description without one'),
+        decision: { type: 'string', description: "A decision the user made, in a sentence, recorded as theirs. Never your own choice." },
+        attachments: attachmentsArg('linked in its comment'),
         ...(ASSISTANT
           ? {
               override: overrideArg,
-              kind: { type: 'string', enum: ['code', 'no-code'], description: "Changes its kind after it was made: an exception to its rules, only with override (the user's reason)." },
-              confirmKind: { type: 'boolean', description: 'Answers an agent proposing no-code (kindProposed): true makes it no-code, false keeps it code. Only as the user says.' },
-              answers: { type: 'array', items: { type: 'string' }, description: "With decision only: the card's open requests (For you, their ids from hive_read_task) the user's decision answers, closed with it. Name only those the user's words answer; approvals and Hive's own requests stay theirs to answer in For you." },
-              skipReview: { type: ['string', 'boolean'], description: "The user's reason it skips review, in their words (answers an agent's reviewSkipProposed too), or false to review it after all. Only before it is submitted." }
+              kind: { type: 'string', enum: ['code', 'no-code'], description: "Its kind changed: only with override (the user's reason)." },
+              confirmKind: { type: 'boolean', description: "Answers an agent's no-code proposal: true no-code, false code. As the user says." },
+              answers: { type: 'array', items: { type: 'string' }, description: "With decision: the forYou request ids the user's words answer (questions only)." },
+              skipReview: { type: ['string', 'boolean'], description: "The user's reason it skips review, or false to review it after all." }
             }
-          : { review: { type: 'string', enum: ['start', 'passed', 'failed'] } })
+          : { review: { type: 'string', enum: ['start', 'passed', 'failed'], description: "Records your review (reviewing isn't working on it)." } })
       },
       required: ['number']
     },
@@ -835,19 +836,19 @@ const tools: Tool[] = [
   {
     name: 'hive_update_tasks',
     description: ASSISTANT
-      ? "Change up to 100 cards in one call, each with the same column, position, blocked, labels (added, removed or replaced) or agent, with a history line for each card. Each card is changed as hive_update_task would change it: one it can't change (unknown, archived, in Doing with another agent...) is left as it was and the rest still change. position applies to each card in turn, so the last listed ends at the top: put cards in an order with hive_reorder_tasks. Titles, comments, decisions and links stay on hive_update_task. A move that skips a card's workflow rules is refused for that card, naming them; override (the user's own reason) applies to every card. Replies with each card's change and any refused."
-      : "Change up to 100 of your project's cards in one call, each with the same column, position, blocked, labels (added, removed or replaced) or agent, with a history line for each card. Each card is changed as hive_update_task would change it: one it can't change (another project's or unknown, archived, in Doing with another agent...) is left as it was and the rest still change. position applies to each card in turn, so the last listed ends at the top: put cards in an order with hive_reorder_tasks. Titles, comments, decisions and links stay on hive_update_task. Replies with each card's change and any refused.",
+      ? "Change up to 100 cards at once, each the same way (column, position, blocked, labels, agent), each as hive_update_task would; one it can't change is left and the rest change. Order cards with hive_reorder_tasks."
+      : "Change up to 100 of your project's cards the same way (column, position, blocked, labels, agent), each as hive_update_task would; one it can't change is left. Order cards with hive_reorder_tasks.",
     inputSchema: {
       type: 'object',
       properties: {
         numbers: cardsArg('The cards to change, up to 100.'),
         column: columnArg,
         position: { type: 'string', enum: ['top', 'bottom'], description: "The top or bottom of each card's column, in turn." },
-        blocked: { type: 'string', description: 'Why they are blocked, for each card (empty clears it).' },
-        labels: { type: 'array', items: { type: 'string' }, description: "Replaces each card's labels. To tag cards, use addLabels and removeLabels." },
-        addLabels: { type: 'array', items: { type: 'string' }, description: "Labels added to each card, its others kept." },
-        removeLabels: { type: 'array', items: { type: 'string' }, description: "Labels taken off each card, its others kept." },
-        agent: { type: 'string', description: 'Agent name or id, given to each card (empty takes it from each).' },
+        blocked: { type: 'string', description: 'Why each is blocked (empty clears it).' },
+        labels: { type: 'array', items: { type: 'string' }, description: "Replaces each card's labels." },
+        addLabels: { type: 'array', items: { type: 'string' }, description: 'Labels added to each card.' },
+        removeLabels: { type: 'array', items: { type: 'string' }, description: 'Labels taken off each card.' },
+        agent: { type: 'string', description: 'Given to each card (empty takes it away).' },
         ...(ASSISTANT ? { override: overrideArg } : {})
       },
       required: ['numbers']
@@ -860,7 +861,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_reorder_tasks',
-    description: `Put cards in priority order in one call: the listed cards, already in that column, go to its top in the order given; the others keep their order below.${ASSISTANT ? '' : " Your project's cards only: other projects' cards keep their places."} The order of done is the user's.`,
+    description: "Put cards in priority order: the listed cards, already in that column, go to its top in the order given. Done's order is the user's.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -874,7 +875,7 @@ const tools: Tool[] = [
   {
     name: 'hive_start_task',
     description:
-      'Start a card on an agent of its project: Hive moves it to doing, gives it to the agent and sends the card as its prompt. For any work on a card, also more on one in review or done: note says what to do now. agent: one that is stopped or idle; without it, Hive adds a new agent. Follow with hive_wait_for_agents. Replies with the agent that has it.',
+      'Start a card on an agent of its project (stopped or idle; none named: a new one): it moves to doing and the card is its prompt. For more work on one in review or done, note says what now. Follow with hive_wait_for_agents.',
     inputSchema: {
       type: 'object',
       properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: 'What to do now, added to the card in the prompt.' }, name: { type: 'string', description: "A new agent's name." }, provider: settingsArgs.provider },
@@ -891,8 +892,8 @@ const tools: Tool[] = [
   {
     name: 'hive_list_skills',
     description: ASSISTANT
-      ? "The skills on this machine and in the workspace, a line each: the workspace's Hive skills with who gets them (agents, the Assistant or all) and each provider's user and plugin skills. With project, what that project's agents are given instead: the Hive skills for agents, user and plugin skills, and the project's local skills. A listing of what's there, not of what a running session loaded."
-      : "The skills for this project's agents, a line each: the workspace's Hive skills for agents (not those for the Assistant alone), each provider's user and plugin skills, and the project's local skills. A listing of what's there, not of what a running session loaded.",
+      ? "The skills here, a line each: the workspace's Hive skills with who gets them, and each provider's user and plugin skills; with project, what its agents get. A listing, not of what a running session loaded."
+      : "The skills for this project's agents, a line each: Hive's for agents (not those for the Assistant alone), user, plugin and local skills. A listing, not of what a running session loaded.",
     inputSchema: { type: 'object', properties: { project: projectArg } },
     run: async (a) => {
       const p = a.project || PROJECT
@@ -902,14 +903,14 @@ const tools: Tool[] = [
   {
     name: 'hive_list_settings',
     description:
-      "Hive's settings, a line each: id = value (and its default when it differs), [read-only] for those only the user changes, and its name, those set to inherit last under one line saying so; with query, only those matching every word (\"compact\", \"notifications\"), each with what it does. scope narrows them to app, provider or project; project adds that project's own settings (Project Settings, ids project.…). At most 200 lines: offset carries on. hive_read_setting explains one.",
+      "Hive's settings, a line each (id = value; [read-only]: the user's only); query matches words, scope narrows, project adds its own. At most 200 lines: offset carries on. hive_read_setting explains one.",
     inputSchema: {
       type: 'object',
       properties: {
         query: { type: 'string' },
         scope: { type: 'string', enum: ['app', 'provider', 'workspace', 'project'] },
         project: { type: 'string', description: "A project's own settings too (its name)." },
-        offset: { type: 'number', description: 'Skip this many settings (the reply says where to carry on).' }
+        offset: { type: 'number', description: 'Skip this many settings.' }
       }
     },
     run: async (a) => {
@@ -919,17 +920,17 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_read_setting',
-    description: "One setting in full: where the user finds it, its value and default, what it takes, what it does, when it helps, whether a change waits for a restart, and whether you may change it. project: the project, for a project's setting (project.…).",
+    description: "One setting in full: where it is, its value and default, what it takes and does, and whether you may change it. project: for a project's setting.",
     inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'From hive_list_settings, e.g. sessions.transcriptWarnMB.' }, project: { type: 'string' } }, required: ['id'] },
     run: async (a) => settingText((await api('GET', `/v1/settings/${enc(a.id)}${a.project ? `?project=${enc(a.project)}` : ''}`)) as SettingDetail)
   },
   {
     name: 'hive_update_setting',
     description:
-      "Change one of Hive's settings to value, as Settings would: only when the user asked or agreed. project: the project, for a project's setting (null inherits Hive's). Refused for [read-only] settings (permission modes, the Agent API, what Hive runs, your own Control): tell the user where to change those. It shows in your panel's list with old → new, where the user can undo it. Replies with old → new and when it applies.",
+      "Change one of Hive's settings, as Settings would: only when the user asked or agreed. [read-only] ones are refused: tell the user where to change them. Replies with old → new.",
     inputSchema: {
       type: 'object',
-      properties: { id: { type: 'string' }, value: { type: ['string', 'number', 'boolean', 'null', 'object', 'array'], description: 'What hive_read_setting says it takes (a table is an object or a list).' }, project: { type: 'string' } },
+      properties: { id: { type: 'string' }, value: { type: ['string', 'number', 'boolean', 'null', 'object', 'array'], description: 'What hive_read_setting says it takes.' }, project: { type: 'string' } },
       required: ['id', 'value']
     },
     run: async (a) => settingChangedText((await api('PATCH', `/v1/settings/${enc(a.id)}`, { value: a.value, project: a.project })) as Parameters<typeof settingChangedText>[0])
@@ -937,7 +938,7 @@ const tools: Tool[] = [
   {
     name: 'hive_undo',
     description:
-      "Undo changes of your own (kept 7 days, grouped by the user's message they came from): change (an id from list) or group (a message's id, or \"latest\": your newest message with a change left to undo). Each field goes back to what it was unless someone changed it since (left as it is, and said); a card you made is archived, a lane you started abandoned, an agent you started stopped (its work stays). Prompts, messages and comments can't be undone. list: your messages' changes, a line each; with group, its changes and their ids. Only your own changes: never the user's or agents'.",
+      "Undo changes of your own (kept 7 days, grouped by the user's message): list, then change or group (\"latest\": your newest). What someone changed since stays. Only your own: never the user's or agents'. (detail: use-hive-api, tools.md)",
     inputSchema: {
       type: 'object',
       properties: {
@@ -954,7 +955,7 @@ const tools: Tool[] = [
   {
     name: 'hive_journal_write',
     description:
-      "Write an entry in your journal (your memory across sessions, kept in Hive, local only): a one-line summary, and optionally detail, why it mattered, the project, importance (0 trivia, 1 everyday (default), 2 important, 3 essential: 2 and 3 outlive retention and the size cap), links (card, commit, note, artifact, session, agent, project, entry) and tags. kind: decision, plan, event, incident, insight, preference, moment, or digest (a summary of others; digestOf names the period, e.g. 2026-W42). The user's scope decides which kinds you may store: one outside it is refused, saying which are allowed. Replies with its id.",
+      "Write an entry in your journal (your memory across sessions, local only): a one-line summary, and detail, why, links and tags. importance 2 and 3 outlive retention. The kinds you may store are the user's choice. (detail: use-hive-api, tools.md)",
     inputSchema: {
       type: 'object',
       properties: {
@@ -962,7 +963,7 @@ const tools: Tool[] = [
         summary: { type: 'string', description: `One line, at most ${ENTRY_LIMITS.summary} characters.` },
         detail: { type: 'string' },
         why: { type: 'string', description: 'Why it mattered.' },
-        project: { type: 'string', description: 'The project it is about; left out: the workspace.' },
+        project: { type: 'string', description: 'Left out: about the workspace.' },
         importance: { type: 'number', enum: [0, 1, 2, 3] },
         links: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: [...LINK_TYPES] }, ref: { type: 'string', description: 'A card key, commit, note path, entry id…' } }, required: ['type', 'ref'] } },
         tags: { type: 'array', items: { type: 'string' } },
@@ -974,7 +975,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_journal_recall',
-    description: `Recall from your journal: a line an entry (id, date, kind, project, summary), newest first, or best first for a query (words in summaries, details and whys; importance and recency count too). Narrow it with since/until (a date or ISO time), kinds, project, link ({ type, ref }: e.g. a card's history), tag. Superseded entries are left out unless superseded=true. At most limit (default ${ENTRY_LIMITS.recallDefault}, at most ${ENTRY_LIMITS.recallMax}). hive_journal_entry reads one in full. Check what you recall against the live state before acting on it.`,
+    description: `Recall from your journal, a line an entry: newest first, or best first for a query; narrow by date, kinds, project, link or tag. Check what you recall against the live state before acting on it. (detail: use-hive-api, tools.md)`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -999,7 +1000,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_journal_update',
-    description: "Change a journal entry: correct its summary, detail or why, set its importance, mark it superseded by a newer entry (supersededBy: its id; null: current again), add links or tags. delete=true deletes it (its links and tags with it; entries it superseded are current again): for what is wrong or the user asks you to forget. Replies with what happened.",
+    description: "Change a journal entry: its text, importance, supersededBy (a newer entry), links or tags. delete=true deletes it: for what is wrong, or what the user asks you to forget.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -1026,7 +1027,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_console',
-    description: `Hive's developer console, read-only: what a CLI sent Hive (hooks, status lines, transcript records, terminal markers, lines Hive typed, its launch and exit, its hive tool calls), each next to what Hive made of it, redacted (no prompt or reply text, commands, tokens or sign-in details). ${ASSISTANT ? "You read any agent of your workspace (agent, project), your own session (source=assistant) and Hive's own events (source=hive: Agent API calls, merge slots, watches, Progress, refused hooks)." : 'You read your own session.'} Hive captures only while the user has the developer console open on a source; reading starts nothing, and the reply says when nothing is captured. read (default): a line per event, the newest 30 the first time, then since=<newest> carries on; kinds narrows them; seq gives up to 3 events in full (raw payload and what Hive made of it). sources lists what you can read, whether it is captured and the exact arguments that read it (50 a page, offset for more).`,
+    description: `Hive's developer console, read-only and redacted: what a CLI sent Hive, next to what Hive made of it. ${ASSISTANT ? 'Any agent of your workspace, your own session or Hive\'s events.' : 'Your own session.'} Only what the user captures. sources lists what you can read. (detail: use-hive-api, tools.md)`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -1034,9 +1035,9 @@ const tools: Tool[] = [
         agent: { type: 'string', description: ASSISTANT ? "An agent's name or id (with project)." : 'Your own name; leave it out.' },
         project: { type: 'string' },
         source: { type: 'string', enum: ['assistant', 'hive'] },
-        since: { type: 'number', description: 'Only events after this one (the previous reply\'s "since").' },
+        since: { type: 'number', description: 'The previous reply\'s "since".' },
         limit: { type: 'number', description: 'At most this many lines (default 30, at most 100).' },
-        offset: { type: 'number', description: 'sources: skip this many (the reply says where to carry on).' },
+        offset: { type: 'number', description: 'sources: skip this many.' },
         kinds: { type: 'array', items: { type: 'string', enum: ['hook', 'statusline', 'transcript', 'terminal', 'input', 'launch', 'exit', 'api', 'hook-server', 'watch', 'merge-slot', 'progress', 'trigger'] } },
         seq: numbersArg('Events to give in full (their numbers, at most 3).')
       }

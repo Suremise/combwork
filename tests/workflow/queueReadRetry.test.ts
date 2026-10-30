@@ -11,7 +11,7 @@ import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
-import { READ_RETRIES, type QueueConfig } from '../../src/main/workflow/mergeQueue'
+import { gitTree, READ_RETRIES, type QueueConfig, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
 import { git } from '../../src/main/git'
 import * as G from '../../src/main/platform/git'
 import { isUnknown } from '../../src/main/platform/types'
@@ -48,9 +48,15 @@ vi.mock('../../src/main/gitWorker', async (orig) => {
 
 /**
  * HI-2020: the queue's own git with options (its merge commits: mergeQueue's gitTree) starts with child_process.spawn.
- * Matching ones fail to start: an 'error' with no pid (EAGAIN), or, `sync`, a throw at once. Everything else is spawned.
+ * Matching ones fail to start: an 'error' with no pid (EAGAIN), or, `sync`, a throw at once; or, `signal` (HI-2042), start
+ * and are ended by that signal (an exit with no code, as Node reports a child ended through its handle); or, `late`
+ * (HI-2043), run for real with their exit told first and their output after it, two turns later, then their close (as
+ * a loaded machine can deliver them), or `held`, its output before its exit and never closed; or, `drive`, no process
+ * at all: a child standing in (nothing to end), which the rule's function drives. Everything else is spawned.
  */
-const spawnFail = vi.hoisted(() => ({ rules: [] as { match: string; times: number; sync?: boolean }[], seen: [] as string[] }))
+const spawnFail = vi.hoisted(() => ({ rules: [] as { match: string; times: number; sync?: boolean; signal?: string; late?: boolean; held?: boolean; drive?: (cp: FakeChild) => void }[], seen: [] as string[] }))
+/** A child standing in for git (`drive`): its outputs, and `kill` (its bound's end, through endTree) as the rule sets it. */
+type FakeChild = import('events').EventEmitter & { stdout: import('events').EventEmitter & { destroy: () => void }; stderr: import('events').EventEmitter & { destroy: () => void }; pid: undefined; exitCode: number | null; signalCode: string | null; kill: () => void; killed: number; destroyed: number }
 vi.mock('child_process', async (orig) => {
   const real = (await orig()) as typeof import('child_process')
   const { EventEmitter } = await import('events')
@@ -60,6 +66,50 @@ vi.mock('child_process', async (orig) => {
     if (cmd === 'git') spawnFail.seen.push(line)
     if (!rule) return real.spawn(cmd, args as string[], opts as never)
     rule.times--
+    if (rule.drive) {
+      const cp = new EventEmitter() as FakeChild
+      const stream = () => Object.assign(new EventEmitter(), { destroy: () => void cp.destroyed++ })
+      Object.assign(cp, { stdout: stream(), stderr: stream(), pid: undefined, exitCode: null, signalCode: null, killed: 0, destroyed: 0, kill: () => void cp.killed++ })
+      const drive = rule.drive
+      setImmediate(() => drive(cp))
+      return cp
+    }
+    if (rule.late || rule.held) {
+      const child = real.spawn(cmd, args as string[], opts as never)
+      const stream = () => Object.assign(new EventEmitter(), { destroy: () => {} })
+      const cp = Object.assign(new EventEmitter(), { stdout: stream(), stderr: stream(), pid: child.pid })
+      const out: Buffer[] = []
+      const err: Buffer[] = []
+      child.stdout!.on('data', (d: Buffer) => out.push(d))
+      child.stderr!.on('data', (d: Buffer) => err.push(d))
+      child.once('error', (e) => cp.emit('error', e))
+      child.once('close', (c, s) => {
+        // `held`: its output all came before the exit, and stays open after it (a descendant holding it): no close.
+        if (rule.held) {
+          for (const d of out) cp.stdout.emit('data', d)
+          for (const d of err) cp.stderr.emit('data', d)
+          cp.emit('exit', c, s)
+          return
+        }
+        cp.emit('exit', c, s)
+        setImmediate(() =>
+          setImmediate(() => {
+            for (const d of out) cp.stdout.emit('data', d)
+            for (const d of err) cp.stderr.emit('data', d)
+            cp.emit('close', c, s)
+          })
+        )
+      })
+      return cp
+    }
+    if (rule.signal) {
+      const cp = Object.assign(new EventEmitter(), { stdout: null, stderr: null, pid: 4242 })
+      setImmediate(() => {
+        cp.emit('exit', null, rule.signal)
+        cp.emit('close', null, rule.signal)
+      })
+      return cp
+    }
     const failure = Object.assign(new Error('spawn git EAGAIN'), { code: 'EAGAIN', errno: -11, syscall: 'spawn git' })
     if (rule.sync) throw failure
     const cp = Object.assign(new EventEmitter(), { stdout: null, stderr: null, pid: undefined })
@@ -75,6 +125,9 @@ const failing = (match: string | RegExp, times = 1, more: { code?: number; err?:
   fail.rules.push({ match: (l) => (typeof match === 'string' ? l.includes(match) : match.test(l)), times, err: more.err ?? BUSY, code: more.code ?? 128, ...(more.native ? { native: more.native } : {}), ...(more.after ? { after: more.after } : {}) })
 }
 const callsOf = (match: string): number => fail.calls.filter((l) => l.includes(match)).length
+/** HI-2050: the one git that reads the commit identity (both keys). */
+const IDENTITY = 'config --null --get-regexp'
+const HEAD_READ = 'rev-parse --verify -q HEAD'
 
 let env: Env | null = null
 beforeEach(() => {
@@ -113,11 +166,10 @@ const count = (e: Env, card: number, kind: string): number => e.store.facts(card
 
 /** The reads before anything is touched, each as the queue asks git (the target checked out: the journal's too). */
 const BEFORE_TOUCH: [string, string, boolean][] = [
-  ['the identity (user.name)', 'config user.name', false],
-  ['the identity (user.email)', 'config user.email', false],
+  ['the identity', IDENTITY, false],
   ["the queue worktree's listing", 'worktree list --porcelain', false],
   ["the queue worktree's add", 'worktree add --detach', false],
-  ["the test merge's head", 'rev-parse --verify -q HEAD', false],
+  ["the test merge's head", HEAD_READ, false],
   ["the checked-out folder's staged files", 'diff --cached --name-only', true],
   ["the merge's files", 'diff --name-only -z --no-renames', true],
   ["the checked-out folder's status", 'status --porcelain -z --untracked-files=all --no-renames', true]
@@ -170,7 +222,7 @@ describe('a read that fails once before anything is touched: the entry goes roun
     const e = project({ strict: true })
     const card = await queued(e)
     commit(e.project, { 'other.txt': 'meanwhile\n' }, 'meanwhile') // the card is behind main: brought up to date
-    failing('config user.name')
+    failing(IDENTITY)
     expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
     expect(e.kinds(card.id)).toContain('Updated')
     expect(e.store.queuePause('main')).toBeNull()
@@ -192,9 +244,9 @@ describe('a read that keeps failing pauses needsYou with what git said, after th
   it("the identity: read 1 + READ_RETRIES times, paused needsYou with git's words, never identity; the card stays queued", async () => {
     const e = project()
     const card = await queued(e)
-    failing('config user.name', Infinity, { err: 'fatal: bad config line 1 in file .git/config' })
+    failing(IDENTITY, Infinity, { err: 'fatal: bad config line 1 in file .git/config' })
     expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: 'fatal: bad config line 1 in file .git/config' }])
-    expect(callsOf('config user.name')).toBe(1 + READ_RETRIES)
+    expect(callsOf(IDENTITY)).toBe(1 + READ_RETRIES)
     expect(e.store.queuePause('main')).toMatchObject({ reason: 'needsYou', message: 'fatal: bad config line 1 in file .git/config' })
     expect(e.wf.state(card).stage).toBe('merging')
     expect(count(e, card.id, 'CheckRan')).toBe(0)
@@ -210,17 +262,17 @@ describe('a read that keeps failing pauses needsYou with what git said, after th
   it('the identity, git never running to an exit (EAGAIN): needsYou, never identity', async () => {
     const e = project()
     await queued(e)
-    failing('config user.name', Infinity, { native: 'EAGAIN' })
+    failing(IDENTITY, Infinity, { native: 'EAGAIN' })
     expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: "git config didn't run to an exit (EAGAIN)" }])
-    expect(callsOf('config user.name')).toBe(1 + READ_RETRIES)
+    expect(callsOf(IDENTITY)).toBe(1 + READ_RETRIES)
   })
 
   it('the identity read failing once is read again (not the failed answer kept): 2 reads, returned', async () => {
     const e = project()
     await queued(e)
-    failing('config user.name')
+    failing(IDENTITY)
     expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'returned' }])
-    expect(callsOf('config user.name')).toBe(2)
+    expect(callsOf(IDENTITY)).toBe(2)
   })
 })
 
@@ -236,7 +288,7 @@ describe('what needs the user still pauses at once, with no retry', () => {
     sh(e.project, 'config', '--unset', 'user.name')
     const r = retried()
     expect(await e.queue({ ...red, hooks: r.hooks }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'identity', files: [e.project] }])
-    expect(callsOf('config user.name')).toBe(1)
+    expect(callsOf(IDENTITY)).toBe(1)
     expect(r.tries()).toBe(0)
     expect(e.wf.state(card).stage).toBe('merging')
   })
@@ -310,7 +362,7 @@ describe('admitted afresh after the wait, before any new merge or check', () => 
   }
   // Red: a read before the checks (the identity); green: a read after them, in the advance's conditions.
   const cases: [string, string, Partial<QueueConfig>][] = [
-    ['red', 'config user.name', red],
+    ['red', IDENTITY, red],
     ['green', 'diff --cached --name-only', {}]
   ]
 
@@ -422,6 +474,33 @@ describe("the test merge's commit, its git never started (HI-2020): put back, an
       expect(count(e, card.id, 'Integrated')).toBe(1)
     })
 
+  // HI-2042: git ended by a signal (no answer of its own): never taken for a conflict or a hook's refusal; put back, again.
+  for (const [what, o, match] of cases.filter(([, , , sync]) => !sync))
+    it(`${what}, git ended by a signal (HI-2042): merged once, nothing paused or returned`, async () => {
+      const e = project(o)
+      const card = await queued(e)
+      if (o.strict || o.style === 'rebase') commit(e.project, { 'other.txt': 'meanwhile\n' }, 'meanwhile')
+      spawnFail.rules.push({ match, times: 1, signal: 'SIGTERM' })
+      expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
+      expect(spawnFail.rules[0].times).toBe(0)
+      expect(e.store.queuePause('main')).toBeNull()
+      expect(e.wf.state(card).stage).toBe('done')
+      expect(count(e, card.id, 'IntegrationFailed')).toBe(0)
+      expect(count(e, card.id, 'Integrated')).toBe(1)
+    })
+
+  it('ended by a signal every time (HI-2042): needsYou saying so after 1 + READ_RETRIES tries; never a hook or conflict', async () => {
+    const e = project()
+    const card = await queued(e)
+    const before = sh(e.project, 'rev-parse', 'main')
+    spawnFail.rules.push({ match: 'merge --no-ff', times: Infinity, signal: 'SIGTERM' })
+    expect(await e.queue(red).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: 'git was ended by a signal (SIGTERM)' }])
+    expect(spawnFail.seen.filter((l) => l.includes('merge --no-ff'))).toHaveLength(1 + READ_RETRIES)
+    expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
+    expect(count(e, card.id, 'IntegrationFailed')).toBe(0)
+    expect(e.wf.state(card).stage).toBe('merging')
+  })
+
   it('never starting, every time: needsYou with its start error after 1 + READ_RETRIES tries; nothing merged', async () => {
     const e = project()
     const card = await queued(e)
@@ -432,6 +511,137 @@ describe("the test merge's commit, its git never started (HI-2020): put back, an
     expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
     expect(count(e, card.id, 'CheckRan')).toBe(0)
     expect(e.wf.state(card).stage).toBe('merging')
+  })
+})
+
+describe("whether the repository signs, read by a git that couldn't answer (HI-2054): again, never taken for unsigned", () => {
+  const SIGNS = 'config --type=bool --get commit.gpgsign'
+  /**
+   * The queue's git (its config's seam, above src/main/git's normalisation): the signing read answered `failed` its first
+   * `times` times; each command's line in order. Everything else as the queue runs it.
+   */
+  const reading = (failed: Partial<QueueGitResult>, times: number, lines: string[]): Partial<QueueConfig> => ({
+    git: async (cwd, args, opts) => {
+      const line = args.slice(args.indexOf('core.quotepath=off') + 1).join(' ')
+      lines.push(line)
+      if (line.includes(SIGNS) && times-- > 0) return { ok: false, out: '', err: '', ...failed } as QueueGitResult
+      return opts ? gitTree(cwd, args, opts) : git(cwd, args)
+    }
+  })
+  const notAnswers: [string, Partial<QueueGitResult>][] = [
+    ['never started', { code: -1, notRun: 'EAGAIN', err: 'spawn git EAGAIN' }],
+    ["git's own error", { code: 128, err: "fatal: bad boolean config value 'maybe' for 'commit.gpgsign'" }],
+    ['ended by a signal', { code: -1, signal: 'SIGTERM', err: 'git was ended by a signal (SIGTERM)' }],
+    ["ended at a bound, its code 1, 'false' out", { code: 1, timedOut: true, out: 'false\n' }]
+  ]
+  // Each caller of the read, and the command it would have gone on to.
+  const callers: [string, Partial<WorkflowOptions>, string][] = [
+    ['the merge', {}, 'merge --no-ff'],
+    ["a squash's merge", { style: 'squash' }, 'merge --squash'],
+    ["strict's update of the card", { strict: true }, 'merge --no-ff --no-edit'],
+    ["Rebase and fast-forward's rebase", { style: 'rebase' }, 'rebase --no-rebase-merges']
+  ]
+  for (const [what, o, next] of callers)
+    for (const [how, failed] of notAnswers)
+      it(`${what}, the read by a git that ${how} once: again before it goes on, read again, merged once`, async () => {
+        const e = project(o)
+        const card = await queued(e)
+        if (o.strict || o.style === 'rebase') commit(e.project, { 'other.txt': 'meanwhile\n' }, 'meanwhile')
+        const lines: string[] = []
+        expect(await e.queue(reading(failed, 1, lines)).drain('main')).toMatchObject([{ outcome: 'integrated' }])
+        // Read again in the next round, and nothing the read decides ran before it was answered.
+        const reads = lines.flatMap((l, i) => (l.includes(SIGNS) ? [i] : []))
+        expect(reads.length).toBeGreaterThanOrEqual(2)
+        expect(lines.slice(0, reads[1]).some((l) => l.includes(next))).toBe(false)
+        expect(lines.slice(reads[1]).some((l) => l.includes(next))).toBe(true)
+        expect(e.store.queuePause('main')).toBeNull()
+        expect(e.wf.state(card).stage).toBe('done')
+        expect(count(e, card.id, 'IntegrationFailed')).toBe(0)
+        expect(count(e, card.id, 'Integrated')).toBe(1)
+      })
+
+  it("failing every time: needsYou with git's words after 1 + READ_RETRIES reads; nothing merged", async () => {
+    const e = project()
+    const card = await queued(e)
+    const before = sh(e.project, 'rev-parse', 'main')
+    const lines: string[] = []
+    const failed = notAnswers[1][1]
+    expect(await e.queue({ ...red, ...reading(failed, Infinity, lines) }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'needsYou', message: failed.err }])
+    expect(lines.filter((l) => l.includes(SIGNS))).toHaveLength(1 + READ_RETRIES)
+    expect(lines.some((l) => l.includes('merge --no-ff'))).toBe(false)
+    expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
+    expect(count(e, card.id, 'IntegrationFailed')).toBe(0)
+    expect(e.wf.state(card).stage).toBe('merging')
+  })
+})
+
+describe("the queue's own git's output, read whole before a failure is told (HI-2043)", () => {
+  /** A commit-msg hook that refuses (git runs hooks with its sh), LF only. */
+  const refusing = (e: Env): void => writeFileSync(join(e.project, '.git', 'hooks', 'commit-msg'), '#!/bin/sh\necho "message rejected by policy" >&2\nexit 1\n', { mode: 0o755 })
+
+  const cases: [string, Partial<WorkflowOptions>, string][] = [
+    ['the merge', {}, 'merge --no-ff'],
+    ["a squash's commit", { style: 'squash' }, 'commit -q']
+  ]
+  for (const [what, o, match] of cases)
+    it(`${what}: its exit told before its output, a hook's refusal is still the hook's (the card returned with its words)`, async () => {
+      const e = project(o)
+      const card = await queued(e)
+      refusing(e)
+      const before = sh(e.project, 'rev-parse', 'main')
+      spawnFail.rules.push({ match, times: 1, late: true })
+      expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'returned', reason: 'hook' }])
+      expect(spawnFail.rules[0].times).toBe(0)
+      expect(e.store.facts(card.id).filter((f) => f.kind === 'IntegrationFailed').at(-1)!.data).toMatchObject({ reason: 'hook', log: expect.stringContaining('message rejected by policy') })
+      expect(e.store.queuePause('main')).toBeNull()
+      expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
+    })
+
+  it('its output held open after its exit (a descendant that got away): settled with what came, after a quiet spell', async () => {
+    const e = project()
+    const card = await queued(e)
+    spawnFail.rules.push({ match: 'merge --no-ff', times: 1, held: true })
+    expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
+    expect(spawnFail.rules[0].times).toBe(0)
+    expect(e.wf.state(card).stage).toBe('done')
+  })
+
+  // HR3's round 1: its bound is on git, not on its output.
+  it('a git that exits before its bound, its output open past it: never timed out, its own answer (nothing ended)', async () => {
+    let child: FakeChild | null = null
+    spawnFail.rules.push({ match: 'merge', times: 1, drive: (cp) => {
+      child = cp
+      cp.stderr.emit('data', Buffer.from('told'))
+      cp.exitCode = 0
+      cp.emit('exit', 0, null)
+    } })
+    const r = await gitTree('.', ['merge', 'x'], { env: {}, timeoutMs: 50 })
+    expect(r).toMatchObject({ ok: true, code: 0, err: 'told' })
+    expect(r.timedOut).toBeUndefined()
+    expect(child!.killed).toBe(0)
+    // Its output closed once quiet.
+    expect(child!.destroyed).toBe(2)
+  })
+
+  it('a git its bound ends: timed out, with what it had said at the bound, and what came after it', async () => {
+    let child: FakeChild | null = null
+    spawnFail.rules.push({ match: 'merge', times: 1, drive: (cp) => {
+      child = cp
+      cp.stderr.emit('data', Buffer.from('waiting for a passphrase'))
+      cp.kill = () => {
+        cp.killed++
+        cp.signalCode = 'SIGTERM'
+        cp.emit('exit', null, 'SIGTERM')
+        setImmediate(() => {
+          cp.stderr.emit('data', Buffer.from('; ended'))
+          cp.emit('close', null, 'SIGTERM')
+        })
+      }
+    } })
+    const r = await gitTree('.', ['merge', 'x'], { env: {}, timeoutMs: 50 })
+    expect(r).toMatchObject({ ok: false, timedOut: true, errAtTimeout: 'waiting for a passphrase', err: 'waiting for a passphrase; ended' })
+    expect(r.signal).toBeUndefined()
+    expect(child!.killed).toBe(1)
   })
 })
 
@@ -451,7 +661,7 @@ describe("a git that didn't run to an exit is never git's answer (HR2's round 2:
 
   it("the identity: unknown when git didn't run to an exit, null only when git says a key isn't set", async () => {
     const e = project()
-    failing('config user.name', 1, { native: 'EAGAIN' })
+    failing(IDENTITY, 1, { native: 'EAGAIN' })
     const failed = await G.identity(e.project)
     expect(isUnknown(failed) && failed.detail).toBe("git config didn't run to an exit (EAGAIN)")
     expect(await G.identity(e.project)).toEqual({ name: expect.any(String), email: expect.any(String) })

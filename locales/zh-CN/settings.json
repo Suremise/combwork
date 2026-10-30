@@ -255,6 +255,8 @@
   "settings.advanced.copilot.retry.context.desc": "Copilot 的错误钩子表明可恢复错误是它会重试的模型调用的位置（被限流，或无法连接到服务）。在 Copilot 继续之前，Hive 将智能体显示为等待重试。设置错误时，等待中的智能体只会显示“工作中”。",
   "settings.advanced.copilot.retry.message.title": "重试：错误消息",
   "settings.advanced.copilot.retry.message.desc": "该钩子对调用失败原因的措辞：一个正则表达式，其命名分组 status 是拒绝它的 HTTP 状态，其分组 limited 匹配限流（429）的措辞，或在无法连接到服务时其分组 network 匹配。Copilot 的钩子给出的是服务自身的错误，常常没有状态。设置错误时，等待会在不显示原因的情况下显示。",
+  "settings.advanced.hive.lanes.freshStartWaitMinutes.desc": "通道会在新对话中启动其智能体。通道开始时忙碌的智能体（正在某一轮次中，或正在阅读 Hive 刚给它的消息）会在空闲后启动，最长等待这么久。之后 Hive 停止尝试：通道的行会显示这一点，你可以在那里重试或结束通道。Hive 绝不会为此中断轮次，也绝不会把通道的卡片交给旧对话。",
+  "settings.advanced.hive.lanes.freshStartWaitMinutes.title": "通道：Hive 等待重新启动忙碌智能体的最长时间",
   "settings.advanced.hive.retry.tellAssistantAfterSeconds.title": "等待重试：在此之后通知 Assistant",
   "settings.advanced.hive.retry.tellAssistantAfterSeconds.desc": "智能体的编码智能体在一轮中可以持续等待重试其模型请求（被限流，或无法连接到服务）多久，之后 Hive 会通知 Hive Assistant，每轮一次。0：从不。",
   "settings.advanced.codex.signIn.expired.desc": "Codex 会话文件中表示登录被拒绝或已过期的回合错误，用于 Codex 本身没有标记该错误的情况（#309）。",

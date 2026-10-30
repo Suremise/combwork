@@ -1,7 +1,7 @@
 // The Git adapter's answers on real repositories (#1118, SPEC §16.3.2): fixed endpoints, sameness by replay with the
 // candidate key only as a first test, containment of a merge, a fast-forward and a squash.
 import { execFileSync } from 'child_process'
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { join } from 'path'
 import { tempDir } from '../tempDir'
@@ -344,5 +344,71 @@ describe('Git adapter', () => {
     expect(() => sh(wt, 'rebase', '-q', 'main')).toThrow()
     expect((await G.dirty(wt)) as string[]).toContain('(rebase-merge)')
     expect((await G.dirty(repo)) as string[]).not.toContain('(rebase-merge)')
+  })
+})
+
+describe('identity in one git, as `git config <key>` answers each (HI-2050)', () => {
+  /** What `git config <key>` says (null: not set, exit 1). */
+  const key = (folder: string, k: string): string | null => {
+    try {
+      return execFileSync('git', ['config', k], { cwd: folder, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    } catch {
+      return null
+    }
+  }
+  /** identity, and what the two `git config` reads it replaces would make of the same repository. */
+  async function same(folder: string): Promise<void> {
+    const r = await counted(() => G.identity(folder))
+    const n = key(folder, 'user.name')
+    const e = key(folder, 'user.email')
+    expect(r.value).toEqual(n && e ? { name: n, email: e } : null)
+    expect(r.ran).toHaveLength(1)
+  }
+  const configFile = (folder: string): string => join(sh(folder, 'rev-parse', '--path-format=absolute', '--git-common-dir'), 'config')
+
+  it('set, repeated (the last), one or both missing, empty, a key with no value, a value with a newline', async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    await same(repo)
+    expect(await G.identity(repo)).toEqual({ name: 'Hive Test', email: 'test@hive.invalid' })
+    sh(repo, 'config', '--add', 'user.name', 'Second Name')
+    await same(repo)
+    expect(await G.identity(repo)).toMatchObject({ name: 'Second Name' })
+    sh(repo, 'config', '--unset-all', 'user.name')
+    await same(repo)
+    sh(repo, 'config', '--unset-all', 'user.email')
+    await same(repo)
+    sh(repo, 'config', 'user.name', '')
+    sh(repo, 'config', 'user.email', 'e@hive.invalid')
+    await same(repo)
+    // A key with no value, then a value with a newline in it (the config file's own escape).
+    const file = configFile(repo)
+    sh(repo, 'config', '--unset-all', 'user.name')
+    writeFileSync(file, `${readFileSync(file, 'utf8')}[user]\n\tname\n`)
+    await same(repo)
+    sh(repo, 'config', '--unset-all', 'user.name')
+    writeFileSync(file, `${readFileSync(file, 'utf8')}[user]\n\tname = "Two\\nLines"\n`)
+    await same(repo)
+    expect(await G.identity(repo)).toMatchObject({ name: 'Two\nLines' })
+  })
+
+  it("an include, and a worktree's own config, as git reads them; a config git can't read is unknown, never no identity", async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    const inc = join(tempDir('git-'), 'identity.inc')
+    writeFileSync(inc, '[user]\n\tname = Included\n')
+    sh(repo, 'config', 'include.path', inc.replace(/\\/g, '/'))
+    await same(repo)
+    expect(await G.identity(repo)).toMatchObject({ name: 'Included' })
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'side', wt, 'main')
+    sh(repo, 'config', 'extensions.worktreeConfig', 'true')
+    sh(wt, 'config', '--worktree', 'user.name', 'Its Own')
+    await same(wt)
+    expect(await G.identity(wt)).toMatchObject({ name: 'Its Own' })
+    await same(repo)
+    const file = configFile(repo)
+    writeFileSync(file, `${readFileSync(file, 'utf8')}[user\n`)
+    const broken = await counted(() => G.identity(repo))
+    expect(isUnknown(broken.value)).toBe(true)
+    expect(broken.ran).toHaveLength(1)
   })
 })

@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 99
+const FIXTURES_VERSION = 100
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2064,7 +2064,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'card-loop-rounds',
-    title: 'A card loop at its round limit: the builder asks the user (blocks the card, hive_notify) instead of another round',
+    title: 'A card loop at its round limit: the builder asks the user (a request under For you) instead of another round',
     async setup(c) {
       await c.card('w', {
         title: 'Retry the sync',
@@ -2080,12 +2080,13 @@ module.exports.SCENARIOS = [
       })
     },
     prompt: (c) => `Work through card #${c.cards.w} as its builder (rounds: 2). Round 1 (the first build and its review) and round 2 (the fix and its review) have both failed review; round 2's review is its last comment.`,
-    fake: (c) => `skill card-loop hive hive_update_task {"number":${c.cards.w},"blocked":"At its round limit: carry on, split, accept with follow-ups, or take over?"} then hive hive_notify {"title":"#${c.cards.w} at its round limit","message":"Round 1: no delay (fixed). Round 2: the delay is never awaited (the same finding came back). Carry on, split, accept with follow-ups, or take over?"}`,
+    fake: (c) => `skill card-loop hive hive_ask_user {"card":"#${c.cards.w}","kind":"decide","text":"#${c.cards.w} is at its round limit. Round 1: no delay (fixed). Round 2: the delay is never awaited (the same finding came back). Carry on, split, accept with follow-ups, or take over?"}`,
     expect: (o, c) => [
       ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
-      ['asked the user (hive_notify)', ran(o, 'hive_notify').length >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
-      // A lane watch wakes on a card becoming blocked, never on a notification alone (#840).
-      ['blocked the card with its question', !!o.cards.w?.blocked, o.cards.w?.blocked ?? 'not blocked'],
+      // card-loop (rounds.md): a question for the user is a request under For you (hive_ask_user), which wakes whoever
+      // watches the lane; where Hive's own round limit already asked the user (rules enforced), that request is the one
+      // (HI-2035). A block or a notification alone is no longer the way to ask.
+      ['asked the user: a request under For you (its hive_ask_user, or the round limit Hive asked)', (o.cards.w?.forYou ?? []).length >= 1, `${o.hiveCalls.map((x) => x.tool).join(',')} | forYou: ${JSON.stringify(o.cards.w?.forYou ?? [])}`],
       // Back in Doing from round 2's failed review: no round three sent (no move to Review, no submission of its own).
       ["didn't send it round three (not back to Review, no submission of its own, not Done)", movedInto(o.cards.w, 'Review') < 0 && !submissionsOf(o, c, 'w').length && o.cards.w?.column === 'doing', history(o.cards.w).join(' | ')]
     ]
@@ -2778,7 +2779,7 @@ module.exports.SCENARIOS = [
       c.head = c.git('rev-parse', 'HEAD').trim()
     },
     prompt: (c) => `Card #${c.cards.s} is yours, in Doing, and its work is done in this folder. Submit it for review now with hive_submit.`,
-    fake: (c) => `skill work-on-card then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."} then Nothing is committed yet: shall I commit the card's work so it can be submitted for review?`,
+    fake: (c) => `skill work-on-card then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."} then say Nothing is committed yet: shall I commit the card's work so it can be submitted for review?`,
     expect: (o, c) => {
       const n = c.cards.s
       const submits = called(o, 'hive_submit').filter((x) => isCard(argsOf(x).card, n))
@@ -3280,17 +3281,15 @@ module.exports.SCENARIOS = [
     },
     prompt: "Coder is building something for me (there's no card for it). Tell me when it's done.",
     fake: 'skill coordinate-agents then hive hive_wait_for_agents {"agents":[{"project":"alpha","agent":"Coder"}],"wake":true}',
-    // Its turn ended with the watch running: watching, which a wait held in the call never shows.
-    during: (c, status) => {
-      if (status === 'watching') c.sawWatching = true
-    },
-    expect: (o, c) => {
+    // Its turn ended with the watch running: watching, which a wait held in the call never shows. Read from every status the
+    // session reported (HI-2022: sampled between looks, a watch that Coder's end cut short was often missed).
+    expect: (o) => {
       const waits = called(o, 'hive_wait_for_agents')
       const watched = waits.some((x) => x.ok && argsOf(x).wake === true)
       return [
         ['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')],
         ['watched Coder with an agent watch (hive_wait_for_agents with wake), which worked', watched, waits.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ')],
-        ['ended its turn watching (status watching), not waiting in the call', !!c.sawWatching],
+        ['ended its turn watching (status watching), not waiting in the call', (o.statuses ?? []).includes('watching'), (o.statuses ?? []).join(' → ')],
         ['no polling: no wait held in the call', !waits.some((x) => argsOf(x).wake !== true && !argsOf(x).cancel), waits.map((x) => x.args).join(' | ')],
         ['woken when Coder finished: its watch has ended', watched && o.status !== 'watching', o.status]
       ]
@@ -4018,7 +4017,8 @@ module.exports.SCENARIOS.push(
       const d = c.cards.d
       return [
         ['gave the card to Coder', agentOf(o.cards.d) === c.agents.coder.id, agentOf(o.cards.d)],
-        ["Coder's lane has it after #" + c.cards.b + ', or Coder was told', (coderLane?.cards ?? []).map((x) => x.number).includes(d) || briefsTo(o, 'Coder').some((t) => names(t, d)), JSON.stringify(lanes.map((l) => [l.builder?.name, l.cards?.map((x) => x.number)]))],
+        // Its list, or its list queued after the card in flight (HI-2029: Hive starts the lane's first card on its idle builder).
+        ["Coder's lane has it after #" + c.cards.b + ', or Coder was told', (coderLane?.cards ?? []).map((x) => x.number).includes(d) || (coderLane?.queued ?? []).includes(d) || briefsTo(o, 'Coder').some((t) => names(t, d)), JSON.stringify(lanes.map((l) => [l.builder?.name, l.cards?.map((x) => x.number), l.queued]))],
         ["Builder2's lane no longer has it", !(otherLane?.cards ?? []).map((x) => x.number).includes(d), JSON.stringify(otherLane?.cards?.map((x) => x.number))],
         ["ended its turn watching both lanes' last cards, the moved card's new place (its live watch, waking on moves, comments and verdicts)", liveWatchCovers(o, [d, c.cards.c]), liveWatch(o)]
       ]

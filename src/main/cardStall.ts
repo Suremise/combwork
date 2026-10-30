@@ -2,8 +2,8 @@ import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
 import { backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, type LaneOrderView, type StallAgent } from '../shared/tasks'
-import type { AgentInfo, AgentStart, ProgressRun, TaskCard } from '../shared/types'
-import { LOOP_STEP_WAIT_MINUTES } from '../shared/lanes'
+import type { AgentInfo, AgentStart, LaneStatus, ProgressRun, TaskCard } from '../shared/types'
+import { LOOP_STEP_WAIT_MINUTES, laneStatusText } from '../shared/lanes'
 import { projectPreferences } from './workflow/preferences'
 import { queueReturnOf, staleApprovalOf } from './queueReturn'
 import { isResuming } from './restartResume'
@@ -96,14 +96,16 @@ export const LANE_NEXT_STALL_MS = 15 * 60_000
 export function laneNextWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column' | 'archived' | 'blocked'>, lane: LaneOrderView | null | undefined, builder: { name: string; status: string | null }, now = Date.now()): string | null {
   if (!lane || lane.state === 'paused' || c.archived || c.blocked || c.column !== 'todo') return null
   const at = lane.cards.findIndex((x) => x.number === c.number)
-  if (at < 1 || lane.cards.slice(0, at).some((x) => x.column !== 'done')) return null
+  if (at < 0 || lane.cards.slice(0, at).some((x) => x.column !== 'done')) return null
   if (builder.status !== null && !IDLE.includes(builder.status)) return null
-  const before = lane.cards[at - 1]
-  const since = Date.parse(before.movedAt ?? '')
+  // Its first card (HI-2029): since the lane started; a later one, since the card before it went Done.
+  const before = at > 0 ? lane.cards[at - 1] : null
+  const since = Date.parse((before ? before.movedAt : lane.startedAt) ?? '')
   if (!since || now - since < LANE_NEXT_STALL_MS) return null
   const min = Math.round((now - since) / 60_000)
   const name = (x: { number: number; key?: string }): string => x.key ?? `#${x.number}`
-  return `${name(c)} is the lane's next card: ${name(before)} went Done ${min} min ago, and ${builder.name} ${builder.status === null ? "isn't running" : builder.status === 'watching' ? 'is only watching' : 'is idle'} without starting it.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  const doing = `${builder.name} ${builder.status === null ? "isn't running" : builder.status === 'watching' ? 'is only watching' : 'is idle'} without starting it.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  return before ? `${name(c)} is the lane's next card: ${name(before)} went Done ${min} min ago, and ${doing}` : `${name(c)} is the lane's first card: the lane started ${min} min ago, and ${doing}` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
 /** A workspace's live agents (by its folder): their names, projects, cards left with no watch, card watches (and since when), and how each is now. */
@@ -175,17 +177,34 @@ export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: stri
  */
 function laneNext(c: TaskCard, lane: LaneOrderView | null | undefined, live: ReturnType<typeof liveOf>, agentNow: StallAgent | null): string | null {
   if (!lane || c.column !== 'todo' || !c.project) return null
+  const fresh = freshBlockedReason(c, lane)
+  if (fresh) return fresh
   const b = live.find((a) => a.agentId === lane.builder && a.project.toLowerCase() === c.project!.toLowerCase())
   if (b) return laneNextWaitReason(c, lane, { name: b.name, status: b.status })
   if (c.agent === lane.builder && agentNow && !agentNow.running) return laneNextWaitReason(c, lane, { name: agentNow.name, status: null })
   return null
 }
 
+/**
+ * A lane's next card held by its builder's new conversation that Hive stopped trying to start (HI-2034, the lane's status
+ * `startWait` `fresh` with `freshBlocked`): stalled at once, as only the user's Retry or ending the lane moves it (the
+ * lane watch's `stalled`). Its card, in Todo with every card before it Done; null otherwise.
+ */
+function freshBlockedReason(c: Pick<TaskCard, 'number' | 'key' | 'column'>, lane: LaneOrderView): string | null {
+  if (!lane.freshBlocked || lane.state === 'paused') return null
+  const at = lane.cards.findIndex((x) => x.number === c.number)
+  if (at < 0 || lane.cards.slice(0, at).some((x) => x.column !== 'done')) return null
+  return `${c.key ?? `#${c.number}`} waits: ${lane.freshBlocked}` // i18n-ignore: agent-facing (the Agent API's stalled)
+}
+
 /** A running lane as the stall check reads it (#1410), its cards' keys and last moves from the board's cards (`card`). */
-export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: string } | null; state?: string; cards: { number: number; column: string }[] }, card: (n: number) => Pick<TaskCard, 'key' | 'history'> | undefined): LaneOrderView => ({
+export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: string } | null; state?: string; startedAt?: string; status?: LaneStatus | null; cards: { number: number; column: string }[] }, card: (n: number) => Pick<TaskCard, 'key' | 'history'> | undefined): LaneOrderView => ({
   builder: l.builder.id,
   reviewer: l.reviewer?.id ?? null,
   ...(l.state ? { state: l.state } : {}),
+  ...(l.startedAt ? { startedAt: l.startedAt } : {}),
+  // Its agent's new conversation no more tried (HI-2034), said as the lane's status says it.
+  ...(l.status?.reason === 'startWait' && l.status.why === 'fresh' && l.status.freshBlocked ? { freshBlocked: laneStatusText(l.status) } : {}),
   cards: l.cards.map((c) => {
     const t = card(c.number)
     return { number: c.number, column: c.column, movedAt: t ? columnSince(t) : null, ...(t?.key ? { key: t.key } : {}) }

@@ -942,6 +942,9 @@ describe("Hive's own test runners (tests/progressReport.mts)", () => {
     own.waiting('B4 (hb4)')
     await vi.waitFor(() => expect(calls.length).toBe(1), { timeout: HUNG_MS })
     expect(calls[0].body).toEqual({ title: 'e2e: waiting for a test slot', command: 'npm run e2e -- --all', waiting: 'waiting for a test slot: B4 (hb4)', pid: process.pid })
+    // The test slots' own wording (HI-2070): the whole line, what is ahead, as slots.mjs waitSummary puts it.
+    own.waitingAs("waiting for a test slot (2 heavy runs ahead: HB6's scenarios: 151 (fake), HB4's e2e: 4 suites × 5)")
+    await vi.waitFor(() => expect(calls.at(-1)?.body).toEqual({ waiting: "waiting for a test slot (2 heavy runs ahead: HB6's scenarios: 151 (fake), HB4's e2e: 4 suites × 5)" }), { timeout: HUNG_MS })
     await own.finish('got a test slot after 3 s')
     expect(calls.at(-1)).toMatchObject({ path: '/v1/progress/run-1/finish', body: { ok: true, summary: 'got a test slot after 3 s' } })
     calls.length = 0

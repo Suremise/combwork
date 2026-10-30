@@ -177,6 +177,18 @@ export function buildLock(root, { dir = BUILD_LOCKS, owner = process.pid, alive 
 }
 
 /**
+ * Why the worktree's dev build isn't from its source as it is now, or null when it is; with the inputs it was read
+ * against. Also for a runner that must know before it builds (a model trial takes a CPU slot to build, HI-2070).
+ */
+export function buildWhy(root) {
+  const hasBuild = existsSync(join(root, 'out', 'main', 'index.js'))
+  const stamp = buildStamp(root)
+  const inputs = buildInputs(root)
+  const why = hasBuild && stamp === inputs ? null : !hasBuild ? 'there is no dev build' : !stamp ? "the dev build wasn't made with --build, so which code it holds is unknown" : 'the dev build was made from other source than this'
+  return { why, inputs }
+}
+
+/**
  * Makes sure the build is the source's, or says why not. { stale, built, waited, why }:
  * - fresh (the stamp matches the source): nothing to do;
  * - otherwise, with build: under the worktree's build lock, looks again (another runner may have just built it); still
@@ -188,13 +200,7 @@ export function buildLock(root, { dir = BUILD_LOCKS, owner = process.pid, alive 
  */
 export function ensureBuild({ root, build, runBuild, lock: lockOpts = {} }) {
   const lock = buildLock(root, lockOpts)
-  const look = () => {
-    const hasBuild = existsSync(join(root, 'out', 'main', 'index.js'))
-    const stamp = buildStamp(root)
-    const inputs = buildInputs(root)
-    const why = hasBuild && stamp === inputs ? null : !hasBuild ? 'there is no dev build' : !stamp ? "the dev build wasn't made with --build, so which code it holds is unknown" : 'the dev build was made from other source than this'
-    return { why, inputs }
-  }
+  const look = () => buildWhy(root)
   if (!build) {
     const waited = lock.waitFree()
     const { why } = look()
@@ -212,6 +218,25 @@ export function ensureBuild({ root, build, runBuild, lock: lockOpts = {} }) {
   } finally {
     process.off('exit', lock.release)
     lock.release()
+  }
+}
+
+/**
+ * ensureBuild for a run whose build needs a CPU slot it doesn't hold (HI-2070: a model trial with no CPU credit,
+ * slots.mjs buildNeedsCpuSlot): it looks first, once no other runner of this worktree is building (ensureBuild without
+ * build, which waits that out), so a build that became needed meanwhile is seen; only a stale one takes the slot
+ * (takeSlot: async, its release()), held while it builds and let go after. The slot before the build lock, as every
+ * runner takes them, so neither waits on the other. needsSlot false: ensureBuild as it is. ensure: for tests.
+ */
+export async function ensureBuildWithSlot({ root, runBuild, needsSlot, takeSlot, ensure = ensureBuild }) {
+  if (!needsSlot) return ensure({ root, build: true, runBuild })
+  const looked = ensure({ root, build: false })
+  if (!looked.stale) return looked
+  const slot = await takeSlot()
+  try {
+    return ensure({ root, build: true, runBuild })
+  } finally {
+    slot.release()
   }
 }
 

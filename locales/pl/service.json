@@ -172,6 +172,8 @@
   "service.laneStart.sameAgent": "Wykonawca nie może być własnym recenzentem.",
   "service.laneStart.starting": "Tor agenta {agent} jest już uruchamiany.",
   "service.laneStart.unknownAgent": "{agent} nie jest agentem projektu {project}.",
+  "service.laneStarts.freshBlockedBody": "{why, select, timeout {Nie był wolny w ciągu {minutes, plural, one {# minuty} few {# minut} many {# minut} other {# minuty}}.} uncertain {Hive zamknął się podczas uruchamiania, więc mogła się nie rozpocząć.} other {{reason}}} Spróbuj ponownie z wiersza toru w panelu Postęp albo zakończ tor. Do tego czasu jego karty czekają.",
+  "service.laneStarts.freshBlockedTitle": "Nowa rozmowa agenta {agent} się nie rozpoczęła",
   "service.lanes.noWorkspace": "Żaden obszar roboczy nie jest otwarty",
   "service.lanes.unknown": "Nieznany tor {id}",
   "service.metrics.badProvider": "provider musi być identyfikatorem dostawcy",

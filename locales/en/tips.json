@@ -1124,7 +1124,7 @@
     "description": "A tip's title."
   },
   "tips.maxAgents.text": {
-    "defaultMessage": "Maximum agents in Version Control → Workflow is how many agents the Assistant adds to a project, so it never brings in agents you didn’t plan for. Each preset sets its team: Solo one agent, Pair a builder and a reviewer. You can always add more yourself.",
+    "defaultMessage": "Maximum agents in Version Control → Workflow is how many agents a project has, so nobody brings in agents you didn’t plan for, the Assistant included. Each preset sets its team: Solo one agent, Pair a builder and a reviewer. Raise it there to add more.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Maximum agents is a workflow option (HI-2001); Solo and Pair are presets."
   },
   "tips.maxAgents.title": {
@@ -1260,7 +1260,7 @@
     "description": "A tip's title."
   },
   "tips.moreAgents.text": {
-    "defaultMessage": "Need more than {usual, plural, one {# agent} other {# agents}} in a project? Add them yourself, up to {most, number}, and raise Maximum agents in Version Control → Workflow so the Assistant can too. Above {usual, number} it shows what they cost: the memory your running agents take, and how much is free.",
+    "defaultMessage": "Need more than {usual, plural, one {# agent} other {# agents}} in a project? Raise Maximum agents in Version Control → Workflow, up to {most, number}, then add them. Above {usual, number} it shows what they cost: the memory your running agents take, and how much is free.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {usual} is how many agents a project has by default (12), {most} the most it can have (24). Maximum agents is a workflow option (HI-2001)."
   },
   "tips.moreAgents.title": {

@@ -97,6 +97,7 @@
   "content.templates.noKeySave": "Hive 无法读取 {project} 的项目键，因此无法用它保存名称。请重试，或取消勾选“在名称中使用项目键”后保存。",
   "content.templates.noWorkspace": "请先打开工作区。",
   "content.templates.nothing": "{problem}未做任何更改。",
+  "content.templates.overMax": "它有 {count, number} 个智能体，而此项目的工作流程最多允许 {max, plural, other {# 个智能体}}：请先在“版本控制”→“工作流程”中调高“最大智能体数”，或连同它的工作流程一起加载。未做任何更改。",
   "content.templates.provider": "{problem, select, unknown {此 Hive 不认识提供方“{provider}”（请更新 Hive）} off {{provider} 已关闭（“设置”→“提供方”）} other {{provider} 未安装（“配置提供方”）}}",
   "content.templates.restoring": "撤销正在把此项目的智能体恢复为加载模板之前的样子",
   "content.templates.running": "{agent} 正在运行或启动：请先停止它。",
