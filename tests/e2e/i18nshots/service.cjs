@@ -57,9 +57,17 @@ async function diffTooLarge(ctx) {
   fs.writeFileSync(path.join(ctx.project, BIG), Buffer.alloc(3 * 1024 * 1024, 120))
   await ctx.command('project.tab.changes')
   await (await shown(ctx, page.locator('.git-sections [data-section="changes"]'), "the Git tab's sections")).click()
-  // The project folder's own changes (the picker's last entry), when there is a picker.
+  // The project folder's own changes (the picker's entry valued "", its last), when there is a picker: by its value, not
+  // its place, as the groups above it (comparisons, unused worktrees) can still be loading (HI-2159: an index counted
+  // before they came picked the unused worktrees). Picked again in the wait below until it holds.
   const picker = page.locator('select.changes-picker')
-  if (await picker.count()) await picker.first().selectOption({ index: (await picker.first().locator('option').count()) - 1 })
+  const folderPicked = async () => {
+    if (!(await picker.count())) return true
+    if ((await picker.first().inputValue().catch(() => null)) === '') return true
+    await picker.first().selectOption({ value: '' }, { timeout: 2000 }).catch(() => undefined)
+    return false
+  }
+  await folderPicked()
   const rows = page.locator('.split-list .pane-body .row')
   const shownFile = page.locator('.split-main .editor-toolbar .path strong').first()
   // Its own row, by the file's path (data-path, never its text: HI-1935), once the list has it: never each row in turn,
@@ -67,7 +75,7 @@ async function diffTooLarge(ctx) {
   const own = page.locator(`.split-list .pane-body .row[data-path$="${BIG}"]`).first()
   const started = Date.now()
   const opened = await ctx.lib.until(async () => {
-    if (!(await own.count())) return false
+    if (!(await folderPicked()) || !(await own.count())) return false
     await own.click({ timeout: 2000 }).catch(() => undefined)
     return ((await shownFile.textContent({ timeout: 500 }).catch(() => null)) ?? '').endsWith(BIG)
   }, ctx.hungMs)

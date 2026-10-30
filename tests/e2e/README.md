@@ -130,7 +130,7 @@ the same lock for its run; fake Codex trials use their own homes and do not wait
 different locks, and a junction or another spelling of one home has the same lock. Codex runs any number of sessions
 inside the suite that holds the lock. What the suites change there, the trusted folders in its
 `config.toml`, goes through `lib.trustForCodex`, under a lock beside the file (`config.toml.lock`, broken after 30 s
-as a crash's), so two runners trusting their lanes' folders at once never lose one. A suite that runs out of time (10 minutes) is stopped with everything it started, so its test
+as a crash's), so two runners trusting their lanes' folders at once never lose one. A suite that runs out of time (10 minutes; a `--lang` run 6 a language) is stopped with everything it started, so its test
 Hive doesn't keep holding the lane's port.
 The home lock fixes overlapping launches. A separate failure where every alias launch is refused during another
 runner's full test run is tracked in #499; the diagnostics record it and keep its FAIL verdict.
@@ -425,7 +425,9 @@ npm run e2e -- i18nshots                 # as part of a run (the full set, or --
   open only the images it flags, a card names or your change touches (a language run is ~170 screens in two themes).
   The screenshots are kept for people to browse. Check a flag before acting on it: a deliberate layout (a tab strip
   that scrolls, a long path cut with "…") is flagged too.
-- **A full language run is heavy**: run one at a time on the machine, with load capped (AGENTS.md).
+- **A full language run is heavy**: run one at a time on the machine, with load capped (AGENTS.md). A language takes
+  about 3 minutes, so a `--lang` run's time limit is 6 minutes a language (at least the usual 10, HI-2159): all seven
+  languages fit in one run.
 
 ### The installer on a clean machine: the Sandbox checks
 
