@@ -113,6 +113,35 @@ describe('answers about fixed commits, kept', () => {
     expect(await isAncestor(repo, c, b)).toBe(true)
   })
 
+  it("a linked worktree whose own config.worktree gains an include: not plain there, so git again (HR3's round 3, finding 2)", async () => {
+    const { repo, a, b } = history()
+    const wt = join(repo, '..', 'wt')
+    sh(repo, 'worktree', 'add', '-q', '--detach', wt)
+    expect((await counted(() => isAncestor(wt, a, b))).ran.length).toBe(1)
+    expect((await counted(() => isAncestor(wt, a, b))).ran).toEqual([])
+    writeFileSync(join(sh(wt, 'rev-parse', '--absolute-git-dir'), 'config.worktree'), '[include]\n\tpath = more.config\n')
+    expect(await counted(() => isAncestor(wt, a, b))).toEqual({ v: true, ran: [expect.any(Array)] })
+    // The project's own folder (another git dir, its config.worktree plain) still answers from what was kept.
+    expect((await counted(() => isAncestor(repo, a, b))).ran).toEqual([])
+  })
+
+  it("metadata that can't be read is never taken for plain: what was kept isn't given (HR3's round 3, finding 1)", async () => {
+    const { repo, a, b } = history()
+    expect(await isAncestor(repo, a, b)).toBe(true)
+    expect((await counted(() => isAncestor(repo, a, b))).ran).toEqual([])
+    // A config file that is there but can't be read (here a folder in its place: EISDIR, not "no such file").
+    const worktreeConfig = join(repo, '.git', 'config.worktree')
+    mkdirSync(worktreeConfig)
+    expect((await counted(() => isAncestor(repo, a, b))).ran.length).toBe(1)
+    rmSync(worktreeConfig, { recursive: true })
+    expect((await counted(() => isAncestor(repo, a, b))).ran).toEqual([])
+    // packed-refs likewise: git is asked (whatever it answers), never the kept "yes".
+    mkdirSync(join(repo, '.git', 'packed-refs'))
+    expect((await counted(() => isAncestor(repo, a, b))).ran.length).toBe(1)
+    rmSync(join(repo, '.git', 'packed-refs'), { recursive: true })
+    expect((await counted(() => isAncestor(repo, a, b))).ran).toEqual([])
+  })
+
   it('another replace namespace named in the environment: never kept', async () => {
     const { repo, a, b } = history()
     process.env.GIT_REPLACE_REF_BASE = 'refs/other-replace/'

@@ -91,7 +91,9 @@ const kept = new Map<string, unknown>()
 function onceForever<T>(repo: string, what: string, ids: string[], ask: () => Promise<Maybe<T>>): Promise<Maybe<T>> {
   if (!ids.every((id) => SHA.test(id))) return onceInStep(repo, what, ids, ask)
   const common = commonDirSync(repo)
-  if (!common || !plainRepo(common)) return onceInStep(repo, what, ids, ask)
+  // The folder's own git dir: a linked worktree's `config.worktree` is its own (HR3's round 3, finding 2).
+  const own = gitDirSync(repo)
+  if (!common || !own || !plainRepo(common, own)) return onceInStep(repo, what, ids, ask)
   const key = [common.toLowerCase(), what, ...ids].join('\0')
   if (kept.has(key)) {
     const v = kept.get(key) as Maybe<T>
@@ -101,7 +103,7 @@ function onceForever<T>(repo: string, what: string, ids: string[], ask: () => Pr
     return Promise.resolve(v)
   }
   return onceInStep(repo, what, ids, ask).then((v) => {
-    if (isUnknown(v) || !plainRepo(common)) return v
+    if (isUnknown(v) || !plainRepo(common, own)) return v
     kept.set(key, v)
     if (kept.size > KEPT_MAX) kept.delete(kept.keys().next().value!)
     return v
