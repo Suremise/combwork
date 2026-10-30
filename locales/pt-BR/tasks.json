@@ -105,6 +105,7 @@
   "tasks.history.context": "Ler primeiro: {refs}",
   "tasks.history.contextRemoved": "Removidas as seções de documentos para ler primeiro",
   "tasks.history.created": "Criado em {column, select, hold {Em espera} todo {A fazer} doing {Fazendo} review {Revisão} passed {Aprovado} done {Concluído} other {{column}}}",
+  "tasks.history.queueReturned": "Devolvido pela fila de merge: {reason, select, conflict {um conflito com {target}} checks {a verificação de merge {check} falhou no resultado do merge} checksSome {uma verificação de merge falhou no resultado do merge} checksEnv {a verificação de merge {check} falhou por causa do ambiente, não do trabalho} install {a instalação antes das verificações de merge falhou} hook {um hook do git recusou o commit de merge} targetMoved {{target} mudou durante o merge} folderBusy {a pasta onde {target} está aberto estava ocupada} notUpToDate {não está atualizado com {target}} focused {os testes focados não puderam rodar no resultado do merge} other {{reason}}}{files, select, none {} other { (em {files})}}. A seção Trabalho do cartão mostra a execução.",
   "tasks.history.startsWithout": "{card} foi movido para Concluído sem que seu trabalho esteja no destino ({reason}): este cartão pode começar sem ele.",
   "tasks.history.decision": "Registrou uma decisão: “{decision}”",
   "tasks.history.decisionChanged": "Alterou uma decisão para “{decision}” (era “{was}”)",

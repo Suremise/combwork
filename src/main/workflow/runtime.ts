@@ -96,6 +96,8 @@ export interface Effects {
   wake?: (agent: string, card: CardRecord, why: string) => void
   /** A notice to the user: its English, and its text as data for the window when Hive wrote it (an agent's words have none). */
   notify?: (card: CardRecord, text: string, shown?: StoredText) => void
+  /** HI-2087: a comment of Hive's on the card: its English, and its text as data for the window. */
+  comment?: (card: CardRecord, text: string, shown?: StoredText) => void
 }
 
 /** What `slotFor` gives a start (#1438): the slot and lease, or why it waits for one; null, no slot. */
@@ -2698,6 +2700,9 @@ export class Workflow {
         return
       case 'notify':
         if (this.store.deliver({ action: id, kind, target: 'user', payload })) this.cfg.effects?.notify?.(card, String(payload.text), payload.shown as StoredText | undefined)
+        return
+      case 'comment':
+        if (this.store.deliver({ action: id, kind, target: 'card', payload })) this.cfg.effects?.comment?.(card, String(payload.text), payload.shown as StoredText | undefined)
         return
       case 'prepareSlot':
       case 'pin':

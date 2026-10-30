@@ -178,25 +178,39 @@ export interface InboxItem {
 /** The unread deliveries as the inbox lists them, oldest first: a card's events in one item, where its first one was. */
 export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
   const out: InboxItem[] = []
-  const byCard = new Map<number, { item: InboxItem; bodies: string[] }>()
+  const byCard = new Map<number, { item: InboxItem; events: DeliveryRecord[] }>()
   for (const r of [...records].filter(isUnread).sort((a, b) => a.seq - b.seq)) {
     if (r.kind === 'card-event' && r.card) {
       const had = byCard.get(r.card)
       if (had) {
         had.item.ids.push(r.id)
-        had.bodies.push(r.body)
+        had.events.push(r)
         if (!had.item.from.split(' and ').includes(r.from.name)) had.item.from += ` and ${r.from.name}`
         continue
       }
       const item: InboxItem = { ids: [r.id], kind: r.kind, from: r.from.name, card: r.card, text: '', at: r.created }
-      byCard.set(r.card, { item, bodies: [r.body] })
+      byCard.set(r.card, { item, events: [r] })
       out.push(item)
       continue
     }
     out.push({ ids: [r.id], kind: r.kind, from: r.from.name, ...(r.card ? { card: r.card } : {}), text: r.body, at: r.created })
   }
-  for (const { item, bodies } of byCard.values()) item.text = bodies.length === 1 && bodies[0] ? bodies[0] : `${bodies.length} ${bodies.length === 1 ? 'change' : 'changes'}, read the card`
+  for (const { item, events } of byCard.values()) item.text = coalesced(events)
   return out
+}
+
+/**
+ * A card's events in one line: one as it is; several counted. HI-2087: led by the merge queue's latest return of the
+ * card (its line marked so where it was made: `meta.queueReturn`) while it still says where the work is, that is while
+ * nothing but comments on it came after (`meta.commentOnly`: the queue's own comment, say); a later move, verdict, merge
+ * or removal is newer than the return, so the count again.
+ */
+function coalesced(events: readonly DeliveryRecord[]): string {
+  if (events.length === 1 && events[0].body) return events[0].body
+  const i = events.findLastIndex((r) => r.meta?.queueReturn === true)
+  const counted = `${events.length} ${events.length === 1 ? 'change' : 'changes'}, read the card`
+  if (i < 0 || !events.slice(i + 1).every((r) => r.meta?.commentOnly === true)) return counted
+  return `${events[i].body} (with ${events.length - 1} more ${events.length === 2 ? 'change' : 'changes'}: read the card)`
 }
 
 const idList = (ids: readonly string[]): string => ids.join(', ')

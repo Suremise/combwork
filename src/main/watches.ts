@@ -24,6 +24,7 @@ import { isResuming } from './restartResume'
 import { sessions } from './sessions'
 import { cardsNow, getTask, inScope, liveCardHeads, noteOnCard, unknownTask } from './tasks'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
+import { queueReturnOf } from './queueReturn'
 import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { isUnread, type DeliveryRecord } from '../shared/deliveries'
 import { cancelFromSource, createDelivery, deliveryNow, followAgent, inFlightNow as deliveriesInFlight, load as loadDeliveries, offerNow, registerSource, settled as deliveriesSettled } from './deliveries'
@@ -2037,6 +2038,7 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
   const current = (): boolean => !token.cancelled && alive(store) && store.list.includes(rec)
   try {
     let line = rec.fired.line
+    let returned: 'queueReturn' | 'commentOnly' | false = false
     // Whether the line tells a reply of the user's (#418): then the setting is checked again before every piece and
     // before Enter, and turned off, it isn't given.
     let telling = !!rec.fired.replies
@@ -2109,6 +2111,10 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
       } else if (r.hits.length || r.replies.length) {
         const made = withCardNames(store.ws, () => cardWakeLine(r.hits, r.replies.map((x) => x.note), rec.released ?? [], userName()), rec.scope)
         line = fitLine(made.line)
+        // HI-2087: a line about one card that leads with the merge queue's return of it, or tells only a comment on it,
+        // marked so (the inbox's fold leads with a return only while nothing but comments came after it).
+        const one = r.hits.length === 1 && !r.replies.length ? r.hits[0] : null
+        returned = one?.about?.queueReturn ? 'queueReturn' : one && one.changes !== 'gone' && one.changes.length && one.changes.every((c) => c === 'comment') ? 'commentOnly' : false
         telling = r.replies.length > 0
         toldOfCards = Object.fromEntries(r.hits.filter((h) => h.changes !== 'gone' && r.told[h.number]).map((h) => [h.number, r.told[h.number]]))
         if (r.hits.length) told = r.told
@@ -2140,7 +2146,7 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
     // rather than making another (the same watch and fire make the same one). Not saved: not handed over (tried again).
     const given = await locked(store, async () => {
       if (!current() || !rec.fired || rec.fired.delivery) return null
-      const d = await createDelivery(rec.projectPath, { agentId: rec.agentId, kind: 'card-event', from: HIVE, body: line, ...(rec.fired.cards.length ? { card: rec.fired.cards[0] } : {}), source: 'watch', ref: wakeRef(rec), replace: true, ...(rec.fired.again ? { again: 'Hive restarted while typing it' } : {}) })
+      const d = await createDelivery(rec.projectPath, { agentId: rec.agentId, kind: 'card-event', from: HIVE, body: line, ...(rec.fired.cards.length ? { card: rec.fired.cards[0] } : {}), source: 'watch', ref: wakeRef(rec), replace: true, ...(returned ? { meta: { [returned]: true } } : {}), ...(rec.fired.again ? { again: 'Hive restarted while typing it' } : {}) })
       rec.fired.line = line
       rec.fired.delivery = d.id
       // A lane watch's marks move only once its line is received: pending with it until then (saved, for a restart).
@@ -2217,7 +2223,15 @@ async function check(store: Store, rec: WatchRecord, cards?: CardReads, ctx: Rel
       kinds = changesBetween(rec.marks[n], after, rec.cond, into)
       if (kinds !== 'gone') kinds.push(...handoffsSince(card, rec.since, rec.cond, rec.watcherName))
     }
-    if (kinds === 'gone' || kinds.length) hits.push({ ...cardChange(n, card, kinds), about: wakeAbout(card, kinds, rec.agentId) })
+    if (kinds === 'gone' || kinds.length) {
+      const about = wakeAbout(card, kinds, rec.agentId)
+      // HI-2087: moved back to work because the merge queue returned it: the line leads with the return and its reason.
+      if (kinds !== 'gone' && kinds.includes('column') && card && (card.column === 'doing' || card.column === 'todo') && card.project && store.path) {
+        const back = await queueReturnOf(store.ws, join(store.path, card.project), n).catch(() => null)
+        if (back) about.queueReturn = back.text
+      }
+      hits.push({ ...cardChange(n, card, kinds), about })
+    }
     if (card?.project && rec.scope === null && rec.replySeq !== undefined) {
       const projectPath = join(store.path, card.project)
       for (const id of new Set([card.agent, card.review?.agent].filter((x): x is string => !!x))) {

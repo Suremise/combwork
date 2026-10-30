@@ -2469,14 +2469,16 @@ export async function noteOnCard(n: number, what: string | StoredText, ws: Works
  * card. `still`: whether the card, as it is in the change, is still the one meant (its column, project and agent may
  * have changed since it was chosen). True when it was written. `said`: English text, or a message of the card history's
  * (shared/taskHistory.ts), kept as its English (`text`) and as data (`hiveText`, #846) for the window to show in its language.
- * `key`: the comment's id, at most once on the card.
+ * `key`: the comment's id, at most once on the card. Or both (HI-2087): its English as agents read it (`text`, longer
+ * than the window's), and the message the window shows (`shown`).
  */
-export async function commentAsHive(n: number, said: string | StoredText, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string): Promise<boolean> {
+export async function commentAsHive(n: number, said: string | StoredText | { text: string; shown: StoredText }, ws: WorkspaceService = workspace, still: (card: TaskCard) => boolean = () => true, key?: string): Promise<boolean> {
   return boardLock(ws, async () => {
     const card = await getTask(n, ws)
     // `key` (HI-2014): the comment's id, written once on the card: a retry finds it and writes nothing.
     if (card.archived || !still(card) || (key && card.comments.some((c) => c.id === key))) return false
-    addComment(card, BY.hive, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)
+    if (typeof said !== 'string' && 'shown' in said) addComment(card, BY.hive, said.text, said.shown, key)
+    else addComment(card, BY.hive, typeof said === 'string' ? said : englishSaid(said), typeof said === 'string' ? undefined : said, key)
     await saveCard(ws, n, card)
     changed(ws)
     return true

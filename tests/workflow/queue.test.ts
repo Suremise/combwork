@@ -8,6 +8,9 @@ import { preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
 import { MAX_RETESTS, MergeQueue } from '../../src/main/workflow/mergeQueue'
 import { Workflow } from '../../src/main/workflow/runtime'
+import { tr } from '../../src/shared/i18n'
+import { HISTORY } from '../../src/shared/taskHistory'
+import type { StoredText } from '../../src/shared/types'
 
 let env: Env | null = null
 afterEach(() => {
@@ -63,6 +66,13 @@ describe('the merge queue', () => {
     const f = e.wf.state(card).entries.at(-1)?.failure
     expect(f?.conflicts).toEqual({ oursIs: 'target', files: [{ file: 'src/x.txt', hunks: [{ line: 1, before: [], ours: ['target'], theirs: ['card'], after: [] }] }] })
     expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes('src/x.txt (1 conflict, line 1)'))).toBe(true)
+    // HI-2087: and a comment of Hive's on the card, its English what the wake says, its message the window's.
+    const comments = e.store.deliveries().filter((d) => d.kind === 'comment')
+    expect(comments).toHaveLength(1)
+    expect(String(comments[0].payload.text)).toMatch(new RegExp(`^${card.key} came back from the merge queue: a conflict with main in src/x.txt \\(1 conflict, line 1\\)\\..* Merge main into your worktree`))
+    const shown = comments[0].payload.shown as StoredText
+    expect(shown).toEqual({ id: 'tasks.history.queueReturned', values: { reason: 'conflict', target: 'main', check: '', files: 'src/x.txt' } })
+    expect(tr(HISTORY.queueReturned, shown.values as never)).toBe("Came back from the merge queue: a conflict with main (in src/x.txt). The card's Work section shows the run.")
   })
 
   it("HI-1181 round 1: a name git would quote (café.txt) is read as it is named, its hunk recorded", async () => {
