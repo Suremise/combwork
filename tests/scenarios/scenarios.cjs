@@ -2184,7 +2184,7 @@ module.exports.SCENARIOS = [
       ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
       ["didn't ask the user (no hive_notify)", called(o, 'hive_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
       ['handed it on again for round three (back to Review, or its submission)', handedOnAt(o, c, 'r') > 0 && handedOn(o, c, 'r'), history(o.cards.r).join(' | ')],
-      ['ended its turn with a live watch for the verdict (#376)', o.status === 'watching', o.status],
+      ['ended its turn with a live watch for the verdict (#376)', !!turnWatch(o), o.status],
       ['fixed it: the delay is awaited', /await\s+wait\(/.test(c.read('sync.js') ?? ''), c.read('sync.js')],
       ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.r)]
     ],
@@ -2214,7 +2214,7 @@ module.exports.SCENARIOS = [
         ["didn't ask the user (no hive_notify)", called(o, 'hive_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
         verdictLeftCheck(o, c, 'q', false),
         // Its watch for the card's next round (fresh, #434) is still live: one without fresh answers at once.
-        ['ended its turn watching for the card to come back (fresh)', o.status === 'watching', `${o.status}; ${JSON.stringify(ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)))}`],
+        ['ended its turn watching for the card to come back (fresh)', !!turnWatch(o), `${o.status}; ${JSON.stringify(ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)))}`],
         ['changed no files', o.gitStatus.trim() === '', o.gitStatus]
       ]
     },
@@ -2247,7 +2247,7 @@ module.exports.SCENARIOS = [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         // What a reviewer's wait for its return sees (shared/watch.ts movedIntoSince): moved back into Review, or returned.
         ['handed on for round two: back into Review (the reviewer is woken), or its submission', handedOn(o, c, 'f') && (after.some((w) => /^(Moved to (the (top|bottom) of )?Review\b|Returned for review, round 2)/.test(w)) || submissionsOf(o, c, 'f').length > 0), h.join(' | ')],
-        ['ended its turn with a live watch for the verdict (#376)', o.status === 'watching', o.status],
+        ['ended its turn with a live watch for the verdict (#376)', !!turnWatch(o), o.status],
         ['fixed it: the delay is awaited', /await\s+wait\(/.test(c.read('sync.js') ?? ''), c.read('sync.js')],
         ["didn't ask the user (no hive_notify)", called(o, 'hive_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
         ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.f)]
@@ -2281,7 +2281,7 @@ module.exports.SCENARIOS = [
         ['committed the work, leaving nothing uncommitted', head !== c.head && o.gitStatus.trim() === '', `${c.head} → ${head}; ${o.gitStatus.trim()}`],
         ['committed before handing the card on (to Review, or its submission)', !!committedAt && !!movedAt && committedAt <= movedAt, `${new Date(committedAt).toISOString?.()} / ${movedAt ? new Date(movedAt).toISOString() : 'not moved'}`],
         ['named the commit on the card', named, (o.cards.a?.comments ?? []).map((x) => x.text.split('\n')[0]).join(' | ')],
-        ['ended its turn with a live watch for the verdict', o.status === 'watching', o.status]
+        ['ended its turn with a live watch for the verdict', !!turnWatch(o), o.status]
       ]
     },
     fakeSkips: ['named the commit on the card']
@@ -2305,7 +2305,7 @@ module.exports.SCENARIOS = [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['gave no verdict (not failed on that alone)', !h.some((x) => /^Review (passed|failed)$/.test(x)), h.join(' | ')],
         ['asked on the card for a commit', asked, (o.cards.r?.comments ?? []).map((x) => x.text.split('\n')[0]).join(' | ')],
-        ["ended its turn watching for the builder's reply", o.status === 'watching' && watches.some((a) => Array.isArray(a.changes) && a.changes.includes('comment')), `${o.status}; ${JSON.stringify(watches)}`],
+        ["ended its turn watching for the builder's reply", !!turnWatch(o) && watches.some((a) => Array.isArray(a.changes) && a.changes.includes('comment')), `${o.status}; ${JSON.stringify(watches)}`],
         ['left the card in Review', o.cards.r?.column === 'review', o.cards.r?.column],
         ["didn't commit the builder's work itself", c.git('rev-parse', 'HEAD').trim() === c.head && /greet\.js/.test(o.gitStatus), o.gitStatus]
       ]
@@ -2335,7 +2335,7 @@ module.exports.SCENARIOS = [
         ["before its first card's review", !!startedAt && (!review || startedAt <= review.at), `${startedAt} / ${review?.at}`],
         ['one lane, not one a card', starts.length === 1, String(starts.length)],
         ['its first card to Review, the second not begun', o.cards.a?.column === 'review' && o.cards.b?.column === 'todo', `${o.cards.a?.column} / ${o.cards.b?.column}`],
-        ['ended its turn with a live watch for the verdict', o.status === 'watching', o.status]
+        ['ended its turn with a live watch for the verdict', !!turnWatch(o), o.status]
       ]
     }
   },
@@ -2366,14 +2366,14 @@ module.exports.SCENARIOS = [
       const lane = require('../e2e/storeDocs.cjs').storeDocs(c.ws, 'lanes').find((l) => l.cards?.includes(c.cards.a))
       const waits = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.a))
       // Its watch for the verdict, its own or the one Hive arms at its submission (#1639): the lane's wait long.
-      const minutes = o.watch ? Math.round((Date.parse(o.watch.limitAt) - Date.parse(o.watch.since)) / 60000) : null
+      const minutes = turnWatch(o) ? Math.round((Date.parse(turnWatch(o).limitAt) - Date.parse(turnWatch(o).since)) / 60000) : null
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         [`its lane has ${v.rounds} rounds and a ${v.wait}-minute wait`, lane?.rounds === v.rounds && lane?.waitMinutes === v.wait, JSON.stringify(lane ? { rounds: lane.rounds, waitMinutes: lane.waitMinutes } : null)],
-        [`it waits for the verdict with that wait (${v.wait} minutes)`, !!o.watch?.cards?.includes(c.cards.a) && Math.abs(minutes - v.wait) <= 1, JSON.stringify({ watch: o.watch, minutes, waits })],
+        [`it waits for the verdict with that wait (${v.wait} minutes)`, !!turnWatch(o)?.cards?.includes(c.cards.a) && Math.abs(minutes - v.wait) <= 1, JSON.stringify({ watch: turnWatch(o), minutes, waits })],
         // Submitted under the review rules (#1486): a submit refused (nothing committed) leaves it in Doing.
         ['its first card to Review, the second not begun', o.cards.a?.column === 'review' && o.cards.b?.column === 'todo', `${o.cards.a?.column} / ${o.cards.b?.column}`],
-        ['ended its turn with a live watch for the verdict', o.status === 'watching', o.status]
+        ['ended its turn with a live watch for the verdict', !!turnWatch(o), o.status]
       ]
     }
   })),
@@ -2438,7 +2438,7 @@ module.exports.SCENARIOS = [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ["joined the builder's lane by its name", joins.length >= 1 && /implementer/i.test(String(joins[0].builder ?? '')), JSON.stringify(lanes)],
         ["didn't start a lane of its own", !lanes.some((a) => a.action === 'start'), JSON.stringify(lanes)],
-        ['ended its turn watching for the first card to arrive in Review', o.status === 'watching' && arrivals.length >= 1, `${o.status}; ${JSON.stringify(arrivals)}`],
+        ['ended its turn watching for the first card to arrive in Review', !!turnWatch(o) && arrivals.length >= 1, `${o.status}; ${JSON.stringify(arrivals)}`],
         ['left the cards as they were', o.cards.a?.column === 'doing' && o.cards.b?.column === 'todo', `${o.cards.a?.column} / ${o.cards.b?.column}`],
         ['changed no files', o.gitStatus.trim() === '', o.gitStatus]
       ]
@@ -3652,7 +3652,7 @@ module.exports.SCENARIOS = [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         [`reviewed #${c.cards.a}: started a review and gave a verdict`, h.includes('Started reviewing') && h.some((x) => /^Review (passed|failed)$/.test(x)), h.join(' | ')],
         ["didn't ask the user (no hive_notify)", called(o, 'hive_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
-        ['ended its turn with a live watch', o.status === 'watching', o.status]
+        ['ended its turn with a live watch', !!turnWatch(o), o.status]
       ]
     }
   },
@@ -3846,6 +3846,11 @@ const cardWatches = (o) => ran(o, 'hive_wait_for_tasks').filter((x) => argsOf(x)
  */
 const TEAM_WAKES = ['column', 'comment', 'verdict']
 /**
+ * The watch its last turn since its prompt ended with, as it reported it then (HI-2086: a wake may end it before the run
+ * looks, and a fake's turn for that wake ends with none), or null if no turn ended watching.
+ */
+const turnWatch = (o) => (o.turnWatch !== undefined ? o.turnWatch : o.status === 'watching' ? o.watch : null)
+/**
  * A lane watch on every running lane (#531: it follows each lane's cards as the lane goes on), or a card watch (not an
  * agent watch, no single column) over every one of `cards` that wakes on all of TEAM_WAKES.
  */
@@ -3854,13 +3859,13 @@ const watchCovers = (w, cards) => !!w && ((w.lanes ?? []).includes('all') || (!w
  * The watch it ended its turn with (the live one: a new watch replaces the last, so an earlier call proves nothing) covers
  * every one of `cards`, waking it on whatever happens to them (watchCovers).
  */
-const liveWatchCovers = (o, cards) => o.status === 'watching' && watchCovers(o.watch, cards)
+const liveWatchCovers = (o, cards) => watchCovers(turnWatch(o), cards)
 /** Board sweeps (cards, lanes or agents read) after its first wake watch: in a turn a wake started, not the first one. */
 const sweepsAfterWatch = (o) => {
   const first = o.hiveCalls.findIndex((x) => x.tool === 'hive_wait_for_tasks' && x.ok && argsOf(x).wake === true)
   return first < 0 ? 0 : o.hiveCalls.slice(first + 1).filter((x) => x.ok && ['hive_list_tasks', 'hive_lane', 'hive_project_status', 'hive_list_projects', 'hive_read_task'].includes(x.tool)).length
 }
-const liveWatch = (o) => `${o.status}; ${JSON.stringify(o.watch)}; calls: ${cardWatches(o).map((x) => x.args).join(' | ')}`
+const liveWatch = (o) => `${o.status}; ${JSON.stringify(o.watch)}; its turn ended watching: ${JSON.stringify(turnWatch(o))}; calls: ${cardWatches(o).map((x) => x.args).join(' | ')}`
 /** A brief the Assistant sent an agent (hive_prompt_agent's text, hive_start_agent's prompt), by the agent's name. */
 const briefsTo = (o, name) =>
   [...ran(o, 'hive_prompt_agent'), ...ran(o, 'hive_start_agent'), ...ran(o, 'hive_start_task')]
@@ -4031,8 +4036,8 @@ module.exports.SCENARIOS.push(
     prompt: "Two card loops are running in alpha: keep following them. Reviewer2 is also building a small script for me, with no card for it: tell me when it's done.",
     fake: 'skill run-lanes then hive hive_wait_for_tasks {"lanes":["all"],"agents":[{"project":"alpha","agent":"Reviewer2"}],"wake":true,"limitMinutes":360}',
     expect: (o) => [
-      ["ended its turn on a lane watch that also follows Reviewer2 (its live watch)", o.status === 'watching' && (o.watch?.lanes ?? []).length > 0 && (o.watch?.agents ?? []).includes('Reviewer2'), liveWatch(o)],
-      ['no agent watch left in place of the lanes', !(o.watch?.agents && !(o.watch?.lanes ?? []).length), liveWatch(o)]
+      ["ended its turn on a lane watch that also follows Reviewer2 (its live watch)", !!turnWatch(o) && (turnWatch(o)?.lanes ?? []).length > 0 && (turnWatch(o)?.agents ?? []).includes('Reviewer2'), liveWatch(o)],
+      ['no agent watch left in place of the lanes', !(turnWatch(o)?.agents && !(turnWatch(o)?.lanes ?? []).length), liveWatch(o)]
     ]
   },
   {
@@ -4262,8 +4267,8 @@ module.exports.SCENARIOS.push(
       const mine = [c.cards.a, c.cards.b]
       return [
         ['read the run-lanes skill', read(o, 'run-lanes'), o.skillsRead.join(',')],
-        ['ended its turn on a lane watch (its live watch)', o.status === 'watching' && (o.watch?.lanes ?? []).length > 0, liveWatch(o)],
-        ["added none of the lane's cards to it", !(o.watch?.cards ?? []).some((n) => mine.includes(n)), liveWatch(o)]
+        ['ended its turn on a lane watch (its live watch)', !!turnWatch(o) && (turnWatch(o)?.lanes ?? []).length > 0, liveWatch(o)],
+        ["added none of the lane's cards to it", !(turnWatch(o)?.cards ?? []).some((n) => mine.includes(n)), liveWatch(o)]
       ]
     }
   },
@@ -4356,7 +4361,7 @@ module.exports.SCENARIOS.push(
     expect: (o, c) => [
       ["asked the user nothing (no notification, request or question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
       ["merged, moved and ended nothing itself (the builder's merge): no commit, no card moved, no merge reported, no lane ended", c.git('rev-parse', 'HEAD').trim() === c.head && ['a', 'b'].every((k) => !movesOf(o, c.cards[k]).length) && !called(o, 'hive_lane').some((x) => argsOf(x).action === 'end'), o.hiveCalls.map((x) => x.tool).join(',')],
-      ['ended its turn watching the lanes again (its live watch)', o.status === 'watching' && (o.watch?.lanes ?? []).length > 0, liveWatch(o)]
+      ['ended its turn watching the lanes again (its live watch)', !!turnWatch(o) && (turnWatch(o)?.lanes ?? []).length > 0, liveWatch(o)]
     ],
     fakeSkips: ["asked the user nothing (no notification, request or question)"]
   },
@@ -4492,7 +4497,7 @@ module.exports.SCENARIOS.push(
     fake: 'skill run-lanes then hive hive_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}',
     expect: (o, c) => [
       ['no fresh-start suggestion while a lane runs', !suggestsFresh(o), (o.finalReply ?? '').slice(0, 300)],
-      ['ended its turn watching the running lane (a lane watch on it, or its card)', liveWatchCovers(o, [c.cards.c]) || (o.status === 'watching' && (o.watch?.lanes ?? []).includes(c.running)), liveWatch(o)],
+      ['ended its turn watching the running lane (a lane watch on it, or its card)', liveWatchCovers(o, [c.cards.c]) || (!!turnWatch(o) && (turnWatch(o)?.lanes ?? []).includes(c.running)), liveWatch(o)],
       ['restarted and stopped nothing itself', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]
     ],
     fakeSkips: ['no fresh-start suggestion while a lane runs']
