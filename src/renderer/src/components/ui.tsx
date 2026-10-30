@@ -333,6 +333,8 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
 }
 
 export function InfoTip({ text }: { text: ReactNode }) {
+  // No text, no ⓘ: an icon that opens an empty tooltip (HI-2149).
+  if (text == null || text === '' || text === false) return null
   return (
     <Tooltip content={text} delay={100}>
       <Icon name="info" className="info-icon" />

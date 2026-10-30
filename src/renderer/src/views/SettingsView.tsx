@@ -350,6 +350,17 @@ async function saveSettings(patch: SettingsPatch): Promise<void> {
 /** A row's text as Settings shows it, in the user's language (#767). */
 const rowText = (d: SettingEntry): { title: string; desc: string; tip: string } => shownSetting(d)
 
+/** A row's ⓘ with its tip, beside a space; nothing for a row without one (HI-2149: an empty tooltip). */
+function RowTip({ d }: { d: SettingEntry }) {
+  const { tip } = rowText(d)
+  return tip ? (
+    <>
+      {' '}
+      <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{tip}</span>} />
+    </>
+  ) : null
+}
+
 /** Why a row can't be changed now, as shown; null when it can. */
 function disabledText(d: SettingEntry, settings: AppSettings): string | null {
   const why = d.disabledBy?.(settings)
@@ -991,7 +1002,8 @@ function WorkflowDefaultsTabs({ rows, searching }: { rows: SettingDef[]; searchi
         <TabPanel key={d.id} idBase={idBase} id={d.id} selected={d.id === shown && offered.includes(d)} className="setting wide" data-setting={d.id}>
           <div className="s-text">
             <div className="s-desc">
-              {rowText(d).desc} <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(d).tip}</span>} />
+              {rowText(d).desc}
+              <RowTip d={d} />
             </div>
             {d.id === WORKFLOW_DEFAULTS_TAB.global ? <WorkflowLevelForm level="global" onDirty={onGlobalDirty} /> : <WorkflowLevelForm level="workspace" onDirty={onWorkspaceDirty} />}
           </div>
@@ -1064,12 +1076,7 @@ export function SettingsView() {
               <p>
                 {sectionText(g).desc}
                 {/* Its only row drawn untitled (HI-2107): its tip here, beside the one description. */}
-                {g.items.length === 1 && g.items[0].untitled && rowText(g.items[0]).tip && (
-                  <>
-                    {' '}
-                    <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(g.items[0]).tip}</span>} />
-                  </>
-                )}
+                {g.items.length === 1 && g.items[0].untitled && <RowTip d={g.items[0]} />}
               </p>
               {g.id === 'workflow' && <WorkflowDefaultsTabs rows={g.items} searching={!!query.trim() || modifiedOnly} />}
               {g.id !== 'workflow' && g.items.map((d) => {
@@ -1083,7 +1090,8 @@ export function SettingsView() {
                     <div key={`${d.section}.${d.key}`} className="setting wide" data-setting={d.id}>
                       <div className="s-text">
                         <div className="s-title">
-                          {rowText(d).title} <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(d).tip}</span>} />
+                          {rowText(d).title}
+                          <RowTip d={d} />
                         </div>
                         {d.desc && <div className="s-desc">{rowText(d).desc}</div>}
                         {d.render?.()}
@@ -1098,7 +1106,8 @@ export function SettingsView() {
                             <span className="modified" />
                           </Tooltip>
                         )}
-                        {rowText(d).title} <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(d).tip}</span>} />
+                        {rowText(d).title}
+                        <RowTip d={d} />
                         {modified && (
                           <IconButton icon="discard" title={tr(msg({ id: 'settings.resetToDefault', defaultMessage: 'Reset to default ({value})', description: 'Button beside a setting changed from its default: puts it back. {value} is the default.' }), { value: defaultShown(d) })} onClick={() => void update(d, defaultValue(d))} />
                         )}
