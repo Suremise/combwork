@@ -92,6 +92,19 @@ async function settled(env) {
     const added = await lib.until(async () => (await agents())[0] ?? null, HUNG_MS)
     check('the quick add puts the agent on Claude second, its CLI Claude Code', added?.connection === 'c-claude' && added.provider === 'claude-code', JSON.stringify(added && { connection: added.connection, provider: added.provider }))
     check('…and starts nothing', (await inv('session:live')).length === 0)
+
+    // No account on here (the Assistant's ask on HI-2108): Add Agent says so with a link to Accounts & Connections, and
+    // "Start a session now" is unticked and off, saying why.
+    await inv('connections:setOn', 'a-codex', false)
+    await inv('connections:setOn', 'a-claude', false)
+    await lib.addMenuRun(page, 'Configure Agent and Add…')
+    await lib.until(async () => (await add.count()) === 1, HUNG_MS)
+    const start = add.locator('label', { hasText: 'Start a session now' })
+    const noAccount = add.locator('[data-no-account]')
+    check('no account on here: the choice says so, with a link to Accounts & Connections', !!(await lib.until(async () => (await noAccount.count()) === 1, HUNG_MS)) && (await noAccount.locator('a', { hasText: 'Open Accounts & Connections' }).count()) === 1, await noAccount.innerText().catch(() => ''))
+    check('…and "Start a session now" is unticked and off, saying why', !!(await lib.until(async () => (await start.locator('input').isDisabled()) && !(await start.locator('input').isChecked()), HUNG_MS)) && /No account is on in this workspace/.test((await start.getAttribute('title')) ?? ''), JSON.stringify({ disabled: await start.locator('input').isDisabled(), title: await start.getAttribute('title') }))
+    await add.screenshot({ path: path.join(lib.WORK, 'connectionfirst-no-account.png') })
+    await add.getByRole('button', { name: 'Cancel', exact: true }).click()
   } catch (e) {
     check('the first part ran to its end', false, e.stack)
   } finally {
@@ -119,6 +132,9 @@ async function duringDetection(env) {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
+    // Both on here again (the first part turned them off at its end).
+    await inv('connections:setOn', 'a-codex', true)
+    await inv('connections:setOn', 'a-claude', true)
     const codex = async () => (await inv('provider:info')).codex
     const pending = await lib.until(async () => {
       const info = await inv('provider:info')
