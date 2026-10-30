@@ -267,6 +267,31 @@ describe("the summary read again only when what it's read from changed (HI-2115)
     }
   })
 
+  it("a branch whose commit the files can't give (reftable, unborn) is never kept (HR3's HI-2115 round 1, finding 2)", async () => {
+    const table = join(outer, 'table')
+    mkdirSync(outer, { recursive: true })
+    execFileSync('git', ['init', '-q', '--ref-format=reftable', '-b', 'main', table])
+    commit(table, 'a.txt')
+    const read = async (): Promise<{ n: number; s: GitRepoSummary }> => {
+      let n = 0
+      gitHooks.started = () => void n++
+      try {
+        return { s: await repo.repoSummary(table), n }
+      } finally {
+        gitHooks.started = undefined
+      }
+    }
+    expect((await read()).n).toBeGreaterThan(0)
+    expect((await read()).n).toBeGreaterThan(0)
+    // The very next read after a commit is git's: never the last one's head.
+    commit(table, 'b.txt')
+    expect((await read()).s.head).toBe(git(table, 'rev-parse', '--short', 'HEAD'))
+    // Unborn (no commit on its branch yet): asked each time too.
+    git(proj, 'switch', '-q', '--orphan', 'empty')
+    expect((await counted()).n).toBeGreaterThan(0)
+    expect((await counted()).n).toBeGreaterThan(0)
+  })
+
   it('config given in the environment is never kept', async () => {
     process.env.GIT_CONFIG_COUNT = '0'
     try {

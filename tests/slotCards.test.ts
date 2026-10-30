@@ -504,6 +504,51 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
       observer.follow([])
     }
   })
+
+  it("HI-2115 (HR3's round 1, finding 1): back on its line at the same commit with no reflog: asked again, and detached", async () => {
+    const { e, n, line, slot } = await doneInSlot('No reflog')
+    const asks = async (fn: () => Promise<unknown>): Promise<number> => {
+      let k = 0
+      gitTestHooks.started = (_cwd, args) => void (args[0] === 'rev-parse' && args.includes('--symbolic-full-name') && k++)
+      try {
+        await fn()
+      } finally {
+        gitTestHooks.started = undefined
+      }
+      return k
+    }
+    const look = () => finishedSlot(e.project, e.wf, n, 'l-1', view(slot))
+    observer.follow([{ path: e.project, platform: 'git', root: e.project }])
+    try {
+      await look()
+      expect(branch(slot)).toBe('HEAD')
+      // No reflogs from here on, the slot's own gone; the card's line at the commit the slot is detached at.
+      sh(e.project, 'config', 'core.logAllRefUpdates', 'false')
+      rmSync(join(sh(slot, 'rev-parse', '--absolute-git-dir').trim(), 'logs', 'HEAD'), { force: true })
+      sh(e.project, 'branch', '-f', line, sh(slot, 'rev-parse', 'HEAD').trim())
+      expect(await asks(look)).toBe(1)
+      expect(await asks(look)).toBe(0)
+      // The switch moves no line, no commit and no reflog: only the slot's HEAD file says it.
+      sh(slot, 'switch', '-q', line)
+      expect(await asks(look)).toBe(1)
+      expect(branch(slot)).toBe('HEAD')
+    } finally {
+      observer.follow([])
+    }
+  })
+
+  it("HI-2115 (HR3's round 1, finding 2): a reftable repository's refs can't be watched: git each time", async () => {
+    const base = tempDir('reftable-')
+    const repo = join(base, 'repo')
+    sh(base, 'init', '-q', '--ref-format=reftable', '-b', 'main', repo)
+    commit(repo, { 'a.txt': 'a\n' }, 'a')
+    observer.follow([{ path: repo, platform: 'git', root: repo }])
+    try {
+      expect(await observer.refsNow(repo, repo)).toBeNull()
+    } finally {
+      observer.follow([])
+    }
+  })
 })
 
 describe("a begun deletion settled by the project's pass, whatever the switches (#1438, HR1's round 3)", { timeout: 60_000 }, () => {

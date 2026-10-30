@@ -368,6 +368,13 @@ class RepoWatch {
     return false
   }
 
+  /** A working folder's own git dir, as the last read found it; null when it isn't one of the folders read. */
+  gitDirOf(folder: string): string | null {
+    const k = resolve(folder).toLowerCase()
+    for (const [g, f] of this.reflogFolder) if (resolve(f).toLowerCase() === k) return g
+    return null
+  }
+
   current(): Promise<void> {
     if (this.closed || this.covered >= this.asked) return Promise.resolve()
     const want = this.asked
@@ -611,10 +618,23 @@ export class Observer {
     const p = this.projects.get(resolve(project).toLowerCase())
     const r = p?.repo ? this.repos.get(p.repo.toLowerCase()) : undefined
     if (!r) return null
+    // Refs in a reftable aren't in the files these reads walk: nothing of them can be seen to move (HR3's HI-2115 round 1,
+    // finding 2).
+    if (existsSync(join(r.common, 'reftable'))) return null
+    // The folder's own HEAD as it is written (the branch it names, or its commit): a switch between two branches at the
+    // same commit with no reflog moves nothing the reads compare (HR3's round 1, finding 1).
+    const gitDir = r.gitDirOf(folder)
+    let head: string
+    try {
+      head = gitDir ? readFileSync(join(gitDir, 'HEAD'), 'utf8').trim() : ''
+    } catch {
+      return null
+    }
+    if (!head) return null
     r.read()
     await r.current()
-    if (this.repos.get(p!.repo!.toLowerCase()) !== r || !r.watches(folder)) return null
-    return `${this.serial(r)}:${r.changes}`
+    if (this.repos.get(p!.repo!.toLowerCase()) !== r || !r.watches(folder) || r.gitDirOf(folder) !== gitDir) return null
+    return `${this.serial(r)}:${r.changes}:${head}`
   }
 
   /** Each repository watch's own number: a watch started again (after a hold) is another, whose moves start afresh. */

@@ -211,9 +211,14 @@ async function summaryKey(root: string, basis: KeyBasis): Promise<string | null>
   const own = G.gitDirSync(root)
   const common = own ? G.commonDirSync(root) : null
   if (!own || !common) return null
+  // Refs in a reftable aren't in the files read here: nothing of them can be seen to change (HR3's HI-2115 round 1).
+  if (await exists(join(common, 'reftable'))) return null
   const head = await readFile(join(own, 'HEAD'), 'utf8').then((h) => h.trim(), () => null)
   if (head === null) return null
   const ref = /^ref: (.+)$/.exec(head)?.[1]
+  // A branch whose commit the files don't give (unborn, or a ref backend they can't read): no key, git each time.
+  const commit = ref ? G.refSync(common, ref) : head
+  if (!commit) return null
   let up: string | null = null
   if (basis.upstream) {
     up = G.refSync(common, basis.upstream.remote ? `refs/remotes/${basis.upstream.name}` : `refs/heads/${basis.upstream.name}`)
@@ -222,7 +227,7 @@ async function summaryKey(root: string, basis: KeyBasis): Promise<string | null>
   const at = (p: string): Promise<string> => stat(p).then((s) => `${s.mtimeMs}:${s.size}`, () => '-')
   const configs = await configFiles(basis.configs, [join(common, 'config'), join(own, 'config.worktree'), ...globalConfigs()])
   const stats = await Promise.all([join(common, 'packed-refs'), ...configs].map(at))
-  return JSON.stringify([own.toLowerCase(), head, ref ? G.refSync(common, ref) : null, up, configs, stats])
+  return JSON.stringify([own.toLowerCase(), head, commit, up, configs, stats])
 }
 
 /** The global config files git reads, as it finds them: GIT_CONFIG_GLOBAL, else ~/.gitconfig and the XDG one. */
