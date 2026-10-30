@@ -295,6 +295,7 @@ export const SUITES = [
   { name: 'sessiontoolbar' },
   { name: 'sessiontree' },
   { name: 'setaside' },
+  { name: 'settingstips' },
   { name: 'setupcopy' },
   { name: 'setuplayout' },
   { name: 'signin' },
