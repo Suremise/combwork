@@ -1,7 +1,8 @@
 import { randomUUID } from 'crypto'
-import { basename, join, resolve } from 'path'
+import { homedir } from 'os'
+import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { agentPlace, folderFacts } from './agentFolders'
-import { stat } from 'original-fs/promises'
+import { readFile, stat } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
 import {
   BRANCHES_SHOWN,
@@ -163,16 +164,141 @@ const exists = (p: string): Promise<boolean> => stat(p).then(() => true, () => f
 export async function repoSummary(root: string): Promise<GitRepoSummary> {
   const problem = gitProblem()
   if (problem) return { ...EMPTY, gitProblem: problem }
+  // HI-2115: read again with git only when what it is read from changed (summaryKey); the state and the fetch time,
+  // read from the files, are always read again.
+  const k = resolve(root).toLowerCase()
+  const had = summaries.get(k)
+  const basis: KeyBasis = { upstream: had?.summary.upstream ?? null, configs: had?.configs ?? [] }
+  const before = await summaryKey(root, basis)
+  if (had && before !== null && before === had.key) return { ...had.summary, ...(await fileParts(had.gitDir)) }
+  const read = await readSummary(root)
+  if (!read.gitDir || !read.configs || before === null) summaries.delete(k)
+  else {
+    // Kept only when nothing changed while git read it: its key as it is now, from what git just named (its upstream,
+    // the config files it read).
+    const still = (await summaryKey(root, basis)) === before
+    const key = still ? await summaryKey(root, { upstream: read.summary.upstream, configs: read.configs }) : null
+    if (key !== null) summaries.set(k, { key, gitDir: read.gitDir, configs: read.configs, summary: read.summary })
+    else summaries.delete(k)
+  }
+  return read.summary
+}
+
+/** HI-2115: each folder's last summary (lower-cased path), its git dir, the config files git read, and its key (summaryKey). */
+const summaries = new Map<string, { key: string; gitDir: string; configs: string[]; summary: GitRepoSummary }>()
+
+/** Tests: forgets the summaries read. */
+export function forgetSummaries(): void {
+  summaries.clear()
+}
+
+/** What a summary's key is read with: the upstream and the config files of the last read (none before the first). */
+interface KeyBasis {
+  upstream: GitRepoSummary['upstream']
+  configs: readonly string[]
+}
+
+/**
+ * HI-2115: what a folder's summary is read from, from its files with no git process: HEAD, the branch's and its
+ * upstream's commits, the packed refs, and every config file git reads there (remotes and upstreams can come from any):
+ * those its last read named, the repository's own, the global ones whether they exist yet or not, and each file an
+ * include in them names. The status bar reads the summary again at each usage change of the project's agents (several a
+ * second while lanes build): the same key is git's same answer. Null where the files can't say: no `.git` of its own,
+ * an upstream whose ref isn't read from them, or config given in the environment.
+ */
+async function summaryKey(root: string, basis: KeyBasis): Promise<string | null> {
+  if (process.env.GIT_CONFIG_PARAMETERS || process.env.GIT_CONFIG_COUNT || process.env.GIT_CONFIG) return null
+  const own = G.gitDirSync(root)
+  const common = own ? G.commonDirSync(root) : null
+  if (!own || !common) return null
+  const head = await readFile(join(own, 'HEAD'), 'utf8').then((h) => h.trim(), () => null)
+  if (head === null) return null
+  const ref = /^ref: (.+)$/.exec(head)?.[1]
+  let up: string | null = null
+  if (basis.upstream) {
+    up = G.refSync(common, basis.upstream.remote ? `refs/remotes/${basis.upstream.name}` : `refs/heads/${basis.upstream.name}`)
+    if (!up) return null
+  }
+  const at = (p: string): Promise<string> => stat(p).then((s) => `${s.mtimeMs}:${s.size}`, () => '-')
+  const configs = await configFiles(basis.configs, [join(common, 'config'), join(own, 'config.worktree'), ...globalConfigs()])
+  const stats = await Promise.all([join(common, 'packed-refs'), ...configs].map(at))
+  return JSON.stringify([own.toLowerCase(), head, ref ? G.refSync(common, ref) : null, up, configs, stats])
+}
+
+/** The global config files git reads, as it finds them: GIT_CONFIG_GLOBAL, else ~/.gitconfig and the XDG one. */
+function globalConfigs(): string[] {
+  if (process.env.GIT_CONFIG_GLOBAL) return [process.env.GIT_CONFIG_GLOBAL]
+  const home = process.env.HOME || homedir()
+  return [join(home, '.gitconfig'), process.env.XDG_CONFIG_HOME ? join(process.env.XDG_CONFIG_HOME, 'git', 'config') : join(home, '.config', 'git', 'config')]
+}
+
+/**
+ * The config files `named` and `more`, with each file an `include` or `includeIf` in them names (whatever its condition,
+ * existing or not, as deep as they go), lower-cased and sorted: a file added, changed or removed changes the key.
+ */
+async function configFiles(named: readonly string[], more: readonly string[]): Promise<string[]> {
+  const seen = new Map<string, string>()
+  const queue = [...named, ...more]
+  while (queue.length && seen.size < 64) {
+    const file = resolve(queue.shift()!)
+    if (seen.has(file.toLowerCase())) continue
+    seen.set(file.toLowerCase(), file)
+    const text = await readFile(file, 'utf8').catch(() => '')
+    for (const m of text.matchAll(/^\s*path\s*=\s*"?([^"\r\n]*?)"?\s*$/gim)) {
+      const p = m[1].trim()
+      if (!p) continue
+      queue.push(p.startsWith('~/') ? join(process.env.HOME || homedir(), p.slice(2)) : isAbsolute(p) ? p : join(dirname(file), p))
+    }
+  }
+  return [...seen.keys()].sort()
+}
+
+/** What a summary reads from the git dir's files each time: a merge or rebase under way, and the last fetch. */
+async function fileParts(gitDir: string): Promise<Pick<GitRepoSummary, 'state' | 'fetchedAt'>> {
+  let state: GitRepoState | null = null
+  for (const [file, s] of STATE_FILES) {
+    if (await exists(join(gitDir, file))) {
+      state = s
+      break
+    }
+  }
+  const fetched = await stat(join(gitDir, 'FETCH_HEAD')).catch(() => null)
+  return { state, fetchedAt: fetched ? fetched.mtimeMs : null }
+}
+
+/**
+ * The config files `git config --list --show-origin -z` read in `root` (each entry its origin, then its key and value),
+ * as absolute paths; null when an entry came from elsewhere than a file or the command line (a blob, standard input),
+ * which no file's change would show. The command line's are Hive's own (GIT_PREFIX), the same at every read; config
+ * given in the environment (also said as the command line's) isn't kept at all (summaryKey).
+ */
+export function configOrigins(out: string, root: string): string[] | null {
+  const parts = out.split('\0')
+  const files = new Set<string>()
+  for (let i = 0; i + 1 < parts.length; i += 2) {
+    const origin = parts[i]
+    if (origin === 'command line:') continue
+    if (!origin.startsWith('file:')) return null
+    files.add(resolve(root, origin.slice(5)))
+  }
+  return [...files]
+}
+
+/** A summary read by git, its git dir, and the config files git read there (null: unknown, so it isn't kept). */
+async function readSummary(root: string): Promise<{ summary: GitRepoSummary; gitDir: string | null; configs?: string[] | null }> {
   const dir = await git(root, ['rev-parse', '--absolute-git-dir', '--show-toplevel'])
   if (!dir.ok) {
-    if (gitProblem()) return { ...EMPTY, gitProblem: gitProblem()! }
-    if (/not a git repository/i.test(dir.err)) return EMPTY
+    if (gitProblem()) return { summary: { ...EMPTY, gitProblem: gitProblem()! }, gitDir: null }
+    if (/not a git repository/i.test(dir.err)) return { summary: EMPTY, gitDir: null }
     throw commandFailed('git rev-parse', dir) // i18n-ignore: a git command, as it is
   }
   const [gitDir, top] = dir.out.split(/\r?\n/).map((l) => l.trim())
   // A folder inside another repository (a workspace kept in git) shows it, but changes nothing of it.
   const parentRepo = top && !samePlace(top, root) ? resolve(top) : undefined
-  const [sym, head, remotes] = await Promise.all([git(root, ['symbolic-ref', '-q', '--short', 'HEAD']), git(root, ['rev-parse', '-q', '--verify', '--short', 'HEAD']), git(root, ['remote'])])
+  // HI-2115: the config files git reads here (system, global, the repository's, included), which the summary's key
+  // watches: an entry's origin is `file:<path>`; other origins (the command line, a blob) aren't files to watch.
+  const [sym, head, remotes, origins] = await Promise.all([git(root, ['symbolic-ref', '-q', '--short', 'HEAD']), git(root, ['rev-parse', '-q', '--verify', '--short', 'HEAD']), git(root, ['remote']), git(root, ['config', '--list', '--show-origin', '-z'])])
+  const configs = origins.ok ? configOrigins(origins.out, root) : null
   // symbolic-ref says 1 for a detached HEAD; anything else is a failure, not "detached" (#346).
   if (!sym.ok && sym.code !== 1) throw commandFailed('git symbolic-ref', sym) // i18n-ignore: a git command, as it is
   if (!remotes.ok) throw commandFailed('git remote', remotes) // i18n-ignore: a git command, as it is
@@ -185,15 +311,9 @@ export async function repoSummary(root: string): Promise<GitRepoSummary> {
     if (row?.[1]) upstream = { name: row[1], remote: row[2] && row[2] !== '.' ? row[2] : null, ...parseTrack(row[3] ?? '') }
     if (upstream && !upstream.gone) delete upstream.gone
   }
-  let state: GitRepoState | null = null
-  for (const [file, s] of STATE_FILES) {
-    if (await exists(join(gitDir, file))) {
-      state = s
-      break
-    }
-  }
-  const fetched = await stat(join(gitDir, 'FETCH_HEAD')).catch(() => null)
-  return { isRepo: true, branch, head: head.ok ? head.out.trim() || null : null, state, upstream, remotes: remotes.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean), fetchedAt: fetched ? fetched.mtimeMs : null, ...(parentRepo ? { parentRepo } : {}) }
+  const summary = { isRepo: true, branch, head: head.ok ? head.out.trim() || null : null, upstream, remotes: remotes.out.split(/\r?\n/).map((l) => l.trim()).filter(Boolean), ...(await fileParts(gitDir)), ...(parentRepo ? { parentRepo } : {}) }
+  // A folder inside another repository is never kept: its `.git` isn't its own (summaryKey reads none).
+  return { summary, gitDir: parentRepo ? null : gitDir, configs }
 }
 
 /** `git remote -v`: each remote's fetch and push URL (passwords hidden). */

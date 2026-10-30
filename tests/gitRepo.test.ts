@@ -96,6 +96,7 @@ vi.mock('../src/main/git', async (importOriginal) => {
 
 const repo = await import('../src/main/gitRepo')
 const fence = await import('../src/main/folderFence')
+const { gitTestHooks: gitHooks } = await import('../src/main/git')
 
 // Real git work, not a wait: each test runs a few dozen git commands, slow under a full unit run's load.
 vi.setConfig({ testTimeout: 60_000 })
@@ -178,6 +179,102 @@ describe('the summary', () => {
     await expect(repo.addRemote(nested, 'origin', remote)).rejects.toThrow(/inside the git repository/)
     expect(git(outer, 'branch', '--list', 'x')).toBe('')
     expect((await repo.repoSummary(proj)).parentRepo).toBeUndefined()
+  })
+})
+
+describe("the summary read again only when what it's read from changed (HI-2115)", () => {
+  /** How many gits a read of the summary started, and its answer. */
+  const counted = async (): Promise<{ n: number; s: GitRepoSummary }> => {
+    let n = 0
+    gitHooks.started = () => void n++
+    try {
+      return { s: await repo.repoSummary(proj), n }
+    } finally {
+      gitHooks.started = undefined
+    }
+  }
+  /** What git says now, read with nothing kept: the answer a read must give. */
+  const fromGit = async (): Promise<GitRepoSummary> => {
+    repo.forgetSummaries()
+    return repo.repoSummary(proj)
+  }
+  /** Read again with nothing changed: no git, and git's answer. */
+  const same = async (): Promise<GitRepoSummary> => {
+    await counted()
+    const again = await counted()
+    expect(again.n).toBe(0)
+    expect(again.s).toEqual(await fromGit())
+    return again.s
+  }
+  /** Read after a change: git, and git's answer. */
+  const reread = async (): Promise<GitRepoSummary> => {
+    const r = await counted()
+    expect(r.n).toBeGreaterThan(0)
+    expect(r.s).toEqual(await fromGit())
+    return r.s
+  }
+
+  beforeEach(() => repo.forgetSummaries())
+
+  it('nothing changed: no git; a commit, a branch switch, a detached HEAD and a fetch: git, as git says', async () => {
+    await same()
+    commit(proj, 'b.txt')
+    expect((await reread()).upstream).toMatchObject({ ahead: 1 })
+    await same()
+    git(proj, 'switch', '-q', '-c', 'feature/y')
+    expect(await reread()).toMatchObject({ branch: 'feature/y', upstream: null })
+    await same()
+    git(proj, 'checkout', '-q', '--detach')
+    expect(await reread()).toMatchObject({ branch: null, head: git(proj, 'rev-parse', '--short', 'HEAD') })
+    git(proj, 'switch', '-q', 'main')
+    await same()
+    // The upstream's ref moved by a fetch in a terminal: behind, at once.
+    theyPush('o.txt')
+    git(proj, 'fetch', '-q')
+    const fetched = await reread()
+    expect(fetched.upstream).toMatchObject({ ahead: 1, behind: 1 })
+    expect(fetched.fetchedAt).toBeGreaterThan(0)
+  })
+
+  it("a remote or upstream changed in the repository's config, an included file or the global config: read again", async () => {
+    await same()
+    git(proj, 'remote', 'add', 'backup', remote)
+    expect((await reread()).remotes).toEqual(['backup', 'origin'])
+    await same()
+    git(proj, 'branch', '--unset-upstream')
+    expect((await reread()).upstream).toBeNull()
+    await same()
+    // An include the repository's config names, its file written only once the summary is kept: its remote shows.
+    mkdirSync(outer, { recursive: true })
+    const included = join(outer, 'included.gitconfig')
+    git(proj, 'config', 'include.path', included.replace(/\\/g, '/'))
+    await same()
+    writeFileSync(included, `[remote "inc"]\n\turl = ${remote.replace(/\\/g, '/')}\n`)
+    expect((await reread()).remotes).toEqual(['backup', 'inc', 'origin'])
+    await same()
+    // The global config (a file of this test's): a remote added there only, nothing of the repository changed.
+    const global = join(outer, 'global.gitconfig')
+    writeFileSync(global, '')
+    const was = process.env.GIT_CONFIG_GLOBAL
+    process.env.GIT_CONFIG_GLOBAL = global
+    try {
+      await same()
+      writeFileSync(global, `[remote "glob"]\n\turl = ${remote.replace(/\\/g, '/')}\n`)
+      expect((await reread()).remotes).toEqual(['backup', 'glob', 'inc', 'origin'])
+      await same()
+    } finally {
+      process.env.GIT_CONFIG_GLOBAL = was
+    }
+  })
+
+  it('config given in the environment is never kept', async () => {
+    process.env.GIT_CONFIG_COUNT = '0'
+    try {
+      expect((await counted()).n).toBeGreaterThan(0)
+      expect((await counted()).n).toBeGreaterThan(0)
+    } finally {
+      delete process.env.GIT_CONFIG_COUNT
+    }
   })
 })
 

@@ -190,13 +190,15 @@ describe('Git adapter', () => {
     expect(isUnknown(e.head)).toBe(true)
   })
 
-  it('in one git step an answer about fixed commits is asked once; refs are read again; outside a step, and after one, always asked (#1376)', async () => {
+  it('an answer about fixed commits is asked once in a step (#1376) and kept after it (HI-2115); refs are read again; names and unknowns always asked', async () => {
     repo = gitRepo(join(tempDir('git-'), 'r'))
     const [base, rev] = branchWith('one', { 'one.txt': '1\n' })
     const ancestors = (ran: string[]) => ran.filter((c) => c.startsWith('merge-base --is-ancestor')).length
     const twice = async () => [await G.isAncestor(repo, base, rev), await G.isAncestor(repo, base, rev), await G.mergeBase(repo, base, rev), await G.mergeBase(repo, base, rev), await G.lineHead(repo, 'one'), await G.lineHead(repo, 'one')]
+    // Outside a step: kept once asked, for as long as Hive runs (HI-2115: its own tests are gitStarts.test.ts).
     const outside = await counted(twice)
-    expect(ancestors(outside.ran)).toBe(2)
+    expect(ancestors(outside.ran)).toBe(1)
+    G.forgetKeptAnswers()
     const wt = join(repo, '..', 'wt')
     sh(repo, 'worktree', 'add', '-q', '-b', 'side', wt, 'one')
     let leaked: (() => Promise<unknown>) | null = null
@@ -216,8 +218,8 @@ describe('Git adapter', () => {
     expect(inside.ran.filter((c) => c === `merge-base ${base} ${rev}`)).toHaveLength(1)
     // A line's head is read from its ref file each time, with no git (#1491): its own test below.
     expect(inside.ran.filter((c) => c.startsWith('rev-parse --verify'))).toHaveLength(0)
-    // Something the step set off, asking once it has ended: asked again.
-    expect(ancestors((await counted(() => leaked!())).ran)).toBe(1)
+    // Something the step set off, asking once it has ended: the answer kept (HI-2115), no git.
+    expect(ancestors((await counted(() => leaked!())).ran)).toBe(0)
     // Names, not ids, are never kept; nor an unknown answer.
     const names = await counted(() => G.gitStep(async () => [await G.isAncestor(repo, 'main', 'one'), await G.isAncestor(repo, 'main', 'one')]))
     expect(ancestors(names.ran)).toBe(2)

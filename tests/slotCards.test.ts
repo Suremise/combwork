@@ -200,6 +200,8 @@ vi.mock('../src/main/deliveries', async (orig) => {
 })
 
 const { tellListeners } = await import('../src/main/events')
+const { gitTestHooks } = await import('../src/main/git')
+const { observer } = await import('../src/main/platform/observe')
 const { withWriteFence } = await import('../src/main/workflow/factStore')
 const { LeaseLost } = await import('../src/main/workflow/queueRunner')
 const { cycleIn, deleteMergedLine, expectStartPrompt, finishedSlot, finishedSlots, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
@@ -449,6 +451,58 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     const { e, n, line, slot } = await doneInSlot('Released')
     await finishedSlot(e.project, e.wf, n, 'l-1', view(slot, false))
     expect(branch(slot)).toBe(line)
+  })
+
+  it('HI-2115: a slot git found on another line is asked again only once its repository’s refs move; never where they aren’t watched', async () => {
+    const { e, n, line, slot } = await doneInSlot('Moved on')
+    /** How many times the slot's checkout was asked of git (heads) while `fn` ran. */
+    const asks = async (fn: () => Promise<unknown>): Promise<number> => {
+      let k = 0
+      gitTestHooks.started = (_cwd, args) => void (args[0] === 'rev-parse' && args.includes('--symbolic-full-name') && k++)
+      try {
+        await fn()
+      } finally {
+        gitTestHooks.started = undefined
+      }
+      return k
+    }
+    const look = () => finishedSlot(e.project, e.wf, n, 'l-1', view(slot))
+    // Not watched: git each time, as before.
+    await look()
+    expect(branch(slot)).toBe('HEAD')
+    expect(await asks(look)).toBe(1)
+    expect(await asks(look)).toBe(1)
+    observer.follow([{ path: e.project, platform: 'git', root: e.project }])
+    try {
+      // Watched: asked once more (nothing known yet), then not while nothing moves, whatever else happens on the board.
+      expect(await asks(look)).toBe(1)
+      expect(await asks(look)).toBe(0)
+      expect(await asks(look)).toBe(0)
+      // A commit in the project (a line moved): asked again, still elsewhere.
+      commit(e.project, { 'other.txt': 'o\n' }, 'other')
+      expect(await asks(look)).toBe(1)
+      expect(await asks(look)).toBe(0)
+      // The slot switched to a new branch at the same commit (only its HEAD and reflog change): asked again.
+      sh(slot, 'switch', '-q', '-c', 'side')
+      expect(await asks(look)).toBe(1)
+      // Back on the card's line, with uncommitted changes: asked, found there, the user asked; not kept while on it.
+      sh(slot, 'switch', '-q', line)
+      writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
+      expect(await asks(look)).toBe(1)
+      expect(asked(e, n)).toBe(1)
+      expect(await asks(look)).toBe(1)
+      // Clean: detached as before, the question closed; then kept again.
+      rmSync(join(slot, 'wip.txt'))
+      expect(await asks(look)).toBe(1)
+      expect(branch(slot)).toBe('HEAD')
+      expect(asked(e, n)).toBe(0)
+      expect(await asks(look)).toBe(1)
+      expect(await asks(look)).toBe(0)
+      // Another slot view (reused for the next card under another name): asked again.
+      expect(await asks(() => finishedSlot(e.project, e.wf, n, 'l-1', () => ({ ...view(slot)(), name: 'slot-b' })))).toBe(1)
+    } finally {
+      observer.follow([])
+    }
   })
 })
 
