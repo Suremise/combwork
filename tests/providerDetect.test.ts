@@ -89,5 +89,7 @@ describe('detection before Automatic decides (#506)', () => {
     })
     hear('claude-code', null)
     await expect(prepareAgent(join(base, 'p'), DEFAULT_PROJECT_CONFIG, { location: 'project' }, 'Chosen', [])).rejects.toThrow(/still looking/)
+    // One naming its CLI waits only for that CLI.
+    expect((await prepareAgent(join(base, 'p'), DEFAULT_PROJECT_CONFIG, { location: 'project', provider: 'codex' }, 'Named', [])).def.provider).toBe('codex')
   })
 })
