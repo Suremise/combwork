@@ -2135,7 +2135,8 @@ function notTeamAgents(what: string): void {
 
 /** The team's state as the Assistant sees it: its workspace's in full, any other open one as one line with no names. */
 async function teamFor(ws: WorkspaceService): Promise<{ paused: boolean; pausedBy: string | null; since: string | null; parked: boolean; safeToInstall: boolean; running: { project: string; agent: string; state: string; what: string }[]; others: string[] }> {
-  const own = await scanWorkspace(ws)
+  // The asking Assistant's own turn isn't counted, only its (round 1, finding 4): a script's ask counts it.
+  const own = await scanWorkspace(ws, assistantCaller() ? { assistantOf: ws } : {})
   const others = openWorkspaces().filter((w) => w.path && w !== ws)
   const lines: string[] = []
   let othersOk = true

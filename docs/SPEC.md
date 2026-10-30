@@ -4598,11 +4598,16 @@ checked every agent and process by hand.
 - **Parked** (`teamParked.ts`, a fresh scan of every open workspace each time): every agent stopped, or idle (ready, finished,
   watching) or at a question for the user (a permission prompt, a sign-in) with nothing of its own left: no background task,
   no open Progress run (a test run, a check in a copy, a merge, a slot's warming), no held slot writer, no process in its job
-  beyond its CLI's own. The CLI's own, by its recorded identity: the launch's gate, the CLI the gate started, and the CLI's
-  direct children that are Hive's hive server (by its script) or started with the CLI (within 2 minutes: its own MCP servers,
-  whose config Hive doesn't read); each alone, never what it started. A status Hive can't read, an unknown turn, a job that
-  can't be listed (or listed cut short), or a scan that fails is *can't be checked*, never parked. The Assistant's own turn
-  isn't counted; what it started is. A stopped agent's leftovers count.
+  beyond its CLI's own. The CLI's own, positively identified (HR1's round 1): the launch's gate, the CLI the gate started,
+  and the CLI's direct children that run one of the MCP servers this launch was given (its recorded config: the server's
+  executable and every argument; a shell wrapping one, with the one server it started); each alone, never what it started,
+  and never a child guessed by when it started. A status Hive can't read, an unknown turn, a job that can't be listed (or
+  listed cut short), projects that can't be read, a pause not saved (one taken from the user's pause and still pending, or
+  whose save failed), a workspace that closed during the scan, or a scan that fails is *can't be checked*, never parked.
+  Only the Assistant asking about its own workspace has its own turn left out; any other Assistant's, and the user's
+  install check, count it; what it started always counts. A stopped agent's leftovers count. Install Now scans again until
+  a scan ends with nothing changed while it was made (an agent's status or launch, a run, a pause, the open workspaces;
+  five tries), then reads every agent's status once more with nothing awaited before the install.
 - **The window:** the Lanes section's band, *Pausing the team: 3 still running* with each named (*B1: npm run e2e (a run)*,
   *R1: node (process 4120)*, *its slot slot-b is still held*), **End It…** on a process (after a question: it and what it
   started, found again by pid and start time, never the CLI's own), or *All parked: safe to install* with **Install Now**

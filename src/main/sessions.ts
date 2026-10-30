@@ -393,6 +393,8 @@ interface LiveSession {
    * from when it first became ready (readyAt), for a CLI that never connects it.
    */
   hiveTools?: 'connecting' | 'connected'
+  /** The MCP servers this launch was given (HI-2081: its CLI's own processes are told by them, never by age). */
+  launchedMcp?: Record<string, McpServerDef>
   /** When this launch first became ready (or watching, or finished), in ms (#865). */
   readyAt?: number
   /**
@@ -1199,6 +1201,11 @@ class SessionManager {
    * call hive_inbox. At most hive.mcp.connectSeconds from when it first became ready, for a CLI that never connects it
    * (its server failed to start, or MCP is off in it).
    */
+  /** The MCP servers an agent's running launch was given (HI-2081), or null: none running, or from before it was recorded. */
+  launchedMcp(projectPath: string, agentId: string): Record<string, McpServerDef> | null {
+    return this.live.get(liveId(projectPath, agentId))?.launchedMcp ?? null
+  }
+
   hiveToolsWaiting(projectPath: string, agentId: string): boolean {
     const l = this.live.get(liveId(projectPath, agentId))
     if (l?.hiveTools !== 'connecting') return false
@@ -2338,6 +2345,7 @@ class SessionManager {
     state.permissionMode = mode ?? undefined
     // Given Hive's tools, it takes no line of Hive's until they have connected (#865).
     l.hiveTools = eff.mcpServers.hive ? 'connecting' : undefined
+    l.launchedMcp = eff.mcpServers
     // Its own Agent API token for this launch, which confines its board calls to its project (the Assistant has its own).
     if (!workspace.isAssistantHome(projectPath)) await newAgentToken({ workspace: workspaceOf(projectPath).path!, projectPath, agentId: agent.id }, state.runId)
     const assistantText = workspace.isAssistantHome(projectPath) ? await this.assistantInstructions(projectPath, agent).catch(() => null) : null

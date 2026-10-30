@@ -169,27 +169,23 @@ describe("the update's restart lifts only the pause its close named (HR1's s10 c
   })
 })
 
-describe("a CLI's own processes, by their recorded identity (HR1's s12 check)", () => {
-  // FILETIMEs: 100 ns since 1601. The CLI started at t, its servers within 2 minutes of it.
+describe("a CLI's own processes, by the launch's recorded servers (round 1, finding 1)", () => {
+  // FILETIMEs: 100 ns since 1601.
   const ft = (ms: number): string => String(BigInt(ms) * 10000n + 116444736000000000n)
   const t = Date.parse('2026-10-30T05:00:00.000Z')
   const p = (pid: number, parent: number, at: number, command = '', name = 'node.exe'): ActivityProcess => ({ pid, parent, name, label: command || name, created: ft(at), command })
   const gate = 100
+  const hive = { command: 'C:/Hive/Hive.exe', args: ['C:/Hive/out/main/hive-mcp.js'] }
 
-  it('the gate, the CLI, and the servers it started with itself are its own; what any of them started is not', () => {
-    const procs = [p(200, gate, t, 'claude.exe', 'claude.exe'), p(300, 200, t + 5_000, 'node ollama-mcp.js'), p(301, 200, t + 90_000, 'node "C:\\Hive\\out\\main\\hive-mcp.js"'), p(400, 200, t + 600_000, 'node vitest run'), p(500, 300, t + 700_000, 'electron .')]
-    expect(beyondCli(gate, procs)!.map((x) => x.pid)).toEqual([400, 500])
-  })
-
-  it("Hive's hive server is its own whenever the CLI started it; another server started late is not", () => {
-    const procs = [p(200, gate, t, 'claude.exe', 'claude.exe'), p(301, 200, t + 3_600_000, 'node C:\\Hive\\out\\main\\hive-mcp.js'), p(302, 200, t + 3_600_000, 'node other-mcp.js')]
-    expect(beyondCli(gate, procs)!.map((x) => x.pid)).toEqual([302])
+  it('the gate, the CLI, and the servers it was given are its own; what any of them started is not, however soon', () => {
+    const procs = [p(200, gate, t, 'claude.exe', 'claude.exe'), p(301, 200, t + 90_000, '"C:/Hive/Hive.exe" "C:/Hive/out/main/hive-mcp.js"', 'Hive.exe'), p(400, 200, t + 5_000, 'node vitest run'), p(500, 301, t + 700_000, 'electron .')]
+    expect(beyondCli(gate, procs, [hive])!.map((x) => x.pid)).toEqual([400, 500])
   })
 
   it('the same command line under another parent is not exempt; with no CLI to tell, nothing is verified', () => {
-    const procs = [p(200, gate, t, 'claude.exe', 'claude.exe'), p(300, 999, t + 5_000, 'node C:\\Hive\\out\\main\\hive-mcp.js')]
-    expect(beyondCli(gate, procs)!.map((x) => x.pid)).toEqual([300])
-    expect(beyondCli(gate, [p(300, 999, t, 'node')])).toBeNull()
+    const procs = [p(200, gate, t, 'claude.exe', 'claude.exe'), p(300, 999, t + 5_000, '"C:/Hive/Hive.exe" "C:/Hive/out/main/hive-mcp.js"', 'Hive.exe')]
+    expect(beyondCli(gate, procs, [hive])!.map((x) => x.pid)).toEqual([300])
+    expect(beyondCli(gate, [p(300, 999, t, 'node')], [hive])).toBeNull()
   })
 })
 

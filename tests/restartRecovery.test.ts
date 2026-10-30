@@ -21,6 +21,8 @@ const h = vi.hoisted(() => ({
   pending: [] as string[],
   tasks: null as Promise<unknown[]> | null,
   stopEnds: true,
+  /** The team of the workspace paused (HI-2081). */
+  paused: false,
   advanced: { 'hive.restart.resumeAfterUpdate': true, 'hive.restart.resumeReadySeconds': 90 } as Record<string, unknown>,
   run: 0
 }))
@@ -55,8 +57,8 @@ vi.mock('../src/main/workspace', () => ({
   inWorkspace: (_w: unknown, fn: () => unknown) => fn()
 }))
 vi.mock('../src/main/lanes', () => ({ listLanes: async () => [] }))
-// The team never paused here (HI-2081: restart recovery waits for a paused team, which teamPause.test covers).
-vi.mock('../src/main/teamPause', () => ({ pausedFor: () => null }))
+// The team's pause (HI-2081): restart recovery waits for a paused team.
+vi.mock('../src/main/teamPause', () => ({ pausedFor: () => (h.paused ? { pauseId: 'p1', since: '', by: 'user' } : null) }))
 vi.mock('../src/main/tasks', () => ({ allTasks: () => h.tasks ?? Promise.resolve([]) }))
 vi.mock('../src/main/deliveries', () => ({ createDelivery: async () => null, leaveDelivery: async () => null, roundOf: () => 1 }))
 vi.mock('../src/main/assistantControl', () => ({ assistantHome: (ws: string) => join(ws, '.hive', 'assistant') }))
@@ -138,7 +140,7 @@ function takesNote(agentId: string): void {
 
 beforeEach(() => {
   dir = tempDir('hive-restart-recovery-')
-  Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, run: 0 })
+  Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, paused: false, run: 0 })
 })
 afterEach(() => {
   m?.stopRestartRecovery()
@@ -166,6 +168,26 @@ describe('the restart queue (HI-1707)', () => {
     await m.restartRecordSaved()
     expect(h.starts).toEqual([])
     expect(saved()?.entries.map((e) => [e.agentId, e.state])).toEqual([['a1', 'pending']])
+  })
+
+  // HI-2081 (HR1's round 1, finding 6): a pause landing after the resume's first check stops it before its start.
+  it('the team paused while a resume waits on its slot check: nothing starts, the entry stays pending, and it resumes with the team', async () => {
+    const ws = workspace(join(dir, 'ws'), ['a1'])
+    h.workspaces = [ws]
+    let release!: () => void
+    h.hold = new Promise((r) => (release = r))
+    await startWith([entry(ws.path, 'a1')])
+    m.workspaceRecovering(ws.path, Promise.resolve())
+    await m.startRestartRecovery()
+    await vi.waitFor(() => expect(h.holdAsked).toBe(1), { timeout: HUNG_MS })
+    h.paused = true
+    await queueSettles(release)
+    expect(h.starts).toEqual([])
+    expect(m.restartRecord()?.entries[0].state).toBe('pending')
+    // The team resumes: the queue goes on, and it starts.
+    h.paused = false
+    ;(await import('../src/main/events')).emit({ type: 'team-pause-changed', workspacePath: ws.path, pause: null })
+    await vi.waitFor(() => expect(h.starts).toEqual(['a1']), { timeout: HUNG_MS })
   })
 
   it("waits for its workspace to be read and its merge slots recovered: a path alone isn't ready", async () => {

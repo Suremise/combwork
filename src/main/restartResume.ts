@@ -496,6 +496,9 @@ async function until(fn: () => boolean, ms: number): Promise<boolean> {
  * `gen`: the queue's generation; Hive closing meanwhile cancels it ('cancelled': nothing changed), a workspace closing
  * puts it back to pending.
  */
+/** A resume refused as it spawns because its team is paused now (HI-2081): pending again, not failed. */
+class TeamPausedNow extends Error {}
+
 async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancelled'> {
   const cancelled = (): boolean => gen !== generation || stopping
   // Its workspace closed (not Hive): back to pending, for when it opens again.
@@ -538,6 +541,8 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
   // Checked again just before the start, nothing awaited between: what changed while the hold and the save were awaited.
   ws = readyWorkspaceOf(e)
   if (!ws) return closed()
+  // Its team paused meanwhile (round 1, finding 6): pending again; the start's own `allowed` asks once more as it spawns.
+  if (pausedFor(e.projectPath)) return closed()
   const again = check(ws)
   if (again) return skip(again)
   const ms = readyMs(ws)
@@ -555,8 +560,18 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
     return s && s.runId === runId ? s : null
   }
   let ready = false
+  // Its team paused since it was checked (HI-2081, round 1 finding 6): asked again as the launch spawns, after its awaits;
+  // refused, the entry is pending again, resumed once the team resumes.
+  const allowed = (): void => {
+    if (pausedFor(e.projectPath)) throw new TeamPausedNow()
+  }
   try {
-    runId = (await inWorkspace(ws, () => sessions.start(e.projectPath, { agentId: e.agentId, resumeId: e.sessionId, auto: true, ...(e.sessionName ? { name: e.sessionName } : {}), prompt: resumeNote(e, app.getVersion(), policy()) }))).runId
+    try {
+      runId = (await inWorkspace(ws, () => sessions.start(e.projectPath, { agentId: e.agentId, resumeId: e.sessionId, auto: true, allowed, ...(e.sessionName ? { name: e.sessionName } : {}), prompt: resumeNote(e, app.getVersion(), policy()) }))).runId
+    } catch (err) {
+      if (err instanceof TeamPausedNow || (err instanceof Error && err.cause instanceof TeamPausedNow)) return closed()
+      throw err
+    }
     // Its launch ending meanwhile (stopped by the user, or its CLI exited), Hive closing, or its workspace closing end
     // the wait too.
     ready = await until(() => took || TOOK_NOTE.has(mine()?.status ?? 'stopped') || !mine() || cancelled() || !openWorkspaceOf(e), ms)

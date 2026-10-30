@@ -40,6 +40,14 @@ let closing: PauseClosing | null = null
 
 /** Each workspace's pause as read (by its .hive folder): null, none. */
 const known = new Map<string, TeamPause | null>()
+/**
+ * Whether each held pause is saved (round 1, finding 2): `pending` for one a workspace took from the user's pause of every
+ * workspace and hasn't saved yet, `failed` when its save failed (held all the same, never parked), else saved.
+ */
+type SaveState = 'saved' | 'pending' | { failed: string }
+const saves = new Map<string, SaveState>()
+/** The pause each workspace's agents were told of (its id): told once a pause, whoever saved it. */
+const told = new Map<string, string>()
 /** When each workspace's team last resumed (ms; this run's): stall clocks count from then too (HR1's s12 check). */
 const resumed = new Map<string, number>()
 /** Each workspace's lock: pause, resume and the gates' admission checks go one at a time. */
@@ -126,15 +134,26 @@ export function teamPauseOf(ws: WorkspaceService | null | undefined): TeamPause 
     log.info(`The team of ${userText(ws.path)} resumes after the update it was paused for (${p.pauseId})`)
     p = null
   }
+  known.set(k, p)
+  saves.set(k, 'saved')
   if (!p) {
     const all = appPause()
     if (all) {
+      // Held at once, pending until saved (round 1, finding 2): pauseTeam saves it, tells the window and the agents, and
+      // a failure is the workspace's (never parked).
+      known.set(k, all)
+      saves.set(k, 'pending')
       p = all
-      void withLock(ws, () => save(ws, all)).catch((e) => log.warn('Saving the team pause of a workspace opened while the team was paused', e))
+      void pauseTeam(ws, 'user', all.pauseId).catch((e) => log.warn('Saving the team pause of a workspace opened while the team was paused', e))
     }
   }
-  known.set(k, p)
   return p
+}
+
+/** Whether a workspace's pause is saved: `pending` (taken from the user's pause, not saved yet), or why its save failed. */
+export function pauseSaveState(ws: WorkspaceService): SaveState {
+  teamPauseOf(ws)
+  return saves.get(keyOf(ws)) ?? 'saved'
 }
 
 /** The pause of the workspace a project (or the Assistant's home) is in: null for none, or a path in no open workspace. */
@@ -161,6 +180,7 @@ export function withLock<T>(ws: WorkspaceService, fn: () => Promise<T> | T): Pro
 async function save(ws: WorkspaceService, p: TeamPause): Promise<void> {
   await writeJsonAtomic(fileOf(ws), p)
   known.set(keyOf(ws), p)
+  saves.set(keyOf(ws), 'saved')
 }
 
 /** Tells the window and the passes (lane starts, the pool, the deliveries) that a workspace's pause changed. */
@@ -174,7 +194,7 @@ async function tellAgents(ws: WorkspaceService, p: TeamPause): Promise<void> {
   // Loaded here: deliveries.ts asks this module for its admission gate.
   const { createDelivery } = await import('./deliveries')
   const projects = ws.info()?.projects ?? []
-  const told = await Promise.allSettled(
+  const results = await Promise.allSettled(
     projects.flatMap((proj) =>
       projectAgents(proj.config).flatMap((a) =>
         sessions.liveFor(proj.path, a.id)
@@ -183,26 +203,38 @@ async function tellAgents(ws: WorkspaceService, p: TeamPause): Promise<void> {
       )
     )
   )
-  for (const r of told) if (r.status === 'rejected') log.warn('Telling an agent the team is pausing', r.reason)
+  for (const r of results) if (r.status === 'rejected') log.warn('Telling an agent the team is pausing', r.reason)
 }
 
 /**
- * Pauses a workspace's team (its pause saved first: a failed save throws and nothing is held or told). Already paused:
- * kept as it is, unless the user's pause gives it the app's id. Returns the pause.
+ * Pauses a workspace's team (its pause saved first: a failed save throws, and a new pause holds and tells nothing; one
+ * taken from the user's pause stays held, its failure named, never parked). Already paused and saved: kept as it is,
+ * unless the user's pause gives it the app's id. Its agents are told once a pause. Returns the pause.
  */
 export async function pauseTeam(ws: WorkspaceService, by: TeamPause['by'], pauseId: string = randomUUID()): Promise<TeamPause> {
   if (!ws.path) throw new Error('No workspace is open') // i18n-ignore: an error for the log and the caller's reply
+  const k = keyOf(ws)
   const p = await withLock(ws, async () => {
     const was = teamPauseOf(ws)
-    if (was && (was.pauseId === pauseId || by === 'assistant')) return null
-    const next: TeamPause = { pauseId, since: new Date().toISOString(), by }
-    await save(ws, next)
+    const saved = saves.get(k) === 'saved'
+    if (was && saved && (was.pauseId === pauseId || by === 'assistant')) return null
+    // Taken from the user's pause and not saved yet: that very pause is saved now, as it was.
+    const next: TeamPause = was && !saved && was.pauseId === pauseId ? was : { pauseId, since: new Date().toISOString(), by }
+    try {
+      await save(ws, next)
+    } catch (e) {
+      if (was && !saved) saves.set(k, { failed: e instanceof Error ? e.message : String(e) })
+      throw e
+    }
     return next
   })
   if (!p) return teamPauseOf(ws)!
   log.info(`The team of ${userText(ws.path)} is paused (${p.by}, ${p.pauseId})`)
   changed(ws)
-  await tellAgents(ws, p).catch((e) => log.warn('Telling the agents the team is pausing', e))
+  if (told.get(k) !== p.pauseId) {
+    told.set(k, p.pauseId)
+    await tellAgents(ws, p).catch((e) => log.warn('Telling the agents the team is pausing', e))
+  }
   return p
 }
 
@@ -214,6 +246,7 @@ export async function resumeTeam(ws: WorkspaceService): Promise<boolean> {
     if (!p) return null
     await rm(fileOf(ws), { force: true })
     known.set(keyOf(ws), null)
+    saves.set(keyOf(ws), 'saved')
     resumed.set(keyOf(ws), Date.now())
     return p
   })
@@ -270,11 +303,14 @@ export async function resumeApp(): Promise<AppPauseResult> {
 /** A workspace closing: its pause is read from its file again when it opens next. */
 export function forgetTeamPause(ws: WorkspaceService): void {
   known.delete(keyOf(ws))
+  saves.delete(keyOf(ws))
 }
 
 /** For tests: forgets every workspace's pause as read. */
 export function resetTeamPauseForTests(): void {
   known.clear()
+  saves.clear()
+  told.clear()
   locks.clear()
   resumed.clear()
 }

@@ -1252,7 +1252,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       if (pausedLane()) throw new Waits()
       const r = there
         ? await deliverNow(projectPath, { ...nd, need: 'free', conversation: st!.sessionId || null }, () => !pausedLane())
-        : (await launchWith(projectPath, nd, (line) => (st ? sessions.newConversation(projectPath, agentId, line) : launch(line)))).record
+        : (await launchWith(projectPath, nd, (line) => (st ? sessions.newConversation(projectPath, agentId, line, () => { if (pausedLane()) throw new Waits() }) : launch(line)))).record
       if (!r || NOT_GIVEN.has(r.state)) throw new Error(`#${n}'s delivery to ${agent.name} wasn't given (${r?.state ?? 'none made'})`) // i18n-ignore: an error for the log (the pass tries again)
       delivery = r.id
       offered.delete(offerKey(projectPath, n))

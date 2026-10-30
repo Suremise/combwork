@@ -631,7 +631,7 @@ From api.version 11 (HI-2081, SPEC §16.10.9). Before an update, a workspace's *
   "others": ["Another open workspace isn't paused: the user pauses it from its window, or with Pause the Team."] }
 ```
 
-- `parked`: every agent stopped, or idle (ready, finished or watching) or at a question for the user, with nothing of its own still running: no background task, Progress run, held slot writer or process in its job beyond its CLI's own (the CLI, Hive's hive server and the MCP servers it started with itself). `state` `unknown` (its status unknown, its processes unreadable) is never parked. The Assistant's own turn isn't counted; what it started is.
+- `parked`: every agent stopped, or idle (ready, finished or watching) or at a question for the user, with nothing of its own still running: no background task, Progress run, held slot writer or process in its job beyond its CLI's own (the CLI and the MCP servers its launch was given, each by its recorded executable and arguments). `state` `unknown` (its status unknown, its processes or the workspace's projects unreadable, its pause not saved) is never parked. Your own turn isn't counted when you ask about your own workspace; what you started is.
 - `safeToInstall`: this workspace parked, and every other open one paused and parked. Another open workspace is only ever one line in `others`, with none of its agents.
 
 `POST /v1/team/pause` and `POST /v1/team/resume` — `{}`: reply as `GET /v1/team`. Resuming hands out what the pause held (each wake offered again if still due) and lets lanes start their cards again. A pause outlives a crash or a plain quit; only Hive's restart for the update it was paused for lifts it by itself.
