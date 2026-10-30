@@ -534,7 +534,15 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const r = await resumeApp()
       return { done: r.done, failed: r.failed }
     },
-    'team:endProcess': (p, agentId, pid, created) => endParkedProcess(workspace.assertSessionHost(p), String(agentId), Number(pid), String(created)),
+    // The asking window's own workspace only, checked on its own service (the `workspace` proxy would find another
+    // window's by the path): another workspace's process is ended from its own window (HI-2095).
+    'team:endProcess': (p, agentId, pid, created) => endParkedProcess(contextWorkspace()!.assertSessionHost(String(p)), String(agentId), Number(pid), String(created)),
+    'team:showWorkspace': (path) => {
+      const other = windowShowing(String(path))
+      if (!other) return false
+      showWindow(other.win)
+      return true
+    },
     'team:install': () => installIfParked(),
     'app:openChromiumLicenses': () => {
       const file = join(dirname(process.execPath), 'LICENSES.chromium.html')

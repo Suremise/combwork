@@ -3547,6 +3547,14 @@
     "defaultMessage": "Resume the Team",
     "description": "A button and command (HI-2081): lifts the pause of every open workspace, so lanes start their cards and agents are woken again."
   },
+  "board.team.showWindow": {
+    "defaultMessage": "Show Its Window",
+    "description": "A button beside another open workspace's name in the paused team's band (HI-2095): brings forward the Hive window showing that workspace, where what still runs in it can be ended."
+  },
+  "board.team.showWindowTitle": {
+    "defaultMessage": "Its processes are ended from its own window",
+    "description": "The tooltip of Show Its Window in the paused team's band (HI-2095): End It is offered only in the window of the workspace a process belongs to."
+  },
   "board.team.stillPaused": {
     "defaultMessage": "The team is still paused",
     "description": "A notice as Hive's window opens (HI-2081): the team was paused before Hive last closed (not for an update that has now been installed), so Hive starts no lane card and wakes no agent until the user resumes it."
@@ -3562,6 +3570,10 @@
   "board.team.thisWorkspace": {
     "defaultMessage": "This workspace",
     "description": "A heading in the paused team's band, over what still runs in the window's own workspace (HI-2081), when several are open."
+  },
+  "board.team.windowGone": {
+    "defaultMessage": "{name} isn’t open in a window any more",
+    "description": "A notice (HI-2095): the user chose Show Its Window for another workspace ({name}, its folder's name) in the paused team's band, but no window shows it now."
   },
   "board.toolbar.archived": {
     "defaultMessage": "Archived ({n, number})",

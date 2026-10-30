@@ -4621,7 +4621,9 @@ checked every agent and process by hand.
   workspaces; five tries), then reads every agent's status once more with nothing awaited before the install.
 - **The window:** the Lanes section's band, *Pausing the team: 3 still running* with each named (*B1: npm run e2e (a run)*,
   *R1: node dev-server.js (process 4120)*, a leftover; *its slot slot-b is still held*), **End It…** on a leftover process
-  (after a question: it and what it started, found again by pid and start time), or *All parked: safe to install* with **Install Now**
+  (after a question: it and what it started, found again by pid and start time; offered only for the window's own workspace,
+  as main ends only the asking window's processes: another open workspace's heading has **Show Its Window** instead, which
+  brings forward the window showing it and never switches this one; the band shows in a workspace with no lanes too, HI-2095), or *All parked: safe to install* with **Install Now**
   once an update is ready. Install Now scans every open workspace again in main, under their locks, and installs only if
   each is paused and parked. The Updates dialog shows the same band. The status bar says *Team paused* (or *Team parked*).
 - **Resume** lifts the pause (the user's resumes every open workspace and the profile's): lanes look again, the pool and the

@@ -10,6 +10,8 @@ import { Icon } from './ui'
  * Pausing the team before an update (HI-2081): the Lanes section's Pause the Team / Resume the Team, and while a team is
  * paused, its band: what still runs (End It on a process, after a question), or All parked: safe to install, with Install
  * Now once an update is ready. The Updates dialog shows the same band. Install Now is checked again in main.
+ * End It is offered for the window's own workspace only: another open workspace's blockers are listed with Show Its
+ * Window, which brings forward the window that can end them (HI-2095).
  */
 
 export const M = {
@@ -27,6 +29,9 @@ export const M = {
   endTitle: msg({ id: 'board.team.endTitle', defaultMessage: 'End this process?', description: "Title of the question before ending a process the paused team's band names (HI-2081)." }),
   endMessage: msg({ id: 'board.team.endMessage', defaultMessage: "End {agent}'s {label} (process {pid}) and everything it started?", description: "The question before ending a process (HI-2081). {agent} is the agent's name, {label} what the process runs, {pid} its id." }),
   endDetail: msg({ id: 'board.team.endDetail', defaultMessage: 'Only that process and what it started end, and only while they are still the ones listed. Work they had not saved is lost.', description: "Detail of the question before ending a process from the paused team's band (HI-2081)." }),
+  showWindow: msg({ id: 'board.team.showWindow', defaultMessage: 'Show Its Window', description: "A button beside another open workspace's name in the paused team's band (HI-2095): brings forward the Hive window showing that workspace, where what still runs in it can be ended." }),
+  showWindowTitle: msg({ id: 'board.team.showWindowTitle', defaultMessage: 'Its processes are ended from its own window', description: "The tooltip of Show Its Window in the paused team's band (HI-2095): End It is offered only in the window of the workspace a process belongs to." }),
+  windowGone: msg({ id: 'board.team.windowGone', defaultMessage: '{name} isn’t open in a window any more', description: "A notice (HI-2095): the user chose Show Its Window for another workspace ({name}, its folder's name) in the paused team's band, but no window shows it now." }),
   endFailed: msg({ id: 'board.team.endFailed', defaultMessage: "{label} couldn't be ended", description: 'A notice (HI-2081): ending a process from the paused team’s band failed, or it was no longer the one listed. {label} is what it runs.' }),
   item: msg({
     id: 'board.team.item',
@@ -41,15 +46,23 @@ function itemText(i: ParkedItem): string {
   return tr(M.item, { kind: i.kind, agent: i.agent || tr(msg({ id: 'board.team.hive', defaultMessage: 'Hive', description: "Who runs something while the team is paused when no agent does (HI-2081): Hive itself (a slot's setup, a merge). Hive is the product's name." })), label: i.label ?? '', pid: i.process?.pid ?? 0 }) // i18n-ignore: select keys, never shown
 }
 
-/** End It: after the question, the process and what it started, found again in main by its recorded identity. */
+/** End It (the window's own workspace only): after the question, the process and what it started, found again in main by its recorded identity. */
 async function endIt(v: TeamPauseView, i: ParkedItem): Promise<void> {
-  if (!i.process) return
+  const ws = useStore.getState().workspace
+  if (!i.process || !ws || ws.path.toLowerCase() !== v.workspacePath.toLowerCase()) return
   const label = i.label ?? i.process.name
   const ok = await confirm({ title: tr(M.endTitle), message: tr(M.endMessage, { agent: i.agent, label, pid: i.process.pid }), detail: tr(M.endDetail), confirmLabel: tr(M.endIt).replace(/…$/, ''), danger: true })
   if (!ok) return
-  const path = i.project ? `${v.workspacePath}\\${i.project}` : (useStore.getState().workspace?.assistant?.path ?? '')
+  const path = i.project ? `${v.workspacePath}\\${i.project}` : (ws.assistant?.path ?? '')
   const r = await call('team:endProcess', path, i.agentId, i.process.pid, i.process.created).catch(() => 'failed' as const)
   if (r !== 'ended') notify('warning', tr(M.endFailed, { label }))
+  void refreshTeamPause()
+}
+
+/** Show Its Window: another open workspace's window brought forward, where its own End It is. */
+async function showItsWindow(v: TeamPauseView): Promise<void> {
+  const shown = await call('team:showWorkspace', v.workspacePath).catch(() => false)
+  if (!shown) notify('warning', tr(M.windowGone, { name: basename(v.workspacePath) }))
   void refreshTeamPause()
 }
 
@@ -99,13 +112,13 @@ export function TeamPauseBand(): React.JSX.Element | null {
   const others = state.workspaces.filter((w) => w !== own)
   const left = state.workspaces.reduce((n, w) => n + w.items.length, 0) + state.workspaces.filter((w) => !w.pause).length
   const several = state.workspaces.length > 1
-  const list = (v: TeamPauseView): React.JSX.Element | null =>
+  const list = (v: TeamPauseView, endable: boolean): React.JSX.Element | null =>
     v.items.length ? (
       <ul className="team-pause-items">
         {v.items.map((i, k) => (
           <li key={`${i.agentId}-${i.kind}-${i.process?.pid ?? i.label ?? k}`} className={i.state === 'unknown' ? 'unknown' : undefined}>
             <span>{itemText(i)}</span>
-            {i.process && (
+            {endable && i.process && (
               <button type="button" className="btn small subtle" onClick={() => void endIt(v, i)}>
                 {tr(M.endIt)}
               </button>
@@ -130,13 +143,18 @@ export function TeamPauseBand(): React.JSX.Element | null {
       </div>
       {/* Each workspace with something to name: what still runs in it, or that it isn't paused. */}
       {own && several && own.items.length > 0 && <div className="team-pause-ws">{tr(M.thisWorkspace)}</div>}
-      {own && list(own)}
+      {own && list(own, true)}
       {others
         .filter((o) => !o.pause || o.items.length)
         .map((o) => (
-          <div key={o.workspacePath}>
-            <div className="team-pause-ws">{o.pause ? basename(o.workspacePath) : tr(M.notPaused, { name: basename(o.workspacePath) })}</div>
-            {list(o)}
+          <div key={o.workspacePath} data-team-workspace={o.workspacePath}>
+            <div className="team-pause-ws other">
+              <span>{o.pause ? basename(o.workspacePath) : tr(M.notPaused, { name: basename(o.workspacePath) })}</span>
+              <button type="button" className="btn small subtle" title={tr(M.showWindowTitle)} onClick={() => void showItsWindow(o)}>
+                {tr(M.showWindow)}
+              </button>
+            </div>
+            {list(o, false)}
           </div>
         ))}
     </div>

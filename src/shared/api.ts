@@ -228,6 +228,8 @@ export interface HiveRequests {
   'team:resume': () => { done: string[]; failed: { workspacePath: string; error: string }[] }
   /** End It on a process the check names, after the window's question: it and what it started, by its recorded identity. */
   'team:endProcess': (projectPath: string, agentId: string, pid: number, created: string) => 'ended' | 'notFound' | 'failed'
+  /** Show Its Window (HI-2095): brings forward the window showing another open workspace; never switches this one. False when none shows it. */
+  'team:showWorkspace': (workspacePath: string) => boolean
   /** Install Now: scanned again here first; installed only when every open workspace is paused and parked. */
   'team:install': () => { installed: boolean; state: import('./teamPause').TeamPauseState }
   /** Opens the Chromium/Electron licences that ship next to the app's executable. */
