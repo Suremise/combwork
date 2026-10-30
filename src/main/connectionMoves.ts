@@ -263,7 +263,7 @@ export function pointAssistant(ws: WorkspaceService, cli: ProviderId, opts: { ac
   if (!ws.path) return Promise.resolve()
   // One change of a workspace's Assistant at a time, each from what the one before it left (HR1's round 1: two edits at
   // once kept only one of them).
-  return serially(`assistant\n${ws.path.toLowerCase()}`, () => pointAssistantNow(ws, cli, opts))
+  return serially(`assistant\n${ws.path.toLowerCase()}`, () => pointAssistantNow(ws, cli, opts)) // i18n-ignore: a lock's key, not text
 }
 
 /** Changes of the Assistant under way, by workspace: each starts once the one before it has ended. */
