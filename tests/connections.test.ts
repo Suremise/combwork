@@ -31,7 +31,7 @@ delete process.env.HIVE_TEST_CLI_HOME_CONNECTION
 const accounts = await import('../src/main/accounts')
 const seam = await import('../src/main/connectionSeam')
 const { config } = await import('../src/main/config')
-const { advanced } = await import('../src/main/advanced')
+const { advanced, updateSettingsChecked } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
 const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace, setNewWorkspaceExtras } = await import('../src/main/workspace')
@@ -41,6 +41,7 @@ const moves = await import('../src/main/connectionMoves')
 const { assistantOwn, cliDefaults, legacyLaunchSettings: agentLaunchSettings, moveProjectOverrides } = await import('../src/shared/connectionDefaults')
 const { addAgent, updateAgent } = await import('../src/main/projectAgents')
 const templates = await import('../src/main/templates')
+const { applySetting, entryOf } = await import('../src/main/settingsTools')
 const { TEMPLATE_VERSION } = await import('../src/shared/templates')
 const { fileLockDepth, withFileLock } = await import('../src/main/fsutil')
 const { listSkills, invalidateSkillCache, machineSkillCacheSize } = await import('../src/main/skills')
@@ -1046,6 +1047,50 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     } finally {
       providerService.info = info
       await here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { connection: null }))
+    }
+  })
+
+  it("decision E for Settings → Assistant and → GitHub Copilot: refused before it is saved, settings and connections unchanged (HR1, round 2)", async () => {
+    await signedInConnection('Personal', 'me@example.com')
+    const info = providerService.info
+    providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe', catalog: { source: 'cli', version: '1', models: [{ value: 'haiku', label: 'Haiku', efforts: [] }, { value: 'opus', label: 'Opus', efforts: ['low', 'high'] }] } })) as never
+    const off = config.onSettingsCheck(moves.checkLaunchSettings)
+    const was = structuredClone(config.settings)
+    try {
+      await here(() => moves.pointAssistant(w, 'claude-code', { values: { model: 'opus', effort: 'high' }, become: true }))
+      // What the window and the settings tool read the Assistant from.
+      await w.refresh()
+      // Its connection as the window's agent row has it (the adapter's `connectionId`; without it, its own).
+      const connection = () => {
+        const a = w.info()?.assistant?.agents[0] as { connectionId?: string; connection?: string } | undefined
+        return a?.connectionId ?? a?.connection
+      }
+      const before = connection()
+      expect(accounts.getConnection(before)).toMatchObject({ model: 'opus', effort: 'high' })
+      // Settings → Assistant, as settings:update saves it (its handler's call): Haiku with the High it keeps from its
+      // connection, refused to the caller.
+      expect(await outcome(updateSettingsChecked({ assistant: { providers: { 'claude-code': { model: 'haiku' } } } } as never, (p) => config.updateSettings(p)))).toMatch(/haiku doesn't take high effort/)
+      expect(config.settings.assistant.providers['claude-code']?.model).toBe(was.assistant.providers['claude-code']?.model)
+      expect(connection()).toBe(before)
+      // The settings tool (hive_update_setting) saves through updateSettings too, checked the same; the Assistant's own
+      // settings are never its to change at all.
+      expect(await outcome(applySetting(entryOf('assistant.claude-code.model'), 'haiku', null, () => undefined))).toMatch(/It decides how the Assistant itself/)
+      // A pair it takes goes through.
+      expect(() => config.updateSettings({ assistant: { providers: { 'claude-code': { effort: 'low' } } } } as never)).not.toThrow()
+      // Settings → GitHub Copilot: its sign-in's base connection.
+      // Its sign-in's account, as config.json's migration makes it at a start (this file's profile never started).
+      if (!accounts.accountById('copilot'))
+        config.update((c) => {
+          c.accounts = [...(c.accounts ?? []), { id: 'copilot', provider: 'copilot', kind: 'signIn', home: 'cli', name: 'GitHub Copilot', createdAt: '' }]
+          c.connections = [...(c.connections ?? []), { id: 'c-copilot1', account: 'copilot', name: 'GitHub Copilot' }]
+        })
+      const copilotWas = config.settings.providers.copilot.defaultModel
+      expect(() => config.updateSettings({ providers: { copilot: { defaultModel: 'haiku', defaultEffort: 'high' } } } as never)).toThrow(/haiku doesn't take high effort/)
+      expect(config.settings.providers.copilot.defaultModel).toBe(copilotWas)
+    } finally {
+      off()
+      providerService.info = info
+      config.updateSettings({ assistant: was.assistant, providers: { copilot: was.providers.copilot } } as never)
     }
   })
 

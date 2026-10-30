@@ -1,6 +1,6 @@
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
-import type { AgentDef, AppSettings, Connection, LaunchValues, MovedField, ProjectConfig, ProviderId } from '../shared/types'
+import type { Account, AgentDef, AppSettings, Connection, LaunchValues, MovedField, ProjectConfig, ProviderId } from '../shared/types'
 import { baseConnection, launchValues, valuesOf } from '../shared/accounts'
 import { COPILOT_ACCOUNT, type LegacyInputs, type MovedNotice, type AccountStore, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, waitsForConnection } from '../shared/connectionDefaults'
 import { autoProviderPending, providerDescriptor } from '../shared/providers'
@@ -354,6 +354,43 @@ async function followAssistantSettings(s: AppSettings, prev: AppSettings): Promi
 }
 
 /**
+ * Decision E for Settings → Assistant and Settings → GitHub Copilot (the adapter until HI-2107 and HI-2108), checked
+ * before a change of settings is saved (config.onSettingsCheck): a change of a model or effort that, merged with the
+ * connection it goes to (the effort or model it keeps from it included), makes a pair the model doesn't take is refused
+ * whole, its caller told, settings and connections unchanged. For each open workspace's Assistant, its connection for
+ * that CLI (its agent's, or its record's); for Copilot, its account's base connection. What the migration carried over,
+ * or a later catalogue left, isn't checked: only a change.
+ */
+export function checkLaunchSettings(next: AppSettings, prev: AppSettings): void {
+  for (const p of Object.keys(next.assistant?.providers ?? {}) as ProviderId[]) {
+    const a = next.assistant.providers[p]
+    const b = prev.assistant?.providers?.[p]
+    if (!a || (a.model === b?.model && a.effort === b?.effort)) continue
+    for (const ws of openWorkspaces()) {
+      const home = ws.path ? ws.info()?.assistant : null
+      if (!home) continue
+      const agent = home.agents[0]
+      const current = getConnection(agent?.provider === p ? (agent.connectionId ?? agent.connection) : home.config.migrations?.accounts1?.assistant?.[p])
+      const account = accountById(current?.account) ?? accountHere(p, ws.config)
+      if (!account) continue
+      checkPair(p, account, current ?? baseConnection(account.id, allConnections()), { model: a.model, effort: a.effort }, { model: b?.model, effort: b?.effort })
+    }
+  }
+  const c = next.providers?.copilot
+  const d = prev.providers?.copilot
+  const copilot = accountById(COPILOT_ACCOUNT)
+  if (c && copilot && (c.defaultModel !== d?.defaultModel || c.defaultEffort !== d?.defaultEffort)) checkPair('copilot', copilot, baseConnection(copilot.id, allConnections()), { model: c.defaultModel, effort: c.defaultEffort }, { model: d?.defaultModel, effort: d?.defaultEffort })
+}
+
+/** The pair a change makes with the connection it goes to (each value changed, else the connection's), refused when the model doesn't take the effort. */
+function checkPair(cli: ProviderId, account: Account, conn: Connection | undefined, now: { model?: string; effort?: string }, was: { model?: string; effort?: string }): void {
+  const base = baseConnection(account.id, allConnections())
+  const model = now.model !== was.model ? now.model || base?.model : conn?.model
+  const effort = now.effort !== was.effort ? now.effort || base?.effort : conn?.effort
+  if (effort) assertEffortTaken(cli, model ?? null, account, effort)
+}
+
+/**
  * Settings → GitHub Copilot's model, effort, mode and extra arguments changed (the adapter until HI-2107): its account's
  * base connection takes the change, as its agents without settings of their own ran with them before.
  */
@@ -394,6 +431,7 @@ export function initConnectionMoves(): void {
       void migrateWorkspace(ws)
     }
   }
+  config.onSettingsCheck(checkLaunchSettings)
   config.onSettingsChanged((s, prev) => {
     if (JSON.stringify(s.assistant) !== JSON.stringify(prev.assistant)) void followAssistantSettings(s, prev)
     followCopilotSettings(s, prev)

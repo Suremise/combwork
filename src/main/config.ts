@@ -55,6 +55,8 @@ class ConfigStore {
   private data: AppConfig = structuredClone(DEFAULT_APP_CONFIG)
   private saveTimer: NodeJS.Timeout | null = null
   private listeners = new Set<(s: AppSettings, prev: AppSettings) => void>()
+  /** Checks a change of settings must pass before it is saved (onSettingsCheck); one throwing refuses the whole change. */
+  private checks = new Set<(next: AppSettings, prev: AppSettings) => void>()
   /** The file on disk is from an older Hive (config version 1): keep a copy before the first save replaces it. */
   private backupBeforeSave = false
 
@@ -174,6 +176,11 @@ class ConfigStore {
     const order: unknown = patch.providerOrder
     if (order !== undefined && (!Array.isArray(order) || order.some((x) => typeof x !== 'string' || !x || x.length > 64) || new Set(order).size !== order.length)) throw new Error('providerOrder must list provider ids, each once.') // i18n-ignore: a programming error's message
     const prev = structuredClone(this.data.settings)
+    // Refused whole, nothing changed, by a check (HI-2106: a model and effort that don't go together, decision E).
+    if (this.checks.size) {
+      const next = mergeDefaults(structuredClone(this.data.settings), patch)
+      for (const check of this.checks) check(next, prev)
+    }
     this.data.settings = mergeDefaults(this.data.settings, patch)
     this.keepOrderRevision(prev)
     this.scheduleSave()
@@ -297,6 +304,15 @@ class ConfigStore {
 
   onSettingsChanged(listener: (s: AppSettings, prev: AppSettings) => void): void {
     this.listeners.add(listener)
+  }
+
+  /**
+   * A check every change of settings (updateSettings: Settings, the settings tool) must pass before anything is saved:
+   * it throws to refuse the whole change, which its caller is told. Returns its removal.
+   */
+  onSettingsCheck(check: (next: AppSettings, prev: AppSettings) => void): () => void {
+    this.checks.add(check)
+    return () => void this.checks.delete(check)
   }
 
   private scheduleSave(): void {
