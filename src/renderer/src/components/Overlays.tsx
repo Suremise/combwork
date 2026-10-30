@@ -1282,7 +1282,7 @@ export function QuitPendingBanner() {
       <button className="btn small" onClick={() => void call('app:cancelPendingQuit')}>
         {tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." }))}
       </button>
-      <button className="btn small primary" style={{ marginLeft: 0 }} onClick={() => void call('app:quit')}>
+      <button className="btn small primary" onClick={() => void call('app:quit')}>
         {tr(msg({ id: 'shell.quitPending.now', defaultMessage: 'Quit now', description: "The banner's button: quits without waiting." }))}
       </button>
     </div>

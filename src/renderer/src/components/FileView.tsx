@@ -508,7 +508,7 @@ export function FileView({
           <button className="btn small" onClick={() => void reloadFromDisk()}>
             {tr(M.reload)}
           </button>
-          <button className="btn small" style={{ marginLeft: 0 }} onClick={() => void save(true)}>
+          <button className="btn small" onClick={() => void save(true)}>
             {tr(M.overwrite)}
           </button>
         </div>
