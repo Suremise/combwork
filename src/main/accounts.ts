@@ -762,6 +762,8 @@ export function firstAccountHere(cli: ProviderId, cfg: WorkspaceConfig | null): 
     c.accounts = store.accounts
     c.connections = store.connections
   })
+  // A window's choice of connection lists it now (HI-2118: the template dialogs make it as they ask for their options).
+  if (a) emit({ type: 'connections-changed' })
   return a ?? null
 }
 
@@ -1132,7 +1134,7 @@ const projectsFor = (a: Account): { name: string; path: string }[] => {
   const all = list()
   const usedBy = (p: ProjectInfo, own: (agent: AgentInfo) => string | null | undefined): boolean =>
     p.agents.some((ag) => {
-      if (agentProvider(ag, p.config, config.settings) !== a.provider) return false
+      if (agentProvider(ag, config.settings) !== a.provider) return false
       const r = resolveConnection(cfg, a.provider, own(ag), all)
       return r.ok && r.id === a.id
     })

@@ -1355,7 +1355,10 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
   describe("remove reads each project's agents as saved, under the lock their writes take (HR1, round 1)", () => {
     const p = join(wsPath, 'cr2')
     const file = join(p, '.hive', 'project.json')
-    const agentOn = (connection?: string) => ({ version: 2, migrations: { accounts1: { at: '' } }, agents: [{ id: 'g1', name: 'Gamma', provider: 'claude-code', ...(connection ? { connection } : {}) }] })
+    // Its own project id in every write (HI-2130): one written without it is given one by the workspace's id check (the
+    // root watch's, or any projectIds read), which takes this file's lock, a third waiter in the queue these cases count.
+    const id = 'p-2130c0ffee02'
+    const agentOn = (connection?: string) => ({ version: 2, id, migrations: { accounts1: { at: '' } }, agents: [{ id: 'g1', name: 'Gamma', provider: 'claude-code', ...(connection ? { connection } : {}) }] })
     beforeAll(async () => {
       mkdirSync(join(p, '.hive'), { recursive: true })
       writeFileSync(file, JSON.stringify(agentOn()))
@@ -1363,7 +1366,7 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
       // As Hive's start sets it (initConnections).
       setConnectionGuard(accounts.connectionAssignable)
     })
-    afterAll(() => writeFileSync(file, JSON.stringify({ version: 2, agents: [] })))
+    afterAll(() => writeFileSync(file, JSON.stringify({ version: 2, id, agents: [] })))
     afterEach(() => {
       accounts.accountTestHooks.beforeUsersRead = undefined
       writeFileSync(file, JSON.stringify(agentOn()))
@@ -1385,15 +1388,21 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
       const c = accounts.addConnection(a.id, { name: 'Held' })
       let release!: () => void
       const held = withFileLock(file, () => new Promise<void>((r) => (release = r)))
-      await vi.waitFor(() => expect(fileLockDepth(file)).toBe(1), { timeout: HUNG_MS })
-      const removal = outcome(accounts.removeConnection(c.id))
-      await vi.waitFor(() => expect(fileLockDepth(file)).toBe(2), { timeout: HUNG_MS })
-      // The write under way finishes giving it to Gamma, then lets go.
-      writeFileSync(file, JSON.stringify(agentOn(c.id)))
-      release()
-      await held
-      expect(await removal).toMatch(/Still in use, so Held was kept: Gamma/)
-      expect(accounts.getConnection(c.id)).toBeDefined()
+      // Let go however the case ends: a hold left by a failed check would stall every later write to the file.
+      try {
+        await vi.waitFor(() => expect(fileLockDepth(file)).toBe(1), { timeout: HUNG_MS })
+        const removal = outcome(accounts.removeConnection(c.id))
+        await vi.waitFor(() => expect(fileLockDepth(file)).toBe(2), { timeout: HUNG_MS })
+        // The write under way finishes giving it to Gamma, then lets go.
+        writeFileSync(file, JSON.stringify(agentOn(c.id)))
+        release()
+        await held
+        expect(await removal).toMatch(/Still in use, so Held was kept: Gamma/)
+        expect(accounts.getConnection(c.id)).toBeDefined()
+      } finally {
+        release()
+        await held
+      }
     })
 
     it('a write giving it to an agent while the removal reads: refused, nothing written; the removal goes through', async () => {
@@ -1407,10 +1416,14 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
         return new Promise<void>((r) => (go = r))
       }
       const removal = accounts.removeConnection(c.id)
-      await atRead
-      expect(await outcome(w.mutateProjectConfig(p, (now) => ({ agents: now.agents.map((x) => ({ ...x, connection: c.id })) })))).toMatch(/The connection chosen for Gamma was removed, or is being removed/)
-      expect(saved()).toBeUndefined()
-      go()
+      try {
+        await atRead
+        expect(await outcome(w.mutateProjectConfig(p, (now) => ({ agents: now.agents.map((x) => ({ ...x, connection: c.id })) })))).toMatch(/The connection chosen for Gamma was removed, or is being removed/)
+        expect(saved()).toBeUndefined()
+      } finally {
+        // The removal held at its read goes on however the case ends, so it leaves no connection marked as being removed.
+        go?.()
+      }
       await removal
       expect(accounts.getConnection(c.id)).toBeUndefined()
       // Gone: still refused afterwards; an agent keeping a connection it already has is never refused.

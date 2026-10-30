@@ -1955,10 +1955,6 @@
     "defaultMessage": "all agents",
     "description": "Stands for {who} in \"Connection for {who}\" (HI-2109): the Same for all choice. Lower case."
   },
-  "assistant.templateConnections.gone": {
-    "defaultMessage": "A connection that can’t be used here",
-    "description": "A choice of connection (HI-2109) that was removed, or whose account is off in this workspace: shown so nothing changes silently."
-  },
   "assistant.templateConnections.heading": {
     "defaultMessage": "Connections",
     "description": "Heading of the Load template and Choose Connections dialogs' section choosing which connection (a named setup on an account: model, effort, mode) the agents run on (HI-2109)."
@@ -1978,6 +1974,10 @@
   "assistant.templateConnections.none": {
     "defaultMessage": "No connection is usable in this workspace yet: agents get one once you add an account in Settings → Accounts & Connections.",
     "description": "The Connections section (HI-2109) when no connection is usable in this workspace: agents loaded now are made without one, and get one once an account is added. Settings → Accounts & Connections names a section: use its translated names."
+  },
+  "assistant.templateConnections.notOffered": {
+    "defaultMessage": "it can’t be used for these agents",
+    "description": "Why a connection is greyed out in the Connections section (HI-2118): Hive offers it elsewhere but not to these agents (its coding agent CLI is off or not installed, or its account is off here). A short clause, lower case, after the connection's name and a dash."
   },
   "assistant.templateConnections.perAgent": {
     "defaultMessage": "Per agent",

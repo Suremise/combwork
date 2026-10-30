@@ -917,11 +917,11 @@ const tools: Tool[] = [
       'Start a card on an agent of its project (stopped or idle; none named: a new one): it moves to doing and the card is its prompt. For more work on one in review or done, note says what now. Follow with hive_wait_for_agents.',
     inputSchema: {
       type: 'object',
-      properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: 'What to do now, added to the card in the prompt.' }, name: { type: 'string', description: "A new agent's name." }, provider: { type: 'string', description: "A new agent's CLI (provider id): it gets that CLI's first usable connection. Default: the first usable connection's." } },
+      properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: 'What to do now, added to the card in the prompt.' }, name: { type: 'string', description: "A new agent's name." }, connection: { type: 'string', description: "A new agent's connection, by id or name (hive_connection): its model, effort, mode and CLI. Default: the first usable here." } },
       required: ['number']
     },
     run: async (a) => {
-      const r = (await api('POST', `/v1/tasks/${enc(String(a.number))}/start`, { agent: a.agent, note: a.note, name: a.name, provider: a.provider, reply: 'short', ...legacyWorktreeArgs(a) })) as { agent: string; added: boolean; card: TaskRow }
+      const r = (await api('POST', `/v1/tasks/${enc(String(a.number))}/start`, { agent: a.agent, note: a.note, name: a.name, connection: a.connection, reply: 'short', ...legacyWorktreeArgs(a), ...legacyAgentArgs(a) })) as { agent: string; added: boolean; card: TaskRow }
       return `Started ${cardName(r.card)} ${r.card.title} on ${r.added ? 'a new agent, ' : ''}${r.agent}${r.card.project ? ` in ${r.card.project}` : ''}; the card is in ${r.card.column === 'doing' ? 'Doing' : r.card.column}. Follow it with hive_wait_for_agents.`
     }
   },

@@ -295,7 +295,6 @@ interface HiveMessageValues {
   'agents.picker.showOlder': undefined
   'agents.place.short': { is: string; name: string | number }
   'agents.place.tip': { is: string; name: string | number; path: string | number }
-  'agents.provider.automatic': { state: string; provider: string | number }
   'agents.provider.compactDefault': { provider: string | number; at: number }
   'agents.provider.compactDefaultFor': { provider: string | number; at: number; why: string; estimate: string }
   'agents.provider.compactOff': { provider: string | number; source: string | number; estimate: string }
@@ -305,7 +304,6 @@ interface HiveMessageValues {
   'agents.provider.contextOf': { tokens: number; window: number }
   'agents.provider.extraArgsDashes': undefined
   'agents.provider.lastTurn': { input: number; output: number }
-  'agents.provider.warning': { why: string; provider: string | number }
   'agents.resume.goneWorktree': { folder: string | number }
   'agents.resume.hold.after': { agent: string | number; kind: string; work: string | number; slot: string | number }
   'agents.resume.hold.byHand': { slot: string | number; agent: string | number }

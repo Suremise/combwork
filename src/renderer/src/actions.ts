@@ -5,7 +5,7 @@ import { cliReadyOf, firstReadyConnection, offeredConnections } from '@shared/co
 import { agentOf, cancelDialog, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
 import { AGENT_LIMIT_MAX, MANY_AGENTS, OPEN_WORKFLOW_OPTIONS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
-import { defaultProviderPending, isKnownProvider, isProviderEnabled, projectDefaultProvider, providerName } from '@shared/providers'
+import { autoProvider, autoProviderPending, isKnownProvider, isProviderEnabled, providerName } from '@shared/providers'
 import { agentsToResume, resumeAll, stalledOnSignIn, type ResumeAllResult } from '@shared/resumeAll'
 import { holdShort, holdText } from '@shared/sessionResume'
 import type { FreshRow } from '@shared/freshStarts'
@@ -293,8 +293,8 @@ async function ensureAgent(path: string, agentId: string, resumes?: ProviderId):
   const a = (): ReturnType<typeof agentOf> => agentOf(project(path), agentId)
   // Automatic's pick matters only to an agent that follows it and isn't running (a running one has its provider).
   const provider = await detectedProvider(
-    () => resumes ?? agentProviderOf(project(path), a()),
-    () => !resumes && !a()?.live && !a()?.provider && defaultProviderPending(project(path)?.config, get().settings)
+    () => resumes ?? agentProviderOf(a()),
+    () => !resumes && !a()?.live && !a()?.provider && autoProviderPending(get().settings)
   )
   if (!provider) return false
   const name = providerName(provider)
@@ -451,7 +451,7 @@ export async function quickAddAgent(path: string | null = get().selectedProject,
   // Decision A (HI-2108): the first usable connection in the order of accounts (a session's CLI's, when resuming one),
   // its CLI on and installed, as main's firstUsableAccount: waited for while Hive still looks for a CLI before it. Its CLI
   // follows from it. Connections here but none on an installed CLI: the dialog, which says why. None usable here (no
-  // account on, or a test copy on its CLI test home): as before accounts.
+  // account on, or a test copy on its CLI test home): the first CLI on and installed, as main's prepareAgent.
   const view = await call('connections:list').catch(() => null)
   const first = await readyConnection(view, forProvider)
   if (!first) return null
@@ -463,8 +463,8 @@ export async function quickAddAgent(path: string | null = get().selectedProject,
   const provider = connection
     ? undefined
     : await detectedProvider(
-        () => forProvider ?? projectDefaultProvider(project(path)?.config, get().settings),
-        () => !forProvider && defaultProviderPending(project(path)?.config, get().settings)
+        () => forProvider ?? autoProvider(get().settings),
+        () => !forProvider && autoProviderPending(get().settings)
       )
   if (!connection && !provider) return null
   if (provider && (!isProviderEnabled(get().settings, provider) || !get().providers[provider]?.found)) {
@@ -571,7 +571,7 @@ export function resumeTarget(p: ProjectInfo | undefined, item: Pick<SessionListI
   if (free(recorded)) return recorded!
   if (free(focused)) return focused!
   const idle = p.agents.filter((a) => !legacyOf(a) && !a.live)
-  const other = (idle.find((a) => item.provider && agentProviderOf(p, a) === item.provider) ?? idle[0])?.id
+  const other = (idle.find((a) => item.provider && agentProviderOf(a) === item.provider) ?? idle[0])?.id
   return other ?? (inFolder(recorded) ? recorded! : (p.agents.find((a) => !legacyOf(a))?.id ?? null))
 }
 
@@ -684,7 +684,7 @@ async function resumeLatest(path: string, id: string): Promise<void> {
   const a = agentOf(p, id)
   // Hive works out the session in the main process (AgentInfo.resume), skipping any open in another agent.
   const list = a?.resume ? await attempt(listFailed(), () => call('session:list', path)) : []
-  const last = a?.resume ? (list ?? []).find((s) => s.id === a.resume!.id) ?? { id: a.resume.id, name: a.resume.name, title: null, recache: null, agentId: id, cwd: legacyOf(a)?.path, provider: agentProviderOf(p, a) } : null
+  const last = a?.resume ? (list ?? []).find((s) => s.id === a.resume!.id) ?? { id: a.resume.id, name: a.resume.name, title: null, recache: null, agentId: id, cwd: legacyOf(a)?.path, provider: agentProviderOf(a) } : null
   if (!last) {
     notify(
       'info',
@@ -797,7 +797,7 @@ async function resumeAll_(path: string): Promise<void> {
   const result = await resumeAll(project(path)?.agents ?? [], async (a) => {
     // Running, stopped mid-turn by a refused sign-in: a short "carry on" (its CLI resumes nothing itself).
     if (stalledOnSignIn(a.live)) return void (await call('session:carryOn', path, a.id))
-    const provider = agentProviderOf(project(path), a)
+    const provider = agentProviderOf(a)
     const name = providerName(provider)
     if (!isProviderEnabled(get().settings, provider)) throw new Error(providerOff(name))
     if (!get().providers[provider]?.found) throw new Error(providerMissing(name))
@@ -939,7 +939,7 @@ async function startNewAll_(path: string, archive: boolean): Promise<void> {
   for (const a of agents) if (now(a.id)?.live) await call('session:stop', path, a.id).catch(() => undefined)
   await Promise.all(agents.map((a) => waitForStop(path, a.id)))
   const result = await eachAgent(agents, async (a) => {
-    const provider = agentProviderOf(project(path), a)
+    const provider = agentProviderOf(a)
     const name = providerName(provider)
     if (!isProviderEnabled(get().settings, provider)) throw new Error(providerOff(name))
     if (!get().providers[provider]?.found) throw new Error(providerMissing(name))

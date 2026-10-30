@@ -388,8 +388,6 @@
   "tips.projectTabsKeys.title": "Alt et un chiffre pour chaque onglet",
   "tips.projectTabsSettings.text": "Le dernier élément de Plus ▾, au bout des onglets d’un projet, est Paramètres du projet…, avec son raccourci (Alt+0, sauf si tu le changes).",
   "tips.projectTabsSettings.title": "Les paramètres du projet depuis Plus ▾",
-  "tips.providerOrder.text": "Réordonne la liste dans Paramètres → Fournisseurs en faisant glisser un fournisseur, ou avec Monter et Descendre dans son menu ⋯ : Automatique donne aux nouveaux agents le premier de cet ordre qui est activé et installé, par exemple Codex avant Claude Code.",
-  "tips.providerOrder.title": "Choisis l’agent de code qu’Automatique essaie en premier",
   "tips.quitWhenDone.text": "Quitter pendant qu’un agent travaille propose Quitter quand les agents ont fini : Hive se masque et quitte tout seul une fois qu’ils ont terminé. Les conversations sont toujours conservées.",
   "tips.quitWhenDone.title": "Quitter quand les agents ont fini",
   "tips.recentWorkspaces.text": "Retire un espace de travail de Fichier → Ouvrir un élément récent ou de la page d’accueil avec son ✕, ou par clic droit. Effacer les éléments récents les oublie tous ; les dossiers disparus s’affichent comme introuvables.",

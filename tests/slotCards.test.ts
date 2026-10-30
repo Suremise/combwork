@@ -35,7 +35,7 @@ const state = vi.hoisted(() => ({
   live: null as null | { cwd: string; sessionId: string },
   /** The card's slot folder, where a start that wins runs the builder. */
   slot: '',
-  deliveries: [] as { id: string; source?: string; ref?: string; state: string; body?: string }[],
+  deliveries: [] as { id: string; source?: string; ref?: string; state: string; body?: string; meta?: Record<string, unknown> }[],
   /** The next delivery or launch: given, or not (refused, or its launch failed: cancelled). */
   next: [] as ('given' | 'refused' | 'launchFails')[],
   calls: [] as string[],
@@ -166,8 +166,8 @@ vi.mock('../src/main/sessions', async (orig) => {
 vi.mock('../src/main/deliveries', async (orig) => {
   const actual = await orig<typeof import('../src/main/deliveries')>()
   let seq = 0
-  const make = (nd: { source?: string; ref?: string; body?: string }, given: boolean): { id: string; source?: string; ref?: string; state: string; body?: string } => {
-    const r = { id: `m${++seq}`, source: nd.source, ref: nd.ref, state: given ? 'offered' : 'cancelled', body: nd.body }
+  const make = (nd: { source?: string; ref?: string; body?: string; meta?: Record<string, unknown> }, given: boolean): { id: string; source?: string; ref?: string; state: string; body?: string; meta?: Record<string, unknown> } => {
+    const r = { id: `m${++seq}`, source: nd.source, ref: nd.ref, state: given ? 'offered' : 'cancelled', body: nd.body, ...(nd.meta ? { meta: nd.meta } : {}) }
     state.deliveries.push(r)
     return r
   }
@@ -757,6 +757,24 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     expect(state.calls).toEqual(['resume c1 with the card'])
     expect(placedHow(e, n)).toEqual(['resumed'])
     expect(state.deliveries.map((d) => d.state)).toEqual(['offered'])
+  })
+
+  it("HI-2134: resumed with the card, its fact not written (its workspace closed): the next pass records it resumed, not typed, and gives nothing more", async () => {
+    const { e, n, slot, cycle, ws } = await owed()
+    // The earlier pass's launch: the conversation resumed in its slot with the card's delivery, kept with how it was made.
+    state.deliveries.push({ id: 'm8', source: 'slot-placement', ref: `${n}:${cycle.seq}:l-1`, state: 'received', meta: { how: 'resumed' } })
+    state.live = { cwd: slot, sessionId: 'c1' }
+    await place(ws, e.project, e.wf, n, cycle, lease)
+    expect(state.calls).toEqual([])
+    expect(state.deliveries).toHaveLength(1)
+    expect(e.store.facts(n).find((f) => f.kind === 'BuilderPlaced')?.data).toMatchObject({ delivery: 'm8', how: 'resumed' })
+  })
+
+  it("HI-2134: a placement's delivery keeps how it was made", async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = resume
+    await place(ws, e.project, e.wf, n, cycle, lease)
+    expect(state.deliveries.map((d) => d.meta)).toEqual([{ how: 'resumed' }])
   })
 
   it("its conversation's lookup failing (unknown): nothing launched, tried again; resumed once it can be read", async () => {

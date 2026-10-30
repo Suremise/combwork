@@ -490,12 +490,12 @@ interface HiveMessageValues {
   'assistant.template.sameName': { name: string | number }
   'assistant.template.tooMany': { count: string | number; max: string | number }
   'assistant.templateConnections.all': undefined
-  'assistant.templateConnections.gone': undefined
   'assistant.templateConnections.heading': undefined
   'assistant.templateConnections.keep': undefined
   'assistant.templateConnections.keepOwn': { name: string | number }
   'assistant.templateConnections.label': { who: string | number }
   'assistant.templateConnections.none': undefined
+  'assistant.templateConnections.notOffered': undefined
   'assistant.templateConnections.perAgent': undefined
   'assistant.templateConnections.roleChoice': undefined
   'assistant.templateConnections.roleRow': { role: string }

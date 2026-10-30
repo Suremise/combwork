@@ -388,8 +388,6 @@
   "tips.projectTabsKeys.title": "每个标签页一个 Alt 数字键",
   "tips.projectTabsSettings.text": "项目标签页末尾“更多 ▾”的最后一项是“项目设置…”，并显示其快捷键（除非你更改，否则为 Alt+0）。",
   "tips.projectTabsSettings.title": "从“更多 ▾”打开项目设置",
-  "tips.providerOrder.text": "在 设置 → 提供方 中拖动提供方，或使用其 ⋯ 菜单中的“上移”“下移”来调整列表顺序：“自动”会为新代理使用该顺序中第一个已开启并已安装的提供方，例如先 Codex 后 Claude Code。",
-  "tips.providerOrder.title": "选择“自动”优先尝试哪个编码代理",
   "tips.quitWhenDone.text": "在智能体工作时退出，会提供“智能体完成后退出”：Hive 会先隐藏，等它们完成后自行退出。对话始终会保留。",
   "tips.quitWhenDone.title": "智能体完成后退出",
   "tips.recentWorkspaces.text": "在“文件”→“打开最近的工作区”或欢迎页上，用 ✕ 或右键菜单移除某个工作区。“清除最近打开的工作区…”会忘记全部工作区；已不存在的文件夹会显示为找不到。",

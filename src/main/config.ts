@@ -3,9 +3,9 @@ import { randomBytes } from 'crypto'
 import { join } from 'path'
 import { copyFileSync, existsSync, readFileSync } from 'original-fs'
 import { DEFAULT_APP_CONFIG, mergeDefaults, migrateConfig, withLegacySettings } from '../shared/defaults'
-import { extraArgsProblem, isKnownProvider, providerOrderWith } from '../shared/providers'
+import { extraArgsProblem } from '../shared/providers'
 import { migrateAccounts } from '../shared/connectionDefaults'
-import type { AppConfig, AppSettings, EffortOption, FallbackModel, LegacyConnection, ModelPrice, ProviderId, ProviderSettings, SlotDefaults } from '../shared/types'
+import type { AppConfig, AppSettings, EffortOption, FallbackModel, LegacyConnection, ModelPrice, ProviderSettings, SlotDefaults } from '../shared/types'
 import type { SettingsPatch } from '../shared/api'
 import type { PlatformId } from '../shared/platform/descriptors'
 import type { WorkflowOptions } from '../shared/workflow/options'
@@ -172,7 +172,8 @@ class ConfigStore {
         if (problem) throw new Error(problem)
       }
     }
-    // The provider order (HI-1965): provider ids, each once.
+    // The provider order (HI-1965): provider ids, each once. No screen sets it since decision A (HI-2113: a 0.9 order is
+    // still read), but settings:update still takes the key, so a malformed one is never saved.
     const order: unknown = patch.providerOrder
     if (order !== undefined && (!Array.isArray(order) || order.some((x) => typeof x !== 'string' || !x || x.length > 64) || new Set(order).size !== order.length)) throw new Error('providerOrder must list provider ids, each once.') // i18n-ignore: a programming error's message
     const prev = structuredClone(this.data.settings)
@@ -182,31 +183,9 @@ class ConfigStore {
       for (const check of this.checks) check(next, prev)
     }
     this.data.settings = mergeDefaults(this.data.settings, patch)
-    this.keepOrderRevision(prev)
     this.scheduleSave()
     for (const l of this.listeners) l(this.data.settings, prev)
     return this.data.settings
-  }
-
-  /**
-   * The provider order's revision (HI-1965): only main sets it, one more whenever the order changes (a move, a patch, a
-   * reset), never what a caller's patch says, so a window can tell a newer order from an older one whatever came first.
-   */
-  private keepOrderRevision(prev: AppSettings): void {
-    const changed = JSON.stringify(prev.providerOrder) !== JSON.stringify(this.data.settings.providerOrder)
-    this.data.settings.providerOrderRevision = prev.providerOrderRevision + (changed ? 1 : 0)
-  }
-
-  /**
-   * Moves one provider to a place in the order (HI-1965: Settings → Providers), from the order as it is now: one step
-   * with nothing awaited between the read and the write, so each window's moves, sent one at a time, apply in turn.
-   * Returns what this move made, as its acknowledgement.
-   */
-  moveProvider(id: ProviderId, toIndex: number): { providerOrder: ProviderId[]; revision: number } {
-    if (!isKnownProvider(id)) throw new Error(`Unknown provider: ${id}`) // i18n-ignore: a programming error's message
-    if (!Number.isInteger(toIndex) || toIndex < 0) throw new Error('toIndex must be a place in the list, from 0.') // i18n-ignore: a programming error's message
-    const s = this.updateSettings({ providerOrder: providerOrderWith(this.data.settings, id, toIndex) })
-    return { providerOrder: s.providerOrder, revision: s.providerOrderRevision }
   }
 
   /**
@@ -296,7 +275,6 @@ class ConfigStore {
     const prev = structuredClone(this.data.settings)
     if (section) (this.data.settings as unknown as Record<string, unknown>)[section] = structuredClone(DEFAULT_APP_CONFIG.settings[section])
     else this.data.settings = structuredClone(DEFAULT_APP_CONFIG.settings)
-    this.keepOrderRevision(prev)
     this.scheduleSave()
     for (const l of this.listeners) l(this.data.settings, prev)
     return this.data.settings

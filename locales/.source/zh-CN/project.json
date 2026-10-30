@@ -182,6 +182,7 @@
   "project.empty.markWorking": "Mark as working on",
   "project.empty.noAccount": "No account is on in this workspace — Settings → Accounts & Connections",
   "project.empty.noAgents": "No agents yet",
+  "project.empty.noCli": "No account on here has its coding agent CLI installed — Help → Provider Setup",
   "project.empty.noSession": "No session running",
   "project.empty.notActive": "{project} is not active",
   "project.empty.notRunning": "{agent} is not running",

@@ -210,12 +210,11 @@ export interface AppSettings {
   /** The provider Add Agent's quick add uses unless the project says otherwise. */
   defaultProvider: ProviderId
   /**
-   * The order Settings → Providers lists the providers in, which Automatic picks from and every provider list follows
-   * (HI-1965: orderedProviders). Empty: Hive's own order. Providers it doesn't name follow, in Hive's order.
+   * The order the provider lists show the providers in, which Automatic picks from (HI-1965: orderedProviders). Empty:
+   * Hive's own order. Providers it doesn't name follow, in Hive's order. No screen sets it since decision A (HI-2113:
+   * the one order is the accounts'); one saved by 0.9 is still read.
    */
   providerOrder: ProviderId[]
-  /** One more each time main changes providerOrder (HI-1965); only main sets it, so a window tells a newer order from an older one. */
-  providerOrderRevision: number
   notifications: {
     chimeEnabled: boolean
     chimeSound: ChimeSound
@@ -1361,9 +1360,9 @@ export interface TaskPatch {
  */
 export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[] } | { refused: Refusal }
 
-/** Which agent Start gives a card to. */
+/** Which agent Start gives a card to; a new one runs on `connection` (its id: HI-2121), else the first usable here. */
 /** `worktree` (0.9's own worktree for a new agent) is refused since 1.0 (#1451); the window stops sending it (#1442). */
-export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree?: boolean; name?: string; provider?: ProviderId }
+export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree?: boolean; name?: string; connection?: string }
 
 /** How a project leaves Hive (the main menu's Project → Remove Project…). */
 export type ProjectRemoval = 'hide' | 'remove' | 'delete'
@@ -3830,7 +3829,9 @@ export interface LaneStatus {
   /** hooks: the agent whose hooks aren't arriving, by name; startWait: the builder. */
   agent?: string
   /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
-  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh'
+  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
+  /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */
+  waitsFor?: string
   /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */
   freshBlocked?: 'timeout' | 'uncertain' | 'failed'
   freshWhy?: string

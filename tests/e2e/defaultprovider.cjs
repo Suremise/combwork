@@ -1,9 +1,9 @@
 // The default provider follows what's installed (#474).
 // 1. A Codex-only install (Codex turned on, the fake Codex its CLI; Claude Code and Copilot off) on a fresh profile: the
 //    default is Automatic, the empty project says nothing about Claude Code, and New
-//    Session adds its first agent, a Codex one, and starts it in one click. A default the user chose that can't run
-//    (Claude Code, turned off, in Settings; a project has none of its own since HI-2106) is named in the empty project, and Add Agent keeps it chosen,
-//    says why it can't add, and adds nothing until another provider is chosen.
+//    Session adds its first agent, a Codex one, and starts it in one click. A 0.9 config's chosen default (Claude Code,
+//    turned off) is read by nothing (decision A, HI-2132): the empty project doesn't name it, and Add Agent offers
+//    connections, with no provider to keep chosen.
 // 2. Claude Code turned on but not installed (hidden: a PATH without it, and a home and AppData of the suite's own, as
 //    the Copilot stand-in does), Codex installed: nothing warns about Claude Code (no banner, no Provider Setup opening, a
 //    plain status bar item) until an agent uses it.
@@ -68,13 +68,10 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => !(await live()), 10000)
   await inv('project:updateConfig', alpha, { agents: [] })
 
-  // A default chosen in Settings that can't run is named.
+  // A 0.9 config's chosen default (Claude Code, turned off) is read by nothing since decision A (HI-2132): the empty
+  // project still names Codex and warns of nothing.
   await inv('settings:update', { defaultProvider: 'claude-code' })
-  const named = await lib.until(async () => {
-    const w = card.locator('[data-provider-warning]')
-    return (await w.count()) === 1 ? w.innerText() : null
-  }, 10000)
-  check('a chosen default that is turned off is named', /Claude Code is turned off/.test(named ?? ''), String(named))
+  check('a 0.9 chosen default is not named', !!(await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0 && (await card.innerText()).includes('adds a Codex agent'), 10000)), await card.innerText())
   await shot('chosen-off')
 
   // Add Agent has no provider to choose (HI-2108, decision A): it offers connections, and Settings' old default doesn't

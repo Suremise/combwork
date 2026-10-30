@@ -137,7 +137,7 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 
 ## Agents' settings
 
-`hive_add_agent`, `hive_update_agent`: model, effort, context and mode are its connection's, and its CLI; `provider`, `model`, `effort`, `mode`, `context200k` are refused.
+`hive_add_agent`, `hive_update_agent`, `hive_start_task`: its connection sets model, effort, context, mode, CLI; `provider`, `model`, `effort`, `mode`, `context200k` refused.
 - `connection`: id or name (`hive_connection`). Default or empty: the first usable here.
 - `workflowRole`: builder, reviewer, either (never its own cards) or generalist (no lanes or reviews). Default: from its name.
 - `mcpServers`: `[]` none, `["*"]` all (default); hive always.

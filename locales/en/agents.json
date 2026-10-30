@@ -1175,10 +1175,6 @@
     "defaultMessage": "{is, select, slot {Works in {name}: {path}} carried {Works in {name}, the slot kept for it: {path}} home {Works in its retired home {name}: {path}} other {Works in its 0.9 worktree {name}: {path}}}",
     "description": "A line of an agent's hover: where it works and that folder's path ({path}): a slot it builds in ({name}: the slot's name, such as slot-b), its carried slot (its own worktree from before 1.0, kept for it as a slot), a reviewer's retired home, or its worktree from before 1.0 (Hive 0.9) not moved to a slot yet. Glossary: slot."
   },
-  "agents.provider.automatic": {
-    "defaultMessage": "{state, select, checking {Automatic (checking…)} picked {Automatic ({provider})} other {Automatic}}",
-    "description": "The default provider Automatic (it follows what is installed), in the provider pickers: while Hive checks which CLIs are installed; with the provider it picks now ({provider}: its name); or plain."
-  },
   "agents.provider.compactDefault": {
     "defaultMessage": "{provider} compacts by itself at about {at, number} by default (its settings can change this)",
     "description": "A context tooltip for a session that isn't running: where the CLI ({provider}) compacts its conversation by itself by default, in tokens ({at})."
@@ -1214,10 +1210,6 @@
   "agents.provider.lastTurn": {
     "defaultMessage": "{input, number} input + {output, number} output of the last turn (thinking included)",
     "description": "A context tooltip: the last turn's input and output tokens, its thinking counted in the output."
-  },
-  "agents.provider.warning": {
-    "defaultMessage": "{why, select, off {{provider} is turned off — Settings → Providers} missing {{provider} isn't installed — Help → Provider Setup} noneOn {No coding agents are turned on — Settings → Providers} other {No coding agent CLI is installed — Help → Provider Setup}}",
-    "description": "A warning about a project's new agents' provider ({provider}: its name): turned off, not installed, none turned on, or no CLI installed. Settings → Providers and Help → Provider Setup are places in Hive where it is fixed."
   },
   "agents.resume.goneWorktree": {
     "defaultMessage": "It ran in a worktree no agent uses any more ({folder}). Add an agent for that worktree to resume it.",

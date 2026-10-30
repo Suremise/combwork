@@ -13,7 +13,7 @@ import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUs
 import { agentLimitText, contextPercent, turnPushedCompaction, mergeBlocked } from '@shared/defaults'
 import { useAdvancedValue, useAgentLimit } from '../advanced'
 import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } from '@shared/inboxSwitches'
-import { PROVIDERS, contextLines, inProviderOrder, isProviderEnabled, orderedProviders, permissionLabel, projectDefaultProvider, providerDescriptor, providerName } from '@shared/providers'
+import { PROVIDERS, contextLines, inProviderOrder, isProviderEnabled, orderedProviders, permissionLabel, providerDescriptor, providerName } from '@shared/providers'
 import { instructionsStarter } from '@shared/projectTabs'
 import { PROJECT_KEY_DESC, PROJECT_SETTINGS_SECTIONS, settingEntry, shownSetting, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { shownText } from '@shared/advanced'
@@ -32,7 +32,7 @@ import { useGitRead } from './GitTab'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
-import { ConnectionMark, connectionLine, useConnections } from '../components/ConnectionChoice'
+import { cliReadyOf, ConnectionMark, connectionCli, connectionLine, firstReadyConnection, useConnections } from '../components/ConnectionChoice'
 import { connectionOf } from '@shared/connectionLabel'
 import { useConnectionsInUse } from '../connectionUsage'
 import { connectionsApply } from '@shared/accounts'
@@ -569,7 +569,7 @@ export function OverviewTab({ project }: { project: ProjectInfo }) {
         {project.agents.length > 1 && (
           <>
             <h2 className="section">{tr(M.byAgent)}</h2>
-            <AgentsByUsage rows={project.agents.map((a) => ({ id: a.id, name: a.name, provider: agentProviderOf(project, a), t: sumUsage(inPeriod.filter((i) => sessionAgent(project, i) === a.id), from) }))} />
+            <AgentsByUsage rows={project.agents.map((a) => ({ id: a.id, name: a.name, provider: agentProviderOf(a), t: sumUsage(inPeriod.filter((i) => sessionAgent(project, i) === a.id), from) }))} />
           </>
         )}
 
@@ -780,7 +780,7 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
               <select className="select" aria-label={tr(M.agent)} value={agent.id} onChange={(e) => setPickedId(e.target.value)}>
                 {project.agents.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} · {providerName(agentProviderOf(project, a))}
+                    {a.name} · {providerName(agentProviderOf(a))}
                   </option>
                 ))}
               </select>
@@ -1321,7 +1321,7 @@ export function MemoryTab({ project }: { project: ProjectInfo }) {
   const sel = sources.find((s) => `${s.provider}:${s.id}` === selected)
   // One pair of groups per provider the project uses (or, with none yet, every enabled provider).
   const settings = useStore((s) => s.settings)
-  const used = new Set(project.agents.map((a) => agentProviderOf(project, a)))
+  const used = new Set(project.agents.map((a) => agentProviderOf(a)))
   const providers = orderedProviders(settings).filter((p) => used.has(p.id) || (isProviderEnabled(settings, p.id) && sources.some((s) => s.provider === p.id && s.exists)))
   // With agents of more than one provider: one shared AGENTS.md instead of a file per CLI.
   const usedIds = [...used].sort()
@@ -1444,11 +1444,13 @@ export function ProjectSkillsTab({ project }: { project: ProjectInfo }) {
 
   const providers = orderedProviders(settings).filter((p) => isProviderEnabled(settings, p.id))
   const ids = providers.map((p) => p.id)
-  // One provider's skills at a time (#118): the one last shown for this project, else the project's default provider,
-  // else the first turned on.
+  // One provider's skills at a time (#118): the one last shown for this project, else the CLI of the first usable
+  // connection (HI-2121, decision A: what a new agent runs), else the first turned on.
   const key = project.path.toLowerCase()
   const remembered = useStore((s) => s.skillsProvider[key])
-  const fallback = projectDefaultProvider(project.config, settings)
+  const connections = useConnections()
+  const cliFound = useStore((s) => s.providers)
+  const fallback = connectionCli(connections, firstReadyConnection(connections, settings, cliReadyOf(cliFound)).id)
   const shown = providers.find((p) => p.id === remembered) ?? providers.find((p) => p.id === fallback) ?? providers[0]
   const showProvider = (id: ProviderId): void => rememberProjectPref('skillsProvider', key, id)
   // Hive skills (the workspace's, the same in every project) start open at the top; the provider's skills folded under
@@ -1749,7 +1751,7 @@ function AgentList({ project }: { project: ProjectInfo }) {
   return (
     <div className="agent-list">
       {project.agents.map((a) => {
-        const provider = agentProviderOf(project, a)
+        const provider = agentProviderOf(a)
         const conn = connectionFor(a, provider)
         // Its connection's values (its model, effort, context, mode), and its own MCP servers when it has a choice of them.
         const line = [(conn && connectionLine(connections, conn, settings)) || providerName(provider), agentChoosesMcp(a) ? tr(S.ownMcp, { servers: agentMcpText(a) }) : ''].filter(Boolean).join(' · ')

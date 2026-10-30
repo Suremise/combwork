@@ -620,7 +620,6 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'settings:get': () => config.settings,
     // Show developer features is kept in advanced.json too: written there first, or refused (#367).
     'settings:update': (patch) => updateSettingsChecked(patch, (p) => config.updateSettings(p)),
-    'settings:moveProvider': (id, toIndex) => config.moveProvider(id, toIndex),
     'settings:setKeybinding': (id, key) => config.setKeybinding(id, key),
     'settings:setProviderPrices': (provider, prices, removed) => config.setProviderPrices(knownProvider(provider), prices, removed),
     'settings:setProviderFallback': (provider, kind, list) => config.setProviderFallback(knownProvider(provider), kind === 'efforts' ? 'efforts' : 'models', list),

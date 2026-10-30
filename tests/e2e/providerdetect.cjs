@@ -1,14 +1,16 @@
-// Automatic never resolves from partial detection, and a resume runs its conversation's own provider (#506).
-// Claude Code (the fake) and Codex (the fake) are both turned on; the default provider is Automatic, and so is the
-// Assistant's. 1. The Assistant starts a conversation: Claude Code (first in order, installed). 2. Hive restarts with
-// Claude Code's detection held back (HIVE_TEST_SLOW_DETECT) so Codex answers first: the Assistant still offers its Claude Code conversation, and resuming it waits for the
-// detection and runs Claude Code. 3. With the Assistant's provider set to Codex, its Claude Code conversation still
-// resumes in Claude Code (a default never re-points a conversation), asking for no restart. 4. Claude Code held beyond
-// Hive's wait (HIVE_TEST_DETECT_WAIT_MS): a new conversation and an agent following Automatic are refused, not guessed.
+// The first usable connection is never chosen from partial detection, and a resume runs its conversation's own provider
+// (#506). Claude Code (the fake) and Codex (the fake, on its test home: no account) are both turned on. 1. The
+// Assistant starts a conversation: Claude Code (the first usable connection's). 2. Hive restarts with Claude Code's
+// detection held back (HIVE_TEST_SLOW_DETECT) so Codex answers first: the Assistant still offers its Claude Code
+// conversation, and resuming it waits for the detection and runs Claude Code. 3. With the Assistant switched to Codex
+// (HI-2108: its CLI is its own, as an agent's, no longer Settings → Assistant's), its Claude Code conversation still
+// resumes in Claude Code (a change never re-points a conversation), asking for no restart. 4. Claude Code held beyond
+// Hive's wait (HIVE_TEST_DETECT_WAIT_MS): a new conversation of the Assistant, switched back to Claude Code, and an
+// agent added with no connection are refused, not guessed.
 // 5. A Claude Code agent switched to Codex resumes its Claude Code conversation in Claude Code; a new one runs Codex.
 // 6. Claude Code held beyond the wait again: a launch of a known provider waits only for its own CLI, so the Assistant
-// set to Codex starts a conversation, and the agent resumes its Codex one. 7. The Claude Code conversation with its
-// Hive record gone (one started outside Hive) still resumes in Claude Code, found by its transcript.
+// switched to Codex starts a conversation, and the agent resumes its Codex one. 7. The Claude Code conversation with
+// its Hive record gone (one started outside Hive) still resumes in Claude Code, found by its transcript.
 // Throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME; quiet. No real CLI runs.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -49,6 +51,8 @@ const check = (name, ok, extra = '') => {
     await lib.until(() => p.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false), 30000)
     return { app: a, page: p, inv: (ch, ...x) => p.evaluate(([c, args]) => window.hive.invoke(c, ...args), [ch, x]) }
   }
+  /** The Assistant's CLI changed (HI-2108: it follows its connection; Codex has no account here, so its test home's, decision H), as part 5's agent's. */
+  const assistantOn = (cli) => inv('agents:update', home, 'assistant', { provider: cli })
 
   // 1. The Assistant's first conversation, with both CLIs found.
   let { app, page, inv } = await lib.launch({ userData, env })
@@ -56,11 +60,10 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(inv, page, ws)
   await lib.waitForProvider(inv, 'claude-code')
   await lib.waitForProvider(inv, 'codex')
-  check('the default is Automatic, and so is the Assistant’s', (await inv('settings:get')).defaultProvider === 'auto' && (await inv('settings:get')).assistant.provider === '')
   let home = (await inv('workspace:refresh')).assistant.path
   const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.agentId === 'assistant')
   const started = await inv('session:start', home, { agentId: 'assistant' })
-  check('the Assistant’s conversation runs Claude Code (Automatic: first in order, installed)', started.provider === 'claude-code', started.provider)
+  check('the Assistant’s conversation runs Claude Code (the first usable connection’s: first in order, installed)', started.provider === 'claude-code', started.provider)
   const ready = await lib.until(async () => ((await live())?.sessionId && ['ready', 'finished'].includes((await live()).status) ? await live() : null), 30000)
   const sid = ready?.sessionId
   check('…and is ready', !!sid, JSON.stringify(await live()))
@@ -90,24 +93,26 @@ const check = (name, ok, extra = '') => {
   await inv('session:stop', home, 'assistant')
   await lib.until(async () => !(await live()), 20000)
 
-  // 3. The Assistant's provider changed: its Claude Code conversation still resumes in Claude Code.
-  await inv('settings:update', { assistant: { provider: 'codex' } })
+  // 3. The Assistant switched to Codex: its Claude Code conversation still resumes in Claude Code.
+  await lib.waitForProvider(inv, 'claude-code', 20000)
+  await assistantOn('codex')
   const again = await inv('session:start', home, { agentId: 'assistant', resumeId: sid })
-  check('with the Assistant set to Codex, its Claude Code conversation resumes in Claude Code', again.provider === 'claude-code' && again.sessionId === sid, JSON.stringify({ provider: again.provider, sessionId: again.sessionId }))
+  check('with the Assistant switched to Codex, its Claude Code conversation resumes in Claude Code', again.provider === 'claude-code' && again.sessionId === sid, JSON.stringify({ provider: again.provider, sessionId: again.sessionId }))
   await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 30000)
   const restart = (await inv('workspace:refresh')).assistant.agents[0]?.restartNeeded
-  check('…and asks for no restart: the setting is for its next new conversation', restart === false, String(restart))
+  check('…and asks for no restart: the connection is for its next new conversation', restart === false, String(restart))
   await inv('session:stop', home, 'assistant')
   await lib.until(async () => !(await live()), 20000)
+  // Back on Claude Code for part 4, while both are found.
+  await assistantOn('claude-code')
   await app.close()
 
-  // 4. Claude Code's detection held beyond Hive's wait: nothing is decided from a guess. A new Assistant conversation
-  // and an agent following Automatic are refused ("still looking"), nothing starts and no agent is added; once Claude
-  // Code has answered, both work, with Claude Code.
+  // 4. Claude Code's detection held beyond Hive's wait: nothing is decided from a guess. A new conversation of the
+  // Assistant switched back to Claude Code and an agent added with no connection are refused ("still looking"), nothing
+  // starts and no agent is added; once Claude Code has answered, both work, with Claude Code.
   ;({ app, page, inv } = await launchHeld({ HIVE_TEST_SLOW_DETECT: 'claude-code=9000', HIVE_TEST_DETECT_WAIT_MS: '1500' }))
   await lib.openWorkspace(inv, page, ws)
   home = (await inv('workspace:refresh')).assistant.path
-  await inv('settings:update', { assistant: { provider: '' } })
   const refused = await inv('session:start', home, { agentId: 'assistant' }).then(
     (st) => `started ${st.provider}`,
     (e) => String(e.message)
@@ -121,7 +126,7 @@ const check = (name, ok, extra = '') => {
     (d) => `added ${d.provider}`,
     (e) => String(e.message)
   )
-  check('an agent following Automatic is refused too, and none is added', /still looking for/.test(addRefused) && (await agentsNow()).length === before, `${addRefused}; ${before} → ${(await agentsNow()).length}`)
+  check('an agent added with no connection is refused too, and none is added', /still looking for/.test(addRefused) && (await agentsNow()).length === before, `${addRefused}; ${before} → ${(await agentsNow()).length}`)
   await lib.waitForProvider(inv, 'claude-code', 20000)
   const fresh = await inv('session:start', home, { agentId: 'assistant' })
   check('once Claude Code has answered, a new conversation runs Claude Code', fresh.provider === 'claude-code', fresh.provider)
@@ -171,13 +176,13 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(inv, page, ws)
   home = (await inv('workspace:refresh')).assistant.path
   await lib.waitForProvider(inv, 'codex')
-  await inv('settings:update', { assistant: { provider: 'codex' } })
+  await assistantOn('codex')
   const held = async () => (await inv('provider:info'))['claude-code']?.checking
   const codexNew = await inv('session:start', home, { agentId: 'assistant' }).then(
     (st) => st.provider,
     (e) => String(e.message)
   )
-  check('with Claude Code still being looked for, past the wait, the Assistant set to Codex starts a Codex conversation', codexNew === 'codex' && (await held()), `${codexNew}; Claude Code checking: ${await held()}`)
+  check('with Claude Code still being looked for, past the wait, the Assistant switched to Codex starts a Codex conversation', codexNew === 'codex' && (await held()), `${codexNew}; Claude Code checking: ${await held()}`)
   await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 30000)
   await inv('session:stop', home, 'assistant')
   await lib.until(async () => !(await live()), 20000)

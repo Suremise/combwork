@@ -1074,7 +1074,7 @@ export function SettingsView() {
               </p>
               {g.id === 'workflow' && <WorkflowDefaultsTabs rows={g.items} searching={!!query.trim() || modifiedOnly} />}
               {g.id !== 'workflow' && g.items.map((d) => {
-                const modified = (d.type !== 'custom' || ['defaultModel', 'defaultEffort', 'defaultProvider', 'modelFallback', 'effortFallback'].includes(d.key)) && getValue(settings, d) !== defaultValue(d)
+                const modified = (d.type !== 'custom' || ['defaultModel', 'defaultEffort', 'modelFallback', 'effortFallback'].includes(d.key)) && getValue(settings, d) !== defaultValue(d)
                 return d.untitled && g.items.length === 1 ? (
                   <div key={`${d.section}.${d.key}`} className="setting wide" data-setting={d.id}>
                     <div className="s-text">{d.render?.()}</div>

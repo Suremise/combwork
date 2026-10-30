@@ -550,7 +550,7 @@ describe('undo, round 3: implicit effects, permission at the write, retention (#
     expect(await agent('p1')).toMatchObject({ provider: 'claude-code', connection: before.connection, lastSessionId: 'conv-1' })
     // None of its own (from before 0.2): back on the CLI it ran, pinned (HI-2106, decision A: none is inherited).
     await addAgent('p2')
-    const ran = agentProvider(await agent('p2'), null, config.settings)
+    const ran = agentProvider(await agent('p2'), config.settings)
     const second = newMessage()
     await changeAgent('p2', { provider: 'codex' })
     await userUndo(w, { group: second })

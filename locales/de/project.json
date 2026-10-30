@@ -175,6 +175,7 @@
   "project.empty.markActive": "Markiere dieses Projekt als eines, an dem du arbeitest, um Sitzungen auszuführen und den Status zu sehen. Du kannst auch direkt eine Sitzung starten.",
   "project.empty.markWorking": "Als aktiv markieren",
   "project.empty.noAccount": "In diesem Arbeitsbereich ist kein Konto eingeschaltet – Einstellungen → Konten & Verbindungen",
+  "project.empty.noCli": "Bei keinem hier eingeschalteten Konto ist die Coding-Agent-CLI installiert – Hilfe → Anbieter-Einrichtung",
   "project.empty.noAgents": "Noch keine Agenten",
   "project.empty.noSession": "Keine Sitzung läuft",
   "project.empty.notActive": "Projekt {project} ist nicht aktiv",

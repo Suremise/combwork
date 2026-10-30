@@ -2167,6 +2167,10 @@
     "defaultMessage": "{reason, select, blocked {{card} is blocked} hold {{card} is On Hold} you {waiting for you ({ask, select, approve {approval} decide {a decision} test {a test} signIn {a sign-in} other {an answer}}): {card}} roundLimit {waiting for you: {card} reached its round limit} notMerged {waiting: {card} not merged} merging {waiting: {card} merging} stale {stale: {card} must be submitted again} reviewer {waiting for a reviewer on {card}} lineUpdate {waiting: bringing the builder’s branch up to date before {card}} hooks {paused: {agent}'s hooks aren't arriving} checkCopy {waiting for a check copy for {card}} slot {waiting for a slot} other {list changes after {card}}}",
     "description": "Why a lane (a builder and its reviewer working through cards) waits, in its header in the Progress panel, lower case. {card} is a card's name (its key, such as HI-12). reason: blocked or On Hold (a board column); waiting for the user (ask: for their approval, a decision, a test, a sign-in or another answer); at its round limit (the user decides how to go on); a card passed but not merged yet (or merging now), so the next can't start (one card at a time); its pass is stale (the builder must submit again); nobody reviews it; Hive brings the builder's branch up to date before that card (after a squash merge, #1271); hooks: the agent {agent} (a name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so the lane is paused; checkCopy: its review or check waits for a check copy (a folder Hive keeps at one revision for a review or an isolated check) to be free; slot: every slot (a working folder Hive lends to a card or a lane) is in use, so the lane can't start until one is free; changes to the lane's list of cards apply once that card is done (other). Keep the select keys. Glossary: lane, round limit, stale."
   },
+  "board.lanes.waitsDependency": {
+    "defaultMessage": "{card} waits to start: it waits for {dependency} to merge",
+    "description": "Why a lane waits, in its header in the Progress panel (HI-2129): its card {card} (its key, such as HI-12) is due to start, but it depends on the card {dependency} (its key, such as HI-11), which isn't merged (Done) yet, and the project's workflow starts a card only once the cards it depends on are. Hive starts it once that card is merged. The lane isn't paused."
+  },
   "board.lanes.waitsFresh": {
     "defaultMessage": "waiting: {agent} starts in a new conversation once it is free",
     "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-2034): its agent {agent} (an agent's name) was busy as the lane started (in a turn, or reading a message), so Hive starts it in a new conversation with the lane's brief once it is free. The lane isn't paused."
@@ -3391,6 +3395,10 @@
     "defaultMessage": "{status}. Choose it once it's idle.",
     "description": "Under a busy agent in the Start dialog, which can't take the card yet: what it is doing ({status}: \"Working\")."
   },
+  "board.start.checkingConnection": {
+    "defaultMessage": "Finding out which coding agents are installed, to choose the first connection that can run…",
+    "description": "Under the new agent's choice of connection in the Start dialog (HI-2121) while Hive still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Start waits until then."
+  },
   "board.start.idle": {
     "defaultMessage": "{status}: gets the card as its next message.",
     "description": "Under an idle agent in the Start dialog: what it is doing ({status}: \"Ready\", \"Finished\"), and that the card is typed to it next."
@@ -3427,17 +3435,9 @@
     "defaultMessage": "OK",
     "description": "Button: closes the Start dialog of a card that has no project."
   },
-  "board.start.projectDefault": {
-    "defaultMessage": "Project default ({provider})",
-    "description": "The Start dialog's provider choice: the project's default CLI ({provider}, its name)."
-  },
   "board.start.projectGone": {
     "defaultMessage": "{project} isn't a project in this workspace.",
     "description": "Why a card can't start: its project ({project}) isn't in the workspace."
-  },
-  "board.start.provider": {
-    "defaultMessage": "Provider",
-    "description": "A field label in the Start dialog: the new agent's CLI (Claude Code, Codex…)."
   },
   "board.start.providerOff": {
     "defaultMessage": "{provider} is turned off.",

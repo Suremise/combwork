@@ -707,6 +707,10 @@
     "defaultMessage": "No agents yet",
     "description": "Heading of the Session tab of a project with no agents, and the tooltip of its status badge."
   },
+  "project.empty.noCli": {
+    "defaultMessage": "No account on here has its coding agent CLI installed — Help → Provider Setup",
+    "description": "Warning on the Session tab of a project with no agents (HI-2132): accounts are on in this workspace, but none of their CLIs (Claude Code, Codex…) is installed, so a new agent can't run. Help → Provider Setup is the menu item."
+  },
   "project.empty.noSession": {
     "defaultMessage": "No session running",
     "description": "Heading of the Session tab when its one agent has no session running."

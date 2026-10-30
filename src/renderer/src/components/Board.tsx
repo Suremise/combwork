@@ -1,12 +1,12 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { AgentInfo, ArchiveBatch, BoardColumnId, BoardFold, ProjectInfo, ProviderId, StoredText, TaskCard, TaskColumn, TaskDecision, TaskPatch, TaskStartTarget } from '@shared/types'
+import type { AgentInfo, ArchiveBatch, BoardColumnId, BoardFold, ProjectInfo, StoredText, TaskCard, TaskColumn, TaskDecision, TaskPatch, TaskStartTarget } from '@shared/types'
 import { BUSY, BY_TEXT, storedLineText } from '@shared/taskHistory'
 import { gitProblemText } from '@shared/gitTool'
 import { agentRuntime, hooksMissingText } from '@shared/runtime'
 import { LOOP_STEP_WAIT_MINUTES } from '@shared/lanes'
 import { projectInfoPreferences } from '@shared/workflow/preferences'
 import { COLUMN_TEXT, REVIEW_WAIT_STALL_MS, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, backgroundTaskMinutes, builderJobOf, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stallAgentOf, stalledReason, startFailedReason, taskOverview, type BoardFoldChange, type LaneOrderView } from '@shared/tasks'
-import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
+import { isProviderEnabled, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { NO_PROJECTS, agentProviderOf, cardHasActivity, cardLabelOf, choose, confirm, findProject, get, loadTasks, notify, openCardActivity, prompt, revealAgent, set, setProjectTab, showView, useDateStyle, useLanguage, useStore, wantFullArchive, type ArchiveAllRequest, type DoingRequest } from '../store'
@@ -40,6 +40,7 @@ import { readOnlyReason } from './BoardUpgrade'
 import { SET_ASIDE_ITEM } from './SetAside'
 import { useNow } from '../usage'
 import { ProviderIcon } from './ProviderIcon'
+import { cliReadyOf, ConnectionChoice, firstReadyConnection, offeredConnections, useConnections } from './ConnectionChoice'
 import { CardCostLine } from './CardCost'
 import { useLaneOf, useLanes } from '../laneSource'
 import { DocRefViewer, problemLines } from './DocRefViewer'
@@ -2364,36 +2365,49 @@ function useStartPick(project: ProjectInfo | null) {
   const worktreeWhy = !project ? null : gitProblem ? `${gitProblem}.` : project.isGitRepo ? null : tr(msg({ id: 'board.start.notGit', defaultMessage: 'The project is not a git repository.', description: 'Why a card cannot start on a new agent in its own worktree (the Start dialog): the project has no git repository.' }))
   const [choice, setChoice] = useState<StartChoice | null>(null)
   const [name, setName] = useState('')
-  const [provider, setProvider] = useState<ProviderId | ''>('')
-  const usable = (a: AgentInfo): boolean => !!project && freeAgent(a) && isProviderEnabled(settings, agentProviderOf(project, a))
+  // A new agent's connection (HI-2121, decision A): its id, the first usable in the order of accounts until the user
+  // chooses one; '' while none is (yet). Its CLI follows from it, as in Add Agent.
+  const [connection, setConnection] = useState('')
+  const [connectionChosen, setConnectionChosen] = useState(false)
+  const view = useConnections()
+  const providers = useStore((s) => s.providers)
+  const firstReady = firstReadyConnection(view, settings, cliReadyOf(providers))
+  useEffect(() => {
+    if (!connectionChosen) setConnection(firstReady.id ?? '')
+  }, [connectionChosen, firstReady.id])
+  const usable = (a: AgentInfo): boolean => !!project && freeAgent(a) && isProviderEnabled(settings, agentProviderOf(a))
   /** Back to the first choice: the card's own agent if it can take it, else the first that can, else a new agent. */
   const reset = (agentId: string | null): void => {
     const mine = agentId && project ? project.agents.find((a) => a.id === agentId) : null
     const first = mine && usable(mine) ? mine : project?.agents.find(usable)
     setChoice(first ? { kind: 'agent', id: first.id } : { kind: 'new' })
     setName('')
-    setProvider('')
+    setConnectionChosen(false)
+    setConnection(firstReady.id ?? '')
   }
+  const chooseConnection = (id: string): void => {
+    setConnectionChosen(true)
+    setConnection(id)
+  }
+  // A new agent waits for the automatic choice while connections are offered here (Add Agent's rule, HI-2108 round 2);
+  // with none offered at all, main picks as before accounts.
+  const unresolved = !connection && offeredConnections(view, settings).length > 0
   const chosen = choice?.kind === 'agent' ? (project?.agents.find((a) => a.id === choice.id) ?? null) : null
-  const ready = !!project && !!choice && (choice.kind === 'agent' ? !!chosen && usable(chosen) : choice.kind === 'new' || !worktreeWhy)
+  const ready = !!project && !!choice && (choice.kind === 'agent' ? !!chosen && usable(chosen) : !unresolved && (choice.kind === 'new' || !worktreeWhy))
   const target = (): TaskStartTarget =>
-    choice?.kind === 'agent' ? { kind: 'agent', agentId: choice.id } : { kind: 'new-agent', worktree: choice?.kind === 'worktree', name: name.trim() || undefined, provider: provider || undefined }
-  return { settings, choice, setChoice, name, setName, provider, setProvider, reset, ready, target, worktreeWhy }
+    choice?.kind === 'agent' ? { kind: 'agent', agentId: choice.id } : { kind: 'new-agent', worktree: choice?.kind === 'worktree', name: name.trim() || undefined, connection: connection || undefined }
+  return { settings, choice, setChoice, name, setName, connection, chooseConnection, checking: !connection && firstReady.checking, reset, ready, target, worktreeWhy }
 }
 
 type StartPick = ReturnType<typeof useStartPick>
 
 function StartChoices({ project, pick }: { project: ProjectInfo; pick: StartPick }) {
-  const { settings, choice, setChoice, name, setName, provider, setProvider, worktreeWhy } = pick
-  const providers = enabledProviders(settings)
-  // Automatic's default follows what's installed (#474): shown again when that changes.
-  useStore((s) => s.providers)
-  const def = projectDefaultProvider(project.config, settings)
+  const { settings, choice, setChoice, name, setName, connection, chooseConnection, checking, worktreeWhy } = pick
   return (
     <>
       <div className="choice-list">
         {project.agents.map((a) => {
-          const p = agentProviderOf(project, a)
+          const p = agentProviderOf(a)
           const enabled = isProviderEnabled(settings, p)
           const ok = enabled && freeAgent(a)
           return (
@@ -2439,15 +2453,13 @@ function StartChoices({ project, pick }: { project: ProjectInfo; pick: StartPick
         <div className="agent-form nested">
           <label>{tr(msg({ id: 'board.start.name', defaultMessage: 'Name', description: "A field label in the Start dialog: the new agent's name." }))}</label>
           <input className="input" placeholder={tr(msg({ id: 'board.start.namePlaceholder', defaultMessage: 'Default: Agent n', description: "Placeholder of the new agent's name in the Start dialog: left empty, it is named Agent and a number." }))} value={name} onChange={(e) => setName(e.target.value)} />
-          <label>{tr(msg({ id: 'board.start.provider', defaultMessage: 'Provider', description: "A field label in the Start dialog: the new agent's CLI (Claude Code, Codex…)." }))}</label>
-          <select className="select" value={provider} onChange={(e) => setProvider(e.target.value as ProviderId)}>
-            <option value="">{tr(msg({ id: 'board.start.projectDefault', defaultMessage: 'Project default ({provider})', description: "The Start dialog's provider choice: the project's default CLI ({provider}, its name)." }), { provider: providerName(def) })}</option>
-            {providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          {/* Its connection holds its model, effort, context and mode; its CLI follows from it (HI-2121). */}
+          <ConnectionChoice id="start-agent-connection" value={connection} onChange={chooseConnection} />
+          {checking && (
+            <div className="hint span2" data-connection-checking>
+              <Icon name="loading" spin /> {tr(msg({ id: 'board.start.checkingConnection', defaultMessage: 'Finding out which coding agents are installed, to choose the first connection that can run…', description: "Under the new agent's choice of connection in the Start dialog (HI-2121) while Hive still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Start waits until then." }))}
+            </div>
+          )}
         </div>
       )}
     </>

@@ -9,7 +9,7 @@ import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
-import { PROVIDERS, agentProvider, isKnownProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
+import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
 import { publicReason, UNDO_FINAL, type ActivityAgent, type ActivityKind, type ActivityTarget } from '../shared/assistantActivity'
@@ -519,7 +519,7 @@ async function projectSummary(p: string) {
     agents: info.agents.map((a) => ({
       id: a.id,
       name: a.name,
-      provider: a.live?.provider ?? agentProvider(a, info.config, config.settings),
+      provider: a.live?.provider ?? agentProvider(a, config.settings),
       // Its role in the workflow (#1430): its own, else the guess from its note or name.
       workflowRole: agentWorkflowRole(a),
       // Where it works now (#1451): its running session's folder, else where a new conversation would start, short (a
@@ -541,7 +541,7 @@ async function projectSummary(p: string) {
       // The guidance and skill revisions it launched with (compare with GET /v1/status's to spot an old launch).
       launched: a.live?.launched ?? null,
       // Its connection (HI-1771, for a CLI with connections): the one chosen (null: the default), the one its run is on, and a switch waiting.
-      ...agentConnectionFields(p, a, a.live?.provider ?? agentProvider(a, info.config, config.settings))
+      ...agentConnectionFields(p, a, a.live?.provider ?? agentProvider(a, config.settings))
     })),
     // Its builder and reviewer pairs (#1531): its running lanes', then by name; empty without either.
     pairs: workflowPairs(info.agents, await lanes.listLanes(workspaceOf(p), { project: basename(p) }).catch(() => [])),
@@ -1711,7 +1711,7 @@ async function agentActivity(p: string, agentId: string, detail = false) {
   const place = await agentPlace(p, a, st ? { cwd: st.cwd } : null)
   const folder = place.now.path
   const typed = sessions.userTypedAt(p, agentId)
-  const provider = st?.provider ?? agentProvider(a, info.config, config.settings)
+  const provider = st?.provider ?? agentProvider(a, config.settings)
   // What was left for it (#530, #647): unread and overdue, and its latest deliveries with their states and times.
   const inbox = await deliveryView(p, agentId, detail ? 20 : 5)
   // The model and effort it runs with, and its time waiting for its CLI to retry a throttled or failed request (HI-1996):
@@ -2521,7 +2521,7 @@ async function handoverAuthor(body: any): Promise<HandoverAuthor | null> {
     const a = projectAgents(cfg).find((x) => x.id === body.agent)
     if (!a) return null
     const st = sessions.liveFor(p, a.id)
-    return { author: `${a.name} (${providerName(st?.provider ?? agentProvider(a, cfg, config.settings))})`, session: st?.sessionId || undefined }
+    return { author: `${a.name} (${providerName(st?.provider ?? agentProvider(a, config.settings))})`, session: st?.sessionId || undefined }
   } catch {
     return null
   }
@@ -3568,19 +3568,24 @@ route('POST', '/v1/tasks/:n/ask-assistant', async ({ params, body }) => {
 
 // An agent starting a card itself runs its start intent (#1267); the Assistant starts a card on an agent.
 route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
-  requireWorkspace()
+  const ws = requireWorkspace()
   if (agentCaller()) return cardIntent(params[0], { kind: 'start' })
   const n = taskNumber(params[0])
   const card = await tasks.readTask(n, await taskActor())
   // 1.0 (#1451): no agent gets a worktree of its own: asking for one is refused, never ignored.
   if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, NOT_PINNED)
+  // A new agent's connection (HI-2121, as hive_add_agent's: decisions A and D): the one named, else the first usable here.
+  if (body?.agent && body?.connection !== undefined) throw new HttpError(400, 'connection is for a new agent: an existing agent runs on its own (hive_update_agent changes it).')
+  const conn = !body?.agent && card.project && ws.path ? connectionArg(body, join(ws.path, card.project)) : undefined
+  // Decision D (HI-2108): provider, model, effort, mode and context are a connection's now, refused naming those there.
+  refuseOldFields(body, getConnection(conn?.connection)?.account ?? firstUsableAccount(ws.path ? ws.config : null)?.id)
+  if (conn?.cli && !isProviderEnabled(config.settings, conn.cli)) throw new HttpError(409, `${providerName(conn.cli)} is turned off in Settings → Providers.`)
   const target: TaskStartTarget = body?.agent
     ? { kind: 'agent', agentId: String(body.agent) }
-    : { kind: 'new-agent', name: body?.name ? String(body.name) : undefined, provider: body?.provider && isKnownProvider(String(body.provider)) ? (String(body.provider) as ProviderId) : undefined }
+    : { kind: 'new-agent', name: body?.name ? String(body.name) : undefined, ...(conn?.connection ? { connection: conn.connection } : {}) }
   // The agent it is started on, when it exists (a new one is named once added).
   const named = target.kind === 'agent' ? await knownAgent(card.project, target.agentId) : undefined
   return assistantChange('agents', `start ${cardRef(n)} ${target.kind === 'agent' ? `on ${named?.name ?? 'an agent'}` : 'on a new agent'}${card.project ? ` in ${card.project}` : ''}`, { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async () => {
-    if (target.kind === 'new-agent' && body?.provider && !isKnownProvider(String(body.provider))) throw new HttpError(400, `Unknown provider "${body.provider}". hive_list_providers lists them.`)
     const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined)
     return {
       done: `Started ${cardRef(n)} on ${r.added ? 'a new agent, ' : ''}${r.agentName} in ${card.project}: ${clip(card.title, 80)}`,
@@ -3782,7 +3787,7 @@ async function progressCallerIn(workspacePath: string): Promise<ProgressCaller> 
   if (a) {
     const cfg = await workspace.projectConfig(a.projectPath)
     const def = projectAgents(cfg).find((x) => x.id === a.agentId)
-    return { source: 'agent', workspacePath, projectPath: a.projectPath, agentId: a.agentId, agentName: def?.name ?? a.agentId, provider: def ? agentProvider(def, cfg, config.settings) : null }
+    return { source: 'agent', workspacePath, projectPath: a.projectPath, agentId: a.agentId, agentName: def?.name ?? a.agentId, provider: def ? agentProvider(def, config.settings) : null }
   }
   if (assistantCaller()) {
     const live = sessions.liveFor(join(workspacePath, HIVE_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID)

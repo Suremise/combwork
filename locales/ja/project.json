@@ -175,6 +175,7 @@
   "project.empty.markActive": "セッションを実行して状態を確認するには、このプロジェクトを作業中にしてください。セッションを直接開始することもできます。",
   "project.empty.markWorking": "作業対象にする",
   "project.empty.noAccount": "このワークスペースで有効なアカウントがありません（「設定」→「アカウントと接続」）",
+  "project.empty.noCli": "ここで有効なアカウントのコーディングエージェントCLIがどれもインストールされていません（「ヘルプ」→「プロバイダーのセットアップ」）",
   "project.empty.noAgents": "エージェントはまだいません",
   "project.empty.noSession": "実行中のセッションはありません",
   "project.empty.notActive": "{project}はアクティブではありません",
