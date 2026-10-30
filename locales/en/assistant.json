@@ -1976,7 +1976,7 @@
     "description": "A disclosure in the Connections section (HI-2109): opens a connection choice for each agent, over its role's."
   },
   "assistant.templateConnections.roleChoice": {
-    "defaultMessage": "Its role's",
+    "defaultMessage": "Same as its role",
     "description": "The first choice of an agent's own connection (Per agent, HI-2109): it takes the connection chosen for its role."
   },
   "assistant.templateConnections.roleRow": {

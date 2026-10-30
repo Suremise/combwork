@@ -493,7 +493,7 @@
   "assistant.templateConnections.label": "Conexão para {who}",
   "assistant.templateConnections.none": "Ainda não há nenhuma conexão utilizável neste espaço de trabalho: os agentes recebem uma assim que você adicionar uma conta em Configurações → Contas e conexões.",
   "assistant.templateConnections.perAgent": "Por agente",
-  "assistant.templateConnections.roleChoice": "A do papel dele",
+  "assistant.templateConnections.roleChoice": "Igual ao papel dele",
   "assistant.templateConnections.roleRow": "{role, select, builder {Executores} reviewer {Revisores} either {Ambos} other {Generalistas}}",
   "assistant.templateConnections.same": "A mesma para todos",
   "assistant.templateConnections.suggests": "sugere {cli}",

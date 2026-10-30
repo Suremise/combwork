@@ -493,7 +493,7 @@
   "assistant.templateConnections.label": "Verbindung für {who}",
   "assistant.templateConnections.none": "In diesem Arbeitsbereich ist noch keine Verbindung verwendbar: Agenten bekommen eine, sobald du ein Konto in Einstellungen → Konten & Verbindungen hinzufügst.",
   "assistant.templateConnections.perAgent": "Pro Agent",
-  "assistant.templateConnections.roleChoice": "Die seiner Rolle",
+  "assistant.templateConnections.roleChoice": "Wie seine Rolle",
   "assistant.templateConnections.roleRow": "{role, select, builder {Bearbeiter} reviewer {Reviewer} either {Beides} other {Generalisten}}",
   "assistant.templateConnections.same": "Für alle gleich",
   "assistant.templateConnections.suggests": "schlägt {cli} vor",

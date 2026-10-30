@@ -506,7 +506,7 @@
   "assistant.templateConnections.label": "Connection for {who}",
   "assistant.templateConnections.none": "No connection is usable in this workspace yet: agents get one once you add an account in Settings → Accounts & Connections.",
   "assistant.templateConnections.perAgent": "Per agent",
-  "assistant.templateConnections.roleChoice": "Its role's",
+  "assistant.templateConnections.roleChoice": "Same as its role",
   "assistant.templateConnections.roleRow": "{role, select, builder {Builders} reviewer {Reviewers} either {Either} other {Generalists}}",
   "assistant.templateConnections.same": "Same for all",
   "assistant.templateConnections.suggests": "suggests {cli}",

@@ -493,7 +493,7 @@
   "assistant.templateConnections.label": "Połączenie dla: {who}",
   "assistant.templateConnections.none": "W tym obszarze roboczym nie ma jeszcze żadnego używalnego połączenia: agenci dostaną je, gdy dodasz konto w Ustawienia → Konta i połączenia.",
   "assistant.templateConnections.perAgent": "Dla każdego agenta",
-  "assistant.templateConnections.roleChoice": "Połączenie jego roli",
+  "assistant.templateConnections.roleChoice": "Tak jak jego rola",
   "assistant.templateConnections.roleRow": "{role, select, builder {Wykonawcy} reviewer {Recenzenci} either {Dowolna} other {Generaliści}}",
   "assistant.templateConnections.same": "To samo dla wszystkich",
   "assistant.templateConnections.suggests": "sugeruje {cli}",

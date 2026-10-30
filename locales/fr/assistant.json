@@ -493,7 +493,7 @@
   "assistant.templateConnections.label": "Connexion pour {who}",
   "assistant.templateConnections.none": "Aucune connexion n’est encore utilisable dans cet espace de travail : les agents en recevront une dès que tu ajouteras un compte dans Paramètres → Comptes et connexions.",
   "assistant.templateConnections.perAgent": "Par agent",
-  "assistant.templateConnections.roleChoice": "Celle de son rôle",
+  "assistant.templateConnections.roleChoice": "Comme son rôle",
   "assistant.templateConnections.roleRow": "{role, select, builder {Auteurs} reviewer {Relecteurs} either {Les deux} other {Généralistes}}",
   "assistant.templateConnections.same": "La même pour tous",
   "assistant.templateConnections.suggests": "suggère {cli}",

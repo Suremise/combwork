@@ -493,7 +493,7 @@
   "assistant.templateConnections.label": "{who} 的连接",
   "assistant.templateConnections.none": "此工作区中还没有可用的连接：在“设置 → 账户与连接”中添加账户后，智能体就会获得连接。",
   "assistant.templateConnections.perAgent": "按智能体",
-  "assistant.templateConnections.roleChoice": "其角色的连接",
+  "assistant.templateConnections.roleChoice": "与其角色相同",
   "assistant.templateConnections.roleRow": "{role, select, builder {构建者} reviewer {评审者} either {均可} other {通才}}",
   "assistant.templateConnections.same": "全部相同",
   "assistant.templateConnections.suggests": "建议 {cli}",
