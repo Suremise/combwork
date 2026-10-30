@@ -222,7 +222,13 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
       await dlg.getByRole('button', { name: 'End It', exact: true }).click()
       return !!(await until(async () => !alive(pid) && !(await procsB()).some((i) => i.process.pid === pid), HUNG_MS))
     }
-    // B has no lanes: its band shows all the same, with End It on its own.
+    // B has no lanes: its band shows all the same, with End It on its own (its screenshots without the leftovers' toasts).
+    const toastClose = pageB.locator('.toast .icon-btn[aria-label="Dismiss"]')
+    await until(async () => {
+      if ((await toastClose.count()) === 0) return true
+      await toastClose.first().click().catch(() => undefined)
+      return false
+    }, HUNG_MS)
     if (await until(async () => (await bandB.getByRole('button', { name: 'End It…' }).count()) === 2, HUNG_MS))
       for (const theme of ['dark', 'light']) {
         await invB('settings:update', { appearance: { theme } })
