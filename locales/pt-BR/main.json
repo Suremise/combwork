@@ -36,6 +36,7 @@
   "main.branchMerge.notBranch": "{branch} não é um branch local do projeto.",
   "main.branchMerge.same": "Não dá para fazer merge de {branch} nele mesmo.",
   "main.connections.badMode": "O {cli} não tem o modo de permissão {mode}.",
+  "main.connections.beingRemoved": "{name} já está sendo removida.",
   "main.connections.choice.missing": "A conexão escolhida para o agente {agent} não existe mais. Escolha outra ou a padrão do espaço de trabalho.",
   "main.connections.choice.off": "{name} não está ativada neste espaço de trabalho. Ative-a em Configurações → Contas e conexões ou escolha outra para o agente {agent}.",
   "main.connections.choice.otherCli": "{name} é de outra CLI, não da CLI do agente {agent}. Escolha uma da CLI dele.",

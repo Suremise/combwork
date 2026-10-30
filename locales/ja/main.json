@@ -36,6 +36,7 @@
   "main.branchMerge.notBranch": "{branch}はプロジェクトのローカルブランチではありません。",
   "main.branchMerge.same": "{branch}を自分自身にマージすることはできません。",
   "main.connections.badMode": "{cli}には権限モード{mode}がありません。",
+  "main.connections.beingRemoved": "{name}はすでに削除中です。",
   "main.connections.choice.missing": "{agent}に選ばれた接続はもうありません。別の接続かワークスペースの既定を選んでください。",
   "main.connections.choice.off": "{name}はこのワークスペースでは有効になっていません。「設定」→「アカウントと接続」で有効にするか、{agent}に別の接続を選んでください。",
   "main.connections.choice.otherCli": "{name}は{agent}とは別のCLI用です。{agent}のCLIの接続を選んでください。",

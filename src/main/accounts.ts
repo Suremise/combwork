@@ -1,21 +1,21 @@
 import { randomBytes } from 'crypto'
-import { join, resolve, sep } from 'path'
+import { basename, join, resolve, sep } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
 import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, LaunchValues, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
 import { HIVE_DIR } from '../shared/defaults'
-import { readKeptJson } from './fsutil'
+import { readKeptJson, withFileLock } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
 import { acceptable, accountState, baseConnection, connectionsOn, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, resolveConnection, topOfOrder, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { ASSISTANT_NAME } from '../shared/assistant'
 import { profileFolder } from '../shared/appName'
-import { agentProvider, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS } from '../shared/providers'
+import { agentProvider, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS } from '../shared/providers'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { advanced } from './advanced'
 import { config } from './config'
 import { emit, onHiveEvent } from './events'
-import { hiveError } from './hiveError'
+import { capturedText, hiveError, HiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { connectionLoginChanged, forgetConnectionUsage, usageLogin } from './planUsage'
 import { childEnv, hasPty, killPty, ptyGone } from './ptyHost'
@@ -26,7 +26,7 @@ import { git } from './git'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
 import { modelCaps } from '../shared/models'
-import { openWorkspaces, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
+import { openWorkspaces, setConnectionGuard, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
 import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStore'
 import { coverageView } from './keyCoverage'
 import { aliasModels, MODEL_ALIASES, originOf, parseBaseUrl, serverDefaultModel, withRemote } from '../shared/serverConnection'
@@ -222,7 +222,7 @@ const generation = (id: string): number => generations.get(id) ?? 0
 // ---------------------------------------------------------------------------
 
 /** For tests: run before each delete of a removal (with the folder it is in), to change the folder meanwhile. */
-export const accountTestHooks: { beforeDelete?: (dir: string) => Promise<void>; beforeOrderRead?: () => Promise<void> } = {}
+export const accountTestHooks: { beforeDelete?: (dir: string) => Promise<void>; beforeOrderRead?: () => Promise<void>; beforeUsersRead?: () => Promise<void> } = {}
 
 /** Why a folder can't be used or removed safely, in English (the log and `leftover`), with the text for the user. */
 class Unsafe extends Error {}
@@ -548,6 +548,7 @@ const NO_CONNECTION_NAME = msg({ id: 'main.connections.noName', defaultMessage: 
 const NAME_TAKEN = msg({ id: 'main.connections.nameTaken', defaultMessage: '{account} already has a connection named {name}. Choose another name.', description: 'An error saving a connection (Settings → Accounts & Connections, HI-2107): another connection on the same account ({account}, its name) has this name ({name}).' })
 const BAD_MODE = msg({ id: 'main.connections.badMode', defaultMessage: "{cli} has no permission mode {mode}.", description: 'An error saving a connection (HI-2107): the permission mode asked for ({mode}, as given) is not one of the coding agent CLI\'s ({cli}: "Codex").' })
 const CONNECTION_IN_USE = msg({ id: 'main.connections.inUse', defaultMessage: 'Still in use, so {name} was kept: {users}. Choose another connection for them first, then remove it.', description: 'An error removing a connection (Settings → Accounts & Connections, HI-2107): agents or the Assistant use it ({users}: their names, listed, each with its project).' })
+const CONNECTION_BEING_REMOVED = msg({ id: 'main.connections.beingRemoved', defaultMessage: '{name} is being removed already.', description: 'An error removing a connection (HI-2107): a removal of it ({name}, its name) is already under way.' })
 const USER_IN = msg({ id: 'main.connections.userIn', defaultMessage: '{agent} ({project})', description: 'One user of a connection in the error refusing its removal (HI-2107): an agent ({agent}) and its project ({project}).' })
 
 function mustConnection(id: string): { c: Connection; a: Account } {
@@ -567,6 +568,9 @@ function savedValues(a: Account, now: LaunchValues, patch: ConnectionPatch): Lau
   for (const k of ['model', 'effort', 'use200kContext', 'permissionMode', 'extraArgs'] as const) if (patch[k] !== undefined) next[k] = patch[k] ?? undefined
   const mode = next.permissionMode as string | undefined
   if (mode && !modeOption(a.provider, mode as LaunchValues['permissionMode'])) throw hiveError(BAD_MODE, { cli: providerDescriptor(a.provider).name, mode }, { kind: 'invalid' })
+  // A bare "--" (#523): Hive passes the task after its own, and a launch refuses it; refused here, before it is saved.
+  const argsProblem = typeof next.extraArgs === 'string' ? capturedText((t) => extraArgsProblem(next.extraArgs as string, t)) : null
+  if (argsProblem) throw new HiveError(argsProblem, { kind: 'invalid' })
   // Kept as the user chose it (a mode the CLI calls its default is still the user's choice), only emptied values dropped.
   const out = launchValues(next as LaunchValues, a.provider, isServer(a))
   if (mode) out.permissionMode = mode as LaunchValues['permissionMode']
@@ -650,12 +654,49 @@ export function connectionUsers(): Map<string, ConnectionUser[]> {
 }
 
 /** Removes a connection (HI-2107): refused while an agent or the Assistant in an open workspace uses it, naming them. */
-export function removeConnection(id: string): void {
+export async function removeConnection(id: string): Promise<void> {
   const { c } = mustConnection(id)
-  const users = connectionUsers().get(id) ?? []
-  if (users.length) throw hiveError(CONNECTION_IN_USE, { name: c.name, users: fmt.list(users.map((u) => (u.assistant ? u.agent : tr(USER_IN, { agent: u.agent, project: u.project })))) }, { kind: 'conflict' })
-  changeConnections((all) => all.splice(0, all.length, ...all.filter((x) => x.id !== id)))
-  log.info(`connection ${id} removed`)
+  if (removing.has(id)) throw hiveError(CONNECTION_BEING_REMOVED, { name: c.name }, { kind: 'conflict' })
+  // Marked first: from here no write gives it to an agent (mutateProjectConfig asks connectionAssignable under each
+  // project's lock), and each project's agents are read as saved, under that lock, never from a window's snapshot. A
+  // write that got in before the mark is either saved by the time its project is read (the lock waits for it) or refused.
+  removing.add(id)
+  try {
+    await accountTestHooks.beforeUsersRead?.()
+    const users = await savedUsers(id)
+    if (users.length) throw hiveError(CONNECTION_IN_USE, { name: c.name, users: fmt.list(users.map((u) => (u.assistant ? u.agent : tr(USER_IN, { agent: u.agent, project: u.project })))) }, { kind: 'conflict' })
+    changeConnections((all) => all.splice(0, all.length, ...all.filter((x) => x.id !== id)))
+    log.info(`connection ${id} removed`)
+  } finally {
+    removing.delete(id)
+  }
+}
+
+/** Connections being removed now: none may be given to an agent meanwhile (HI-2107). */
+const removing = new Set<string>()
+
+/** Whether an agent may be given this connection now: it exists and isn't being removed. */
+export const connectionAssignable = (id: string): boolean => !removing.has(id) && !!getConnection(id)
+
+/**
+ * The agents and Assistants of the open workspaces whose saved project.json names a connection, each file read under
+ * the lock its writes take (mutateProjectConfig's).
+ */
+async function savedUsers(id: string): Promise<ConnectionUser[]> {
+  const out: ConnectionUser[] = []
+  const seen = new Set<string>()
+  for (const w of openWorkspaces()) {
+    if (!w.path) continue
+    const homes = [...(w.info()?.projects ?? []).map((p) => ({ path: p.path, name: p.name, assistant: false })), { path: w.assistantHome, name: basename(w.path), assistant: true }]
+    for (const h of homes) {
+      if (seen.has(h.path.toLowerCase())) continue
+      seen.add(h.path.toLowerCase())
+      const file = join(h.path, HIVE_DIR, 'project.json')
+      const cfg = await withFileLock(file, () => readKeptJson<Partial<ProjectConfig>>(file, {}))
+      for (const a of cfg.agents ?? []) if (a.connection === id) out.push({ projectPath: h.path, project: h.name, agentId: a.id, agent: h.assistant ? ASSISTANT_NAME : (a.name ?? a.id), ...(h.assistant ? { assistant: true as const } : {}) })
+    }
+  }
+  return out
 }
 
 /** Moves a connection to `index` among its account's (HI-2107; 0: its base, what a new agent on the account gets first). */
@@ -1936,6 +1977,8 @@ export const connectionOrderReady = (): Promise<void> => orderReady
 
 /** Returns once the order is final (index.ts waits for it before workspaces open and the Agent API starts). */
 export function initConnections(): Promise<void> {
+  // No agent is given a connection that is gone or being removed (HI-2107).
+  setConnectionGuard(connectionAssignable)
   // The most recent workspace default becomes the top of its CLI's preference order, once (HI-1875); what depends on
   // the order (a launch on a connection, a new workspace's seeding) waits for it.
   const ready = startConnectionOrder()

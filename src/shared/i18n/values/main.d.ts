@@ -38,6 +38,7 @@ interface HiveMessageValues {
   'main.branchMerge.notBranch': { branch: string | number }
   'main.branchMerge.same': { branch: string | number }
   'main.connections.badMode': { cli: string | number; mode: string | number }
+  'main.connections.beingRemoved': { name: string | number }
   'main.connections.choice.missing': { agent: string | number }
   'main.connections.choice.off': { name: string | number; agent: string | number }
   'main.connections.choice.otherCli': { name: string | number; agent: string | number }

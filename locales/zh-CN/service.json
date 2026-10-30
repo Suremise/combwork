@@ -232,6 +232,7 @@
   "service.workspace.agentGone": "该智能体已不存在。",
   "service.workspace.badName": "项目名称不能以“.”开头，也不能包含 {chars}",
   "service.workspace.closed": "工作区已关闭",
+  "service.workspace.connectionGone": "为 {agent} 选择的连接已被移除或正在移除。请另选一个。",
   "service.workspace.folderExists": "已存在名为“{name}”的文件夹",
   "service.workspace.holdsOpen": "在另一个窗口中打开的工作区 {workspace} 位于 {folder} 内。请先关闭它，再将 {name} 作为工作区打开。",
   "service.workspace.insideOpen": "{folder} 位于工作区 {workspace} 内，而该工作区已在另一个窗口中打开。请先关闭那个工作区，或从那里打开此文件夹中的项目。",

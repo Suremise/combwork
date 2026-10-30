@@ -147,6 +147,10 @@
     "defaultMessage": "{cli} has no permission mode {mode}.",
     "description": "An error saving a connection (HI-2107): the permission mode asked for ({mode}, as given) is not one of the coding agent CLI's ({cli}: \"Codex\")."
   },
+  "main.connections.beingRemoved": {
+    "defaultMessage": "{name} is being removed already.",
+    "description": "An error removing a connection (HI-2107): a removal of it ({name}, its name) is already under way."
+  },
   "main.connections.choice.missing": {
     "defaultMessage": "The connection chosen for {agent} no longer exists. Choose another, or the workspace's default.",
     "description": "An error saving an agent's settings (or adding one): the connection chosen for it ({agent}, its name) was removed. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)."

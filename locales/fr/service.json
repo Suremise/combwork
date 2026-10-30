@@ -232,6 +232,7 @@
   "service.workspace.agentGone": "Cet agent n’existe plus.",
   "service.workspace.badName": "Le nom d’un projet ne peut pas commencer par « . » ni contenir {chars}",
   "service.workspace.closed": "L’espace de travail a été fermé",
+  "service.workspace.connectionGone": "La connexion choisie pour {agent} a été supprimée ou est en cours de suppression. Choisis-en une autre.",
   "service.workspace.folderExists": "Un dossier nommé « {name} » existe déjà",
   "service.workspace.holdsOpen": "L’espace de travail {workspace}, ouvert dans une autre fenêtre, se trouve dans {folder}. Ferme-le d’abord pour ouvrir {name} comme espace de travail.",
   "service.workspace.insideOpen": "{folder} se trouve dans l’espace de travail {workspace}, ouvert dans une autre fenêtre. Ferme d’abord cet espace de travail, ou ouvre les projets de ce dossier depuis celui-ci.",

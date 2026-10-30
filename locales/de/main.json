@@ -36,6 +36,7 @@
   "main.branchMerge.notBranch": "{branch} ist kein lokaler Branch des Projekts.",
   "main.branchMerge.same": "{branch} kann nicht in sich selbst gemergt werden.",
   "main.connections.badMode": "{cli} hat keinen Berechtigungsmodus {mode}.",
+  "main.connections.beingRemoved": "{name} wird bereits entfernt.",
   "main.connections.choice.missing": "Die für {agent} gewählte Verbindung gibt es nicht mehr. Wähle eine andere oder den Standard des Arbeitsbereichs.",
   "main.connections.choice.off": "{name} ist in diesem Arbeitsbereich nicht eingeschaltet. Schalte die Verbindung unter Einstellungen → Konten & Verbindungen ein oder wähle eine andere für {agent}.",
   "main.connections.choice.otherCli": "{name} ist für eine andere CLI als die von {agent}. Wähle eine Verbindung für die CLI von {agent}.",

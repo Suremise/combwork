@@ -232,6 +232,7 @@
   "service.workspace.agentGone": "Diesen Agenten gibt es nicht mehr.",
   "service.workspace.badName": "Projektnamen dürfen nicht mit „.“ beginnen oder {chars} enthalten",
   "service.workspace.closed": "Der Arbeitsbereich wurde geschlossen",
+  "service.workspace.connectionGone": "Die für {agent} gewählte Verbindung wurde entfernt oder wird gerade entfernt. Wähle eine andere.",
   "service.workspace.folderExists": "Ein Ordner namens „{name}“ existiert bereits",
   "service.workspace.holdsOpen": "Der Arbeitsbereich {workspace}, der in einem anderen Fenster geöffnet ist, liegt in {folder}. Schließe ihn zuerst, um {name} als Arbeitsbereich zu öffnen.",
   "service.workspace.insideOpen": "{folder} liegt im Arbeitsbereich {workspace}, der in einem anderen Fenster geöffnet ist. Schließe diesen Arbeitsbereich zuerst oder öffne die Projekte dieses Ordners von dort.",
