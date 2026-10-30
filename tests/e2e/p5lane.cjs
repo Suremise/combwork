@@ -88,6 +88,8 @@ const ancestor = (x, y) => {
     await page.keyboard.press('Escape')
     const identity = options?.identity ?? fx.identity
     const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, '-c', `user.email=${identity.email}`, ...args]).trim()
+    /** git for a poll of a slot Hive may be changing: null while it can't be read (HEAD mid-checkout: HI-2103), polled again. */
+    const gitNow = (cwd, ...args) => { try { return git(cwd, ...args) } catch { return null } }
 
     const b1 = await q.agent(fx, h, 'B1')
     const r1 = await q.agent(fx, h, 'R1')
@@ -251,7 +253,7 @@ const ancestor = (x, y) => {
       const started = (await factsOf(n, 'Started')).at(-1)?.data
       if (s.status === 200 && s.body?.data?.folder) {
         wt = s.body.data.folder
-        await waitHung(() => git(wt, 'branch', '--show-current') === s.body.data.line)
+        await waitHung(() => gitNow(wt, 'branch', '--show-current') === s.body.data.line)
       }
       return { s, base: started?.base, line: started?.line }
     }
@@ -381,7 +383,8 @@ const ancestor = (x, y) => {
     let slot3 = null
     const asThree = (now) => !!started3 && !!prep3 && prep3.lease === started3.lease && now.head === prep3.revision && now.status === '' && now.branch === prep3.line
     const settled = await waitHung(async () => {
-      slot3 = { ...worktreeNow(), branch: git(wt, 'branch', '--show-current') }
+      slot3 = { head: gitNow(wt, 'rev-parse', 'HEAD'), status: gitNow(wt, 'status', '--porcelain'), branch: gitNow(wt, 'branch', '--show-current') }
+      if (slot3.head === null || slot3.status === null || slot3.branch === null) return null
       if (slot3.head === two.was.head && slot3.status === two.was.status) return 'untouched'
       started3 = (await factsOf(c3, 'Started')).find((f) => f.actor === 'hive')?.data ?? null
       prep3 = (await factsOf(c3, 'SlotPrepared')).at(-1)?.data ?? null
