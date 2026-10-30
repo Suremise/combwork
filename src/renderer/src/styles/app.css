@@ -4905,6 +4905,7 @@ h2.section#unused-worktrees {
   border-radius: 6px 6px 0 0;
 }
 .connection-list {
+  container: connection-list / inline-size;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -4919,17 +4920,45 @@ h2.section#unused-worktrees {
   align-items: center;
   min-height: 26px;
 }
+/* A list narrower than those minimums (Settings beside the sidebar in a small window, HI-2163): the summary goes under
+   the name, the users column stays 80px, none sized by its text, so the rows stay inside the card and lined up. A
+   narrow window has its own layout (below). */
+@media (min-width: 701px) {
+  @container connection-list (max-width: 439px) {
+    .connection-row {
+      grid-template-columns: minmax(0, 1fr) 80px auto;
+      grid-template-areas: 'name users more' 'summary summary more';
+      row-gap: 0;
+      padding: 2px 0;
+    }
+    .connection-row > .connection-name {
+      grid-area: name;
+    }
+    .connection-row > .connection-summary {
+      grid-area: summary;
+    }
+    .connection-row > .connection-users {
+      grid-area: users;
+    }
+    .connection-row > :last-child {
+      grid-area: more;
+    }
+  }
+}
 .connection-row:hover {
   background: var(--bg-hover);
 }
 .connection-name {
   font-weight: 600;
   display: inline-flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 0 6px;
   align-items: center;
   overflow-wrap: anywhere;
 }
+/* Its First badge goes under a long name rather than breaking (HI-2163). */
 .connection-base {
+  white-space: nowrap;
   font-weight: normal;
   font-size: 11px;
   padding: 0 6px;
