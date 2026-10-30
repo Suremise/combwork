@@ -491,6 +491,14 @@
     "defaultMessage": "Waiting for your input",
     "description": "The notification that an agent waits for the user, when its CLI didn't say what for."
   },
+  "session.orphan.body": {
+    "defaultMessage": "Process {pid}: the shell that started it has exited. Activity lists it, with End It; the agent is told too.",
+    "description": "The notice that an agent left a process running (HI-2111). {pid} is its process id. Activity is a tab of Hive's; End It is a button there."
+  },
+  "session.orphan.title": {
+    "defaultMessage": "{agent} left {command} running for {time}",
+    "description": "A notice's title (HI-2111): a process an agent's command started is still running with the shell that started it gone. {agent} is the agent's name; {command} what the process runs, cut short; {time} how long it has run (\"12 min\")."
+  },
   "session.plan.asking": {
     "defaultMessage": "The agent is asking you something. Answer it first.",
     "description": "Turning Plan mode on or off is refused: the agent waits for the user."

@@ -492,7 +492,7 @@ function Row({ node, selected, onSelect }: { node: ActivityNode; selected: boole
   const sub = node.gone ? tr(M.endedNode) : line
   return (
     <div
-      className={cx('activity-row', `act-${node.kind}`, state && `act-${state}`, node.gone && 'act-gone', selected && 'selected')}
+      className={cx('activity-row', `act-${node.kind}`, state && `act-${state}`, node.kind === 'process' && node.process.orphan && 'act-orphan', node.gone && 'act-gone', selected && 'selected')}
       role="button"
       tabIndex={0}
       aria-pressed={selected}
@@ -545,7 +545,10 @@ function describe(n: ActivityNode): { icon: string; title: string; sub: string; 
     case 'process': {
       const started = filetimeMs(n.process.created)
       // The command as given (HI-1743: a cmd /c wrapper as what it runs); a hive-progress run by its title.
-      return { icon: n.own ? 'terminal' : 'server-process', title: n.process.run ?? commandText(n.process), sub: started ? tr(M.processFor, { pid: n.process.pid, time: ranFor(started) }) : tr(M.process, { pid: n.process.pid }), state: null }
+      const title = n.process.run ?? commandText(n.process)
+      // Left running by its command, its shell gone (HI-2111): said, with how long and its CPU time.
+      if (n.process.orphan) return { icon: 'warning', title, sub: tr(M.orphanFor, { pid: n.process.pid, time: ranFor(started), cpu: durationText(n.process.orphan.cpuMs, tr) }), state: null }
+      return { icon: n.own ? 'terminal' : 'server-process', title, sub: started ? tr(M.processFor, { pid: n.process.pid, time: ranFor(started) }) : tr(M.process, { pid: n.process.pid }), state: null }
     }
   }
 }
@@ -608,10 +611,11 @@ export function Details({ project, node, onClose }: { project: ProjectInfo; node
     case 'process': {
       const started = filetimeMs(node.process.created)
       rows.push([tr(M.pidLabel), String(node.process.pid)])
+      if (node.process.orphan) rows.push([tr(M.orphanLabel), tr(M.orphanFact)], [tr(M.cpuLabel), durationText(node.process.orphan.cpuMs, tr)])
       if (node.process.parent) rows.push([tr(M.parentLabel), String(node.process.parent)])
       if (started) rows.push([tr(M.started), fmt.relative(started - Date.now())])
       input = node.process.command ?? node.process.label
-      if (!node.own && node.process.created) buttons.push(<EndProcessButton key="end" project={project} agentId={node.agentId} pid={node.process.pid} created={node.process.created} label={node.process.label} />)
+      if (!node.own && node.process.created) buttons.push(<EndProcessButton key="end" project={project} agentId={node.agentId} pid={node.process.pid} created={node.process.created} label={node.process.label} orphan={!!node.process.orphan} />)
       break
     }
   }
@@ -651,9 +655,10 @@ export function Details({ project, node, onClose }: { project: ProjectInfo; node
 }
 
 /** Ends one of the agent's own processes, after a confirmation; main checks it is still that agent's, that process. */
-function EndProcessButton({ project, agentId, pid, created, label }: { project: ProjectInfo; agentId: string; pid: number; created: string; label: string }) {
+function EndProcessButton({ project, agentId, pid, created, label, orphan }: { project: ProjectInfo; agentId: string; pid: number; created: string; label: string; orphan?: boolean }) {
   const end = async (): Promise<void> => {
-    const ok = await confirm({ title: tr(M.endTitle), message: tr(M.endMessage, { label, pid }), detail: tr(M.endDetail), confirmLabel: tr(M.endButton), danger: true })
+    // Left running (HI-2111): End It, behind the same question.
+    const ok = await confirm({ title: tr(M.endTitle), message: tr(M.endMessage, { label, pid }), detail: tr(M.endDetail), confirmLabel: orphan ? tr(M.endIt).replace(/…$/, '') : tr(M.endButton), danger: true })
     if (!ok) return
     const r = await actions.attempt(tr(M.endFailed), () => call('activity:endProcess', project.path, agentId, pid, created))
     if (!r) return
@@ -662,7 +667,7 @@ function EndProcessButton({ project, agentId, pid, created, label }: { project: 
   }
   return (
     <button className="btn small danger" onClick={() => void end()}>
-      {tr(M.endButton)}
+      {tr(orphan ? M.endIt : M.endButton)}
     </button>
   )
 }
@@ -731,6 +736,11 @@ const M = {
   openCard: msg({ id: 'activity.openCard', defaultMessage: 'Open Card', description: "A button in the Activity tab's details: opens the card." }),
   showAgent: msg({ id: 'activity.showAgent', defaultMessage: 'Show Agent', description: "A button in the Activity tab's details: shows the agent's terminal." }),
   openSession: msg({ id: 'activity.openSession', defaultMessage: 'Open in Sessions Tab', description: "A button in the Activity tab's details: opens the session's transcript in the Sessions tab." }),
+  orphanFor: msg({ id: 'activity.orphanFor', defaultMessage: 'Left running · process {pid} · running {time} · CPU {cpu}', description: "A process node's second line in the Activity tab when the agent's command left it running, the shell that started it gone (HI-2111): its process id ({pid}), how long it has run ({time}: \"12 min\") and the processor time it has used ({cpu}: \"3 min\")." }),
+  orphanLabel: msg({ id: 'activity.orphanLabel', defaultMessage: 'Left running', description: "A label in the Activity tab's details (HI-2111): the process was left running by the agent's command." }),
+  orphanFact: msg({ id: 'activity.orphanFact', defaultMessage: 'The process that started it has exited, and it has run for over ten minutes. The agent is told; Hive doesn’t end it.', description: "The value beside Left running in the Activity tab's details (HI-2111): why this process counts as left running." }),
+  cpuLabel: msg({ id: 'activity.cpuLabel', defaultMessage: 'CPU time', description: "A label in the Activity tab's details (HI-2111): the processor time a process has used." }),
+  endIt: msg({ id: 'activity.endIt', defaultMessage: 'End It…', description: "A button in the Activity tab's details for a process the agent's command left running (HI-2111): ends it, after a confirmation (…)." }),
   endButton: msg({ id: 'activity.endButton', defaultMessage: 'End Process…', description: "A button in the Activity tab's details: ends this one process of the agent's, after a confirmation (…)." }),
   endTitle: msg({ id: 'activity.endTitle', defaultMessage: 'End this process?', description: 'Title of the confirmation before ending one of an agent\'s processes from the Activity tab.' }),
   endMessage: msg({ id: 'activity.endMessage', defaultMessage: 'End {label} (process {pid})?', description: 'The confirmation before ending one of an agent\'s processes. {label} is what it runs, {pid} its id.' }),

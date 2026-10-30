@@ -194,6 +194,22 @@ else {
     await endHeld(strangerProc)
   }, 60000)
 
+  it("says each running launch's process's parent state (HI-2111): the exited CLI's child is an orphan, the child's own child isn't", async () => {
+    const { launchLineage, launchEnded, settleLeftovers } = await import('../src/main/agentProcesses')
+    const { isOrphan, parseLineage } = await import('../src/main/orphanProcesses')
+    const out = join(dir, 'lineage.txt')
+    await launch('lineage1', out, 'lin')
+    const pids = pidsIn(out)
+    const lineage = parseLineage((await launchLineage(['lineage1']))?.lineage1)
+    const of = (pid: number) => lineage.find((l) => l.pid === pid)
+    expect(of(pids.child)).toBeDefined()
+    expect(isOrphan(of(pids.child)!)).toBe(true)
+    expect(of(pids.grandchild)).toMatchObject({ parent: pids.child })
+    expect(isOrphan(of(pids.grandchild)!)).toBe(false)
+    await launchEnded('lineage1')
+    await settleLeftovers(dir, 'lin', 'end')
+  })
+
   it("measures the memory running agents take (#562): each running launch's processes, summed", async () => {
     const { agentsMemory, launchEnded, trackLaunch } = await import('../src/main/agentProcesses')
     const out = join(dir, 'mem.txt')

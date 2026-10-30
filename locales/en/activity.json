@@ -39,6 +39,10 @@
     "defaultMessage": "{column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
     "description": "A card node's second line in the Activity tree: its board column. Use the board's column names."
   },
+  "activity.cpuLabel": {
+    "defaultMessage": "CPU time",
+    "description": "A label in the Activity tab's details (HI-2111): the processor time a process has used."
+  },
   "activity.details": {
     "defaultMessage": "Details",
     "description": "The Activity tab's details panel, for screen readers."
@@ -62,6 +66,10 @@
   "activity.endFailed": {
     "defaultMessage": "Could not end the process",
     "description": "An error's title: ending a process from the Activity tab failed."
+  },
+  "activity.endIt": {
+    "defaultMessage": "End It…",
+    "description": "A button in the Activity tab's details for a process the agent's command left running (HI-2111): ends it, after a confirmation (…)."
   },
   "activity.endMessage": {
     "defaultMessage": "End {label} (process {pid})?",
@@ -138,6 +146,18 @@
   "activity.openSession": {
     "defaultMessage": "Open in Sessions Tab",
     "description": "A button in the Activity tab's details: opens the session's transcript in the Sessions tab."
+  },
+  "activity.orphanFact": {
+    "defaultMessage": "The process that started it has exited, and it has run for over ten minutes. The agent is told; Hive doesn’t end it.",
+    "description": "The value beside Left running in the Activity tab's details (HI-2111): why this process counts as left running."
+  },
+  "activity.orphanFor": {
+    "defaultMessage": "Left running · process {pid} · running {time} · CPU {cpu}",
+    "description": "A process node's second line in the Activity tab when the agent's command left it running, the shell that started it gone (HI-2111): its process id ({pid}), how long it has run ({time}: \"12 min\") and the processor time it has used ({cpu}: \"3 min\")."
+  },
+  "activity.orphanLabel": {
+    "defaultMessage": "Left running",
+    "description": "A label in the Activity tab's details (HI-2111): the process was left running by the agent's command."
   },
   "activity.parentLabel": {
     "defaultMessage": "Started by process",

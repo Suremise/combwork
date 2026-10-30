@@ -124,6 +124,8 @@ interface HiveMessageValues {
   'session.notice.untakenRetried': undefined
   'session.notice.untakenTitle': { agent: string | number }
   'session.notice.waitingForInput': undefined
+  'session.orphan.body': { pid: string | number }
+  'session.orphan.title': { agent: string | number; command: string | number; time: string | number }
   'session.plan.asking': undefined
   'session.plan.noToggle': { provider: string | number }
   'session.plan.typing': undefined

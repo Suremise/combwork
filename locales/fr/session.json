@@ -122,6 +122,8 @@
   "session.notice.untakenRetried": "Hive l’a tapée et a appuyé deux fois sur Entrée, mais sa CLI ne lisait pas sa saisie. Affiche l’agent, clique dans son terminal et appuie sur Entrée.",
   "session.notice.untakenTitle": "{agent} n’a pas pris une ligne tapée par Hive",
   "session.notice.waitingForInput": "En attente de ta réponse",
+  "session.orphan.body": "Processus {pid} : le shell qui l’a lancé s’est terminé. Activité le liste, avec L’arrêter ; l’agent est prévenu aussi.",
+  "session.orphan.title": "{agent} a laissé {command} en cours depuis {time}",
   "session.plan.asking": "L’agent te pose une question. Réponds-lui d’abord.",
   "session.plan.noToggle": "{provider} n’a pas de bascule pour le mode Plan.",
   "session.plan.typing": "Hive tape une ligne dans cet agent. Réessaie dans un instant.",

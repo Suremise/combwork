@@ -1,12 +1,14 @@
 import { basename } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
+import type { AgentProcess } from '../shared/agentProcesses'
 import type { ParkedItem, TeamPauseState, TeamPauseView } from '../shared/teamPause'
 import type { LiveSessionState } from '../shared/types'
 import { heldSlots } from './agentFolders'
 import { endTreesExactly, leftoversOf } from './agentProcesses'
 import { startNow } from './agentStarts'
 import { onHiveEvent } from './events'
+import { orphansOf } from './orphanProcesses'
 import { progress } from './progressService'
 import { sessions } from './sessions'
 import { appPause, pauseSaveState, teamPauseOf, withLock } from './teamPause'
@@ -21,11 +23,12 @@ import { openWorkspaces, type WorkspaceService } from './workspace'
  * idle (ready, finished or watching) or at a question for the user, with nothing of Hive's records left: busy, and named,
  * when it works or starts, when its CLI reports background tasks, when a Progress run of it is open (a test run, a check
  * in a copy, a merge), when it holds a slot writer, or when its launches, an earlier one's included, left processes
- * running (HI-2055's leftovers); and can't be checked, and named, when its state is unknown, the workspace's projects or
+ * running (HI-2055's leftovers), or when its running launch's commands left a process running, its parent gone (HI-2111:
+ * orphanProcesses.ts); and can't be checked, and named, when its state is unknown, the workspace's projects or
  * slots can't be read, its pause isn't saved, or the workspace closed during the scan. Only "parked" is parked.
  *
- * Hive doesn't read the CLI's own process tree to guess what else it runs (its MCP servers, a server started from a
- * shell): what Hive doesn't record is the user's to end, as the user guide's Updates section says. The asking Assistant's
+ * Hive doesn't classify the CLI's own processes to guess what else it runs (its MCP servers, a command under way): those
+ * have a live parent, and are the user's to end, as the user guide's Updates section says. The asking Assistant's
  * own turn isn't counted (no self-wait); any other Assistant's is, and what it left running always is.
  */
 
@@ -47,6 +50,11 @@ async function agentItems(project: string, projectPath: string, agentId: string,
   const left = leftoversOf(projectPath, agentId)
   for (const p of left.processes) add({ state: 'busy', kind: 'process', label: p.label, what: `left running: ${p.label} (pid ${p.pid})`, ...(p.created ? { process: { pid: p.pid, created: p.created, name: p.name }, since: isoOf(p.created) } : {}) })
   if (left.more) add({ state: 'unknown', kind: 'process', what: `${left.more} more processes left running, not listed` })
+  // What its running launch's commands left running (HI-2111: its parent gone), as soon as it is seen, shown or not.
+  for (const o of orphansOf(projectPath, agentId)) {
+    const label = o.label ?? `process ${o.pid}`
+    add({ state: 'busy', kind: 'process', label, what: `its command left running: ${label} (pid ${o.pid})`, process: { pid: o.pid, created: o.created, name: label }, since: isoOf(o.created) })
+  }
   // A start of it under way, its session not made yet (round 3: reserved by sessions.start, or its slot being prepared):
   // starting, never stopped.
   if (!st) {
@@ -122,10 +130,16 @@ export async function teamPauseState(): Promise<TeamPauseState> {
  * by a pid alone.
  */
 export async function endParkedProcess(projectPath: string, agentId: string, pid: number, created: string): Promise<'ended' | 'notFound' | 'failed'> {
-  const left = leftoversOf(projectPath, agentId).processes.find((x) => x.pid === pid && x.created === created)
+  const left = leftoversOf(projectPath, agentId).processes.find((x) => x.pid === pid && x.created === created) ?? orphanProcess(projectPath, agentId, pid, created)
   if (!left) return 'notFound'
   const r = await endTreesExactly([left])
   return r && !r.failed.length && !r.unverified.length ? 'ended' : 'failed'
+}
+
+/** One of what an agent's running launch's commands left running (HI-2111), as a process to end, by its identity. */
+function orphanProcess(projectPath: string, agentId: string, pid: number, created: string): AgentProcess | undefined {
+  const o = orphansOf(projectPath, agentId).find((x) => x.pid === pid && x.created === created)
+  return o && { pid: o.pid, created: o.created, name: o.label ?? '', label: o.label ?? '' }
 }
 
 /**

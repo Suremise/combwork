@@ -8022,6 +8022,13 @@ button.agent-place:hover {
 .activity-row.act-waiting {
   border-left-color: var(--state-waiting, var(--warning));
 }
+/* Left running by the agent's command, its shell gone (HI-2111). */
+.activity-row.act-orphan {
+  border-left-color: var(--warning);
+}
+.activity-row.act-orphan > .codicon {
+  color: var(--warning);
+}
 .activity-row.act-failed {
   border-left-color: var(--error);
 }

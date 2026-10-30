@@ -1667,6 +1667,14 @@
     "defaultMessage": "Resuming after a connection drops: wait at most",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\")."
   },
+  "settings.advanced.hive.processes.orphanNotice.desc": {
+    "defaultMessage": "When a process an agent's command started is still running ten minutes on with the shell that started it gone, Hive says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. Turned off, neither is told; Activity still lists the process as left running, with End It.",
+    "description": "What the advanced setting \"Processes left running: tell me and the agent\" does (Settings → Advanced, under Hive). Activity is a tab of Hive's; End It is its button."
+  },
+  "settings.advanced.hive.processes.orphanNotice.title": {
+    "defaultMessage": "Processes left running: tell me and the agent",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive: a process an agent's command left running, its shell gone, is told in a notice and to the agent."
+  },
   "settings.advanced.hive.progress.lanesShown.desc": {
     "defaultMessage": "How many card-loop lanes the Progress panel shows before its lanes scroll, until you drag the section's top edge (the drag is kept per workspace). A workspace that runs many lanes at once can set its own.",
     "description": "What the advanced setting \"Progress panel: lanes shown\" is for, and what goes wrong when it is wrong (Settings → Advanced)."

@@ -122,6 +122,8 @@
   "session.notice.untakenRetried": "O Hive digitou a linha e pressionou Enter duas vezes, mas a CLI não estava lendo a entrada. Mostre o agente, clique no terminal dele e pressione Enter.",
   "session.notice.untakenTitle": "{agent} não aceitou uma linha que o Hive digitou",
   "session.notice.waitingForInput": "Aguardando sua resposta",
+  "session.orphan.body": "Processo {pid}: o shell que o iniciou terminou. A Atividade o lista, com Encerrar; o agente também é avisado.",
+  "session.orphan.title": "{agent} deixou {command} em execução há {time}",
   "session.plan.asking": "O agente está perguntando algo a você. Responda primeiro.",
   "session.plan.noToggle": "{provider} não tem uma opção para ativar o modo Planejar.",
   "session.plan.typing": "O Hive está digitando uma linha neste agente. Tente de novo em instantes.",
