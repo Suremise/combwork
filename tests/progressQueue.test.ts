@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { fmt, setLanguage, tr } from '../src/shared/i18n'
-import { ESTIMATE_OF, HISTORY_SHOWN, JUST_MERGED_MS, historyOutcome, historyRows, pauseWhyShort, pushStateText, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnCheck, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
+import { BUSY_MERGE_MS, ESTIMATE_OF, HISTORY_SHOWN, allProjectsQueues, queueBusy, JUST_MERGED_MS, historyOutcome, historyRows, pauseWhyShort, pushStateText, RETURN_SEEN_SHOWN_MS, justMerged, keptLive, nextFold, queueKey, withKept, type KeptReturn, mergedText, onPulseLine, pauseText, pulseLine, queueEstimate, queueNews, queueShown, queuedCount, queuedText, returnCheck, returnedText, returnRun, returnWhy, runCheckName, shownQueues, shownReturns, stepText, testingText, unseenReturns } from '../src/shared/progressQueue'
 import { copiesRunsKey, HIVE_RUNS, NO_RUNS_FILTER, runAgentKey, runMatches, runThing, slotRunsKey, tabBadges } from '../src/shared/progressTabs'
 import type { ProgressRun } from '../src/shared/types'
 import { RECENT_MAX, type QueuePauseLogged, type QueueRecent, type QueueView } from '../src/shared/workflow/queue'
@@ -108,6 +108,25 @@ describe('which merge queues show (#1356 item 0)', () => {
   it('in order: by project, then target; hidden ones left out', () => {
     const views = [view({ project: 'beta', projectPath: 'D:\\ws\\beta', hiveMerges: true }), view({ target: 'release', hiveMerges: true }), view({ hiveMerges: true }), view({ target: 'old' })]
     expect(shownQueues(views, NOW).map((v) => `${v.project}/${v.target}`)).toEqual(['alpha/main', 'alpha/release', 'beta/main'])
+  })
+
+  it('All projects: an inactive project\'s queue only while it is busy (HI-2165)', () => {
+    const idle = view({ project: 'beta', projectPath: 'D:\\ws\\beta', hiveMerges: true, runBy: 'Hive' })
+    const active = new Set(['d:\\ws\\alpha'])
+    const shown = (v: QueueView, now = NOW): boolean => allProjectsQueues([v], active, now).length > 0
+    // The project being worked on: its idle queue shows; another's doesn't, even run and merged into by Hive.
+    expect(shown(view({ hiveMerges: true }))).toBe(true)
+    expect(queueBusy(idle, NOW)).toBe(false)
+    expect(shown(idle)).toBe(false)
+    expect(shown({ ...idle, testing })).toBe(true)
+    expect(shown({ ...idle, queued: [queued(107)] })).toBe(true)
+    expect(shown({ ...idle, paused: { reason: 'user', card: null, files: [], by: 'user', at: iso(NOW) } })).toBe(true)
+    expect(shown({ ...idle, returns: [recent({ outcome: 'returned', reason: 'conflict' })] })).toBe(true)
+    // A merge in the last hour, not one before it nor another outcome.
+    const merged = recent({ at: iso(NOW - BUSY_MERGE_MS + 1_000) })
+    expect(shown({ ...idle, recent: [merged] })).toBe(true)
+    expect(shown({ ...idle, recent: [merged] }, NOW + 1_000)).toBe(false)
+    expect(shown({ ...idle, recent: [{ ...merged, outcome: 'cancelled' }] })).toBe(false)
   })
 })
 

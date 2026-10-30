@@ -891,6 +891,9 @@ describe('progress rules', () => {
     expect(activeFilter(all, { project: 'c:\\ws\\beta', agent: 'x' })).toEqual({ project: 'c:\\ws\\beta' })
     // Every run in one project: nothing to choose between, so no filter.
     expect(activeFilter([a1, a2], { project: 'c:\\ws\\alpha', agent: 'x' })).toBe(SHOW_ALL)
+    // …unless offered anyway (HI-2165: All projects hides a queue): the one project is a choice.
+    expect(activeFilter([], { project: 'c:\\ws\\beta' }, ['C:\\ws\\beta'], true)).toEqual({ project: 'c:\\ws\\beta' })
+    expect(activeFilter([], { project: 'c:\\ws\\beta' }, ['C:\\ws\\beta'])).toBe(SHOW_ALL)
     expect(activeFilter(all, undefined)).toBe(SHOW_ALL)
   })
 

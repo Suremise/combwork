@@ -495,12 +495,13 @@ export function agentChoices(runs: readonly ProgressRun[], project: string, tr: 
 /**
  * The filter that applies to these runs: the chosen one while its project (and agent) still has runs (or a merge queue
  * shown, `also`: their folders, #1356) and they span more than one project; otherwise every run (the filter is hidden
- * when there is nothing to choose between).
+ * when there is nothing to choose between). `offered`: the filter shows whatever the count (HI-2165: All projects
+ * hides a queue, so one project is a choice too).
  */
-export function activeFilter(runs: readonly ProgressRun[], chosen: ProgressFilter | undefined, also: readonly string[] = []): ProgressFilter {
+export function activeFilter(runs: readonly ProgressRun[], chosen: ProgressFilter | undefined, also: readonly string[] = [], offered = false): ProgressFilter {
   if (!chosen || chosen.project === ALL_PROJECTS) return SHOW_ALL
   const projects = new Set([...runs.map(projectOf), ...also.map((p) => p.toLowerCase())])
-  if (projects.size < 2 || !projects.has(chosen.project)) return SHOW_ALL
+  if ((projects.size < 2 && !offered) || !projects.has(chosen.project)) return SHOW_ALL
   if (chosen.agent && !runs.some((r) => projectOf(r) === chosen.project && agentOf(r) === chosen.agent)) return { project: chosen.project }
   return chosen
 }
