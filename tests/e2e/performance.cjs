@@ -29,7 +29,7 @@ const timed = (count, ms) => {
 }
 const apiSeries = (route, role, outcome, count, ms = 8) => ({ route, method: route.includes(':n') ? 'GET' : 'GET', role, outcome, ...timed(count, ms), requestBytes: count * 20, responseBytes: count * 900 })
 const mcpSeries = (tool, count, chars) => ({ tool, role: 'agent', mode: 'compact', outcome: 'ok', ...timed(count, 4), chars: count * chars, bytes: count * chars })
-const launch = (provider, launches) => ({ provider, role: 'agent', launches, guidanceBytes: launches * 3000, guidanceChars: launches * 3000, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: launches * 6, skillCatalogBytes: launches * 1200, skillBytes: launches * 40000, skillsNotDelivered: 0, skillsUnmeasured: 0 })
+const launch = (provider, launches) => ({ provider, role: 'agent', workflow: 'builder', launches, guidanceBytes: launches * 3000, guidanceChars: launches * 3000, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: launches * 6, skillCatalogBytes: launches * 1200, skillBytes: launches * 40000, skillsNotDelivered: 0, skillsUnmeasured: 0 })
 const part = (api = [], mcp = [], guidance = []) => ({ api: Object.fromEntries(api.map((s, i) => [String(i), s])), mcp: Object.fromEntries(mcp.map((s, i) => [String(i), s])), guidance: Object.fromEntries(guidance.map((s, i) => [String(i), s])), catalog: {} })
 const now = Date.now()
 const hourStart = (t) => Math.floor(t / HOUR) * HOUR
@@ -138,6 +138,8 @@ const check = (name, ok, extra = '') => {
   check('…then fewest first: the Assistant’s one', (await usageWho()) === 'Assistant,Agents', await usageWho())
   await usage.locator('th button', { hasText: 'Sessions' }).click()
   check('the guidance table has each part', /Core\|Project\|Role\|Mode/i.test((await page.locator('.table-wrap th').allInnerTexts()).join('|')), (await page.locator('.table-wrap th').allInnerTexts()).join('|'))
+  const guidanceTable = page.locator('.performance-page:visible .table-wrap', { has: page.locator('th', { hasText: 'Workflow role' }) })
+  check('…and each launch’s workflow role (HI-2049)', (await guidanceTable.count()) === 1 && (await guidanceTable.locator('tbody tr', { hasText: 'Builder' }).count()) >= 1, (await page.locator('.table-wrap th').allInnerTexts()).join('|'))
   check('cancelled requests are shown apart from failures', /cancelled/.test(await page.locator('.performance-page:visible .card', { hasText: 'API requests' }).innerText()))
   await shot('wide-dark')
 

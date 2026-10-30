@@ -30,7 +30,7 @@ import { atMost, whenAll } from '../shared/atMost'
 import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter } from './agentFolders'
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
-import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
+import { agentWorkflowRole, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
 import { agentLaunchSettings, agentProvider, canSwitchModeLive, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
 import { resolvedModel } from '../shared/models'
@@ -393,6 +393,8 @@ interface LiveSession {
    * from when it first became ready (readyAt), for a CLI that never connects it.
    */
   hiveTools?: 'connecting' | 'connected'
+  /** This launch's side of the workflow, as its metrics count it (HI-2049): taken once, as it launched. */
+  workflow?: LaunchWorkflow
   /** When this launch first became ready (or watching, or finished), in ms (#865). */
   readyAt?: number
   /**
@@ -2359,6 +2361,8 @@ class SessionManager {
     const extraDirs = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false)) ? [copies] : []
     l.extraDirs = extraDirs
     l.cliVersion = info.version ?? null
+    // Its side of the workflow for its metrics (HI-2049), once: its part in the running lanes now, else its own role.
+    l.workflow = workspace.isAssistantHome(projectPath) ? 'none' : launchWorkflow(agentWorkflowRole(agent), await this.laneParts(projectPath, agent.id).catch(() => []))
     times?.mark('guidance')
     const ctx = {
       projectPath,
@@ -2485,6 +2489,7 @@ class SessionManager {
     recordLaunch(metrics, workspace.isAssistantHome(projectPath) ? null : basename(projectPath), {
       provider: adapter.id,
       role: workspace.isAssistantHome(projectPath) ? 'assistant' : 'agent',
+      workflow: l.workflow,
       ...parts,
       skills: given.length,
       skillCatalogBytes: deliveredSizes.catalog,
@@ -4859,6 +4864,21 @@ class SessionManager {
       toast('warning', tr(M.longConversation, { agent: label }), tr(HAND_OVER_TEXT.notice, values), actions, st.projectPath)
       this.notify(st.projectPath, withValues(M.longConversation, { agent: label }), withValues(HAND_OVER_TEXT.notice, values), 'notice')
     })
+  }
+
+  /**
+   * The agent's parts in its project's running lanes (HI-2049: its launch's side of the workflow): set by launchSides.ts,
+   * which knows the lanes, at startup before any launch.
+   */
+  laneParts: (projectPath: string, agentId: string) => Promise<('builder' | 'reviewer')[]> = async () => []
+
+  /**
+   * The side of the workflow of an agent's launch `runId` (HI-2049), for what its hive server reports: `unknown` once
+   * that launch has ended or another has taken its place, so a late report never takes the next launch's side.
+   */
+  launchSide(projectPath: string, agentId: string, runId: string | null): LaunchWorkflow | 'unknown' {
+    const l = this.live.get(liveId(projectPath, agentId))
+    return l && runId && l.state.runId === runId && l.workflow ? l.workflow : 'unknown'
   }
 
   /** Whether the agent may hand over to a new conversation of its own now (#1057): set by handOverCheck.ts, which knows the lanes. */

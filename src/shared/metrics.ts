@@ -5,6 +5,7 @@
  * provider reported. Hive estimates no tokens. Nothing here holds a prompt, a body, a token, a URL or a path.
  */
 import type { Text } from './advanced'
+import type { LaunchWorkflow } from './workflow/roles'
 
 /** Latency histogram bounds (ms, inclusive upper bounds); a last bucket counts everything above the highest. */
 export const LATENCY_BOUNDS_MS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000] as const
@@ -51,6 +52,8 @@ export interface McpSeries extends Timed {
 export interface GuidanceSeries {
   provider: string
   role: 'agent' | 'assistant'
+  /** The launch's side of the workflow (HI-2049); `unknown`: recorded before Hive counted it. */
+  workflow: LaunchWorkflow | 'unknown'
   launches: number
   /**
    * Each part of what Hive tells the session at launch, counted once a launch whichever way the provider gets it (the
@@ -91,9 +94,17 @@ export interface GuidanceSeries {
  */
 export interface CatalogSeries {
   role: 'agent' | 'assistant'
+  /** The side of the workflow of the launch whose bridge sent it (HI-2049); `unknown`: recorded before Hive counted it. */
+  workflow: LaunchWorkflow | 'unknown'
   starts: number
   tools: number
   toolsBytes: number
+  /**
+   * The same list's characters (its JSON's UTF-16 code units), and of how many of the starts: a bridge from before
+   * HI-2049 sent bytes only, so its starts are in `starts` and not here.
+   */
+  toolsChars: number
+  charStarts: number
 }
 
 /** The skill service (revisions.ts): scans, what they read and what the inventory saved. */

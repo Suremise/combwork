@@ -19,7 +19,7 @@ const clean = (v) =>
 
 /** The sum of a metrics report's parts, work by the harness's own token (role api: its setup and reads) left out. */
 function metricsTotals(r) {
-  const t = { apiRequests: 0, apiFailed: 0, apiCancelled: 0, apiRequestBytes: 0, apiResponseBytes: 0, apiMs: 0, toolCalls: 0, toolErrors: 0, toolDetailCalls: 0, toolChars: 0, toolBytes: 0, toolMs: 0, launches: 0, coreBytes: 0, customBytes: 0, roleBytes: 0, modeBytes: 0, catalogBytes: 0, coreChars: 0, customChars: 0, roleChars: 0, modeChars: 0, skillBytes: 0, skillsDelivered: 0, skillsNotDelivered: 0, skillsUnmeasured: 0, toolListBytes: 0, toolListStarts: 0, skillScans: 0, skillHits: 0, skillMisses: 0, skillInvalidations: 0, skillBytesRead: 0, skillTooLarge: 0, dropped: 0 }
+  const t = { apiRequests: 0, apiFailed: 0, apiCancelled: 0, apiRequestBytes: 0, apiResponseBytes: 0, apiMs: 0, toolCalls: 0, toolErrors: 0, toolDetailCalls: 0, toolChars: 0, toolBytes: 0, toolMs: 0, launches: 0, coreBytes: 0, customBytes: 0, roleBytes: 0, modeBytes: 0, catalogBytes: 0, coreChars: 0, customChars: 0, roleChars: 0, modeChars: 0, skillBytes: 0, skillsDelivered: 0, skillsNotDelivered: 0, skillsUnmeasured: 0, toolListBytes: 0, toolListStarts: 0, toolListChars: 0, toolListCharStarts: 0, skillScans: 0, skillHits: 0, skillMisses: 0, skillInvalidations: 0, skillBytesRead: 0, skillTooLarge: 0, dropped: 0 }
   if (!r) return t
   for (const part of [...Object.values(r.projects ?? {}), ...(r.workspace ? [r.workspace] : [])]) {
     for (const a of part.api ?? []) {
@@ -58,6 +58,8 @@ function metricsTotals(r) {
     for (const c of part.catalog ?? []) {
       t.toolListBytes += c.toolsBytes
       t.toolListStarts += c.starts
+      t.toolListChars += c.toolsChars ?? 0
+      t.toolListCharStarts += c.charStarts ?? 0
     }
   }
   const sk = r.skills
@@ -84,6 +86,9 @@ function measuresOf(before, after, observed, usage) {
     if (seen.has(k)) repeated++
     seen.add(k)
   }
+  // The tool list's characters only when every start in the scenario had them counted (HI-2049): else unknown.
+  if (m.toolListCharStarts !== m.toolListStarts) delete m.toolListChars
+  delete m.toolListCharStarts
   m.hiveCalls = calls.length
   m.hiveCallErrors = calls.filter((c) => !c.ok).length
   m.repeatedCalls = repeated

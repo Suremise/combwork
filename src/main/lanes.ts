@@ -1197,6 +1197,12 @@ export async function laneOf(ws: WorkspaceService, project: string, agentId: str
   return l ? (await views(ws, [l]))[0] : null
 }
 
+/** A project agent's parts in its project's running lanes (HI-2049): builder of one, reviewer of another, or none. */
+export async function laneParts(ws: WorkspaceService, project: string, agentId: string): Promise<('builder' | 'reviewer')[]> {
+  const lanes = (await read(ws)).filter((l) => running(l) && same(l.project, project))
+  return [...(lanes.some((l) => l.builder.id === agentId) ? ['builder' as const] : []), ...(lanes.some((l) => l.reviewer?.id === agentId) ? ['reviewer' as const] : [])]
+}
+
 /** A workspace's lanes: those listed (running, or ended lately), or with `all` every one kept; `project` narrows them. */
 export async function listLanes(ws: WorkspaceService, o: { project?: string | null; all?: boolean } = {}): Promise<LaneInfo[]> {
   if (!ws.path) return []

@@ -1115,7 +1115,7 @@ interface CallReport {
   ms: number
 }
 const pending: CallReport[] = []
-let catalog: { tools: number; toolsBytes: number } | null = null
+let catalog: { tools: number; toolsBytes: number; toolsChars: number } | null = null
 let flushTimer: NodeJS.Timeout | null = null
 /** At most this many calls in one report (the API's limit), sent at most every 2 seconds. */
 const REPORT_MAX = 50
@@ -1208,10 +1208,11 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       sayConnected()
       const list = offered.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))
       reply(id, { tools: list })
-      // Its size as the CLI got it (the tools array's JSON), once a session.
+      // Its size as the CLI got it (the tools array's JSON: UTF-8 bytes, and characters as UTF-16 code units), once a session.
       if (!listed) {
         listed = true
-        catalog = { tools: list.length, toolsBytes: Buffer.byteLength(JSON.stringify(list), 'utf8') }
+        const json = JSON.stringify(list)
+        catalog = { tools: list.length, toolsBytes: Buffer.byteLength(json, 'utf8'), toolsChars: json.length }
         scheduleReports()
       }
       return

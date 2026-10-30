@@ -676,12 +676,16 @@ const prose = (seed, n) => {
   const got = {}
   for (const sr of alphaPart?.mcp ?? []) got[`${sr.tool} ${sr.mode} ${sr.outcome}`] = { count: sr.count, chars: sr.chars, bytes: sr.bytes }
   check("metrics: each tool call's reported size is the text the model got, by mode and outcome", JSON.stringify(Object.fromEntries(Object.entries(got).filter(([k]) => k in expected).sort())) === JSON.stringify(Object.fromEntries(Object.entries(expected).sort())), JSON.stringify({ got, expected }))
-  const cat = (alphaPart?.catalog ?? []).find((c) => c.role === 'agent')
+  // Each launch's side of the workflow its own series (HI-2049): summed here.
+  const cats = (alphaPart?.catalog ?? []).filter((c) => c.role === 'agent')
+  const cat = cats.reduce((a, c) => ({ starts: a.starts + c.starts, tools: a.tools + c.tools, toolsBytes: a.toolsBytes + c.toolsBytes, toolsChars: a.toolsChars + c.toolsChars, charStarts: a.charStarts + c.charStarts }), { starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0 })
   // Once a start: the coder's, and the agent a card was started on, whose fake reads its inbox when its task's doorbell
   // rings (#650: through the hive server, which it starts for that call, with a tool list of its own). The catalog sums
   // them: the coder's list as it got it, and the other's.
   const listBytes = Buffer.byteLength(JSON.stringify(list), 'utf8')
-  check("metrics: the tool list as the session got it, once a start", cat?.starts === 2 && cat.tools > list.length && cat.tools < list.length * 3 && cat.toolsBytes > listBytes && cat.toolsBytes < listBytes * 3, JSON.stringify({ cat, list: list.length, bytes: listBytes }))
+  const listChars = JSON.stringify(list).length
+  check("metrics: the tool list as the session got it, once a start, in bytes and characters", cat.starts === 2 && cat.tools > list.length && cat.tools < list.length * 3 && cat.toolsBytes > listBytes && cat.toolsBytes < listBytes * 3 && cat.charStarts === 2 && cat.toolsChars > listChars && cat.toolsChars < listChars * 3, JSON.stringify({ cat, list: list.length, bytes: listBytes, chars: listChars }))
+  check("metrics: each tool list on the side of the launch whose hive server sent it", cats.length > 0 && cats.every((c) => ['builder', 'reviewer', 'either', 'none'].includes(c.workflow)), JSON.stringify(cats.map((c) => [c.workflow, c.starts])))
   check("metrics: the Assistant's tool calls are the workspace's own, with detail mode counted", (report.workspace?.mcp ?? []).some((sr) => sr.role === 'assistant' && sr.tool === 'hive_agent_activity' && sr.mode === 'detail'), JSON.stringify(report.workspace?.mcp?.slice(0, 3)))
   const routes = [...Object.values(report.projects), report.workspace].flatMap((pt) => pt.api.map((sr) => sr.route))
   check('metrics: API routes are templates, never paths asked for', routes.includes('/v1/tasks/:n') && !routes.some((r) => /\/\d/.test(r)), routes.join(' '))
@@ -713,7 +717,7 @@ const prose = (seed, n) => {
   check('metrics: a client that goes away mid-request is cancelled, with the body bytes it did send', cancelled?.requestBytes === Buffer.byteLength('{"title":'), JSON.stringify(cancelled))
   check('metrics: says what it does not measure', after.notMeasured.length >= 4 && after.recording === true)
   const g = (after.projects.alpha?.guidance ?? []).find((x) => x.provider === 'claude-code' && x.role === 'agent')
-  check("metrics: each launch's guidance, exact sizes, by provider and role", g?.launches >= 1 && g.guidanceBytes > 1000 && g.guidanceChars > 1000 && g.skills >= 5 && g.skillCatalogBytes > 0 && g.skillBytes > g.skillCatalogBytes, JSON.stringify(g))
+  check("metrics: each launch's guidance, exact sizes, by provider, role and workflow role", ['builder', 'reviewer', 'either', 'none'].includes(g?.workflow) && g?.launches >= 1 && g.guidanceBytes > 1000 && g.guidanceChars > 1000 && g.skills >= 5 && g.skillCatalogBytes > 0 && g.skillBytes > g.skillCatalogBytes, JSON.stringify(g))
   const ga = (after.workspace?.guidance ?? []).find((x) => x.role === 'assistant')
   // Its custom part is the journal's rule (#1032: on by default, work only).
   const journalBytes = Buffer.byteLength(`

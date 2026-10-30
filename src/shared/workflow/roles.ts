@@ -32,6 +32,23 @@ export function agentWorkflowRole(a: { name: string; role?: string; workflowRole
 }
 
 /**
+ * The side of the workflow a launch's metrics count it on (HI-2049): none for a generalist and the Assistant. Series
+ * recorded before it was counted read as `unknown`, never as one of these.
+ */
+export type LaunchWorkflow = 'builder' | 'reviewer' | 'either' | 'none'
+
+/**
+ * A launch's side: its part in the running lanes it is in at launch (builder in one and reviewer in another: either),
+ * which wins over its own role, else its own role (`null`: the Assistant).
+ */
+export function launchWorkflow(role: WorkflowRole | null, laneParts: readonly ('builder' | 'reviewer')[]): LaunchWorkflow {
+  const parts = new Set(laneParts)
+  if (parts.size > 1) return 'either'
+  if (parts.size === 1) return [...parts][0]
+  return role === 'builder' || role === 'reviewer' || role === 'either' ? role : 'none'
+}
+
+/**
  * A project's builder and reviewer pairs (#1531, #1346 item 2: an Assistant named another project's reviewer, the agents
  * having no roles it could see): each running lane's builder with its reviewer (or the pool), then, by name, a builder
  * and a reviewer in no running lane whose names end in the same number (HB2 and HR2, HI-B1 and HI-R1), only where that
