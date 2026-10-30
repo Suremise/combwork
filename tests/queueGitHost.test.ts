@@ -620,11 +620,9 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
   })
 
   it('HI-2137: the git Hive starts (gitExe), in the host and through the launcher; one gone, PATH git once more', async () => {
-    const w = world()
-    const runner = await acquire(w)
-    const execPath = win32.normalize(sh(w.project, '--exec-path'))
+    // As checkGit resolves it, from the launcher: before anything is acquired, so nothing is left open where it can't.
+    const execPath = win32.normalize(sh(tempDir('qgh-exec-'), '--exec-path'))
     const top = join(execPath, '..', '..', '..')
-    // As checkGit resolves it, from the launcher.
     const resolved = realGitBehind(join(top, 'cmd', 'git.exe'), execPath)
     if (!resolved) return // Not Git for Windows: nothing of this applies.
     const real = resolved.exe
@@ -633,7 +631,10 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
     const env = { ...baseEnv(), PATH: `${join(top, 'cmd')};${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`, GIT_TRACE2_EVENT: trace }
     // Each git's argv[0], as trace2 has it: the executable as it was started (a path, or "git" found on PATH).
     const started = (): string[] => readdirSync(trace).flatMap((f) => readFileSync(join(trace, f), 'utf8').split('\n').filter((l) => l.includes('"event":"start"')).map((l) => (JSON.parse(l) as { argv: string[] }).argv[0]))
+    const w = world()
+    let runner: QueueRunner | null = null
     try {
+      runner = await acquire(w)
       setGitToolForTests({ state: 'ok', version: '2.51.0' }, resolved)
       // The launcher's MSYSTEM and its shell tools, seen by an alias through sh.
       const alias = ['-c', 'alias.hivemsys=!echo "$MSYSTEM $(command -v sed)"', 'hivemsys']
@@ -653,7 +654,8 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       expect(gitExe().exe).not.toBe(gone)
       // And git() in the queue's route (the host, through gitOutcome), several at once: the same.
       setGitToolForTests({ state: 'ok', version: '2.51.0' }, { exe: gone })
-      const routed = await withGitRoute((m) => runner.gitOutcome(m), () => Promise.all([1, 2, 3].map(() => hiveGit(w.project, ['rev-parse', 'HEAD'], undefined, undefined, { env }))))
+      const held = runner
+      const routed = await withGitRoute((m) => held.gitOutcome(m), () => Promise.all([1, 2, 3].map(() => hiveGit(w.project, ['rev-parse', 'HEAD'], undefined, undefined, { env }))))
       for (const r of routed) expect(r).toMatchObject({ ok: true })
       expect(gitTool().state).not.toBe('missing')
       // Its check again, settled before the next test.
@@ -661,7 +663,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       expect(gitExe().exe).not.toBe(gone)
     } finally {
       setGitToolForTests({ state: 'unknown' })
-      await runner.release()
+      await runner?.release()
       w.close()
     }
   })

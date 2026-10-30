@@ -2,6 +2,7 @@
 // nothing to lose. Git is hidden from this test process's own PATH (never the machine's), which every git call Hive
 // makes inherits.
 import { execFileSync } from 'child_process'
+import { createRequire } from 'module'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { delimiter, dirname, join, win32 } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -14,6 +15,7 @@ import { ensureHiveExcluded } from '../src/main/hiveVcs'
 import { tempDir, tempRoot } from './tempDir'
 
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' })
+const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 const PATH = process.env.PATH
 let root = ''
 
@@ -254,11 +256,12 @@ describe('the git Hive starts', () => {
     const roaming = join(root, 'roaming')
     const local = join(root, 'local')
     for (const d of [roaming, local]) mkdirSync(d)
-    // No Git folder on PATH, an inherited MSYSTEM that isn't the launcher's, a roaming home apart from USERPROFILE.
-    const env: NodeJS.ProcessEnv = { ...process.env }
+    // The run context's environment, with no global or system git config (as every unit test's git); no Git folder on
+    // PATH, an inherited MSYSTEM that isn't the launcher's, a roaming home apart from USERPROFILE.
+    const env: NodeJS.ProcessEnv = baseEnv()
     for (const k of Object.keys(env)) if (['PATH', 'HOME', 'HOMEDRIVE', 'HOMEPATH', 'USERPROFILE', 'MSYSTEM', 'PLINK_PROTOCOL'].includes(k.toUpperCase())) delete env[k]
-    Object.assign(env, { PATH: `${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`, MSYSTEM: 'MSYS', HOMEDRIVE: roaming.slice(0, 2), HOMEPATH: roaming.slice(2), USERPROFILE: local })
-    const said = (exe: string, e: NodeJS.ProcessEnv): string => execFileSync(exe, ['-c', 'alias.hiveenv=!echo "$MSYSTEM|$HOME|$PLINK_PROTOCOL|$PATH"', 'hiveenv'], { cwd: p, env: e, encoding: 'utf8' })
+    Object.assign(env, { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', PATH: `${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`, MSYSTEM: 'MSYS', HOMEDRIVE: roaming.slice(0, 2), HOMEPATH: roaming.slice(2), USERPROFILE: local })
+    const said = (exe: string, e: NodeJS.ProcessEnv): string => execFileSync(exe, ['-c', 'alias.hiveenv=!echo "$MSYSTEM|$HOME|$PLINK_PROTOCOL|$PATH"', 'hiveenv'], { cwd: p, env: e, encoding: 'utf8', windowsHide: true })
     const through = said(launcher, env)
     expect(through).toMatch(/^MINGW64\|/)
     expect(said(real.exe, withLauncherEnv(env, real.launcherEnv))).toBe(through)
