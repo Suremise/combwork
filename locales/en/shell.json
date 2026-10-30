@@ -547,6 +547,14 @@
     "defaultMessage": "Undo Archive",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Tasks category. It isn't in the menus or the palette: notifications and buttons run it by its name."
   },
+  "shell.command.team.pause": {
+    "defaultMessage": "Pause the Team",
+    "description": "A command (the command palette, Settings → Keyboard Shortcuts), in the Help category (HI-2081): before an update, Hive starts no lane card, wakes no agent with card events and gives no reviews out in every open workspace, and tells each running agent to park (finish its turn, end its runs, commit). The Progress panel's Lanes shows what still runs."
+  },
+  "shell.command.team.resume": {
+    "defaultMessage": "Resume the Team",
+    "description": "A command (the command palette, Settings → Keyboard Shortcuts), in the Help category (HI-2081): lifts the pause of every open workspace, so lanes start their cards and agents are woken again."
+  },
   "shell.command.template.addAgent": {
     "defaultMessage": "Add Agent from Template…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. The … says it opens a dialog first: keep it."
@@ -1470,6 +1478,18 @@
   "shell.status.stopped": {
     "defaultMessage": "Stopped",
     "description": "An agent's status."
+  },
+  "shell.status.teamParked": {
+    "defaultMessage": "Team parked",
+    "description": "The status bar item (HI-2081) once the paused team has parked: nothing runs, so an update can be installed."
+  },
+  "shell.status.teamPaused": {
+    "defaultMessage": "Team paused",
+    "description": "A status bar item while the team is paused before an update (HI-2081): Hive starts no lane card and wakes no agent until it resumes. Click: opens the Progress panel."
+  },
+  "shell.status.teamPausedTip": {
+    "defaultMessage": "The team is paused: no lane starts a card and no agent is woken until you resume it. The Progress panel's Lanes says what still runs.",
+    "description": "Tooltip of the status bar item while the team is paused (HI-2081)."
   },
   "shell.status.waiting": {
     "defaultMessage": "Needs your input",

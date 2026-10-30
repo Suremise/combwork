@@ -728,6 +728,8 @@
   "assistant.undo.why.start": "O início fica no trabalho do cartão: desfazer move o cartão de volta, mas não desfaz o início.",
   "assistant.undo.why.startReview": "A revisão que ele iniciou fica no trabalho do cartão.",
   "assistant.undo.why.submit": "O envio fica no trabalho do cartão.",
+  "assistant.undo.why.teamPaused": "Uma equipe que ele pausou continua pausada: retome-a se ela deve continuar.",
+  "assistant.undo.why.teamResumed": "Uma equipe que ele retomou não é pausada de novo: pause-a se ela deve esperar.",
   "assistant.undo.why.templateCards": "Os cartões e as raias dos agentes que um modelo substituiu ficam como o carregamento os deixou (cartões devolvidos, raias encerradas): desfazer não os devolve.",
   "assistant.undo.why.verdict": "O veredito fica no trabalho do cartão, e a rodada com ele.",
   "assistant.undo.why.withdrawn": "As mensagens que ele retirou não são enviadas de novo.",

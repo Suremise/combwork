@@ -138,6 +138,8 @@ interface HiveMessageValues {
   'shell.command.task.new': undefined
   'shell.command.task.reviewSetAside': undefined
   'shell.command.task.undoArchive': undefined
+  'shell.command.team.pause': undefined
+  'shell.command.team.resume': undefined
   'shell.command.template.addAgent': undefined
   'shell.command.template.load': undefined
   'shell.command.template.save': undefined
@@ -369,6 +371,9 @@ interface HiveMessageValues {
   'shell.status.signin': undefined
   'shell.status.starting': undefined
   'shell.status.stopped': undefined
+  'shell.status.teamParked': undefined
+  'shell.status.teamPaused': undefined
+  'shell.status.teamPausedTip': undefined
   'shell.status.waiting': undefined
   'shell.status.waitingOnTasks': { n: number }
   'shell.status.watching': undefined

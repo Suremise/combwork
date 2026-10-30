@@ -728,6 +728,8 @@
   "assistant.undo.why.start": "Rozpoczęcie zostaje w pracy karty: cofnięcie przenosi kartę z powrotem, ale nie odwołuje rozpoczęcia.",
   "assistant.undo.why.startReview": "Rozpoczęta recenzja zostaje w pracy karty.",
   "assistant.undo.why.submit": "Zgłoszenie zostaje w pracy karty.",
+  "assistant.undo.why.teamPaused": "Zespół, który wstrzymał, pozostaje wstrzymany: wznów go, jeśli ma pracować dalej.",
+  "assistant.undo.why.teamResumed": "Zespół, który wznowił, nie jest ponownie wstrzymywany: wstrzymaj go, jeśli ma czekać.",
   "assistant.undo.why.templateCards": "Karty i tory agentów zastąpionych przez szablon zostają takie, jak zostawiło je wczytanie (karty oddane, tory zakończone): cofnięcie ich nie zwraca.",
   "assistant.undo.why.verdict": "Werdykt zostaje w pracy karty, a wraz z nim jego runda.",
   "assistant.undo.why.withdrawn": "Wycofane wiadomości nie są wysyłane ponownie.",

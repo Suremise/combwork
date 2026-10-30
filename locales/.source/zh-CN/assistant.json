@@ -738,6 +738,8 @@
   "assistant.undo.why.start": "Its start stays in the card's work: undo moves the card back, it doesn't unstart it.",
   "assistant.undo.why.startReview": "The review it started stays in the card's work.",
   "assistant.undo.why.submit": "Its submission stays in the card's work.",
+  "assistant.undo.why.teamPaused": "A team it paused stays paused: resume it if it should go on.",
+  "assistant.undo.why.teamResumed": "A team it resumed isn't paused again: pause it if it should wait.",
   "assistant.undo.why.templateCards": "The cards and lanes of the agents a template replaced stay as the load left them (cards put back, lanes ended): undo doesn't give them back.",
   "assistant.undo.why.verdict": "Its verdict stays in the card's work, and its round with it.",
   "assistant.undo.why.withdrawn": "Messages it withdrew aren't sent again.",

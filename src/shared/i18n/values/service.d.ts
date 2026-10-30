@@ -177,6 +177,7 @@ interface HiveMessageValues {
   'service.laneStarts.freshBlockedBody': { why: string; minutes: number; reason: string | number }
   'service.laneStarts.freshBlockedTitle': { agent: string | number }
   'service.lanes.noWorkspace': undefined
+  'service.lanes.teamPaused': undefined
   'service.lanes.unknown': { id: string | number }
   'service.mcp.addedDropped': { n: number }
   'service.mcp.addedTitle': undefined

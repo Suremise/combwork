@@ -728,6 +728,8 @@
   "assistant.undo.why.start": "Son démarrage reste dans le travail de la carte : l’annulation remet la carte en place, sans annuler le démarrage.",
   "assistant.undo.why.startReview": "La relecture qu’il a commencée reste dans le travail de la carte.",
   "assistant.undo.why.submit": "Sa soumission reste dans le travail de la carte.",
+  "assistant.undo.why.teamPaused": "Une équipe qu’il a mise en pause reste en pause : reprends-la si elle doit continuer.",
+  "assistant.undo.why.teamResumed": "Une équipe qu’il a reprise n’est pas remise en pause : mets-la en pause si elle doit attendre.",
   "assistant.undo.why.templateCards": "Les cartes et les couloirs des agents qu’un modèle a remplacés restent comme le chargement les a laissés (cartes rendues, couloirs terminés) : l’annulation ne les leur rend pas.",
   "assistant.undo.why.verdict": "Son verdict reste dans le travail de la carte, et son tour avec lui.",
   "assistant.undo.why.withdrawn": "Les messages qu’il a retirés ne sont pas renvoyés.",

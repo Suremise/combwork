@@ -175,6 +175,7 @@
   "service.laneStarts.freshBlockedBody": "{why, select, timeout {Il n’a pas été libre en {minutes, plural, one {# minute} many {# minutes} other {# minutes}}.} uncertain {Hive s’est fermé pendant son démarrage : il n’a peut-être pas démarré.} other {{reason}}} Réessaie depuis la ligne du couloir dans le panneau Progression, ou termine le couloir. Ses cartes attendent jusque-là.",
   "service.laneStarts.freshBlockedTitle": "La nouvelle conversation de {agent} n’a pas démarré",
   "service.lanes.noWorkspace": "Aucun espace de travail n’est ouvert",
+  "service.lanes.teamPaused": "L’équipe est en pause (avant une mise à jour) : reprends d’abord l’équipe, puis lance le couloir.",
   "service.lanes.unknown": "Couloir inconnu : {id}",
   "service.mcp.addedDropped": "Chaque projet et l’Assistant Hive listent les serveurs qui y tournaient. {n, plural, one {# choix gardé pour un serveur désactivé dans l’espace de travail a été abandonné} many {# choix gardés pour des serveurs désactivés dans l’espace de travail ont été abandonnés} other {# choix gardés pour des serveurs désactivés dans l’espace de travail ont été abandonnés}} : ajoute un serveur dans l’onglet MCP d’un projet là où tu en as besoin.",
   "service.mcp.addedTitle": "Les serveurs MCP sont maintenant ajoutés là où ils tournent",

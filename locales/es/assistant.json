@@ -728,6 +728,8 @@
   "assistant.undo.why.start": "Su inicio se queda en el trabajo de la tarjeta: deshacer devuelve la tarjeta, pero no anula el inicio.",
   "assistant.undo.why.startReview": "La revisión que inició se queda en el trabajo de la tarjeta.",
   "assistant.undo.why.submit": "Su envío se queda en el trabajo de la tarjeta.",
+  "assistant.undo.why.teamPaused": "Un equipo que pausó sigue en pausa: reanúdalo si debe continuar.",
+  "assistant.undo.why.teamResumed": "Un equipo que reanudó no vuelve a pausarse: páusalo si debe esperar.",
   "assistant.undo.why.templateCards": "Las tarjetas y los carriles de los agentes que una plantilla reemplazó quedan como los dejó la carga (tarjetas devueltas, carriles terminados): deshacer no se los devuelve.",
   "assistant.undo.why.verdict": "Su veredicto se queda en el trabajo de la tarjeta, y su ronda con él.",
   "assistant.undo.why.withdrawn": "Los mensajes que retiró no se vuelven a enviar.",

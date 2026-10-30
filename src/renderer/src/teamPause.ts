@@ -5,9 +5,9 @@ import { call } from './api'
 import { notify } from './store'
 
 const STILL = {
-  title: msg({ id: 'team.stillPaused', defaultMessage: 'The team is still paused', description: "A notice as Hive's window opens (HI-2081): the team was paused before Hive last closed (not for an update that has now been installed), so Hive starts no lane card and wakes no agent until the user resumes it." }),
-  body: msg({ id: 'team.stillPausedBody', defaultMessage: "No lane starts a card and no agent is woken until you resume the team. The Progress panel's Lanes says what still runs.", description: 'The notice that the team is still paused as the window opens (HI-2081).' }),
-  resume: msg({ id: 'team.stillPausedResume', defaultMessage: 'Resume the Team', description: 'A button in the notice that the team is still paused (HI-2081): resumes it.' })
+  title: msg({ id: 'board.team.stillPaused', defaultMessage: 'The team is still paused', description: "A notice as Hive's window opens (HI-2081): the team was paused before Hive last closed (not for an update that has now been installed), so Hive starts no lane card and wakes no agent until the user resumes it." }),
+  body: msg({ id: 'board.team.stillPausedBody', defaultMessage: "No lane starts a card and no agent is woken until you resume the team. The Progress panel's Lanes says what still runs.", description: 'The notice that the team is still paused as the window opens (HI-2081).' }),
+  resume: msg({ id: 'board.team.stillPausedResume', defaultMessage: 'Resume the Team', description: 'A button in the notice that the team is still paused (HI-2081): resumes it.' })
 }
 
 /**
