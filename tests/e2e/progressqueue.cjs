@@ -55,8 +55,6 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       w.isFocused = () => true
       w.emit('focus')
     })
-    const reviewer = await q.agent(fx, h, 'R1')
-    check('the reviewer has its token', !!reviewer.token)
     const view = async () => (await inv('queue:list', fx.alpha, TARGET))[0]
     const keyOf = async (n) => (await h.card(n))?.key
     const column = async (n) => (await h.card(n))?.column
@@ -87,7 +85,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     }
 
     // --- HI-2165, one queue alone (alpha's, not worked on yet): left out under All projects while idle, with the filter
-    // offered all the same, and shown when alpha is chosen there.
+    // offered all the same, and shown when alpha is chosen there. Before its agents start (starting one marks alpha
+    // worked on).
     await showTab('merges')
     const projectFilter = panel.getByRole('combobox', { name: 'Show the runs of' })
     check("under All projects, an inactive project's idle queue isn't shown, even as the only one (HI-2165)", !!(await until(async () => (await projectFilter.count()) === 1 && (await card.count()) === 0, HUNG_MS)), await panel.innerText().catch(() => ''))
@@ -98,6 +97,8 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
 
     // --- Hive merges, nothing queued: the queue's card shows, empty, for the project being worked on (HI-2165: beta,
     // not worked on, is left out under All projects while its queue is idle).
+    const reviewer = await q.agent(fx, h, 'R1')
+    check('the reviewer has its token', !!reviewer.token)
     await inv('project:setActive', fx.alpha, true)
     await inv('workflow:setOptions', beta, { preset: null, options: q.queueOptions(fx) })
     check("the Merges tab shows the queue's card, empty, while the options have Hive merge", !!(await until(async () => /Merge queue · integration/.test(await cardText()) && /Nothing queued\./.test(await cardText()), HUNG_MS)), JSON.stringify({ panel: await panel.innerText().catch(() => ''), alpha: await inv('queue:list', fx.alpha).catch((e) => String(e)), beta: await inv('queue:list', beta).catch((e) => String(e)), projects: (await inv('workspace:refresh')).projects.map((p) => p.path) }))
