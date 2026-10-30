@@ -2448,11 +2448,11 @@ module.exports.SCENARIOS = [
     id: 'card-loop-lane-next',
     title: "A card loop builder whose lane's first card goes Done while it reads the wake (HI-1990): once its turn ends, Hive starts the lane's next card on it, with no prompt from the user or the Assistant",
     // The first card's work as merged (HI-2047): without it the next card can't be built, and a model asks the user why.
-    files: { 'src/greet.js': "module.exports = (name) => 'Hi, ' + name\n" },
+    files: { 'greet.js': "module.exports = (name) => 'Hi, ' + name\n" },
     async setup(c) {
       await reviewedPair(c)
-      const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'doing' })
-      const b = await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
+      const a = await c.card('a', { title: 'greet() says Hi', description: 'greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'doing' })
+      const b = await c.card('b', { title: 'greet() trims the name', description: 'greet.js: greet trims spaces around the name.', agent: 'coder' })
       await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a, b], name: 'greetings' })
     },
     // The first card Done (merged, as the user moves it) while the builder is in its turn: Hive waits for the turn's end.
