@@ -94,7 +94,6 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   }
   await toReview(n1)
   await verdict(n1, 'passed')
-  await inv('tasks:update', n1, { column: 'done' })
   await toReview(n2)
   await verdict(n2, 'passed')
   // #3: failed once, back in Review for round 2. #4: failed, being fixed in Doing.
@@ -109,10 +108,9 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await inv('tasks:update', n7, { column: 'hold' })
   await inv('tasks:update', n8, { column: 'todo' })
   check('the board is set up', back.status === 200, JSON.stringify(back))
-  // A long lane: 18 cards done, 4 to do.
+  // A long lane: 18 cards done (once it has started, below), 4 to do.
   const long = []
   for (let i = 0; i < 22; i++) long.push(await make(`Long ${i + 1}`, 'todo', b3.id))
-  for (const n of long.slice(0, 18)) await inv('tasks:update', n, { column: 'done' })
   await inv('tasks:update', long[18], { column: 'doing' })
   const short = [await make('Small fix', 'review', r1.id), await make('Follow-up', 'todo', r1.id)]
 
@@ -163,6 +161,10 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const l3 = await startLane('R1', null, null, short)
   const l4 = await startLane('B5', 'R1', 'merged earlier', [n1, n2])
   const l5 = await startLane('B6', null, 'given up', [n5, n8])
+  // Cards merged while their lanes run (HI-2176): a lane started leaves out a card already Done (HI-2097), so #1 and
+  // the long lane's first 18 go to Done only now.
+  await inv('tasks:update', n1, { column: 'done' })
+  for (const n of long.slice(0, 18)) await inv('tasks:update', n, { column: 'done' })
   const ended = await api(workspaceToken, 'POST', `/v1/lanes/${l4}/end`, { mergeCommit: 'abc1234' })
   const dropped = await api(workspaceToken, 'POST', `/v1/lanes/${l5}/end`, { abandoned: true })
   const l6 = await startLane('B7', 'R1', 'six of six', [await make('Seventh lane, one', 'doing')])
