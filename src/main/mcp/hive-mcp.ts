@@ -709,7 +709,7 @@ const tools: Tool[] = [
   {
     name: 'hive_template',
     description:
-      "A project's agent templates: list, plan (what loading one would do, changing nothing), load (replaces every agent of the project, and sets its workflow options) and apply (Choose Connections: its existing agents' connections, by role or name, nothing else changed). Only when the user asked for it. (detail: use-hive-api, tools.md)",
+      "A project's agent templates: list, plan (what loading one would do, changing nothing), load (replaces every agent of the project and sets its workflow options), apply (only its agents' connections). Only when the user asked for it. (detail: use-hive-api, tools.md)",
     inputSchema: {
       type: 'object',
       properties: {
@@ -719,7 +719,7 @@ const tools: Tool[] = [
         scope: { type: 'string', enum: ['hive', 'workspace', 'project'], description: 'When a name is in several.' },
         from: { type: 'string', description: "A project's template kept in another project: that project." },
         names: { type: 'object', additionalProperties: { type: 'string' }, description: 'New names for its agents: place ("1") or name → the name.' },
-        connections: { type: 'object', additionalProperties: { type: 'string' }, description: 'plan, load, apply: "*", builder, reviewer, either, generalist or an agent\'s name → a connection\'s id or name (an agent\'s over its role\'s over "*"). load: unnamed ones get the first connection on the CLI their role suggests; apply: unnamed agents keep theirs.' },
+        connections: { type: 'object', additionalProperties: { type: 'string' }, description: '"*", a role or an agent\'s name → a connection\'s id or name (agent over role over "*").' },
         workflow: { type: 'boolean', description: 'Set its workflow options (default true).' }
       },
       required: ['action', 'project']
