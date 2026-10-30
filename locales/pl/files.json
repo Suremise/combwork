@@ -1,7 +1,7 @@
 {
   "files.attach.cardArchived": "Zarchiwizowana",
   "files.attach.cardsKept": "Zostają przy karcie, dopóki nie zostanie usunięta: Wyczyść i Wyczyść całkowicie ich nie usuwają.",
-  "files.attach.openCard": "Otwórz {card}",
+  "files.attach.openCard": "Otwórz kartę {card}",
   "files.attach.toCard": "Dołącz do karty",
   "files.attachments.all": "Wszystkie",
   "files.attachments.archived": "{host, select, assistant {Zarchiwizowane rozmowy} other {Zarchiwizowane sesje}}",

@@ -258,7 +258,7 @@
   "actions.template.blockedMessage": "{project, select, none {このプロジェクト} other {{project}}}にはまだ読み込めません：",
   "actions.template.blockedTitle": "「{name}」はまだ読み込めません",
   "actions.template.everyProject": "ワークスペースのすべてのプロジェクト用（オフならこのプロジェクト専用）",
-  "actions.template.includeWorkflow": "このプロジェクトのワークフローを含める（{platform}のルール：レビュー、名前によるチェック、マージ、ステージ。ターゲットブランチ、チェックのコマンド、IDの名前は含めません）",
+  "actions.template.includeWorkflow": "このプロジェクトのワークフローを含める（{platform}のルール：レビュー、名前によるチェック、マージ、ステージ。マージ先ブランチ、チェックのコマンド、IDの名前は含めません）",
   "actions.template.load": "テンプレートを読み込む",
   "actions.template.loadAdds": "{project}にテンプレートのエージェントを追加します。",
   "actions.template.loadReplaces": "{project}のエージェントをすべて置き換えます。",

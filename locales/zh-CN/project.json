@@ -293,6 +293,7 @@
   "project.overview.byAgent": "按智能体",
   "project.overview.mergeSlot": "合并槽位",
   "project.overview.noAgents": "没有智能体。",
+  "project.overview.noAnswer": "{seconds, number} 秒内无响应",
   "project.overview.period": "时间范围",
   "project.overview.periodHint": "该时间范围内所有提供方的用量，按日历日统计：跨越多天的会话只计入落在该范围内的部分。",
   "project.overview.running": "正在运行",

@@ -30,7 +30,7 @@
   "hooks.note.unsure": "{what}: {why}",
   "hooks.receiver": "through Hive's {form} hook",
   "hooks.refresh": "Refresh",
-  "hooks.response": "{response, select, none {Nothing to say} context {Sent context} allowed {Allowed} warned {Allowed, with a warning} asked {Asked the user} blocked {Blocked} error {Error} other {Unknown}}",
+  "hooks.response": "{response, select, none {Nothing to say} context {Sent context} allowed {Allowed} warned {Allowed, with a warning} asked {Asked you} blocked {Blocked} error {Error} other {Unknown}}",
   "hooks.source": "{source, select, hive {Hive} managed {Managed settings} cli {Command line} project {Project} local {Project (local)} user {User} plugin {Plugin} other {Other}}",
   "hooks.stale": "The agent has restarted since this was read: it shows its earlier session.",
   "hooks.status": "{status, select, passed {Passed by Hive} trusted {Trusted} untrusted {Not trusted: won't run} modified {Changed since trusted: won't run} unverified {Configured · loading unverified} disabled {Turned off} notLoaded {Not loaded} unsupported {Unknown form} other {Unknown}}",

@@ -63,7 +63,7 @@
   "activity.thinking": "考え中…",
   "activity.toolFor": "{summary} · {time}",
   "activity.workspace.agentIn": "{project} · {agent}",
-  "activity.workspace.assistant": "Assistant",
+  "activity.workspace.assistant": "アシスタント",
   "activity.workspace.cardNobody": "いま {card} の作業をしている人はいません。履歴はカードにあります。",
   "activity.workspace.clearCard": "すべてのエージェントを表示",
   "activity.workspace.empty": "このワークスペースで実行中のものはありません。エージェントを起動すると、ここで実行内容を確認できます。",
@@ -75,6 +75,6 @@
   "activity.workspace.projects": "プロジェクト",
   "activity.workspace.showIn": "アクティビティで表示",
   "activity.workspace.whole": "ワークスペース全体",
-  "activity.workspace.wholeTip": "すべてのプロジェクトの実行中のエージェント（プロジェクトごと）と、実行中の Assistant。",
+  "activity.workspace.wholeTip": "すべてのプロジェクトの実行中のエージェント（プロジェクトごと）と、実行中のアシスタント。",
   "activity.writing": "書いています…"
 }

@@ -256,7 +256,7 @@
   "shell.modes.nothingDetail": "Każdy działający agent ma już tryb wskazany w jego ustawieniach.",
   "shell.modes.someSkipped": "Nie przełączono niektórych agentów",
   "shell.modes.switched": "Przełączono tryb uprawnień",
-  "shell.noticeTarget.agentGone": "{agent} nie jest już w projekcie {project}",
+  "shell.noticeTarget.agentGone": "Agent {agent} nie jest już w projekcie {project}",
   "shell.noticeTarget.cardElsewhere": "Karta {card} jest na tablicy obszaru roboczego {workspace}, który nie jest otwarty",
   "shell.noticeTarget.cardGone": "Karty {card} nie ma już na tablicy",
   "shell.notifications.clearAll": "Wyczyść wszystko",

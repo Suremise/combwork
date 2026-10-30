@@ -59,7 +59,7 @@
   "content.skill.notClosed": "o cabeçalho não está fechado (nenhuma linha com --- depois dele)",
   "content.skill.notClosedWithin": "o cabeçalho não termina nos primeiros {kb} KB",
   "content.skill.notFields": "o cabeçalho não é uma lista de campos (`name: …`, `description: …`)",
-  "content.skill.notListed": "Essa pasta não é um skill que o Hive mostra.",
+  "content.skill.notListed": "Essa pasta não é uma skill que o Hive mostra.",
   "content.skill.notSkill": "Não é uma pasta de skill (sem SKILL.md)",
   "content.skill.yaml": "o cabeçalho não é um YAML válido ({reason})",
   "content.skill.yamlAt": "o cabeçalho não é um YAML válido (linha {line}: {reason})",

@@ -1540,7 +1540,7 @@
     "description": "The status bar's quiet item: how many agents finished their turn since the user last looked (\"3 finished\"). Keep it short."
   },
   "board.inbox.finishedHeading": {
-    "defaultMessage": "Finished ({n})",
+    "defaultMessage": "Finished ({n, number})",
     "description": "Heading in the inbox popover above the agents that finished since the user last looked, with how many ({n}). Not something that waits for the user."
   },
   "board.inbox.finishedTip": {
@@ -1560,7 +1560,7 @@
     "description": "Heading in the inbox popover above what waits for the user, when nothing does."
   },
   "board.inbox.needYouHeading": {
-    "defaultMessage": "Need you ({n})",
+    "defaultMessage": "Need you ({n, number})",
     "description": "Heading in the inbox popover above what waits for the user (requests on cards, agents stopped in their panes), with how many ({n})."
   },
   "board.inbox.needYouThings": {
@@ -2076,7 +2076,7 @@
     "description": "Accessible name of a lane's cards in order, opened under it in the Progress panel's Lanes tab ({lane}: its builder / reviewer)."
   },
   "board.lanes.queueState": {
-    "defaultMessage": "{state, select, done {Done} doing {Doing} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}",
+    "defaultMessage": "{state, select, done {Done} doing {Active} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}",
     "description": "A card's state in a lane's cards, opened in the Progress panel's Lanes tab (its icon's name): done, being worked on, in review, not started, waiting for the user (blocked, on hold or at its round limit), gone from the board, or not recorded by the lane. Keep the select keys."
   },
   "board.lanes.retryFresh": {

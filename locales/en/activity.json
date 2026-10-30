@@ -8,11 +8,11 @@
     "description": "The first entry of the Activity tab's Agents and Cards menus: no filter, everything."
   },
   "activity.block.asked": {
-    "defaultMessage": "{other, select, yes {Edit waiting for your OK: {file} is locked by an agent of another project} other {Edit waiting for your OK: {file} is locked by {holder}}}",
+    "defaultMessage": "{other, select, yes {Edit waiting for your OK: {file} is locked by an agent of another project} other {Edit waiting for your OK: {file} is locked by agent {holder}}}",
     "description": "In the Activity tab, under Now: Hive's file lock (Ask me) holds the agent's edit of a file another agent is editing until the user allows it. {file} is the file's path; {holder} the agent editing it."
   },
   "activity.block.blocked": {
-    "defaultMessage": "{other, select, yes {Edit blocked: {file} is locked by an agent of another project} other {Edit blocked: {file} is locked by {holder}}}",
+    "defaultMessage": "{other, select, yes {Edit blocked: {file} is locked by an agent of another project} other {Edit blocked: {file} is locked by agent {holder}}}",
     "description": "In the Activity tab, under Now: Hive's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it."
   },
   "activity.block.for": {
@@ -36,7 +36,7 @@
     "description": "Tooltip of the button closing the Activity tab's details panel."
   },
   "activity.column": {
-    "defaultMessage": "{column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}",
+    "defaultMessage": "{column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
     "description": "A card node's second line in the Activity tree: its board column. Use the board's column names."
   },
   "activity.cpuLabel": {

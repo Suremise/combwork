@@ -59,7 +59,7 @@
   "content.skill.notClosed": "su encabezado no está cerrado (no hay una línea --- después)",
   "content.skill.notClosedWithin": "su encabezado no se cierra dentro de sus primeros {kb} KB",
   "content.skill.notFields": "su encabezado no es una lista de campos (`name: …`, `description: …`)",
-  "content.skill.notListed": "Esa carpeta no es un skill que Hive muestre.",
+  "content.skill.notListed": "Esa carpeta no es una habilidad que Hive muestre.",
   "content.skill.notSkill": "No es una carpeta de habilidad (no hay SKILL.md)",
   "content.skill.yaml": "su encabezado no es YAML válido ({reason})",
   "content.skill.yamlAt": "su encabezado no es YAML válido (línea {line}: {reason})",

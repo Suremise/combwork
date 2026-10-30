@@ -45,7 +45,7 @@
   "files.attachments.tabs": "添付ファイル",
   "files.attachments.title": "添付ファイル",
   "files.attachments.total": "{host, select, assistant {{groups, plural, other {#件の会話}}に{total, number}件} other {{groups, plural, other {#件のセッション}}に{total, number}件}}",
-  "files.attachments.totalWithCards": "{total, plural, other {# 個のファイル}} · カードに {cards, number} 個、{groups, plural, other {# 件のセッション}}に {sessions, number} 個",
+  "files.attachments.totalWithCards": "{total, plural, other {#件のファイル}} · カードに{cards, number}件、{groups, plural, other {#件のセッション}}に{sessions, number}件",
   "files.attachments.unnamed": "{host, select, assistant {会話{id}} other {セッション{id}}}",
   "files.attachments.view": "表示",
   "files.collapseAll": "すべて折りたたむ",

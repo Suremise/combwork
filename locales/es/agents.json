@@ -262,7 +262,7 @@
   "agents.permission.dangerDetail": "Úsalo solo para trabajo desechable en el que los errores no puedan hacer daño. Es posible que {provider} muestre su propia advertencia la primera vez; respóndela en la terminal.",
   "agents.permission.dangerMessage": "{where}: se ejecutarán todos los comandos, ediciones y llamadas de red sin preguntar.",
   "agents.permission.dangerTitle": "¿Usar {mode}?",
-  "agents.permission.editConnection": "Editar «{connection}»…",
+  "agents.permission.editConnection": "Editar “{connection}”…",
   "agents.permission.menu": "Modo de permisos",
   "agents.permission.menuAgent": "Modo de permisos — {agent}",
   "agents.permission.noConnection": "Aún no hay conexión: elige una en Configuración del agente",

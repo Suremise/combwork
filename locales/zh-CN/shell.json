@@ -330,7 +330,7 @@
   "shell.setup.notInstalled": "未安装 {provider}",
   "shell.setup.notInstalledDetail": "Hive 在每个项目中运行独立的 {provider} 命令行工具。它不随 Hive 捆绑提供，请使用 {company} 的官方安装程序安装。",
   "shell.setup.off": "{provider} 未启用，因此 Hive 不会运行它。<on>启用</on>",
-  "shell.setup.openConnections": "打开账号与连接",
+  "shell.setup.openConnections": "打开“账号与连接”",
   "shell.setup.rejected": "已忽略编辑器扩展中捆绑的 {n, plural, other {# 个副本}}（{path}）。Hive 只使用独立的 CLI。",
   "shell.setup.setUp": "{provider} 已配置完成。",
   "shell.setup.signedIn": "{provider} 已登录。",

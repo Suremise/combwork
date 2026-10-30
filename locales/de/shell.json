@@ -372,7 +372,7 @@
   "shell.status.stopped": "Gestoppt",
   "shell.status.teamParked": "Team geparkt",
   "shell.status.teamPaused": "Team pausiert",
-  "shell.status.teamPausedTip": "Das Team ist pausiert: Keine Lane startet eine Karte und kein Agent wird geweckt, bis du es fortsetzt. Unter Lanes im Bereich Fortschritt steht, was noch läuft.",
+  "shell.status.teamPausedTip": "Das Team ist pausiert: Keine Lane startet eine Karte und kein Agent wird geweckt, bis du es fortsetzt. Unter „Lanes“ im Fortschrittspanel steht, was noch läuft.",
   "shell.status.waiting": "Wartet auf dich",
   "shell.status.waitingOnTasks": "{n, plural, one {Wartet auf # Hintergrundaufgabe} other {Wartet auf # Hintergrundaufgaben}}",
   "shell.status.watching": "Wartet auf Karten",

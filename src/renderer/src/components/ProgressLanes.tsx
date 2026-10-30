@@ -816,7 +816,7 @@ function LaneQueue({ lane: l, badges }: { lane: Lane; badges: Map<number, WorkBa
         const known = state !== 'gone' && state !== 'unrecorded'
         const time = known ? laneCardTime(c.column, badges.get(c.number), l.frozen ? l.endedAt : null, now) : null
         const label = cardLabelOf({ tasks }, c.number)
-        const stateText = tr(msg({ id: 'board.lanes.queueState', defaultMessage: '{state, select, done {Done} doing {Doing} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}', description: "A card's state in a lane's cards, opened in the Progress panel's Lanes tab (its icon's name): done, being worked on, in review, not started, waiting for the user (blocked, on hold or at its round limit), gone from the board, or not recorded by the lane. Keep the select keys." }), { state }) // i18n-ignore: a select's key, never shown
+        const stateText = tr(msg({ id: 'board.lanes.queueState', defaultMessage: '{state, select, done {Done} doing {Active} review {In review} todo {To do} waiting {Waiting for you} gone {Gone} other {Not recorded}}', description: "A card's state in a lane's cards, opened in the Progress panel's Lanes tab (its icon's name): done, being worked on, in review, not started, waiting for the user (blocked, on hold or at its round limit), gone from the board, or not recorded by the lane. Keep the select keys." }), { state }) // i18n-ignore: a select's key, never shown
         return (
           <li key={c.number} className={cx('progress-lane-queue-row', state)} data-card={c.number} data-state={state}>
             <Icon name={QUEUE_ICON[state]} className="progress-lane-queue-icon" aria-label={stateText} title={stateText} />

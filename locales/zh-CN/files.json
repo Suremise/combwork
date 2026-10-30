@@ -14,7 +14,7 @@
   "files.attachments.deleteDetail": "会话记录中仍会提到它的路径。",
   "files.attachments.deleteFailed": "无法删除附件",
   "files.attachments.deleteMessage": "要将“{name}”移到回收站吗？",
-  "files.attachments.desc": "随本项目卡片保留的文件，以及粘贴或拖放到其代理会话中的文件。",
+  "files.attachments.desc": "随本项目卡片保留的文件，以及粘贴或拖放到其智能体会话中的文件。",
   "files.attachments.descAssistant": "粘贴或拖放到助手中的文件，按对话分组。",
   "files.attachments.filters": "显示",
   "files.attachments.groupDelete": "{host, select, assistant {删除此对话的附件…} other {删除此会话的附件…}}",
