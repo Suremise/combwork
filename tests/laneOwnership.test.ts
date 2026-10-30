@@ -221,8 +221,8 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
   it("HI-2169: the Assistant's, the user's or a script's start still takes a card off; with rules off, the builder's own does too", async () => {
     const [a, b] = [await make('Off a'), await make('Off b')]
     const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a, b], by: 'Assistant' })).lane
-    const off = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a], by: 'Assistant' })
-    expect([off.lane.cards.map((c) => c.number), off.note]).toEqual([[a], undefined])
+    const takenOff = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a], by: 'Assistant' })
+    expect([takenOff.lane.cards.map((c) => c.number), takenOff.note]).toEqual([[a], undefined])
     await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a, b], by: 'Assistant' })
     await advanced.set(ENFORCE, false)
     const unruled = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a], ownBuilder: true, by: 'B2 (alpha)' })
