@@ -90,7 +90,8 @@ async function busyCoder(c, fakeSecs, secs, agent = c.agents.coder, why = '') {
 /** Coder's (or `agent`'s) live session (status, runId, sessionId), or undefined. */
 const coderLive = async (c, agent = c.agents.coder) => (await c.inv('session:live')).find((s) => s.projectPath.toLowerCase() === c.alpha.toLowerCase() && s.agentId === agent.id)
 /**
- * Starts Coder (or `agent`; a trust question answered), waits until it's ready and types `task` in, until it is working.
+ * Starts Coder (or `agent`; a trust question answered), or takes it as it is when already running or starting, waits
+ * until it's ready and types `task` in, until it is working.
  * With no task, leaves it started and idle. Throws when it doesn't get there (`setup: …`, with its status and the end of
  * its screen, and the environment problem when the screen shows one), so a scenario never runs on a fixture it didn't get.
  */
@@ -103,7 +104,9 @@ async function coderTask(c, task, agent = c.agents.coder) {
     const env = lib.environmentProblem(screen)
     throw new Error(`setup: ${agent.name ?? agent.id} ${what} (status ${(await coderLive(c, agent))?.status ?? 'not running'})${env ? `; environment: ${env}` : ''}; its screen ends: ${screen.slice(-400)}`)
   }
-  await c.inv('session:start', c.alpha, { agentId: agent.id })
+  // Reused when Hive started it first (HI-2094: a lane's builder is started with its card by Hive's lane start, which
+  // may land before or during this start), then waited for until it is ready as one started here.
+  if (!(await coderLive(c, agent))) await c.inv('session:start', c.alpha, { agentId: agent.id }).catch(async (e) => { if (!(await coderLive(c, agent))) throw e })
   for (let t = Date.now(); Date.now() - t < 90000 && !['ready', 'finished'].includes((await coderLive(c, agent))?.status); ) {
     // Terminal UIs draw spaces as cursor moves: matched as plain text.
     const lib = require('../e2e/lib.cjs')
