@@ -3542,7 +3542,14 @@ switches to "The agent merges", and one started afterwards reports its merge.
   read "HI-2046 is in Doing; latest comment by HR1: Round 2: PASSED", and HB2 took the card as merged): a card watch's
   line for a card moved back to work by the queue (`queueReturnOf` in `watches.ts`, `WakeAbout.queueReturn`) is the
   return's own words in place of where it is and its latest comment, with others or alone; an inbox item telling
-  several of a card's events leads with its latest return ("… (with 2 more changes: read the card)"). And the queue
+  several of a card's events leads with its latest return ("… (with 2 more changes: read the card)"). Its **reviewer is
+  woken when the builder submits it again** (HI-2143: HR2's watch on HI-2122, any move counted, began in Review before its
+  pass; the card left and came back, and the watch, comparing only where it was, never fired, while Hive's loop wake left
+  it to that watch): a watch on any move counts a card that left and came back unless every move since was the watcher's
+  own, and a card watch's line or loop wake to anyone but the builder for a card back in Review, submitted after the
+  queue's return with no verdict since (`resubmittedOf` in `queueReturn.ts`, `WakeAbout.resubmitted`), leads with "HI-12
+  is back in Review after the merge queue returned it (a conflict with main in …); HB1 resolved it and submitted it
+  again: review the resolution" ("changed it … review what changed" for another return). And the queue
   leaves a **comment of Hive's on the card** (a `comment` action after the change commits, written once by the action's
   id): its English is the return's words with more room (1,500 characters, 10 of the output's last lines), what agents
   read with `latestComment`; the window shows a message of its own (`tasks.history.queueReturned`: why, the target, the

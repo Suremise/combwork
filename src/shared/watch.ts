@@ -232,7 +232,10 @@ export function changesSince(card: TaskCard | null, base: Baseline & { since: st
   const moves = h.filter((e) => intoColumn(e.what))
   const ownMoves = !!base.watcher && moves.length > 0 && moves.every((e) => e.by === base.watcher)
   const moved = !!cond.column && h.some((e) => intoColumn(e.what) === cond.column && e.by !== base.watcher)
-  if (kinds.has('column') && ((now.column !== base.mark.column && !ownMoves) || moved) && (!cond.column || now.column === cond.column)) out.push('column')
+  // HI-2143: a watch on any move counts a card that left and came back (HR2's on HI-2122, begun in Review: passed,
+  // returned by the merge queue, submitted again, in Review once more), unless every move since was its own.
+  const back = !cond.column && moves.length > 0 && !ownMoves
+  if (kinds.has('column') && ((now.column !== base.mark.column && !ownMoves) || moved || back) && (!cond.column || now.column === cond.column)) out.push('column')
   if (kinds.has('comment') && c.length) out.push('comment')
   if (kinds.has('verdict') && h.some((e) => VERDICT.test(e.what))) out.push('verdict')
   if (kinds.has('agent') && now.agent !== base.mark.agent) out.push('agent')
@@ -379,6 +382,12 @@ export interface WakeAbout {
    * reviewer's pass, saying the opposite of what happened).
    */
   queueReturn?: string
+  /**
+   * HI-2143: the card is back in Review, submitted again after the merge queue returned it (queueReturn.ts's
+   * resubmittedIn): the line leads with that, for its reviewer, in place of where it is and its latest comment (its own
+   * pass).
+   */
+  resubmitted?: string
 }
 
 /**
@@ -546,6 +555,8 @@ export type LoopWakeKind = (typeof LOOP_WAKE_KINDS)[number]
 function lineOf(change: CardChange, tail: string): string {
   // HI-2087: a card the merge queue returned leads with the return and its reason (its words name the card).
   if (change.about?.queueReturn) return returnLine(change.about.queueReturn, (t) => `[Hive] ${t}${tail}`)
+  // HI-2143: and a card submitted again after that return, for its reviewer.
+  if (change.about?.resubmitted && change.changes !== 'gone') return returnLine(change.about.resubmitted, (t) => `[Hive] ${t}${tail}`)
   const head = `[Hive] ${cardRef(change.number)}${whereNow(change)}`
   if (!change.comment) return head + tail
   // The card, its state and what to do always fit (names are short); the comment's first line gives way, cut with "…".
@@ -636,6 +647,12 @@ export function cardPart(c: CardChange, max: number): string {
   if (back && c.changes !== 'gone') {
     const t = [...back.replace(/\.$/, '')]
     return max > 0 ? (t.length > max * 2 ? `${t.slice(0, max * 2 - 1).join('')}…` : t.join('')) : `${cardRef(c.number)} ${CAME_BACK}`
+  }
+  // HI-2143: a card submitted again after that return, for its reviewer.
+  const again = c.about?.resubmitted
+  if (again && c.changes !== 'gone') {
+    const t = [...again.replace(/\s+/g, ' ').trim()]
+    return max > 0 ? (t.length > max * 2 ? `${t.slice(0, max * 2 - 1).join('')}…` : t.join('')) : `${cardRef(c.number)} is back in Review after the merge queue returned it`
   }
   const head = `${cardRef(c.number)}${whereNow(c, max)}`
   if (!c.comment || max <= 0 || c.changes === 'gone') return head

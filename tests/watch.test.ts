@@ -11,7 +11,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { alreadyThere, loopWakeLine, changesBetween, decodeSince, encodeSince, limitLine, markOf, movedIntoSince, readCondition, returnRound, WAKE_MAX_BYTES, wakeAbout, wakeLine, wakeLines, carriedOver, changesSince, entryWithin, seenOf, watchLabel, cardChange, LANES_RUNNING_TAIL, withLanesTail, brief, handoffsSince, hearsHandoffs } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
-import { returnedWake } from '../src/main/workflow/queueState'
+import { resubmittedText, returnedWake } from '../src/main/workflow/queueState'
 import { hookStep } from '../src/main/hookStatus'
 import type { TaskCard } from '../src/shared/types'
 import type { WatchCondition } from '../src/shared/watch'
@@ -156,6 +156,23 @@ describe('what counts as a change', () => {
     expect(changesSince(back, base, { changes: ['column'], column: 'passed', moveInto: true })).toEqual(['column'])
     // Without a watcher (the Assistant's watches), every move counts as before.
     expect(changesSince(sent, { ...base, watcher: undefined }, anyMove)).toEqual(['column'])
+  })
+
+  it('a watch on any move counts a card that left and came back by another, not by its own moves alone (HI-2143: HR2 on HI-2122)', () => {
+    const h = (m: number, what: string, by: string) => ({ at: at(m), by, what })
+    // HR2's watch begun in Review, before its pass.
+    const review = cardOf({ column: 'review', agent: 'a1', history: [h(1, 'Moved to Review', 'B (alpha)'), h(2, 'Started reviewing', 'R (alpha)')] })
+    const base = { mark: markOf(review), seen: seenOf(review), since: at(2), watcher: 'R (alpha)' }
+    const anyMove = { changes: ['column' as const] }
+    // Its pass, and the queue's return in its name: its own moves, no news.
+    const returned = { ...review, column: 'doing' as const, history: [...review.history, h(3, 'Review passed', 'R (alpha)'), h(3, 'Moved to Passed', 'R (alpha)'), h(4, 'Moved to Doing', 'R (alpha)')] }
+    expect(changesSince(returned, base, anyMove)).toEqual([])
+    // Submitted again: in Review as when the watch began, but moved there by the builder.
+    const again = { ...returned, column: 'review' as const, history: [...returned.history, h(5, 'Moved to Review', 'B (alpha)')] }
+    expect(changesSince(again, base, anyMove)).toEqual(['column'])
+    // Back where it was by its own moves only: still no news.
+    const own = { ...review, history: [...review.history, h(3, 'Moved to Doing', 'R (alpha)'), h(4, 'Moved to Review', 'R (alpha)')] }
+    expect(changesSince(own, base, anyMove)).toEqual([])
   })
 
   it("a reviewer's request and the user's decisions count for a watch that counts a verdict, a move or a comment; not for one waiting only for a column, nor the watcher's own (#1272, #912)", () => {
@@ -318,6 +335,26 @@ describe('what counts as a change', () => {
     }
     // Another note of Hive's (a stale pass) is quoted after where the card is, as before.
     expect(loopWakeLine(passed, 'note', '#7: its pass is stale')).toMatch(/^\[Hive\] #7 is in Doing: HR1 \(hive\) passed it; latest comment by HR1 \(hive\): "Round 2: PASSED — no findings"\. Hive: "#7: its pass is stale"/)
+  })
+
+  it("HI-2143: a card submitted again after the merge queue returned it: its reviewer's line leads with the return and the files resolved, never its own pass", () => {
+    const c = cardOf({ column: 'review', agentName: 'HB1', comments: [{ at: at(5), by: 'HR2 (hive)', text: 'Pass: submission 38. No blocking findings.' }] })
+    const hunk = (line: number) => ({ line, before: [], ours: ['a'], theirs: ['b'], after: [] })
+    const conflict = { entry: 'HI-2122/e1', revision: 'a', target: '1.0.0', reason: 'conflict' as const, transient: false, files: ['src/main/projectAgents.ts', 'tests/providerDetect.test.ts'], conflicts: { oursIs: 'target' as const, files: [{ file: 'src/main/projectAgents.ts', hunks: [hunk(447)] }, { file: 'tests/providerDetect.test.ts', hunks: [hunk(78), hunk(89)] }] } }
+    const again = resubmittedText('HI-2122', conflict as never, 'HB1')
+    expect(again).toBe('HI-2122 is back in Review after the merge queue returned it (a conflict with 1.0.0 in src/main/projectAgents.ts (1 conflict, line 447), tests/providerDetect.test.ts (2 conflicts, lines 78 and 89)); HB1 resolved it and submitted it again: review the resolution')
+    const change = { ...cardChange(7, c, ['column']), about: { ...wakeAbout(c, ['column'], 'r1'), resubmitted: again } }
+    // Its own watch's line, and Hive's loop wake for it.
+    expect(wakeLine(change)).toBe(`[Hive] ${again}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`)
+    expect(loopWakeLine(change, 'review')).toBe(`[Hive] ${again}. You review this card in its loop: carry on with it (hive_read_task with latestComment for the comment in full).`)
+    expect(wakeLines([change, cardChange(8, cardOf({ number: 8, column: 'doing' }), ['column'])])).toMatch(/^\[Hive\] HI-2122 is back in Review after the merge queue returned it \(a conflict with 1\.0\.0 in src\/main\/projectAgents\.ts/)
+    // A merge check that failed: what changed, not a resolution; many files: within the line, one line.
+    expect(resubmittedText('HI-9', { entry: 'e', revision: 'a', target: 'main', reason: 'checks', transient: false, check: 'typecheck' }, 'HB1')).toBe('HI-9 is back in Review after the merge queue returned it (the merge check typecheck failed on the merged result); HB1 changed it and submitted it again: review what changed')
+    const many = resubmittedText('HI-9', { ...conflict, files: Array.from({ length: 40 }, (_, i) => `src/${'深'.repeat(30)}/f${i}.ts`), conflicts: undefined } as never, 'HB1')
+    const l = loopWakeLine({ ...change, about: { ...change.about, resubmitted: many } }, 'review')
+    expect(Buffer.byteLength(JSON.stringify(l))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
+    expect(l).not.toMatch(/\n/)
+    expect(l).toMatch(/^\[Hive\] HI-9 is back in Review after the merge queue returned it \(a conflict with 1\.0\.0 in .* and \d+ more\); HB1 resolved it/)
   })
 
   it('the wake line is one short line with the card, its column and the latest comment; the reply is lean', () => {

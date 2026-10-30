@@ -8,7 +8,7 @@ import { preset } from '../../src/shared/workflow/options'
 import { leftWake, NOT_RUN_HERE, pauseWait, queueLine, type PauseWait, queueOrder, queueStateOf, returnedText, WAKE_NOTE_MAX, type QueueLive } from '../../src/main/workflow/queueState'
 import { keptLog, KEPT_LOG, type PauseReason } from '../../src/main/workflow/mergeQueue'
 import { refusalLines } from '../../src/shared/workflow/refusals'
-import { returnIn } from '../../src/main/queueReturn'
+import { resubmittedIn, returnIn } from '../../src/main/queueReturn'
 import { agentOf } from '../../src/shared/workflow/facts'
 import { laneNextText } from '../../src/shared/lanes'
 import { cardChange, loopWakeLine } from '../../src/shared/watch'
@@ -179,6 +179,22 @@ describe('wakes at each queue outcome (what came back and what to do)', () => {
     moved(await e.wf.submit(card.key, B1, { summary: 'fixed' }))
     expect(returnIn(e.wf, card.id)).toBeNull()
     expect(returnIn(e.wf, 99999)).toBeNull()
+  })
+
+  it("a returned card submitted again is one for its reviewer, as its facts say (HI-2143's resubmittedIn): until a verdict on it, or the queue takes it again", async () => {
+    const e = team()
+    const { card, folder } = await queued(e, 'Again')
+    await e.queue({ runCheck: async () => ({ ok: false, output: '1 failing' }) }).drain('main')
+    // Returned, not submitted yet: the builder's, not the reviewer's.
+    expect(resubmittedIn(e.wf, card.id, 'B1')).toBeNull()
+    commit(folder, { 'src/fix.txt': 'fix\n' }, `${card.key}: fix`)
+    moved(await e.wf.submit(card.key, B1, { summary: 'fixed' }))
+    expect(resubmittedIn(e.wf, card.id, 'B1')).toBe(`${card.key} is back in Review after the merge queue returned it (the merge check quick failed on the merged result); B1 changed it and submitted it again: review what changed`)
+    // Reviewed and passed again: no longer.
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+    expect(resubmittedIn(e.wf, card.id, 'B1')).toBeNull()
+    expect(resubmittedIn(e.wf, 99999, 'B1')).toBeNull()
   })
 
   it('red checks: the check, its log, its last lines and the next step; within the wake line', async () => {

@@ -340,6 +340,22 @@ export const staleWake = (key: string, approved: string | null | undefined, curr
 /** A returned card's wake (#1354): its key, what came back, and what to do next. */
 export const returnedWake = (key: string, f: FactData['IntegrationFailed']): string => returnedText(key, f)
 
+/** How many characters a resubmitted card's wake gives what came back (its files): see resubmittedText. */
+const RESUBMITTED_ROOM = 200
+
+/**
+ * HI-2143: a card its builder submitted again after the merge queue returned it, for its reviewer: that it is back, what
+ * came back (the files of a conflict, in RESUBMITTED_ROOM characters: the wake line's bytes keep its end whole, in any
+ * script), who submitted it again and what to review. One sentence (agent-facing, English).
+ */
+export function resubmittedText(key: string, f: FactData['IntegrationFailed'], builder: string): string {
+  const named: FactData['IntegrationFailed'] = { ...f, target: clip(f.target, NAME_MAX), ...(f.check ? { check: clip(f.check, NAME_MAX) } : {}), ...(f.code ? { code: clip(f.code, NAME_MAX) } : {}) }
+  const conflict = f.reason === 'conflict' || (f.reason === 'notUpToDate' && !!f.files?.length)
+  const lead = `${clip(key, NAME_MAX)} is back in Review after the merge queue returned it (`
+  const tail = `); ${clip(builder, NAME_MAX)} ${conflict ? 'resolved it' : 'changed it'} and submitted it again: review ${conflict ? 'the resolution' : 'what changed'}`
+  return `${lead}${failureText(named, RESUBMITTED_ROOM)}${tail}`
+}
+
 /** How long the queue's comment on a returned card is, and how many of its output's last lines it quotes (HI-2087). */
 const COMMENT_MAX = 1500
 const COMMENT_LINES = 10
