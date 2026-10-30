@@ -205,7 +205,9 @@ const TipParent = createContext<((inner: boolean) => void) | null>(null)
  * HI-2052: the hover tooltip showing now, so only one shows at a time: another one showing hides it, unless it is
  * around the new one (an outer tooltip gives way to an inner one by TipParent, and shows again when the inner one goes).
  */
-let hovered: { wrap: HTMLElement; hide: () => void } | null = null
+let hovered: { owner: object; wrap: HTMLElement; hide: () => void } | null = null
+/** Whether a hover tooltip holds the slot, and whether its anchor is still in the page, for tests (HI-2084). */
+;(window as unknown as { __hiveHoveredTip?: () => { connected: boolean } | null }).__hiveHoveredTip = () => (hovered ? { connected: hovered.wrap.isConnected } : null)
 
 /**
  * Two sentences one after the other, each with its own full stop, spaced as the language does: a space in English,
@@ -223,6 +225,9 @@ export function sentences(first: ReactNode, second: ReactNode): ReactNode[] {
  */
 export function Tooltip({ content, children, delay = 350, block, side, focus, className }: { content: ReactNode; children: ReactNode; delay?: number; block?: boolean; side?: 'right'; focus?: boolean; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null)
+  // Who holds the hovered slot (HI-2084): this tooltip for as long as it is mounted. Its anchor's ref is already null when
+  // its unmount's cleanup runs, so the slot is released by this, never by the anchor.
+  const owner = useRef({})
   const tipRef = useRef<HTMLDivElement>(null)
   const [anchor, setAnchor] = useState<Box | null>(null)
   const [placed, setPlaced] = useState<{ left: number; top: number } | null>(null)
@@ -249,7 +254,7 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
       if (byHover.current) {
         // HI-2052: one hover tooltip at a time (an outer one stays, given way to this one by TipParent).
         if (hovered && hovered.wrap !== wrap && !hovered.wrap.contains(wrap)) hovered.hide()
-        hovered = { wrap, hide }
+        hovered = { owner: owner.current, wrap, hide }
       }
       setPlaced(null)
       setFit('normal')
@@ -258,7 +263,7 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
   }
   const hide = (): void => {
     window.clearTimeout(timer.current)
-    if (hovered?.wrap === ref.current) hovered = null
+    if (hovered?.owner === owner.current) hovered = null
     setAnchor(null)
     setPlaced(null)
     setFit('normal')
@@ -266,7 +271,7 @@ export function Tooltip({ content, children, delay = 350, block, side, focus, cl
   useEffect(
     () => () => {
       window.clearTimeout(timer.current)
-      if (hovered?.wrap === ref.current) hovered = null
+      if (hovered?.owner === owner.current) hovered = null
     },
     []
   )
