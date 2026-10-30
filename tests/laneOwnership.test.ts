@@ -166,12 +166,25 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     const made = Date.parse((await run(() => tasks.getTask(c))).createdAt!)
     const by = tasks.actorName(user)
     const turn = made - 1000
-    expect(await lanes.freshCardsNote(w, [c], 'HB6', turn, made + 3000)).toMatch(new RegExp(`^Warning: #${c} was created 3 s ago by ${by}: is it the card you meant\\? To put a new card on a lane, create it with hive_create_task's lane`))
-    expect(await lanes.freshCardsNote(w, [c], by, turn, made + 3000)).toBeNull()
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', turn, 'alpha', made + 3000)).toMatch(new RegExp(`^Warning: #${c} was created 3 s ago by ${by}: is it the card you meant\\? To put a new card on a lane, create it with hive_create_task's lane`))
+    expect(await lanes.freshCardsNote(w, [c], by, turn, 'alpha', made + 3000)).toBeNull()
     // Made before the caller's turn began: a card it was told of (the user's, asking it to put it on a lane).
-    expect(await lanes.freshCardsNote(w, [c], 'HB6', made + 1, made + 3000)).toBeNull()
-    expect(await lanes.freshCardsNote(w, [c], 'HB6', turn, made + lanes.FRESH_CARD_MS)).toBeNull()
-    expect(await lanes.freshCardsNote(w, [c], 'HB6', null, made + 3000)).toBeNull()
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', made + 1, 'alpha', made + 3000)).toBeNull()
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', turn, 'alpha', made + lanes.FRESH_CARD_MS)).toBeNull()
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', null, 'alpha', made + 3000)).toBeNull()
+  })
+
+  it("HI-2167 (HR3's round 1): the safety net reads only cards in the caller's scope; one outside it is told as one that doesn't exist", async () => {
+    const other = (await run(() => tasks.createTask({ title: 'Beta fresh', project: 'beta' }, user))).number
+    const loose = (await run(() => tasks.createTask({ title: 'Workspace fresh' }, user))).number
+    const moved = await make('Moved fresh')
+    await run(() => tasks.updateTask(moved, { project: 'beta' }, user))
+    const at = Date.now() + 1000
+    const turn = at - 60_000
+    // An alpha agent: beta's card, a workspace card and one moved out of alpha say no more than a card that doesn't exist.
+    for (const n of [other, loose, moved, 999_999]) expect(await lanes.freshCardsNote(w, [n], 'HB6', turn, 'alpha', at), `#${n}`).toBeNull()
+    // The Assistant and scripts (no scope): the workspace's cards.
+    expect(await lanes.freshCardsNote(w, [other], 'HB6', turn, null, at)).toMatch(/^Warning: .+ was created \d+ s ago by /)
   })
 
   it('between cards a change applies at once; with rules off, at once even mid-card', async () => {
