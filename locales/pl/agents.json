@@ -1,5 +1,6 @@
 {
   "agents.add.add": "Dodaj agenta",
+  "agents.add.checkingConnection": "Sprawdzanie, którzy agenci programistyczni są zainstalowani, aby wybrać pierwsze połączenie, które może działać…",
   "agents.add.failed": "Nie udało się dodać agenta",
   "agents.add.full": "{limit} Najpierw usuń jednego z agentów.",
   "agents.add.nameTaken": "Projekt {project} ma już agenta o nazwie {agent}: nazwy agentów są unikalne w całym obszarze roboczym.",

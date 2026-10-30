@@ -3,6 +3,10 @@
     "defaultMessage": "Add Agent",
     "description": "The Add Agent dialog's button: adds the agent."
   },
+  "agents.add.checkingConnection": {
+    "defaultMessage": "Finding out which coding agents are installed, to choose the first connection that can run…",
+    "description": "Under the choice of connection in Add Agent (HI-2108) while Hive still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Add waits until then."
+  },
   "agents.add.failed": {
     "defaultMessage": "Could not add agent",
     "description": "An error's title: adding an agent to a project failed."

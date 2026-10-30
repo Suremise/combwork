@@ -1,5 +1,6 @@
 {
   "agents.add.add": "Agent hinzufügen",
+  "agents.add.checkingConnection": "Hive prüft, welche Coding-Agenten installiert sind, um die erste Verbindung zu wählen, die laufen kann…",
   "agents.add.failed": "Agent konnte nicht hinzugefügt werden",
   "agents.add.full": "{limit} Zuerst einen entfernen.",
   "agents.add.nameTaken": "Das Projekt {project} hat schon einen Agenten namens {agent}: Agentennamen sind im ganzen Arbeitsbereich eindeutig.",

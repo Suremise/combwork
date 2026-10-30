@@ -18,7 +18,7 @@ import { projectMergeChoice } from '../mergeChoice'
 import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
 import { msg, tr, tRich } from '@shared/i18n'
 import { ProviderIcon } from './ProviderIcon'
-import { cliReadyOf, ConnectionChoice, connectionCli, firstUsableConnection, useConnections } from './ConnectionChoice'
+import { cliReadyOf, ConnectionChoice, connectionCli, firstReadyConnection, offeredConnections, useConnections } from './ConnectionChoice'
 import { ConnectionDialog } from './ConnectionDefaults'
 import { cx } from '../util'
 import { formatSize } from '@shared/units'
@@ -184,7 +184,8 @@ export function AddAgentDialog() {
   // The first usable connection in the order (decision A), until the user chooses one; read again as the list changes.
   // On and installed (decision A, as main's firstUsableAccount): none chosen while detection may still change it.
   const providers = useStore((s) => s.providers)
-  const first = firstUsableConnection(view, settings, cliReadyOf(providers))
+  const ready = firstReadyConnection(view, settings, cliReadyOf(providers))
+  const first = ready.id
   useEffect(() => {
     if (path && !chosen) setConnection(first ?? '')
   }, [path, chosen, first])
@@ -198,7 +199,10 @@ export function AddAgentDialog() {
   const everyone = workspaceAgentList(workspaceProjects)
   const owner = name.trim() ? nameTaken(name, everyone) : null
   const suggestion = owner ? suggestAgentName(name.trim(), project.name, everyone.map((a) => a.name)) : ''
-  const valid = !!name.trim() && !owner && !full
+  // An automatic choice not made yet (HI-2108 round 2): Add waits for one while connections are offered here (still
+  // finding which CLIs are installed, or none of theirs is); with none offered at all, main picks as before accounts.
+  const unresolved = !connection && offeredConnections(view, settings).length > 0
+  const valid = !!name.trim() && !owner && !full && !unresolved
   const choose = (id: string): void => {
     setChosen(true)
     setConnection(id)
@@ -277,6 +281,11 @@ export function AddAgentDialog() {
         )}
         {/* Its connection holds its model, effort, context and mode; its CLI follows from it (HI-2108). */}
         <ConnectionChoice id="add-agent-connection" value={connection} onChange={choose} onNew={setNewOn} />
+        {!connection && ready.checking && (
+          <div className="hint span2" data-connection-checking>
+            <Icon name="loading" spin /> {tr(msg({ id: 'agents.add.checkingConnection', defaultMessage: 'Finding out which coding agents are installed, to choose the first connection that can run…', description: 'Under the choice of connection in Add Agent (HI-2108) while Hive still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Add waits until then.' }))}
+          </div>
+        )}
         <label htmlFor="add-agent-note">{tr(NOTE)}</label>
         <input id="add-agent-note" className="input" value={note} maxLength={ROLE_MAX} placeholder={tr(NOTE_NONE)} list="add-agent-note-suggestions" onChange={(e) => setNote(e.target.value)} />
         <datalist id="add-agent-note-suggestions">

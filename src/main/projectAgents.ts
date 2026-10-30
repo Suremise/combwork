@@ -4,7 +4,7 @@ import { basename, dirname, join } from 'path'
 import { AGENT_LIMIT_MAX, ROLE_MAX, SESSION_LAYOUTS, agentLimitText, agentMaxText, agentPtyKey, layoutPanes, mergeBlocked, moveAgentTo, projectAgents, projectLayout, slugify, swapAgentsIn } from '../shared/defaults'
 import { orderByCells, placedCells } from '../shared/paneCells'
 import { forgetPtys } from './ptyHost'
-import { agentProvider, defaultProviderPending, isKnownProvider } from '../shared/providers'
+import { agentProvider, isKnownProvider } from '../shared/providers'
 import { cleanMcpServers } from '../shared/agentMcp'
 import { isWorkflowRole, type WorkflowRole } from '../shared/workflow/roles'
 import type { AddAgentOptions, AddedAgent, AgentBranchStatus, AgentDef, AgentPatch, Connection, LaunchValues, MergeResult, ProjectConfig, ProjectGitInfo, ProjectProviderConfig, ProviderId, RemovedAgent, SessionLayout, WorktreeCheck, WorktreeMatch } from '../shared/types'
@@ -374,9 +374,10 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
   // that's usable here (its CLI on and installed).
   const named = getConnection(opts.connection)
   const ws = workspaceOf(projectPath)
+  // Only once Hive knows which CLIs are installed (HI-2108 round 2): a CLI earlier in the order still being looked for
+  // could be the first usable, so nothing is decided from a guess (refused, saying so, if it still isn't known).
+  if (!opts.provider && !opts.connection) await providerService.settle()
   const first = opts.provider || opts.connection ? null : firstUsableAccount(ws.path ? ws.config : null)
-  // With none usable, Settings' choice from before (read only) or Automatic's, which waits for detection (#506).
-  if (!opts.provider && !opts.connection && !first && defaultProviderPending(cfg, config.settings)) await providerService.settle()
   const provider = opts.provider || accountById(named?.account ?? opts.connection)?.provider || first?.provider || agentProvider(null, cfg, config.settings)
   if (!isKnownProvider(provider)) throw hiveError(M.unknownProvider, { provider }, { kind: 'invalid' })
   const def: AgentDef = { id, name, provider }

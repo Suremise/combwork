@@ -1,9 +1,12 @@
 // The connection a new agent gets (HI-2108 round 1, decision A): the first in the order of accounts whose CLI is on AND
 // installed, as main's firstUsableAccount picks it. Accounts in the order Codex (on, its CLI not installed), then Claude
 // Code (the fake, installed), both on here: Add Agent preselects Claude Code's connection and greys out Codex's, saying
-// why; the quick add (Ctrl+Alt+Shift+N) adds the agent on Claude Code's. No session is started. The test seam off so
-// the real rule applies; Codex hidden from PATH and given no path.
+// why; the quick add (Ctrl+Alt+Shift+N) adds the agent on Claude Code's. Then (round 2) both installed, Codex's detection
+// held (HIVE_TEST_SLOW_DETECT): while it is still looked for, Add Agent chooses nothing and Add waits, saying why; an
+// Add with no connection (the window's call) waits for detection in main; once Codex is found, Codex's connection is
+// chosen and the agent added there. No session is started. The test seam off so the real rule applies.
 const lib = require('./lib.cjs')
+const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -15,6 +18,8 @@ const ws = path.join(lib.WORK, 'connectionfirst-ws')
 const alpha = path.join(ws, 'alpha')
 const fakeUser = path.join(lib.WORK, 'connectionfirst-user')
 let failed = 0
+/** The accounts, connections and migration record both parts start from. */
+let CONFIG = null
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
@@ -41,7 +46,15 @@ const check = (name, ok, extra = '') => {
   ]
   cfg.settings.providers.codex = { ...cfg.settings.providers.codex, enabled: true, executablePath: '' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+  CONFIG = { accounts: cfg.accounts, connections: cfg.connections, migrations: cfg.migrations }
+  await settled(env)
+  await duringDetection(env)
+  console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
+  process.exit(failed ? 1 : 0)
+})()
 
+/** Codex not installed: Claude Code's connection preselected and quick-added; Codex's greyed out. */
+async function settled(env) {
   // Codex isn't on PATH, and its usual places are an empty throwaway user folder.
   const { app, page } = await lib.launch({
     userData,
@@ -80,10 +93,65 @@ const check = (name, ok, extra = '') => {
     check('the quick add puts the agent on Claude second, its CLI Claude Code', added?.connection === 'c-claude' && added.provider === 'claude-code', JSON.stringify(added && { connection: added.connection, provider: added.provider }))
     check('…and starts nothing', (await inv('session:live')).length === 0)
   } catch (e) {
-    check('the suite ran to its end', false, e.stack)
+    check('the first part ran to its end', false, e.stack)
   } finally {
     await app.close().catch(() => undefined)
   }
-  console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
-  process.exit(failed ? 1 : 0)
-})()
+}
+
+/** Both installed, Codex's detection held: nothing decided from a guess, in the dialog or in main; Codex's once found. */
+async function duringDetection(env) {
+  // A profile of its own (the first part's has Codex's detection cached), with the same accounts and connections.
+  const userData2 = path.join(lib.WORK, 'connectionfirst-profile-2')
+  fs.rmSync(userData2, { recursive: true, force: true })
+  fs.mkdirSync(userData2, { recursive: true })
+  const cfg = JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8'))
+  const fresh = { version: cfg.version, settings: { ...cfg.settings, providers: { ...cfg.settings.providers, codex: { ...cfg.settings.providers.codex, enabled: true, executablePath: path.join(__dirname, 'fake-codex', 'fake-codex.cmd') } } }, accounts: CONFIG.accounts, connections: CONFIG.connections, migrations: CONFIG.migrations }
+  fs.writeFileSync(path.join(userData2, 'config.json'), JSON.stringify(fresh, null, 2))
+  fs.mkdirSync(path.join(fakeUser, 'codex-home'), { recursive: true })
+  // Held long enough to act while it is pending, and let go by itself: the suite waits for its end, never a time.
+  // Launched as providerdetect does, not with lib.launch (which waits for detection to finish).
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData2, ...env, CODEX_HOME: path.join(fakeUser, 'codex-home'), HIVE_TEST_SLOW_DETECT: 'codex=20000', HIVE_TEST_CLI_HOME_CONNECTION: '0' }) })
+  const page = await app.firstWindow()
+  await lib.fitWindow(app, page, { width: 1400, height: 900 })
+  await lib.until(() => page.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false), HUNG_MS)
+  try {
+    page.on('pageerror', (e) => check('no page errors', false, e.message))
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    await lib.openWorkspace(inv, page, ws)
+    const codex = async () => (await inv('provider:info')).codex
+    const pending = await lib.until(async () => {
+      const info = await inv('provider:info')
+      return info.codex?.checking && !info.codex.found && info['claude-code']?.found ? info : null
+    }, HUNG_MS)
+    const seen = await inv('provider:info')
+    check('Codex is still being looked for, Claude Code found', !!pending, JSON.stringify({ codex: { found: seen.codex?.found, checking: seen.codex?.checking, path: seen.codex?.path }, claude: { found: seen['claude-code']?.found, checking: seen['claude-code']?.checking } }))
+
+    // Add Agent while Codex is looked for: nothing chosen, Add waits, saying why.
+    await page.getByText('alpha', { exact: true }).first().click()
+    await lib.addMenuRun(page, 'Configure Agent and Add…')
+    const add = page.locator('.dialog', { hasText: 'Add an agent' })
+    const select = add.locator('#add-agent-connection')
+    const addButton = add.getByRole('button', { name: 'Add Agent', exact: true })
+    await lib.until(async () => (await select.count()) === 1, HUNG_MS)
+    const waiting = (await codex()).checking
+    check('while Codex is looked for: no connection chosen, Add waits, saying why', waiting && (await select.inputValue()) === '' && (await addButton.isDisabled()) && (await add.locator('[data-connection-checking]').count()) === 1, JSON.stringify({ choice: await select.inputValue(), disabled: await addButton.isDisabled(), checking: waiting }))
+    await add.screenshot({ path: path.join(lib.WORK, 'connectionfirst-checking.png') })
+
+    // The window's call with no connection (as quick add's fallback, or a script), made while it is looked for: main
+    // waits for detection before choosing, so it goes on Codex's.
+    const viaMain = page.evaluate((p) => window.hive.invoke('agents:add', p, { name: 'Viamain' }), alpha)
+    check('…an add with no connection made then waits for detection (Codex still looked for)', (await codex()).checking === true)
+
+    // Once Codex is found: Codex first in the order, chosen; Add enabled.
+    check('once Codex is found, Add Agent chooses its connection (first in the order) and Add can go', !!(await lib.until(async () => (await select.inputValue()) === 'c-codex' && !(await addButton.isDisabled()), 45000)), await select.inputValue().catch(() => ''))
+    const made = await viaMain.catch((e) => ({ error: e.message }))
+    check("…and main's add went on Codex's connection, its CLI Codex", made?.connection === 'c-codex' && made.provider === 'codex', JSON.stringify(made))
+    await add.getByRole('button', { name: 'Cancel', exact: true }).click()
+    check('…nothing started', (await inv('session:live')).length === 0)
+  } catch (e) {
+    check('the second part ran to its end', false, e.stack)
+  } finally {
+    await app.close().catch(() => undefined)
+  }
+}

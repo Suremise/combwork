@@ -1,5 +1,6 @@
 {
   "agents.add.add": "添加智能体",
+  "agents.add.checkingConnection": "正在检查已安装哪些编程智能体，以选择第一个可以运行的连接…",
   "agents.add.failed": "无法添加智能体",
   "agents.add.full": "{limit}请先删除一个。",
   "agents.add.nameTaken": "{project} 已有名为 {agent} 的智能体：智能体名称在整个工作区内必须唯一。",
