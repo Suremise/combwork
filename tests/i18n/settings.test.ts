@@ -116,7 +116,7 @@ describe('the settings catalogue as Settings shows it', () => {
       const s = shownSetting(e!)
       return [s.title, s.desc, s.tip, ...(e!.options ?? []).map((o) => shownText(o.text)), ...(e!.text.confirmOn ? [shownText(e!.text.confirmOn.title)] : [])]
     }
-    for (const id of ['workflow.git.fileLocks', 'workspace.workflow.none.fileLocks', 'project.workflow.fileLocks', 'claude-code.defaultPermissionMode', 'codex.defaultPermissionMode', 'copilot.defaultPermissionMode', 'claude-code.enableDangerousMode', 'codex.enableDangerousMode', 'copilot.enableDangerousMode', 'assistant.provider:codex'])
+    for (const id of ['workflow.git.fileLocks', 'workspace.workflow.none.fileLocks', 'project.workflow.fileLocks', 'claude-code.enableDangerousMode', 'codex.enableDangerousMode', 'copilot.enableDangerousMode', 'assistant.provider:codex'])
       for (const text of shown(id)) for (const name of english) expect(text, `${id}: ${name}`).not.toContain(name)
     expect(problems).toEqual([])
   })
@@ -225,14 +225,14 @@ describe('with a translation loaded (as a language file gives it)', () => {
     for (const id of ['claude-code.enableDangerousMode', 'codex.enableDangerousMode', 'copilot.enableDangerousMode']) {
       const e = settingEntry(id)!
       const s = shownSetting(e)
-      expect([s.title, s.tip, shownText(e.text.confirmOn!.title)], id).toEqual([expect.stringMatching(/^启用“[^“”]+”选项$/), expect.stringMatching(/^“[^“”]+”永远不会/), expect.stringMatching(/^启用“[^“”]+”选项？$/)])
+      expect([s.title, s.tip, shownText(e.text.confirmOn!.title)], id).toEqual([expect.stringMatching(/^启用“[^“”]+”选项$/), expect.stringMatching(/^只有连接可以选择“[^“”]+”。/), expect.stringMatching(/^启用“[^“”]+”选项？$/)])
     }
     // Two modes (as Copilot's were, #461): each in its own quotes, not the whole list in one pair (“Autopilot和Allow all”).
     const copilot = settingEntry('copilot.enableDangerousMode')!
     const quote: Msg = { id: 'settings.provider.enableDangerousMode.quoted', ...EN['settings.provider.enableDangerousMode.quoted'] }
     const two = { n: 2, names: listOf(['Autopilot', 'Allow all']), quotedNames: listOf(['Autopilot', 'Allow all'].map((mode) => withValues(quote, { mode }))) }
     const titled = (t: TextPart | null | undefined): string => shownText(withValues((t as { m: Msg }).m, two))
-    expect([titled(copilot.text.title), titled(copilot.text.tip), titled(copilot.text.confirmOn?.title)]).toEqual([expect.stringMatching(/^启用“Autopilot”和“Allow all”选项$/), expect.stringMatching(/^“Autopilot”和“Allow all”永远不会/), '启用“Autopilot”和“Allow all”选项？'])
+    expect([titled(copilot.text.title), titled(copilot.text.tip), titled(copilot.text.confirmOn?.title)]).toEqual([expect.stringMatching(/^启用“Autopilot”和“Allow all”选项$/), expect.stringMatching(/^只有连接可以选择“Autopilot”和“Allow all”。/), '启用“Autopilot”和“Allow all”选项？'])
     // What the Assistant's tools read doesn't follow it.
     const claude = settingEntry('claude-code.enableDangerousMode')!
     expect([claude.title, claude.confirmOn?.title, englishText(claude.text.title)]).toEqual(['Enable the Bypass permissions option', 'Enable the Bypass permissions option?', 'Enable the Bypass permissions option'])

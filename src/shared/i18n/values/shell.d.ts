@@ -130,6 +130,7 @@ interface HiveMessageValues {
   'shell.command.session.stopBackgroundAndResume': undefined
   'shell.command.session.stopLeftAfterClose': undefined
   'shell.command.session.toggleView': undefined
+  'shell.command.settings.accounts': undefined
   'shell.command.settings.advanced': undefined
   'shell.command.settings.keybindings': undefined
   'shell.command.settings.notifications': undefined

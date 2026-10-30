@@ -4,7 +4,7 @@ import { runCommand } from '../commands'
 import { setActivity, set, setProgressOpen, useProviderWarnings, useStore, type Activity } from '../store'
 import { useTeamPaused } from './TeamPause'
 import { useTeamPause } from '../teamPause'
-import { enabledProviders, installSourceText } from '@shared/providers'
+import { enabledProviders, installSourceText, providerDescriptor } from '@shared/providers'
 import { ProviderIcon } from './ProviderIcon'
 import { cx, formatKeybinding, resetsIn, timeAgo } from '../util'
 import { commandKeybinding } from '../commands'
@@ -22,7 +22,7 @@ import { AGENT_LIMIT_MAX } from '@shared/defaults'
 import { AgentRowsTable, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, WAITING_COLUMN, agentRow, tableText, type AgentTableData, type AgentTableRow } from './AgentsTable'
 import { limitWindow } from '../views/ProjectTabs'
 import { useConnections } from './ConnectionChoice'
-import { connectionsApply } from '@shared/accounts'
+import { connectionsApply, planUsageItems } from '@shared/accounts'
 import { useConnectionsInUse } from '../connectionUsage'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 
@@ -268,8 +268,9 @@ function shortLimit(l: PlanLimit): string {
 /**
  * Each enabled provider's plan limits, as Hive keeps them from its sessions' reports (the highest in each reset period,
  * #383): one item per provider. A limit whose reset has passed with no new report is left out, not shown as it was.
- * With connections (HI-1756, the preview on), a CLI that has them shows one item per connection a session of this
- * window's workspace runs on, named, each that login's own limits; its CLI-wide item (sessions not on one) goes.
+ * A CLI with accounts (HI-1756; HI-2107) shows one item per account a session of this window's workspace runs on, by its
+ * name now, all of them in the one order of accounts across every CLI (HI-2119), each that login's own limits; its
+ * CLI-wide item (sessions not on one) goes. CLIs without accounts here follow, each with its CLI-wide item.
  */
 function PlanUsageStatus() {
   const all = useStore((s) => s.planUsage)
@@ -279,13 +280,18 @@ function PlanUsageStatus() {
   const inUse = useConnectionsInUse()
   const now = useNow(60000)
   const byConnections = new Set((view?.providers ?? []).filter((p) => connectionsApply(view, p)))
+  // Accounts in the one order, each by its name now (renamed since its session launched: the new one), then CLI-wide items.
+  const items = planUsageItems(enabledProviders(settings).map((p) => p.id), byConnections, inUse, view?.order ?? [], (id) => view?.connections.find((a) => a.id === id)?.name)
   return (
     <>
-      {enabledProviders(settings).map((p) =>
-        byConnections.has(p.id)
-          ? inUse.filter((c) => c.provider === p.id).map((c) => <PlanItem key={c.id} provider={p.id} kept={byConnection[c.id]} now={now} label={c.name} first={tr(M.connectionLine, { name: c.name, provider: p.name, hasPlan: byConnection[c.id]?.plan ? 'yes' : 'no', plan: byConnection[c.id]?.plan ?? '' })} data={{ 'data-plan': p.id, 'data-plan-connection': c.id }} />)
-          : <PlanItem key={p.id} provider={p.id} kept={all[p.id]} now={now} first={tr(M.planLine, { provider: p.name, hasPlan: all[p.id]?.plan ? 'yes' : 'no', plan: all[p.id]?.plan ?? '' })} data={{ 'data-plan': p.id }} />
-      )}
+      {items.map((it) => {
+        const p = providerDescriptor(it.provider)
+        return it.kind === 'account' ? (
+          <PlanItem key={it.id} provider={p.id} kept={byConnection[it.id]} now={now} label={it.name} first={tr(M.connectionLine, { name: it.name, provider: p.name, hasPlan: byConnection[it.id]?.plan ? 'yes' : 'no', plan: byConnection[it.id]?.plan ?? '' })} data={{ 'data-plan': p.id, 'data-plan-connection': it.id }} />
+        ) : (
+          <PlanItem key={p.id} provider={p.id} kept={all[p.id]} now={now} first={tr(M.planLine, { provider: p.name, hasPlan: all[p.id]?.plan ? 'yes' : 'no', plan: all[p.id]?.plan ?? '' })} data={{ 'data-plan': p.id }} />
+        )
+      })}
     </>
   )
 }

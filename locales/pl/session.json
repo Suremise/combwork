@@ -55,7 +55,7 @@
   "session.inUse.reserved": "Hive już archiwizuje, usuwa lub czyści tę sesję.",
   "session.inUse.running": "Sesja działa. Najpierw ją zatrzymaj.",
   "session.inUse.writing": "Jej CLI nadal zapisuje transkrypcję. Spróbuj ponownie za chwilę.",
-  "session.keyRefused.body": "Zastąp klucz {name} w Ustawienia → Połączenia, a potem Wznów w nagłówku projektu je wznowi.",
+  "session.keyRefused.body": "Zastąp klucz {name} w Ustawienia → Konta i połączenia, a potem Wznów w nagłówku projektu je wznowi.",
   "session.keyRefused.title": "{n, plural, one {{agent} zatrzymał się: klucz {name} został odrzucony} few {# agentów zatrzymało się: klucz {name} został odrzucony} many {# agentów zatrzymało się: klucz {name} został odrzucony} other {# agenta zatrzymało się: klucz {name} został odrzucony}}",
   "session.leftovers.body": "{processes}. {n, plural, one {Uruchomił go agent i może blokować folder lub porty projektu.} few {Uruchomił je agent i mogą blokować folder lub porty projektu.} many {Uruchomił je agent i mogą blokować folder lub porty projektu.} other {Uruchomił je agent i mogą blokować folder lub porty projektu.}}",
   "session.leftovers.end": "Zakończ je",

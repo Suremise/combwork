@@ -125,11 +125,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `contex
   await inv('session:stop', proj, small.id)
   await until(async () => !(await live(small.id)), HUNG_MS)
 
-  // Project Settings has no such row for Claude Code; Agent Settings shows the agent's own.
+  // Project Settings has no Claude Code page any more (HI-2107); Agent Settings shows the agent's own.
   await lib.openProjectSettings(page)
-  await page.locator('.settings-nav .row', { hasText: 'Claude Code' }).click()
-  await lib.until(async () => (await page.locator('.setting', { hasText: 'Extra arguments' }).count()) >= 1, HUNG_MS)
-  check('Project Settings → Claude Code has no such setting', (await page.locator('.setting', { hasText: 'Use 200K context (instead of 1M)' }).count()) === 0)
+  await lib.until(async () => (await page.locator('.settings-nav .row', { hasText: 'Agents' }).count()) >= 1, HUNG_MS)
+  check('Project Settings has no Claude Code page, nor such a setting', (await page.locator('.settings-nav .row', { hasText: 'Claude Code' }).count()) === 0 && (await page.locator('.setting', { hasText: 'Use 200K context (instead of 1M)' }).count()) === 0)
   await shot(page, '3-project')
   await inv('agents:update', proj, small.id, { use200kContext: false })
   await page.locator('.settings-nav .row', { hasText: 'Agents' }).first().click()

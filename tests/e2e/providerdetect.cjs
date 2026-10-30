@@ -1,8 +1,7 @@
 // Automatic never resolves from partial detection, and a resume runs its conversation's own provider (#506).
 // Claude Code (the fake) and Codex (the fake) are both turned on; the default provider is Automatic, and so is the
 // Assistant's. 1. The Assistant starts a conversation: Claude Code (first in order, installed). 2. Hive restarts with
-// Claude Code's detection held back (HIVE_TEST_SLOW_DETECT) so Codex answers first: Settings says "Automatic
-// (checking…)" (never Codex), the Assistant still offers its Claude Code conversation, and resuming it waits for the
+// Claude Code's detection held back (HIVE_TEST_SLOW_DETECT) so Codex answers first: the Assistant still offers its Claude Code conversation, and resuming it waits for the
 // detection and runs Claude Code. 3. With the Assistant's provider set to Codex, its Claude Code conversation still
 // resumes in Claude Code (a default never re-points a conversation), asking for no restart. 4. Claude Code held beyond
 // Hive's wait (HIVE_TEST_DETECT_WAIT_MS): a new conversation and an agent following Automatic are refused, not guessed.
@@ -80,25 +79,16 @@ const check = (name, ok, extra = '') => {
     return i.codex && !i.codex.checking && i.codex.found && i['claude-code']?.checking && !i['claude-code'].found ? i : null
   }, HOLD_MS - 1000, 100)
   check('Codex is found while Hive is still looking for Claude Code', !!codexFirst, JSON.stringify(await info()))
-  await page.keyboard.press('Control+,')
-  await page.locator('.settings-nav .row', { hasText: 'Providers' }).first().click()
-  const picker = page.locator('.setting', { hasText: 'Default provider' }).locator('select').first()
-  const label = () => picker.evaluate((el) => el.selectedOptions[0]?.textContent ?? '')
-  const checking = await lib.until(async () => ((await picker.count()) ? label() : null), 5000)
-  check('Settings says "Automatic (checking…)" meanwhile, never Codex', checking === 'Automatic (checking…)', `${checking} after ${Date.now() - t0} ms`)
-  await page.screenshot({ path: path.join(lib.WORK, 'provdetect-checking.png') })
-  console.log(`(Settings read and screenshotted ${Date.now() - t0} ms after the start; Claude Code is held ${HOLD_MS} ms)`)
+  // Settings → Providers' Default provider, which said "Automatic (checking…)" here, went with HI-2107 (decision A).
+  console.log(`(Codex found ${Date.now() - t0} ms after the start; Claude Code is held ${HOLD_MS} ms)`)
   const offered = (await inv('workspace:refresh')).assistant.agents[0]?.resume?.id
   check('the Assistant still offers its Claude Code conversation to resume', offered === sid, String(offered))
   const stillChecking = (await info())['claude-code']?.checking
   const resumed = await inv('session:start', home, { agentId: 'assistant', resumeId: sid })
   check('resuming it while Claude Code is still being looked for waits, then runs Claude Code', stillChecking && resumed.provider === 'claude-code' && resumed.sessionId === sid, JSON.stringify({ stillChecking, provider: resumed.provider, sessionId: resumed.sessionId }))
-  const settled = await lib.until(async () => ((await picker.count()) && (await label()) === 'Automatic (Claude Code)' ? true : null), 15000)
-  check('…and Settings says "Automatic (Claude Code)" once both have answered', !!settled, await label().catch(() => ''))
   await lib.until(async () => ['ready', 'finished'].includes((await live())?.status), 30000)
   await inv('session:stop', home, 'assistant')
   await lib.until(async () => !(await live()), 20000)
-  await page.keyboard.press('Escape')
 
   // 3. The Assistant's provider changed: its Claude Code conversation still resumes in Claude Code.
   await inv('settings:update', { assistant: { provider: 'codex' } })

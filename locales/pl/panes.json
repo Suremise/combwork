@@ -44,7 +44,7 @@
   "panes.failed.title": "Nie udało się uruchomić:",
   "panes.footer.compactionHistory": "Kliknij, aby zobaczyć historię kompaktowania",
   "panes.footer.compactions": "{n, plural, one {Dotąd # kompaktowanie} few {Dotąd # kompaktowania} many {Dotąd # kompaktowań} other {Dotąd # kompaktowania}}{over, select, yes { – rozważ kompaktowanie} other {}}",
-  "panes.footer.connectionChanged": "Jego logowanie zmieniło się od czasu dodania: zobacz Ustawienia → Połączenia.",
+  "panes.footer.connectionChanged": "Logowanie konta zmieniło się od czasu jego dodania: zobacz Ustawienia → Konta i połączenia.",
   "panes.footer.connectionEmail": "Zalogowano jako {email}.",
   "panes.footer.connectionOff": "Połączenie wybrane dla niego jest wyłączone w tym obszarze roboczym, więc działa na domyślnym połączeniu obszaru roboczego.",
   "panes.footer.connectionSwitching": "przełączy się po zakończeniu tury",

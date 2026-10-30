@@ -448,9 +448,6 @@ const prose = (seed, n) => {
   const recolour = measure('hive_update_setting (a table)', tool('hive_update_setting', { id: 'board.colors', value: { doing: '#ff0000' } }, 'assistant+settings'), 400)
   check('a table change says which entry changed, old → new', /^Changed Settings → Board → Column colours \(board\.colors\): doing: #[0-9a-f]{6} → doing: #ff0000\./.test(recolour), recolour)
   await inv('settings:update', { board: { colors: { doing: '#3b82f6' } } })
-  // Copilot's: a CLI with connections has no default effort of its own (HI-1774).
-  const badEffort = tool('hive_update_setting', { id: 'copilot.defaultEffort', value: 'bananas' }, 'assistant+settings')
-  check("an effort level the picker doesn't offer is refused, naming those it does", badEffort.isError && /takes one of: /.test(badEffort.text) && (await inv('settings:get')).providers.copilot.defaultEffort === '', badEffort.text)
   await inv('settings:update', { assistant: { providers: { 'claude-code': { model: 'opus' } } } })
   const ownModel = tool('hive_read_setting', { id: 'assistant.claude-code.model' }, 'assistant').text
   check("the Assistant's own model reads as it is, and is the user's", /\(assistant\.claude-code\.model\): opus \(default \(empty\)\)/.test(ownModel) && /Read-only to you: /.test(ownModel), ownModel)

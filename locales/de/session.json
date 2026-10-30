@@ -55,7 +55,7 @@
   "session.inUse.reserved": "Hive archiviert, löscht oder räumt diese Sitzung bereits auf.",
   "session.inUse.running": "Sie läuft. Stoppe sie zuerst.",
   "session.inUse.writing": "Die CLI schreibt noch das Transkript. Versuche es gleich noch einmal.",
-  "session.keyRefused.body": "Ersetze den Schlüssel von {name} unter Einstellungen → Verbindungen; danach setzt Fortsetzen im Kopf des Projekts sie fort.",
+  "session.keyRefused.body": "Ersetze den Schlüssel von {name} unter Einstellungen → Konten & Verbindungen; danach setzt Fortsetzen im Kopf des Projekts sie fort.",
   "session.keyRefused.title": "{n, plural, one {{agent} wurde angehalten: Der Schlüssel von {name} wurde abgelehnt} other {# Agenten wurden angehalten: Der Schlüssel von {name} wurde abgelehnt}}",
   "session.leftovers.body": "{processes}. {n, plural, one {Er wurde vom Agenten gestartet und belegt womöglich den Projektordner oder Ports.} other {Sie wurden vom Agenten gestartet und belegen womöglich den Projektordner oder Ports.}}",
   "session.leftovers.end": "Beenden",

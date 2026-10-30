@@ -335,21 +335,18 @@ interface HiveMessageValues {
   'project.settings.never': undefined
   'project.settings.neverChoice': undefined
   'project.settings.noMatch': undefined
-  'project.settings.now': { desc: string | number; current: string | number }
   'project.settings.off': undefined
   'project.settings.offLower': undefined
   'project.settings.on': undefined
   'project.settings.onLower': undefined
   'project.settings.openHive': undefined
   'project.settings.overrides': undefined
-  'project.settings.providerDefault': { provider: string | number }
   'project.settings.reset': undefined
   'project.settings.resetButton': undefined
   'project.settings.resetMessage': undefined
   'project.settings.resetTitle': undefined
   'project.settings.saveFailed': undefined
   'project.settings.search': { project: string | number }
-  'project.settings.sessionsIn': { project: string | number }
   'project.settings.warnOver': undefined
   'project.skills.addLocal': { provider: string | number }
   'project.skills.assistantOnly': { count: number }

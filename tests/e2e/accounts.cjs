@@ -1,4 +1,4 @@
-// Settings → Connections (HI-980: sign-in connections, the section's id still 'accounts'; on for everyone since HI-1774):
+// Settings → Accounts & Connections (HI-980; HI-2107: the section's id still 'accounts'; on for everyone since HI-1774):
 // Add Account… makes the account's folder (its projects\ a junction to the CLI home's) and opens its sign-in in Hive's
 // terminal, nothing typed into it; once it ends, the row says who it is signed in as, and Set Up (HI-1826) runs the CLI
 // itself on the folder for its first-run screens. Turned on, it is this workspace's
@@ -86,7 +86,12 @@ const check = (name, ok, extra = '') => {
       await field.fill(text)
       await page.locator('.dialog .dialog-footer .btn.primary').click()
     }
-    // Add a Connection… (HI-1870): one button for every CLI, its dialog asking which first.
+    // An account's ⋯ menu (HI-2107): Rename, Sign In, Set Up, Remove.
+    const menuOf = async (name, item) => {
+      await row(name).locator('[data-action="account-menu"]').click()
+      await page.locator('.menu .menu-item', { hasText: item }).first().click()
+    }
+    // Add Account… (HI-1870): one button for every CLI, its dialog asking which first.
     const addVia = async (cli, name) => {
       await page.locator('[data-add]').click()
       await page.locator(`[data-cli-choice="${cli}"]`).check({ timeout: HUNG_MS })
@@ -112,12 +117,12 @@ const check = (name, ok, extra = '') => {
 
     // --- Always there (S8, HI-1774: no preview switch any more).
     await openSettings()
-    check('Settings → Connections shows, with nothing turned on first', !!(await lib.until(async () => (await nav.count()) === 1, HUNG_MS)))
+    check('Settings → Accounts & Connections shows, with nothing turned on first', !!(await lib.until(async () => (await nav.count()) === 1, HUNG_MS)))
     await nav.click()
-    check('…with no connections yet', !!(await lib.until(async () => (await page.getByText('No connections yet').count()) === 1, HUNG_MS)))
+    check('…with no accounts yet', !!(await lib.until(async () => (await page.getByText('No accounts yet').count()) === 1, HUNG_MS)))
 
-    // --- Add a Connection… (HI-1870): one button, its dialog asking which CLI first, each with its icon.
-    check('one Add a Connection… for every CLI', (await page.locator('[data-add]').count()) === 1 && /Add a Connection…/.test(await page.locator('[data-add]').innerText()))
+    // --- Add Account… (HI-1870): one button, its dialog asking which CLI first, each with its icon.
+    check('one Add Account… for every CLI', (await page.locator('[data-add]').count()) === 1 && /Add Account…/.test(await page.locator('[data-add]').innerText()))
     loginAs('one@example.com')
     await page.locator('[data-add]').click()
     const choice = (cli) => page.locator('.dialog .conn-cli-choice', { has: page.locator(`[data-cli-choice="${cli}"]`) })
@@ -171,10 +176,10 @@ const check = (name, ok, extra = '') => {
     check('…and, its screens answered, its row says it is set up, Set Up no longer primary', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)) && (await row('Personal').locator('[data-set-up].primary').count()) === 0 && (await row('Personal').locator('[data-set-up-note]').count()) === 0)
     await shots('set-up-done')
 
-    // --- On in this workspace: its default.
+    // --- On in this workspace.
     await row('Personal').getByRole('switch').click()
     check('turned on here, it is on in this workspace (workspace.json; HI-2106: no default kept, the order says which)', !!(await lib.until(async () => JSON.stringify(wsJson(ws1)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), HUNG_MS)), JSON.stringify(wsJson(ws1)))
-    check('…and its row says so', !!(await lib.until(async () => (await row('Personal').locator('.account-default').count()) === 1, HUNG_MS)))
+    check('…and its row says so: On here', !!(await lib.until(async () => (await row('Personal').locator('[data-on-here] [role="switch"]').getAttribute('aria-checked')) === 'true', HUNG_MS)))
 
     // --- Set up for this workspace (HI-1870): on here, its CLI must trust the folders it would be used in too, read
     // from its .claude.json (never written by Hive). Claude Code's trust of a folder covers those inside it (HI-1871),
@@ -215,7 +220,7 @@ const check = (name, ok, extra = '') => {
     check('a project with no agent on this CLI isn’t counted', (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1 && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
 
     // --- Rename: the name only.
-    await row('Personal').getByRole('button', { name: 'Rename…' }).click()
+    await menuOf('Personal', 'Rename…')
     await fillPrompt('Hive overnight')
     check('Rename… changes its name, not its folder', !!(await lib.until(async () => (await list()).connections.some((a) => a.id === personal.id && a.name === 'Hive overnight'), HUNG_MS)) && fs.existsSync(folder))
 
@@ -247,41 +252,28 @@ const check = (name, ok, extra = '') => {
     check('two accounts on one login are both flagged', !!(await lib.until(async () => (await page.locator('[data-warning="duplicate"]').count()) === 2, HUNG_MS)))
     await shots('duplicate')
 
-    // --- The preference order (HI-1875): the top wears Default (a hint, Hive-wide); Make Default moves one to the top
-    // and never turns it on; drag or Alt+Up/Down reorders; when the Default is off here, the first on wears Used here.
+    // --- The one order of accounts (HI-2107, decision A): drag or Alt+Up/Down reorders, never turning one on or off;
+    // no Default or Make Default any more. Each account's connections are listed under it, the first named after it.
     const claudeOrder = async () => (await list()).connections.filter((c) => c.provider === 'claude-code').map((c) => c.id)
     const onHere = async () => (await list()).workspace['claude-code']?.on ?? []
-    check('the top of the order wears Default, with no Make Default; the next has Make Default', (await row('Two').locator('[data-default-hint]').count()) === 1 && (await row('Two').locator('[data-make-default]').count()) === 0 && (await row('Work').locator('[data-make-default]').count()) === 1)
-    const onBefore = JSON.stringify(await onHere())
-    await row('Work').locator('[data-make-default]').click()
-    check('Make Default moves Work to the top, wearing Default', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([work.id, personal.id]) && (await row('Work').locator('[data-default-hint]').count()) === 1, HUNG_MS)))
-    check('…turning nothing on or off', JSON.stringify(await onHere()) === onBefore && !(await onHere()).includes(work.id))
-    check('…the Default off here, the first on wears Used here', !!(await lib.until(async () => (await row('Two').locator('[data-used-here]').count()) === 1, HUNG_MS)) && (await list()).workspace['claude-code']?.default === personal.id)
-    // Every row keeps its switch and buttons in the same place, its bottom line, on or off (Darren, 27 Oct ~22:30).
-    const actionsAt = async (name) => {
-      const r = await row(name).boundingBox()
-      const a = await row(name).locator('.account-actions').boundingBox()
-      const n = await row(name).locator('.account-name').boundingBox()
-      return r && a && n ? { left: Math.round(a.x - r.x), belowName: a.y >= n.y + n.height, bottomGap: Math.round(r.y + r.height - (a.y + a.height)) } : null
-    }
-    // In a wide window, where they would fit beside the name (rc.9 put a short row's there).
-    await page.setViewportSize({ width: 2200, height: 950 })
-    await lib.until(async () => ((await row('Work').boundingBox())?.width ?? 0) > 1400, HUNG_MS)
-    const offRow = await actionsAt('Work')
-    const onRow = await actionsAt('Two')
-    await page.setViewportSize({ width: 1400, height: 950 })
-    check('an off row and an on row put their switch and buttons in the same place: the bottom line, below the name', !!offRow && !!onRow && offRow.belowName && onRow.belowName && offRow.left === onRow.left && offRow.bottomGap === onRow.bottomGap, JSON.stringify({ offRow, onRow }))
+    check('no Default, Make Default or Used here on any row', (await page.locator('[data-default-hint], [data-make-default], [data-used-here]').count()) === 0)
+    check('each account lists its first connection under it, named after it as it was added (a rename leaves it)', !!(await lib.until(async () => /Personal/.test(await page.locator(`[data-connections-of="${personal.id}"] [data-connection]`).first().innerText().catch(() => '')) && (await page.locator(`[data-connections-of="${work.id}"] [data-connection]`).count()) === 1, HUNG_MS)))
+    check('…and On here on every row, on or off', (await row('Two').locator('[data-on-here]').count()) === 1 && (await row('Work').locator('[data-on-here]').count()) === 1)
     await shots('order')
-    // Dragged back to the top by its handle.
-    await row('Two').locator('[data-move-handle]').dragTo(row('Work'))
-    check('dragging a row onto another moves it there in its CLI’s order', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([personal.id, work.id]), HUNG_MS)) && (await row('Two').locator('[data-used-here]').count()) === 0)
+    const onBefore = JSON.stringify(await onHere())
+    // Dragged to the top by its handle.
+    await row('Work').locator('[data-move-handle]').dragTo(row('Two'))
+    check('dragging a row onto another moves it there in the one order', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([work.id, personal.id]), HUNG_MS)))
+    check('…turning nothing on or off', JSON.stringify(await onHere()) === onBefore)
     // From the keyboard: Alt+Down on its handle, then Alt+Up.
-    await row('Two').locator('[data-move-handle]').focus()
+    await row('Work').locator('[data-move-handle]').focus()
     await page.keyboard.press('Alt+ArrowDown')
-    check('Alt+Down on the handle moves it down', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([work.id, personal.id]), HUNG_MS)))
-    await row('Two').locator('[data-move-handle]').focus()
+    check('Alt+Down on the handle moves it down', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([personal.id, work.id]), HUNG_MS)))
+    await row('Work').locator('[data-move-handle]').focus()
     await page.keyboard.press('Alt+ArrowUp')
-    check('…Alt+Up back to the top', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([personal.id, work.id]), HUNG_MS)))
+    check('…Alt+Up back to the top', !!(await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([work.id, personal.id]), HUNG_MS)))
+    await inv('connections:move', personal.id, 0)
+    await lib.until(async () => JSON.stringify(await claudeOrder()) === JSON.stringify([personal.id, work.id]), HUNG_MS)
 
     // --- A second window: its workspace keeps its own choice.
     const next = app.waitForEvent('window')
@@ -314,7 +306,7 @@ const check = (name, ok, extra = '') => {
     await addVia('codex', 'ChatGPT')
     const gpt = await lib.until(async () => (await list()).connections.find((a) => a.name === 'ChatGPT' && a.observed?.loggedIn) ?? null, HUNG_MS)
     check('a Codex connection signs in', !!gpt, JSON.stringify((await list()).connections.map((a) => [a.name, a.observed])))
-    check('…in the same list, grouped after Claude Code’s, with its own CLI and icon', !!(await lib.until(async () => JSON.stringify(await page.locator('.account-row').evaluateAll((rs) => rs.map((r) => r.getAttribute('data-cli')))) === JSON.stringify(['claude-code', 'claude-code', 'codex']), HUNG_MS)) && (await row('ChatGPT').locator('.account-cli .provider-icon').count()) === 1)
+    check('…in the same list, last in the one order (HI-2107), with its own CLI and icon', !!(await lib.until(async () => JSON.stringify(await page.locator('.account-block').evaluateAll((rs) => rs.map((r) => r.getAttribute('data-cli')))) === JSON.stringify(['claude-code', 'claude-code', 'codex']), HUNG_MS)) && (await row('ChatGPT').locator('.account-cli .provider-icon').count()) === 1)
     check('…needing set up, said as for Claude Code, naming the sandbox', !!(await lib.until(async () => (await row('ChatGPT').locator('[data-set-up-state="needed"]').count()) === 1, HUNG_MS)) && (await row('ChatGPT').locator('[data-set-up].primary').count()) === 1 && /Windows sandbox/.test(await row('ChatGPT').locator('[data-set-up-note]').innerText().catch(() => '')))
     await closeEnded()
     await shots('codex-needs-set-up')
@@ -331,9 +323,9 @@ const check = (name, ok, extra = '') => {
     const held = await lib.until(async () => (await list()).connections.find((a) => a.name === 'Held') ?? null, HUNG_MS)
     check('a sign-in still waiting has its terminal open, with Close', !!held && !!(await lib.until(async () => terminalOpen(held.id), HUNG_MS)) && (await page.locator('.account-signin [data-close-terminal]').count()) === 1)
     check('…Close asks first, and ends it once confirmed, the connection kept, not signed in', !!(await closeRunning(true)) && !!(await lib.until(async () => !(await terminalOpen(held.id)) && (await page.locator('.account-signin').count()) === 0, HUNG_MS)) && !!(await list()).connections.find((a) => a.id === held.id && !a.accepted))
-    await row('Held').getByRole('button', { name: 'Sign In' }).click()
+    await menuOf('Held', 'Sign In')
     await lib.until(async () => terminalOpen(held.id), HUNG_MS)
-    await row('Held').getByRole('button', { name: 'Remove…' }).click()
+    await menuOf('Held', 'Remove…')
     const askOpen = page.locator('.dialog', { hasText: 'Close its terminal and remove Held?' })
     check('Remove with its sign-in open asks to close its terminal and remove it', !!(await lib.until(async () => (await askOpen.count()) === 1, HUNG_MS)) && /Close Terminal and Remove/.test(await askOpen.locator('.dialog-footer .btn.danger').innerText()))
     await shots('remove-open')
@@ -342,7 +334,7 @@ const check = (name, ok, extra = '') => {
 
     // --- Remove: the folder for good, the conversations kept.
     const workFolder = path.join(accountsRoot, work.id)
-    await row('Work').getByRole('button', { name: 'Remove…' }).click()
+    await menuOf('Work', 'Remove…')
     const ask = page.locator('.dialog', { hasText: 'Remove Work?' })
     check('Remove… asks first, saying its login on this PC goes with it', !!(await lib.until(async () => /deleted for good, with its login on this PC/.test(await ask.innerText().catch(() => '')), HUNG_MS)))
     await ask.locator('.dialog-footer .btn.danger').click()
