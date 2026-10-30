@@ -9,8 +9,8 @@ import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
 
 /** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
-const { returns } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>() }))
-vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null, staleApprovalOf: async () => null, staleIn: () => null }))
+const { returns, resubmits } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>(), resubmits: new Map<number, string>() }))
+vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null, resubmittedOf: async (_ws: unknown, _p: string, n: number) => resubmits.get(n) ?? null, resubmittedIn: () => null, staleApprovalOf: async () => null, staleIn: () => null }))
 
 describe('loop wake lines (#405)', () => {
   const card = { number: 12, title: 'T', description: '', project: 'alpha', agent: 'b1', agentName: 'B1', column: 'review' as const, order: 1, labels: [], blocked: null, blockedBy: [], links: [], comments: [{ at: '2026-10-10T00:00:00.000Z', by: 'R1 (alpha)', text: 'Round 1: FAILED. 1. No delay.' }], history: [{ at: '2026-10-10T00:00:00.000Z', by: 'R1 (alpha)', what: 'Review failed' }], archived: false, createdAt: '2026-10-10T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-10T00:00:00.000Z' }
@@ -833,6 +833,47 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
         expect(st.typed[0]).toMatchObject({ agent: 'b1', text: expect.stringContaining('came back from the merge queue: a conflict with main in src/b.ts') })
       } finally {
         returns.delete(c)
+      }
+      await disposeWorkspaceService(w)
+    })
+
+    it("HI-2122's sequence (HI-2143): the reviewer's watch on any move, begun before its pass; returned and submitted again, the card wakes the reviewer once, led by the return", async () => {
+      await loopWakes.clearLoopWakes()
+      await rulesOff()
+      const { w, alpha } = await open()
+      const st = fake(alpha)
+      const c = await newCard(w)
+      await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await typedUntil(st, 1)
+      // R1 reviews, starts its watch on any move of the card (HR2's: changes column, no column), then passes it.
+      st.status.set('r1', 'working')
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
+      await watches.registerWatch(w, alpha, 'r1', { cards: [c], changes: ['column'] })
+      await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'Round 1: PASSED.' }))
+      st.status.set('r1', 'watching')
+      // The queue returns it to Doing in its approver's name, as it does.
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'doing' }, r1))
+      await watches.evaluateWatches(w)
+      await settled()
+      const before = st.typed.filter((t) => t.agent === 'r1').length
+      const text = `#${c} is back in Review after the merge queue returned it (a conflict with main in src/a.ts (1 conflict, line 4)); B1 resolved it and submitted it again: review the resolution`
+      resubmits.set(c, text)
+      try {
+        // B1 resolves it and submits again: R1, back to waiting on it, is woken once, led by the return.
+        await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+        await watches.evaluateWatches(w)
+        await vi.waitFor(async () => {
+          await loopWakes.tryLoopWakes()
+          expect(st.typed.filter((t) => t.agent === 'r1')).toHaveLength(before + 1)
+        }, HANG)
+        await settled()
+        const toR1 = st.typed.filter((t) => t.agent === 'r1')
+        expect(toR1).toHaveLength(before + 1)
+        expect(toR1.at(-1)!.text).toContain(`[Hive] ${text}`)
+        expect(toR1.at(-1)!.text).not.toContain('Round 1: PASSED')
+      } finally {
+        resubmits.delete(c)
       }
       await disposeWorkspaceService(w)
     })

@@ -1,5 +1,5 @@
 import type { WorkspaceService } from './workspace'
-import { queueStateOf, returnedWake } from './workflow/queueState'
+import { queueStateOf, resubmittedText, returnedWake } from './workflow/queueState'
 import type { Workflow } from './workflow/runtime'
 import { workflowFor } from './workflow/service'
 
@@ -28,6 +28,32 @@ export function returnIn(wf: Workflow, n: number): QueueReturn | null {
     // A card not on this board (gone, another project's) or a board from before 1.0.
     return null
   }
+}
+
+/**
+ * HI-2143: a card the merge queue returned that its builder (`builder`, its board name) has submitted again since, for
+ * its reviewer, as its facts say: in Review, its queue's last entry failed, a submission after that failure and no verdict
+ * since it. The reviewer's wake leads with it (resubmittedText). Null when it isn't one, or unreadable.
+ */
+export function resubmittedIn(wf: Workflow, n: number, builder: string): string | null {
+  try {
+    const card = wf.store.card(n)
+    const s = wf.state(card)
+    const last = s.entries.at(-1)
+    if (s.stage !== 'review' || last?.state !== 'failed' || !last.failure || !s.latest) return null
+    if (wf.rulesetOf(card, s).options.finish !== 'hiveMerges') return null
+    const failed = wf.store.facts(n).findLast((f) => f.kind === 'IntegrationFailed')
+    if (!failed || s.latest.id < failed.seq || s.verdicts.some((v) => v.seq > failed.seq)) return null
+    return resubmittedText(card.key, last.failure, builder)
+  } catch {
+    return null
+  }
+}
+
+/** resubmittedIn for a card of a project in a workspace. */
+export async function resubmittedOf(ws: WorkspaceService, projectPath: string, n: number, builder: string): Promise<string | null> {
+  const wf = await workflowFor(ws, projectPath).catch(() => null)
+  return wf ? resubmittedIn(wf, n, builder) : null
 }
 
 /** A card approved with a stale pass (HI-1763): since when (its `Stale` fact), what was passed and where its line is. */

@@ -3,7 +3,7 @@ import { projectAgents } from '../shared/defaults'
 import { pendingStep } from '../shared/tasks'
 import type { LaneInfo, TaskCard, TaskHistoryEntry } from '../shared/types'
 import { HISTORY, storedText } from '../shared/taskHistory'
-import { ANSWER_MAX, cardChange, isReturnNote, LOOP_WAKE_KINDS, laneNextWords, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind } from '../shared/watch'
+import { ANSWER_MAX, cardChange, isReturnNote, LOOP_WAKE_KINDS, laneNextWords, loopStepWords, loopWakeLine, wakeAbout, type LoopWakeKind, type WakeAbout } from '../shared/watch'
 import { boardRead } from './boardStore'
 import { onHiveEvent } from './events'
 import { laneNow, onLanesWritten } from './lanes'
@@ -19,7 +19,7 @@ import { actionDelivered, cancelFromSource, createDelivery, everyFromSource, off
 import { isWaiting, type DeliveryRecord } from '../shared/deliveries'
 import { workspaceFor, type WorkspaceService } from './workspace'
 import { scopeOfHost, withCardNames } from './projectKeys'
-import { queueReturnOf } from './queueReturn'
+import { queueReturnOf, resubmittedOf } from './queueReturn'
 import { projectPreferences } from './workflow/preferences'
 import { rulesEnforced } from './workflow/recorder'
 
@@ -192,6 +192,17 @@ function laneNextOf(ws: WorkspaceService, card: TaskCard, agentId: string, kind:
 }
 
 /**
+ * What a wake's line adds about the card (wakeAbout); HI-2143: a reviewer's for a card submitted again after the merge
+ * queue returned it leads with that (resubmittedOf), not with its own pass as the latest comment.
+ */
+async function wakeAboutFor(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopWakeKind, agentId: string): Promise<WakeAbout> {
+  const about = wakeAbout(card, kindsOf(kind), agentId)
+  if (kind !== 'review' || card.column !== 'review') return about
+  const again = await resubmittedOf(ws, projectPath, card.number, card.agentName ?? card.agent ?? 'its builder').catch(() => null)
+  return again ? { ...about, resubmitted: again } : about
+}
+
+/**
  * Queues a wake for an agent (the latest per agent and card: a newer handoff of the same card replaces one still
  * waiting), unless its own watch tells it; made, and offered. `action`: the durable action making it (its delivery
  * carries the id: made once).
@@ -207,7 +218,7 @@ async function enqueue(ws: WorkspaceService, projectPath: string, card: TaskCard
     // The user's answer is an answer from them (#1626: acked, never coalesced into the card's events), each its own (a
     // later handoff of the card, or another answer, doesn't replace it); the rest, Hive's card events, the latest per card.
     const ref = answer ? `#${card.number}/answer${action ? `/${action}` : ''}` : `#${card.number}`
-    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : HIVE, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: wakeAbout(card, kinds, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref, replace: true, meta, ...(action ? { action } : {}) })
+    await createDelivery(projectPath, { agentId: to.id, agentName: to.name, kind: answer ? 'answer' : 'card-event', from: answer ? USER : HIVE, card: card.number, body: loopWakeLine({ ...cardChange(card.number, card, kinds), about: await wakeAboutFor(ws, projectPath, card, w.kind, to.id) }, w.kind, w.text), expiresMs: KEEP_MS, source: 'loop', ref, replace: true, meta, ...(action ? { action } : {}) })
     await offerNow(projectPath, to.id)
   }, scopeOfHost(projectPath))
 }
@@ -394,7 +405,9 @@ registerSource('loop', {
     madeFrom.set(madeKey(host, r.id, v), { seq, column: card.column, key })
     if (madeFrom.size > 1000) madeFrom.delete(madeFrom.keys().next().value!)
     const kinds = kindsOf(p.kind)
-    return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: wakeAbout(card, kinds, r.agentId) }, p.kind, p.text, laneNextOf(ws, card, r.agentId, p.kind)), meta: { ...r.meta, v } }
+    // laneNextOf first, without waiting (HI-1990).
+    const next = laneNextOf(ws, card, r.agentId, p.kind)
+    return { body: loopWakeLine({ ...cardChange(p.n, card, kinds), about: await wakeAboutFor(ws, host, card, p.kind, r.agentId) }, p.kind, p.text, next), meta: { ...r.meta, v } }
   },
   // Its version made, its watch not telling it, and what it was decided from as it was: for a line being typed, also
   // nothing on the board or lanes changed (#578 round 2: it stops at once); for a hand-out (hive_inbox, and the notices

@@ -24,7 +24,7 @@ import { isResuming } from './restartResume'
 import { sessions } from './sessions'
 import { cardsNow, getTask, inScope, liveCardHeads, noteOnCard, unknownTask } from './tasks'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
-import { queueReturnOf } from './queueReturn'
+import { queueReturnOf, resubmittedOf } from './queueReturn'
 import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { isUnread, type DeliveryRecord } from '../shared/deliveries'
 import { cancelFromSource, createDelivery, deliveryNow, followAgent, inFlightNow as deliveriesInFlight, load as loadDeliveries, offerNow, registerSource, settled as deliveriesSettled } from './deliveries'
@@ -2229,6 +2229,11 @@ async function check(store: Store, rec: WatchRecord, cards?: CardReads, ctx: Rel
       if (kinds !== 'gone' && kinds.includes('column') && card && (card.column === 'doing' || card.column === 'todo') && card.project && store.path) {
         const back = await queueReturnOf(store.ws, join(store.path, card.project), n).catch(() => null)
         if (back) about.queueReturn = back.text
+      }
+      // HI-2143: back in Review, submitted again after that return: for whoever watches it but its builder, led by that.
+      if (kinds !== 'gone' && kinds.includes('column') && card && card.column === 'review' && card.agent !== rec.agentId && card.project && store.path) {
+        const again = await resubmittedOf(store.ws, join(store.path, card.project), n, card.agentName ?? card.agent ?? 'its builder').catch(() => null)
+        if (again) about.resubmitted = again
       }
       hits.push({ ...cardChange(n, card, kinds), about })
     }

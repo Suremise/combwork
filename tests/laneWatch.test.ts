@@ -18,7 +18,7 @@ import type { ProgressRun } from '../src/shared/types'
 import { resetAgentStartsForTests, startBegun, startEnded } from '../src/main/agentStarts'
 /** The merge queue's returns as queueReturnOf finds them (HI-1721), by card: none unless a test sets one. */
 const { returns, stales } = vi.hoisted(() => ({ returns: new Map<number, { at: string; text: string; builder: string | null }>(), stales: new Map<number, { since: string; approved: string | null; current: string | null }>() }))
-vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null, staleApprovalOf: async (_ws: unknown, _p: string, n: number) => stales.get(n) ?? null, staleIn: () => null }))
+vi.mock('../src/main/queueReturn', () => ({ queueReturnOf: async (_ws: unknown, _p: string, n: number) => returns.get(n) ?? null, returnIn: () => null, resubmittedOf: async () => null, resubmittedIn: () => null, staleApprovalOf: async (_ws: unknown, _p: string, n: number) => stales.get(n) ?? null, staleIn: () => null }))
 /** Agents queued to resume after a restart (HI-1707's isResuming), by id: none unless a test sets one. */
 const { resuming } = vi.hoisted(() => ({ resuming: new Set<string>() }))
 vi.mock('../src/main/restartResume', async (orig) => ({ ...(await orig<object>()), isResuming: (_p: string, id: string) => resuming.has(id) }))
