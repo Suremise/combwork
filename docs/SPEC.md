@@ -4241,8 +4241,10 @@ repeating them (#533) [note §8].
 - **Loose cards (HI-2046)**: a card in Review under reviewer-agent rules (G1: an agent, or an agent then you) that no
   running lane holds (no lane, or its lane ended: the runtime's own `card.lane`) is given out by the same pass, whatever
   G17 says, so a card started on its builder alone is reviewed with no Assistant step. Its submission and verdicts write
-  `assignReviewer` as a pool card's do (a follow-up keeps the reviewer it has); the pass looks at every project with a
-  card in Review. Running free reviewers come first; a stopped one is launched for review, whatever the project's loop
+  `assignReviewer` as a pool card's do; the pass looks at every project with a card in Review. A follow-up (a pool
+  card's too) keeps the reviewer of the submission before it: carried onto it as `ReviewerAssigned` in the submit's own
+  write, so no pass gives it to another, and told by the pass, once and when free, to start its review again (no wake
+  besides). Running free reviewers come first; a stopped one is launched for review, whatever the project's loop
   wakes say. The write checks again that the card is still loose (a lane that claimed it meanwhile reviews it itself),
   and the line and the launch carry the same check, made as the line is typed and as the launch spawns (`deliverNow`'s
   hold, `sessions.start`'s `allowed`): a newer submission, a lane's claim, a review started by another or a lease taken
