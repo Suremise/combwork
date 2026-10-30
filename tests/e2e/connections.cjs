@@ -65,7 +65,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     check('…and the project asks for a connection', !!(await lib.until(async () => (await page.locator('[data-connection-setup="project"]').count()) >= 1, HUNG_MS)))
     // On for everyone (HI-1774): the one-time notice, the Assistant's banner and Provider Setup's line, none of which falls
     // back to the CLI's own sign-in.
-    check('the one-time notice says agents run on connections, naming Claude Code', !!(await lib.until(async () => /Agents now run on connections: add one for Claude Code/.test(await page.locator('[data-connections-intro]').innerText().catch(() => '')), HUNG_MS)))
+    check('the one-time notice says agents run on accounts (HI-2108), naming Claude Code', !!(await lib.until(async () => /Agents now run on accounts: add one for Claude Code/.test(await page.locator('[data-connections-intro]').innerText().catch(() => '')), HUNG_MS)))
     if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')
     check("the Assistant asks for a connection too: it can't start without one", !!(await lib.until(async () => /so the Assistant can't start/.test(await page.locator('[data-connection-setup="assistant"]').innerText().catch(() => '')), HUNG_MS)))
     await shots('setup')
@@ -76,7 +76,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     await page.locator('.palette-item[data-command="help.agentSetup"]').waitFor({ timeout: HUNG_MS })
     await page.keyboard.press('Enter')
     const setupDialog = page.locator('.dialog', { hasText: 'Provider Setup' })
-    check("Provider Setup's Claude Code tab: signed in per connection, none on yet, no sign-in of its own", !!(await lib.until(async () => /signs in per connection, and none is on in this workspace yet/.test(await setupDialog.locator('[data-connection-setup-line]').innerText().catch(() => '')), HUNG_MS)) && (await setupDialog.locator('button', { hasText: /^Sign in/ }).count()) === 0)
+    check("Provider Setup's Claude Code tab: signed in per account (HI-2108), none on yet, no sign-in of its own", !!(await lib.until(async () => /signs in per account, and none is on in this workspace yet/.test(await setupDialog.locator('[data-connection-setup-line]').innerText().catch(() => '')), HUNG_MS)) && (await setupDialog.locator('button', { hasText: /^Sign in/ }).count()) === 0)
     await shots('agent-setup')
     await setupDialog.locator('[data-open-connections]').click()
     check('…Open Connections closes it and shows Settings → Connections', !!(await lib.until(async () => (await setupDialog.count()) === 0 && (await page.locator('.settings-nav .row.selected[data-section="accounts"]').count()) === 1, HUNG_MS)))
