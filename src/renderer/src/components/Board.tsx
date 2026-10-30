@@ -17,7 +17,7 @@ import { CardWork, WorkBadges } from './CardWork'
 import { ForYouChip, ForYouSection } from './ForYou'
 import { KindField, KindMark, KindProposal } from './CardKind'
 import { ReviewSkipField, ReviewSkipMark, ReviewSkipProposal, useProjectReviews } from './CardReviewSkip'
-import { useForYou } from '../forYou'
+import { askedByNow, useForYou } from '../forYou'
 import type { ForYouItem } from '@shared/workflow/workView'
 import { useWorkBadges } from '../cardWork'
 import type { WorkBadge } from '@shared/workflow/workView'
@@ -141,7 +141,8 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
   const waiting = reviewWaitReason(c, watchers, Date.now(), tr)
   if (!waiting) {
     const verdict = reviewVerdictWaitReason(c, watchers, Date.now(), tr, reviewJob(c, agent))
-    if (verdict) return { text: verdict, kind: 'review-verdict' }
+    // HI-2080: a reviewer waiting on its own question to the user (For you) isn't stalled, as main's check has it.
+    if (verdict && !(c.review && askedByNow(c.number, c.review.agent))) return { text: verdict, kind: 'review-verdict' }
     const order = laneOrderWaitReason(c, lane, watchers, Date.now(), tr)
     if (order) return { text: order, kind: 'lane-order' }
     // loopStepWait's own first tests, before the project's options are worked out for it (HI-1806: for every card).

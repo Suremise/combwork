@@ -18,6 +18,12 @@ const NONE: ForYouSummary = { items: [], count: 0 }
 let lastRead: ForYouSummary = NONE
 const readForYou = sharedRead<ForYouSummary>(() => window.hive.invoke('tasks:forYou').then((s) => (lastRead = keepSame(lastRead, s))))
 
+/**
+ * Whether a card has an open request for the user that this agent asked, as For you was last read (HI-2080): the stall
+ * check's, which isn't a hook. Read again with each board read, as the board itself is.
+ */
+export const askedByNow = (card: number, agentId: string): boolean => lastRead.items.some((i) => i.card === card && i.asker === agentId)
+
 /** The workspace's requests for the user, and by card; empty while loading. */
 export function useForYou(): { summary: ForYouSummary; byCard: Map<number, ForYouItem[]> } {
   const ws = useStore((s) => s.workspace?.path ?? '')
