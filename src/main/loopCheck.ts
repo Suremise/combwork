@@ -10,6 +10,7 @@ import { createLogger, userText } from './logger'
 import { loopReviewerOf } from './loopReviewer'
 import { sessions } from './sessions'
 import { allTasks, liveCardHeads } from './tasks'
+import { forYouOfCards } from './workflow/cardWork'
 import { workspaceOf } from './workspace'
 import { projectPreferences } from './workflow/preferences'
 
@@ -103,6 +104,8 @@ export interface LoopReach {
   wakes: boolean
   /** The card's loop reviewer's id (loopReviewerOf), or null: no reviewer, so no loop wakes for it. */
   reviewerOf: (n: number) => string | null
+  /** Whether the card has an open For you request the agent asked (HI-2080): the user's answer is its loop wake. */
+  asked?: (n: number) => boolean
 }
 
 /**
@@ -110,7 +113,9 @@ export interface LoopReach {
  * it sits idle with no watch. A loop wake brings it the other side's move, so these aren't, while one can reach it:
  * - its own card (the builder's) in Review, with no request of its reviewer's left to answer: the reviewer's verdict;
  * - its own card in Doing with a design or follow-up posted (`pendingStep`): the reviewer's answer;
- * - a card it reviews in the loop, in Doing with no step waiting for it: the builder's submission.
+ * - a card it reviews in the loop, in Doing with no step waiting for it: the builder's submission;
+ * - a card with an open For you request it asked (`hive_ask_user`, `hive_cannot_within_rules`; HI-2080): the user's
+ *   answer, whatever the card's column or reviewer. Once answered or closed, the card is owed as before.
  * The rest is its own move (a builder's card in Doing, a step its reviewer must answer, a card in Review its reviewer
  * hasn't given a verdict on), or one no loop wake tells (no reviewer, loop wakes off, no inbox).
  */
@@ -119,6 +124,7 @@ export function owedCards(cards: readonly TaskCard[], project: string, agentId: 
   if (!reach.wakes) return inPlay
   return inPlay.filter((n) => {
     const c = cards.find((x) => x.number === n)!
+    if (reach.asked?.(n)) return false
     const reviewer = reach.reviewerOf(n)
     if (!reviewer) return true
     const step = !!pendingStep(c)
@@ -167,7 +173,10 @@ async function owedNow(loop: Loop): Promise<number[]> {
   const cards = await allTasks(ws, { numbers: inPlay })
   const reviewers = new Map<number, string | null>()
   for (const c of cards) reviewers.set(c.number, (await loopReviewerOf(ws, c).catch(() => null))?.id ?? null)
-  return owedCards(cards, project, loop.agentId, loop.cards, { wakes, reviewerOf: (n) => reviewers.get(n) ?? null })
+  // Its own questions for the user still open (HI-2080), from the board's For you as it is now.
+  const open = forYouOfCards(ws, inPlay)
+  const asked = (n: number): boolean => (open.get(n) ?? []).some((r) => r.asker === loop.agentId)
+  return owedCards(cards, project, loop.agentId, loop.cards, { wakes, reviewerOf: (n) => reviewers.get(n) ?? null, asked })
 }
 
 /** Starts an idle agent's grace before its owed cards are flagged (once: a timer running, or a flag made, waits). */

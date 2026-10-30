@@ -82,6 +82,21 @@ describe("what a loop agent with no watch owes, while Hive's loop wakes reach it
     // A request from before the card came back for review is that round's: answered or not, the verdict waits now.
     expect(owedCards([own({ column: 'review', agentName: 'B1', history: [...asked, h('Returned for review, round 2')] })], 'alpha', 'b1', [1], reach)).toEqual([])
   })
+  // HI-2080: HB5 asked Darren on HI-2068 and ended its turn; "isn't watching" fired over "waiting for the user".
+  it('a card with an open For you request of its own (asked of the user) is the user\'s move: not owed, wherever it is; once closed, owed as before', () => {
+    const asked = (n: number) => n === 1
+    for (const c of [own({ column: 'doing' }), own({ column: 'review', history: [h('Moved to Review')] })]) {
+      expect(owedCards([c], 'alpha', 'b1', [1], { ...reach, asked })).toEqual([])
+      expect(owedCards([c], 'alpha', 'r1', [1], { ...reach, asked })).toEqual([])
+      // Even with no reviewer: the user's answer wakes the one that asked, in or out of a loop.
+      expect(owedCards([c], 'alpha', 'b1', [1], { wakes: true, reviewerOf: () => null, asked })).toEqual([])
+    }
+    // Answered or closed (none open): its own move again.
+    expect(owedCards([own({ column: 'doing' })], 'alpha', 'b1', [1], { ...reach, asked: () => false })).toEqual([1])
+    // With loop wakes off the answer wakes nobody, so it is owed as before.
+    expect(owedCards([own({ column: 'doing' })], 'alpha', 'b1', [1], { ...reach, wakes: false, asked })).toEqual([1])
+  })
+
   it('everything is owed where no loop wake reaches it: none can (loop wakes off, no inbox), or the card has no reviewer', () => {
     const inReview = [own({ column: 'review', history: [h('Moved to Review')] })]
     expect(owedCards(inReview, 'alpha', 'b1', [1], { ...reach, wakes: false })).toEqual([1])
