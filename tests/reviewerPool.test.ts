@@ -600,4 +600,56 @@ describe('a card in Review outside a lane (HI-2046): given to a free reviewer by
     await pass(e)
     expect(state.calls).toEqual([])
   })
+
+  // HR1's round 1: the launch for a delivery still on its way (a retry) carries the same guard as a first one.
+  it.each(['lease', 'lane'] as const)("a retry's launch for a delivery still on its way, with a %s taken as it prepares: nothing spawned", async (what) => {
+    const e = loose()
+    const a = e.wf.createCard({ title: `Retry ${what}` })
+    await submitted(e, a, B1)
+    await pass(e)
+    expect(state.calls).toEqual(['start R1 for review'])
+    // R1 stopped before it took the line, which is still on its way: the next pass starts it again for it.
+    state.running.clear()
+    state.calls = []
+    state.deliveries[0].state = 'uncertain'
+    state.beforeSpawn = what === 'lease' ? () => lease(e, 'R1', true) : () => lane(e, 'L1', [a.id], 'B1', 'R2')
+    await pass(e)
+    expect(state.calls).toEqual([])
+    // With nothing changed, a retry starts it.
+    if (what === 'lease') {
+      lease(e, 'R1', false)
+      state.beforeSpawn = null
+      await pass(e)
+      expect(state.calls).toEqual(['start R1 for review'])
+    }
+  })
+
+  // HR1's round 1: a follow-up keeps the reviewer it had, carried onto the new submission in the submit's own write.
+  it('a follow-up keeps its reviewer: carried onto the new submission, given to nobody else, and told once, as a follow-up, when free', async () => {
+    const e = loose()
+    const a = e.wf.createCard({ title: 'Follow-up' })
+    await submitted(e, a, B1)
+    await pass(e)
+    moved(await e.wf.startReview(a.key, R1))
+    // R1 is busy (in its review's turn) and R2 free when the builder submits a follow-up.
+    state.running = new Set(['R1', 'R2'])
+    state.busy.add('R1')
+    state.calls = []
+    commit(e.project, { 'followup.txt': 'follow-up\n' }, 'Follow-up', { trailer: a.key })
+    await attributeFolder(e.wf)
+    moved(await e.wf.submit(a.key, B1, { summary: 'Follow-up ready', followUp: true }))
+    const sub = e.wf.state(e.store.card(a.id)!).latest!.id
+    expect(submissionReviewers(e.store.facts(a.id), sub, () => true).reviewing).toBe('R1')
+    expect(pending(e).filter((x) => x.kind === 'wake')).toEqual([])
+    await pass(e)
+    await pass(e)
+    expect(submissionReviewers(e.store.facts(a.id), sub, () => true)).toEqual({ seen: ['R1'], reviewing: 'R1' })
+    expect(state.calls).toEqual([])
+    // Free again: told once, to start its review again.
+    state.busy.delete('R1')
+    await pass(e)
+    await pass(e)
+    expect(state.calls).toEqual(['typed to R1'])
+    expect(state.deliveries.at(-1)?.body).toMatch(/follow-up submitted for review .*Start your review again/)
+  })
 })

@@ -15,6 +15,7 @@ import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type 
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
 import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
+import { submissionReviewers } from '../../shared/workflow/reviewerPool'
 import { chosenTests, focusedCheckName, reviewProved, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
 import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
@@ -1486,9 +1487,14 @@ export class Workflow {
     w.move('review', cause)
     w.action('prepareReviewCopy', { revision: g.revision })
     // A lane reviewed by the pool (#1443, G17), or a card no running lane holds (HI-2046: loose): the pool's pass gives
-    // the submission to a free reviewer and tells it, so no lane reviewer is woken here. A loose card's follow-up keeps
-    // the reviewer it has, woken below to start again.
-    if (reviewerAgent(g.o.review) && (g.card.reviewerPool || (!g.card.lane && !args.followUp))) w.action('assignReviewer', { submission: sub.seq })
+    // the submission to a free reviewer and tells it, so no lane reviewer is woken here. A follow-up keeps the reviewer
+    // of the submission before it (HR1's round 1): carried onto this one in this write, so no pass gives it to another,
+    // and told once by the pass, as a follow-up.
+    if (reviewerAgent(g.o.review) && (g.card.reviewerPool || !g.card.lane)) {
+      const kept = args.followUp && st.latest ? submissionReviewers(w.tx.facts(g.card.id), st.latest.id, () => true).reviewing : null
+      if (kept && kept !== 'user') w.fact('ReviewerAssigned', { reviewer: kept, submission: sub.seq })
+      w.action('assignReviewer', { submission: sub.seq })
+    }
     // A follow-up (HI-1832): the card stays in Review, so no arrival wakes its reviewer; told what to do, its words kept.
     else if (reviewerAgent(g.o.review) && args.followUp) this.wake(w, this.reviewerOf(g.card), `${g.card.key}: follow-up submitted for review at ${(g.revision ?? '').slice(0, 7)} (submission ${sub.seq}). Start your review again (hive_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused`, 'review') // i18n-ignore: a wake, agent-facing
     else if (reviewerAgent(g.o.review) && ahead) {

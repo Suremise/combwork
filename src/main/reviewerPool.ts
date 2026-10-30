@@ -217,19 +217,10 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
   const assignment = wf.store.facts(c.card).findLast((f) => f.kind === 'ReviewerAssigned' && (f.data as FactData['ReviewerAssigned']).reviewer === id && (f.data as FactData['ReviewerAssigned']).submission === c.submission)
   if (!assignment) return
   const ref = `${c.card}:${c.submission}:${agent.id}:${assignment.seq}`
-  const made = (await deliveriesOf(projectPath, agent.id)).find((r) => r.source === POOL_REVIEW && r.ref === ref && !NOT_GIVEN.has(r.state))
-  const st = sessions.liveFor(projectPath, agent.id)
-  if (made) {
-    if (!st && (made.state === 'queued' || made.state === 'offered' || made.state === 'uncertain')) await sessions.start(projectPath, { agentId: agent.id, purpose: 'review' })
-    return
-  }
-  if (!idle(projectPath, agent.id)) return
-  const builder = agents.find((a) => c.builders.includes(a.id))?.name
-  const body = withCardNames(ws, () => `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''} is in Review${c.loose ? ', outside a lane: you review it' : ': you review it from the pool'}. Review its latest submission (hive_read_task, then hive_start_review and hive_verdict); your verdict frees you for the next card.`) // i18n-ignore: agent-facing
-  const nd = { agentId: agent.id, agentName: agent.name, kind: 'card-event' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: c.card, body, source: POOL_REVIEW, ref } // i18n-ignore: who a delivery is from, as agents read it
   // Still this assignment as it is given (HI-2046, HR1): the card still in Review on this submission, given out as read
   // (a lane claiming a loose card meanwhile takes it), still given to this agent, and the agent holding no dispatch lease.
-  // Asked as the line is typed, and as a stopped one's launch spawns (sessions.start's `allowed`, after its awaits).
+  // Asked before either launch (a first one, or a retry for a delivery still on its way: HR1's round 1), as the line is
+  // typed, and as a stopped one's launch spawns (sessions.start's `allowed`, after its awaits).
   const still = (): boolean => {
     const rec = cardOf(wf, c.card)
     if (!rec || !stillGivenOut(rec, c.loose)) return false
@@ -237,21 +228,33 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
     if (s.stage !== 'review' || s.latest?.id !== c.submission) return false
     return submissionReviewers(wf.store.facts(c.card), c.submission, (x) => agents.some((a) => a.id === x)).reviewing === agent.id && wf.store.dispatchLeased(slotProject, agent.id) === false
   }
-  if (!still()) return
+  const allowed = (): void => {
+    if (!still()) throw new Error(`${cardRef(c.card)}'s review is no longer ${agent.name}'s`) // i18n-ignore: for the log (the launch is refused)
+  }
+  const notStarted = (e: unknown): null => (log.info(`${userText(agent.name)} not started for #${c.card}: ${userText((e as Error).message)}`), null)
+  const made = (await deliveriesOf(projectPath, agent.id)).find((r) => r.source === POOL_REVIEW && r.ref === ref && !NOT_GIVEN.has(r.state))
+  const st = sessions.liveFor(projectPath, agent.id)
+  if (made) {
+    if (!st && (made.state === 'queued' || made.state === 'offered' || made.state === 'uncertain') && still()) await sessions.start(projectPath, { agentId: agent.id, purpose: 'review', allowed }).catch(notStarted)
+    return
+  }
+  if (!idle(projectPath, agent.id) || !still()) return
+  const builder = agents.find((a) => c.builders.includes(a.id))?.name
+  // A follow-up carried to its reviewer (HR1's round 1): told to start again, as the runtime's follow-up wake said.
+  const followUp = !!(wf.store.facts(c.card).find((f) => f.seq === c.submission)?.data as FactData['Submitted'] | undefined)?.followUp
+  const body = withCardNames(ws, () =>
+    followUp
+      ? `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''}: follow-up submitted for review (submission ${c.submission}), still yours to review. Start your review again (hive_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused.` // i18n-ignore: agent-facing
+      : `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''} is in Review${c.loose ? ', outside a lane: you review it' : ': you review it from the pool'}. Review its latest submission (hive_read_task, then hive_start_review and hive_verdict); your verdict frees you for the next card.` // i18n-ignore: agent-facing
+  )
+  const nd = { agentId: agent.id, agentName: agent.name, kind: 'card-event' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: c.card, body, source: POOL_REVIEW, ref } // i18n-ignore: who a delivery is from, as agents read it
   log.info(`Telling ${userText(agent.name)} of #${c.card} ${c.loose ? 'outside a lane' : 'from the pool'} (${st ? 'typed' : 'started'})`)
   const r = st
     ? await deliverNow(projectPath, { ...nd, need: 'free', conversation: st.sessionId || null }, still)
     : (
         await launchWith(projectPath, nd, (line) =>
-          sessions.start(projectPath, {
-            agentId: agent.id,
-            prompt: line,
-            purpose: 'review',
-            allowed: () => {
-              if (!still()) throw new Error(`${cardRef(c.card)}'s review is no longer ${agent.name}'s`) // i18n-ignore: for the log (the launch is refused)
-            }
-          })
-        ).catch((e) => (log.info(`${userText(agent.name)} not started for #${c.card}: ${userText((e as Error).message)}`), { record: null }))
+          sessions.start(projectPath, { agentId: agent.id, prompt: line, purpose: 'review', allowed })
+        ).catch((e) => ({ record: notStarted(e) }))
       ).record
   if (!r || NOT_GIVEN.has(r.state)) log.info(`#${c.card}'s pool delivery to ${userText(agent.name)} wasn't given (${r?.state ?? 'none made'}): told at the next pass`)
 }
