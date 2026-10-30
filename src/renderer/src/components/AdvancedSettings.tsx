@@ -3,7 +3,7 @@ import { ADVANCED_DEFS, advancedRow, type AdvancedGroup, advancedShown, advanced
 import { msg, tr, tRich } from '@shared/i18n'
 import { INBOX_SWITCH_ID } from '@shared/inboxSwitches'
 import type { ProviderId } from '@shared/types'
-import { PROVIDERS, inProviderOrder, isProviderEnabled } from '@shared/providers'
+import { PROVIDERS, isProviderEnabled } from '@shared/providers'
 import { call, errorMessage } from '../api'
 import { chooseTab, notify, set, useRememberedTab, useStore } from '../store'
 import { NumberField } from './NumberField'
@@ -33,7 +33,7 @@ const T = {
 const TABS_KEY = 'settings.advanced'
 
 /**
- * Its tabs (HI-1839): Hive, then each CLI with advanced values, in Hive's order here (shown in the user's, HI-1965), as the descriptors name them;
+ * Its tabs (HI-1839): Hive, then each CLI with advanced values, in Hive's order (HI-2139), as the descriptors name them;
  * a group of a CLI Hive no longer offers keeps a tab after them.
  */
 const GROUPS: AdvancedGroup[] = (() => {
@@ -57,8 +57,7 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   // Its English matches as well as what it shows, as Settings' own rows do.
   const shown = rows.filter((r) => (!modifiedOnly || r.override !== undefined || r.workspaceValue !== undefined) && matches(`${r.def.id} ${r.def.setting ?? ''} ${groupName(r.def.group)} ${r.def.title} ${r.def.desc} ${shownText(r.def.text.title)} ${shownText(r.def.text.desc)}`))
   const settings = useStore((s) => s.settings)
-  // The CLIs' tabs in the user's order (HI-1965: Settings → Providers), Hive's first.
-  const groups = inProviderOrder(GROUPS, (g) => (isCli(g) ? g : null), settings)
+  const groups = GROUPS
   const idBase = useId()
   // Filtering (Settings' search, this list's filter, either Modified only): each tab counts its matches; the tab shown is
   // the remembered one while it has some, else the first that has; a tab clicked meanwhile narrows to it, unremembered,

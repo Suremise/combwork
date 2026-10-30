@@ -2,7 +2,7 @@
 // HI-2132) a new agent's CLI is its connection's, and Automatic is only the last resort for an agent with no CLI of its
 // own; no default provider, Settings' or a project's, is read outside the migration.
 import { afterEach, describe, expect, it } from 'vitest'
-import { AUTO_PROVIDER, agentProvider, autoProvider, autoProviderPending, inProviderOrder, orderedProviders, providerWarnings, providersInUse, setInstalledCheck } from '../src/shared/providers'
+import { AUTO_PROVIDER, PROVIDERS, agentProvider, autoProvider, autoProviderPending, enabledProviders, providerWarnings, providersInUse, setInstalledCheck } from '../src/shared/providers'
 import { DEFAULT_APP_CONFIG, DEFAULT_SETTINGS, mergeDefaults, migrateConfig } from '../src/shared/defaults'
 import type { AppSettings, ProviderId } from '../src/shared/types'
 
@@ -137,49 +137,26 @@ describe('which providers Hive warns about (the banner, the status bar, Provider
   })
 })
 
-describe("the providers' order (HI-1965)", () => {
-  const ordered = (s: AppSettings): string[] => orderedProviders(s).map((p) => p.id)
-  const inOrder = (order: string[], on = ALL): AppSettings => ({ ...settings(on), providerOrder: order })
-
-  it("Hive's own order until the user reorders: Claude Code, Codex, GitHub Copilot", () => {
-    expect(DEFAULT_SETTINGS.providerOrder).toEqual([])
-    expect(ordered(settings(ALL))).toEqual(ALL)
-  })
-
-  it('Automatic picks the first turned on and installed in the order as set, and says so', () => {
-    installed(['claude-code', 'codex', 'copilot'])
-    expect(autoProvider(inOrder(['codex', 'copilot', 'claude-code']))).toBe('codex')
-    expect(autoProvider(inOrder(['copilot', 'codex', 'claude-code']))).toBe('copilot')
-    // The first in the order not installed: the next that is.
-    installed(['claude-code', 'copilot'])
-    expect(autoProvider(inOrder(['codex', 'copilot', 'claude-code']))).toBe('copilot')
-    // Turned off: skipped, whatever its place.
+describe("Hive's order (HI-2139: no order of the user's)", () => {
+  it('Claude Code, Codex, GitHub Copilot: Automatic picks the first turned on and installed in it', () => {
+    expect(PROVIDERS.map((p) => p.id)).toEqual(ALL)
     installed(ALL)
-    expect(autoProvider(inOrder(['codex', 'copilot', 'claude-code'], ['claude-code', 'copilot']))).toBe('copilot')
+    expect(autoProvider(settings(ALL))).toBe('claude-code')
+    expect(enabledProviders(settings(['copilot', 'codex'])).map((p) => p.id)).toEqual(['codex', 'copilot'])
+    // The first not installed: the next that is; turned off: skipped.
+    installed(['claude-code', 'copilot'])
+    expect(autoProvider(settings(['codex', 'copilot']))).toBe('copilot')
   })
 
-  it('names some providers: those first, the rest after in Hive’s order; unknown ids skipped', () => {
-    expect(ordered(inOrder(['copilot']))).toEqual(['copilot', 'claude-code', 'codex'])
-    expect(ordered(inOrder(['gemini', 'codex']))).toEqual(['codex', 'claude-code', 'copilot'])
-  })
-
-  it("a list's provider entries follow it, each run in its own places; the rest stay (Settings' and Project Settings' sections, Advanced's tabs)", () => {
-    const nav = ['general', 'providers', 'p:claude-code', 'p:codex', 'p:copilot', 'assistant', 'a:claude-code', 'a:codex', 'a:copilot', 'advanced']
-    const providerOf = (s: string) => (s.includes(':') ? (s.split(':')[1] as ProviderId) : null)
-    expect(inProviderOrder(nav, providerOf, inOrder(['copilot', 'claude-code', 'codex']))).toEqual(['general', 'providers', 'p:copilot', 'p:claude-code', 'p:codex', 'assistant', 'a:copilot', 'a:claude-code', 'a:codex', 'advanced'])
-    expect(inProviderOrder(nav, providerOf, settings(ALL))).toEqual(nav)
-    // An entry of a provider this Hive doesn't know (an old Advanced group) stays where it was.
-    expect(inProviderOrder(['hive', 'claude-code', 'codex', 'gemini'], (g) => (g === 'hive' ? null : (g as ProviderId)), inOrder(['codex']))).toEqual(['hive', 'codex', 'claude-code', 'gemini'])
-  })
-
-  it('survives a restart: saved, loaded as it was; a damaged one is Hive’s order', () => {
+  it("a 0.9 saved order is kept as the migration's input (a damaged one as none), its revision dropped; Automatic no longer follows it", () => {
     const load = (raw: Record<string, unknown>) => migrateConfig(mergeDefaults(structuredClone(DEFAULT_APP_CONFIG), raw), raw)
-    expect(load({ version: 8, settings: { providerOrder: ['copilot', 'codex', 'claude-code'] } }).settings.providerOrder).toEqual(['copilot', 'codex', 'claude-code'])
+    const c = load({ version: 8, settings: { providerOrder: ['copilot', 'codex', 'claude-code'], providerOrderRevision: 4 } })
+    expect(c.settings.providerOrder).toEqual(['copilot', 'codex', 'claude-code'])
+    expect('providerOrderRevision' in c.settings).toBe(false)
     expect(load({ version: 8, settings: { providerOrder: ['gemini', 'codex', 'codex', 7] } }).settings.providerOrder).toEqual(['gemini', 'codex'])
     expect(load({ version: 8, settings: { providerOrder: 'codex' } }).settings.providerOrder).toEqual([])
-    expect(load({ version: 8, settings: {} }).settings.providerOrder).toEqual([])
-    // Its revision went with the window's moves (HI-2113): a saved one is dropped.
-    expect('providerOrderRevision' in load({ version: 8, settings: { providerOrder: ['codex'], providerOrderRevision: 4 } }).settings).toBe(false)
+    installed(ALL)
+    expect(autoProvider(c.settings)).toBe('claude-code')
   })
 })
 

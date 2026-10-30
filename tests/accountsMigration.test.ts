@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Account, AgentDef, AppSettings, Connection, LegacyConnection, ProjectConfig, ProviderId, WorkspaceConfig } from '../src/shared/types'
-import { DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, mergeDefaults, migrateProjectConfig, withLegacyProjectFields } from '../src/shared/defaults'
-import { agentLaunchSettings, setInstalledCheck, splitArgs } from '../src/shared/providers'
+import { DEFAULT_APP_CONFIG, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, mergeDefaults, migrateConfig, migrateProjectConfig, withLegacyProjectFields } from '../src/shared/defaults'
+import { agentLaunchSettings, autoProvider, setInstalledCheck, splitArgs } from '../src/shared/providers'
 import { connectionName, joinArgs, launchValues, matchingConnection, resolveAgentConnection, sameValues } from '../src/shared/accounts'
 import { type AccountStore, type LegacyInputs, COPILOT_ACCOUNT, assistantHasSetup, baseValues, connectionFor, legacyEffective, legacyLaunchSettings, migrateAccounts, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, seamAccountId } from '../src/shared/connectionDefaults'
 import { ASSISTANT_AGENT_ID, assistantProjectConfig } from '../src/shared/assistant'
@@ -333,5 +333,28 @@ describe('the full upgrade of an rc.12-shaped profile (HI-2106)', () => {
     expect(migrateProject(migrated.hive, inp, store, AT)).toBeNull()
     expect(migrateAssistant(assistant, inp, store, AT)).toBeNull()
     expect(store.connections.length).toBe(count)
+  })
+})
+
+describe("0.9's providers' order, read by the migration only (HI-2139)", () => {
+  // config.json as 0.9 kept it: Automatic, Codex first in the order the user set, both CLIs on (and installed: line 14).
+  const raw = { version: 8, settings: { defaultProvider: 'auto', providerOrder: ['codex', 'claude-code', 'copilot'], providers: { 'claude-code': { enabled: true }, codex: { enabled: true } } } }
+  const loaded = migrateConfig(mergeDefaults(structuredClone(DEFAULT_APP_CONFIG), raw), raw)
+
+  it('is kept as it was saved, through a load', () => {
+    expect(loaded.settings.providerOrder).toEqual(['codex', 'claude-code', 'copilot'])
+  })
+
+  it('an Automatic Assistant and an agent with no provider of its own stay on the CLI they ran: Codex', () => {
+    const inp: LegacyInputs = { settings: loaded.settings, ws: {}, legacy: [], seam: () => false }
+    const store: AccountStore = { accounts: [], connections: [], newId }
+    const assistant = migrateAssistant(projectOf({ version: 2, agents: [{ id: ASSISTANT_AGENT_ID, name: 'Assistant' }] }), inp, store, AT)!
+    expect(assistant.agents[0].provider).toBe('codex')
+    const project = migrateProject(projectOf({ version: 2, agents: [{ id: 'x', name: 'X' }] }), inp, store, AT)!
+    expect(project.agents[0].provider).toBe('codex')
+  })
+
+  it("isn't today's: Automatic's fallback picks in Hive's order", () => {
+    expect(autoProvider(loaded.settings)).toBe('claude-code')
   })
 })

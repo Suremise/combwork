@@ -210,9 +210,9 @@ export interface AppSettings {
   /** The provider Add Agent's quick add uses unless the project says otherwise. */
   defaultProvider: ProviderId
   /**
-   * The order the provider lists show the providers in, which Automatic picks from (HI-1965: orderedProviders). Empty:
-   * Hive's own order. Providers it doesn't name follow, in Hive's order. No screen sets it since decision A (HI-2113:
-   * the one order is the accounts'); one saved by 0.9 is still read.
+   * 0.9's order of the providers (HI-1965), which its Automatic picked from. No list follows it since HI-2139 (Hive's
+   * order): kept read-only in config.json, as defaultProvider is, for the migration's reading of a 0.9 launch
+   * (connectionDefaults.ts' legacyAutoProvider) in workspaces not opened yet. Never written.
    */
   providerOrder: ProviderId[]
   notifications: {

@@ -449,51 +449,9 @@ export function isProviderEnabled(settings: Pick<AppSettings, 'providers'> | nul
   return isKnownProvider(id) && !!settings?.providers?.[id]?.enabled
 }
 
-/** Settings as the provider order reads them: `providerOrder` optional, so callers holding only `providers` still fit. */
-type OrderedSettings = Pick<AppSettings, 'providers'> & Partial<Pick<AppSettings, 'providerOrder'>>
-
-/**
- * Every provider in the user's order (HI-1965; one saved by 0.9's Settings → Providers, which no screen sets since
- * decision A, HI-2113): those `providerOrder` names first, as listed, then any it doesn't (one added since, or none
- * saved) in Hive's own order (PROVIDERS'). Ids it names that this Hive doesn't know (a newer Hive's) are skipped, not
- * dropped from the setting. Automatic picks from this order.
- */
-export function orderedProviders(settings: Partial<Pick<AppSettings, 'providerOrder'>> | null | undefined): ProviderDescriptor[] {
-  const order = Array.isArray(settings?.providerOrder) ? settings.providerOrder : []
-  const rank = (id: ProviderId): number => {
-    const i = order.indexOf(id)
-    return i < 0 ? order.length + PROVIDERS.findIndex((p) => p.id === id) : i
-  }
-  return [...PROVIDERS].sort((a, b) => rank(a.id) - rank(b.id))
-}
-
-/**
- * A list with its providers' entries (a settings section, an Advanced tab) in the user's order (HI-1965): each run of
- * entries that belong to a provider, one after another, sorted within its places, and the rest where they were. A nav's
- * General and Workspace stay first; its provider pages, and further down the Assistant's per-provider ones, each follow
- * the order without mixing.
- */
-export function inProviderOrder<T>(items: readonly T[], providerOf: (t: T) => ProviderId | null | undefined, settings: Partial<Pick<AppSettings, 'providerOrder'>> | null | undefined): T[] {
-  const rank = new Map(orderedProviders(settings).map((p, i) => [p.id, i]))
-  const known = (t: T): boolean => {
-    const p = providerOf(t)
-    return !!p && rank.has(p)
-  }
-  const out: T[] = []
-  for (let i = 0; i < items.length; ) {
-    if (!known(items[i])) {
-      out.push(items[i++])
-      continue
-    }
-    const run: T[] = []
-    while (i < items.length && known(items[i])) run.push(items[i++])
-    out.push(...run.sort((a, b) => rank.get(providerOf(a)!)! - rank.get(providerOf(b)!)!))
-  }
-  return out
-}
-
-export function enabledProviders(settings: OrderedSettings | null | undefined): ProviderDescriptor[] {
-  return orderedProviders(settings).filter((p) => isProviderEnabled(settings, p.id))
+/** The providers turned on, in Hive's order (PROVIDERS': HI-2139, no order of the user's). */
+export function enabledProviders(settings: Pick<AppSettings, 'providers'> | null | undefined): ProviderDescriptor[] {
+  return PROVIDERS.filter((p) => isProviderEnabled(settings, p.id))
 }
 
 /**
@@ -518,8 +476,11 @@ export function setInstalledCheck(fn: (id: ProviderId) => boolean | null): void 
   installedCheck = fn
 }
 
+/** Whether a provider's CLI was found, as this process last heard (installedCheck); null while still looking. */
+export const installedAsHeard = (id: ProviderId): boolean | null => installedCheck(id)
+
 /**
- * Automatic's provider, in the user's order (HI-1965): the first turned on and installed, else the first turned on, else
+ * Automatic's provider, in Hive's order (HI-2139): the first turned on and installed, else the first turned on, else
  * Claude Code. Never from
  * partial detection (#506): until every turned-on provider has answered (autoProviderPending), this is only a guess for
  * display, the first turned-on provider not known to be missing (never Codex because it answered before Claude Code).

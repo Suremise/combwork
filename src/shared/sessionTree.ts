@@ -1,5 +1,5 @@
 import type { ProviderId, SessionListItem } from './types'
-import { PROVIDERS, orderedProviders, providerName } from './providers'
+import { PROVIDERS, providerName } from './providers'
 import { msg, tr } from './i18n'
 import { removedAgentName } from './sessionOrigin'
 
@@ -44,8 +44,6 @@ export interface SessionTreeOptions {
   selectedId?: string | null
   /** Search: a session shows when it or one of its sub-sessions matches. */
   match?: ((s: SessionListItem) => boolean) | null
-  /** The providers' order as the user set it (HI-1965: Settings → Providers); none: Hive's. */
-  providerOrder?: readonly ProviderId[]
 }
 
 /** The group of sessions no agent ran (adopted, or from before Hive recorded agents), as the Sessions tab names it. */
@@ -94,10 +92,9 @@ export function buildSessionTree(items: readonly SessionListItem[], opts: Sessio
 
   const providers = new Map<ProviderId, SessionNode[]>()
   for (const r of roots) providers.set(r.item.provider, [...(providers.get(r.item.provider) ?? []), r])
-  // In the user's order (HI-1965), a provider this Hive doesn't know last.
-  const ranked = orderedProviders({ providerOrder: [...(opts.providerOrder ?? [])] })
+  // In Hive's order (HI-2139), a provider this Hive doesn't know last.
   const order = (p: ProviderId): number => {
-    const i = ranked.findIndex((d) => d.id === p)
+    const i = PROVIDERS.findIndex((d) => d.id === p)
     return i < 0 ? PROVIDERS.length : i
   }
   return [...providers.entries()]
