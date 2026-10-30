@@ -495,6 +495,23 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
       expect(w.set.looked).toEqual(['1 slot-a ready'])
     })
 
+    it("the pool's close waits for a settle under way, which ends its operation", async () => {
+      const w = world({ builders: 1 })
+      const r = await onLine(w)
+      const held = holdDirty(r.slot.folder)
+      const release = w.pool.release(r.lease.id, 'done')
+      await held.started
+      let closed = false
+      const closing = w.pool.close().then(() => (closed = true))
+      // Still settling: its close waits (the next microtasks see it not closed).
+      await Promise.resolve()
+      expect(closed).toBe(false)
+      held.open()
+      await closing
+      await release
+      expect(w.store.slot('slot-a')).toMatchObject({ op: null, state: 'ready' })
+    })
+
     it('a look that throws ends its operation, the slot as it was; the next look settles it', async () => {
       const w = world({ builders: 1 })
       const r = await onLine(w)

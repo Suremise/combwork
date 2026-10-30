@@ -1344,10 +1344,14 @@ export class SlotPool {
     if (!s || s.op || s.writer || this.store.openLease(name)) return
     if (s.state === 'creating' || s.state === 'removing') return
     const token = newToken()
-    if (!(await this.store.beginSettle(name, s.state, token, await this.deps.holder.self()))) return
+    const holder = await this.deps.holder.self()
     let to: SlotState = s.state
+    let began = false
     try {
+      // Live (and awaited by close) before its row is written, so no look of a pool takes it for an abandoned one.
       await this.op(token, async () => {
+        if (!(await this.store.beginSettle(name, s.state, token, holder))) return
+        began = true
         try {
           const now = await this.look(s)
           // Clean, it waits for its next card detached at the target's head (HI-2014, HI-1986), before it is ready to lend:
@@ -1359,12 +1363,15 @@ export class SlotPool {
           // Its operation ends with what it found, or the slot as it was (a failure: the next look tries again).
           await this.store.fenced(name, token, (db) => this.store.setIn(db, name, to, {}, { op: null })).catch((e) => {
             if (!(e instanceof OpLost)) throw e
+            // Taken over meanwhile: what it found isn't the slot's, its new holder's look is.
+            to = s.state
           })
         }
       })
     } finally {
-      // Only a change: a pass that settles slots asks for itself again, so a slot that stays dirty mustn't loop it.
-      if (to !== s.state) this.deps.looked?.(name, to)
+      // After its row's write, only a change: a pass that settles slots asks for itself again, so a slot that stays dirty
+      // mustn't loop it.
+      if (began && to !== s.state) this.deps.looked?.(name, to)
     }
   }
 
