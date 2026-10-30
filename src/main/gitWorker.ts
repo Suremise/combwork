@@ -1,5 +1,6 @@
 import { execFile, type ChildProcess } from 'child_process'
 import { existsSync } from 'original-fs'
+import { delimiter, join } from 'path'
 import { parentPort } from 'worker_threads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
 
@@ -22,6 +23,21 @@ export interface GitRequest {
   input?: string
   env?: NodeJS.ProcessEnv
   timeout?: number
+  /** HI-2137: the git it starts (gitTool's gitExe()): PATH's `git` when not given. */
+  exe?: string
+  /** HI-2137: the environment Git for Windows' launcher would have given it (gitExe()). */
+  launcherEnv?: LauncherEnv
+}
+
+/**
+ * HI-2137: what Git for Windows' launcher (`<root>\cmd\git.exe`) gives the real git it starts, which Hive gives it when
+ * it starts that git itself: MSYSTEM when it isn't set, and its folders before PATH (`pathFirst`: `<root>\mingw64\bin`
+ * and `<root>\usr\bin`), then the user's `~\bin`. The real git, given MSYSTEM, leaves PATH as it is; without it, it
+ * would put `~\bin` first itself.
+ */
+export interface LauncherEnv {
+  pathFirst: string
+  msystem: string
 }
 
 /** execFile's outcome: its output, and its error's code (a number: git's exit code; a string: Node's), killed and signal. */
@@ -63,7 +79,8 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Pr
     let held = false
     let exited = false
     let quiet: ReturnType<typeof setTimeout> | undefined
-    const child = execFile('git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(m.env ? { env: m.env } : {}), ...(m.timeout ? { timeout: m.timeout } : {}) }, (err, stdout, stderr) => {
+    const env = m.launcherEnv ? withLauncherEnv(m.env ?? process.env, m.launcherEnv) : m.env
+    const child = execFile(m.exe ?? 'git', m.args, { cwd: m.cwd, windowsHide: true, maxBuffer: m.maxBuffer, encoding: 'buffer', ...(env ? { env } : {}), ...(m.timeout ? { timeout: m.timeout } : {}) }, (err, stdout, stderr) => {
       clearTimeout(quiet)
       const e = err as (Error & { code?: unknown; killed?: boolean; signal?: string | null }) | null
       res({
@@ -94,6 +111,17 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Pr
     // What the command reads (update-ref --stdin's transaction).
     if (m.input !== undefined) child.stdin?.end(m.input)
   })
+}
+
+/**
+ * HI-2137: `env` as Git for Windows' launcher gives it to the git it starts (LauncherEnv): a copy, its PATH found
+ * whatever its case (a spread environment's key is as Windows spelled it), its home as the launcher finds it.
+ */
+export function withLauncherEnv(env: NodeJS.ProcessEnv, l: LauncherEnv): NodeJS.ProcessEnv {
+  const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
+  const home = env.HOME || env.USERPROFILE
+  const first = home ? `${l.pathFirst}${delimiter}${join(home, 'bin')}` : l.pathFirst
+  return { ...env, [key]: env[key] ? `${first}${delimiter}${env[key]}` : first, ...(env.MSYSTEM ? {} : { MSYSTEM: l.msystem }) }
 }
 
 /**

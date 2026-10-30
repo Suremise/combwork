@@ -3,7 +3,7 @@ import { join, resolve, sep } from 'path'
 import { SHARE_ENV, Worker } from 'worker_threads'
 import { lstat, readFile, readlink } from 'original-fs/promises'
 import { insideReal } from './fsutil'
-import { gitProblem, gitTool, noteGitMissing, noteGitRan } from './gitTool'
+import { gitExe, gitExeGone, gitProblem, gitTool, noteGitMissing, noteGitRan } from './gitTool'
 import type { GitDiff, GitStatus } from '../shared/types'
 import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
@@ -54,6 +54,8 @@ export const GIT_PREFIX = ['--no-optional-locks', '-c', 'diff.autoRefreshIndex=f
 export interface GitRunOptions {
   env?: NodeJS.ProcessEnv
   timeout?: number
+  /** HI-2137: gitTool's own check of git: this git rather than gitExe()'s, and what it does is not noted as git's state. */
+  exe?: string
 }
 
 /**
@@ -89,7 +91,9 @@ export function withoutGitRoute<T>(fn: () => T): T {
 }
 
 export async function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
-  const m = { cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) }
+  // HI-2137: the git Hive starts (Git for Windows' real git rather than its launcher, where it found one).
+  const use = opts.exe !== undefined ? { exe: opts.exe } : gitExe()
+  const m = { cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(use.exe !== 'git' ? { exe: use.exe } : {}), ...(use.launcherEnv ? { launcherEnv: use.launcherEnv } : {}), ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) }
   const scope = routes.getStore()
   // HI-2078: a route's scope runs it there; else it starts off main's thread (HI-1783): gitWorker.ts runs it as this
   // always did. Either way its outcome is read here.
@@ -106,9 +110,13 @@ export async function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1
   const ranToExit = !err || typeof errCode === 'number'
   const notRun = !ranToExit && !missing ? String(errCode ?? err?.signal ?? 'error') : undefined
   const code = err ? (typeof errCode === 'number' ? errCode : -1) : 0
-  if (missing) noteGitMissing()
-  // Git ran (whatever it answered): not one that didn't start for another reason (no working folder, output too big).
-  else if (ranToExit) noteGitRan()
+  if (opts.exe === undefined) {
+    // HI-2137: the real git Hive found couldn't start (uninstalled, moved): it never ran, so once more with PATH's.
+    if (missing && gitExeGone(m.exe)) return git(cwd, args, maxBuffer, input, opts)
+    if (missing) noteGitMissing()
+    // Git ran (whatever it answered): not one that didn't start for another reason (no working folder, output too big).
+    else if (ranToExit) noteGitRan()
+  }
   const stderr = Buffer.from(o.stderr.buffer, o.stderr.byteOffset, o.stderr.byteLength).toString('utf8').trim()
   const said = stderr || (notRun ? `git ${args[0]} didn't run to an exit (${notRun})` : '') // i18n-ignore: git's side of an error, in English as git's messages are
   return { out: buf.toString('utf8'), ok: !err, buf, err: said, code, ...(missing ? { missing } : {}), ...(notRun ? { notRun } : {}), ...(err?.killed && opts.timeout ? { timedOut: true } : {}) }

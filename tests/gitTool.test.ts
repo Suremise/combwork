@@ -2,12 +2,13 @@
 // nothing to lose. Git is hidden from this test process's own PATH (never the machine's), which every git call Hive
 // makes inherits.
 import { execFileSync } from 'child_process'
-import { existsSync, rmSync, writeFileSync } from 'fs'
-import { delimiter, join } from 'path'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+import { delimiter, dirname, join, win32 } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GIT_MIN, compareGitVersions, gitFixText, gitOldText, gitProblemText, gitStateOf, gitUnusable, parseGitVersion } from '../src/shared/gitTool'
-import { checkGit, gitOnPath, gitProblem, gitTool, setGitToolForTests } from '../src/main/gitTool'
+import { checkGit, gitExe, gitOnPath, gitProblem, gitTool, realGit, realGitBehind, setGitToolForTests } from '../src/main/gitTool'
 import { git, gitStatus } from '../src/main/git'
+import { withLauncherEnv } from '../src/main/gitWorker'
 import { branchStatus, createWorktree, removeCheckedWorktree, worktreeCheck } from '../src/main/worktrees'
 import { ensureHiveExcluded } from '../src/main/hiveVcs'
 import { tempDir, tempRoot } from './tempDir'
@@ -148,5 +149,98 @@ describe('git failing', () => {
     const c = await worktreeCheck(p, wt)
     expect(c.removable).toBe(false)
     expect(gitProblem()).toBeNull()
+  })
+})
+
+// HI-2137: where PATH's git is Git for Windows' launcher (<root>\cmd\git.exe), Hive starts the real git beneath it
+// directly; anything else keeps PATH's git.
+describe('the git Hive starts', () => {
+  /** A Git for Windows layout: its launcher, and its real git under `mingw` (empty files: only where they are counts). */
+  const layouts: string[] = []
+  afterEach(() => {
+    for (const d of layouts.splice(0)) rmSync(d, { recursive: true, force: true })
+  })
+  function layout(mingw = 'mingw64'): { root: string; launcher: string; execPath: string; real: string } {
+    const top = tempDir('hive-gitexe-')
+    layouts.push(top)
+    const launcher = join(top, 'cmd', 'git.exe')
+    const execPath = join(top, mingw, 'libexec', 'git-core')
+    for (const d of [dirname(launcher), execPath]) mkdirSync(d, { recursive: true })
+    writeFileSync(launcher, '')
+    writeFileSync(join(execPath, 'git.exe'), '')
+    return { root: top, launcher, execPath, real: join(execPath, 'git.exe') }
+  }
+  /** git's own answers, as `run` gives them to realGit: by the git asked and its arguments; the calls, in order. */
+  function answers(byExe: Record<string, Record<string, string | null>>): { run: (exe: string, args: string[]) => Promise<string | null>; calls: string[] } {
+    const calls: string[] = []
+    return { calls, run: async (exe, args) => (calls.push(`${exe} ${args.join(' ')}`), byExe[exe]?.[args.join(' ')] ?? null) }
+  }
+  const SAID = 'git version 2.51.0.windows.1\n'
+
+  it("the launcher, its exec-path under its root and the same version: the real git, with the launcher's PATH folders", async () => {
+    const g = layout()
+    const { run: ask } = answers({ git: { '--exec-path': `${g.execPath.replace(/\\/g, '/')}\n` }, [g.real]: { '--version': SAID } })
+    expect(await realGit(SAID, g.launcher, ask)).toEqual({ exe: g.real, launcherEnv: { pathFirst: [join(g.root, 'mingw64', 'bin'), join(g.root, 'usr', 'bin')].join(delimiter), msystem: 'MINGW64' } })
+    // Git for Windows on ARM.
+    const arm = layout('clangarm64')
+    expect(realGitBehind(arm.launcher, arm.execPath)?.launcherEnv).toEqual({ pathFirst: [join(arm.root, 'clangarm64', 'bin'), join(arm.root, 'usr', 'bin')].join(delimiter), msystem: 'CLANGARM64' })
+  })
+
+  it("the real git's environment is the launcher's: MSYSTEM unless set, its folders and then ~\\bin before PATH", () => {
+    const l = { pathFirst: 'C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin', msystem: 'MINGW64' }
+    // A spread environment keeps Windows' spelling of PATH: that key, not a second one.
+    expect(withLauncherEnv({ Path: 'C:\\Windows', USERPROFILE: 'C:\\Users\\u' }, l)).toEqual({ Path: 'C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin;C:\\Users\\u\\bin;C:\\Windows', USERPROFILE: 'C:\\Users\\u', MSYSTEM: 'MINGW64' })
+    // HOME first, as the launcher takes it; an MSYSTEM already set stays.
+    expect(withLauncherEnv({ PATH: 'C:\\Windows', HOME: 'D:\\home', USERPROFILE: 'C:\\Users\\u', MSYSTEM: 'MSYS' }, l)).toMatchObject({ PATH: 'C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin;D:\\home\\bin;C:\\Windows', MSYSTEM: 'MSYS' })
+  })
+
+  it('a different version from the real git (a mismatch, or it failed): PATH git', async () => {
+    const g = layout()
+    for (const said of ['git version 2.50.1.windows.1\n', null]) {
+      const { run: ask } = answers({ git: { '--exec-path': g.execPath }, [g.real]: { '--version': said } })
+      expect(await realGit(SAID, g.launcher, ask)).toEqual({ exe: 'git' })
+    }
+  })
+
+  it('anything but the launcher itself: PATH git, with no exec-path asked', async () => {
+    const g = layout()
+    for (const onPath of [null, join(g.root, 'cmd', 'git.com'), join(g.root, 'bin', 'git.exe'), join(g.root, 'scoop', 'shims', 'git.exe'), g.real]) {
+      const { run: ask, calls } = answers({ git: { '--exec-path': g.execPath }, [g.real]: { '--version': SAID } })
+      expect(await realGit(SAID, onPath, ask)).toEqual({ exe: 'git' })
+      expect(calls).toEqual([])
+    }
+  })
+
+  it("the launcher with an exec-path elsewhere, or no real git there: PATH git", async () => {
+    const g = layout()
+    const other = layout()
+    expect(realGitBehind(g.launcher, other.execPath)).toBeNull()
+    expect(realGitBehind(g.launcher, join(g.root, 'usr', 'libexec', 'git-core'))).toBeNull()
+    rmSync(g.real)
+    expect(realGitBehind(g.launcher, g.execPath)).toBeNull()
+    const { run: ask } = answers({ git: { '--exec-path': null } })
+    expect(await realGit(SAID, other.launcher, ask)).toEqual({ exe: 'git' })
+  })
+
+  it('this machine: with the launcher first on PATH, Hive starts the real git, and git runs', async () => {
+    const execPath = run(process.cwd(), '--exec-path').trim()
+    const launcher = join(dirname(dirname(dirname(win32.normalize(execPath)))), 'cmd', 'git.exe')
+    if (!existsSync(launcher)) return // Not Git for Windows: nothing of this applies.
+    process.env.PATH = `${dirname(launcher)}${delimiter}${PATH}`
+    await checkGit()
+    expect(gitExe().exe.toLowerCase()).toBe(join(win32.normalize(execPath), 'git.exe').toLowerCase())
+    const { p } = await project()
+    expect(await git(p, ['rev-parse', '--abbrev-ref', 'HEAD'])).toMatchObject({ ok: true, out: 'main\n' })
+  })
+
+  it("a real git that can't start any more (uninstalled, moved): that git once more from PATH, and git checked again", async () => {
+    const { p } = await project()
+    const gone = join(root, 'gone', 'mingw64', 'libexec', 'git-core', 'git.exe')
+    setGitToolForTests({ state: 'ok', version: '2.51.0' }, { exe: gone, launcherEnv: { pathFirst: join(root, 'gone', 'usr', 'bin'), msystem: 'MINGW64' } })
+    expect(await git(p, ['rev-parse', '--abbrev-ref', 'HEAD'])).toMatchObject({ ok: true, out: 'main\n' })
+    expect(gitExe().exe).not.toBe(gone)
+    expect(gitTool().state).not.toBe('missing')
+    expect((await checkGit()).state).not.toBe('missing')
+    expect(gitExe().exe).not.toBe(gone)
   })
 })

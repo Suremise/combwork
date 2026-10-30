@@ -142,6 +142,7 @@ export const SUITES = [
   { name: 'freshpath' },
   { name: 'gitbranchcards' },
   { name: 'gitcleanup' },
+  { name: 'gitdirect' },
   { name: 'gitinit' },
   { name: 'gitmissing' },
   { name: 'gitremotes' },
