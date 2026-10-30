@@ -68,17 +68,20 @@ describe('the session contract', () => {
     // #1529 (P8): the intents, and that Hive enforces the rest (§16.8): what the project's rules refuse is the refusal's to say.
     for (const t of ['hive_start_card', 'hive_submit', 'hive_start_review', 'hive_verdict', 'hive_report_merge']) expect(agent, t).toContain(t)
     expect(agent).toMatch(/Hive refuses what the project's rules don't allow, saying why and what to do next/)
-    expect(agent).toMatch(/a column move \(hive_update_task\) is translated into its intent/)
-    expect(agent).toMatch(/On hold is the user's: never move cards in or out unasked/)
+    // HI-2010: a column move's translation is its reply's to say, and checkHold refuses an agent putting a card On Hold;
+    // taking one out isn't refused, so that half stays.
+    expect(agent).not.toMatch(/is translated into its intent/)
+    expect(agent).toMatch(/Never take a card out of On Hold unasked/)
     expect(agent).toMatch(/Add cards for follow-up work rather than doing it unasked/)
     expect(agent).toMatch(/use the hive tools for them, not the file system/)
   })
 
   // #1529 (#903): a fresh user's Claude agents read their inbox and never acked, so it showed overdue. Every CLI gets the contract.
-  it('says read, act, then ack, and why, to agents and the Assistant', () => {
+  // HI-2010: the overdue mark is Hive's (deliveries.ts), so the contract no longer explains it.
+  it('says read, act, then ack, to agents and the Assistant', () => {
     for (const text of [agent, assistant]) {
-      expect(text).toMatch(/read it with hive_inbox, act on it, then ack it \(hive_inbox with ack\) before you wait or end your turn/)
-      expect(text).toMatch(/one not acked within 30 minutes shows the user it's overdue/)
+      expect(text).toMatch(/read it with hive_inbox, act on it, then ack it \(hive_inbox with ack\) before you wait or end your turn\./)
+      expect(text).not.toMatch(/within 30 minutes/)
     }
   })
 
@@ -537,7 +540,6 @@ describe('the review and merge skills follow the gates (#1525)', () => {
     const text = merge()
     const ways = text.split(/\r?\n/).filter((l) => l.startsWith('- **'))
     const way = (starts: string): string => ways.find((l) => l.startsWith(`- **${starts}`)) ?? ''
-    const context = text.split(/\r?\n/).find((l) => l.startsWith('The ways a card finishes, for context:')) ?? ''
     // The next step is the one Hive names, never inferred from a column or a missing field (HR1's #1525 round 2, the
     // Assistant's m3822): the agent merges on Hive's word, waits on a request for the user, leaves the queue's card alone.
     expect(text).toMatch(/Never infer the next step from the card's column: do the one Hive names\./)
@@ -548,21 +550,15 @@ describe('the review and merge skills follow the gates (#1525)', () => {
     expect(way('A request waiting for the user')).toMatch(/\(For you: their review, their OK before merging, their acceptance\): wait for their answer/)
     expect(way("The card's `merge`")).toMatch(/Hive's merge queue has it, and merges it or returns it with why/)
     expect(text).not.toMatch(/with no `merge`|no `merge`[^.\n]*(yours|merge it)|In Passed[^.\n]*merge is yours/)
-    // Each finish is context, conditional. Keyed by the options' own values: a new way to finish fails to compile here
-    // until the skill says it.
-    const FINISH: Record<Finisher, RegExp> = {
-      hiveMerges: /^The ways a card finishes, for context: Hive merges;/,
-      agentMerges: /the agent merges \(after a passing review where there is one, after the user's OK where the rules ask for it, else straight after its submission, the card staying in Doing\)/,
-      notChecked: /merges not checked \(once it passes, merged as the brief says and reported, nothing checked\)/,
-      committed: /committed is done, and no-code cards \(Done once passed or submitted\)/,
-      accept: /no version control \(accepted, after the user's approval where the rules ask for it\)/
-    }
-    for (const [finish, says] of Object.entries(FINISH)) expect(context, finish).toMatch(says)
+    // HI-2010: each way a card finishes is said where the agent is (the card's `merge`, each step's reply), so the skill's
+    // list of them, for context, is gone; what the agent does in each is the bullets above and below.
+    expect(text).not.toMatch(/The ways a card finishes, for context/)
     // HR1's counterexamples, each a cell the guidance must get right: [platform, review, finish, the user's OK, what the agent does].
+    // With no review under the agent merges, Hive says the merge is the agent's straight after its submission.
     const CASES: [platform: 'Git' | 'None', review: ReviewBy, finish: Finisher, ok: boolean, does: RegExp][] = [
       ['None', 'agentThenYou', 'accept', false, /\(For you: [^)]*their acceptance\): wait for their answer/],
       ['Git', 'agent', 'agentMerges', true, /\(For you: [^)]*their OK before merging[^)]*\): wait for their answer/],
-      ['Git', 'none', 'agentMerges', false, /else straight after its submission, the card staying in Doing/]
+      ['Git', 'none', 'agentMerges', false, /\(Hive tells you once the merge is yours\): merge it and report it/]
     ]
     for (const [platform, reviewBy, finish, ok, does] of CASES) expect(text, `${platform} · review ${reviewBy} · ${finish}${ok ? ' · OK first' : ''}`).toMatch(does)
     // The card's own rules decide (HR1's #1525 round 1 finding 2): a project's options changed after it started don't.
@@ -724,20 +720,14 @@ describe('coordinator guidance', () => {
       ['review user: it waits for them, no reviewer', 'coordinate-agents', '**Its review**', /Where only the user reviews, the card waits for them under For you/],
       ['review off: the stage is skipped, on to the finish, no reviewer', 'coordinate-agents', '**Its review**', /with no review, the review stage is skipped and the card goes straight on to its finish \(How a card finishes\): start no reviewer for either\./],
       ['review off or user: a lane is its builder alone', 'run-lanes', '**One per lane**', /Where the project's work isn't reviewed by an agent \(no review, or only the user's\), a lane is its builder alone\./],
-      ['no-code, review on: through its review and approval', 'coordinate-agents', '**How a card finishes**', /A no-code card has nothing to merge: it finishes through its review \(and the user's approval, where the options ask for it\)/],
-      ['no-code, review off: as it is submitted', 'coordinate-agents', '**How a card finishes**', /or as it is submitted where the project has no review\./],
+      // HI-2010: how a card finishes, and the loop's steps, are said where they happen (the card's `merge`, Hive's replies);
+      // the skills keep only that they aren't the user's to answer, so the Assistant doesn't ask (#1346).
+      ['how a card finishes: the card and Hive say it', 'coordinate-agents', '**How a card finishes**', /isn't the user's to answer: the card's `merge` and Hive's reply to each step say what comes next/],
+      ['Hive runs the loop: the limit asks, none with the rules off, merges as Who merges says, the OK first', 'run-lanes', '**Hive runs the loop**', /at the limit Hive asks the user itself \(with workflow rules off there is none\); a passed card merges as Who merges says, Hive asking for an OK where the options want one; a lane ends by itself once every card is Done\. Never ask the user whether to go on, merge or end a lane/],
       ['no-code: made so, no merge', 'coordinate-agents', 'Create cards (`hive_create_task`)', /`kind: "no-code"`: it finishes with no merge, through its review where the project has one, else as it is submitted/],
-      ['code, Hive merges: the queue', 'coordinate-agents', '**How a card finishes**', /A code card, after its review if any, goes on as Who merges says: Hive's merge queue merges it/],
-      ['code, the agent merges: its builder merges and reports', 'coordinate-agents', '**How a card finishes**', /its builder merges it and reports the merge/],
-      ['code, committed is done', 'coordinate-agents', '**How a card finishes**', /it is done once committed in the project folder/],
-      ['code, Not checked: its builder reports it', 'coordinate-agents', '**How a card finishes**', /\(Not checked\) its builder reports it done/],
-      ['code: the OK before merging comes first where asked', 'coordinate-agents', '**How a card finishes**', /where the options ask for the user's OK before merging, Hive asks them first/],
-      ['a merge due: code only, as Who merges says, the OK first', 'run-lanes', '**A merge due**', /\(a code card passed; a no-code card has none\): it goes on as Who merges says .*committed in the project folder, it is already done\. Where the options ask for the user's OK before merging, Hive asks them first/],
       ['Done: merged, accepted (no-code) or reported (Not checked)', 'coordinate-agents', 'Done means merged', /Done means merged \(for a no-code card, accepted; under Not checked, reported done by its builder\)/],
       ['verify: a Done code card in the target, none for Not checked or no-code', 'run-lanes', 'Check what agents report', /a Done code card's work really is in the target \(Not checked records no merge, and a no-code card has none\)/],
-      ['enforcement on: one card at a time, queued lists, the limit asks', 'run-lanes', 'Hive owns the lane:', /While workflow rules are enforced .* it also takes one card at a time .*, queues list changes between cards and asks the user at the round limit; with them off, none of those three happens\./],
       ['enforcement off: list changes apply at once', 'run-lanes', "A lane's list is Hive's", /While workflow rules are enforced, a change made while one of its cards is in flight is queued until that card is Done, and Hive tells the builder when it applies; between cards, or with the rules off, it applies at once/],
-      ['enforcement off: no limit, and no asking in its place', 'run-lanes', '**The round limit**', /With workflow rules off there is no limit: nothing asks and no lane pauses for it, so don't ask in its place/],
       ['enforcement off: the pool gives nothing out', 'run-lanes', '**A shared pool**', /The pool works only while workflow rules are enforced: with them off, nothing is given out/],
       ['enforcement off: nothing refuses, card-loop carries the steps', 'run-lanes', 'The rules themselves', /With workflow rules off nothing refuses, and the agents' own skills \(card-loop\) carry the steps\./],
       ['enforcement off: cards move as put', 'coordinate-agents', '**With workflow rules off**', /Hive enforces none of the project's rules: cards move as they are put/]
@@ -764,15 +754,14 @@ describe('coordinator guidance', () => {
       }
       // The limit is the lane's configured rounds, where Hive asks; none with the rules off, and the Assistant doesn't ask in
       // its place (HR3's round 1 finding 1: that recreated the switched-off gate in text).
-      const limit = line('run-lanes', '**The round limit**')
-      expect(limit).toMatch(/the lane's rounds .*Hive asks the user itself, under For you/)
-      expect(limit).toMatch(/With workflow rules off there is no limit: nothing asks and no lane pauses for it, so don't ask in its place/)
+      const loop = line('run-lanes', '**Hive runs the loop**')
+      expect(loop).toMatch(/a failed review below the lane's round limit is the builder's to fix; at the limit Hive asks the user itself \(with workflow rules off there is none\)/)
       for (const [name, body] of both()) expect(body, name).not.toMatch(/ask the user yourself when a card has failed|failed that many reviews/i)
-      expect(line('run-lanes', '**A failed review is the loop\'s**')).toMatch(/at any round below the lane's limit \(at any round with workflow rules off\)/)
     })
     it("leave Hive's steps to Hive: merges, a lane's end, a decision's wakes; and say what the switches turn off", () => {
-      expect(line('run-lanes', '**A merge due**')).toMatch(/Never ask whether to merge/)
-      expect(line('run-lanes', "**A lane's end**")).toMatch(/ends by itself once every card is Done/)
+      expect(line('run-lanes', '**Hive runs the loop**')).toMatch(/a lane ends by itself once every card is Done\. Never ask the user whether to go on, merge or end a lane: pass on Hive's questions, record the answers as decisions, and step in only when a merge stalls/)
+      // What the loop can't handle stays the Assistant's (HR3 on HI-2010/s7).
+      expect(catalog.get('run-lanes')!.text).toMatch(/The loop runs itself; you handle what it can't: a question for the user, a finding that keeps coming back, a lane that stops\./)
       expect(line('coordinate-agents', '**Ask the user only for what Hive leaves to them**')).toMatch(/a decision .*a block or a question waiting on them, a conflict between lanes, and publishing/)
       // A decision wakes the loop, unless its loop wakes are off.
       expect(line('coordinate-agents', 'When the user decides something about a card')).toMatch(/in a loop wakes its builder and, while the card is in Review or Passed, its reviewer, unless the project turned its loop wakes off/)
@@ -807,7 +796,8 @@ describe('coordinator guidance', () => {
       const real = line(c, '**Real decisions only.**')
       expect(real).toMatch(/a finding that keeps coming back\. What Hive or the card already decides .* isn't theirs to answer again \(coordinate-agents and run-lanes say which\)/)
       expect(c).not.toMatch(/keeps failing review|failed twice/)
-      expect(line(c, 'Match your habits to the setup (coordinate-agents, Fit the setup)')).toMatch(/light for a solo user with one agent, a lane for a builder and reviewer pair, the run-lanes skill for a team/)
+      // HI-2010: its "How you work" only pointed at the skills owning each habit (Fit the setup is coordinate-agents').
+      expect(c).not.toMatch(/## How you work/)
     })
     it("Release manager: the project's path stage by stage, each publishing step its own OK, taken in the agent's own pane", () => {
       const r = mode('release-manager')

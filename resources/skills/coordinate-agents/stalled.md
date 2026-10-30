@@ -1,8 +1,4 @@
-# Coordinate agents: stalled and handed-over work
-
-## Hand work over
-
-`hive_hand_over` passes one agent's work to another in the same project, for example from a review to the agent that fixes it. Hive has the first agent write a handover, waits for it, and starts the second on it. With the same agent as `from` and `to`, the agent carries on in a new conversation, which makes a long transcript (`transcriptMB` in `hive_agent_activity`) short again.
+# Coordinate agents: stalled cards
 
 ## Stalled cards
 
