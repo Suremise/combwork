@@ -9,7 +9,7 @@ import { legacyWorktree, slotsMigrated } from './agentFolders'
 import { lendLane } from './slotCards'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
 import { HiveError, hiveError } from './hiveError'
-import { changeFreshStart, freshStartsNow, holdLaneStart, listLanes, oweFreshStart, rawLanes, retryFreshStarts, setLaneSlotWait, startLane } from './lanes'
+import { changeFreshStart, freshStartsNow, holdLaneStart, listLanes, oweFreshStart, rawLanes, refuseWhileTeamPaused, retryFreshStarts, setLaneSlotWait, startLane } from './lanes'
 import { createLogger, userText } from './logger'
 import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
@@ -50,6 +50,8 @@ const M = {
 const starting = new Set<string>()
 
 export async function startLaneFromWindow(ws: WorkspaceService, projectPath: string, req: LaneStartRequest): Promise<LaneStartResult> {
+  // The team paused (HI-2081): refused before anything else is asked of the lane.
+  refuseWhileTeamPaused(ws)
   const project = basename(projectPath)
   const cfg = await ws.projectConfig(projectPath)
   const agents = projectAgents(cfg)

@@ -862,9 +862,13 @@ async function tellReordered(ws: WorkspaceService, l: LaneRecord, put: { putBack
   }
 }
 
-export async function startLane(ws: WorkspaceService, s: StartLane): Promise<LaneChange> {
-  // The team paused (HI-2081, HR1's s8 check): no lane starts or changes its list until it resumes.
+/** The team paused (HI-2081, HR1's s8 check): no lane starts or changes its list until it resumes (Start Lane, the API). */
+export function refuseWhileTeamPaused(ws: WorkspaceService): void {
   if (teamPauseOf(ws)) throw new LaneError(409, M.teamPaused)
+}
+
+export async function startLane(ws: WorkspaceService, s: StartLane): Promise<LaneChange> {
+  refuseWhileTeamPaused(ws)
   const builder = await agentIn(ws, s.project, s.builder)
   if (!builder) throw new LaneError(404, 'Unknown agent: the builder must be an agent of the project') // i18n-ignore: hive_lane's refusal, which only agents get
   const reviewer = s.reviewer ? await agentIn(ws, s.project, s.reviewer) : s.reviewer === undefined ? undefined : null
