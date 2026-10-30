@@ -1476,3 +1476,80 @@ describe('HI-2049: launches and tool lists by workflow role', () => {
     await disposeWorkspaceService(w)
   })
 })
+
+describe("HI-2063: the tool list's parts", () => {
+  const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
+  const write = (path: string, data: unknown) => {
+    mkdirSync(join(path, '.hive', 'metrics'), { recursive: true })
+    writeFileSync(join(path, '.hive', 'metrics', 'metrics.json'), JSON.stringify(data))
+  }
+
+  it('parts come both or neither, with the characters, and add up to no more than them', async () => {
+    const { w } = await open()
+    const h = metrics.metricsHandle(w)
+    const ok = { tools: 40, toolsBytes: 10000, toolsChars: 9800 }
+    for (const bad of [
+      { ...ok, descriptionChars: 6000, paramChars: 4000 },
+      { ...ok, descriptionChars: 5000 },
+      { ...ok, paramChars: 3000 },
+      { tools: 40, toolsBytes: 10000, descriptionChars: 1, paramChars: 1 },
+      { ...ok, descriptionChars: -1, paramChars: 1 },
+      { ...ok, descriptionChars: 1.5, paramChars: 1 },
+      { ...ok, descriptionChars: 'many', paramChars: 1 },
+      { ...ok, descriptionChars: null, paramChars: 1 }
+    ])
+      expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', bad), JSON.stringify(bad)).toBe(false)
+    expect(metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' } }).projects.alpha?.catalog ?? []).toEqual([])
+    expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { ...ok, descriptionChars: 5000, paramChars: 4800 })).toBe(true)
+    expect(metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' } }).projects.alpha.catalog[0]).toMatchObject({ starts: 1, charStarts: 1, partStarts: 1, partToolsChars: 9800, descriptionChars: 5000, paramChars: 4800 })
+    await disposeWorkspaceService(w)
+  })
+
+  it('bytes-only, characters-only and parts-bearing starts each average over their own: saved, reloaded and merged', async () => {
+    const { w, path } = await open()
+    await w.close()
+    // Saved earlier in the hour: a bridge from before HI-2049 (bytes only) and one from HI-2049 (characters, no parts).
+    const saved = { a: { role: 'agent', starts: 2, tools: 80, toolsBytes: 20000 }, b: { role: 'agent', workflow: 'builder', starts: 1, tools: 40, toolsBytes: 10000, toolsChars: 9000, charStarts: 1 } }
+    write(path, { version: 1, buckets: [{ start: hourOf(T0), span: 'hour', projects: { alpha: { catalog: saved } } }] })
+    await w.open(path)
+    const h = metrics.metricsHandle(w)
+    // Now, two parts-bearing starts on the builder side, in the same bucket as the HI-2049 one.
+    metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { tools: 40, toolsBytes: 10200, toolsChars: 10000, descriptionChars: 4000, paramChars: 3000 })
+    metrics.recordCatalog(h, 'beta', 'agent', 'builder', { tools: 40, toolsBytes: 12200, toolsChars: 12000, descriptionChars: 5000, paramChars: 4000 })
+    await w.close()
+    await metrics.flushMetrics()
+    await w.open(path)
+    const { toolListRows } = await import('../src/shared/metricsView')
+    const r = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - 2 * HOUR).toISOString() })
+    const rows = toolListRows(Object.values(r.projects).flatMap((p) => p.catalog))
+    const by = Object.fromEntries(rows.map((x) => [x.workflow, x]))
+    // Characters over the three starts that had them; parts over the two that had parts, never diluted by the others.
+    expect(by.builder).toMatchObject({ starts: 3, chars: (9000 + 10000 + 12000) / 3, descriptionChars: 4500, paramChars: 3500, schemaChars: (10000 + 12000 - 9000 - 7000) / 2 })
+    // The bytes-only starts: tools and bytes known, characters and parts unknown, never zero.
+    expect(by.unknown).toMatchObject({ starts: 2, tools: 40, bytes: 10000, chars: null, descriptionChars: null, paramChars: null, schemaChars: null })
+    await disposeWorkspaceService(w)
+  })
+
+  it('a saved series whose parts are more than its characters, or than its starts, is not read', async () => {
+    const { w, path } = await open()
+    await w.close()
+    const series = { role: 'agent', workflow: 'builder', starts: 2, tools: 80, toolsBytes: 20000, toolsChars: 19000, charStarts: 2 }
+    const catalog = { over: { ...series, partStarts: 1, partToolsChars: 9000, descriptionChars: 6000, paramChars: 4000 }, more: { ...series, workflow: 'reviewer', partStarts: 3, partToolsChars: 9000, descriptionChars: 1, paramChars: 1 }, fine: { ...series, workflow: 'either', partStarts: 1, partToolsChars: 9000, descriptionChars: 5000, paramChars: 3000 } }
+    write(path, { version: 1, buckets: [{ start: hourOf(T0) - HOUR, span: 'hour', projects: { alpha: { catalog } } }] })
+    await w.open(path)
+    const part = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' }, from: new Date(T0 - 2 * HOUR).toISOString() }).projects.alpha
+    expect(part.catalog.map((c) => c.workflow)).toEqual(['either'])
+    await disposeWorkspaceService(w)
+  })
+})
+
+describe('HI-2063: Copy Diagnostics says the tool list a start', () => {
+  it('counts only, per role and workflow role; what was not measured is said, never zero', async () => {
+    const { toolListLine } = await import('../src/main/diagnostics')
+    const row = { role: 'agent' as const, workflow: 'builder' as const, starts: 3, tools: 98, bytes: 63000.4, chars: 61234.2, descriptionChars: 30120, paramChars: 12004, schemaChars: 19110 }
+    expect(toolListLine('Workspace 1', [row, { ...row, role: 'assistant', workflow: 'none', starts: 1, chars: 70000, descriptionChars: null, paramChars: null, schemaChars: null }, { ...row, workflow: 'unknown', chars: null }])).toBe(
+      '- Workspace 1 hive tool list (24 h): agents · builder: 98 tools, 61,234 chars a start (descriptions 30,120, parameters 12,004, schemas 19,110), 63,000 bytes, 3 starts; assistant · none: 98 tools, 70,000 chars a start (parts not measured), 63,000 bytes, 1 start; agents · unknown: 98 tools, characters not measured, 63,000 bytes, 3 starts'
+    )
+    expect(toolListLine('Workspace 2', [])).toBe('- Workspace 2 hive tool list (24 h): none recorded')
+  })
+})

@@ -27,6 +27,7 @@ import { OVERDUE_MINUTES, ackText, inboxText, type InboxItem } from '../../share
 import { INBOX_SWITCHES, type InboxSwitch } from '../../shared/inboxSwitches'
 import { ENTRY_LIMITS, JOURNAL_KINDS, LINK_TYPES } from '../../shared/journal'
 import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
+import { toolListSize } from '../../shared/toolListSize'
 
 const VERSION = '1.0.0'
 const API = (process.env.HIVE_API_URL || 'http://127.0.0.1:47821').replace(/\/$/, '')
@@ -1115,7 +1116,7 @@ interface CallReport {
   ms: number
 }
 const pending: CallReport[] = []
-let catalog: { tools: number; toolsBytes: number; toolsChars: number } | null = null
+let catalog: { tools: number; toolsBytes: number; toolsChars: number; descriptionChars: number; paramChars: number } | null = null
 let flushTimer: NodeJS.Timeout | null = null
 /** At most this many calls in one report (the API's limit), sent at most every 2 seconds. */
 const REPORT_MAX = 50
@@ -1208,11 +1209,11 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       sayConnected()
       const list = offered.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))
       reply(id, { tools: list })
-      // Its size as the CLI got it (the tools array's JSON: UTF-8 bytes, and characters as UTF-16 code units), once a session.
+      // Its size as the CLI got it (the tools array's JSON: UTF-8 bytes, and characters as UTF-16 code units, with the
+      // descriptions' and the parameters' descriptions' parts), once a session.
       if (!listed) {
         listed = true
-        const json = JSON.stringify(list)
-        catalog = { tools: list.length, toolsBytes: Buffer.byteLength(json, 'utf8'), toolsChars: json.length }
+        catalog = { tools: list.length, toolsBytes: Buffer.byteLength(JSON.stringify(list), 'utf8'), ...toolListSize(list) }
         scheduleReports()
       }
       return

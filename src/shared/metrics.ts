@@ -105,6 +105,16 @@ export interface CatalogSeries {
    */
   toolsChars: number
   charStarts: number
+  /**
+   * Its parts (HI-2063), of the starts that reported them (`partStarts`, a bridge from before HI-2063 reported none):
+   * those starts' characters in all (`partToolsChars`), the tools' descriptions and the parameters' descriptions, each
+   * as the JSON has them. The rest of those characters is the schemas and the list's structure (names, types, keys,
+   * punctuation, escapes): `partToolsChars - descriptionChars - paramChars`.
+   */
+  partStarts: number
+  partToolsChars: number
+  descriptionChars: number
+  paramChars: number
 }
 
 /** The skill service (revisions.ts): scans, what they read and what the inventory saved. */

@@ -678,13 +678,19 @@ const prose = (seed, n) => {
   check("metrics: each tool call's reported size is the text the model got, by mode and outcome", JSON.stringify(Object.fromEntries(Object.entries(got).filter(([k]) => k in expected).sort())) === JSON.stringify(Object.fromEntries(Object.entries(expected).sort())), JSON.stringify({ got, expected }))
   // Each launch's side of the workflow its own series (HI-2049): summed here.
   const cats = (alphaPart?.catalog ?? []).filter((c) => c.role === 'agent')
-  const cat = cats.reduce((a, c) => ({ starts: a.starts + c.starts, tools: a.tools + c.tools, toolsBytes: a.toolsBytes + c.toolsBytes, toolsChars: a.toolsChars + c.toolsChars, charStarts: a.charStarts + c.charStarts }), { starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0 })
+  const cat = cats.reduce((a, c) => Object.fromEntries(Object.keys(a).map((k) => [k, a[k] + c[k]])), { starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0 })
   // Once a start: the coder's, and the agent a card was started on, whose fake reads its inbox when its task's doorbell
   // rings (#650: through the hive server, which it starts for that call, with a tool list of its own). The catalog sums
   // them: the coder's list as it got it, and the other's.
   const listBytes = Buffer.byteLength(JSON.stringify(list), 'utf8')
   const listChars = JSON.stringify(list).length
   check("metrics: the tool list as the session got it, once a start, in bytes and characters", cat.starts === 2 && cat.tools > list.length && cat.tools < list.length * 3 && cat.toolsBytes > listBytes && cat.toolsBytes < listBytes * 3 && cat.charStarts === 2 && cat.toolsChars > listChars && cat.toolsChars < listChars * 3, JSON.stringify({ cat, list: list.length, bytes: listBytes, chars: listChars }))
+  // Its parts (HI-2063): the descriptions and the parameters' descriptions as the list the coder got has them.
+  const inJson = (s) => JSON.stringify(s).length - 2
+  const paramsOf = (v) => (Array.isArray(v) ? v.reduce((n, x) => n + paramsOf(x), 0) : v && typeof v === 'object' ? Object.entries(v).reduce((n, [k, x]) => n + (k === 'description' && typeof x === 'string' ? inJson(x) : paramsOf(x)), 0) : 0)
+  const listDescriptions = list.reduce((n, t) => n + inJson(t.description ?? ''), 0)
+  const listParams = list.reduce((n, t) => n + paramsOf(t.inputSchema), 0)
+  check("metrics: the tool list's descriptions and parameters' descriptions, a part of its characters", cat.partStarts === 2 && cat.partToolsChars === cat.toolsChars && cat.descriptionChars >= listDescriptions && cat.descriptionChars < listDescriptions * 3 && cat.paramChars >= listParams && cat.paramChars < listParams * 3 && cat.descriptionChars + cat.paramChars < cat.toolsChars, JSON.stringify({ cat, listDescriptions, listParams }))
   check("metrics: each tool list on the side of the launch whose hive server sent it", cats.length > 0 && cats.every((c) => ['builder', 'reviewer', 'either', 'none'].includes(c.workflow)), JSON.stringify(cats.map((c) => [c.workflow, c.starts])))
   check("metrics: the Assistant's tool calls are the workspace's own, with detail mode counted", (report.workspace?.mcp ?? []).some((sr) => sr.role === 'assistant' && sr.tool === 'hive_agent_activity' && sr.mode === 'detail'), JSON.stringify(report.workspace?.mcp?.slice(0, 3)))
   const routes = [...Object.values(report.projects), report.workspace].flatMap((pt) => pt.api.map((sr) => sr.route))

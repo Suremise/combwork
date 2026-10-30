@@ -1551,13 +1551,45 @@
     "defaultMessage": "When",
     "description": "Column header of the Performance page's Main process stalls table: when the stall ended (a time)."
   },
-  "performance.toolList": {
-    "defaultMessage": "The hive tools’ list, as each session got it: {list}.",
-    "description": "A line on the Performance page. {list} is one or two items such as \"agents 23 tools, 4 KB a start\", separated by semicolons."
+  "performance.toolList.bytes": {
+    "defaultMessage": "Bytes",
+    "description": "Column header of the Hive tool list table: the list's size in UTF-8 bytes a start, on average."
   },
-  "performance.toolList.item": {
-    "defaultMessage": "{role, select, assistant {Assistant} other {agents}} {tools, plural, one {# tool} other {# tools}}, {size} a start",
-    "description": "An item of \"The hive tools' list, as each session got it: …\": whose sessions, how many tools they got, and its size per start (\"4 KB\"). {role} is a key (assistant or agent): don't translate the keys, only the texts."
+  "performance.toolList.chars": {
+    "defaultMessage": "Characters",
+    "description": "Column header of the Hive tool list table: the list's characters a start, on average."
+  },
+  "performance.toolList.descriptions": {
+    "defaultMessage": "Descriptions",
+    "description": "Column header of the Hive tool list table: the characters of the tools' descriptions a start, on average."
+  },
+  "performance.toolList.empty": {
+    "defaultMessage": "No tool lists.",
+    "description": "The Hive tool list table when it has no rows."
+  },
+  "performance.toolList.heading": {
+    "defaultMessage": "Hive tool list",
+    "description": "Heading of the Performance page's table of the hive tools' list each session was given (HI-2063). Keep hive (the tools' name)."
+  },
+  "performance.toolList.params": {
+    "defaultMessage": "Parameters",
+    "description": "Column header of the Hive tool list table: the characters of the tools' parameters' descriptions a start, on average."
+  },
+  "performance.toolList.schemas": {
+    "defaultMessage": "Schemas",
+    "description": "Column header of the Hive tool list table: the rest of the list's characters a start (names, types, keys, punctuation), on average."
+  },
+  "performance.toolList.starts": {
+    "defaultMessage": "Starts",
+    "description": "Column header of the Hive tool list table: how many session starts were given the list."
+  },
+  "performance.toolList.tip": {
+    "defaultMessage": "The hive tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, for every provider (not recorded per provider). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. A dash: not measured (sessions from before Hive measured it).",
+    "description": "Tooltip of the Hive tool list table on the Performance page (HI-2063). Descriptions, Parameters and Schemas are its columns: name them as there. Keep hive (the tools' name)."
+  },
+  "performance.toolList.tools": {
+    "defaultMessage": "Tools",
+    "description": "Column header of the Hive tool list table: how many tools a start was given, on average."
   },
   "performance.tools.calls": {
     "defaultMessage": "Calls",

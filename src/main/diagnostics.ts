@@ -26,6 +26,8 @@ import { crashDumpLines, crashDumps, crashDumpsDir } from './exitLog'
 import { lastRunDiagnostics } from './lastRun'
 import { memoryDiagnostics } from './memory'
 import { workerThreadLines } from './workerThreads'
+import { queryMetrics } from './metrics'
+import { toolListRows, type ToolListRow } from '../shared/metricsView'
 
 /** How much of Hive's log a report carries. */
 const LOG_LINES = 50
@@ -57,6 +59,36 @@ async function earlierWork(): Promise<{ folders: string[]; names: string[] }> {
     for (const e of entries) if (e.isDirectory() && !e.name.startsWith('.')) names.push(e.name)
   }
   return { folders, names }
+}
+
+/**
+ * A workspace's hive tool list a start in the last 24 hours (HI-2063), per role and workflow role, as one line: counts
+ * only, never a name. A size Hive didn't measure (a bridge from before it did) is said, never shown as zero.
+ */
+export function toolListLine(label: string, rows: ToolListRow[]): string {
+  const n = (v: number): string => Math.round(v).toLocaleString('en')
+  // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+  if (!rows.length) return `- ${label} hive tool list (24 h): none recorded`
+  const row = (r: ToolListRow): string => {
+    const parts = r.descriptionChars === null || r.paramChars === null || r.schemaChars === null ? 'parts not measured' : `descriptions ${n(r.descriptionChars)}, parameters ${n(r.paramChars)}, schemas ${n(r.schemaChars)}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    const chars = r.chars === null ? 'characters not measured' : `${n(r.chars)} chars a start (${parts})` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    return `${r.role === 'assistant' ? 'assistant' : 'agents'} · ${r.workflow}: ${n(r.tools)} tools, ${chars}, ${n(r.bytes)} bytes, ${r.starts} start${r.starts === 1 ? '' : 's'}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+  }
+  return `- ${label} hive tool list (24 h): ${rows.map(row).join('; ')}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+}
+
+/** The tool list lines of each open workspace (its metrics' last 24 hours; one that can't be read says so). */
+function toolListLines(windows: ReturnType<typeof hiveWindows>): string[] {
+  // Numbered as the skills' lines number them: the windows with a workspace open.
+  return windows.filter((w) => !!w.ws.path).map((w, i) => {
+    const label = `Workspace ${i + 1}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    try {
+      const r = queryMetrics(w.ws, { scope: { kind: 'workspace' } })
+      return toolListLine(label, toolListRows([...Object.values(r.projects), ...(r.workspace ? [r.workspace] : [])].flatMap((p) => p.catalog)))
+    } catch {
+      return `- ${label} hive tool list (24 h): couldn't be read` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    }
+  })
 }
 
 const yesNo = (v: boolean | null | undefined): string => (v === true ? 'yes' : v === false ? 'no' : 'unknown')
@@ -127,6 +159,7 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     '',
     `- Revision ${GUIDANCE_REVISION}${older ? `; ${older} running agent${older === 1 ? '' : 's'} launched with an older one` : ''}`,
     ...skillLines,
+    ...toolListLines(windows),
     '',
     '### Settings',
     '',

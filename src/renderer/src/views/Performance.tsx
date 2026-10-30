@@ -3,7 +3,7 @@ import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { providerDescriptor, providerName } from '@shared/providers'
 import { LATENCY_BOUNDS_MS, percentile, type GuidanceSeries, type MetricsReport, type MetricsScope, type ProviderUsageSummary, type SafeguardCount, type TrendPoint } from '@shared/metrics'
-import { DEFAULT_PERF_FILTERS, PERF_RANGES, WORKSPACE_OWN, byRoute, byTool, isEmpty, latencyOrder, pageQuery, providersIn, select, totals, type PerfFilters, type PerfRange, type PerfRole, type PerfSelection, type RouteRow, type ToolRow } from '@shared/metricsView'
+import { DEFAULT_PERF_FILTERS, PERF_RANGES, WORKSPACE_OWN, byRoute, byTool, isEmpty, latencyOrder, pageQuery, providersIn, select, toolListRows, totals, type PerfFilters, type PerfRange, type PerfRole, type PerfSelection, type RouteRow, type ToolListRow, type ToolRow } from '@shared/metricsView'
 import { compareScopeKey, compareScopeOf } from '@shared/benchmark'
 import { FREE_LOCAL, moneyLabel } from '@shared/usageTotals'
 import { formatDateTime, formatDayLabel, formatWeekdayTime } from '@shared/dates'
@@ -142,8 +142,16 @@ const M = {
   allProviders: msg({ id: 'performance.provider.all', defaultMessage: 'All providers', description: "The Performance page's provider filter's choice of no filter." }),
   providerNote: msg({ id: 'performance.provider.note', defaultMessage: 'Launches and the providers’ usage: the only parts recorded per provider.', description: "Beside the Performance page's Provider filter: what it changes." }),
   providerNothing: msg({ id: 'performance.provider.nothing', defaultMessage: 'Nothing from {provider} in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}{filtered, select, yes { for this filter} other {}}.', description: "The Performance page's provider box when the provider chosen has nothing. {provider} is its name (Claude Code, Codex, Copilot); {filtered} is yes when the Who filter is set; {range} (24h, 7d or 30d) is a key: don't translate the keys, only the texts." }),
-  toolList: msg({ id: 'performance.toolList', defaultMessage: 'The hive tools’ list, as each session got it: {list}.', description: 'A line on the Performance page. {list} is one or two items such as "agents 23 tools, 4 KB a start", separated by semicolons.' }),
-  toolListItem: msg({ id: 'performance.toolList.item', defaultMessage: '{role, select, assistant {Assistant} other {agents}} {tools, plural, one {# tool} other {# tools}}, {size} a start', description: "An item of \"The hive tools' list, as each session got it: …\": whose sessions, how many tools they got, and its size per start (\"4 KB\"). {role} is a key (assistant or agent): don't translate the keys, only the texts." }),
+  toolListHeading: msg({ id: 'performance.toolList.heading', defaultMessage: 'Hive tool list', description: "Heading of the Performance page's table of the hive tools' list each session was given (HI-2063). Keep hive (the tools' name)." }),
+  toolListTip: msg({ id: 'performance.toolList.tip', defaultMessage: 'The hive tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, for every provider (not recorded per provider). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. A dash: not measured (sessions from before Hive measured it).', description: "Tooltip of the Hive tool list table on the Performance page (HI-2063). Descriptions, Parameters and Schemas are its columns: name them as there. Keep hive (the tools' name)." }),
+  toolListEmpty: msg({ id: 'performance.toolList.empty', defaultMessage: 'No tool lists.', description: 'The Hive tool list table when it has no rows.' }),
+  toolListStarts: msg({ id: 'performance.toolList.starts', defaultMessage: 'Starts', description: 'Column header of the Hive tool list table: how many session starts were given the list.' }),
+  toolListTools: msg({ id: 'performance.toolList.tools', defaultMessage: 'Tools', description: 'Column header of the Hive tool list table: how many tools a start was given, on average.' }),
+  toolListChars: msg({ id: 'performance.toolList.chars', defaultMessage: 'Characters', description: "Column header of the Hive tool list table: the list's characters a start, on average." }),
+  toolListDescriptions: msg({ id: 'performance.toolList.descriptions', defaultMessage: 'Descriptions', description: "Column header of the Hive tool list table: the characters of the tools' descriptions a start, on average." }),
+  toolListParams: msg({ id: 'performance.toolList.params', defaultMessage: 'Parameters', description: "Column header of the Hive tool list table: the characters of the tools' parameters' descriptions a start, on average." }),
+  toolListSchemas: msg({ id: 'performance.toolList.schemas', defaultMessage: 'Schemas', description: "Column header of the Hive tool list table: the rest of the list's characters a start (names, types, keys, punctuation), on average." }),
+  toolListBytes: msg({ id: 'performance.toolList.bytes', defaultMessage: 'Bytes', description: "Column header of the Hive tool list table: the list's size in UTF-8 bytes a start, on average." }),
   workflow: msg({ id: 'performance.guidance.workflow', defaultMessage: 'Workflow role', description: 'Column header of the Guidance at launch table (HI-2049): the side of the workflow the launched agents took. Glossary: workflow role.' }),
   workflowSide: msg({ id: 'performance.guidance.workflowSide', defaultMessage: '{side, select, builder {Builder} reviewer {Reviewer} either {Either} none {None} other {Not recorded}}', description: "A cell of the Guidance at launch table's Workflow role column (HI-2049): builder, reviewer, either (builds or reviews), none (a generalist, the Assistant), or not recorded (launches from before Hive recorded it). Glossary: builder, reviewer, either." }),
   launches: msg({ id: 'performance.guidance.launches', defaultMessage: 'Launches', description: 'Column header of the Guidance at launch table: how many sessions were launched.' }),
@@ -481,7 +489,7 @@ function PerformancePage({ workspacePath, scope, filters, setFilters, projects, 
                   <ByProvider report={report} sel={sel} range={range.value} provider={filters.provider} setProvider={(provider) => setFilters({ provider })} />
                 )}
                 {/* Hive's tool list isn't per provider: outside the provider's group. */}
-                <ToolList sel={all} />
+                <ToolListTable sel={all} />
               </>
             )}
             </section>
@@ -734,12 +742,37 @@ function ByProvider({ report, sel, range, provider, setProvider }: { report: Met
   )
 }
 
-/** The hive tools' list as each session got it: every provider's (not recorded per provider). */
-function ToolList({ sel }: { sel: PerfSelection }) {
-  if (!sel.catalog.length) return null
-  // The items are separated by semicolons (each has a comma of its own).
-  const list = sel.catalog.map((c) => tr(M.toolListItem, { role: c.role === 'assistant' ? 'assistant' : 'agent', tools: Math.round(c.starts ? c.tools / c.starts : 0), size: formatBytes(c.starts ? c.toolsBytes / c.starts : 0) })).join('; ')
-  return <p className="hint">{tr(M.toolList, { list })}</p>
+/** A count of characters a start, or — where none was measured (unknown, not zero). */
+const charsCell = (v: number | null): string => (v === null ? '—' : fmt.number(Math.round(v)))
+const charsColumn = (key: string, header: string, value: (r: ToolListRow) => number | null): DataColumn<ToolListRow> => ({ key, header, num: true, descFirst: true, cell: (r) => charsCell(value(r)), sortValue: value })
+/** The Hive tool list table's columns, in the window's language (made again when it changes). */
+const toolListColumns = (): DataColumn<ToolListRow>[] => [
+  { key: 'role', header: tr(M.who), className: 'nowrap', cell: (r) => roleName(r.role), sortValue: (r) => roleName(r.role) },
+  { key: 'workflow', header: tr(M.workflow), className: 'nowrap', cell: (r) => tr(M.workflowSide, { side: r.workflow }), sortValue: (r) => tr(M.workflowSide, { side: r.workflow }) },
+  { key: 'starts', header: tr(M.toolListStarts), num: true, descFirst: true, cell: (r) => num(r.starts), sortValue: (r) => r.starts },
+  { key: 'tools', header: tr(M.toolListTools), num: true, descFirst: true, cell: (r) => fmt.figure(r.tools, r.tools % 1 ? 1 : 0), sortValue: (r) => r.tools },
+  charsColumn('chars', tr(M.toolListChars), (r) => r.chars),
+  charsColumn('descriptions', tr(M.toolListDescriptions), (r) => r.descriptionChars),
+  charsColumn('params', tr(M.toolListParams), (r) => r.paramChars),
+  charsColumn('schemas', tr(M.toolListSchemas), (r) => r.schemaChars),
+  { key: 'bytes', header: tr(M.toolListBytes), num: true, descFirst: true, cell: (r) => formatBytes(r.bytes), sortValue: (r) => r.bytes }
+]
+
+/** The hive tools' list as each session got it, a start (HI-2063): every provider's (not recorded per provider). */
+function ToolListTable({ sel }: { sel: PerfSelection }) {
+  const language = useLanguage()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const columns = useMemo(() => toolListColumns(), [language])
+  const rows = useMemo(() => toolListRows(sel.catalog), [sel.catalog])
+  if (!rows.length) return null
+  return (
+    <>
+      <h2 className="section">
+        {tr(M.toolListHeading)} <InfoTip text={tr(M.toolListTip)} />
+      </h2>
+      <DataTable id="perf-tool-list" rows={rows} columns={columns} rowKey={(r) => `${r.role} ${r.workflow}`} empty={tr(M.toolListEmpty)} />
+    </>
+  )
 }
 
 const perLaunch = (n: number, launches: number): number | null => (launches && n ? n / launches : null)
@@ -890,7 +923,7 @@ function GuidanceTable({ sel, unmeasured }: { sel: PerfSelection; unmeasured: nu
         {tr(M.guidanceHeading)}{' '}
         <InfoTip text={tr(M.guidanceTableTip)} />
       </h2>
-      <DataTable id="perf-guidance" rows={sel.guidance} columns={columns} rowKey={(g) => `${g.provider} ${g.role}`} empty={tr(M.guidanceEmpty)} />
+      <DataTable id="perf-guidance" rows={sel.guidance} columns={columns} rowKey={(g, i) => `${g.provider} ${g.role} ${g.workflow} ${i}`} empty={tr(M.guidanceEmpty)} />
       {unmeasured > 0 && <p className="hint">{tr(M.unmeasuredSkills)}</p>}
     </>
   )
