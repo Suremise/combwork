@@ -190,14 +190,17 @@ export function laneStartDue(lane: Pick<LaneInfo, 'state' | 'cards'>): LaneCard 
 /**
  * Why a lane's card due to start (laneStartDue) isn't started yet (HI-2029), as laneStarts.ts finds it: its builder in a
  * turn or starting (`busy`), waiting on a watch of other work (`watching`), a line of Hive's on its way to it (`queued`),
- * its last start failed (`failed`), or Hive's start refused for now and tried again (`refused`).
+ * its last start failed (`failed`), Hive's start refused for now and tried again (`refused`), or a card it depends on
+ * not Done yet where its rules wait for that (`dependencies`, HI-2129: `waitsFor` names it).
  */
-export type LaneStartWhy = 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh'
+export type LaneStartWhy = 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
 /** A lane's card waiting to be started, why, and its builder's name (LaneStatus `startWait`). */
 export interface LaneStartWait {
   card: number
   why: LaneStartWhy
   agent: string
+  /** `dependencies`: the card it waits for, by its key. */
+  waitsFor?: string
 }
 
 /** Whether a lane reads its cards as it left them (ended or abandoned, with its snapshot) rather than from the board. */
@@ -238,7 +241,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   const preparing = running(rec) && !unrecorded && slot?.info?.state === 'preparing' ? { reason: 'preparing' as const, card: current, slot: slot.info.name } : null
   // Its card due to start and not started yet (HI-2029, laneStarts.ts: `startWait`), only while that card is the current
   // one and nothing else says why the lane waits: never "active" with its card untouched and nothing said. Not a pause.
-  const waitsStart = running(rec) && !unrecorded && startWait && startWait.card === current && list.find((c) => c.number === current)?.column === 'todo' ? { reason: 'startWait' as const, card: startWait.card, why: startWait.why, agent: startWait.agent } : null
+  const waitsStart = running(rec) && !unrecorded && startWait && startWait.card === current && list.find((c) => c.number === current)?.column === 'todo' ? { reason: 'startWait' as const, card: startWait.card, why: startWait.why, agent: startWait.agent, ...(startWait.waitsFor ? { waitsFor: startWait.waitsFor } : {}) } : null
   // An agent still owed its new conversation (HI-2034, `freshStart`; its builder's first): said while Hive waits for it
   // to be free, and before anything else but its hooks and its slot once no more is tried (the user retries it or ends
   // the lane). Not a pause.
@@ -402,6 +405,7 @@ export function laneStatusText(s: LaneStatus): string {
     case 'startWait':
       // An agent owed its new conversation (HI-2034): said of the agent, whichever card.
       if (s.why === 'fresh') return s.freshBlocked ? `${s.agent ?? 'its agent'}'s new conversation didn't start (${s.freshBlocked === 'timeout' ? "it wasn't free in time" : s.freshBlocked === 'uncertain' ? 'Hive closed as it started' : (s.freshWhy ?? 'its start failed')}): retry it from the lane's row, or end the lane` : `waiting: ${s.agent ?? 'its agent'} starts in a new conversation once it is free`
+      if (s.why === 'dependencies') return `${card} waits to start: it waits for ${s.waitsFor ?? 'a card it depends on'} to merge`
       return `${card} waits to start: ${s.why === 'watching' ? `${s.agent ?? 'its builder'} is waiting on other work` : s.why === 'queued' ? `a line of Hive's is on its way to ${s.agent ?? 'its builder'}` : s.why === 'failed' ? `${s.agent ?? 'its builder'}'s last start failed` : s.why === 'refused' ? 'its start was refused for now; Hive tries again' : `${s.agent ?? 'its builder'} is in a turn`}`
   }
 }

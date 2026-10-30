@@ -3833,7 +3833,9 @@ export interface LaneStatus {
   /** hooks: the agent whose hooks aren't arriving, by name; startWait: the builder. */
   agent?: string
   /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
-  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh'
+  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
+  /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */
+  waitsFor?: string
   /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */
   freshBlocked?: 'timeout' | 'uncertain' | 'failed'
   freshWhy?: string
