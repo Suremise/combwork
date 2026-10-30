@@ -3,7 +3,8 @@
 // has no living parent, as a server started with `&` from a shell that has ended has. Shortened for the test
 // (HIVE_TEST_ORPHAN_MS, HIVE_TEST_ORPHAN_POLL_MS), its ten minutes are seconds: Activity marks it as left running, with
 // its CPU time and End It; one notice says so, clicking to HB2; HB2 is told once, at its next tool call; Pause the team
-// names it as not parked; End It, behind Activity's question, ends exactly it. Screenshots of the row and the notice,
+// names it as not parked; End It, behind Activity's question, ends exactly it. A second window, showing another workspace
+// and opened last (so the window focused last), gets no notice of it: the notice goes to the orphan's own window. Screenshots of the row and the notice,
 // dark and light. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR; the window stays quiet (lib.launch).
 // Only the process the fake agent started here is ended, by its recorded identity.
 const lib = require('./lib.cjs')
@@ -17,6 +18,7 @@ const userData = at('profile')
 const ws = at('ws')
 const claudeHome = at('claude-home')
 const alpha = path.join(ws, 'alpha')
+const wsB = at('wsB')
 const shots = at('shots')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -32,11 +34,12 @@ const ids = new Map()
 const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 1
 
 ;(async () => {
-  for (const d of [userData, ws, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, wsB, claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
   fs.mkdirSync(shots, { recursive: true })
   lib.gitProject(alpha)
-  const env = lib.fakeClaude(userData, claudeHome, [alpha, ws])
+  lib.gitProject(path.join(wsB, 'beta'))
+  const env = lib.fakeClaude(userData, claudeHome, [alpha, ws, wsB])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -59,6 +62,23 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     })
     const toasts = () => page.evaluate(() => window.__toasts)
 
+    // --- Window B, another workspace, opened last: the window focused last, where a notice with no window of its own goes.
+    const next = app.waitForEvent('window')
+    await inv('window:new')
+    const pageB = await next
+    await pageB.waitForLoadState('domcontentloaded')
+    await lib.appReady(pageB)
+    pageB.on('pageerror', (e) => check('no page errors (B)', false, e.message))
+    const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    await invB('workspace:open', wsB)
+    await until(async () => (await invB('workspace:get'))?.path?.toLowerCase() === wsB.toLowerCase())
+    await pageB.evaluate(() => {
+      window.__toasts = []
+      window.hive.onEvent((e) => {
+        if (e.type === 'toast') window.__toasts.push(e.toast)
+      })
+    })
+
     // --- HB2 runs, and its command leaves a process running whose starter has exited.
     const hb2 = await lib.addAgent(inv, alpha, { name: 'HB2' })
     const liveOf = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === hb2.id)
@@ -74,9 +94,11 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     const shownNow = async () => (await inv('activity:now', alpha)).launches.filter((l) => l.agentId === hb2.id).flatMap((l) => l.processes).find((p) => p.pid === pid && p.orphan)
     const shown = await until(shownNow)
     check('Activity lists it as left running, with its CPU time', !!shown && typeof shown.orphan.cpuMs === 'number' && !!shown.created, JSON.stringify(shown))
-    const mine = async () => (await toasts()).filter((t) => t.source === 'processes' && t.message?.includes(String(pid)))
+    const ofPid = (list) => list.filter((t) => t.target?.kind === 'agent' && t.message?.includes(String(pid)))
+    const mine = async () => ofPid(await toasts())
     const toast = (await until(async () => (await mine())[0] ?? null)) ?? null
     check('a notice says HB2 left it running, clicking to HB2', !!toast && /^HB2 left .*linger.* running for /.test(toast.title) && toast.target?.kind === 'agent' && toast.target.agentId === hb2.id, JSON.stringify(toast))
+    check("…in its own window only: window B, focused last, gets none", ofPid(await pageB.evaluate(() => window.__toasts)).length === 0, JSON.stringify(await pageB.evaluate(() => window.__toasts)))
     const toastEl = page.locator('.toast', { hasText: 'HB2 left' }).first()
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })

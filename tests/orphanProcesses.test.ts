@@ -1,19 +1,26 @@
 // What an agent's command leaves running while the agent runs (HI-2111): one rule, a process in a running launch's job
-// whose parent has exited (by its id and start time), shown once it has run ten minutes, and told once.
+// whose parent has exited (by its id and start time), shown once it has run ten minutes and is named, and told once.
 import { describe, expect, it, vi } from 'vitest'
+import type { ActivityProcess } from '../src/shared/activity'
 import type { Lineage, Orphan } from '../src/main/orphanProcesses'
 
 const switchOn = vi.hoisted(() => ({ on: true }))
 vi.mock('../src/main/advanced', () => ({ advanced: { get: () => switchOn.on } }))
-vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: () => undefined, onHiveEvent: () => () => undefined }))
-// The launches running now: r1 unless a test stops it.
-const runs = vi.hoisted(() => ({ ids: ['r1'] }))
-vi.mock('../src/main/agentProcesses', () => ({ runningLaunches: () => runs.ids.map((runId) => ({ runId, projectPath: 'C:\\ws\\alpha', agentId: 'a1', agentName: 'HB2' })), launchLineage: async () => null, launchProcessesNow: async () => null }))
+const toasts = vi.hoisted(() => ({ list: [] as unknown[][] }))
+vi.mock('../src/main/events', () => ({ emit: () => undefined, toast: (...a: unknown[]) => void toasts.list.push(a), onHiveEvent: () => () => undefined }))
+// The launches running now (r1 unless a test stops it), the host's lineage of each and their listed processes.
+const host = vi.hoisted(() => ({ ids: ['r1'], lineage: null as Record<string, unknown> | null, processes: async (): Promise<unknown[] | null> => null }))
+vi.mock('../src/main/agentProcesses', () => ({
+  runningLaunches: () => host.ids.map((runId) => ({ runId, projectPath: 'C:\\ws\\alpha', agentId: 'a1', agentName: 'HB2' })),
+  launchLineage: async () => host.lineage,
+  launchProcessesNow: () => host.processes()
+}))
 
 /** A Windows FILETIME for a Unix time in ms, as text. */
 const ft = (ms: number): string => String(BigInt(ms) * 10000n + 116444736000000000n)
 const launch = { runId: 'r1', projectPath: 'C:\\ws\\alpha', agentId: 'a1', agentName: 'HB2' }
 const MIN = 60_000
+const proc = (pid: number, created: string, command = 'node linger.js'): ActivityProcess => ({ pid, created, name: 'node.exe', label: command, command })
 
 describe('the rule', () => {
   const at = Date.now()
@@ -49,32 +56,33 @@ describe('the rule', () => {
 })
 
 describe('a look at a launch', () => {
-  it('shows an orphan once it has run ten minutes and was seen at an earlier look, once', async () => {
-    const { lookAtLaunch, ORPHAN_MS } = await import('../src/main/orphanProcesses')
+  it('makes an orphan due once it has run ten minutes and was seen at an earlier look; named, it is shown, once', async () => {
+    const { lookAtLaunch, nameDue, ORPHAN_MS } = await import('../src/main/orphanProcesses')
     const now = Date.now()
     const young: Lineage = { pid: 20, created: ft(now - 9 * MIN), parent: 10, parentCreated: '0', cpu: 1 }
-    // First look: an orphan, not shown yet (nine minutes).
+    // First look: an orphan, not due yet (nine minutes).
     let r = lookAtLaunch(new Map(), launch, [young], now, ORPHAN_MS)
-    expect([...r.orphans.values()].map((o) => o.shown)).toEqual([false])
+    expect([...r.orphans.values()].map((o) => [o.present, o.shown])).toEqual([[true, false]])
     expect(r.due).toEqual([])
-    // Ten minutes on: shown, due once.
+    // Ten minutes on: due; named, shown.
     r = lookAtLaunch(r.orphans, launch, [{ ...young, cpu: 2 }], now + MIN, ORPHAN_MS)
     expect(r.due.map((o) => o.pid)).toEqual([20])
-    expect([...r.orphans.values()][0]).toMatchObject({ shown: true, cpuMs: 2, agentId: 'a1' })
+    expect(nameDue(r.due, [proc(20, young.created)]).map((o) => o.label)).toEqual(['node linger.js'])
+    expect([...r.orphans.values()][0]).toMatchObject({ shown: true, cpuMs: 2, agentId: 'a1', command: 'node linger.js' })
     // The next look: still shown, not due again.
     r = lookAtLaunch(r.orphans, launch, [young], now + 2 * MIN, ORPHAN_MS)
     expect(r.due).toEqual([])
     expect([...r.orphans.values()][0].shown).toBe(true)
   })
 
-  it('isn’t shown at its first look however long it has run (a parent and child ending together)', async () => {
+  it('isn’t due at its first look however long it has run (a parent and child ending together)', async () => {
     const { lookAtLaunch } = await import('../src/main/orphanProcesses')
     const now = Date.now()
     const r = lookAtLaunch(new Map(), launch, [{ pid: 20, created: ft(now - 60 * MIN), parent: 10, parentCreated: '0', cpu: 1 }], now)
     expect(r.due).toEqual([])
   })
 
-  it('never counts a process whose parent runs, and forgets an orphan that has ended', async () => {
+  it('never counts a process whose parent runs; one missing from a look is kept, not present', async () => {
     const { lookAtLaunch } = await import('../src/main/orphanProcesses')
     const now = Date.now()
     const child: Lineage = { pid: 30, created: ft(now - 60 * MIN), parent: 20, parentCreated: ft(now - 61 * MIN), cpu: 1 }
@@ -82,7 +90,31 @@ describe('a look at a launch', () => {
     let r = lookAtLaunch(new Map(), launch, [child, orphan], now)
     expect([...r.orphans.values()].map((o) => o.pid)).toEqual([20])
     r = lookAtLaunch(r.orphans, launch, [child], now + MIN)
-    expect(r.orphans.size).toBe(0)
+    expect([...r.orphans.values()].map((o) => [o.pid, o.present])).toEqual([[20, false]])
+  })
+
+  it('keeps what it was told across a look that can’t tell its parent: due and told once in all (HR2’s round 1)', async () => {
+    const { lookAtLaunch, nameDue, orphanLinesFor, setOrphansForTests } = await import('../src/main/orphanProcesses')
+    const now = Date.now()
+    const created = ft(now - 30 * MIN)
+    const at = (parentCreated: string): Lineage[] => [{ pid: 20, created, parent: 10, parentCreated, cpu: 1 }]
+    let known = new Map<string, Orphan>()
+    let due = 0
+    let told = 0
+    for (const [i, parent] of ['0', '0', '?', '0', '0'].entries()) {
+      const r = lookAtLaunch(known, launch, at(parent), now + i * MIN)
+      due += nameDue(r.due, [proc(20, created)]).length
+      known = r.orphans
+      setOrphansForTests('r1', [...known.values()])
+      if (orphanLinesFor(launch.projectPath, 'a1')) told++
+    }
+    expect([due, told]).toEqual([1, 1])
+    // A look it was missing from, then back: still the same, nothing due again.
+    let r = lookAtLaunch(known, launch, [], now + 6 * MIN)
+    r = lookAtLaunch(r.orphans, launch, at('0'), now + 7 * MIN)
+    expect(r.due).toEqual([])
+    expect([...r.orphans.values()][0]).toMatchObject({ present: true, shown: true, told: true })
+    setOrphansForTests('r1', null)
   })
 
   it('follows a process by its id and start time: a later one by the same id is another', async () => {
@@ -92,10 +124,51 @@ describe('a look at a launch', () => {
     const r = lookAtLaunch(first.orphans, launch, [{ pid: 20, created: ft(now - 20 * MIN), parent: 10, parentCreated: '0', cpu: 1 }], now + MIN)
     expect(r.due).toEqual([])
   })
+
+  it('waits for a due orphan’s command line, then shows it by its pid alone after three looks', async () => {
+    const { lookAtLaunch, nameDue } = await import('../src/main/orphanProcesses')
+    const now = Date.now()
+    const l: Lineage[] = [{ pid: 20, created: ft(now - 30 * MIN), parent: 10, parentCreated: '0', cpu: 1 }]
+    let r = lookAtLaunch(new Map(), launch, l, now)
+    const shownAt: number[] = []
+    for (let i = 1; i <= 4; i++) {
+      r = lookAtLaunch(r.orphans, launch, l, now + i * MIN)
+      if (nameDue(r.due, []).length) shownAt.push(i)
+    }
+    expect(shownAt).toEqual([3])
+    const o = [...r.orphans.values()][0]
+    expect([o.shown, o.label]).toEqual([true, undefined])
+  })
+})
+
+describe('a look as the timer makes it', () => {
+  it('tells nothing while a due orphan’s command line is being read, then tells it with its command (HR2’s round 1)', async () => {
+    const { lookForTests, orphanLinesFor, setOrphansForTests } = await import('../src/main/orphanProcesses')
+    const created = ft(Date.now() - 30 * MIN)
+    host.lineage = { r1: [{ pid: 20, created, parent: 10, parentCreated: '0', cpu: 4 }] }
+    toasts.list = []
+    await lookForTests()
+    let release: ((p: unknown[]) => void) | null = null
+    host.processes = () => new Promise((r) => (release = r))
+    const second = lookForTests()
+    // Its names are being read: nothing told yet, however often the agent's hooks ask.
+    await vi.waitFor(() => expect(release).not.toBe(null))
+    expect(orphanLinesFor(launch.projectPath, 'a1')).toBe('')
+    release!([proc(20, created)])
+    await second
+    const line = orphanLinesFor(launch.projectPath, 'a1')
+    expect(line).toContain('pid 20 `node linger.js`')
+    expect(orphanLinesFor(launch.projectPath, 'a1')).toBe('')
+    // One notice, routed by its project's path, clicking to its agent.
+    expect(toasts.list.map((a) => [a[4], (a[5] as { agentId: string }).agentId])).toEqual([['C:\\ws\\alpha', 'a1']])
+    host.processes = async () => null
+    host.lineage = null
+    setOrphansForTests('r1', null)
+  })
 })
 
 describe('telling the agent', () => {
-  const orphan = (pid: number, shown = true): Orphan => ({ ...launch, pid, created: ft(Date.now() - 12 * MIN), cpuMs: 1, shown, told: false, label: 'grep -rh HI-2080 /', command: 'grep -rh HI-2080 /' })
+  const orphan = (pid: number, shown = true): Orphan => ({ ...launch, pid, created: ft(Date.now() - 12 * MIN), cpuMs: 1, present: true, shown, told: false, nameTries: 0, label: 'grep -rh HI-2080 /', command: 'grep -rh HI-2080 /' })
 
   it('tells it once of each shown orphan, with its pid and command, and never of one not shown yet', async () => {
     const { orphanLinesFor, setOrphansForTests } = await import('../src/main/orphanProcesses')
@@ -120,17 +193,17 @@ describe('telling the agent', () => {
     setOrphansForTests('r1', null)
   })
 
-  it('counts only a running launch’s: a stopped one’s are its leftovers, never counted twice', async () => {
+  it('counts only a running launch’s present orphans: a stopped one’s are its leftovers, never counted twice', async () => {
     const { orphansOf, setOrphansForTests } = await import('../src/main/orphanProcesses')
-    setOrphansForTests('r1', [orphan(20, false)])
+    setOrphansForTests('r1', [orphan(20, false), { ...orphan(22, false), present: false }])
     expect(orphansOf(launch.projectPath, 'a1').map((o) => o.pid)).toEqual([20])
-    runs.ids = []
+    host.ids = []
     expect(orphansOf(launch.projectPath, 'a1')).toEqual([])
-    runs.ids = ['r1']
+    host.ids = ['r1']
     setOrphansForTests('r1', null)
   })
 
-  it('marks only shown orphans in Activity, with their CPU time', async () => {
+  it('marks only shown, present orphans in Activity, with their CPU time', async () => {
     const { markOrphans, setOrphansForTests } = await import('../src/main/orphanProcesses')
     const o = orphan(20)
     setOrphansForTests('r1', [o, orphan(21, false)])
