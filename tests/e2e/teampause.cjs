@@ -68,7 +68,10 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
       const res = await fetch(`${API}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(token === workspaceToken ? { 'X-Hive-Workspace': path.basename(wsA) } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
     }
-    const deliveries = async (agent) => ((await api(workspaceToken, 'GET', `/v1/projects/alpha/agents/${encodeURIComponent(agent)}/deliveries?limit=20`)).body?.deliveries ?? []).map((d) => d.body ?? d.text ?? '')
+    const deliveries = async (agent) => {
+      const v = (await api(workspaceToken, 'GET', `/v1/projects/alpha/agents/${encodeURIComponent(agent)}/deliveries?limit=20`)).body ?? {}
+      return (v.items ?? v.deliveries ?? []).map((d) => d.body ?? d.text ?? '')
+    }
 
     // --- alpha: Builder runs a lane and watches its first card.
     const builder = await lib.addAgent(inv, alpha, { name: 'Builder', workflowRole: 'builder' })
