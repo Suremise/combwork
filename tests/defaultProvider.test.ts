@@ -2,7 +2,7 @@
 // turned on and installed, a default the user chose wins, and a project with no agents warns only about a provider
 // the user chose, or when nothing is installed.
 import { afterEach, describe, expect, it } from 'vitest'
-import { AUTO_PROVIDER, agentProvider, autoProvider, autoProviderPending, chosenDefaultProvider, defaultProviderPending, defaultProviderLabel, defaultProviderWarning, inProviderOrder, orderedProviders, providerOrderWith, projectDefaultProvider, providerWarnings, providersInUse, setInstalledCheck } from '../src/shared/providers'
+import { AUTO_PROVIDER, agentProvider, autoProvider, autoProviderPending, chosenDefaultProvider, defaultProviderPending, defaultProviderLabel, defaultProviderWarning, inProviderOrder, orderedProviders, projectDefaultProvider, providerWarnings, providersInUse, setInstalledCheck } from '../src/shared/providers'
 import { DEFAULT_APP_CONFIG, DEFAULT_SETTINGS, mergeDefaults, migrateConfig } from '../src/shared/defaults'
 import type { AppSettings, ProviderId } from '../src/shared/types'
 
@@ -212,16 +212,6 @@ describe("the providers' order (HI-1965)", () => {
     expect(ordered(inOrder(['gemini', 'codex']))).toEqual(['codex', 'claude-code', 'copilot'])
   })
 
-  it('moves one to a place, saving the whole order; nothing past either end; a newer Hive’s ids kept at the end', () => {
-    expect(providerOrderWith(settings(ALL), 'copilot', 1)).toEqual(['claude-code', 'copilot', 'codex'])
-    expect(providerOrderWith(settings(ALL), 'claude-code', 1)).toEqual(['codex', 'claude-code', 'copilot'])
-    expect(providerOrderWith(settings(ALL), 'claude-code', -1)).toEqual(ALL)
-    expect(providerOrderWith(settings(ALL), 'copilot', 9)).toEqual(ALL)
-    // A drop two places away (drag).
-    expect(providerOrderWith(settings(ALL), 'copilot', 0)).toEqual(['copilot', 'claude-code', 'codex'])
-    expect(providerOrderWith(inOrder(['gemini', 'codex']), 'copilot', 0)).toEqual(['copilot', 'codex', 'claude-code', 'gemini'])
-  })
-
   it("a list's provider entries follow it, each run in its own places; the rest stay (Settings' and Project Settings' sections, Advanced's tabs)", () => {
     const nav = ['general', 'providers', 'p:claude-code', 'p:codex', 'p:copilot', 'assistant', 'a:claude-code', 'a:codex', 'a:copilot', 'advanced']
     const providerOf = (s: string) => (s.includes(':') ? (s.split(':')[1] as ProviderId) : null)
@@ -237,6 +227,8 @@ describe("the providers' order (HI-1965)", () => {
     expect(load({ version: 8, settings: { providerOrder: ['gemini', 'codex', 'codex', 7] } }).settings.providerOrder).toEqual(['gemini', 'codex'])
     expect(load({ version: 8, settings: { providerOrder: 'codex' } }).settings.providerOrder).toEqual([])
     expect(load({ version: 8, settings: {} }).settings.providerOrder).toEqual([])
+    // Its revision went with the window's moves (HI-2113): a saved one is dropped.
+    expect('providerOrderRevision' in load({ version: 8, settings: { providerOrder: ['codex'], providerOrderRevision: 4 } }).settings).toBe(false)
   })
 })
 
