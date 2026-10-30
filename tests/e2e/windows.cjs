@@ -164,6 +164,10 @@ async function waitFor(fn, ms = 15000) {
   await lib.acceptClaudeTrust(invA, alpha, agentA.id)
   check('an agent runs in window A', !!(await waitFor(async () => (await invA('session:live')).length === 1)))
   // Its own workspace by another name isn't a switch (#455): no question, its agent runs on, and it keeps the name it has.
+  // Nor is it closed and opened again (HI-2141: that ended what its passes were writing): counted by the log's "Opened
+  // workspace" lines once the switch below has logged its own, which comes after any this open would have written.
+  const openedLines = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => l.includes('Opened workspace')).length
+  const openedBefore = openedLines()
   const same = invA('workspace:open', aliasA)
   const asked = await waitFor(async () => (await pa.getByText('Switch workspace?').count()) > 0, 4000)
   await pa.screenshot({ path: path.join(lib.WORK, 'windows-alias-same.png') }).catch(() => undefined)
@@ -181,6 +185,8 @@ async function waitFor(fn, ms = 15000) {
   await waitFor(async () => (await pa.getByText('Switch workspace?').count()) > 0, 8000)
   await pa.locator('.dialog .btn', { hasText: 'Switch workspace now' }).click()
   check('confirming switches the workspace', (await pending)?.path === wsB)
+  await waitFor(async () => openedLines() > openedBefore, 8000)
+  check('…and opening its own workspace neither closed nor opened it again', openedLines() === openedBefore + 1, `${openedLines() - openedBefore} opened`)
   check("…after stopping the old workspace's agent", (await invA('session:live')).length === 0)
 
   // --- Close Workspace with an agent running: asks, then stops every agent of the workspace.

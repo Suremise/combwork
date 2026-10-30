@@ -283,6 +283,8 @@ export class WorkspaceService {
    * doesn't change it.
    */
   movedFrom: string | null = null
+  /** The open under way in this window, its folder and its run (HI-2141), or null. */
+  private opening: { path: string; run: Promise<WorkspaceInfo> } | null = null
   private ids: (ProjectIdIndex & { key: string; at: number }) | null = null
   /**
    * Where each project id was last seen while this workspace is open, kept when a read misses it: a read part way through
@@ -373,6 +375,29 @@ export class WorkspaceService {
   }
 
   async open(path: string): Promise<WorkspaceInfo> {
+    const run = this.openNow(path)
+    const o = { path: resolve(path), run }
+    this.opening = o
+    try {
+      return await run
+    } finally {
+      if (this.opening === o) this.opening = null
+    }
+  }
+
+  /**
+   * This window's workspace when `path` is it (by real path, #455), once an open of it under way here has ended (the
+   * restore at start, HI-2141): its info, so the window's own open of it neither closes it nor opens it again, which
+   * ended what its passes were writing. Null when the window has or is opening another, has none, or that open failed.
+   */
+  async alreadyHere(path: string): Promise<WorkspaceInfo | null> {
+    const o = this.opening
+    if (o && samePlace(path, o.path)) await o.run.catch(() => undefined)
+    if (this.opening && !samePlace(path, this.opening.path)) return null
+    return this.path && samePlace(path, this.path) ? this.info() : null
+  }
+
+  private async openNow(path: string): Promise<WorkspaceInfo> {
     const abs = resolve(path)
     if (!(await isDir(abs))) throw hiveError(msg({ id: 'service.workspace.notFound', defaultMessage: 'Folder not found: {folder}', description: 'An error opening a workspace: the folder {folder} is not there.' }), { folder: abs })
     // The skills and modes of the workspace this window had, still being brought up to date (HI-1705), first: its close
