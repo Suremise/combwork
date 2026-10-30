@@ -1478,6 +1478,12 @@ class SessionManager {
     return this.projectStates(projectPath)[0] ?? null
   }
 
+  /** When the agent's turn under way began (its ledger's), or null when it is in none (HI-2167: hive_lane start's safety net). */
+  turnBegan(projectPath: string, agentId: string): number | null {
+    const a = this.live.get(liveId(projectPath, agentId))?.ledger?.active
+    return a && a.state === 'running' ? a.startedAt : null
+  }
+
   /** The folders a running agent's launch was granted outside its own (#1439: its project's review copies); none if not running. */
   grantedDirs(projectPath: string, agentId: string): readonly string[] {
     return this.live.get(liveId(projectPath, agentId))?.extraDirs ?? []

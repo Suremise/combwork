@@ -804,15 +804,17 @@ export interface LanePlace {
 export const FRESH_CARD_MS = 2 * 60_000
 
 /**
- * hive_lane start's safety net (HI-2167): a card in its list made in the last FRESH_CARD_MS by someone else than the
- * caller may be a guessed key (a create batched with the start, another agent's card taking the number). Null for none.
+ * hive_lane start's safety net (HI-2167): a card in its list made by someone else than the caller since the caller's turn
+ * began (`since`), in the last FRESH_CARD_MS, may be a guessed key (a create batched with the start, another agent's card
+ * taking the number); one made before the turn began is one the caller was told of. Null for none, and with no turn.
  */
-export async function freshCardsNote(ws: WorkspaceService, cards: readonly number[], by: string, at = Date.now()): Promise<string | null> {
+export async function freshCardsNote(ws: WorkspaceService, cards: readonly number[], by: string, since: number | null, at = Date.now()): Promise<string | null> {
+  if (since === null) return null
   const board = await cardsNow(ws, cards)
   const fresh = cards.flatMap((n) => {
     const c = board.get(n)
     const made = c?.createdAt ? Date.parse(c.createdAt) : NaN
-    return c && c.createdBy && c.createdBy !== by && at - made >= 0 && at - made < FRESH_CARD_MS ? [{ n, ago: Math.max(1, Math.round((at - made) / 1000)), who: c.createdBy }] : []
+    return c && c.createdBy && c.createdBy !== by && made >= since && at - made >= 0 && at - made < FRESH_CARD_MS ? [{ n, ago: Math.max(1, Math.round((at - made) / 1000)), who: c.createdBy }] : []
   })
   if (!fresh.length) return null
   return withCardNames(ws, () => `Warning: ${fresh.map((f) => `${cardRef(f.n)} was created ${f.ago} s ago by ${f.who}`).join('; ')}: is it the card you meant? To put a new card on a lane, create it with hive_create_task's lane, never by its guessed key.`) // i18n-ignore: hive_lane's reply (agents)

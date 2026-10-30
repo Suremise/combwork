@@ -2084,8 +2084,10 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     if (!a && r.did === 'started') launched = recordedLaneNote(await launchRecordedLane(ws, p, r.lane.id))
     else if (!a && r.did === 'updated') launched = await resumeLaneBuilder(p, r.lane)
     // The lane's own note first (an "Applied now:" stays its start; HI-2097's carried brief and Done cards left out).
-    // A card in its list made moments ago by someone else (HI-2167): a guessed key, perhaps; a placed card is its own.
-    const fresh = place ? null : await lanes.freshCardsNote(ws, args.cards!, await laneBy())
+    // A card in its list made by someone else since the caller's turn began (HI-2167): a guessed key, perhaps; a placed
+    // card is its own. The caller's turn: a project agent's own, or the Assistant's; a script has none.
+    const turn = a ? sessions.turnBegan(a.projectPath, a.agentId) : assistantCaller() ? sessions.turnBegan(ws.assistantHome, ASSISTANT_AGENT_ID) : null
+    const fresh = place ? null : await lanes.freshCardsNote(ws, args.cards!, await laneBy(), turn)
     const notes = [r.note, note, told, launched, fresh].filter(Boolean).join(' ')
     return notes ? { ...r, note: notes } : r
   }

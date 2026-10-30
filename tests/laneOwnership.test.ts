@@ -161,13 +161,17 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     await lanes.endLane(w, started.lane.id, { abandoned: true })
   })
 
-  it("HI-2167: hive_lane start's safety net names a card made moments ago by someone else, never one of the caller's or an older one", async () => {
+  it("HI-2167: hive_lane start's safety net names a card made by someone else since the caller's turn began, moments ago; never the caller's own, one from before its turn, an older one, or with no turn", async () => {
     const c = await make('Fresh card')
     const made = Date.parse((await run(() => tasks.getTask(c))).createdAt!)
     const by = tasks.actorName(user)
-    expect(await lanes.freshCardsNote(w, [c], 'HB6', made + 3000)).toMatch(new RegExp(`^Warning: #${c} was created 3 s ago by ${by}: is it the card you meant\\? To put a new card on a lane, create it with hive_create_task's lane`))
-    expect(await lanes.freshCardsNote(w, [c], by, made + 3000)).toBeNull()
-    expect(await lanes.freshCardsNote(w, [c], 'HB6', made + lanes.FRESH_CARD_MS)).toBeNull()
+    const turn = made - 1000
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', turn, made + 3000)).toMatch(new RegExp(`^Warning: #${c} was created 3 s ago by ${by}: is it the card you meant\\? To put a new card on a lane, create it with hive_create_task's lane`))
+    expect(await lanes.freshCardsNote(w, [c], by, turn, made + 3000)).toBeNull()
+    // Made before the caller's turn began: a card it was told of (the user's, asking it to put it on a lane).
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', made + 1, made + 3000)).toBeNull()
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', turn, made + lanes.FRESH_CARD_MS)).toBeNull()
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', null, made + 3000)).toBeNull()
   })
 
   it('between cards a change applies at once; with rules off, at once even mid-card', async () => {
