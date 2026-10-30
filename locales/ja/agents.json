@@ -5,6 +5,7 @@
   "agents.add.full": "{limit}先にどれかを削除してください。",
   "agents.add.nameTaken": "{project}に{agent}という名前のエージェントがすでにあります。エージェント名はワークスペース全体で重複できません。",
   "agents.add.nameTakenHere": "{project}に{agent}という名前のエージェントがすでにあります。",
+  "agents.add.noAccountStart": "ここで有効なアカウントはまだありません",
   "agents.add.startNow": "すぐにセッションを開始",
   "agents.add.title": "{project}にエージェントを追加",
   "agents.add.useSuggestion": "{name}を使う",

@@ -127,7 +127,12 @@ export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew,
           </div>
         )}
         {/* None usable (not for a test copy on its CLI test home, whose account is made as its first agent needs it). */}
-        {!offered.length && !view.testHome.length && <div className="hint">{cli ? tr(M.noneCli, { cli: providerName(cli) }) : tr(M.none)}</div>}
+        {!offered.length && !view.testHome.length && (
+          <div className="hint" data-no-account>
+            {cli ? tr(M.noneCli, { cli: providerName(cli) }) : tr(M.none)}{' '}
+            <a onClick={openConnections}>{tr(SETUP.open)}</a>
+          </div>
+        )}
       </div>
     </>
   )
@@ -169,6 +174,15 @@ export function connectionCellText(own: string | undefined, provider: ProviderId
   if (!s) return null
   return s.shown ? `${s.shown.name}${s.other ? ' ⟳' : ''}` : unusable(s, providerDescriptor(provider).name, false)
 }
+
+/** Why nothing can start here (HI-2108): no account is on in this workspace, as the choice says it. */
+export const noAccountText = (): string => tr(M.none)
+
+/**
+ * Whether no account is on in this workspace for a choice to offer (HI-2108): none offered, and this isn't a test copy
+ * on its CLI test home (whose account is made as its first agent needs it).
+ */
+export const noAccountHere = (view: ConnectionsView | null, settings: Parameters<typeof offeredConnections>[1]): boolean => !!view && !offeredConnections(view, settings).length && !view.testHome.length
 
 /** Opens Settings → Accounts & Connections. */
 export function openConnections(): void {

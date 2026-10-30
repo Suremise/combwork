@@ -18,7 +18,7 @@ import { projectMergeChoice } from '../mergeChoice'
 import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
 import { msg, tr, tRich } from '@shared/i18n'
 import { ProviderIcon } from './ProviderIcon'
-import { cliReadyOf, ConnectionChoice, connectionCli, firstReadyConnection, offeredConnections, useConnections } from './ConnectionChoice'
+import { cliReadyOf, ConnectionChoice, connectionCli, firstReadyConnection, noAccountHere, noAccountText, offeredConnections, useConnections } from './ConnectionChoice'
 import { ConnectionDialog } from './ConnectionDefaults'
 import { cx } from '../util'
 import { formatSize } from '@shared/units'
@@ -202,6 +202,8 @@ export function AddAgentDialog() {
   // finding which CLIs are installed, or none of theirs is); with none offered at all, main picks as before accounts.
   const unresolved = !connection && offeredConnections(view, settings).length > 0
   const valid = !!name.trim() && !owner && !full && !unresolved
+  // No account on here (the Assistant's ask, HI-2108): nothing could start, so a session can't be asked for, saying why.
+  const noAccount = noAccountHere(view, settings)
   const choose = (id: string): void => {
     setChosen(true)
     setConnection(id)
@@ -223,7 +225,7 @@ export function AddAgentDialog() {
       const p = useStore.getState().workspace?.projects.find((x) => x.path === project.path)
       // Show the new agent in a pane: a single-pane layout switches to it (in the Tiles view, its tile: #976).
       if (p) showAgent(p, def.id, 'select')
-      if (startNow) await actions.newSession(project.path, def.id)
+      if (startNow && !noAccount) await actions.newSession(project.path, def.id)
     } catch (e) {
       notify('error', tr(msg({ id: 'agents.add.failed', defaultMessage: 'Could not add agent', description: "An error's title: adding an agent to a project failed." })), errorMessage(e))
       setBusy(false)
@@ -238,8 +240,9 @@ export function AddAgentDialog() {
       wide
       footer={
         <>
-          <label className="flex muted" style={{ marginRight: 'auto' }}>
-            <input type="checkbox" className="checkbox" checked={startNow} onChange={(e) => setStartNow(e.target.checked)} /> {tr(msg({ id: 'agents.add.startNow', defaultMessage: 'Start a session now', description: 'Checkbox in the Add Agent dialog: start the new agent at once.' }))}
+          <label className="flex muted" style={{ marginRight: 'auto' }} title={noAccount ? noAccountText() : undefined} data-start-now={noAccount ? 'no-account' : undefined}>
+            <input type="checkbox" className="checkbox" checked={startNow && !noAccount} disabled={noAccount} aria-description={noAccount ? noAccountText() : undefined} onChange={(e) => setStartNow(e.target.checked)} /> {tr(msg({ id: 'agents.add.startNow', defaultMessage: 'Start a session now', description: 'Checkbox in the Add Agent dialog: start the new agent at once.' }))}
+            {noAccount && <span className="faint" data-start-now-why> — {tr(msg({ id: 'agents.add.noAccountStart', defaultMessage: 'No account is on here yet', description: "After Add Agent's \"Start a session now\", greyed out (HI-2127): why it can't start a session: no account (a sign-in or server a coding agent CLI uses) is on in this workspace. The agent can still be added, for later. Short." }))}</span>}
           </label>
           <button className="btn subtle" onClick={close}>
             {tr(CANCEL)}
