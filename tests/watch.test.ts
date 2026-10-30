@@ -1192,6 +1192,78 @@ describe('watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it('HI-2153: a watch set on a card already in Done or archived answers at once with its state, whatever it waits for; none is kept', async () => {
+    const { w, alpha } = await open()
+    fake(alpha)
+    const done = await inWorkspace(w, () => tasks.createTask({ title: 'Merged', project: 'alpha', column: 'done' }, user))
+    for (const cond of [{ changes: ['column' as const] }, { changes: ['comment' as const, 'verdict' as const] }, { changes: ['column' as const], column: 'review' as const }]) {
+      expect(await watches.registerWatch(w, alpha, 'a1', { cards: [done.number], ...cond })).toMatchObject({ already: { number: done.number, column: 'done' } })
+      expect(watches.watchFor(alpha, 'a1')).toBeNull()
+    }
+    const archived = await inWorkspace(w, () => tasks.createTask({ title: 'Archived', project: 'alpha' }, user))
+    await inWorkspace(w, () => tasks.archiveTask(archived.number, true))
+    expect(await watches.registerWatch(w, alpha, 'a1', { cards: [archived.number], changes: ['comment'] })).toMatchObject({ already: { number: archived.number, changes: 'gone', archived: true } })
+    expect(watches.watchFor(alpha, 'a1')).toBeNull()
+    await disposeWorkspaceService(w)
+  })
+
+  it("HI-2153: Archive All counts a watch on a card in work as someone on it, never a stale one on a card in Done", async () => {
+    const { w, alpha } = await open()
+    const { cardBusy } = await import('../src/main/cardBusy')
+    const inReview = await inWorkspace(w, () => tasks.createTask({ title: 'Watched', project: 'alpha', column: 'review' }, user))
+    const merged = await inWorkspace(w, () => tasks.createTask({ title: 'Merged', project: 'alpha', column: 'done' }, user))
+    // A2 is running and its watch (from before HI-2153, or not yet ended) names both cards.
+    const was = { liveStates: sessions.liveStates, watchFor: sessions.watchFor }
+    Object.assign(sessions, {
+      liveStates: () => [{ projectPath: alpha, agentId: 'a2', agentName: 'Reviewer', status: 'watching' }],
+      watchFor: (p: string, id: string) => (p.toLowerCase() === alpha.toLowerCase() && id === 'a2' ? { cards: [inReview.number, merged.number] } : null)
+    })
+    try {
+      expect(cardBusy(w, inReview)).toBe('Reviewer is watching it')
+      expect(cardBusy(w, merged)).toBeNull()
+    } finally {
+      Object.assign(sessions, was)
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it('HI-2153: a watch on a card that reaches Done ends, also one that waits only for comments or another column; one saved on a Done card ends at the next check', async () => {
+    const { w, path, alpha } = await open()
+    const st = fake(alpha)
+    for (const cond of [{ changes: ['comment' as const] }, { changes: ['column' as const], column: 'passed' as const }]) {
+      st.status = 'watching'
+      const c = await inWorkspace(w, () => tasks.createTask({ title: 'Card', project: 'alpha', column: 'review' }, user))
+      await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], ...cond })
+      const before = st.told.length
+      await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'done' }, user))
+      await evaluated(w)
+      await vi.waitFor(() => expect(st.told).toHaveLength(before + 1), { timeout: HUNG_MS })
+      expect(st.told.at(-1)).toMatch(new RegExp(`^\\[Hive\\] #${c.number} is in Done \\(your watch on it ended\\)`))
+      await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
+    }
+    // Saved before HI-2153 on a card already Done, waiting for a column change that never comes (HR2 on HI-2148).
+    st.status = 'watching'
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'Stale', project: 'alpha', column: 'review' }, user))
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'] })
+    const data = savedOf(path)
+    await watches.cancelWatch(w, alpha, 'a1')
+    const merged = await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'done' }, user))
+    await evaluated(w)
+    // Its view of the card ends with it in Done: no change since will ever fire it.
+    data[0].marks[c.number] = markOf(merged)
+    data[0].seen[c.number] = seenOf(merged)
+    await putSaved(path, data)
+    watches.forgetWatches(w)
+    const before = st.told.length
+    await vi.waitFor(async () => {
+      await evaluated(w)
+      expect(st.told).toHaveLength(before + 1)
+    }, { timeout: HUNG_MS })
+    expect(st.told.at(-1)).toMatch(new RegExp(`^\\[Hive\\] #${c.number} is in Done \\(your watch on it ended\\)`))
+    await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
+    await disposeWorkspaceService(w)
+  })
+
   it("a card moved to another project is gone to the agent: nothing of its new project's comments is told", async () => {
     const { w, path, alpha } = await open()
     const st = fake(alpha)

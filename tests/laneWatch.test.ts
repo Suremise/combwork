@@ -1358,6 +1358,73 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("HI-2153 (the Assistant's call): a card beside the lanes in Done or archived leaves the watch with no notice of its own, the lanes still watched; one named already Done or archived never joins", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    const [x, y, gone] = await newCards(w, 'b2', 3)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    // Comments only, so no column change can stand in for the card leaving.
+    const comments = (cards?: number[]) => {
+      st.status = 'watching'
+      return watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { ...(cards ? { cards } : {}), changes: ['comment'] })
+    }
+    expect((await comments([x, y, gone])).cards).toEqual({ now: [x, y, gone] })
+    // x merged, gone archived: both leave at once, nothing typed; the lanes are still watched.
+    await inWorkspace(w, () => tasks.updateTask(x, { column: 'done' }, user))
+    await inWorkspace(w, () => tasks.archiveTask(gone, true))
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(st.typed).toHaveLength(0)
+    expect(watches.watchFor(home, 'assistant')).toMatchObject({ cards: [y], label: `Waiting on all running lanes and #${y}` })
+    await vi.waitFor(async () => expect((await inWorkspace(w, () => tasks.getTask(x, w))).history.map((h) => h.what)).toContainEqual(expect.stringMatching(/^Ended .*'s watch on it: the card is in Done$/)), { timeout: HUNG_MS })
+    // The next lane event's line names neither.
+    await inWorkspace(w, () => tasks.updateTask(a, { column: 'review' }, agent('b1')))
+    await fail(w, a, 'r1')
+    await watches.evaluateWatches(w)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toContain(`#${a} failed review`)
+    expect(st.told[0]).not.toContain(`#${x}`)
+    expect(st.told[0]).not.toContain(`#${gone}`)
+    // Watched again, cards kept: y only.
+    expect((await comments()).cards).toEqual({ now: [y], kept: true })
+    // Named when already Done or archived: never joins the watch (the reply lists it as dropped).
+    const late = await comments([x, gone])
+    expect(late.cards).toMatchObject({ now: [], dropped: [x, gone] })
+    expect(late.watching.label).toBe('Waiting on all running lanes')
+    await disposeWorkspaceService(w)
+  })
+
+  it('HI-2153 round 2 finding: a card beside the lanes merged after the watch fired but before its line is typed leaves it then, and the line never names it', async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    const [x, y] = await newCards(w, 'b2', 2)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    await watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { cards: [x, y], changes: ['comment'] })
+    // The Assistant works: a lane failure fires the watch, but its line waits; x is merged meanwhile.
+    st.status = 'working'
+    await inWorkspace(w, () => tasks.updateTask(a, { column: 'review' }, agent('b1')))
+    await fail(w, a, 'r1')
+    await watches.evaluateWatches(w)
+    await inWorkspace(w, () => tasks.updateTask(x, { column: 'done' }, user))
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(st.typed).toEqual([])
+    // While it waits, x has left (what its agent shows, and Archive All, see it gone).
+    expect(watches.watchFor(home, 'assistant')).toMatchObject({ cards: [y], label: `Waiting on all running lanes and #${y}` })
+    await vi.waitFor(async () => expect((await inWorkspace(w, () => tasks.getTask(x, w))).history.map((h) => h.what)).toContainEqual(expect.stringMatching(/^Ended .*'s watch on it: the card is in Done$/)), { timeout: HUNG_MS })
+    st.status = 'watching'
+    await watches.tick()
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toContain(`#${a} failed review`)
+    expect(st.told[0]).not.toContain(`#${x}`)
+    // Watched again, cards kept: y only, x not carried over.
+    st.status = 'watching'
+    expect((await watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { changes: ['comment'] })).cards).toEqual({ now: [y], kept: true })
+    await disposeWorkspaceService(w)
+  })
+
   it('a lane watch replaced before its wake was given keeps its cards from where it was: the change is still told (#726)', async () => {
     const { w, alpha, home } = await open()
     const st = fake(alpha, home)

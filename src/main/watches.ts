@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { projectAgents } from '../shared/defaults'
-import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
+import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
 import { agentBusy, agentEvent, agentLimitLine, agentMarkOf, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, readSavedAgentMark, replyFirstLine, replyPart, REPLY_CHARS, type AgentEvent, type AgentMark, type AgentNow, type AgentWatchCondition, type WatchedAgent } from '../shared/agentWatch'
 import { isProjectId, type ProjectIdIndex } from '../shared/projectIds'
 import { rebase } from '../shared/movePaths'
@@ -854,12 +854,14 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
       const role = scope === null ? null : card.agent === agentId ? 'agent' : card.review?.agent === agentId ? 'reviewer' : cond.column === 'review' ? 'awaiting' : null
       if (role) on[n] = { role }
       const mark = markOf(card)
-      if (alreadyThere(mark, cond)) {
-        already = cardChange(n, card, ['column'])
-        break
-      }
       const was = told?.get(String(n))
       const base = start?.card.number === n ? start.card : card
+      // HI-2153: a card in Done or archived never changes again: its state is the answer, never a watch. Unless the watch
+      // starts from before it got there (a wake that told it elsewhere, an intent's card): that move fires it.
+      if (alreadyThere(mark, cond) || (cardOver(mark) && cardOver(was ? was.mark : markOf(base)))) {
+        already = cardChange(n, card, mark.archived ? 'gone' : ['column'])
+        break
+      }
       marks[n] = was ? carriedOver(card, was, self!) : markOf(base)
       seen[n] = was ? was.seen : seenOf(base)
       now[n] = mark
@@ -1482,6 +1484,13 @@ interface LaneRound {
   /** The cards beside its lanes that changed (#726), and each of them as read for the line. */
   cards: CardChange[]
   told: Record<string, Baseline>
+  /**
+   * The cards beside its lanes in Done or archived (HI-2153): they leave the watch with no notice of their own (the
+   * Assistant's call: the lanes' own events tell the watcher), so `cards` never tells them; `done`, those to note in
+   * their history.
+   */
+  drop: number[]
+  done: Released[]
   /** Agents that started waiting for the user since its mark and still wait (#726), and the latest wait known now. */
   waits: WaitHit[]
   waitSeq: number
@@ -1509,10 +1518,30 @@ async function laneRound(store: Store, rec: WatchRecord, board: LaneBoard = lane
     next[n.id] = keepAsked(was, n.mark, from)
   }
   const c = rec.cond.cards.length ? await check(store, rec) : null
+  const drop = c ? [...c.released.map((x) => x.number), ...c.hits.filter((h) => h.changes === 'gone' && h.archived).map((h) => h.number)] : []
   // Named lanes: the waits of their projects' agents; "all": of every project in the watcher's view.
   const named = cond.ids === 'all' ? null : new Set(listed.filter((l) => (cond.ids as string[]).includes(l.id)).map((l) => l.project.toLowerCase()))
   const waitSeq = latestWaitSeq()
-  return { hits, next, cards: c?.hits ?? [], told: c?.told ?? {}, waits: await waitsSince(store, rec, board, named), waitSeq }
+  return { hits, next, cards: c ? c.hits.filter((h) => !drop.includes(h.number)) : [], told: c ? Object.fromEntries(Object.entries(c.told).filter(([n]) => !drop.includes(Number(n)))) : {}, drop, done: c?.released ?? [], waits: await waitsSince(store, rec, board, named), waitSeq }
+}
+
+/**
+ * Takes a round's cards in Done or archived out of a lane watch (HI-2153), under the store's lock, its lanes still
+ * watched: nothing tells them (no `released`), and the Done ones are noted in their history. Whether any left.
+ */
+function dropLaneCards(rec: WatchRecord, r: Pick<LaneRound, 'drop' | 'done'>, ended: { n: number; what: StoredText }[]): boolean {
+  const drop = r.drop.filter((n) => rec.cond.cards.includes(n))
+  if (!drop.length) return false
+  for (const x of r.done) if (drop.includes(x.number)) ended.push({ n: x.number, what: storedText(HISTORY.watchEnded, { watcher: rec.watcherName ?? rec.agentId, ...releasedWhy(x) }) })
+  rec.cond = { ...rec.cond, cards: rec.cond.cards.filter((n) => !drop.includes(n)) }
+  if (rec.fired) rec.fired = { ...rec.fired, cards: rec.fired.cards.filter((n) => !drop.includes(n)) }
+  for (const n of drop) {
+    delete rec.marks[n]
+    delete rec.seen?.[n]
+    delete rec.current?.[n]
+    delete rec.on?.[n]
+  }
+  return true
 }
 
 /**
@@ -1556,15 +1585,33 @@ const roundTells = (r: LaneRound): boolean => r.hits.length > 0 || r.cards.lengt
  * that gets blocked again after an unblock counts, and a lane or card new to the watch starts from now.
  */
 async function evaluateLanes(store: Store): Promise<void> {
-  if (!alive(store) || !store.list.some((r) => r.lanes && !r.fired)) return
+  if (!alive(store) || !store.list.some((r) => r.lanes && (!r.fired || r.cond.cards.length))) return
   // One reading for every watch of this round: each card read at most once.
   const board = laneBoard(store.ws)
+  // Cards beside the lanes in Done or archived taken out of a watch (HI-2153): the Done ones' history, and the watches
+  // left with fewer cards (what their agents show changes).
+  const ended: { n: number; what: StoredText }[] = []
+  const narrowed: WatchRecord[] = []
   await locked(store, async () => {
     let changed = false
     for (const rec of store.list) {
-      if (!rec.lanes || rec.fired) continue
+      if (!rec.lanes) continue
       try {
+        // Fired, not handed over yet: its line is made again as it is delivered, but its cards in Done leave now.
+        if (rec.fired) {
+          if (!rec.cond.cards.length || rec.fired.sending || rec.fired.delivery) continue
+          const c = await check(store, rec)
+          if (dropLaneCards(rec, { drop: [...c.released.map((x) => x.number), ...c.hits.filter((h) => h.changes === 'gone' && h.archived).map((h) => h.number)], done: c.released }, ended)) {
+            narrowed.push(rec)
+            changed = true
+          }
+          continue
+        }
         const r = await laneRound(store, rec, board)
+        if (dropLaneCards(rec, r, ended)) {
+          narrowed.push(rec)
+          changed = true
+        }
         if (roundTells(r)) {
           // Fired: its marks stay where they were, so the line typed later is worked out again from there with
           // whatever else happened meanwhile (one batch, round 1 finding), and becomes what the wake told.
@@ -1582,6 +1629,8 @@ async function evaluateLanes(store: Store): Promise<void> {
     }
     if (changed) await saveQuietly(store)
   })
+  for (const x of ended) inBackground(`noting on #${x.n} that a watch ended`, noteOnCard(x.n, x.what, store.ws))
+  for (const rec of narrowed) sessions.watchChanged(rec.projectPath, rec.agentId)
   for (const rec of store.list.filter((r) => r.lanes && r.fired)) await deliver(store, rec)
 }
 
@@ -1653,7 +1702,8 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     let bySelf = false
     for (const n of extra.cards ?? last?.cards ?? []) {
       const card = await cardIn(store, n, scope)
-      if (keep && (!card || card.archived || card.column === 'done')) {
+      // HI-2153: one named that is in Done or archived too: nothing more comes of it (the reply says it left).
+      if ((keep && !card) || (card && (card.archived || card.column === 'done'))) {
         dropped.push(n)
         continue
       }
@@ -2065,6 +2115,18 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
       // handed over with are what the wake told. Fired by its limit, its line stays.
       // Its agents (HI-1987): each one's latest event since the watch began, told in the same line.
       const r = rec.fired.lanes ? await laneRound(store, rec).catch(() => null) : null
+      // HI-2153: its cards in Done or archived since leave it as the line is made (never told), so what the wake hands
+      // over (its cards, for the next lane watch) is without them.
+      if (r?.drop.some((n) => rec.cond.cards.includes(n))) {
+        const ok = await locked(store, async () => {
+          if (!current() || !rec.fired || rec.fired.sending || rec.fired.delivery) return false
+          dropLaneCards(rec, r, endedAt)
+          await saveQuietly(store)
+          return true
+        }).catch(() => false)
+        if (!ok) return
+        sessions.watchChanged(rec.projectPath, rec.agentId)
+      }
       const agentsNow = r && rec.agents ? agentHits(rec) : []
       for (const h of agentsNow) toldAgents.set(agentKey(h.agent.projectPath, h.agent.agentId), h.seq)
       laneAgentsTold = agentsNow.map((h) => agentKey(h.agent.projectPath, h.agent.agentId))
@@ -2077,6 +2139,7 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
         toldOfCards = Object.fromEntries(r.cards.filter((h) => h.changes !== 'gone' && r.told[h.number]).map((h) => [h.number, r.told[h.number]]))
       } else if (r) {
         // Nothing left to tell (a wait the user answered meanwhile, a block lifted): not given, the watch waits on.
+        for (const x of endedAt) inBackground(`noting on #${x.n} that a watch ended`, noteOnCard(x.n, x.what, store.ws))
         await withdraw(store, rec, current)
         return
       }
@@ -2223,6 +2286,11 @@ async function check(store: Store, rec: WatchRecord, cards?: CardReads, ctx: Rel
       kinds = changesBetween(rec.marks[n], after, rec.cond, into)
       if (kinds !== 'gone') kinds.push(...handoffsSince(card, rec.since, rec.cond, rec.watcherName))
     }
+    // HI-2153: in Done with nothing new to tell (a watch saved on it there, or the watcher's own move): it ends all the same.
+    if (kinds !== 'gone' && !kinds.length && card?.column === 'done') {
+      released.push({ number: n, why: 'done', detail: null })
+      continue
+    }
     if (kinds === 'gone' || kinds.length) {
       const about = wakeAbout(card, kinds, rec.agentId)
       // HI-2087: moved back to work because the merge queue returned it: the line leads with the return and its reason.
@@ -2258,6 +2326,9 @@ async function check(store: Store, rec: WatchRecord, cards?: CardReads, ctx: Rel
  * it is paused, not gone, and its loop waits for it (a reviewer that moved on deadlocked with its builder).
  */
 function releaseOf(rec: WatchRecord, n: number, card: TaskCard | null, ctx: ReleaseContext = NO_CONTEXT): Released | null {
+  // HI-2153 (#1475 before, for a loop's watches only): in Done, nothing more comes of it, whoever watches it and for
+  // what. A watch that counts the move there is told it as that change (check: unless it saw nothing new).
+  if (card && !card.archived && card.column === 'done' && !countsDone(rec.cond)) return { number: n, why: 'done', detail: null }
   const on = rec.on?.[n]
   if (!on || !card || card.archived) return null
   const me = rec.agentId
@@ -2274,8 +2345,6 @@ function releaseOf(rec: WatchRecord, n: number, card: TaskCard | null, ctx: Rele
   if (on.role === 'awaiting' && was && card.agent !== was && card.agent !== me) return { number: n, why: 'reassigned', detail: card.agentName ?? card.agent ?? null }
   // #1475: nothing more can come of it (the project's card-loop wakes off: kept, as before).
   if (!ctx.loopWakes) return null
-  // Merged (Done) since the watch began, which the watch doesn't count: a reviewer waiting for it in Review, a builder for its verdict.
-  if (card.column === 'done' && rec.marks[n]?.column !== 'done' && !countsDone(rec.cond)) return { number: n, why: 'done', detail: null }
   // A watch for the card's Done that sees it there has what it waited for (HR4's #1475 round 1): told as that change,
   // never as its lane's end. Anything else waited for on a lane that has ended is obsolete, also a change that fired the
   // watch before the lane ended but wasn't handed over yet (an arrival in Review of an abandoned lane's card).

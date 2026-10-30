@@ -315,6 +315,9 @@ export function changesBetween(before: CardMark, after: CardMark, cond: Pick<Wat
  */
 export const alreadyThere = (mark: CardMark, cond: Pick<WatchCondition, 'column' | 'moveInto' | 'fresh'>): boolean => !!cond.column && !cond.fresh && mark.column === cond.column
 
+/** A card nothing more comes of (HI-2153): in Done, or archived. A watch set on one answers at once with its state. */
+export const cardOver = (mark: CardMark): boolean => mark.column === 'done' || mark.archived
+
 /**
  * A wait's `since`: the marks of its cards, as a short opaque text an agent passes back so a change between two calls
  * is never missed. `n:column:comment:verdict:agent:archived`, comma-separated; times in base 36.
