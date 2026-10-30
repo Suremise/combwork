@@ -497,8 +497,6 @@ describe('a choice saved while starting: the last look at its own choice, skills
   const oneChose = () => w.savedAgent(alpha, 'a-one').then((a) => a?.connection)
   // The Assistant's (HI-2106): its agent's connection, as a launch reads it.
   const assistantChose = () => w.savedAgent(w.assistantHome, 'assistant').then((a) => a?.connection)
-  /** An account's base connection's id (HI-2106): what choosing the account means. */
-  const baseOf = (account: string): string => accounts.allConnections().find((c) => c.account === account)!.id
 
   /**
    * A launch on `chosen` whose first `holds` runs wait, before their last look, until let go: `entered(i)` once run i
