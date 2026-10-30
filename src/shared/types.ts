@@ -821,18 +821,23 @@ export interface WorkspaceConfig {
   /** The last project rename (#514, `project-names.json`'s number) its hidden and removed projects follow. */
   renamesApplied?: number
   /**
-   * The MCP servers on in the workspace (#1093): its master switch. A server runs in a project only when it is on here
-   * and on in the project (mcpOnInProject). `model` 2: the settings are #1093's (before, `enabled` meant on for all
-   * projects, unless a project turned it off); absent, they are moved to it when the workspace opens.
+   * The workspace's MCP settings. `enabled` was #1093's master switch (the servers on in the workspace): since HI-2059 it
+   * is only read, frozen, for projects not yet converted to added servers (mcpAdded), and never written. `model` 2: the
+   * settings are #1093's (before, `enabled` meant on for all projects, unless a project turned it off); absent, they are
+   * moved to it when the workspace opens.
    */
   mcp: {
     enabled: string[]
     model?: 2
     /**
-     * The servers the Hive Assistant has on (HI-1472, off until switched on), as a project's own choice: each runs for it
-     * only while it is on in the workspace too (mcpOnInProject). Absent until set or moved from the old Advanced switch.
+     * The servers added for the Hive Assistant (HI-1472, HI-2059: its view's MCP servers), as a project's. Absent until
+     * set or moved from the old Advanced switch; before `assistantModel` 3, #1093's meaning (assistantMcpAdded).
      */
     assistant?: string[]
+    /** 3: `assistant` means added (HI-2059), converted once from #1093's meaning. */
+    assistantModel?: 3
+    /** Choices dropped converting to added servers (HI-2059: servers that were off in the workspace), not yet said. */
+    droppedNotice?: number
   }
   /**
    * The Hive skills the workspace's agents aren't given (#1431, Skills → Delivered to agents), by name: every other skill
@@ -1465,11 +1470,12 @@ export interface ProjectConfig {
   /** Project-scoped shortcut overrides (project, session and agent commands), over the global ones. */
   keybindings?: KeybindingOverrides
   /**
-   * The workspace's MCP servers this project has on (#1093, its MCP tab): each runs here only while it is on in the
-   * workspace too (mcpOnInProject). `disabled` is from before #1093 (a project turning off a server on for all
-   * projects): read once when the workspace's settings are moved to #1093's model, then emptied.
+   * The workspace's MCP servers added to this project (HI-2059, its MCP tab): the ones that run here. `model` 3 says
+   * `enabled` means added; before it is converted, #1093's meaning holds (on here and on in the workspace, mcpAdded).
+   * `disabled` is from before #1093 (a project turning off a server on for all projects): read once when the
+   * workspace's settings are moved to #1093's model, then emptied.
    */
-  mcp: { disabled: string[]; enabled: string[] }
+  mcp: { disabled: string[]; enabled: string[]; model?: 3 }
   /** The Hive skills this project's agents aren't given (#1431, its Skills tab → Delivered to agents), over the workspace's. */
   skillDelivery?: SkillDeliveryChoice
   chime: 'inherit' | 'on' | 'off'
@@ -2672,6 +2678,8 @@ export interface McpServerDef {
   url?: string
   headers?: Record<string, string>
   description?: string
+  /** Words to find it by in the MCP view and the Add server picker (HI-2059): Hive's, never given to the CLIs. */
+  tags?: string[]
   [key: string]: unknown
 }
 
@@ -2682,18 +2690,25 @@ export interface McpServerInfo {
   /** In English, or the reason a read failed as Node gave it; `errorText` is Hive's own as the window shows it (#845). */
   error?: string
   errorText?: Text
-  /** On in the workspace (#1093, its master switch): it runs in the projects that have it on, and nowhere while off. */
-  globallyEnabled: boolean
-  /** The Hive Assistant's own choice for it (HI-1472, workspace.json's mcp.assistant): it runs for it while on in the workspace too. */
+  /** The projects it is added to (HI-2059), by path, hidden ones too: it runs in them. The window's only, never an agent's. */
+  projects: string[]
+  /** Added for the Hive Assistant (HI-1472, HI-2059): it runs for it. */
   assistant: boolean
   secretWarnings: string[]
   /** What it runs, shown before it is enabled (#550): the command or URL, folder, environment and header names. */
   runs: string[]
-  /** Which copy of its definition this is (a replace or an edit changes it): an enable says which it showed. */
+  /** Which copy of its definition this is (a replace or an edit changes it): an Add says which it showed. */
   revision?: string
 }
 
-/** The server an enable showed the user (#550): refused if its definition has been replaced or edited since. */
+/** What Add to… changed (HI-2059), by place (a project's path, or `assistant`), and where it failed, with why. */
+export interface McpPlacesResult {
+  added: string[]
+  removed: string[]
+  failed: { place: string; error: string }[]
+}
+
+/** The server an Add showed the user (#550): refused if its definition has been replaced or edited since. */
 export interface McpShown {
   def: McpServerDef | null
   revision?: string

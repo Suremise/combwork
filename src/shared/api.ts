@@ -78,6 +78,7 @@ import type {
   LiveSessionState,
   McpFileServer,
   McpShown,
+  McpPlacesResult,
   McpProjectServer,
   McpServerDef,
   McpServerInfo,
@@ -760,17 +761,20 @@ export interface HiveRequests {
   /** A listed skill's files (HI-2011), relative with "/", SKILL.md among them; `projectPath`: its project's tab. */
   'skills:files': (skillPath: string, projectPath?: string) => { files: string[]; truncated: boolean }
 
+  /** The workspace's servers, each with where it is added (HI-2059: the projects and the Hive Assistant). */
   'mcp:list': () => McpServerInfo[]
   /**
-   * On or off in the workspace (#1093, its master switch; off keeps the projects' choices). Turning it on with
-   * `expected` (the server the user was shown): refused if it has been replaced or edited since; `projects` (path → on)
-   * sets those projects' own choices in the same change.
+   * Adds a server to a project (its path) or the Hive Assistant (`assistant`), HI-2059. `expected` is the server the user
+   * was shown: refused if it has been replaced or edited since.
    */
-  'mcp:setGlobal': (name: string, enabled: boolean, expected?: McpShown, projects?: Record<string, boolean>, assistant?: boolean) => void
-  /** The Hive Assistant's own choice for a workspace server (HI-1472). */
-  'mcp:setAssistant': (name: string, enabled: boolean, expected?: McpShown) => void
-  /** On or off in one project, its own choice (#1093: it runs there while it is on in the workspace too); `expected` as for mcp:setGlobal. */
-  'mcp:setProject': (projectPath: string, name: string, enabled: boolean, expected?: McpShown) => void
+  'mcp:add': (target: string, name: string, expected: McpShown) => void
+  /** Removes a server from a project (its path) or the Hive Assistant (`assistant`), HI-2059. */
+  'mcp:remove': (target: string, name: string) => void
+  /**
+   * Add to… (the MCP view, HI-2059): added to the projects ticked (path → true) and removed from the others listed, and
+   * for the Hive Assistant as `assistant` says; `expected` as for mcp:add. Says what changed where, and what failed.
+   */
+  'mcp:places': (name: string, expected: McpShown | undefined, projects: Record<string, boolean>, assistant?: boolean) => McpPlacesResult
   'mcp:create': (name: string) => McpServerInfo
   'mcp:read': (name: string) => string
   /** With `expected` (the text as read), refuses with CONFLICT if the file has changed on disk since. */

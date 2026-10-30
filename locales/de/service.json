@@ -176,6 +176,8 @@
   "service.laneStarts.freshBlockedTitle": "Die neue Unterhaltung von {agent} ist nicht gestartet",
   "service.lanes.noWorkspace": "Kein Arbeitsbereich geöffnet",
   "service.lanes.unknown": "Unbekannte Lane {id}",
+  "service.mcp.addedDropped": "Jedes Projekt und der Hive-Assistent führen die Server auf, die dort liefen. {n, plural, one {# Auswahl für einen Server, der im Arbeitsbereich aus war, wurde} other {# Auswahlen für Server, die im Arbeitsbereich aus waren, wurden}} verworfen: Füge einen Server im Tab „MCP“ eines Projekts hinzu, wo du ihn brauchst.",
+  "service.mcp.addedTitle": "MCP-Server werden jetzt dort hinzugefügt, wo sie laufen",
   "service.metrics.badProvider": "provider muss die ID eines Anbieters sein",
   "service.metrics.badRange": "from und to müssen ISO-Zeiten sein, from vor to",
   "service.metrics.badRole": "role muss agent, assistant, api oder viewer sein",

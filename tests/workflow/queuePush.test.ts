@@ -263,6 +263,8 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
   // HI-2054: where to push, read by git, is taken only from git's own answer (a value, or exit 1: not set). A git that
   // couldn't answer (never started, ended by a signal, ended at a bound whatever its code and partial output, or git's
   // own error) is unreadable: paused in Hive's own words, still owed, nothing pushed; never "no remote", nor a guessed ref.
+  // One card each (HI-2077: twelve cases of two cards each reached the time limit on a loaded machine): that the next card
+  // waits behind a pushUnreadable pause is the lineHead and isAncestor reads' tests above.
   const notAnswers: [string, Partial<QueueGitResult>][] = [
     ['never started', { code: -1, notRun: 'EAGAIN', err: 'spawn git EAGAIN' }],
     ["git's own error", { code: 128, err: 'fatal: bad config line 3 in file .git/config' }],
@@ -281,7 +283,6 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
         if (!upstream) sh(e.project, 'branch', '-q', '--unset-upstream', 'main')
         const before = remoteMain(bare)
         const a = await queued(e, 'A', 'a.txt')
-        const b = await queued(e, 'B', 'b.txt')
         let pushed = false
         let asked = 0
         const git1 = withPush(async (run) => {
@@ -301,16 +302,13 @@ describe('the merge queue pushes its target after merging (G18, #1179)', () => {
         expect(pushed).toBe(false)
         expect(remoteMain(bare)).toBe(before)
         expect(e.wf.state(a).stage).toBe('done')
-        // The next card waits for the owed push.
-        expect(e.wf.state(b).stage).toBe('merging')
         expect(owed(e)).not.toBeNull()
         expect(pending(e).map((p) => p.entry)).toEqual([entryOf(e, a)])
         // In Hive's own words, as the other unreadable reads: no English stored with it.
         expect(e.store.queuePause('main')).toMatchObject({ reason: 'pushUnreadable', card: a.key })
         expect(e.store.queuePause('main')?.message).toBeFalsy()
         e.queue().resume('main')
-        expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
-        expect(e.wf.state(b).stage).toBe('done')
+        await e.queue().drain('main')
         expect(remoteMain(bare)).toBe(localMain(e))
         expect(owed(e)).toBeNull()
         expect(e.store.queuePause('main')).toBeNull()

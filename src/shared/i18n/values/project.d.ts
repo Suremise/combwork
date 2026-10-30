@@ -243,19 +243,23 @@ interface HiveMessageValues {
   'project.limit.title': { window: string; label: string | number }
   'project.limit.used': undefined
   'project.loading': undefined
+  'project.mcp.addServer': undefined
   'project.mcp.builtIn': undefined
   'project.mcp.copy': undefined
   'project.mcp.definedByProject': undefined
   'project.mcp.givenAll': undefined
   'project.mcp.givenNone': undefined
   'project.mcp.givenTo': { agents: string | number }
-  'project.mcp.heading': undefined
+  'project.mcp.headingAdded': undefined
   'project.mcp.hiveDesc': undefined
   'project.mcp.invalid': undefined
   'project.mcp.manage': undefined
-  'project.mcp.none': undefined
+  'project.mcp.noneAdded': undefined
+  'project.mcp.noneInWorkspace': undefined
   'project.mcp.off': undefined
   'project.mcp.onAll': undefined
+  'project.mcp.remove': undefined
+  'project.mcp.removeLabel': { name: string | number; project: string | number }
   'project.mcp.target': undefined
   'project.memory.autoTip': { provider: string | number }
   'project.memory.create': undefined

@@ -1,8 +1,8 @@
-// The Hive Assistant's MCP servers (HI-1472): it works like a project. A workspace server is on for it only when it is
-// on in the workspace and the Assistant has it on (its own choice, workspace.json's mcp.assistant, off until switched
-// on); a project's choices never reach it, nor its a project. Turning one on shows what it runs and needs the server on
-// in the workspace; turning the workspace off keeps the choice. The old Advanced switch (every workspace server for it)
-// moves once per workspace, before the Assistant can start: a new workspace gets none. Each case has workspaces of its own.
+// The Hive Assistant's MCP servers (HI-1472, HI-2059): it works like a project. A workspace server runs for it only when
+// added for it (workspace.json's mcp.assistant, none until added); a project's never reach it, nor its a project. Adding
+// one shows what it runs. Before its list is converted to mean added, #1093's meaning holds (on in the workspace too).
+// The old Advanced switch (every workspace server for it) moves once per workspace, before the Assistant can start: a
+// new workspace gets none. Each case has workspaces of its own.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -176,15 +176,15 @@ describe("the Assistant's MCP servers move from the old Advanced switch (HI-1472
   })
 })
 
-describe("the Assistant's own choices (HI-1472)", () => {
-  /** Turns a server on for the Assistant as Settings → Assistant does: shown first. */
-  const turnOn = async (w: Service, name: string): Promise<void> =>
+describe("the Assistant's added servers (HI-1472, HI-2059)", () => {
+  /** Adds a server for the Assistant as its view's Add server picker does: shown first. */
+  const addFor = async (w: Service, name: string): Promise<void> =>
     inWorkspace(w, async () => {
-      const m = (await mcp.listMcp()).find((x) => x.name === name)!
-      await mcp.setMcpAssistant(name, true, { def: m.def, revision: m.revision })
+      const m = (await mcp.listMcp(true)).find((x) => x.name === name)!
+      await mcp.addMcpTo('assistant', name, { def: m.def, revision: m.revision })
     })
 
-  it("gets exactly its servers that are on in the workspace, never a project's, nor a project its", async () => {
+  it("gets exactly the servers added for it, never a project's, nor a project its", async () => {
     legacySwitch(undefined)
     const { ws, proj } = oldWorkspace()
     const w = await opened(ws)
@@ -192,32 +192,39 @@ describe("the Assistant's own choices (HI-1472)", () => {
       const builder = () => gets(proj, { id: 'a1', name: 'Builder', provider: 'claude-code' })
       expect(await assistantGets(w)).toEqual([])
       const before = sessions.signature(await sessions.effective(w.assistantHome, ASSISTANT as never))
-      await turnOn(w, 'notes')
-      expect(await assistantGets(w)).toEqual(['notes'])
+      await addFor(w, 'notes')
+      // idle, off in the workspace before: no switch now, so it is simply added.
+      await addFor(w, 'idle')
+      expect(await assistantGets(w)).toEqual(['idle', 'notes'])
       expect(await builder()).toEqual(['sandbox'])
       expect((await w.projectConfig(proj)).mcp.enabled).toEqual(['sandbox'])
       // Its launch changes, so a running Assistant is told to restart.
       expect(sessions.signature(await sessions.effective(w.assistantHome, ASSISTANT as never))).not.toBe(before)
       // listMcp and the window say so.
-      const listed = await inWorkspace(w, () => mcp.listMcp())
-      expect(listed.map((m) => [m.name, m.assistant])).toEqual([['idle', false], ['notes', true], ['sandbox', false]])
+      const listed = await inWorkspace(w, () => mcp.listMcp(true))
+      expect(listed.map((m) => [m.name, m.assistant, m.projects.length])).toEqual([
+        ['idle', true, 0],
+        ['notes', true, 0],
+        ['sandbox', false, 1]
+      ])
+      await inWorkspace(w, () => mcp.removeMcpFrom('assistant', 'idle'))
+      expect(await assistantGets(w)).toEqual(['notes'])
     } finally {
       await disposeWorkspaceService(w)
     }
   })
 
-  it('is refused for a server off in the workspace, or without the definition shown, and changes nothing then', async () => {
+  it('is refused without the definition shown, or one changed since, and changes nothing then', async () => {
     legacySwitch(undefined)
     const { ws } = oldWorkspace()
     const w = await opened(ws)
     try {
-      await expect(turnOn(w, 'idle')).rejects.toThrow('idle is off in the workspace')
-      await expect(inWorkspace(w, () => mcp.setMcpAssistant('notes', true))).rejects.toThrow('has changed since it was shown to you')
-      const shown = (await inWorkspace(w, () => mcp.listMcp())).find((x) => x.name === 'notes')!
+      await expect(inWorkspace(w, () => mcp.addMcpTo('assistant', 'notes', { def: null }))).rejects.toThrow('has changed since it was shown to you')
+      const shown = (await inWorkspace(w, () => mcp.listMcp(true))).find((x) => x.name === 'notes')!
       // Replaced meanwhile: refused.
       writeFileSync(join(ws, '.hive', 'mcp', 'notes.json'), JSON.stringify({ command: 'node', args: ['other.js'] }))
-      await expect(inWorkspace(w, () => mcp.setMcpAssistant('notes', true, { def: shown.def, revision: shown.revision }))).rejects.toThrow('has changed since it was shown to you')
-      await expect(inWorkspace(w, () => mcp.setMcpAssistant('missing', true))).rejects.toThrow('no MCP server named missing')
+      await expect(inWorkspace(w, () => mcp.addMcpTo('assistant', 'notes', { def: shown.def, revision: shown.revision }))).rejects.toThrow('has changed since it was shown to you')
+      await expect(inWorkspace(w, () => mcp.addMcpTo('assistant', 'missing', { def: null }))).rejects.toThrow('no MCP server named missing')
       expect(saved(ws)).toEqual([])
       expect(await assistantGets(w)).toEqual([])
     } finally {
@@ -225,41 +232,38 @@ describe("the Assistant's own choices (HI-1472)", () => {
     }
   })
 
-  it("keeps its choice while the workspace has the server off, and gets it again when it's back on", async () => {
+  it("before its conversion it keeps #1093's meaning, and a change converts it without starting one the workspace had off", async () => {
     legacySwitch(undefined)
     const { ws } = oldWorkspace()
     const w = await opened(ws)
     try {
-      await turnOn(w, 'notes')
-      await inWorkspace(w, () => mcp.setMcpGlobal('notes', false))
-      expect(await assistantGets(w)).toEqual([])
-      expect(saved(ws)).toEqual(['notes'])
-      const shown = (await inWorkspace(w, () => mcp.listMcp())).find((x) => x.name === 'notes')!
-      await inWorkspace(w, () => mcp.setMcpGlobal('notes', true, { def: shown.def, revision: shown.revision }))
+      // As a conversion cut short leaves it: idle remembered while the workspace had it off.
+      w.config.mcp.assistant = ['idle', 'notes']
+      delete w.config.mcp.assistantModel
       expect(await assistantGets(w)).toEqual(['notes'])
-      // Turned off for it while the workspace has it off: allowed.
-      await inWorkspace(w, () => mcp.setMcpGlobal('notes', false))
-      await inWorkspace(w, () => mcp.setMcpAssistant('notes', false))
-      expect(saved(ws)).toEqual([])
+      expect((await inWorkspace(w, () => mcp.listMcp(true))).filter((m) => m.assistant).map((m) => m.name)).toEqual(['notes'])
+      await inWorkspace(w, () => mcp.removeMcpFrom('assistant', 'sandbox'))
+      expect(json(join(ws, '.hive', 'workspace.json')).mcp).toMatchObject({ assistant: ['notes'], assistantModel: 3 })
+      expect(await assistantGets(w)).toEqual(['notes'])
     } finally {
       await disposeWorkspaceService(w)
     }
   })
 
-  it("is set with the workspace's switch from its enable dialog, and lost with a deleted server, as a project's is", async () => {
+  it("is set with Add to… in the MCP view, and lost with a deleted server, as a project's is", async () => {
     legacySwitch(undefined)
     const { ws, proj } = oldWorkspace()
     const w = await opened(ws)
     try {
-      const idle = (await inWorkspace(w, () => mcp.listMcp())).find((x) => x.name === 'idle')!
-      await inWorkspace(w, () => mcp.setMcpGlobal('idle', true, { def: idle.def, revision: idle.revision }, {}, true))
+      const idle = (await inWorkspace(w, () => mcp.listMcp(true))).find((x) => x.name === 'idle')!
+      expect(await inWorkspace(w, () => mcp.setMcpPlaces('idle', { def: idle.def, revision: idle.revision }, {}, true))).toEqual({ added: ['assistant'], removed: [], failed: [] })
       expect(await assistantGets(w)).toEqual(['idle'])
       expect((await w.projectConfig(proj)).mcp.enabled).toEqual(['sandbox'])
       await inWorkspace(w, () => mcp.deleteMcp('idle'))
       expect(saved(ws)).toEqual([])
-      // Added again under the name: off for it, as for every project.
+      // Added again under the name: added nowhere, as for every project.
       writeFileSync(join(ws, '.hive', 'mcp', 'idle.json'), JSON.stringify({ command: 'node', args: ['idle.js'] }))
-      expect((await inWorkspace(w, () => mcp.listMcp())).find((x) => x.name === 'idle')?.assistant).toBe(false)
+      expect((await inWorkspace(w, () => mcp.listMcp(true))).find((x) => x.name === 'idle')?.assistant).toBe(false)
     } finally {
       await disposeWorkspaceService(w)
     }
@@ -272,8 +276,8 @@ describe("the Assistant's own choices (HI-1472)", () => {
     const wa = await opened(a.ws)
     const wb = await opened(b.ws)
     try {
-      await turnOn(wa, 'notes')
-      await turnOn(wb, 'sandbox')
+      await addFor(wa, 'notes')
+      await addFor(wb, 'sandbox')
       expect([await assistantGets(wa), await assistantGets(wb)]).toEqual([['notes'], ['sandbox']])
     } finally {
       await disposeWorkspaceService(wa)

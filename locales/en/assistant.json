@@ -1151,13 +1151,17 @@
     "defaultMessage": "Mark as Working On",
     "description": "A project's right-click menu: makes it active."
   },
+  "assistant.sidebar.mcpNoMatch": {
+    "defaultMessage": "No server matches.",
+    "description": "The MCP view (HI-2059) when no server matches its search and filter."
+  },
   "assistant.sidebar.mcpServers": {
     "defaultMessage": "MCP Servers",
     "description": "The heading of the MCP sidebar: the workspace's MCP servers."
   },
-  "assistant.sidebar.mcpTip": {
-    "defaultMessage": "MCP servers deployed to the workspace (.hive/mcp) are available to every project and run in a project only when on here (its switch, which asks for the projects) and on in that project's MCP tab. Changes apply to new sessions.",
-    "description": "Tooltip on MCP Servers. Keep .hive/mcp as it is."
+  "assistant.sidebar.mcpTipAdded": {
+    "defaultMessage": "MCP servers deployed to the workspace (.hive/mcp) are available to every project and the Hive Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.",
+    "description": "Tooltip on MCP Servers (HI-2059). Keep .hive/mcp as it is; \"MCP tab\" and \"Add to…\" as Hive shows them."
   },
   "assistant.sidebar.needYou": {
     "defaultMessage": "{count, plural, one {# agent needs you} other {# agents need you}}",
@@ -2919,6 +2923,10 @@
     "defaultMessage": "Undoing…",
     "description": "The Undo button of the question while the changes are being undone."
   },
+  "assistant.view.addMcp": {
+    "defaultMessage": "Add Server…",
+    "description": "The Assistant view's MCP Servers section (HI-2059): the + button that opens the picker of the workspace's servers to add."
+  },
   "assistant.view.allAttachments": {
     "defaultMessage": "All Attachments",
     "description": "The Assistant view: the row that shows the files attached to its conversations."
@@ -2947,6 +2955,14 @@
     "defaultMessage": "What the Assistant keeps in its journal (decisions, plans, what happened and why) and Hive's own facts. Search it, correct it, or forget what you'd rather it didn't keep.",
     "description": "The Assistant view: the info tip of its Journal section."
   },
+  "assistant.view.mcp": {
+    "defaultMessage": "MCP Servers",
+    "description": "The Assistant view (HI-2059): the section of the workspace's MCP servers added for the Assistant. MCP is a protocol's name: keep it."
+  },
+  "assistant.view.mcpTip": {
+    "defaultMessage": "The workspace's MCP servers the Assistant gets, as a project's MCP tab has them: add one with +, Remove takes it off the Assistant only. Applies from its next session.",
+    "description": "The Assistant view: the info tip of its MCP Servers section (HI-2059). \"MCP tab\" as Hive names it; + is the add button."
+  },
   "assistant.view.modes": {
     "defaultMessage": "Modes",
     "description": "The Assistant view: the section of the Assistant's modes (how it works: Advisor, Builder…)."
@@ -2954,6 +2970,10 @@
   "assistant.view.newMode": {
     "defaultMessage": "New Mode…",
     "description": "The Assistant view, Modes: a button that creates a mode."
+  },
+  "assistant.view.noMcp": {
+    "defaultMessage": "No servers added.",
+    "description": "The Assistant view's MCP Servers section (HI-2059) when none is added for the Assistant."
   },
   "assistant.view.noWorkspace": {
     "defaultMessage": "Open a workspace to see its Assistant.",
@@ -2974,6 +2994,10 @@
   "assistant.view.refresh": {
     "defaultMessage": "Refresh",
     "description": "The Assistant view, Modes: a button that reads the modes again."
+  },
+  "assistant.view.removeMcp": {
+    "defaultMessage": "Remove {name} from the Assistant",
+    "description": "The Assistant view's MCP Servers section (HI-2059): the button on a server that removes it from the Assistant. {name} is the server."
   },
   "assistant.view.showPanel": {
     "defaultMessage": "Show the Assistant's panel",

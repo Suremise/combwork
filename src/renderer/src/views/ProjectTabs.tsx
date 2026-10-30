@@ -6,7 +6,7 @@ import { KeybindingsEditor } from '../components/Keybindings'
 import type { CompactionEvent, GitDiff, GitStatus, McpServerInfo, MemorySource, PlanLimit, PlanUsage, ProjectConfig, ProjectInfo, ProviderId, SessionListItem, SessionUsage, SkillInfo, UnusedWorktree } from '@shared/types'
 import { unpricedModel, unpricedText, usesOwnPrices } from '@shared/prices'
 import { formatDateTime, formatDayLabel } from '@shared/dates'
-import { agentChoosesMcp, agentGetsMcp, agentMcpText, serverOnIn } from '@shared/agentMcp'
+import { agentChoosesMcp, agentGetsMcp, agentMcpText, serverAddedIn } from '@shared/agentMcp'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import { UnusedHeading, UnusedWorkNotice, UnusedWorktreesLine, UnusedWorktreesSection, useUnusedWorktrees } from '../components/UnusedWorktrees'
 import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUsage, type DayTotal, type Period, type Totals } from '@shared/usageTotals'
@@ -34,7 +34,7 @@ import { LEFTOVERS_ROOT, LeftoversOption, LeftoversPage, useLeftovers } from '..
 import { useGitRead } from './GitTab'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
-import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Switch, Tooltip } from '../components/ui'
+import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
 import { ConnectionMark, useConnections } from '../components/ConnectionChoice'
 import { useConnectionsInUse } from '../connectionUsage'
 import { connectionsApply, resolveConnection } from '@shared/accounts'
@@ -256,9 +256,13 @@ const C = {
   givenAll: msg({ id: 'project.mcp.givenAll', defaultMessage: 'Given to every agent', description: "Under an MCP server in a project's MCP tab, once agents choose their own servers." }),
   givenTo: msg({ id: 'project.mcp.givenTo', defaultMessage: 'Given to {agents} only', description: 'Under an MCP server: the agents that get it, as a list.' }),
   givenNone: msg({ id: 'project.mcp.givenNone', defaultMessage: 'Given to no agent (each chose others)', description: 'Under an MCP server no agent gets.' }),
-  mcpHeading: msg({ id: 'project.mcp.heading', defaultMessage: 'Workspace MCP servers', description: "Heading in a project's MCP tab." }),
+  mcpHeading: msg({ id: 'project.mcp.headingAdded', defaultMessage: 'Added servers', description: "Heading in a project's MCP tab (HI-2059): the workspace's MCP servers added to this project." }),
+  addServer: msg({ id: 'project.mcp.addServer', defaultMessage: 'Add Server…', description: "A button in a project's MCP tab and the Hive Assistant's view (HI-2059): opens the picker of the workspace's MCP servers to add." }),
+  remove: msg({ id: 'project.mcp.remove', defaultMessage: 'Remove', description: "A button on an MCP server added to a project or the Hive Assistant (HI-2059): it no longer runs there (it stays in the workspace)." }),
+  removeLabel: msg({ id: 'project.mcp.removeLabel', defaultMessage: 'Remove {name} from {project}', description: "Accessible name of Remove on an MCP server in a project's MCP tab (HI-2059). {name} is the server, {project} the project." }),
+  noneAdded: msg({ id: 'project.mcp.noneAdded', defaultMessage: "No servers added. Add one to give this project's agents its tools.", description: "A project's MCP tab (HI-2059) when no MCP server is added to it." }),
   mcpTarget: msg({ id: 'project.mcp.target', defaultMessage: "the workspace's MCP servers", description: 'What could not be read in the MCP tab: shown in "Could not load {what}: {error}" and "Could not refresh {what}; last updated …".' }),
-  noServers: msg({ id: 'project.mcp.none', defaultMessage: 'No MCP servers in this workspace.', description: "A project's MCP tab when the workspace has none." }),
+  noServers: msg({ id: 'project.mcp.noneInWorkspace', defaultMessage: 'The workspace has no MCP servers yet.', description: "A project's MCP tab (HI-2059) when the workspace has no MCP servers to add." }),
   manage: msg({ id: 'project.mcp.manage', defaultMessage: 'Manage MCP servers', description: 'Link: opens the workspace\'s MCP view.' }),
   invalid: msg({ id: 'project.mcp.invalid', defaultMessage: 'invalid', description: "Badge on an MCP server whose file can't be read." }),
   definedByProject: msg({ id: 'project.mcp.definedByProject', defaultMessage: 'Defined by the project (disabled)', description: "Heading in a project's MCP tab: servers in the project's own agent config." }),
@@ -1598,6 +1602,8 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
   const load = useCallback(() => loadScoped(wsPath, () => call('mcp:list')), [wsPath, loadScoped])
   useEffect(load, [load, version])
   const hiveOn = !!(settings?.agentApi.enabled && settings.agentApi.provideHiveMcp && api?.running)
+  // Only the servers added here (HI-2059): a broken definition still named in its list stays, to be removed.
+  const added = (servers ?? []).filter((m) => serverAddedIn({ ...m, def: m.def ?? {} }, project.path))
   // Which agents get a server, once any agent has a choice of its own (#537, Agent Settings → MCP servers).
   const choosing = project.agents.some((a) => agentChoosesMcp(a))
   const givenTo = (name: string): string | null => {
@@ -1608,8 +1614,14 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
   return (
     <div className="scroll-page">
       <div className="page-narrow">
-        <h2 className="section">{tr(C.mcpHeading)}</h2>
-        <p className="hint">{tr(msg({ id: 'mcp.tab.hint', defaultMessage: "Every MCP server in the workspace is available here: turn on the ones this project's agents need. A server runs here only while it is on in the workspace too (its switch in the MCP view).", description: "Under Workspace MCP servers in a project's MCP tab." }))}</p>
+        <div className="flex mcp-section-head">
+          <h2 className="section">{tr(C.mcpHeading)}</h2>
+          <span style={{ flex: 1 }} />
+          <button className="btn small" data-action="mcp-add" disabled={!servers} onClick={() => void actions.addMcpServer(project)}>
+            <Icon name="add" /> {tr(C.addServer)}
+          </button>
+        </div>
+        <p className="hint">{tr(msg({ id: 'mcp.tab.hintAdded', defaultMessage: "The workspace's MCP servers this project's agents get. Add one from the workspace's servers; Remove takes it off this project only.", description: "Under Added servers in a project's MCP tab (HI-2059)." }))}</p>
         <ChangesApplyNote project={project} />
         {error && servers && <StaleNote what={tr(C.mcpTarget)} error={error} at={loaded.at} onRetry={load} />}
         {!servers ? (
@@ -1624,25 +1636,27 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
           <p className="hint">
             {tr(C.noServers)} <a onClick={() => setActivity('mcp')}>{tr(C.manage)}</a>
           </p>
+        ) : !added.length ? (
+          <p className="hint" data-mcp-none-added="">
+            {tr(C.noneAdded)}
+          </p>
         ) : (
           <div className="toggle-list">
-            {servers.map((m) => {
-              const on = serverOnIn(m, project.config.mcp)
-              // The project's own choice (#1093), kept while the workspace has the server off.
-              const chosen = project.config.mcp.enabled.includes(m.name)
-              const gated = !m.globallyEnabled && !m.error
+            {added.map((m) => {
               const given = givenTo(m.name)
               return (
-                <div key={m.name} className={cx('toggle-item', !on && 'disabled')} data-mcp={m.name} data-gated={gated || undefined}>
+                <div key={m.name} className="toggle-item" data-mcp={m.name}>
                   <Icon name={m.def?.url ? 'globe' : 'plug'} />
                   <div className="ti-text">
                     <div className="ti-name">
-                      {m.name} <span className="badge">{tr(msg({ id: 'mcp.tab.workspaceBadge', defaultMessage: 'workspace', description: "A badge on a server in a project's MCP tab: it is one of the workspace's servers." }))}</span> {gated && <span className="badge mcp-gated">{tr(actions.MCP_OFF_IN_WORKSPACE)}</span>} {m.error && <span className="badge error">{tr(C.invalid)}</span>}
+                      {m.name} {m.error && <span className="badge error">{tr(C.invalid)}</span>}
                     </div>
-                    <div className="ti-desc">{m.error ?? m.def?.description ?? m.def?.command}</div>
-                    {on && given && <div className="ti-desc">{given}</div>}
+                    <div className="ti-desc">{actions.mcpErrorText(m) ?? m.def?.description ?? m.def?.command}</div>
+                    {given && <div className="ti-desc">{given}</div>}
                   </div>
-                  <Switch checked={chosen} disabled={!!m.error} label={tr(msg({ id: 'mcp.tab.switch', defaultMessage: '{name} on in {project}', description: "A server's switch in a project's MCP tab, for screen readers. {name} is the server, {project} the project." }), { name: m.name, project: project.name })} onChange={(v) => void actions.setMcpServerInProject(project, m, v)} />
+                  <button className="btn small subtle" data-action="mcp-remove" aria-label={tr(C.removeLabel, { name: m.name, project: project.name })} onClick={() => void actions.removeMcpServer(project, m)}>
+                    {tr(C.remove)}
+                  </button>
                 </div>
               )
             })}
@@ -1651,7 +1665,7 @@ export function ProjectMcpTab({ project }: { project: ProjectInfo }) {
         {project.unmanagedMcp.length > 0 && (
           <>
             <h2 className="section">{tr(C.definedByProject)}</h2>
-            <p className="hint">{tr(msg({ id: 'mcp.tab.projectDefined', defaultMessage: "These servers are in the project's own agent config (such as .mcp.json). Hive starts sessions with only workspace servers, so they stay disabled until copied to the workspace, which turns them on here.", description: "Under Defined by the project in a project's MCP tab. Keep .mcp.json as it is." }))}</p>
+            <p className="hint">{tr(msg({ id: 'mcp.tab.projectDefinedAdded', defaultMessage: "These servers are in the project's own agent config (such as .mcp.json). Hive starts sessions with only workspace servers, so they stay disabled until copied to the workspace, which adds them here.", description: "Under Defined by the project in a project's MCP tab (HI-2059: copying one to the workspace adds it to this project). Keep .mcp.json as it is." }))}</p>
             <div className="toggle-list">
               {project.unmanagedMcp.map((n) => (
                 <div key={n} className="toggle-item disabled">

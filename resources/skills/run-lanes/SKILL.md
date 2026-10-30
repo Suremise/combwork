@@ -11,7 +11,7 @@ A team works through cards in **lanes**: each a builder taking cards in order in
 
 ## Watch to the end
 
-Nothing wakes you but the user and a watch you started, so never leave lanes on "they'll tell you".
+Nothing wakes you but the user and a watch you started, so never leave lanes on "they'll tell you". The loop runs itself; you handle what it can't: a question for the user, a finding that keeps coming back, a lane that stops.
 
 - **One lane watch covers the whole team.** `hive_wait_for_tasks` with `lanes: ["all"]`, `wake: true`, `limitMinutes: 360`, and no `cards` of the lanes: it follows every running lane, lanes started later and cards added to a lane too, and wakes you only for what needs you: a failed review, a card blocked or stalled, a lane whose cards have all passed (its merge is due) or whose merge then stalls, a lane ended or abandoned, an agent starting to wait for the user, and always a question for the user on a lane's card (`paused-user`). A lane's cards added as `cards` would wake you on every move of them. Add `events` (`passed`, `moved`, `paused-merge` for a lane waiting on a merge) only to follow more. You have one watch at a time: a card you follow outside the lanes (a release, a one-off fix) goes in the same watch as `cards` (`lanes: ["all"], cards: [720]`), which the next lane watch keeps until you pass `cards` again (`[]` for none).
 - **Check the reply says it is waiting** before you end your turn. If it doesn't, start it again once; if it still doesn't, tell the user.
@@ -24,5 +24,5 @@ Read one only when it applies. Each is in this skill's own folder, beside this S
 
 - [starting.md](starting.md): planning lanes by files and briefing them, before you start one.
 - [reviewers.md](reviewers.md): choosing a lane's reviewer, or the project reviews from a pool.
-- [changing-lanes.md](changing-lanes.md): what Hive does (so you don't ask), whose job is what, or a running lane to change.
+- [changing-lanes.md](changing-lanes.md): what Hive does (so you don't ask), a finding that keeps coming back, or a running lane to change.
 - [verify.md](verify.md): a lane says it is done, or an agent reports a result.

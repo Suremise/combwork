@@ -842,7 +842,7 @@ describe('a follow-up submitted in Review (HI-1832): the revision under review m
     return { ...c, first }
   }
 
-  it("its builder submits it with followUp: a new submission at the head, pinned, in the same round, still in Review and its builder's; the reviewer woken to start again", async () => {
+  it("its builder submits it with followUp: a new submission at the head, pinned, in the same round, still in Review and its builder's; its reviewer kept for it (HI-2046)", async () => {
     const e = pair()
     const { card, folder, first } = await inReview(e)
     const now = head(folder)
@@ -858,7 +858,10 @@ describe('a follow-up submitted in Review (HI-1832): the revision under review m
     // No move written, and its pin is the card's second.
     expect(e.store.facts(card.id).filter((f) => f.kind === 'Moved').map((f) => (f.data as FactData['Moved']).to)).toEqual(['active', 'review'])
     expect(sh(e.project, 'rev-parse', `refs/hive/cards/${card.key.toLowerCase()}/2`).trim()).toBe(now)
-    expect(e.wakes).toEqual([expect.objectContaining({ agent: 'reviewers', why: expect.stringContaining(`follow-up submitted for review at ${now.slice(0, 7)} (submission ${s.latest!.id}). Start your review again (hive_start_review)`) })])
+    // No lane holds it (HI-2046, HR1's round 1): R1 keeps it, carried onto the follow-up in the submit's write, and the
+    // reviewer pool's pass tells it to start again (reviewerPool.test.ts), so nothing is woken here.
+    expect(e.wakes).toEqual([])
+    expect(e.store.facts(card.id).filter((f) => f.kind === 'ReviewerAssigned').map((f) => f.data)).toEqual([{ reviewer: 'R1', submission: s.latest!.id }])
     // The review of the earlier submission doesn't carry: a verdict on it, or one not started on the follow-up, is refused.
     // (A pass on the earlier one is refused first because the line moved on from it.)
     refusedBy(await e.wf.verdict(card.key, R1, { submission: first.id, pass: true, comment: 'good' }), 'review.headMoved')

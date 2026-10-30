@@ -97,7 +97,7 @@ import { FinishBatcher, finishedApiTitle, finishedNotice, noticeRoute, type Focu
 import type { SlotNote } from './mergeSlots'
 import { commentOnDoingCards, recordCards } from './cardSessions'
 import { listMcp, toLaunchDef } from './mcp'
-import { agentGetsMcp, serverOnIn } from '../shared/agentMcp'
+import { agentGetsMcp, assistantMcpAdded, serverOnIn } from '../shared/agentMcp'
 import { launchEnded, leftoversOf, noteUntracked, settleLeftovers, STOPPED_BEFORE_START, trackingProblemText, trackingReady, trackLaunch, type TrackResult } from './agentProcesses'
 import type { GateWord } from './launchGate'
 import { leftoversSummary, processCount } from '../shared/agentProcesses'
@@ -1549,11 +1549,12 @@ class SessionManager {
     // The workspace's servers on in the project (#713); the agent's own choice narrows them (#537): all of them unless
     // it names some. Never one named as Hive's own (a hand-made .hive/mcp/hive.json): the CLIs pre-approve that one's tools.
     const forAgent = agent ?? projectAgents(pc)[0]
-    // The Assistant gets the workspace's servers it has on (HI-1472, as a project's own choice, Settings → Assistant),
-    // each while on in the workspace too; never a project's.
+    // The Assistant gets the workspace's servers added for it (HI-1472, HI-2059: its view's MCP Servers, as a project's
+    // MCP tab); never a project's.
     const mcpServers: Record<string, McpServerDef> = {}
     for (const m of await reads.servers()) {
-      const on = assistant ? serverOnIn(m, { enabled: m.assistant ? [m.name] : [] }) : serverOnIn(m, pc.mcp)
+      // Added there (HI-2059), as mcpAdded reads it: a list not yet converted keeps its old meaning.
+      const on = assistant ? !!m.def && assistantMcpAdded(workspace.config.mcp).includes(m.name) : serverOnIn(m, pc.mcp, workspace.config.mcp.enabled)
       if (on && m.def && agentGetsMcp(forAgent, m.name) && m.name.toLowerCase() !== 'hive') mcpServers[m.name] = toLaunchDef(m.def, workspace.mcpDir)
     }
     const hive = this.hiveMcp(projectPath, agent?.id)

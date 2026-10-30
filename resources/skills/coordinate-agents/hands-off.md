@@ -13,6 +13,6 @@ To stop a busy agent, `hive_stop_agent` asks the user. Give your reason.
 ## What Hive or the card decides
 
 Don't ask the user about what Hive does in the project's configuration or what the card's facts decide:
-- **How a card finishes** follows its kind and the project's workflow options. A no-code card has nothing to merge: it finishes through its review (and the user's approval, where the options ask for it), or as it is submitted where the project has no review. A code card, after its review if any, goes on as Who merges says: Hive's merge queue merges it, its builder merges it and reports the merge, it is done once committed in the project folder, or (Not checked) its builder reports it done; where the options ask for the user's OK before merging, Hive asks them first. Hive moves it on, and its reply to each step (and a refusal) says what comes next.
+- **How a card finishes** isn't the user's to answer: the card's `merge` and Hive's reply to each step say what comes next.
 - **Ask the user only for what Hive leaves to them**: a decision about the work, a block or a question waiting on them, a conflict between lanes, and publishing (a push, a release).
 - **With workflow rules off** (Settings → Advanced), Hive enforces none of the project's rules: cards move as they are put, and agents' skills carry the steps.
