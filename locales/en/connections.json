@@ -19,6 +19,10 @@
     "defaultMessage": "No account is on in this workspace. Add one in Settings → Accounts & Connections.",
     "description": "Under the choice of connection when no account is on in this workspace (HI-2108). Settings → Accounts & Connections names a section."
   },
+  "connections.choice.notInstalled": {
+    "defaultMessage": "{cli} isn't installed",
+    "description": "Why a connection is greyed out in the choice of connection (HI-2108 round 1): its coding agent CLI ({cli}: \"Codex\") isn't installed on this PC. A short clause, lower case after the name."
+  },
   "connections.choice.offHere": {
     "defaultMessage": "{name} (its account is off here: its CLI's first usable connection runs it)",
     "description": "A choice of connection that is chosen but on an account turned off in this workspace ({name}: the connection's name) (HI-2108): the agent runs on its CLI's first usable connection instead."

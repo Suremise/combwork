@@ -15,7 +15,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { connectionRef, connectionsFor, connectionShown, resolveConnection, type ConnectionsView } from '../src/shared/accounts'
-import { connectionCli, connectionOf, firstUsableConnection, offeredConnections } from '../src/shared/connectionLabel'
+import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections } from '../src/shared/connectionLabel'
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -38,7 +38,8 @@ const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWork
 const { runSwitch } = await import('../src/main/connectionSwitch')
 const { authScope, sessions } = await import('../src/main/sessions')
 const moves = await import('../src/main/connectionMoves')
-const { connectionValuesArg, refuseOldFields } = await import('../src/main/servers')
+const { atTheChange, connectionValuesArg, refuseOldFields } = await import('../src/main/servers')
+const control = await import('../src/main/assistantControl')
 const { assistantOwn, cliDefaults, legacyLaunchSettings: agentLaunchSettings, moveProjectOverrides } = await import('../src/shared/connectionDefaults')
 const { addAgent, updateAgent } = await import('../src/main/projectAgents')
 const templates = await import('../src/main/templates')
@@ -135,6 +136,38 @@ describe("the Agent API's connection arguments (HI-2108)", () => {
     expect(connectionValuesArg({})).toEqual({})
     expect(() => connectionValuesArg({ name: '  ' })).toThrow(/A connection needs a name/)
     expect(() => connectionValuesArg({ context200k: 'maybe' })).toThrow(/context200k is "on"/)
+  })
+})
+
+describe("hive_connection's change, checked at the moment of it (HI-2108 round 1)", () => {
+  /** The Assistant's current launch token for the workspace, from its file (a new one each launch). */
+  const tokenNow = (): string => readFileSync(control.assistantTokenFile(wsPath), 'utf8').match(/"token":\s*"([0-9a-f]+)"/)![1]
+  const act = { kind: 'add-connection' as const }
+  it("refuses once the Assistant's session that asked ended or restarted, or Change settings went off, nothing changed; else changes", async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const was = config.settings.assistant.changeSettings
+    config.settings.assistant.changeSettings = true
+    try {
+      await control.newAssistantToken(wsPath)
+      // Admitted for its session, which then restarts (a new token) before the change.
+      const stale = control.admit(wsPath, tokenNow(), 'look', 'make a connection', act)
+      await control.newAssistantToken(wsPath)
+      const before = structuredClone(accounts.allConnections())
+      let made = false
+      expect(() => atTheChange(stale, () => ((made = true), accounts.addConnection(a.id, { name: 'Stale' })))).toThrow(/session that asked for this ended/)
+      expect([made, accounts.allConnections()]).toEqual([false, before])
+      // Change settings turned off meanwhile: refused the same, before the session is even looked at.
+      const current = control.admit(wsPath, tokenNow(), 'look', 'make a connection', act)
+      config.settings.assistant.changeSettings = false
+      expect(() => atTheChange(current, () => accounts.addConnection(a.id, { name: 'Off' }))).toThrow(/Change settings is off/)
+      expect(accounts.allConnections()).toEqual(before)
+      // Its session current and the switch on: changed.
+      config.settings.assistant.changeSettings = true
+      const c = atTheChange(current, () => accounts.addConnection(a.id, { name: 'Made' }))
+      expect(accounts.getConnection(c.id)).toMatchObject({ account: a.id, name: 'Made' })
+    } finally {
+      config.settings.assistant.changeSettings = was
+    }
   })
 })
 
@@ -717,7 +750,15 @@ describe('what an agent row names (connectionOf, HI-1769; HI-2108: connections)'
     const s = { providers: { 'claude-code': { enabled: true }, codex: { enabled: true } } } as never
     expect(offeredConnections(v, s).map((c) => c.id)).toEqual(['x1', 'a1', 'a2'])
     expect(offeredConnections(v, s, 'claude-code').map((c) => c.id)).toEqual(['a1', 'a2'])
-    expect(firstUsableConnection(v, s)).toBe('x1')
+    const installed = cliReadyOf({ 'claude-code': { found: true }, codex: { found: true } })
+    expect(firstUsableConnection(v, s, installed)).toBe('x1')
+    // Decision A (HI-2108 round 1): on and installed, as main's firstUsableAccount; Codex first in the order but not
+    // installed: Claude Code's first connection; still being looked for: none yet (a caller waits).
+    expect(firstReadyConnection(v, s, cliReadyOf({ 'claude-code': { found: true }, codex: { found: false } }))).toEqual({ id: 'a1', checking: false })
+    expect(firstReadyConnection(v, s, cliReadyOf({ 'claude-code': { found: true }, codex: { found: false, checking: true } }))).toEqual({ checking: true })
+    expect(firstReadyConnection(v, s, cliReadyOf({ 'claude-code': { found: true } }))).toEqual({ checking: true })
+    expect(firstReadyConnection(v, s, cliReadyOf({ 'claude-code': { found: false }, codex: { found: false } }))).toEqual({ checking: false })
+    expect(firstUsableConnection(v, s, cliReadyOf({ 'claude-code': { found: true }, codex: { found: false } }), 'codex')).toBeUndefined()
     expect(connectionCli(v, 'a2')).toBe('claude-code')
     expect(connectionCli(v, 'gone')).toBeUndefined()
   })

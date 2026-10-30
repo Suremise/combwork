@@ -3729,8 +3729,10 @@ module.exports.SCENARIOS = [
     role: 'assistant',
     control: 'agents',
     async setup(c) {
-      // Coder's connection, as the Agent API shows it: the one the fake names.
-      c.conn = (await c.api('GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.name === 'Coder')?.connection?.id ?? ''
+      // Coder's connection, as the Agent API shows it (its id and name): the one asked for, the one the fake names.
+      const coder = (await c.api('GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.name === 'Coder')?.connection
+      c.conn = coder?.id ?? ''
+      c.connName = coder?.name ?? ''
     },
     prompt: 'Add a reviewer agent called Checker to alpha, running on the same connection as Coder. Don\'t start it.',
     fake: (c) => `hive hive_connection {"action":"list"} then hive hive_add_agent {"project":"alpha","name":"Checker","workflowRole":"reviewer","connection":"${c.conn}"}`,
@@ -3739,7 +3741,7 @@ module.exports.SCENARIOS = [
       const args = adds.map(argsOf)
       return [
         ['added it with hive_add_agent, which worked', adds.length >= 1, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
-        ['named its connection', args.some((a) => typeof a.connection === 'string' && a.connection.trim() !== ''), JSON.stringify(args)],
+        ["named Coder's connection (its id, or its name)", !!c.conn && args.some((a) => typeof a.connection === 'string' && (a.connection.trim() === c.conn || (!!c.connName && a.connection.trim().toLowerCase() === c.connName.toLowerCase()))), `${JSON.stringify(args)}; Coder's: ${c.conn} (${c.connName})`],
         ['named no provider, model, effort, mode or context (its connection holds them)', !o.hiveCalls.some((x) => /^hive_(add|update)_agent$/.test(x.tool) && /"(provider|model|effort|mode|context200k)"\s*:/.test(x.args ?? '')), o.hiveCalls.filter((x) => x.tool.endsWith('_agent')).map((x) => x.args).join(' | ')],
         ["started nothing", called(o, 'hive_start_agent').length === 0 && !args.some((a) => a.start || a.prompt)],
         ["made or changed no connection", ran(o, 'hive_connection').every((x) => /"action"\s*:\s*"list"/.test(x.args ?? '')), JSON.stringify(c.conn)]

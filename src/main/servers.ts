@@ -1254,15 +1254,28 @@ export function connectionValuesArg(body: any): ConnectionPatch {
  * Change settings on, asked again at the change, and listed in its panel. Accounts (sign-ins, servers, keys) stay the
  * user's: a connection goes only on an account that exists.
  */
-async function connectionChange<T>(act: ActivityTarget, what: string, fn: () => Promise<{ done: string; act?: Partial<ActivityTarget>; result: T }>): Promise<T> {
-  const allowed = (): void => {
-    if (config.settings.assistant?.changeSettings !== true) throw new HttpError(403, "The user's settings don't let you change connections (Settings → Assistant → Control → Change settings is off). Tell the user how to change it in Settings → Accounts & Connections, or that turning Change settings on lets you.")
-  }
-  allowed()
-  return assistantChange('look', what, act, async () => {
-    allowed()
-    return fn()
+async function connectionChange<T>(act: ActivityTarget, what: string, fn: (atTheChange: <R>(change: () => R) => R) => Promise<{ done: string; act?: Partial<ActivityTarget>; result: T }>): Promise<T> {
+  connectionsAllowed()
+  return assistantChange('look', what, act, async (guard) => {
+    connectionsAllowed()
+    return fn((change) => atTheChange(guard, change))
   })
+}
+
+/** Change settings on (HI-2108): else a connection change is refused, saying where the user changes it. */
+function connectionsAllowed(): void {
+  if (config.settings.assistant?.changeSettings !== true) throw new HttpError(403, "The user's settings don't let you change connections (Settings → Assistant → Control → Change settings is off). Tell the user how to change it in Settings → Accounts & Connections, or that turning Change settings on lets you.")
+}
+
+/**
+ * A connection's change, its checks made at the moment of it (HI-2108 round 1), after every await: Change settings still
+ * on, and the Assistant's control and its session still current (`guard`, assistantChange's: one stopped or restarted
+ * since it asked refuses it). Only then the change, which is synchronous, so nothing comes between.
+ */
+export function atTheChange<R>(guard: () => void, change: () => R): R {
+  connectionsAllowed()
+  guard()
+  return change()
 }
 
 /** A connection change, a refusal it makes (decision E, a mode the CLI lacks, an account gone) answered as the caller's to fix. */
@@ -1276,7 +1289,7 @@ async function connectionsCall<T>(fn: () => T | Promise<T>): Promise<T> {
 }
 
 route('POST', '/v1/connections', async ({ body }) =>
-  connectionChange({ kind: 'add-connection' }, 'make a connection', async () => {
+  connectionChange({ kind: 'add-connection' }, 'make a connection', async (checked) => {
     const ref = String(body?.account ?? '').trim()
     if (!ref) throw new HttpError(400, "Name the account it goes on (account: its id or name, from hive_connection list). Adding an account is the user's, in Settings → Accounts & Connections.")
     const accounts = allAccounts()
@@ -1285,19 +1298,19 @@ route('POST', '/v1/connections', async ({ body }) =>
     if (!account) throw byName.length > 1 ? new HttpError(409, `Several accounts are named "${ref}": use its id (${byName.map((a) => a.id).join(', ')}).`) : new HttpError(404, `No account named "${ref}": hive_connection list names them. Adding one is the user's, in Settings → Accounts & Connections.`)
     const v = connectionValuesArg(body)
     if (!v.name) throw new HttpError(400, 'A connection needs a name.')
-    const c = await connectionsCall(() => addConnection(account.id, { ...v, name: v.name! }))
+    const c = await checked(() => connectionsCall(() => addConnection(account.id, { ...v, name: v.name! })))
     return { done: `Made the connection ${c.name} on ${account.name}`, act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
   })
 )
 
 route('PATCH', '/v1/connections/:ref', async ({ params, body }) =>
-  connectionChange({ kind: 'update-connection' }, 'change a connection', async () => {
+  connectionChange({ kind: 'update-connection' }, 'change a connection', async (checked) => {
     const ref = decodeURIComponent(params[0] ?? '')
     const r = connectionRef(ref, allConnections(), allConnections().map((c) => c.id))
     if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, `Several connections are named "${ref}": use its id (${r.ids!.join(', ')}).`) : new HttpError(404, `No connection named "${ref}", and none has that id.`)
     const v = connectionValuesArg(body)
     if (!Object.keys(v).length) throw new HttpError(400, 'Nothing to change: give name, model, effort, mode, context200k or extraArgs.')
-    const c = await connectionsCall(() => updateConnection(r.id, v))
+    const c = await checked(() => connectionsCall(() => updateConnection(r.id, v)))
     return { done: `Changed the connection ${c.name} (agents running on it take it when restarted)`, act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
   })
 )

@@ -8,6 +8,7 @@
   "connections.choice.none": "No {cli} connection is on in this workspace. Add one in Settings → Connections.",
   "connections.choice.noneCli": "No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections.",
   "connections.choice.noneHere": "No account is on in this workspace. Add one in Settings → Accounts & Connections.",
+  "connections.choice.notInstalled": "{cli} isn't installed",
   "connections.choice.off": "{name} (off in this workspace: the default runs it)",
   "connections.choice.offHere": "{name} (its account is off here: its CLI's first usable connection runs it)",
   "connections.choice.otherCli": "{cli} connections",

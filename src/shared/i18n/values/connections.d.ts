@@ -6,6 +6,7 @@ interface HiveMessageValues {
   'connections.choice.new': undefined
   'connections.choice.noneCli': { cli: string | number }
   'connections.choice.noneHere': undefined
+  'connections.choice.notInstalled': { cli: string | number }
   'connections.choice.offHere': { name: string | number }
   'connections.choice.pick': undefined
   'connections.choice.removed': undefined

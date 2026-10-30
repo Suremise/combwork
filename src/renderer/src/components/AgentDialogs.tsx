@@ -18,7 +18,7 @@ import { projectMergeChoice } from '../mergeChoice'
 import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
 import { msg, tr, tRich } from '@shared/i18n'
 import { ProviderIcon } from './ProviderIcon'
-import { ConnectionChoice, connectionCli, firstUsableConnection, useConnections } from './ConnectionChoice'
+import { cliReadyOf, ConnectionChoice, connectionCli, firstUsableConnection, useConnections } from './ConnectionChoice'
 import { ConnectionDialog } from './ConnectionDefaults'
 import { cx } from '../util'
 import { formatSize } from '@shared/units'
@@ -182,7 +182,9 @@ export function AddAgentDialog() {
   }, [path])
 
   // The first usable connection in the order (decision A), until the user chooses one; read again as the list changes.
-  const first = firstUsableConnection(view, settings)
+  // On and installed (decision A, as main's firstUsableAccount): none chosen while detection may still change it.
+  const providers = useStore((s) => s.providers)
+  const first = firstUsableConnection(view, settings, cliReadyOf(providers))
   useEffect(() => {
     if (path && !chosen) setConnection(first ?? '')
   }, [path, chosen, first])

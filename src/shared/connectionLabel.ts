@@ -50,8 +50,36 @@ export function offeredConnections(view: ConnectionsView | null, settings: Param
   return connectionsHere(view, cli).filter((c) => isProviderEnabled(settings, cliOf(c.account) ?? ''))
 }
 
-/** The first connection a choice offers (decision A), for preselecting one; undefined when none is usable here. */
-export const firstUsableConnection = (view: ConnectionsView | null, settings: Parameters<typeof isProviderEnabled>[0], cli?: ProviderId): string | undefined => offeredConnections(view, settings, cli)[0]?.id
+/**
+ * Whether a CLI can run a new agent now, as Hive's detection says (decision A: on and installed): `yes`, installed;
+ * `no`, not found; `checking`, not known yet (detection under way).
+ */
+export type CliReady = (cli: ProviderId) => 'yes' | 'no' | 'checking'
+
+/** A CliReady from the window's providers (their detection): installed, not found, or not known yet. */
+export const cliReadyOf = (providers: Partial<Record<ProviderId, { found?: boolean; checking?: boolean }>>): CliReady => (cli) => {
+  const i = providers[cli]
+  return i?.found ? 'yes' : !i || i.checking ? 'checking' : 'no'
+}
+
+/**
+ * The connection a new agent gets (decision A, HI-2108 round 1), as main's firstUsableAccount picks it: the first offered
+ * whose CLI is installed (`ready`), skipping one whose CLI isn't. `checking` while a CLI earlier in the order isn't known
+ * yet: the answer may still change, so a caller waits (quick add) or keeps looking (a dialog's preselection).
+ */
+export function firstReadyConnection(view: ConnectionsView | null, settings: Parameters<typeof isProviderEnabled>[0], ready: CliReady, cli?: ProviderId): { id?: string; checking: boolean } {
+  if (!view) return { checking: true }
+  const cliOf = cliOfConnections(view)
+  for (const c of offeredConnections(view, settings, cli)) {
+    const r = ready(cliOf(c.account) ?? '')
+    if (r === 'checking') return { checking: true }
+    if (r === 'yes') return { id: c.id, checking: false }
+  }
+  return { checking: false }
+}
+
+/** The first connection a new agent gets (firstReadyConnection), for preselecting one; undefined while none is (yet). */
+export const firstUsableConnection = (view: ConnectionsView | null, settings: Parameters<typeof isProviderEnabled>[0], ready: CliReady, cli?: ProviderId): string | undefined => firstReadyConnection(view, settings, ready, cli).id
 
 /** Each account's CLI, by its id. */
 const cliOfConnections = (view: ConnectionsView): ((account: string) => ProviderId | undefined) => {

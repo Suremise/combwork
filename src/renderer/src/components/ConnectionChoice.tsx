@@ -6,9 +6,9 @@ import { enabledProviders, providerDescriptor, providerName } from '@shared/prov
 import { fmt, msg, tr } from '@shared/i18n'
 import { call } from '../api'
 import { set, setActivity, useStore } from '../store'
-import { connectionCli, connectionOf, firstUsableConnection, offeredConnections, orderedAccounts, type ConnectionShown } from '@shared/connectionLabel'
+import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, orderedAccounts, type ConnectionShown } from '@shared/connectionLabel'
 
-export { connectionCli, firstUsableConnection, offeredConnections }
+export { cliReadyOf, connectionCli, firstReadyConnection, firstUsableConnection, offeredConnections }
 import { Icon, Tooltip } from './ui'
 
 /**
@@ -24,6 +24,7 @@ const M = {
   off: msg({ id: 'connections.choice.offHere', defaultMessage: "{name} (its account is off here: its CLI's first usable connection runs it)", description: "A choice of connection that is chosen but on an account turned off in this workspace ({name}: the connection's name) (HI-2108): the agent runs on its CLI's first usable connection instead." }),
   gone: msg({ id: 'connections.choice.removed', defaultMessage: "A removed connection (its CLI's first usable one runs it)", description: "A choice of connection that no longer exists (HI-2108): the agent runs on its CLI's first usable connection until another is chosen." }),
   pick: msg({ id: 'connections.choice.pick', defaultMessage: 'Choose a connection', description: 'The first choice of connection when none is chosen yet (HI-2108).' }),
+  notInstalled: msg({ id: 'connections.choice.notInstalled', defaultMessage: "{cli} isn't installed", description: "Why a connection is greyed out in the choice of connection (HI-2108 round 1): its coding agent CLI ({cli}: \"Codex\") isn't installed on this PC. A short clause, lower case after the name." }),
   unavailable: msg({ id: 'connections.choice.unavailable', defaultMessage: '{name} — {why}', description: "A choice of connection that can't be chosen here (HI-2108), greyed out: its name ({name}) and why ({why}, a short clause)." }),
   newConnection: msg({ id: 'connections.choice.new', defaultMessage: 'New Connection…', description: "Button beside the choice of connection (Add Agent, HI-2108): opens the connection dialog to make another setup (model, effort, mode) on the chosen connection's account." }),
   none: msg({ id: 'connections.choice.noneHere', defaultMessage: 'No account is on in this workspace. Add one in Settings → Accounts & Connections.', description: 'Under the choice of connection when no account is on in this workspace (HI-2108). Settings → Accounts & Connections names a section.' }),
@@ -79,8 +80,16 @@ export function connectionLine(view: ConnectionsView | null, c: Connection, sett
 export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew, summary = true, label = true }: { id?: string; value: string; onChange: (id: string) => void; cli?: ProviderId; unavailable?: (c: Connection) => string | null; onNew?: (account: string) => void; summary?: boolean; label?: boolean }) {
   const view = useConnections()
   const settings = useStore((s) => s.settings)
+  const providers = useStore((s) => s.providers)
   if (!view) return null
   const offered = offeredConnections(view, settings, cli)
+  const ready = cliReadyOf(providers)
+  // Greyed out: its CLI isn't installed (decision A), or what the caller says (the one chosen stays choosable, to keep it).
+  const why = (c: Connection): string | null => {
+    const cliOfIt = connectionCli(view, c.id)
+    if (cliOfIt && ready(cliOfIt) === 'no') return tr(M.notInstalled, { cli: providerName(cliOfIt) })
+    return unavailable?.(c) ?? null
+  }
   const accounts = orderedAccounts(view).filter((a) => offered.some((c) => c.account === a.id))
   const chosen = value ? view.connectionRows?.find((c) => c.id === value) : undefined
   const chosenOffered = offered.some((c) => c.id === value)
@@ -96,10 +105,10 @@ export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew,
             {accounts.map((a) => (
               <optgroup key={a.id} label={tr(M.account, { account: a.name, cli: providerName(a.provider) })}>
                 {connectionsOn(a.id, offered).map((c) => {
-                  const why = c.id === value ? null : (unavailable?.(c) ?? null)
+                  const off = why(c)
                   return (
-                    <option key={c.id} value={c.id} disabled={!!why} data-unavailable={why ? '' : undefined}>
-                      {why ? tr(M.unavailable, { name: c.name, why }) : c.name}
+                    <option key={c.id} value={c.id} disabled={!!off && c.id !== value} data-unavailable={off ? '' : undefined}>
+                      {off ? tr(M.unavailable, { name: c.name, why: off }) : c.name}
                     </option>
                   )
                 })}

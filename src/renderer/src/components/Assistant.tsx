@@ -14,7 +14,7 @@ import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
 import { legacyOf, placeText, placeTip } from '../agentPlace'
-import { ConnectionChoice, connectionCellText, connectionCli, firstUsableConnection, NoConnectionBanner, useConnections } from './ConnectionChoice'
+import { cliReadyOf, ConnectionChoice, connectionCellText, connectionCli, firstUsableConnection, NoConnectionBanner, useConnections } from './ConnectionChoice'
 import { connectionOf } from '@shared/connectionLabel'
 import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setLoaded, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
@@ -929,7 +929,8 @@ export function AssistantSettingsDialog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openFlag])
   // None chosen yet (a new workspace's): the first usable in the order of accounts, as a new agent's (decision A).
-  const first = firstUsableConnection(view, settings)
+  const providers = useStore((s) => s.providers)
+  const first = firstUsableConnection(view, settings, cliReadyOf(providers))
   useEffect(() => {
     if (openFlag && !connection && first) setConnection(first)
   }, [openFlag, connection, first])

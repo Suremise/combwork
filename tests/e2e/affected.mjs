@@ -207,7 +207,7 @@ export const AREAS = [
   // Model, effort and context belong to the connection (HI-1770): the resolver, the move, the defaults and the notice.
   { paths: ['src/shared/connectionDefaults.ts', 'src/main/connectionMoves.ts', 'src/renderer/src/components/ConnectionDefaults.tsx', 'tests/e2e/connectiondefaults.cjs'], suites: ['connectiondefaults', 'connections', 'context'] },
   // The agent rows and templates name connections (HI-1769).
-  { paths: ['src/shared/connectionLabel.ts', 'src/renderer/src/components/TemplatePlan.tsx', 'src/renderer/src/components/TemplateLoad.tsx', 'tests/e2e/connectionrows.cjs'], suites: ['connectionrows', 'templates', 'templatesv2'] },
+  { paths: ['src/shared/connectionLabel.ts', 'src/renderer/src/components/TemplatePlan.tsx', 'src/renderer/src/components/TemplateLoad.tsx', 'tests/e2e/connectionrows.cjs'], suites: ['connectionrows', 'connectionfirst', 'templates', 'templatesv2'] },
   { paths: ['src/shared/activity.ts', 'src/renderer/src/views/ActivityTab.tsx', 'src/renderer/src/activityView.ts', 'src/main/agentProcesses.ts'], suites: ['activitytab', 'activityworkspace', 'activitywindows'] },
   { paths: ['src/renderer/src/views/WorkspaceActivity.tsx', 'src/main/activityWorkspace.ts'], suites: ['activityworkspace'] },
   // What agents' commands leave running while they run (HI-2111).
