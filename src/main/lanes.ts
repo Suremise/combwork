@@ -744,8 +744,8 @@ async function refuseGeneralist(ws: WorkspaceService, project: string, ids: read
 /**
  * A card in two lanes (HI-1821): the open cards (not Done, archived or gone) of a builder's start that another builder's
  * running lane of the project lists, or has in its queued list, as a warning for the start's reply; null: none. The
- * card's agent decides whose it is (a lane never takes another agent's card); the other lane gives it up with its own
- * start without it, which applies at once while it isn't in flight there.
+ * card's agent decides whose it is (a lane never takes another agent's card); a card leaves a lane by the Assistant's,
+ * the user's or a script's start of it without the card, never its builder's own (HI-2169: that keeps every card).
  */
 function sharedCards(ws: WorkspaceService, lanes: readonly LaneRecord[], project: string, builder: string, cards: readonly number[]): string | null {
   const others = lanes.filter((l) => running(l) && same(l.project, project) && l.builder.id !== builder)
@@ -757,7 +757,7 @@ function sharedCards(ws: WorkspaceService, lanes: readonly LaneRecord[], project
     return !!c && !c.archived && same(c.project, l.project) && c.column !== 'done'
   })
   if (!shared.length) return null
-  return withCardNames(ws, () => `Warning: ${shared.map(({ n, l }) => `${cardRef(n)} is also in ${l.builder.name}'s lane (${l.id})`).join('; ')}. A card belongs to one lane: take it out of the other (its builder's hive_lane start without it applies at once while it isn't in flight there), or out of this one.`) // i18n-ignore: hive_lane's reply (agents)
+  return withCardNames(ws, () => `Warning: ${shared.map(({ n, l }) => `${cardRef(n)} is also in ${l.builder.name}'s lane (${l.id})`).join('; ')}. A card belongs to one lane: ask the Assistant or the user to take it out of one of them (a builder's own hive_lane start never takes a card off its lane).`) // i18n-ignore: hive_lane's reply (agents)
 }
 
 export interface StartLane {
@@ -790,6 +790,13 @@ export interface StartLane {
    * ignored.
    */
   place?: LanePlace
+  /**
+   * The lane's own builder changes its running lane (HI-2169: a project agent's own hive_lane start, from the
+   * authenticated caller, never the request): with the rules enforced, the cards of the lane's list (its queued one when
+   * it has one) that the new list leaves out are kept, after the given ones. A builder adds and reorders cards; taking one
+   * off is the Assistant's, the user's or a script's.
+   */
+  ownBuilder?: boolean
 }
 
 /** Where a new card goes on its builder's lane (HI-2167). */
@@ -962,6 +969,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   let shared: string | null = null
   let carried: LaneRecord | null = null
   let leftOut: number[] = []
+  let kept: number[] = []
   // One decision a save (HR6's #1270 round 2): a change applied at once is saved only while none of the lane's cards is
   // in flight, checked under the board's lock; a card started meanwhile makes it decide again, and queue it.
   const decide = () => mutate(ws, async (lanes, checks, also) => {
@@ -969,6 +977,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     ended.length = 0
     carried = null
     leftOut = []
+    kept = []
     // After a put back for a reorder applied now (HI-1995), only the lane it was for, as it was then: ended or changed in
     // between, refused with why, nothing resumed or recreated (Darren's decision).
     const bound = put ? lanes.find((l) => l.id === put.lane) : undefined
@@ -977,7 +986,12 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const was = bound ?? lanes.find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
     // A new card placed on the lane (HI-2167): its list as it is under this lock, so a change made meanwhile is kept.
     if (s.place?.needsLane && !was) throw new LaneError(409, `${builder.name} has no running lane in ${s.project}: the card was made but not placed. Start one with hive_lane start (its key is in this reply), or pass lane as { builder, reviewer } to start one as you create a card.`) // i18n-ignore: hive_create_task's refusal (agents)
-    const cards = s.place ? await placed(ws, was, s.place) : s.cards
+    const given = s.place ? await placed(ws, was, s.place) : s.cards
+    // A builder's own start never takes a card off its lane (HI-2169: HB6's registration with its first card alone cut
+    // the Assistant's second one, and the lane ended after the first merged); as read under this lock.
+    const prev = was && on && s.ownBuilder ? (was.pending ?? was.cards) : []
+    kept = prev.filter((n) => !given.includes(n))
+    const cards = kept.length ? [...given, ...kept] : given
     shared = sharedCards(ws, lanes, s.project, builder.id, cards)
     // As it was under this lock, for the Assistant's change (#1282): recorded with the save, in its transaction.
     const before = was ? laneValues(was) : null
@@ -1074,9 +1088,10 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   // The builder told of a reorder applied now, once its list is saved (HI-1995).
   if (put) await tellReordered(ws, r.rec, put, s.by)
   const applied = put ? `Applied now: ${put.putBack} is back in Todo (its work stays on ${put.line ?? 'its branch'}); the lane's cards are now in this order, and ${builder.name} is told.` : null // i18n-ignore: hive_lane's reply (agents)
-  const kept = carriedNote(builder.name, carried, s.name != null)
+  const carriedText = carriedNote(builder.name, carried, s.name != null)
   const gone = leftOut.length ? withCardNames(ws, () => `${leftOut.map(cardRef).join(', ')} ${leftOut.length > 1 ? 'are' : 'is'} already Done: left out.`) : null // i18n-ignore: hive_lane's reply (agents)
-  const note = [applied, kept, gone, queued, shared].filter(Boolean).join(' ') || undefined
+  const stays = kept.length ? withCardNames(ws, () => `${kept.map(cardRef).join(', ')} ${kept.length > 1 ? 'stay' : 'stays'} on the lane, after the cards you listed: a builder's own hive_lane start adds or reorders cards, never takes one off (the Assistant or the user does).`) : null // i18n-ignore: hive_lane's reply (agents)
+  const note = [applied, carriedText, gone, stays, queued, shared].filter(Boolean).join(' ') || undefined
   return { lane, did: r.did, replaced: replaced ?? null, ...(note ? { note } : {}) }
 }
 
