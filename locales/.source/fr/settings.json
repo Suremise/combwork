@@ -426,6 +426,8 @@
   "settings.advanced.hive.outage.resumesPerHour.title": "Resuming after a connection drops: resumes in an hour",
   "settings.advanced.hive.outage.waitMinutes.desc": "How long Hive waits for the connection to come back before it stops waiting and tells you.",
   "settings.advanced.hive.outage.waitMinutes.title": "Resuming after a connection drops: wait at most",
+  "settings.advanced.hive.processes.orphanNotice.desc": "When a process an agent's command started is still running ten minutes on with the shell that started it gone, Hive says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. Turned off, neither is told; Activity still lists the process as left running, with End It.",
+  "settings.advanced.hive.processes.orphanNotice.title": "Processes left running: tell me and the agent",
   "settings.advanced.hive.progress.lanesShown.desc": "How many card-loop lanes the Progress panel shows before its lanes scroll, until you drag the section's top edge (the drag is kept per workspace). A workspace that runs many lanes at once can set its own.",
   "settings.advanced.hive.progress.lanesShown.title": "Progress panel: lanes shown",
   "settings.advanced.hive.progress.replySeconds.desc": "How long hive-progress waits for Hive to answer before a command or a check starts, and for its start to be taken. A check needs the answer (its command is the project's): with none, it asks once more, then runs nothing and says Hive is slow. Raise it when a busy Hive makes checks fail with \"Hive is slow to answer\" (HI-1892). Kept at 2 minutes at most.",

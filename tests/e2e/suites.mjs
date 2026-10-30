@@ -211,6 +211,7 @@ export const SUITES = [
   { name: 'onopen' },
   { name: 'openguard' },
   { name: 'openspeed' },
+  { name: 'orphans' },
   { name: 'outage' },
   { name: 'overview' },
   { name: 'p4lane' },

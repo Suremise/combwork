@@ -122,6 +122,8 @@
   "session.notice.untakenRetried": "Tekst został wpisany, a Enter naciśnięty dwa razy, ale wejście nie trafiło do CLI agenta. Pokaż agenta, kliknij jego terminal i naciśnij Enter.",
   "session.notice.untakenTitle": "{agent}: wiersz wpisany przez Hive nie został przyjęty",
   "session.notice.waitingForInput": "Czeka na Twoją odpowiedź",
+  "session.orphan.body": "Proces {pid}: powłoka, która go uruchomiła, zakończyła się. Aktywność go pokazuje, z przyciskiem Zakończ; agent też dostaje informację.",
+  "session.orphan.title": "{agent} zostawił działający {command} od {time}",
   "session.plan.asking": "Agent pyta Cię o coś. Najpierw odpowiedz.",
   "session.plan.noToggle": "{provider} nie ma przełącznika trybu Plan.",
   "session.plan.typing": "Hive wpisuje wiersz do tego agenta. Spróbuj ponownie za chwilę.",

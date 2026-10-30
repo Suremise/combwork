@@ -122,6 +122,8 @@
   "session.notice.untakenRetried": "HiveはEnterを2回押しましたが、CLIが入力を受け付けていませんでした。エージェントを表示し、ターミナルをクリックしてEnterを押してください。",
   "session.notice.untakenTitle": "{agent}がHiveの入力した行を受け取っていません",
   "session.notice.waitingForInput": "入力を待っています",
+  "session.orphan.body": "プロセス{pid}：起動したシェルは終了しています。アクティビティに一覧され、終了できます。エージェントにも知らせます。",
+  "session.orphan.title": "{agent}が{command}を{time}実行したままにしています",
   "session.plan.asking": "エージェントが質問しています。先に回答してください。",
   "session.plan.noToggle": "{provider}にはプランモードの切り替えがありません。",
   "session.plan.typing": "Hiveがこのエージェントに入力中です。しばらくしてからもう一度お試しください。",

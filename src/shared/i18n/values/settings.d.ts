@@ -418,6 +418,8 @@ interface HiveMessageValues {
   'settings.advanced.hive.outage.resumesPerHour.title': undefined
   'settings.advanced.hive.outage.waitMinutes.desc': undefined
   'settings.advanced.hive.outage.waitMinutes.title': undefined
+  'settings.advanced.hive.processes.orphanNotice.desc': undefined
+  'settings.advanced.hive.processes.orphanNotice.title': undefined
   'settings.advanced.hive.progress.lanesShown.desc': undefined
   'settings.advanced.hive.progress.lanesShown.title': undefined
   'settings.advanced.hive.progress.replySeconds.desc': undefined

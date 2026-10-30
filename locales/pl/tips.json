@@ -266,6 +266,8 @@
   "tips.lanesLegend.title": "Co oznaczają kolory toru",
   "tips.language.text": "Hive używa języka wyświetlania Windows, jeśli go obsługuje. Ustawienia → Ogólne → Język pozwala wybrać inny; języki przetłumaczone przez AI są oznaczone, a poprawki mile widziane. Z agentami Hive nadal rozmawia po angielsku.",
   "tips.language.title": "Hive w Twoim języku",
+  "tips.leftRunning.text": "Proces uruchomiony przez polecenie agenta, który działa dalej po zakończeniu powłoki, widać w Aktywności jako Pozostawiony, z czasem CPU i przyciskiem Zakończ. Po dziesięciu minutach powiadomienie mówi o tym raz, a agent też dostaje informację.",
+  "tips.leftRunning.title": "Zobacz, co polecenie zostawiło działające",
   "tips.leftoverBranches.text": "Kontrola wersji → Zmiany wyświetla pozostałe gałęzie: gałąź zastąpionej lub zarchiwizowanej karty, gałąź agenta sprzed slotów. Najpierw porównaj ją z gałęzią docelową, potem użyj Usuń…; gałąź z własnymi commitami wyświetla je przed usunięciem.",
   "tips.leftoverBranches.title": "Posprzątaj gałęzie, których nic nie używa",
   "tips.leftoverProcesses.text": "Serwer podglądu lub tail -f uruchomiony przez agenta może działać po jego zatrzymaniu, blokując folder projektu lub port. Hive wymienia je w menu ⋯ panelu agenta i proponuje ich zakończenie; w Ustawienia → Agenci możesz kończyć je za każdym razem.",

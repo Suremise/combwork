@@ -11,12 +11,14 @@ interface HiveMessageValues {
   'activity.cardsLabel': undefined
   'activity.closeDetails': undefined
   'activity.column': { column: string }
+  'activity.cpuLabel': undefined
   'activity.details': undefined
   'activity.empty': undefined
   'activity.emptyFiltered': undefined
   'activity.endButton': undefined
   'activity.endDetail': undefined
   'activity.endFailed': undefined
+  'activity.endIt': undefined
   'activity.endMessage': { label: string | number; pid: string | number }
   'activity.endTitle': undefined
   'activity.ended': { label: string | number }
@@ -36,6 +38,9 @@ interface HiveMessageValues {
   'activity.nowHeading': undefined
   'activity.openCard': undefined
   'activity.openSession': undefined
+  'activity.orphanFact': undefined
+  'activity.orphanFor': { pid: string | number; time: string | number; cpu: string | number }
+  'activity.orphanLabel': undefined
   'activity.parentLabel': undefined
   'activity.pause': undefined
   'activity.pauseTip': undefined

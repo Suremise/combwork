@@ -122,6 +122,8 @@
   "session.notice.untakenRetried": "Hive 已输入并按了两次 Enter，但它的 CLI 没有读取输入。请显示它，点击它的终端并按 Enter。",
   "session.notice.untakenTitle": "{agent} 尚未接收 Hive 输入的一行内容",
   "session.notice.waitingForInput": "正在等待你的输入",
+  "session.orphan.body": "进程 {pid}：启动它的 shell 已退出。活动中列出了它，可结束它；也会告知智能体。",
+  "session.orphan.title": "{agent} 遗留了 {command}，已运行 {time}",
   "session.plan.asking": "智能体正在向你提问。请先回答。",
   "session.plan.noToggle": "{provider} 没有计划模式开关。",
   "session.plan.typing": "Hive 正在向此智能体输入一行内容。请稍后重试。",

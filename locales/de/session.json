@@ -122,6 +122,8 @@
   "session.notice.untakenRetried": "Hive hat die Zeile getippt und zweimal Enter gedrückt, aber die CLI hat ihre Eingabe nicht gelesen. Zeige den Agenten an, klicke in das Terminal und drücke Enter.",
   "session.notice.untakenTitle": "{agent} hat eine von Hive getippte Zeile nicht angenommen",
   "session.notice.waitingForInput": "Wartet auf deine Eingabe",
+  "session.orphan.body": "Prozess {pid}: Die Shell, die ihn gestartet hat, ist beendet. Aktivität listet ihn, mit Beenden; auch der Agent wird informiert.",
+  "session.orphan.title": "{agent} hat {command} laufen gelassen, seit {time}",
   "session.plan.asking": "Der Agent fragt dich etwas. Antworte zuerst.",
   "session.plan.noToggle": "{provider} hat keinen Schalter für den Planmodus.",
   "session.plan.typing": "Hive tippt gerade eine Zeile in diesen Agenten. Versuche es gleich noch einmal.",

@@ -86,7 +86,7 @@ import * as projectAgents from './projectAgents'
 import * as templates from './templates'
 import * as branchWatch from './branchWatch'
 import { sessions } from './sessions'
-import { activityCardAgents, activityNowAll } from './activityWorkspace'
+import { activityCardAgents, activityNowAll, launchesNow } from './activityWorkspace'
 import { usageHistory } from './usageHistory'
 import { mayHandOverNow } from './handOverCheck'
 import { transcripts } from './transcripts'
@@ -94,7 +94,7 @@ import * as skills from './skills'
 import * as storage from './storage'
 import { applyCleanupPlan, cardCleanupPreview, queueCleanup } from './cardAttachmentCleanup'
 import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus, moveDefenderPlan, prepareAntivirus } from './antivirus'
-import { agentsMemory, allLeftovers, endAgentProcess, leftoversSettled, projectLaunches, settleLeftovers } from './agentProcesses'
+import { agentsMemory, allLeftovers, endAgentProcess, leftoversSettled, settleLeftovers } from './agentProcesses'
 import { cardWork, forYou, workBadges } from './workflow/cardWork'
 import { contextWorkspace, currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
 import { ensureHiveExcluded, trackedHiveFiles, untrackHive, vcsOf } from './hiveVcs'
@@ -1223,7 +1223,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // A project or the Assistant's home (HI-1664: Activity's workspace level shows the Assistant too).
     'activity:now': async (p) => {
       p = workspace.assertSessionHost(p)
-      return { launches: await projectLaunches(p), tasks: sessions.backgroundTasks(p), blocks: sessions.hookBlocks(p) }
+      return { launches: await launchesNow(p), tasks: sessions.backgroundTasks(p), blocks: sessions.hookBlocks(p) }
     },
     'activity:nowAll': (paths) => activityNowAll(paths),
     'activity:cardAgents': (card) => activityCardAgents(card),

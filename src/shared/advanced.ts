@@ -236,6 +236,11 @@ export const LANES_FRESH_START_WAIT_MINUTES = 'hive.lanes.freshStartWaitMinutes'
  * (HI-2069): read by main's inboxNotices, with the drain.
  */
 export const LANES_UNWATCHED_NOTICE = 'hive.lanes.unwatchedNotice'
+/**
+ * Whether a process an agent's command left running (HI-2111: its parent gone, past ten minutes) is told in a notice and
+ * to the agent: read by main's orphanProcesses. Activity lists it either way.
+ */
+export const ORPHAN_NOTICE = 'hive.processes.orphanNotice'
 
 /**
  * Settings Hive no longer has, dropped quietly from advanced.json as it is read (and so at its next write), never listed
@@ -1005,6 +1010,20 @@ const SOURCES: readonly AdvancedSource[] = [
       id: 'settings.advanced.hive.lanes.unwatchedNotice.desc',
       defaultMessage: "When the Hive Assistant is about to end its turn while lanes are running and no watch of its covers them, Hive keeps it going once to say so, naming the lanes' builders, so it watches them before it finishes. Turned off, its turn ends as its CLI ends it, and nothing wakes it about those lanes until it watches them again.",
       description: 'What the advanced setting "Lanes: remind the Assistant to watch them" does (Settings → Advanced, under Hive). A lane is a card loop; a watch is what wakes an agent when the cards or lanes it follows change.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
+  // A process an agent's command left running (HI-2111): a notice and a line to the agent, once each.
+  {
+    id: ORPHAN_NOTICE,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.processes.orphanNotice.title', defaultMessage: 'Processes left running: tell me and the agent', description: "An advanced setting's title (Settings → Advanced), listed under Hive: a process an agent's command left running, its shell gone, is told in a notice and to the agent." }),
+    desc: msg({
+      id: 'settings.advanced.hive.processes.orphanNotice.desc',
+      defaultMessage: "When a process an agent's command started is still running ten minutes on with the shell that started it gone, Hive says so once in a notice, and tells the agent once at its next tool call or turn's end, so it can end it. Turned off, neither is told; Activity still lists the process as left running, with End It.",
+      description: 'What the advanced setting "Processes left running: tell me and the agent" does (Settings → Advanced, under Hive). Activity is a tab of Hive\'s; End It is its button.'
     }),
     kind: 'boolean',
     default: true,

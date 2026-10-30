@@ -210,6 +210,8 @@ export const AREAS = [
   { paths: ['src/shared/connectionLabel.ts', 'src/renderer/src/components/TemplatePlan.tsx', 'src/renderer/src/components/TemplateLoad.tsx', 'tests/e2e/connectionrows.cjs'], suites: ['connectionrows', 'templates', 'templatesv2'] },
   { paths: ['src/shared/activity.ts', 'src/renderer/src/views/ActivityTab.tsx', 'src/renderer/src/activityView.ts', 'src/main/agentProcesses.ts'], suites: ['activitytab', 'activityworkspace', 'activitywindows'] },
   { paths: ['src/renderer/src/views/WorkspaceActivity.tsx', 'src/main/activityWorkspace.ts'], suites: ['activityworkspace'] },
+  // What agents' commands leave running while they run (HI-2111).
+  { paths: ['src/main/orphanProcesses.ts', 'src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/activityWorkspace.ts', 'src/main/teamParked.ts', 'src/main/inboxNotices.ts', 'src/renderer/src/views/ActivityTab.tsx', 'tests/e2e/fake-claude/linger.cjs'], suites: ['orphans'] },
   { paths: ['src/main/compaction.ts'], suites: ['compact', 'overview', 'paneheader', 'idlestatus'] },
   { paths: ['src/shared/safeguards.ts', 'src/main/providers/claude/safeguards.ts', 'src/main/providers/codex/safeguards.ts', 'src/main/cardSessions.ts'], suites: ['safeguards'] },
   { paths: ['src/main/diagnostics.ts', 'src/shared/redact.ts'], suites: ['about', 'testedclis'] },

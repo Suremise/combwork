@@ -10,6 +10,7 @@ import { initReviewsOnOpen } from './reviewsOnOpen'
 import { initSkillCopies } from './skillCopies'
 import { offNames } from '../shared/skillDelivery'
 import { initInboxNotices } from './inboxNotices'
+import { startOrphanWatch, stopOrphanWatch } from './orphanProcesses'
 import { initDecisionWakes } from './decisionWakes'
 // The user's answers given to the Assistant too (HI-1734): its delivery source, registered at start.
 import './answerRelay'
@@ -743,6 +744,7 @@ async function quitLeftovers(): Promise<void> {
   // settles their slot writers if their releases aren't written before Hive exits.
   await recordEndedLaunches().catch((e) => log.warn('keeping the ended runs for their slot writers as Hive quits', e))
   await leftoversSaved()
+  stopOrphanWatch()
   closeProcessTracking()
 }
 
@@ -1027,6 +1029,8 @@ app.whenReady().then(async () => {
   // Hive's skill copies in folders no session of Hive's works in (#1431), as each workspace opens.
   initSkillCopies((folder) => sessions.runningIn(folder))
   initInboxNotices()
+  // What agents' commands leave running while they run (HI-2111).
+  startOrphanWatch()
   initDecisionWakes()
   initWorkflowNotices()
   initDevConsole()
@@ -1270,6 +1274,7 @@ app.on('will-quit', () => {
   // Any other way out (the updater's install, a renderer crash's quit) clears it too.
   clearDiscoveryNow()
   killAll()
+  stopOrphanWatch()
   closeProcessTracking()
   unwatchAll()
   stopObserving()

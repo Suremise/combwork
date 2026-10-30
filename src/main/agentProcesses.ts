@@ -463,6 +463,27 @@ export async function projectLaunches(projectPath: string): Promise<LaunchNow[]>
   return out
 }
 
+/** The launches running now, each tracked in its job (HI-2111: what their commands left running is looked for). */
+export function runningLaunches(): { runId: string; projectPath: string; agentId: string; agentName: string }[] {
+  return [...running.values()].map((l) => ({ runId: l.runId, projectPath: l.projectPath, agentId: l.agentId, agentName: l.agentName }))
+}
+
+/**
+ * Each of these running launches' processes with its parent's state and CPU time (HI-2111, the host's "lineage"), by
+ * run id. Null when the host can't say; never starts the host.
+ */
+export async function launchLineage(runIds: readonly string[]): Promise<Record<string, unknown> | null> {
+  if (process.platform !== 'win32' || !runIds.length || !host.pid) return null
+  const r = await host.request('lineage', runIds.join(','))
+  return r && typeof r === 'object' && !Array.isArray(r) ? (r as Record<string, unknown>) : null
+}
+
+/** A running launch's processes now, with their command lines, masked (HI-2111: what a notice names); null when unknown. */
+export async function launchProcessesNow(runId: string): Promise<ActivityProcess[] | null> {
+  if (process.platform !== 'win32' || !running.has(runId) || !host.pid) return null
+  return (await listJob(runId, true))?.processes ?? null
+}
+
 /** A launch's own CLI among its processes: its gate and what the gate started. */
 function cliOf(l: Launch, processes: readonly AgentProcess[]): number[] {
   return l.gate ? [l.gate, ...processes.filter((p) => p.parent === l.gate).map((p) => p.pid)] : []

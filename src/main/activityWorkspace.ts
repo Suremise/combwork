@@ -1,5 +1,6 @@
-import type { ActivityCardAgent, ActivityNow } from '../shared/activity'
+import type { ActivityCardAgent, ActivityLaunch, ActivityNow } from '../shared/activity'
 import { projectLaunches } from './agentProcesses'
+import { markOrphans } from './orphanProcesses'
 import { sessions } from './sessions'
 import { workspace, workspaceFor } from './workspace'
 
@@ -21,7 +22,12 @@ export async function activityNowAll(paths: unknown): Promise<{ path: string; no
     const h = workspace.assertSessionHost(p)
     if (!hosts.has(h.toLowerCase())) hosts.set(h.toLowerCase(), h)
   }
-  return Promise.all([...hosts.values()].map(async (path) => ({ path, now: { launches: await projectLaunches(path), tasks: sessions.backgroundTasks(path), blocks: sessions.hookBlocks(path) } })))
+  return Promise.all([...hosts.values()].map(async (path) => ({ path, now: { launches: await launchesNow(path), tasks: sessions.backgroundTasks(path), blocks: sessions.hookBlocks(path) } })))
+}
+
+/** A session host's running launches, what their commands left running marked (HI-2111). */
+export async function launchesNow(path: string): Promise<ActivityLaunch[]> {
+  return (await projectLaunches(path)).map((l) => ({ ...l, processes: markOrphans(l.runId, l.processes) }))
 }
 
 /**

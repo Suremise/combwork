@@ -28,7 +28,7 @@ const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'Wi
 export type HostFailure = { kind: 'test' } | { kind: 'noPowerShell'; error: string } | { kind: 'slowHelper'; seconds: number } | { kind: 'refused' } | { kind: 'helperFailed'; why: string }
 
 /** The host's requests (HiveJobs.Answer). */
-export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow' | 'keeper'
+export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'lineage' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow' | 'keeper'
 
 export interface JobHostOptions {
   /** How long it gets to start, and then to answer each request. */
@@ -854,6 +854,52 @@ public static class HiveJobs {
     }
     return b.Append("]").ToString();
   }
+  /**
+   * Each job's processes with their parents' state (HI-2111), for "job,job,…": JSON {"job":[{"pid","created","parent",
+   * "parentCreated","cpu"}],…}, at most ${MAX_LISTED * 4} per job. parent is the id a snapshot gives; parentCreated, when
+   * a process runs by that id now, its start time (a later one than the child's means the id was given again), "0" when
+   * none runs by it, "?" when it can't be told (access denied). cpu: its kernel and user time, in ms. A process that
+   * can't be opened, or that the snapshot hasn't, is left out. A failed snapshot: null.
+   */
+  public static string Lineage(string ids) {
+    Sweep();
+    var parents = new Dictionary<int, int>();
+    IntPtr snap = CreateToolhelp32Snapshot(2, 0);
+    if (snap == IntPtr.Zero || snap == new IntPtr(-1)) return "null";
+    try {
+      var e = new ProcessEntry(); e.size = (uint)Marshal.SizeOf(typeof(ProcessEntry));
+      if (!Process32FirstW(snap, ref e)) return "null";
+      do { if (e.pid != 0) parents[(int)e.pid] = (int)e.parent; } while (Process32NextW(snap, ref e));
+    } finally { CloseHandle(snap); }
+    var b = new StringBuilder("{");
+    string[] list = ids.Split(',');
+    for (int i = 0; i < list.Length; i++) {
+      b.Append(i > 0 ? "," : "").Append(Q(list[i])).Append(":[");
+      int[] all = Members(list[i]);
+      bool first = true;
+      for (int j = 0; j < all.Length && j < ${MAX_LISTED * 4}; j++) {
+        int pid = all[j], parent;
+        if (!parents.TryGetValue(pid, out parent)) continue;
+        IntPtr p = OpenProcess(0x1000, false, pid);
+        if (p == IntPtr.Zero) continue;
+        long created, x, k, u;
+        bool read;
+        try { read = GetProcessTimes(p, out created, out x, out k, out u); } finally { CloseHandle(p); }
+        if (!read) continue;
+        string pc;
+        IntPtr q = parent > 0 ? OpenProcess(0x1000, false, parent) : IntPtr.Zero;
+        // ERROR_INVALID_PARAMETER: no process by that id.
+        if (q == IntPtr.Zero) pc = parent > 0 && Marshal.GetLastWin32Error() == 87 ? "0" : "?";
+        else {
+          try { uint code; long qc, qx, qk, qu; pc = !GetExitCodeProcess(q, out code) ? "?" : code != 259 ? "0" : GetProcessTimes(q, out qc, out qx, out qk, out qu) ? qc.ToString() : "?"; } finally { CloseHandle(q); }
+        }
+        b.Append(first ? "" : ",").Append("{\"pid\":").Append(pid).Append(",\"created\":\"").Append(created).Append("\",\"parent\":").Append(parent).Append(",\"parentCreated\":\"").Append(pc).Append("\",\"cpu\":").Append((k + u) / 10000).Append("}");
+        first = false;
+      }
+      b.Append("]");
+    }
+    return b.Append("}").ToString();
+  }
   /** The port and the sweeper, as Add starts them with the first job. */
   static void Started() {
     if (sweeper == null) sweeper = new System.Threading.Timer(_ => { try { Sweep(); Tell(); } catch { } }, null, ${SWEEP_MS}, ${SWEEP_MS});
@@ -966,6 +1012,7 @@ public static class HiveJobs {
         case "endexact": r = EndExact(a[2]); break;
         case "endtree": r = EndTree(a[2]); break;
         case "memory": r = Memory(a[2]); break;
+        case "lineage": r = Lineage(a[2]); break;
         // Its journal's path, in base64url (requests are words).
         case "open": r = Q(Open(a[2], a.Length > 3 ? Encoding.UTF8.GetString(Convert.FromBase64String(a[3].Replace('-', '+').Replace('_', '/').PadRight(a[3].Length + (4 - a[3].Length % 4) % 4, '='))) : null)); break;
         case "assign": r = Q(Assign(a[2], int.Parse(a[3]), long.Parse(a[4]), long.Parse(a[5]))); break;

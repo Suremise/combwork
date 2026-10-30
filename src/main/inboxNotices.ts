@@ -5,6 +5,7 @@ import { running } from '../shared/lanes'
 import type { LiveSessionState } from '../shared/types'
 import { advanced } from './advanced'
 import { agentReadsInbox, countable, inboxSwitch } from './deliveries'
+import { orphanLinesFor } from './orphanProcesses'
 import { sessions } from './sessions'
 import { workspaceFor } from './workspace'
 import { pausedFor } from './teamPause'
@@ -43,6 +44,14 @@ const item = (r: DeliveryRecord): NoticeItem => ({ id: r.id, kind: r.kind, ...(r
 
 /** The notice for a launch at a checkpoint or its turn's end; null when there is nothing (new) to tell. */
 export async function noticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'): Promise<string | null> {
+  // What its commands left running (HI-2111), told once each, whatever its inbox has.
+  const orphans = orphanLinesFor(st.projectPath, st.agentId)
+  const inbox = await inboxNoticeFor(st, at)
+  return [inbox, orphans].filter(Boolean).join(' ') || null
+}
+
+/** The notice for what the agent has unread (and the Assistant's unwatched lanes); null when there is nothing new. */
+async function inboxNoticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'): Promise<string | null> {
   // One that can't read an inbox (its hive tools off) is given no delivery (#650's decision): nothing to tell it here.
   if (!agentReadsInbox(st.projectPath, st.agentId)) return null
   // Its switch off (#1432): no notice there, so the turn goes on (or ends) as the CLI would; what is unread stays in the

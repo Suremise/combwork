@@ -122,6 +122,8 @@
   "session.notice.untakenRetried": "Hive la escribió y presionó Enter dos veces, pero su CLI no estaba leyendo lo que se escribía. Muéstralo, haz clic en su terminal y presiona Enter.",
   "session.notice.untakenTitle": "{agent} no ha tomado una línea que escribió Hive",
   "session.notice.waitingForInput": "Esperando tu respuesta",
+  "session.orphan.body": "Proceso {pid}: el shell que lo inició ha terminado. Actividad lo muestra, con Terminarlo; también se avisa al agente.",
+  "session.orphan.title": "{agent} dejó {command} en ejecución desde hace {time}",
   "session.plan.asking": "El agente te está preguntando algo. Respóndele primero.",
   "session.plan.noToggle": "{provider} no tiene un interruptor del modo Plan.",
   "session.plan.typing": "Hive está escribiendo una línea en este agente. Vuelve a intentarlo en un momento.",

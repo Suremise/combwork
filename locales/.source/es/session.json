@@ -126,6 +126,8 @@
   "session.notice.untakenRetried": "Hive typed it and pressed Enter twice, but its CLI wasn't reading its input. Show it, click its terminal and press Enter.",
   "session.notice.untakenTitle": "{agent} hasn't taken a line Hive typed",
   "session.notice.waitingForInput": "Waiting for your input",
+  "session.orphan.body": "Process {pid}: the shell that started it has exited. Activity lists it, with End It; the agent is told too.",
+  "session.orphan.title": "{agent} left {command} running for {time}",
   "session.plan.asking": "The agent is asking you something. Answer it first.",
   "session.plan.noToggle": "{provider} has no Plan mode toggle.",
   "session.plan.typing": "Hive is typing a line into this agent. Try again in a moment.",
