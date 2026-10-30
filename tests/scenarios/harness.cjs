@@ -548,7 +548,14 @@ async function runScenario(sc, providerKey, opts = {}) {
     if (sc.beforeLaunch) await sc.beforeLaunch(ctx)
     // Hive's log as the session under test starts: its hive tools connecting is counted from here.
     const launchMark = lib.hiveLogLines(userData).length
-    await inv('session:start', host, { agentId })
+    // A subject Hive starts itself (HI-2046: a reviewer given a card that reached Review outside a lane): its launch is
+    // the session under test, and Hive's line its prompt.
+    const byHive = !!sc.startedByHive
+    if (!byHive) await inv('session:start', host, { agentId })
+    else if (!(await lib.until(async () => !!(await live()), 90000))) {
+      result.error = "Hive didn't start the session under test"
+      return result
+    }
     const key = lib.ptyKey(host, agentId)
     /** The session under test's conversation as Hive reads it (its transcript's items), or [] before it has one. */
     const conversation = async () => {
@@ -602,6 +609,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     while (Date.now() < readyBy) {
       const s = await live()
       if (s?.status === 'ready' || s?.status === 'finished') break
+      // Hive's line already at work: a model's turn on it is the trial.
+      if (byHive && !p.fake && ['working', 'background'].includes(s?.status)) break
       const screen = plain(await inv('pty:buffer', key).catch(() => ''))
       if (screen) lastScreen = screen
       // Exited before its session started (an OAuth session it couldn't refresh, #577): no prompt can reach it.
@@ -646,7 +655,18 @@ async function runScenario(sc, providerKey, opts = {}) {
     if (sc.beforePrompt && !endedAtLaunch) await sc.beforePrompt(ctx)
     const prompt = typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
     const fakePrompt = typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake
-    const text = p.fake ? fakePrompt : prompt
+    // Started by Hive: its line, once the conversation has it. A model works on it, typed nothing more; a fake (which
+    // does nothing on a line it has no script for) is typed its steps once that turn is over.
+    let hiveLine = null
+    if (byHive && !endedAtLaunch) {
+      const lineOf = async () => (await conversation()).find((x) => x.kind === 'user' && String(x.text ?? '').startsWith('[Hive]'))?.text ?? null
+      await lib.until(async () => !!(hiveLine = await lineOf()) && (!p.fake || ['ready', 'finished'].includes((await live())?.status)), 60000)
+      if (!hiveLine) {
+        result.error = "Hive's line never reached the session under test"
+        return result
+      }
+    }
+    const text = p.fake ? fakePrompt : (hiveLine ?? prompt)
     // The prompt is sent, then checked: a CLI still drawing its first screen can drop an Enter (sent again) or the
     // whole line (typed again).
     const submitted = async () => {
@@ -656,7 +676,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       return items.some((x) => x.kind === 'user' && x.text.includes(text.slice(0, 40)))
     }
     let notTaken = null
-    if (!endedAtLaunch) {
+    if (!endedAtLaunch && !(hiveLine && !p.fake)) {
       turnBefore.set(text, (await live())?.turn?.id ?? null)
       const mark = String((await inv('pty:buffer', key).catch(() => '')) ?? '').length
       // Real Claude Code: its first prompt waits for its hive tools, as Hive's own first line does (HI-1148).

@@ -7,6 +7,8 @@
 //    building in a slot (its lane's lease), and goes to E1 once E1's card is Done and its lane's lease ended.
 // 2. beta (Everyone in the project folder, Committed is done, two reviewers per card): one card reviewed by both pooled
 //    reviewers in turn, each in a review copy at the submitted revision, then Done.
+// 3. gamma (HI-2046, one reviewer per lane): a card started on its builder alone and submitted outside a lane goes to
+//    the project's stopped reviewer, started for it and told, with no Assistant step; its verdict makes it Done.
 // Screenshots of Start Lane with the pool chosen and of the lane's row, in both themes; the builder's brief as text.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -22,6 +24,7 @@ const home = at('claude-home')
 const shots = at('shots')
 const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
+const gamma = path.join(ws, 'gamma')
 const slotsRoot = path.join(`${ws}.worktrees`, 'alpha')
 const PORT = Number(lib.port(47805))
 const identity = { name: 'Hive Pool Test', email: 'pool@example.com' }
@@ -43,11 +46,11 @@ const commitIn = (dir, files, message, trailer) => {
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
-  for (const p of [alpha, beta]) {
+  for (const p of [alpha, beta, gamma]) {
     lib.gitProject(p, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
     lib.git(p, ['branch', '-M', 'main'])
   }
-  const env = lib.fakeClaude(userData, home, [alpha, beta, ws, ...['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(slotsRoot, s))])
+  const env = lib.fakeClaude(userData, home, [alpha, beta, gamma, ws, ...['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(slotsRoot, s))])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -269,6 +272,30 @@ const commitIn = (dir, files, message, trailer) => {
     const second = await review(br2, g, true)
     check('BE-R2 reads it in a review copy too, and passes it', second.ok && second.atRev, second.why)
     check('G is Done (committed)', !!(await until(async () => (await card(g))?.column === 'done', HUNG_MS)), (await card(g))?.column)
+
+    // --- 3. gamma (HI-2046): one reviewer per lane, but a card started on its builder alone, outside a lane. Submitted,
+    // Hive gives it to the project's stopped reviewer itself: started for the review and told, with no Assistant step.
+    await inv('workflow:setOptions', gamma, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
+    const gb1 = await lib.addAgent(inv, gamma, { name: 'GA-B1', workflowRole: 'builder' })
+    const gr1 = await lib.addAgent(inv, gamma, { name: 'GA-R1', workflowRole: 'reviewer' })
+    const k = await create(gamma, 'Loose K')
+    await inv('session:start', gamma, { agentId: gb1.id })
+    const tk = await tokenOf(gamma, gb1.id)
+    const ks = await intent(tk, k, 'start')
+    const revK = commitIn(gamma, { 'k.txt': 'k\n' }, 'K done', (await card(k)).key)
+    const ksub = await intent(tk, k, 'submit', { summary: 'K: ready', revision: revK })
+    check('GA-B1 builds and submits K outside a lane', ks.status === 200 && ksub.status === 200 && !(await card(k))?.lane && !!(await until(async () => (await card(k))?.column === 'review', HUNG_MS)), JSON.stringify({ ks: ks.body, ksub: ksub.body, lane: (await card(k))?.lane }))
+    check('…no lane holds it', !(await inv('lanes:list')).some((l) => same(path.join(ws, l.project), gamma)))
+    check('K goes to GA-R1, its reviewer', !!(await until(async () => JSON.stringify(await assigned(k)) === JSON.stringify([gr1.id]), HUNG_MS)), JSON.stringify(await assigned(k)))
+    const gs1 = await until(() => live(gamma, gr1.id), HUNG_MS)
+    check('GA-R1 is started for the review, in the project folder', !!gs1 && same(gs1.cwd, gamma), JSON.stringify(gs1))
+    const toldK = await until(async () => (await deliveries('gamma', gr1.name)).find((x) => x.includes('outside a lane: you review it')), HUNG_MS)
+    check(`…and told of ${(await card(k)).key}, once`, !!toldK && toldK.includes((await card(k)).key) && (await deliveries('gamma', gr1.name)).filter((x) => x.includes('outside a lane')).length === 1, JSON.stringify(await deliveries('gamma', gr1.name)))
+    const tgr = await tokenOf(gamma, gr1.id)
+    await idle(gamma, gr1.id)
+    const kv = (await intent(tgr, k, 'start-review')).status === 200 && (await intent(tgr, k, 'verdict', { pass: true, comment: 'K: passed' })).status === 200
+    check('GA-R1 reviews and passes K', kv)
+    check('K is Done (committed), with no Assistant step', !!(await until(async () => (await card(k))?.column === 'done', HUNG_MS)) && !(await live(path.join(ws, '.hive', 'assistant'), 'assistant')), (await card(k))?.column)
   } catch (err) {
     check('no unexpected error', false, err.stack)
   } finally {

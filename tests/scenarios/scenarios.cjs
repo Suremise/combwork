@@ -217,11 +217,11 @@ async function reviewedPair(c) {
  * with Coder a reviewer, so a review of it gets a review copy (#1439: the reviewer in the project folder). `pool`: the
  * project's reviewers are its pool (G17, #1443).
  */
-async function inReview(c, pool = false) {
+async function inReview(c, pool = false, description = 'greet.js returns "Hello, <name>", trimmed.') {
   await pairInProject(c, pool ? { reviewerMode: 'pool' } : {})
   await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
   await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })
-  const n = await c.card('r', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>", trimmed.', agent: 'implementer' })
+  const n = await c.card('r', { title: 'Greeting helper', description, agent: 'implementer' })
   await userMove(c, n, 'doing')
   c.write('greet.js', "module.exports = (name) => 'Hello, ' + name.trim()\n")
   c.git('add', '-A')
@@ -836,6 +836,9 @@ module.exports.SCENARIOS = [
     title: "Review a card: it stays in Review with the implementer; the reviewer's verdict ends the review",
     // A real submission (HI-1950): greet.js is the card's own commit, so the revision under review changes something; the
     // project reviews (Pair), Implementer builds and Coder reviews, as inReview's.
+    // HI-2046: Hive gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
+    // is a model's only as the line says it; the fakes are typed their steps after it).
+    startedByHive: true,
     async setup(c) {
       await pairInProject(c)
       await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
@@ -972,6 +975,9 @@ module.exports.SCENARIOS = [
     id: 'review-interrupted',
     title: "A review interrupted by newer work (#1536): started with the intent; the builder takes the card back, so its verdict is refused, and the reviewer neither retries it nor moves the card",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    // HI-2046: Hive gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
+    // is a model's only as the line says it; the fakes are typed their steps after it).
+    startedByHive: true,
     async setup(c) {
       // Implementer's submission in Review, Coder its reviewer (inReview: a reviewed project, its work committed).
       await inReview(c)
@@ -2856,8 +2862,12 @@ module.exports.SCENARIOS = [
     id: 'review-in-copy',
     title: "A reviewer reviews in the review copy its start names (#1444, #1439): it reads and runs the checks there, not in the builder's folder, and gives its verdict",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n", 'test.js': "const greet = require('./greet'); if (greet(' Ada ') !== 'Hello, Ada') { console.error('greet does not trim'); process.exit(1) }\nrequire('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran')\nconsole.log('ok')\n" },
+    // HI-2046: Hive gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
+    // is a model's only as the line says it; the fakes are typed their steps after it).
+    startedByHive: true,
     async setup(c) {
-      await inReview(c)
+      // Its check in the card (HI-2046: Hive's line, not the prompt, starts a model's review).
+      await inReview(c, false, 'greet.js returns "Hello, <name>", trimmed. Its check is node test.js.')
       c.copyLeases = new Set()
     },
     // The review copies Hive lends Coder while it works (a CLI may show a tool's reply only in part: Codex calls the hive
@@ -2892,11 +2902,14 @@ module.exports.SCENARIOS = [
     id: 'pool-reviewer-wake',
     title: "A reviewer from the project's reviewer pool is given a card (#1444, #1443): it reviews that card, with no lane to join, and gives its verdict",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    // HI-2046: Hive gives the card to Coder, the project's free reviewer, and starts it with its line (the prompt below
+    // is a model's only as the line says it; the fakes are typed their steps after it).
+    startedByHive: true,
     async setup(c) {
       await inReview(c, true)
     },
-    // The line Hive's pool gives its reviewer (reviewerPool.ts), the card named.
-    prompt: (c) => `[Hive] #${c.cards.r} (Implementer's card) is in Review: you review it from the pool. Review its latest submission (hive_read_task, then hive_start_review and hive_verdict); your verdict frees you for the next card.`,
+    // The line Hive's pass gives its reviewer (reviewerPool.ts), the card named: no pool lane holds it, so it is loose.
+    prompt: (c) => `[Hive] #${c.cards.r} (Implementer's card) is in Review, outside a lane: you review it. Review its latest submission (hive_read_task, then hive_start_review and hive_verdict); your verdict frees you for the next card.`,
     fake: (c) => `skill review-agent-work then hive hive_read_task {"number":${c.cards.r}} then hive hive_start_review {"card":"#${c.cards.r}"} then hive hive_verdict {"card":"#${c.cards.r}","pass":true,"comment":"Round 1: PASSED. greet trims the name."}`,
     expect: (o) => {
       const joins = called(o, 'hive_lane').filter((x) => argsOf(x).action === 'join')
