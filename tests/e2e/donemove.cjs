@@ -120,11 +120,14 @@ const until = async (fn, ms = 10000) => {
   // user asks", for a session without the skill (tests/guidance.test.ts checks those).
   check('the card prompt points to the work-on-card skill', typeof prompt === 'string' && prompt.includes('Use the work-on-card skill.'), String(prompt))
   const skill = path.join(alpha, '.hive', `launch-${agent.id}`, 'plugin', 'skills', 'work-on-card', 'SKILL.md')
-  const skillText = fs.existsSync(skill) ? fs.readFileSync(skill, 'utf8') : ''
+  // HI-2011: finishing after review is in its reference file beside SKILL.md, copied with it.
+  const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
+  const skillText = read(skill)
+  const afterReview = read(path.join(path.dirname(skill), 'after-review.md'))
   // By meaning rather than sentence (#1596: #1524's rewording broke a literal): one of its steps submits the work with
   // `hive_submit`, which takes the card to Review, and one finishes it as Done by reporting the merge commit with
   // `hive_report_merge`, both through the intent tools rather than a column move.
-  const skillSteps = skillText.split('\n')
+  const skillSteps = `${skillText}\n${afterReview}`.split('\n')
   const submitsToReview = skillSteps.some((l) => l.includes('`hive_submit`') && /\bReview\b/.test(l))
   const doneOnceMerged = skillSteps.some((l) => /\bDone\b/.test(l) && l.includes('`hive_report_merge`') && /\bmerge commit\b/.test(l))
   check('…which says Review when the work is done, and Done once merged', submitsToReview && doneOnceMerged, JSON.stringify({ submitsToReview, doneOnceMerged, start: skillText.slice(0, 200) }))
