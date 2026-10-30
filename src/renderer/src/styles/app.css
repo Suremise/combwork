@@ -9650,9 +9650,6 @@ body.pane-resizing-v .monaco-editor {
 .assistant-empty {
   padding: 6px 0;
 }
-.assistant-defaults {
-  width: 100%;
-}
 .titlebar-btn {
   position: relative;
   width: 30px;

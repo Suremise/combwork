@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Account, AppSettings, Connection, EffortLevel, PermissionMode, ProviderId } from '@shared/types'
 import type { ConnectionPatch, ConnectionRow, ConnectionsView } from '@shared/accounts'
 import type { MovedNotice } from '@shared/connectionDefaults'
-import { modeOption, offeredModes, permissionLabel, providerDescriptor } from '@shared/providers'
+import { modeCaveat, modeOption, offeredModes, permissionLabel, providerDescriptor } from '@shared/providers'
 import { effortName, modelCaps } from '@shared/models'
 import { serverDefaultModel } from '@shared/serverConnection'
 import { modelLabel } from '@shared/defaults'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { notify, useStore } from '../store'
+import { notify, useLanguage, useStore } from '../store'
 import { EffortPicker, ModelPicker } from './ModelPicker'
 import { Icon, Modal } from './ui'
 
@@ -120,6 +120,21 @@ export function ConnectionDialog({ account: accountId, connection: id, onClose }
   return <ConnectionForm account={account} row={row} settings={settings} onClose={onClose} />
 }
 
+/** Under a mode choice: the provider's warning when it may not run that mode with that model (as the CLI says, #125). */
+function ModeCaveat({ provider, mode, model }: { provider: ProviderId; mode: string | null | undefined; model: string | null | undefined }) {
+  const info = useStore((s) => s.providers[provider])
+  const settings = useStore((s) => s.settings)
+  useLanguage()
+  const caps = modelCaps(provider, model, info, settings)
+  const text = modeCaveat(provider, mode as PermissionMode, model, { supportsAuto: caps.supportsAuto, label: caps.label }, tr)
+  if (!text) return null
+  return (
+    <div className="mode-caveat">
+      <Icon name="warning" /> <span>{text}</span>
+    </div>
+  )
+}
+
 function ConnectionForm({ account: a, row, settings, onClose }: { account: Account; row: ConnectionRow | undefined; settings: AppSettings | null; onClose: (saved?: Connection) => void }) {
   const cli = a.provider
   const p = providerDescriptor(cli)
@@ -196,14 +211,18 @@ function ConnectionForm({ account: a, row, settings, onClose }: { account: Accou
           </>
         )}
         <label>{tr(M.mode)}</label>
-        <select className="select" aria-label={tr(M.mode)} data-mode value={mode} onChange={(e) => setMode(e.target.value)}>
-          <option value="">{tr(M.cliDefaultIs, { provider: p.name, which: permissionLabel(cli, p.defaultPermissionMode, tr) })}</option>
-          {shownModes.map((m) => (
-            <option key={m.value} value={m.value}>
-              {permissionLabel(cli, m.value, tr)}
-            </option>
-          ))}
-        </select>
+        <div>
+          <select className="select" aria-label={tr(M.mode)} data-mode value={mode} onChange={(e) => setMode(e.target.value)}>
+            <option value="">{tr(M.cliDefaultIs, { provider: p.name, which: permissionLabel(cli, p.defaultPermissionMode, tr) })}</option>
+            {shownModes.map((m) => (
+              <option key={m.value} value={m.value}>
+                {permissionLabel(cli, m.value, tr)}
+              </option>
+            ))}
+          </select>
+          {/* A mode the model that would run may not take (Claude Code's Auto with Haiku, #129): said under it (HI-2145). */}
+          <ModeCaveat provider={cli} mode={mode || p.defaultPermissionMode} model={runModel} />
+        </div>
         <label htmlFor="connection-args">{tr(M.args)}</label>
         <div>
           <input id="connection-args" className="input mono" value={args} onChange={(e) => setArgs(e.target.value)} />

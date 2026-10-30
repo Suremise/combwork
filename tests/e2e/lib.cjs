@@ -1577,21 +1577,43 @@ async function haikuAutoMode(inv, host, agentId = 'assistant', timeoutMs = 15000
 }
 
 /**
- * Settings → Assistant's warning about Auto with Haiku (#129): there exactly when the CLI says Auto isn't offered
- * (saying the session runs in Manual), none when it says it is, the shipped guess ("may not offer") when it doesn't say.
- * Opens Settings → Assistant (Ctrl+,), waits for its model and mode defaults, then for the warning to be as it should
- * (the window may still be taking in what the CLI said: the shipped guess first). Returns [ok, what it found].
+ * The connection dialog's warning about Auto with Haiku (#129; HI-2145: model and mode are a connection's since
+ * HI-2108): there exactly when the CLI says Auto isn't offered (saying the session runs in Manual), none when it says
+ * it is, the shipped guess ("may not offer") when it doesn't say. Opens Settings → Accounts & Connections (Ctrl+,),
+ * Edit… on a Claude Code account's first connection, chooses Haiku and Auto there, waits for the warning to be as it
+ * should (the window may still be taking in what the CLI said: the shipped guess first), then cancels, saving
+ * nothing. Returns [ok, what it found].
  */
 async function haikuAutoCaveat(page, autoOffered, timeoutMs = 10000) {
-  await page.keyboard.press('Control+,')
-  const nav = page.locator('.settings-nav .row', { hasText: 'Assistant' }).first()
-  await nav.waitFor({ timeout: timeoutMs })
-  await nav.click()
-  await page.locator('.assistant-defaults').first().waitFor({ timeout: timeoutMs })
-  const caveat = () => page.locator('.mode-caveat', { hasText: 'Auto with Haiku' }).allInnerTexts()
-  const right = (c) => (autoOffered === true ? !c.length : autoOffered === false ? c.length === 1 && /doesn't offer Auto with Haiku.*runs in Manual/.test(c[0]) : c.length === 1 && /may not offer Auto with Haiku/.test(c[0]))
-  const ok = !!(await until(async () => right(await caveat()), timeoutMs))
-  return [ok, JSON.stringify(await caveat())]
+  // A Hive account on Claude Code (the view's `connections`: HI-2106 kept the old name); a test copy on its CLI test home
+  // has none listed (that home isn't shown in Settings), so one is added for the look, never signed in, and removed after.
+  // The warning depends on what the CLI said about its models, not on the account.
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const listed = (await inv('connections:list')).connections.find((a) => a.provider === 'claude-code')
+  const account = listed ?? (await inv('connections:add', 'claude-code', 'Auto with Haiku'))
+  const form = page.locator('[data-connection-form]')
+  try {
+    await page.keyboard.press('Control+,')
+    const nav = page.locator('.settings-nav .row[data-section="accounts"]')
+    await nav.waitFor({ timeout: timeoutMs })
+    await nav.click()
+    const row = page.locator(`[data-connections-of="${account.id}"] [data-connection]`).first()
+    await row.locator('[data-action="connection-menu"]').click({ timeout: timeoutMs })
+    await page.locator('.menu .menu-item', { hasText: 'Edit…' }).first().click({ timeout: timeoutMs })
+    await form.waitFor({ timeout: timeoutMs })
+    await form.locator('select').first().selectOption('haiku', { timeout: timeoutMs })
+    await form.locator('select[data-mode]').selectOption('auto', { timeout: timeoutMs })
+    const caveat = () => form.locator('.mode-caveat', { hasText: 'Auto with Haiku' }).allInnerTexts()
+    const right = (c) => (autoOffered === true ? !c.length : autoOffered === false ? c.length === 1 && /doesn't offer Auto with Haiku.*runs in Manual/.test(c[0]) : c.length === 1 && /may not offer Auto with Haiku/.test(c[0]))
+    const ok = !!(await until(async () => right(await caveat()), timeoutMs))
+    return [ok, JSON.stringify(await caveat())]
+  } finally {
+    if (await form.count()) {
+      await page.locator('.dialog').last().getByRole('button', { name: 'Cancel' }).click({ timeout: timeoutMs }).catch(() => undefined)
+      await form.waitFor({ state: 'detached', timeout: timeoutMs }).catch(() => undefined)
+    }
+    if (!listed) await inv('connections:remove', account.id)
+  }
 }
 
 /**

@@ -49,15 +49,29 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
   check('meter coloured at 86%', (await page.locator('.card', { hasText: '5-hour limit' }).locator('.meter.caution').count()) === 1)
   await page.screenshot({ path: path.join(shots, '2-overview.png') })
 
-  // The model picker: Settings → Assistant's for Claude Code (Claude Code has no default model of its own since
-  // HI-1774: each connection's, whose picker is this same one).
+  // The model picker: a connection's, in its dialog (HI-2145: Settings → Assistant has none since HI-2108, and Claude Code
+  // no default model of its own since HI-1774). An account of the suite's own, never signed in, removed after: its first
+  // connection edited, each choice saved with the dialog's Save and read back from the connection.
+  const account = await inv('connections:add', 'claude-code', 'Max')
+  const form = page.locator('[data-connection-form]')
+  const editConnection = async () => {
+    await page.locator('.settings-nav .row[data-section="accounts"]').click()
+    const row = page.locator(`[data-connections-of="${account.id}"] [data-connection]`).first()
+    await row.locator('[data-action="connection-menu"]').click({ timeout: HUNG_MS })
+    await page.locator('.menu .menu-item', { hasText: 'Edit…' }).first().click({ timeout: HUNG_MS })
+    await form.waitFor({ timeout: HUNG_MS })
+  }
+  const saveConnection = async () => {
+    await page.locator('[data-save-connection]').click()
+    await form.waitFor({ state: 'detached', timeout: HUNG_MS })
+    await editConnection()
+  }
   await page.locator('.activity-btn[aria-label="Settings"]').click()
-  await page.locator('.settings-nav .row', { hasText: 'Assistant' }).first().click()
-  const picker = page.locator('.assistant-defaults').first().locator('.model-picker').first()
+  await editConnection()
+  const picker = form.locator('.model-picker').first()
   await picker.waitFor({ timeout: HUNG_MS })
-  await picker.scrollIntoViewIfNeeded()
   const groups = await picker.locator('optgroup').evaluateAll((els) => els.map((e) => e.label))
-  const savedModel = () => inv('settings:get').then((s) => s.assistant.providers['claude-code'].model)
+  const savedModel = async () => (await inv('connections:list')).connectionRows.find((c) => c.account === account.id)?.model ?? ''
   // The models Claude Code reports for this version and account (#125), else Hive's fallback list.
   const catalog = (await inv('provider:info'))['claude-code']?.catalog
   const offered = (await picker.locator('select option').evaluateAll((os) => os.map((o) => o.value))).filter((v) => v && v !== 'custom')
@@ -67,28 +81,34 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
     check(`the picker lists the models Claude Code ${catalog.version} reports`, groups[0] === 'Claude Code models' && JSON.stringify(offered.slice(0, reported.length)) === JSON.stringify(reported), JSON.stringify({ groups, offered, reported }))
     first = reported[0]
     await picker.locator('select').selectOption(reported.at(-1))
+    await saveConnection()
     check('another reported model saved as chosen', !!(await lib.until(async () => (await savedModel()) === reported.at(-1), 5000)), await savedModel())
   } else {
     check('latest and pinned groups, older hidden', JSON.stringify(groups) === JSON.stringify(['Latest (follows new releases)', 'Pinned versions']), JSON.stringify(groups))
     await picker.getByText('Show older versions').click()
     check('older versions shown on request', !!(await lib.until(async () => (await picker.locator('optgroup').count()) === 3, 5000)))
     await picker.locator('select').selectOption('claude-opus-4-5')
+    await saveConnection()
     check('an older version saved as chosen', !!(await lib.until(async () => (await savedModel()) === 'claude-opus-4-5', 5000)), await savedModel())
   }
   // No 1M choice (SPEC §9): current models have the 1M window without asking; Opus 4.6 / Sonnet 4.6 reach it only
   // through a [1m] model ID typed as a custom model, which the placeholder says.
   check('no 1M-context choice in the picker', (await picker.locator('input[type=checkbox]').count()) === 0)
   await picker.locator('select').selectOption(first)
+  await saveConnection()
   check(`${first} saved as chosen`, !!(await lib.until(async () => (await savedModel()) === first, 5000)), await savedModel())
   await picker.locator('select').selectOption('custom')
   check('the custom model box says how to ask for 1M ([1m])', !!(await lib.until(async () => /\[1m\]/.test((await picker.locator('input.input').getAttribute('placeholder', { timeout: 1000 }).catch(() => '')) ?? ''), HUNG_MS)))
   await picker.locator('input.input').fill('claude-sonnet-9-9'); await picker.locator('input.input').press('Enter')
+  await saveConnection()
   check('custom model ID saved', !!(await lib.until(async () => (await savedModel()) === 'claude-sonnet-9-9', HUNG_MS)))
-  // Saved before the reset below: a save still on its way would land after it and undo it.
   await picker.locator('select').selectOption(first)
+  await saveConnection()
   check(`${first} saved again after the custom ID`, !!(await lib.until(async () => (await savedModel()) === first, HUNG_MS)), await savedModel())
   await page.screenshot({ path: path.join(shots, '3-settings.png') })
-  await inv('settings:update', { assistant: { providers: { 'claude-code': { model: '' } } } })
+  await page.locator('.dialog').last().getByRole('button', { name: 'Cancel' }).click()
+  await form.waitFor({ state: 'detached', timeout: HUNG_MS })
+  await inv('connections:remove', account.id)
 
   // Project picker and effort in the header.
   await page.locator('.activity-btn[aria-label="Projects"]').click()

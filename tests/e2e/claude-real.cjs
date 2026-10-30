@@ -121,7 +121,8 @@ const check = (name, ok, extra = '') => {
   await stop(proj, agent.id)
 
   // --- The Assistant with Haiku: launched asking for Auto; what Claude Code runs it in, and what Hive shows and says.
-  await inv('settings:update', { assistant: { providers: { 'claude-code': { model: 'haiku' } } } })
+  // Its model is its connection's (HI-2108; Settings → Assistant's old one is only read by the migration): HI-2145.
+  await lib.setLaunch(inv, home, 'assistant', { model: 'haiku' })
   await inv('session:start', home, { agentId: 'assistant' })
   await lib.cliStep('the Assistant starts', { session: lib.ptyKey(home, 'assistant') }, async () => {
     await lib.acceptClaudeTrust(inv, home, 'assistant', 30000)
@@ -140,7 +141,7 @@ const check = (name, ok, extra = '') => {
   })
   // The warning matches what this Claude Code says: there exactly when Auto isn't offered (a guess when it doesn't say).
   const [caveatRight, caveat] = await lib.haikuAutoCaveat(page, m?.autoOffered)
-  check("Settings → Assistant warns about Auto with Haiku exactly when Claude Code says it isn't offered", caveatRight, caveat)
+  check("the connection dialog warns about Auto with Haiku exactly when Claude Code says it isn't offered", caveatRight, caveat)
   await stop(home, 'assistant')
 
   await app.close()
