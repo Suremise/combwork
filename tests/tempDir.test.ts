@@ -282,6 +282,11 @@ describe("a stopped run's temp folder goes at a later run's start, and every run
       expect(start, runner).toBeLessThan(text.search(/\bspawn(Sync)?\(|require\('\.\/harness\.cjs'\)/))
       expect(text, runner).toMatch(/process\.on\('exit'[^]*?endRunTemp\(\)/)
     }
+    // Playwright takes the temp folder as it loads (its playwright-artifacts-* folders): the scenario harness runs it in
+    // the runner's process, so the runner's folder comes before lib.cjs loads it; the e2e runner runs it only in suites.
+    const scenarios = readFileSync(join(here, 'scenarios/run.mjs'), 'utf8')
+    expect(scenarios.indexOf('startRunTemp(spare)')).toBeLessThan(scenarios.indexOf("require('../e2e/lib.cjs')"))
+    expect(readFileSync(join(here, 'e2e/run.mjs'), 'utf8')).not.toMatch(/_electron|\blib\.launch\(/)
     expect(createRequire(__filename)('./e2e/runContext.cjs').ALLOW).toEqual(expect.arrayContaining(['TEMP', 'TMP', 'TMPDIR']))
   })
 })
