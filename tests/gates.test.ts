@@ -189,9 +189,15 @@ describe('the Assistant moves cards across rules only with a reason (#1265, SPEC
     const a = await create(w, 'A')
     const b = await create(w, 'B')
     await update(w, a, { column: 'doing', agent: 'a1' })
-    // b is in Todo: a move to Doing skips nothing (no agent: started in the project folder), a's to Done skips rules.
+    // b is in Todo with nobody on it: its move to Doing needs the user's reason (HI-2062), refused without it while a
+    // (in Doing already) is left as it is; with it, started in the project folder, the rule recorded. a's to Done skips rules.
     const items = await inWorkspace(w, () => tasks.updateTasks([a, b], { column: 'doing' }, assistant))
-    expect(items.map((i) => i.error)).toEqual([null, null])
+    expect(items[0].error).toBeNull()
+    expect(items[1].error).toMatch(/nobody on it/)
+    expect((await inWorkspace(w, () => tasks.getTask(b, w))).column).toBe('todo')
+    const nobody = await inWorkspace(w, () => tasks.updateTasks([b], { column: 'doing', override: { reason: 'The user takes it' } }, assistant))
+    expect(nobody[0].card?.column).toBe('doing')
+    expect(facts(w, b).find((f) => f.kind === 'Override')).toMatchObject({ data: { by: 'assistant', rules: ['move.doingNobody'], reason: 'The user takes it' } })
     const refused = await inWorkspace(w, () => tasks.updateTasks([a, b], { column: 'done' }, assistant))
     expect(refused.every((i) => i.error && /integrate\.approved/.test(i.error))).toBe(true)
     const done = await inWorkspace(w, () => tasks.updateTasks([a, b], { column: 'done', override: { reason: 'Cleaning up' } }, assistant))
@@ -253,12 +259,13 @@ describe('a move is decided whole, and a refused one leaves nothing (#1265 round
     const moved = await create(w, 'Moved')
     await inWorkspace(w, () => tasks.archiveTask(kept, true))
     const before = await inWorkspace(w, () => tasks.getTask(kept, w))
-    const items = await inWorkspace(w, () => tasks.updateTasks([kept, moved], { column: 'doing' }, assistant))
+    // Nobody on them, by the user's reason (HI-2062): recorded as an Override with the start.
+    const items = await inWorkspace(w, () => tasks.updateTasks([kept, moved], { column: 'doing', override: { reason: 'Nobody yet' } }, assistant))
     expect(items[0].error).toBeTruthy()
     expect(items[1]).toMatchObject({ error: null, card: { column: 'doing' } })
     expect(await inWorkspace(w, () => tasks.getTask(kept, w))).toEqual(before)
     expect(kinds(w, kept)).toEqual([])
-    expect(kinds(w, moved)).toEqual(['Started', 'Moved'])
+    expect(kinds(w, moved)).toEqual(['Override', 'Started', 'Moved'])
   })
 
   it("the Assistant's control revoked while a batch card's move runs: that card left as it was, the one before it kept", async () => {
@@ -270,11 +277,11 @@ describe('a move is decided whole, and a refused one leaves nothing (#1265 round
     const commit = (): void => {
       if (++calls === 2) throw new tasks.TaskPermissionError({ m: { id: 'x', defaultMessage: 'Control was turned down' } } as never)
     }
-    const items = await inWorkspace(w, () => tasks.updateTasks([a, b], { column: 'doing' }, assistant, { commit }))
+    const items = await inWorkspace(w, () => tasks.updateTasks([a, b], { column: 'doing', override: { reason: 'Nobody yet' } }, assistant, { commit }))
     expect(items.map((i) => !!i.error)).toEqual([false, true])
     expect((await inWorkspace(w, () => tasks.getTask(b, w))).column).toBe('todo')
     expect(kinds(w, b)).toEqual([])
-    expect(kinds(w, a)).toEqual(['Started', 'Moved'])
+    expect(kinds(w, a)).toEqual(['Override', 'Started', 'Moved'])
   })
 
   it("the Assistant's refusal says where its rules are changed (§16.8.3's third sentence)", async () => {
@@ -632,5 +639,92 @@ describe('the window asks before a move that skips rules (#1275)', () => {
     const r = await inWorkspace(w, () => tasks.moveTask(card, 'doing', { agent: 'a1' }))
     expect(r).toMatchObject({ moved: { column: 'doing', agent: 'a1' } })
     expect(facts(w, card).find((f) => f.kind === 'Started')).toMatchObject({ data: { builder: 'a1', folder: wt } })
+  })
+})
+
+// HI-2062: the Assistant's move into Doing leaving nobody on the card is the user's choice (nobody, an agent on it, or one
+// started): refused naming the three, through the rules (its start) and without them (P3's move), checked on the card as
+// it is when the change runs; nobody on it passes with the user's reason, recorded as an Override.
+describe('the Assistant puts a card in Doing with someone on it, or nobody by the user\'s reason (HI-2062)', () => {
+  const column = async (w: WS, card: number) => (await inWorkspace(w, () => tasks.getTask(card, w))).column
+  const overrides = (w: WS, card: number) => facts(w, card).filter((f) => f.kind === 'Override').map((f) => f.data)
+
+  for (const enforced of [true, false]) {
+    describe(enforced ? 'through the rules' : 'with the rules not enforced', () => {
+      const open = async () => {
+        advanced.set(ENFORCE, enforced)
+        const { w } = await workspace(PAIR)
+        return { w, card: await create(w) }
+      }
+
+      it('refused with nobody on it, naming the three choices; nothing moved', async () => {
+        const { w, card } = await open()
+        for (const agent of [undefined, null, '']) {
+          const err = await update(w, card, { column: 'doing', ...(agent !== undefined ? { agent } : {}) }, assistant).catch((e) => e)
+          expect(err, String(agent)).toBeInstanceOf(tasks.WorkflowRefusedError)
+          const body = apiErrorReply(err).body
+          expect(body).toMatchObject({ refused: true, rule: 'move.doingNobody', override: 'the user or the Assistant' })
+          expect(body.message).toMatch(/would be in Active with nobody on it\.$/)
+          expect(body.next).toMatch(/override.*\(agent\).*hive_start_task/)
+          expect(await column(w, card)).toBe('todo')
+        }
+        expect(overrides(w, card)).toEqual([])
+      })
+
+      it('an agent named, or on the card already, goes in; an agent the project lacks is its own error', async () => {
+        const { w, card } = await open()
+        await expect(update(w, card, { column: 'doing', agent: 'nobody-here' }, assistant)).rejects.not.toBeInstanceOf(tasks.WorkflowRefusedError)
+        expect(await column(w, card)).toBe('todo')
+        expect(await update(w, card, { column: 'doing', agent: 'a1' }, assistant)).toMatchObject({ column: 'doing', agent: 'a1' })
+        const held = await create(w, 'Held')
+        await update(w, held, { agent: 'a1' })
+        expect(await update(w, held, { column: 'doing' }, assistant)).toMatchObject({ column: 'doing', agent: 'a1' })
+        expect([...overrides(w, card), ...overrides(w, held)]).toEqual([])
+      })
+
+      it('its agent taken off before the change runs (the Assistant asked while it had one): refused on the card as it is then', async () => {
+        const { w, card } = await open()
+        await update(w, card, { agent: 'a1' })
+        // The Assistant's request saw a1 on it; the user took a1 off while it waited for approval.
+        await update(w, card, { agent: '' })
+        await expect(update(w, card, { column: 'doing' }, assistant)).rejects.toMatchObject({ refusal: { rule: 'move.doingNobody' } })
+        expect(await column(w, card)).toBe('todo')
+      })
+
+      it("nobody on it with the user's reason: moved, and the Override records the rule and the reason", async () => {
+        const { w, card } = await open()
+        const moved = await update(w, card, { column: 'doing', override: { reason: 'The user takes it themselves' } }, assistant)
+        expect(moved).toMatchObject({ column: 'doing', agent: null })
+        expect(overrides(w, card)).toEqual([expect.objectContaining({ rules: ['move.doingNobody'], move: 'todo→active', by: 'assistant', reason: 'The user takes it themselves' })])
+      })
+
+      it('a card made in Doing with nobody on it is refused (in Todo, then moved); with an agent it is made there', async () => {
+        const { w } = await open()
+        const err = await inWorkspace(w, () => tasks.createTask({ title: 'New', project: 'p', column: 'doing' }, assistant)).catch((e) => e)
+        expect(err).toBeInstanceOf(tasks.TaskConflictError)
+        expect(err.message).toMatch(/make it in Todo, then move it with override/)
+        expect((await inWorkspace(w, () => tasks.listTasks())).map((c) => c.title)).toEqual(['Work'])
+        expect(await inWorkspace(w, () => tasks.createTask({ title: 'New', project: 'p', column: 'doing', agent: 'a1' }, assistant))).toMatchObject({ column: 'doing', agent: 'a1' })
+      })
+
+      it('the user and project agents are not asked: the user leaves nobody on it, an agent takes it', async () => {
+        const { w, card } = await open()
+        expect(await update(w, card, { column: 'doing' })).toMatchObject({ column: 'doing', agent: null })
+        const other = await create(w, 'Other')
+        expect(await update(w, other, { column: 'doing' }, builder)).toMatchObject({ column: 'doing', agent: 'a1' })
+      })
+    })
+  }
+
+  it('a start that also skips another rule names both, and one reason records both in one Override', async () => {
+    advanced.set(ENFORCE, true)
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { blocked: 'Waits for the design' })
+    const err = await update(w, card, { column: 'doing' }, assistant).catch((e) => e)
+    expect(err.refusal).toMatchObject({ rule: 'move.doingNobody', values: { also: 'yes', rules: 'start.notBlocked' } })
+    expect(err.refusal.message).toMatch(/with nobody on it, and the move skips: start\.notBlocked\./)
+    await update(w, card, { column: 'doing', override: { reason: 'Started for the user' } }, assistant)
+    expect(overrides(w, card)).toEqual([expect.objectContaining({ rules: ['start.notBlocked', 'move.doingNobody'], reason: 'Started for the user' })])
   })
 })

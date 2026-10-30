@@ -2173,9 +2173,15 @@ export class Workflow {
       if (gsub) for (const x of this.failingOf(gsub.card, gsub.s, gsub.r, 'submit', gsub.inputs, gsub.only)) rules.add(x)
       // Past Review (or the user's OK): the review and approvals are skipped, and the change counts as approved.
       if (pastReview && this.enforced()) rules.add('integrate.approved')
+      // The Assistant's start into Active naming nobody (HI-2062): nobody on it, an agent on it or one started is the
+      // user's choice, so it is a rule its reason overrides, recorded in the same Override as any other the move skips.
+      const others = [...rules]
+      const nobody = by === 'assistant' && !!gs && to === 'active' && !opts.builder
+      if (nobody) rules.add('move.doingNobody')
       const skipped = [...rules]
       const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
       if (opts.dry && !skipped.length) return this.ok(card, from, s0.stage)
+      if (nobody && asking) return this.refuse(card, 'assistant', 'move', { rule: 'move.doingNobody', values: { card: card.key, stage: to, also: others.length ? 'yes' : 'no', rules: others.join(', ') } }, 'the user or the Assistant') // i18n-ignore: select keys and who can override, agent-facing (§16.8.3)
       if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
       if (gs && (await this.revalidate(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))

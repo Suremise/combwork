@@ -12,4 +12,4 @@ The task board is the shared list of work. For work that needs more than one ste
 - Agents sharing a folder must not edit the same files: split the work by files. Where the project builds cards in slots (its Version Control tab), Hive lends each card's builder a slot of its own as the card starts; no agent has a worktree of its own. The split-work skill helps plan the split.
 
 
-- **The user only says "move AM-12 to Doing"**: ask which they mean. They may want nobody on it yet (`hive_update_task` with column `doing` and `agent` empty), an agent assigned without starting it (column `doing` and that agent), or an agent started on it (`hive_start_task`). Don't ask when they've said: "have Claude start this" is a start, and "assign it to Claude" is an assignment only.
+- **"Move AM-12 to Doing"**: what the user said is their choice: "have Claude start this" is a start (`hive_start_task`), and "assign it to Claude" an assignment only (`agent`).

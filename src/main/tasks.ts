@@ -1256,6 +1256,9 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
   return recording(actor, reads, () => boardLock(ws, () => createTaskLocked(...args)))
 }
 
+/** The Assistant's card made in Doing with nobody on it (HI-2062): refused, naming the user's three choices. */
+export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultMessage: 'A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then hive_start_task), or nobody on it (make it in Todo, then move it with override and their reason).', description: "An error said to the Hive Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and hive_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names." })
+
 async function createTaskLocked(
   input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string },
   actor: TaskActor
@@ -1274,6 +1277,8 @@ async function createTaskLocked(
   // An agent that puts a new card straight into Doing, naming no agent, is taking it.
   const own = column === 'doing' && input.agent === undefined ? selfIn(actor, project) : null
   const agent = input.agent ? await agentOf(project, input.agent) : own ? await agentOf(project, own) : null
+  // The Assistant's card made in Doing with nobody on it (HI-2062): which the user wants is theirs, as a move's is.
+  if (actor.kind === 'assistant' && column === 'doing' && project && !agent) throw new TaskConflictError(DOING_NOBODY_NEW)
   const ws = workspace
   const by = actorName(actor)
   const now = new Date().toISOString()
@@ -1401,6 +1406,8 @@ async function gateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: 
   // keep P3's recorded move until the window asks through tasks:move (#1275), so today's columns go on working.
   if (s.stage === to || (!o.anyStage && !hasStage(wf.rulesetOf(rec, s), to))) return null
   const agent = patch.agent !== undefined ? await agentIdIn(ws, head.project, patch.agent) : typeof head.agent === 'string' && head.agent ? head.agent : null
+  // An agent named that the project lacks is its own error (agentOf's), never a start for nobody (HI-2062).
+  if (!agent && typeof patch.agent === 'string' && patch.agent) await agentOf(head.project, patch.agent)
   return { wf, to, by: actor.kind, ...(agent ? { builder: agent } : {}) }
 }
 
@@ -2202,6 +2209,11 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
         delete card.agentName
       }
     }
+    // The Assistant's move into Doing leaving nobody on the card (HI-2062), on the card as it is now, its agent as this
+    // change leaves it: nobody on it is the user's choice, passed as override with their reason (null: refused). The
+    // runtime's own writes decided it in their move (a start into Active naming nobody is its rule there).
+    const nobody = actor.kind === 'assistant' && !changeByRuntime() && patch.column === 'doing' && card.column !== 'doing' && !!card.project && !card.agent ? patch.override?.reason.trim() || null : undefined
+    if (nobody === null) throw new WorkflowRefusedError(refusalOf('move.doingNobody', { card: cardRef(n), stage: 'active' }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
     // A review renewed by its reviewer changes the card (when it started) without a line in its history: saved too.
     const reviewed = patch.review !== undefined && (await reviewChange(card, patch, actor, said))
     if (patch.column !== undefined || patch.before !== undefined || patch.position !== undefined) {
@@ -2288,6 +2300,8 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // see the card as it was before this change.
     opts.commit?.()
     await saveCard(ws, n, card, before)
+    // Nobody on it, by the user's reason: recorded as an override is (setKind's), with the rule it passes.
+    if (nobody) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => tx.append(n, { kind: 'Override', actor: actorOf(actor), source: 'recorded', data: { rules: ['move.doingNobody'], move: `${CATEGORY_STAGE[before.column]}→active`, by: 'assistant', reason: nobody } })) // i18n-ignore: a fact's kind and codes, not text
     return card
   })()
   changed(ws)

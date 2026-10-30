@@ -2716,6 +2716,8 @@ route('POST', '/v1/tasks', async ({ body }) => {
   const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(nudge ? { nudge } : {}) })
   if (actor.kind !== 'assistant') return reply(await create())
   const project = typeof input.project === 'string' && input.project ? input.project : null
+  // Made in Doing with nobody on it (HI-2062): refused before the user is asked to approve it (checked again as it is made).
+  if (project && input.column === 'doing' && !input.agent) throw new tasks.TaskConflictError(tasks.DOING_NOBODY_NEW)
   const given = await knownAgent(project, input.agent)
   return assistantChange('agents', `add the task "${clip(title, 60)}" to the board`, { kind: 'create-task', ...(project ? { project } : {}), ...(given ? { agent: given } : {}) }, async () => {
     const c = await create()
@@ -2782,6 +2784,9 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     return copy && !shortReply(body) ? { ...r, reviewCopy: copy } : r
   }
   const was = await tasks.getTask(n).catch(() => null)
+  // Into Doing with nobody on it and no reason from the user (HI-2062): refused before the user is asked to approve it.
+  // Only a first look: the change checks it again on the card as it is then (and an agent named is checked there).
+  if (was?.project && patch.column === 'doing' && was.column !== 'doing' && !patch.override && (patch.agent === undefined ? !was.agent : !patch.agent)) throw new tasks.WorkflowRefusedError(refusal('move.doingNobody', { card: cardRef(n), stage: 'active' }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
   const given = typeof patch.agent === 'string' ? await knownAgent(was?.project, patch.agent) : was ? await cardAgent(was) : undefined
   return assistantChange('agents', `change ${cardRef(n)} on the board`, { kind: 'update-task', card: n, ...(patch.column ? { column: patch.column } : {}), ...(was?.project ? { project: was.project } : {}), ...(given ? { agent: given } : {}) }, async (commit) => {
     const before = await tasks.getTask(n)

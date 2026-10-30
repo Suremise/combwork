@@ -29,6 +29,7 @@
   "tasks.error.decisionEmptied": "La décision est vide : retire-la plutôt.",
   "tasks.error.decisionGone": "Cette décision n’est plus sur la carte {card}.",
   "tasks.error.decisionsUsers": "Seul l’utilisateur modifie ou retire les décisions d’une carte.",
+  "tasks.error.doingNobodyNew": "Une carte créée à l’étape En cours a besoin d’un agent dessus (agent). Demande à l’utilisateur ce qu’il veut : un agent dessus, un agent qui la démarre (crée-la dans À faire, puis hive_start_task), ou personne dessus (crée-la dans À faire, puis déplace-la avec override et sa raison).",
   "tasks.error.emptyComment": "Le commentaire est vide.",
   "tasks.error.emptyDecision": "La décision est vide.",
   "tasks.error.failedToDoing": "Une relecture échouée renvoie la carte {card} dans En cours, à son auteur : donne le verdict sans column.",

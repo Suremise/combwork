@@ -10,7 +10,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.hiveMerges' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -150,6 +150,11 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.move.needsOverride.message', defaultMessage: 'Moving {card} to {stage} skips: {rules}.', description: 'A move that skips rules: {rules} lists the rule names.' }),
     msg({ id: 'workflow.refused.move.needsOverride.next', defaultMessage: "{reader, select, you {Moving it anyway needs your reason: one you gave for it, or one you give once told which rules this skips.} other {Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.}}", description: "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request or after being told which rules the move skips. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences." }),
     msg({ id: 'workflow.refused.move.needsOverride.change', defaultMessage: "{reader, select, you {These rules are set in Version Control, where you can change them.} other {These rules are set in Version Control, where the user can change them.}}", description: 'Where the rules a move would skip are changed: the project\'s Version Control tab (a tab name: use it as Hive shows it). {reader} (select): you is the window\'s wording, other the agent\'s (the user named as the user); translate both whole sentences.' })
+  ),
+  // The Assistant's move into Active leaving nobody on the card (HI-2062): which of the three the user wants is theirs.
+  'move.doingNobody': r(
+    msg({ id: 'workflow.refused.move.doingNobody.message', defaultMessage: '{card} would be in {stage} with nobody on it{also, select, yes {, and the move skips: {rules}} other {}}.', description: "A refused move into the Active stage by the Hive Assistant (HI-2062): the card {card} (its key, like AM-12) would have no agent on it. {stage} is the stage's name. {also} (select): yes when the move also skips other rules, listed in {rules}; translate both branches." }),
+    msg({ id: 'workflow.refused.move.doingNobody.next', defaultMessage: "{reader, select, you {Choose nobody on it, an agent on it, or an agent started on it.} other {Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (hive_start_task).}}", description: "The next step after the Assistant's move into Active was refused for leaving nobody on the card: the user chooses nobody on it, an agent given the card, or an agent started on it. override, agent and hive_start_task are names of a call's fields and a tool: keep them as they are. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences." })
   ),
   'lane.lineBehind': r(
     msg({ id: 'workflow.refused.lane.lineBehind.message', defaultMessage: "{card} can't start yet: {line} still has {earlier}'s work, which was squashed into {target}.", description: "A refused start (§16.19.2): the builder's branch (in its own worktree) still has the previous card's commits, which were merged into the target as one squashed commit, so the next card's change would include them. {card} and {earlier} are card keys like AM-12; {line} a branch name; {target} the branch merged into." }),
@@ -358,7 +363,8 @@ const IN_ENGLISH: RefusalFormat = { one: (m, values) => englishText(values ? { m
  * what each was then: `submit.checksPassed`'s last run's reason (#1654), none before.
  */
 const VALUES_BEFORE: Partial<Record<RuleId, Record<string, string>>> = {
-  'submit.checksPassed': { why: 'none', files: 'none', copy: 'no' } // i18n-ignore: select keys, never shown
+  'submit.checksPassed': { why: 'none', files: 'none', copy: 'no' }, // i18n-ignore: select keys, never shown
+  'move.doingNobody': { also: 'no' } // i18n-ignore: select keys, never shown
 }
 
 /** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */

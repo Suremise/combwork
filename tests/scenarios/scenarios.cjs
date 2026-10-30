@@ -3317,6 +3317,32 @@ module.exports.SCENARIOS = [
       ]
     }
   },
+  // HI-2062: asked only to move cards to Doing, the Assistant can't leave one there with nobody on it: Hive refuses that
+  // move naming the user's three choices (nobody on it with their reason, an agent on it, one started), and the
+  // Assistant asks; a card with an agent on it already just goes in, still that agent's.
+  {
+    id: 'assistant-doing-nobody',
+    title: 'The Assistant asked only to move cards to Doing (HI-2062): one with nobody on it is refused and the user asked which they meant; one with an agent goes in',
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      await c.card('h', { title: 'Greeting helper', description: 'greet.js returns "Hello, <name>".', agent: 'coder' })
+      await c.card('n', { title: 'Farewell helper', description: 'bye.js returns "Bye, <name>".' })
+    },
+    prompt: (c) => `Move #${c.cards.h} and #${c.cards.n} to Doing.`,
+    fake: (c) => `skill coordinate-agents then hive hive_update_task {"number":${c.cards.h},"column":"doing"} then hive hive_update_task {"number":${c.cards.n},"column":"doing"}`,
+    expect: (o, c) => {
+      // Its moves to Doing naming no agent and no reason of the user's (a model may rightly ask before trying any).
+      const untold = called(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.n) && argsOf(x).column === 'doing' && !argsOf(x).agent && !argsOf(x).override)
+      return [
+        ["the card with Coder on it went into Doing, still Coder's", o.cards.h?.column === 'doing' && o.cards.h?.agentName === 'Coder', `${o.cards.h?.column}, ${o.cards.h?.agentName}`],
+        ['the card with nobody on it is not in Doing with nobody on it', o.cards.n?.column !== 'doing' || !!o.cards.n?.agent, `${o.cards.n?.column}, ${o.cards.n?.agentName ?? 'nobody'}`],
+        ['each move of it with nobody on it was refused, naming the choices', untold.every((x) => !x.ok && /nobody on it.*hive_start_task/s.test(String(x.error ?? ''))), untold.map((x) => (x.ok ? 'ok' : String(x.error).slice(0, 120))).join(' | ')],
+        ['asked the user which they meant', asksTheUser(o.finalReply), String(o.finalReply ?? '').slice(0, 200)]
+      ]
+    },
+    fakeSkips: ['asked the user which they meant']
+  },
   // HI-1932: the user's answer to a card's open questions, told the Assistant in chat, is recorded as a decision naming
   // the requests it answers (hive_update_task's answers), so Hive closes them; a pair, the answer covering both questions
   // or only one of them, and the Assistant names those and only those.

@@ -31,6 +31,7 @@ interface HiveMessageValues {
   'tasks.error.decisionEmptied': undefined
   'tasks.error.decisionGone': { card: string | number }
   'tasks.error.decisionsUsers': undefined
+  'tasks.error.doingNobodyNew': undefined
   'tasks.error.emptyComment': undefined
   'tasks.error.emptyDecision': undefined
   'tasks.error.failedToDoing': { card: string | number }

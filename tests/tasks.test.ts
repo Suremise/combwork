@@ -344,9 +344,11 @@ describe('task board', () => {
     // An agent named (or none, with empty) wins.
     const named = await run(async () => tasks.updateTask((await fresh()).number, { column: 'doing', agent: '' }, me))
     expect(named.agent).toBeNull()
-    // The Assistant, the user, a plain Agent API caller and an agent of another project give it to nobody.
+    // The Assistant (with the user's reason for nobody on it, HI-2062), the user, a plain Agent API caller and an agent of
+    // another project give it to nobody.
     for (const who of [assistant, user, agent, { kind: 'agent', name: 'B (beta)', self: { project: 'beta', agentId: 'b1' } } as const]) {
-      expect((await run(async () => tasks.updateTask((await fresh()).number, { column: 'doing' }, who))).agent).toBeNull()
+      const reason = who === assistant ? { override: { reason: 'nobody on it for now' } } : {}
+      expect((await run(async () => tasks.updateTask((await fresh()).number, { column: 'doing', ...reason }, who))).agent).toBeNull()
     }
     // Already in Doing: a move within it isn't taking it.
     expect((await run(() => tasks.updateTask(named.number, { position: 'top' }, me))).agent).toBeNull()
@@ -355,7 +357,8 @@ describe('task board', () => {
     expect((await run(() => tasks.createTask({ title: 'Mine', project: 'alpha', column: 'doing' }, me))).agent).toBe('a1')
     expect((await run(() => tasks.createTask({ title: 'Todo', project: 'alpha' }, me))).agent).toBeNull()
     expect((await run(() => tasks.createTask({ title: 'Nobody', project: 'alpha', column: 'doing', agent: '' }, me))).agent).toBeNull()
-    expect((await run(() => tasks.createTask({ title: 'Theirs', project: 'alpha', column: 'doing' }, assistant))).agent).toBeNull()
+    // The Assistant's, with nobody on it: refused (HI-2062: in Todo, then moved with the user's reason).
+    await expect(run(() => tasks.createTask({ title: 'Theirs', project: 'alpha', column: 'doing' }, assistant))).rejects.toBeInstanceOf(tasks.TaskConflictError)
 
     for (const c of await run(() => tasks.allTasks())) if (['Take me', 'Mine', 'Todo', 'Nobody', 'Theirs'].includes(c.title)) await run(() => tasks.deleteTask(c.number))
   })
