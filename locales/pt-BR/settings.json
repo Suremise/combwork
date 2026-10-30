@@ -1075,7 +1075,7 @@
   "settings.prices.unlisted": "fora da lista do {provider}",
   "settings.prices.unlistedTip": "O {provider} não lista mais este modelo; o preço dele fica para as sessões antigas.",
   "settings.prices.yours": "seu",
-  "settings.project.agents.desc": "O Assistente adiciona agentes até o Máximo de agentes do projeto (Controle de versão → Fluxo de trabalho), e você pode adicionar mais por conta própria, até 24, cada um na pasta do projeto ou em um slot. Agentes sem configurações próprias usam as deste projeto.",
+  "settings.project.agents.desc": "O Assistente adiciona agentes até o Máximo de agentes do projeto (Controle de versão → Fluxo de trabalho), e você pode adicionar mais por conta própria, até {max, number}, cada um na pasta do projeto ou em um slot. Agentes sem configurações próprias usam as deste projeto.",
   "settings.project.agents.title": "Agentes",
   "settings.project.cardAttachmentCleanup.desc": "Os arquivos guardados com os cartões deste projeto vão para a Lixeira esse tempo depois que um cartão é arquivado. Cartões abertos e concluídos mantêm os seus.",
   "settings.project.cardAttachmentCleanup.option.3": "3 dias depois de arquivar",

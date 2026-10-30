@@ -510,7 +510,7 @@
   "workflow.why.finish": "Fusionando a través de la cola de Hive, el trabajo en rojo nunca llega a la rama de destino; trabajando en solitario, una tarjeta pasa a Hecho en cuanto se hace commit.",
   "workflow.why.focusedTests": "Las pruebas propias de cada tarjeta en el resultado fusionado detectan lo que su cambio rompe ahí, sin ejecutar todas las pruebas para cada tarjeta.",
   "workflow.why.folder": "Las parejas y los equipos trabajan en paralelo, cada tarjeta aparte de las demás.",
-  "workflow.why.identity": "Los commits llevan la identidad del proyecto, sea cual sea el equipo que los hizo.",
+  "workflow.why.identity": "Los commits llevan la identidad del proyecto, sea cual sea el PC que los hizo.",
   "workflow.why.maxAgents": "Cada ajuste predefinido es para un equipo de su tamaño (Individual, un agente; Pareja, un autor y un revisor), así el Asistente nunca agrega agentes que no planeaste.",
   "workflow.why.mergeChecks": "Las comprobaciones se ejecutan sobre el trabajo tal como quedará una vez fusionado, no solo como se construyó.",
   "workflow.why.mergeInstall": "Una instalación limpia antes de cada fusión detecta una dependencia que solo funcionaba en la máquina del autor.",

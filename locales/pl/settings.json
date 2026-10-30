@@ -1075,7 +1075,7 @@
   "settings.prices.unlisted": "brak na liście: {provider}",
   "settings.prices.unlistedTip": "{provider} nie ma teraz tego modelu na liście; jego cena zostaje dla starszych sesji.",
   "settings.prices.yours": "Twój",
-  "settings.project.agents.desc": "Asystent dodaje agentów do Maksymalnej liczby agentów projektu (Kontrola wersji → Przepływ pracy), a Ty możesz samodzielnie dodać więcej, do 24, każdy w folderze projektu lub w slocie. Agenci bez własnych ustawień używają ustawień tego projektu.",
+  "settings.project.agents.desc": "Asystent dodaje agentów do Maksymalnej liczby agentów projektu (Kontrola wersji → Przepływ pracy), a Ty możesz samodzielnie dodać więcej, do {max, number}, każdy w folderze projektu lub w slocie. Agenci bez własnych ustawień używają ustawień tego projektu.",
   "settings.project.agents.title": "Agenci",
   "settings.project.cardAttachmentCleanup.desc": "Pliki przechowywane z kartami tego projektu trafiają do Kosza po takim czasie od zarchiwizowania karty. Otwarte karty i karty z kolumny Gotowe zachowują swoje.",
   "settings.project.cardAttachmentCleanup.option.3": "3 dni po zarchiwizowaniu",

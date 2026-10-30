@@ -39,7 +39,7 @@
   "actions.chooseConnections.restartTitle": "切换正在运行的智能体？",
   "actions.chooseConnections.skipped": "{count, plural, other {# 个智能体保留了原来的连接}}",
   "actions.chooseConnections.skippedWhy": "{agent}：{why, select, running {它正在运行，而该连接属于另一个编程智能体：请先停止它} other {它在此期间已被移除}}。",
-  "actions.chooseConnections.switch": "本轮结束后切换它们",
+  "actions.chooseConnections.switch": "回合结束后切换它们",
   "actions.chooseConnections.title": "为 {project} 选择连接",
   "actions.delete.busy": "正在删除…",
   "actions.delete.confirm": "删除",

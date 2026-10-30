@@ -54,7 +54,7 @@
   "panes.footer.connectionUnknown": "Hive no pudo comprobar, al arrancar, con quién inició sesión esta conexión.",
   "panes.footer.costClick": "Haz clic para ver los detalles de esta sesión en el Resumen",
   "panes.footer.costEstimated": "Costo equivalente en la API de esta sesión, estimado por Hive a partir de sus tokens",
-  "panes.footer.costFreeTip": "Esta conversación solo se ejecuta en un servidor de este equipo, así que no cuesta nada. Sus tokens se siguen contando.",
+  "panes.footer.costFreeTip": "Esta conversación solo se ejecuta en un servidor de este PC, así que no cuesta nada. Sus tokens se siguen contando.",
   "panes.footer.costReported": "Costo equivalente en la API de esta sesión, según lo informa el proveedor",
   "panes.footer.ctxValue": "ctx {value}",
   "panes.footer.handOverWhen": "{when, select, now {Traspásalo a una conversación nueva: haz clic para Traspasar a… y elige el propio agente.} other {Puede traspasar a una conversación nueva cuando haya terminado: no mientras trabaja, fusiona o está en una tarjeta de un ciclo de tarjetas.}}",

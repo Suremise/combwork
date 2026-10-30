@@ -1075,7 +1075,7 @@
   "settings.prices.unlisted": "non listé par {provider}",
   "settings.prices.unlistedTip": "{provider} ne liste plus ce modèle ; son prix reste pour les sessions plus anciennes.",
   "settings.prices.yours": "ajouté",
-  "settings.project.agents.desc": "L’Assistant ajoute des agents jusqu’au Nombre maximal d’agents du projet (Gestion de versions → Flux de travail), et tu peux en ajouter d’autres toi-même, jusqu’à 24, chacun dans le dossier du projet ou dans un emplacement. Les agents sans paramètres propres utilisent ceux du projet.",
+  "settings.project.agents.desc": "L’Assistant ajoute des agents jusqu’au Nombre maximal d’agents du projet (Gestion de versions → Flux de travail), et tu peux en ajouter d’autres toi-même, jusqu’à {max, number}, chacun dans le dossier du projet ou dans un emplacement. Les agents sans paramètres propres utilisent ceux du projet.",
   "settings.project.agents.title": "Agents",
   "settings.project.cardAttachmentCleanup.desc": "Les fichiers gardés avec les cartes de ce projet vont dans la Corbeille ce délai après l’archivage d’une carte. Les cartes ouvertes et celles en Terminé gardent les leurs.",
   "settings.project.cardAttachmentCleanup.option.3": "3 jours après l’archivage",

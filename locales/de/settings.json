@@ -1075,7 +1075,7 @@
   "settings.prices.unlisted": "nicht in der Liste von {provider}",
   "settings.prices.unlistedTip": "{provider} listet dieses Modell nicht mehr; sein Preis bleibt für ältere Sitzungen.",
   "settings.prices.yours": "deins",
-  "settings.project.agents.desc": "Der Assistent fügt Agenten bis zur Höchstzahl an Agenten des Projekts hinzu (Versionsverwaltung → Workflow), und du kannst selbst weitere hinzufügen, bis zu 24, jeder im Projektordner oder in einem Slot. Agenten ohne eigene Einstellungen verwenden die dieses Projekts.",
+  "settings.project.agents.desc": "Der Assistent fügt Agenten bis zur Höchstzahl an Agenten des Projekts hinzu (Versionsverwaltung → Workflow), und du kannst selbst weitere hinzufügen, bis zu {max, number}, jeder im Projektordner oder in einem Slot. Agenten ohne eigene Einstellungen verwenden die dieses Projekts.",
   "settings.project.agents.title": "Agenten",
   "settings.project.cardAttachmentCleanup.desc": "Dateien, die mit den Karten dieses Projekts aufbewahrt werden, kommen so lange nach dem Archivieren einer Karte in den Papierkorb. Offene und erledigte Karten behalten ihre.",
   "settings.project.cardAttachmentCleanup.option.3": "3 Tage nach dem Archivieren",

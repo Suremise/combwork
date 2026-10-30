@@ -4,7 +4,7 @@
   "activity.block.asked": "{other, select, yes {编辑等待你批准：{file} 已被另一个项目的智能体锁定} other {编辑等待你批准：{file} 已被智能体 {holder} 锁定}}",
   "activity.block.blocked": "{other, select, yes {编辑被阻止：{file} 已被另一个项目的智能体锁定} other {编辑被阻止：{file} 已被智能体 {holder} 锁定}}",
   "activity.block.for": "Hive 的文件锁 · {time}",
-  "activity.block.tip": "锁存在期间显示：当另一个智能体完成、该智能体重试或转做别的事，或它的轮次结束时消失。其历史记录在该智能体的 ⋯ → 钩子… 中。",
+  "activity.block.tip": "锁存在期间显示：当另一个智能体完成、该智能体重试或转做别的事，或它的回合结束时消失。其历史记录在该智能体的 ⋯ → 钩子… 中。",
   "activity.cards": "{n, plural, =0 {全部卡片} other {# 张卡片}}",
   "activity.cardsLabel": "卡片",
   "activity.closeDetails": "关闭详细信息",

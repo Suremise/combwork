@@ -97,7 +97,7 @@
   "tips.boardDone.title": "Aprobado, y Hecho una vez fusionada",
   "tips.boardExport.text": "El tablero se guarda en la base de datos del espacio de trabajo. Exportar el tablero a JSON…, en el menú ⋯ del tablero, guarda cada tarjeta como un archivo JSON, también las archivadas, en una carpeta que elijas.",
   "tips.boardExport.title": "Tu tablero como archivos sencillos",
-  "tips.boardFold.text": "Contrae una columna a una franja estrecha con la “ de su encabezado, y pliega las tarjetas en una línea con su ▾; el ⋯ de una columna contrae o expande todas sus tarjetas. Hive lo recuerda para el espacio de trabajo.",
+  "tips.boardFold.text": "Contrae una columna a una franja estrecha con la « de su encabezado, y pliega las tarjetas en una línea con su ▾; el ⋯ de una columna contrae o expande todas sus tarjetas. Hive lo recuerda para el espacio de trabajo.",
   "tips.boardFold.title": "Pliega el tablero a lo importante",
   "tips.boardHygiene.text": "Pide al Asistente que ordene el tablero: enlaza las tarjetas duplicadas para que las archives, registra tus respuestas como decisiones en sus tarjetas y señala los motivos de bloqueo desactualizados.",
   "tips.boardHygiene.title": "Pide al Asistente que ordene el tablero",
@@ -231,7 +231,7 @@
   "tips.hardwareAcceleration.text": "Si tu controlador gráfico deja la ventana de Hive en blanco, la hace parpadear o hace que se cierre, activa Configuración → Avanzado → Desactivar la aceleración por hardware y reinicia Hive. Si la ventana no se dibuja en absoluto, inicia Hive una vez con --disable-gpu.",
   "tips.hardwareAcceleration.title": "¿La ventana se ve en blanco o parpadea?",
   "tips.hiveFolder.text": "Hive mantiene fuera de git, por sí solo, la carpeta .hive de cada proyecto (sesiones, copias de seguridad, configuración de inicio). Donde no puede, por ejemplo sin git, con otro sistema de control de versiones o en una carpeta que sincroniza OneDrive o Dropbox, te lo dice el Resumen del proyecto.",
-  "tips.hiveFolder.title": "La carpeta .hive de un proyecto se queda en este equipo",
+  "tips.hiveFolder.title": "La carpeta .hive de un proyecto se queda en este PC",
   "tips.hiveMerges.text": "En Control de versiones → Flujo de trabajo, elige Pareja o pon Quién fusiona en Hive fusiona: la cola de fusión de Hive fusiona cada tarjeta aprobada cuando sus comprobaciones pasan en el resultado fusionado, así el trabajo en rojo nunca llega a la rama de destino.",
   "tips.hiveMerges.title": "Deja que Hive fusione las tarjetas aprobadas",
   "tips.hiveSkills.text": "Los agentes y el Asistente reciben las habilidades propias de Hive: work-on-card, review-agent-work, handover y más. Hive las mantiene al día; las que edites siguen siendo tuyas.",
@@ -251,7 +251,7 @@
   "tips.isolatedChecks.text": "En una carpeta compartida, una comprobación no cuenta si otro agente edita algo mientras se ejecuta. hive-progress --check typecheck --isolated la ejecuta en una copia propia en la versión de la tarjeta, donde nada más escribe. Detener, en el panel Progreso, la termina con todo lo que inició.",
   "tips.isolatedChecks.title": "Una comprobación que nadie puede estropear",
   "tips.keepAwake.text": "Mientras un agente trabaja, Hive impide que Windows entre en suspensión (la pantalla aún puede bloquearse), y lo deja suspenderse cuando terminan. Elige cuándo en Configuración → General.",
-  "tips.keepAwake.title": "Deja a los agentes trabajando: el equipo sigue despierto",
+  "tips.keepAwake.title": "Deja a los agentes trabajando: el PC sigue despierto",
   "tips.laneApplyNow.text": "En Iniciar carril para el autor de un carril, Aplicar ahora cambia el orden al momento: la tarjeta en la que se trabaja vuelve a Pendiente con su trabajo en su rama, y se avisa al autor.",
   "tips.laneApplyNow.title": "Reordena ya un carril en marcha",
   "tips.laneBranchSquash.text": "Tras fusionar con squash la tarjeta de un agente, Hive actualiza su rama antes de su siguiente tarjeta, para que cada revisión muestre solo el trabajo de esa tarjeta. Lo que no puede hacer con seguridad lo pregunta en Para ti; Configuración → Avanzado hace que pregunte siempre.",
@@ -515,6 +515,6 @@
   "tips.workspaceMoved.title": "Mueve un espacio de trabajo sin perder sus agentes",
   "tips.workspaceMovedDefender.text": "Si Hive hizo que Defender omitiera las carpetas del espacio de trabajo, Reparar… después de moverlo ofrece mover esas exclusiones a las carpetas nuevas, con una sola solicitud de administrador, para que ninguna quede en una carpeta que ya no existe. Las exclusiones que creaste tú se quedan como están.",
   "tips.workspaceMovedDefender.title": "Las exclusiones de Defender siguen a un espacio de trabajo movido",
-  "tips.workspaceNotes.text": "Workspace notes, fijada arriba en Notas compartidas, es para lo que vale en este equipo, como una ruta completa. Cada agente la recibe al iniciarse, en cualquier carpeta, así que no hace falta ponerla en un AGENTS.md con commit. Una sección titulada con el nombre de un proyecto es solo de ese proyecto.",
-  "tips.workspaceNotes.title": "Notas sobre este equipo para cada agente"
+  "tips.workspaceNotes.text": "Workspace notes, fijada arriba en Notas compartidas, es para lo que vale en este PC, como una ruta completa. Cada agente la recibe al iniciarse, en cualquier carpeta, así que no hace falta ponerla en un AGENTS.md con commit. Una sección titulada con el nombre de un proyecto es solo de ese proyecto.",
+  "tips.workspaceNotes.title": "Notas sobre este PC para cada agente"
 }

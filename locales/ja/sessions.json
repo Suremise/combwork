@@ -35,7 +35,7 @@
   "sessions.cards.workedOn": "作業したカード",
   "sessions.chips.dismiss": "{file}を外す",
   "sessions.chips.label": "このプロンプトの添付ファイル",
-  "sessions.chips.toCard": "{file} をカードに添付",
+  "sessions.chips.toCard": "{file}をカードに添付",
   "sessions.cleanup.age": "{age, select, day {24時間以上前} week {7日以上前} other {30日以上前}}",
   "sessions.cleanup.archive": "アーカイブ",
   "sessions.cleanup.archiveSummary": "Hive自身のセッションは一覧から非表示になり、トランスクリプトは.hive/archiveに保存されます。「アーカイブ済み」にチェックを入れると表示され、いつでもアーカイブから戻せます。",

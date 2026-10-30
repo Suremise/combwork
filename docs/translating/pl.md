@@ -102,6 +102,7 @@ The words Polish uses for Hive's terms ([glossary.md](glossary.md)). Use them ev
 | review (the act) | recenzja | „przekaż do recenzji”, „recenzja nie przeszła”. |
 | card loop / lane / round | pętla kart / tor / runda | *Start lane…*: „Uruchom tor…”. |
 | merge queue / test merge | kolejka scalania / scalanie próbne | *kolejka scalania* was the old *merge slot*'s word; from 1.0 it names the merge queue. *Pause queue / Resume queue*: „Wstrzymaj kolejkę / Wznów kolejkę”. |
+| merge slot (one agent merge at a time into a branch, where agents merge) | blokada scalania | Feminine: „blokada jest wolna”, „zwolnij ją”. Never *kolejka scalania*, which is the merge queue (Darren, HI-1928). |
 | slot / pool / ready (a slot) | slot (*slotu, sloty, slotów*) / pula / gotowy | „w slocie {slot}”, „pula recenzentów”. |
 | version control (the Version Control tab) | kontrola wersji (zakładka Kontrola wersji) | Its choice *None*: „Brak” („opcja Brak”). |
 | workflow / workflow options | przepływ pracy / opcje przepływu pracy | |
