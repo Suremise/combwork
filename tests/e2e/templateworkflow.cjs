@@ -127,6 +127,8 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     check('loaded: Version Control → Workflow opens with it filled in, saying so, the missing command flagged', !!(await until(async () => (await banner.count()) === 1 && (await banner.locator('[data-template-no-command]').getAttribute('data-template-no-command')) === 'unit')), await text(page.locator('.vc-view')))
     // Only its Maximum agents is saved, with its agents (HI-2058): gita's 12, as gitb's own even though it inherits 12.
     const withoutMax = (w) => (w ? { ...w, options: Object.fromEntries(Object.entries(w.options ?? {}).filter(([k]) => k !== 'maxAgents')) } : w)
+    // The note says what is saved already (HI-2083): its Maximum agents, with its agents; the rest awaits Save.
+    check('…the note says its Maximum agents (12) is saved already and the other options aren’t yet', /Its Maximum agents \(12\) is saved already, with its agents; the other options aren’t saved yet/.test(await text(banner)), await text(banner))
     check('…and nothing else saved yet: its Maximum agents saved with its agents', JSON.stringify(withoutMax(workflowOf(gitb))) === JSON.stringify(withoutMax(gitbBefore === undefined ? undefined : JSON.parse(gitbBefore))) && workflowOf(gitb)?.options?.maxAgents === 12, JSON.stringify(workflowOf(gitb)))
     await shoot('3-filled', () => page.locator('.vc-view'))
     await page.locator('.workflow-actions [data-action="save"]').click()

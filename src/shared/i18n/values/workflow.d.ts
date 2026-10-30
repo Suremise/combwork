@@ -56,7 +56,8 @@ interface HiveMessageValues {
   'workflow.form.from.preset': undefined
   'workflow.form.from.project': undefined
   'workflow.form.from.workspace': undefined
-  'workflow.form.fromTemplate': { template: string | number }
+  'workflow.form.fromTemplateDraft': { template: string | number }
+  'workflow.form.fromTemplateMax': { template: string | number; max: number }
   'workflow.form.heir': { project: string | number; options: string | number }
   'workflow.form.heirCards': { n: number }
   'workflow.form.heirElsewhere': { project: string | number; workspace: string | number; options: string | number }
