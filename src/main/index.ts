@@ -807,7 +807,7 @@ function wireSettingsEffects(): void {
     }
     if (JSON.stringify(s.agentApi) !== JSON.stringify(prev.agentApi)) void startApiServer().then(refreshAll)
     // Session settings changed: refresh "restart to apply", and offer to switch running agents to a new permission mode.
-    else if (JSON.stringify(s.providers) !== JSON.stringify(prev.providers) || s.defaultProvider !== prev.defaultProvider || JSON.stringify(s.assistant) !== JSON.stringify(prev.assistant)) refreshAll()
+    else if (JSON.stringify(s.providers) !== JSON.stringify(prev.providers) || JSON.stringify(s.assistant) !== JSON.stringify(prev.assistant)) refreshAll()
     for (const p of PROVIDERS) {
       const now = providerSettings(s, p.id)
       const before = providerSettings(prev, p.id)

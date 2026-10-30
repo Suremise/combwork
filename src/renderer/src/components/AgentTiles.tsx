@@ -292,7 +292,7 @@ function Tile({ project, a, state, tabStop, movable, onFocus, onMenu }: { projec
       <span className="tile-head">
         <StateMark state={state} className={stoppedEnd ? 'stopped' : undefined} label={stoppedEnd ? stoppedLabel(stoppedEnd) : undefined} />
         <span className="tile-name">{a.name}</span>
-        <span className="tile-provider">{providerName(agentProviderOf(project, a))}</span>
+        <span className="tile-provider">{providerName(agentProviderOf(a))}</span>
       </span>
       {/* Every row keeps its place, shown or not (#1145): a tile is always the same height, so tiles don't move. */}
       <TileText className="tile-status">{status}</TileText>

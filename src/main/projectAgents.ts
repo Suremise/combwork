@@ -4,7 +4,7 @@ import { basename, dirname, join } from 'path'
 import { AGENT_LIMIT_MAX, ROLE_MAX, SESSION_LAYOUTS, agentLimitText, agentMaxText, agentPtyKey, layoutPanes, mergeBlocked, moveAgentTo, projectAgents, projectLayout, slugify, swapAgentsIn } from '../shared/defaults'
 import { orderByCells, placedCells } from '../shared/paneCells'
 import { forgetPtys } from './ptyHost'
-import { agentProvider, isKnownProvider } from '../shared/providers'
+import { agentProvider, autoProvider, isKnownProvider } from '../shared/providers'
 import { cleanMcpServers } from '../shared/agentMcp'
 import { isWorkflowRole, type WorkflowRole } from '../shared/workflow/roles'
 import type { AddAgentOptions, AddedAgent, AgentBranchStatus, AgentDef, AgentPatch, Connection, LaunchValues, MergeResult, ProjectConfig, ProjectGitInfo, ProjectProviderConfig, ProviderId, RemovedAgent, SessionLayout, WorktreeCheck, WorktreeMatch } from '../shared/types'
@@ -371,14 +371,15 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
   // The provider is stored on the agent, so changing a default later doesn't move existing agents. Automatic's is only
   // known once Hive has looked for every CLI before the one it found (#506).
   // Decision A (HI-2106): no default provider; the CLI of the connection named, else of the first account in the one order
-  // that's usable here (its CLI on and installed).
+  // that's usable here (its CLI on and installed); with no account usable (a test copy on its CLI test home), the first
+  // CLI on and installed (autoProvider).
   const named = getConnection(opts.connection)
   const ws = workspaceOf(projectPath)
   // Only once Hive knows which CLIs are installed (HI-2108 round 2): a CLI earlier in the order still being looked for
   // could be the first usable, so nothing is decided from a guess (refused, saying so, if it still isn't known).
   if (!opts.provider && !opts.connection) await providerService.settle()
   const first = opts.provider || opts.connection ? null : firstUsableAccount(ws.path ? ws.config : null)
-  const provider = opts.provider || accountById(named?.account ?? opts.connection)?.provider || first?.provider || agentProvider(null, cfg, config.settings)
+  const provider = opts.provider || accountById(named?.account ?? opts.connection)?.provider || first?.provider || autoProvider(config.settings)
   if (!isKnownProvider(provider)) throw hiveError(M.unknownProvider, { provider }, { kind: 'invalid' })
   const def: AgentDef = { id, name, provider }
   const role = cleanRole(opts.role)
@@ -452,7 +453,7 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   const before = projectAgents(cfgNow).find((a) => a.id === agentId)
   if (patch.provider !== undefined) {
     if (!isKnownProvider(patch.provider)) throw hiveError(M.unknownProvider, { provider: patch.provider }, { kind: 'invalid' })
-    if (before && agentProvider(before, cfgNow, config.settings) !== patch.provider) {
+    if (before && agentProvider(before, config.settings) !== patch.provider) {
       if (sessions.liveFor(projectPath, agentId)) throw hiveError(M.stopForProvider, undefined, { kind: 'conflict' })
       // Its conversations can't be resumed by the new one.
       clean.lastSessionId = undefined
@@ -461,8 +462,8 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   // Undo putting an agent back on its old CLI (HI-2109): the conversation it had there, in the same write.
   if (opts.session !== undefined) clean.lastSessionId = opts.session ?? undefined
   if (touches && before) {
-    const cli = patch.provider ?? agentProvider(before, cfgNow, config.settings)
-    const changedCli = cli !== agentProvider(before, cfgNow, config.settings)
+    const cli = patch.provider ?? agentProvider(before, config.settings)
+    const changedCli = cli !== agentProvider(before, config.settings)
     // Another CLI's model, effort, mode and context aren't carried over: only what the patch gives.
     // Cleared (null): its CLI's first usable here, as none chosen ran on before (decision H: it always names one).
     const cleared = connection === null || connection === ''
@@ -487,10 +488,10 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   // here. Only the one already saved, for the same CLI, may stay while it is off here (the default runs it meanwhile).
   // Whether the patch changes its CLI was decided from the agent as read before the write (resetting what belongs to the
   // old one): the agent as saved now must still be on that CLI, else the change is refused whole (HI-1771).
-  const beforeCli = before ? agentProvider(before, cfgNow, config.settings) : null
+  const beforeCli = before ? agentProvider(before, config.settings) : null
   const check = (current: AgentDef): void => {
     opts.check?.(current)
-    const was = agentProvider(current, cfg, config.settings)
+    const was = agentProvider(current, config.settings)
     // A change of CLI only while it is stopped, as it is now: one started while this write waited keeps everything.
     if (patch.provider !== undefined && patch.provider !== was && sessions.liveFor(projectPath, agentId)) throw hiveError(M.stopForProvider, undefined, { kind: 'conflict' })
     if (patch.provider !== undefined && beforeCli !== null && was !== beforeCli) throw hiveError(msg({ id: 'worktrees.agent.providerChangedMeanwhile', defaultMessage: "{agent}'s provider was changed meanwhile: nothing was changed. Try again.", description: "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name." }), { agent: current.name }, { kind: 'conflict' })

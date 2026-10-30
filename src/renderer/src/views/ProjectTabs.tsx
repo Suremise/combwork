@@ -569,7 +569,7 @@ export function OverviewTab({ project }: { project: ProjectInfo }) {
         {project.agents.length > 1 && (
           <>
             <h2 className="section">{tr(M.byAgent)}</h2>
-            <AgentsByUsage rows={project.agents.map((a) => ({ id: a.id, name: a.name, provider: agentProviderOf(project, a), t: sumUsage(inPeriod.filter((i) => sessionAgent(project, i) === a.id), from) }))} />
+            <AgentsByUsage rows={project.agents.map((a) => ({ id: a.id, name: a.name, provider: agentProviderOf(a), t: sumUsage(inPeriod.filter((i) => sessionAgent(project, i) === a.id), from) }))} />
           </>
         )}
 
@@ -780,7 +780,7 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
               <select className="select" aria-label={tr(M.agent)} value={agent.id} onChange={(e) => setPickedId(e.target.value)}>
                 {project.agents.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} · {providerName(agentProviderOf(project, a))}
+                    {a.name} · {providerName(agentProviderOf(a))}
                   </option>
                 ))}
               </select>
@@ -1321,7 +1321,7 @@ export function MemoryTab({ project }: { project: ProjectInfo }) {
   const sel = sources.find((s) => `${s.provider}:${s.id}` === selected)
   // One pair of groups per provider the project uses (or, with none yet, every enabled provider).
   const settings = useStore((s) => s.settings)
-  const used = new Set(project.agents.map((a) => agentProviderOf(project, a)))
+  const used = new Set(project.agents.map((a) => agentProviderOf(a)))
   const providers = orderedProviders(settings).filter((p) => used.has(p.id) || (isProviderEnabled(settings, p.id) && sources.some((s) => s.provider === p.id && s.exists)))
   // With agents of more than one provider: one shared AGENTS.md instead of a file per CLI.
   const usedIds = [...used].sort()
@@ -1751,7 +1751,7 @@ function AgentList({ project }: { project: ProjectInfo }) {
   return (
     <div className="agent-list">
       {project.agents.map((a) => {
-        const provider = agentProviderOf(project, a)
+        const provider = agentProviderOf(a)
         const conn = connectionFor(a, provider)
         // Its connection's values (its model, effort, context, mode), and its own MCP servers when it has a choice of them.
         const line = [(conn && connectionLine(connections, conn, settings)) || providerName(provider), agentChoosesMcp(a) ? tr(S.ownMcp, { servers: agentMcpText(a) }) : ''].filter(Boolean).join(' · ')

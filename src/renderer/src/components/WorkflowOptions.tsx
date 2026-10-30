@@ -495,7 +495,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     const carried = project?.agents.filter((a) => a.carriedSlot) ?? []
     if (key === 'folder' && effective.folder === 'slots' && carried.length) return <div className="s-desc" data-note="carried">{tr(T.carried, { agents: fmt.list(carried.map((a) => a.name)) })}</div>
     // A reviewer whose CLI can't be given folders reviews the builder's folder read-only (§16.10.5).
-    const readOnly = project?.agents.filter((a) => reviewsWork(agentWorkflowRole(a)) && !providerDescriptor(agentProviderOf(project, a)).capabilities.extraDirs) ?? []
+    const readOnly = project?.agents.filter((a) => reviewsWork(agentWorkflowRole(a)) && !providerDescriptor(agentProviderOf(a)).capabilities.extraDirs) ?? []
     if (key === 'reviewerMode' && readOnly.length) return <div className="s-desc" data-note="read-only">{tr(T.readOnly, { agents: fmt.list(readOnly.map((a) => a.name)) })}</div>
     // The preferences (HI-1766): where file locks apply, and when a change reaches a loop.
     if (key === 'fileLocks') return <div className="s-desc" data-note="file-locks">{tr(T.fileLocksNote)}</div>

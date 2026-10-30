@@ -178,6 +178,7 @@ interface HiveMessageValues {
   'project.empty.markWorking': undefined
   'project.empty.noAccount': undefined
   'project.empty.noAgents': undefined
+  'project.empty.noCli': undefined
   'project.empty.noSession': undefined
   'project.empty.notActive': { project: string | number }
   'project.empty.notRunning': { agent: string | number }

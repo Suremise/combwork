@@ -31,7 +31,7 @@ import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderF
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
-import { agentLaunchSettings, agentProvider, canSwitchModeLive, defaultProviderPending, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
+import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
 import { resolvedModel } from '../shared/models'
 import type {
@@ -1563,7 +1563,7 @@ class SessionManager {
     // account on the CLI's own home (Copilot's sign-in, a test home).
     // An Assistant that names no CLI yet (a new workspace's, HI-2108): the first usable account's, as a new agent's
     // (decision A); Settings' old choice only where none is usable.
-    const cli = assistant && !forAgent?.provider && !forAgent?.connection ? (firstUsableAccount(workspace.config)?.provider ?? agentProvider(forAgent, pc, s)) : agentProvider(forAgent, pc, s)
+    const cli = assistant && !forAgent?.provider && !forAgent?.connection ? (firstUsableAccount(workspace.config)?.provider ?? agentProvider(forAgent, s)) : agentProvider(forAgent, s)
     const choice = resolveAgentConnection(workspace.config, cli, forAgent?.connection, allAccounts(), allConnections())
     const connection = choice.ok ? (choice.account.home ? null : choice.account.id) : `!${choice.why}`
     const l = agentLaunchSettings(cli, choice.ok ? choice.connection : null, s, choice.ok && choice.account.kind === 'server')
@@ -1611,7 +1611,7 @@ class SessionManager {
             // Settings can't be read right now; don't nag.
           }
         }
-        const provider = agentProvider(a, cfg, config.settings)
+        const provider = agentProvider(a, config.settings)
         // The Assistant's sessions ran in the workspace folder, not its home.
         const folder = workspace.isAssistantHome(projectPath) ? (workspaceOf(projectPath).path ?? projectPath) : projectPath
         const r = l ? null : resumeRecord(folder, a, records.filter((x) => recordProvider(x) === provider), openIds, ids, slotFolders)
@@ -1949,7 +1949,7 @@ class SessionManager {
     const cfg = await workspace.projectConfig(projectPath)
     const agent = projectAgents(cfg).find((a) => a.id === agentId)
     if (!agent) return { is: 'none' }
-    const provider = agentProvider(agent, cfg, config.settings)
+    const provider = agentProvider(agent, config.settings)
     // The agent's records alone, newest first (HI-1236: by its index, not every record of the project).
     const rec = (await workspace.sessionsOfAgent(projectPath, agentId)).find((r) => r.agentId === agentId && r.lease === lease && !r.archived && !r.sub && recordProvider(r) === provider)
     if (!rec) return { is: 'none' }
@@ -1982,14 +1982,14 @@ class SessionManager {
     times.mark('sessionsFile')
     this.assertStarting(id)
     // A resume runs the provider its conversation ran in (#506), whatever the agent's provider is now: neither a default
-    // nor a change of the agent's own re-points one. A new conversation following Automatic waits until Hive knows what
-    // is installed.
+    // nor a change of the agent's own re-points one. A new conversation of an agent with no CLI of its own (a new
+    // workspace's Assistant) follows Automatic: it waits until Hive knows what is installed.
     const recorded = opts.resumeId ? await this.resumeProvider(projectPath, opts.resumeId, existing) : null
     times.mark('resumeProvider')
     this.assertStarting(id)
-    if (!recorded && !agent.provider && defaultProviderPending(cfg, config.settings)) await providerService.settle()
+    if (!recorded && !agent.provider && autoProviderPending(config.settings)) await providerService.settle()
     this.assertStarting(id)
-    const providerId = recorded ?? agentProvider(agent, cfg, config.settings)
+    const providerId = recorded ?? agentProvider(agent, config.settings)
     // At start, Hive may still be looking for that CLI.
     await providerService.settle(providerId)
     times.mark('providerSettle')
@@ -4029,9 +4029,9 @@ class SessionManager {
   /** Stops the CLI's background job holding a conversation, then resumes the conversation in this agent. */
   async stopBackgroundAndResume(projectPath: string, agentId: string, jobId: string, sessionId: string): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
-    const { agent, cfg } = await this.agentDef(projectPath, agentId)
+    const { agent } = await this.agentDef(projectPath, agentId)
     const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
-    const adapter = providerAdapter((await this.resumeProvider(projectPath, sessionId, rec)) ?? agentProvider(agent, cfg, config.settings))
+    const adapter = providerAdapter((await this.resumeProvider(projectPath, sessionId, rec)) ?? agentProvider(agent, config.settings))
     const info = providerService.info(adapter.id)
     if (!adapter.stopBackgroundJob || !info.path) throw hiveError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
     await adapter.stopBackgroundJob(info.path, jobId)

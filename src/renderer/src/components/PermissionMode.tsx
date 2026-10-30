@@ -11,9 +11,9 @@ import { ContextMenu, Icon, Tooltip, type MenuEntry } from './ui'
 
 /** The mode an agent's next session starts in: its connection's (HI-2106), else its CLI's default. */
 export function configuredMode(project: ProjectInfo, a: AgentInfo | null | undefined, settings: AppSettings | null): PermissionMode {
-  if (!settings) return providerDescriptor(agentProviderOf(project, a)).defaultPermissionMode
+  if (!settings) return providerDescriptor(agentProviderOf(a)).defaultPermissionMode
   const agent = a ?? project.agents[0]
-  return agentLaunchSettings(agentProviderOf(project, agent), agent, settings).permissionMode
+  return agentLaunchSettings(agentProviderOf(agent), agent, settings).permissionMode
 }
 
 /** What the agent is in now if it runs (as its CLI reports it), else what it will start in. */
@@ -82,7 +82,7 @@ async function setForNewSessions(project: ProjectInfo, a: AgentInfo, provider: P
 }
 
 function menuItems(project: ProjectInfo, a: AgentInfo, settings: AppSettings): MenuEntry[] {
-  const provider = agentProviderOf(project, a)
+  const provider = agentProviderOf(a)
   const desc = providerDescriptor(provider)
   const modes = offeredModes(provider, settings, isAssistantPath(project.path))
   const many = project.agents.length > 1
@@ -176,7 +176,7 @@ export function ModeBadge({ project, a, variant }: { project: ProjectInfo; a: Ag
   const settings = useStore((s) => s.settings)
   useLanguage()
   if (!a) return null
-  const provider = agentProviderOf(project, a)
+  const provider = agentProviderOf(a)
   const mode = currentMode(project, a, settings)
   const option = modeOption(provider, mode)
   // Marked by the mode in effect: on the CLI's own setting, one without guardrails its CLI showed (#1284).

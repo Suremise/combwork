@@ -331,7 +331,7 @@ export function AssistantPanel() {
       <PaneResizer paneKey="assistant" edge={left ? 'right' : 'left'} min={300} max={900} keep={380} />
       <AssistantHeader project={a} a={agent} />
       <AssistantStatus a={agent} />
-      {!agent.live && <AssistantConnectionBanner project={a} a={agent} />}
+      {!agent.live && <AssistantConnectionBanner a={agent} />}
       <AssistantQuestions />
       <AssistantActions />
       <div className="assistant-body" ref={body}>
@@ -358,7 +358,7 @@ export function AssistantPanel() {
               visible
               projectPath={a.path}
               agentId={AGENT}
-              provider={agentProviderOf(a, agent)}
+              provider={agentProviderOf(agent)}
               autoFocus={!!agent.live}
               dimmed={!agent.live && !notStopped}
             />
@@ -385,8 +385,8 @@ export function AssistantPanel() {
  * Asks for an account where the Assistant can't start without one (HI-1774; HI-2108): neither its connection nor its CLI's
  * first usable one can run it here. Not for a test copy on its CLI test home.
  */
-function AssistantConnectionBanner({ project, a }: { project: ProjectInfo; a: AgentInfo }) {
-  const provider = agentProviderOf(project, a)
+function AssistantConnectionBanner({ a }: { a: AgentInfo }) {
+  const provider = agentProviderOf(a)
   const view = useConnections()
   const shown = connectionOf(a.connection, provider, undefined, view)
   if (!shown || shown.desired.ok || !view || view.testHome.includes(provider)) return null
@@ -613,7 +613,7 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
     )
   }
   const kb = commandKeybinding('assistant.toggle')
-  const provider = providerDescriptor(agentProviderOf(project, a)).name
+  const provider = providerDescriptor(agentProviderOf(a)).name
   const state = agentState(live)
   return (
     <div className="assistant-header">
@@ -770,8 +770,8 @@ function OverviewAgent({ project: p, a, state, names, onGo }: { project: Project
   const stateText = tr(AGENT_STATE_LABEL[state])
   const detail = activity && !activity.toLowerCase().startsWith(stateText.toLowerCase()) ? activity : ''
   // Its CLI, and the connection it runs on or would start on (HI-1769).
-  const cli = providerDescriptor(agentProviderOf(p, a)).name
-  const connection = connectionCellText(a.connection, agentProviderOf(p, a), a.live?.launchedConnection, connections)
+  const cli = providerDescriptor(agentProviderOf(a)).name
+  const connection = connectionCellText(a.connection, agentProviderOf(a), a.live?.launchedConnection, connections)
   const first = tr(M.markLabel, { name: a.name, state: stateText, running: a.live ? 'yes' : 'no', hasDetail: detail ? 'yes' : 'no', detail })
   const rest = [
     connection ? tr(M.providerOn, { provider: cli, connection }) : tr(M.provider, { provider: cli }),
@@ -919,7 +919,7 @@ export function AssistantSettingsDialog() {
   const modes = useModes()
   const view = useConnections()
   const agent = a?.agents[0] ?? null
-  const current: ProviderId = a && agent ? (agent.live?.provider ?? agentProvider(agent, a.config, settings)) : ''
+  const current: ProviderId = a && agent ? (agent.live?.provider ?? agentProvider(agent, settings)) : ''
   const [mode, setMode] = useState('')
   const [connection, setConnection] = useState('')
   useEffect(() => {

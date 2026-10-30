@@ -136,6 +136,7 @@ Accounts have one **order**, for every CLI, the same in every workspace. A new a
 
 - **Reorder** in **Settings → Accounts & Connections** by dragging an account by its handle, or press Alt+Up or Alt+Down on the handle. An account's connections keep their own order under it.
 - **Agents already running keep their connection.** A change applies to new agents; the banner about agents running on another connection offers to switch them when their turn is over.
+- **A project with no agents** says which CLI its first agent will run (its first connection's), and warns when no account is on here, or when none of the accounts on here has its CLI installed (**Help → Provider Setup** installs one).
 - **Updating from an earlier version,** each CLI's order of connections became the order of its accounts, and the default of the workspace you used most recently came first. There's no default provider and no order of providers any more.
 
 ## Workspaces and projects <a id="workspaces-and-projects"></a>

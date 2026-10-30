@@ -175,6 +175,7 @@
   "project.empty.markActive": "Marque este projeto como ativo para executar sessões e ver o status dele. Você também pode iniciar uma sessão diretamente.",
   "project.empty.markWorking": "Marcar como ativo",
   "project.empty.noAccount": "Nenhuma conta está ativada neste espaço de trabalho — Configurações → Contas e conexões",
+  "project.empty.noCli": "Nenhuma conta ativada aqui tem a CLI do seu agente de código instalada — Ajuda → Configuração de provedores",
   "project.empty.noAgents": "Nenhum agente ainda",
   "project.empty.noSession": "Nenhuma sessão em execução",
   "project.empty.notActive": "O projeto {project} não está ativo",

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, OPEN_WORKFLOW_OPTIONS, ROLE_MAX, agentLimitText, mergeBlocked, projectAgents, transcriptWarnLimit } from '@shared/defaults'
+import { AGENT_LIMIT_MAX, OPEN_WORKFLOW_OPTIONS, ROLE_MAX, agentLimitText, mergeBlocked, projectAgents, transcriptWarnLimit } from '@shared/defaults'
 import { handOverNow, onRunningLane } from '@shared/handOver'
 import { useAgentLimit } from '../advanced'
-import { agentProvider, isProviderEnabled, modeCaveat, orderedProviders, projectDefaultProvider, providerDescriptor } from '@shared/providers'
+import { agentProvider, autoProvider, isProviderEnabled, modeCaveat, orderedProviders, providerDescriptor } from '@shared/providers'
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import type { MergeBranch } from '@shared/types'
 import type { AgentBranchStatus, MergeResult, PermissionMode, ProviderId } from '@shared/types'
@@ -542,7 +542,7 @@ export function AgentSettingsDialog() {
     const owner = nameTaken(n, everyone, { project: project.name, id: agent.id })
     return owner ? nameTakenMessage(n, owner, suggestAgentName(n, project.name, everyone.map((a) => a.name)), tr) : null
   }
-  const current = agent.live?.provider ?? agentProvider(agent, project.config, settings)
+  const current = agent.live?.provider ?? agentProvider(agent, settings)
   const close = (): void => set({ agentSettingsFor: null })
   const own = legacyOf(agent)
   // Its role as it reads now (the guess, for an agent from before 1.0), stored once the user saves (#1430).
@@ -609,7 +609,8 @@ export function TemplateAgentDialog() {
   useLanguage()
   const req = useStore((s) => s.templateAgentFor)
   const settings = useStore((s) => s.settings)
-  const project = useStore((s) => s.workspace?.projects.find((p) => p.path === s.templateAgentFor?.project) ?? null)
+  const providers = useStore((s) => s.providers)
+  const view = useConnections()
   // The agent as saved, for when the dialog closes (null: cancelled).
   const result = useRef<TemplateAgent | null>(null)
   if (!req) return null
@@ -619,7 +620,8 @@ export function TemplateAgentDialog() {
     req.resolve(answer)
     result.current = null
   }
-  const provider = a?.provider ?? projectDefaultProvider(project?.config ?? DEFAULT_PROJECT_CONFIG, settings)
+  // A new one suggests the CLI a new agent gets (decision A): the first usable connection's, as Add Agent's.
+  const provider = a?.provider ?? connectionCli(view, firstReadyConnection(view, settings, cliReadyOf(providers)).id) ?? autoProvider(settings)
   const initial: AgentFields = { name: a?.name ?? req.suggestedName, role: a?.note ?? '', workflowRole: a?.role ?? agentWorkflowRole({ name: req.suggestedName }), provider, mcp: a?.mcpServers ? [...a.mcpServers] : null, connection: '' }
   return (
     <AgentSettingsModal
@@ -673,7 +675,7 @@ export function HandOverDialog() {
   useEffect(() => {
     if (!target || !project) return
     setHandover(fromReady)
-    const first = project.agents.find((a) => a.id !== target.agentId && idle(a) && isProviderEnabled(settings, agentProviderOf(project, a)))
+    const first = project.agents.find((a) => a.id !== target.agentId && idle(a) && isProviderEnabled(settings, agentProviderOf(a)))
     const own = project.agents.find((a) => a.id === target.agentId)
     const mb = own?.live?.transcriptBytes ?? 0
     const limit = transcriptWarnLimit(project.config, settings?.sessions.transcriptWarnMB ?? 0)
@@ -730,7 +732,7 @@ export function HandOverDialog() {
           <input type="radio" disabled={selfOff} checked={self} onChange={() => setTo(from.id)} />
           <div>
             <strong>
-              <ProviderIcon provider={agentProviderOf(project, from)} /> {tr(msg({ id: 'agents.handOver.self', defaultMessage: '{agent}, in a new conversation', description: 'A choice in the Continue with… dialog: the agent itself ({agent}) carries on in a new conversation.' }), { agent: from.name })}
+              <ProviderIcon provider={agentProviderOf(from)} /> {tr(msg({ id: 'agents.handOver.self', defaultMessage: '{agent}, in a new conversation', description: 'A choice in the Continue with… dialog: the agent itself ({agent}) carries on in a new conversation.' }), { agent: from.name })}
             </strong>
             <div className="faint">
               {!idle(from)
@@ -742,7 +744,7 @@ export function HandOverDialog() {
           </div>
         </label>
         {others.map((a) => {
-          const p = agentProviderOf(project, a)
+          const p = agentProviderOf(a)
           const enabled = isProviderEnabled(settings, p)
           const free = idle(a)
           return (
