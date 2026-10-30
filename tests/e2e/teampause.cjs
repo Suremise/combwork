@@ -123,7 +123,7 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
     // The status bar's Team paused opens the Progress panel, whose Lanes band names what still runs.
     await page.locator('.status-item.team-paused').click()
     const band = page.locator('.team-pause-band')
-    check("the status bar's item opens the Progress panel, where the band names the run", !!(await until(async () => /Pausing the team: 1 still running/.test((await band.innerText().catch(() => '')) ?? '') && /probe run/.test((await band.innerText().catch(() => '')) ?? ''))), await band.innerText().catch(() => ''))
+    check("the status bar's item opens the Progress panel, where the band names the run, its process (End It…) and Builder at work", !!(await until(async () => /Pausing the team: \d+ still running/.test((await band.innerText().catch(() => '')) ?? '') && /Builder: probe run \(a run\)/.test((await band.innerText().catch(() => '')) ?? '') && /hold\.cjs.*\(process \d+\)/.test((await band.innerText().catch(() => '')) ?? '') && (await band.getByRole('button', { name: 'End It…' }).count()) > 0)), await band.innerText().catch(() => ''))
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
       await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
