@@ -873,9 +873,12 @@ function justEnded(lanes: readonly LaneRecord[], project: string, builder: strin
     .sort((a, b) => Date.parse(b.endedAt!) - Date.parse(a.endedAt!))[0]
 }
 
-/** What a start that carried a just-ended lane's brief and name says (HI-2097), or null when it carried neither. */
-function carriedNote(builder: string, from: LaneRecord | null): string | null {
-  const what = [from?.brief?.text ? 'brief' : '', from?.name ? 'name' : ''].filter(Boolean)
+/**
+ * What a start that carried a just-ended lane's brief and name says (HI-2097), or null when it carried neither: only
+ * what it carried, so not the name when the start gave its own (HI-2104).
+ */
+function carriedNote(builder: string, from: LaneRecord | null, ownName: boolean): string | null {
+  const what = [from?.brief?.text ? 'brief' : '', from?.name && !ownName ? 'name' : ''].filter(Boolean)
   if (!from || !what.length) return null
   return `${builder}'s lane ${from.id} had just ended (all merged): started a new lane with its ${what.join(' and ')}; pass brief to change it.` // i18n-ignore: hive_lane's reply (agents)
 }
@@ -1019,7 +1022,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   // The builder told of a reorder applied now, once its list is saved (HI-1995).
   if (put) await tellReordered(ws, r.rec, put, s.by)
   const applied = put ? `Applied now: ${put.putBack} is back in Todo (its work stays on ${put.line ?? 'its branch'}); the lane's cards are now in this order, and ${builder.name} is told.` : null // i18n-ignore: hive_lane's reply (agents)
-  const kept = carriedNote(builder.name, carried)
+  const kept = carriedNote(builder.name, carried, s.name != null)
   const gone = leftOut.length ? withCardNames(ws, () => `${leftOut.map(cardRef).join(', ')} ${leftOut.length > 1 ? 'are' : 'is'} already Done: left out.`) : null // i18n-ignore: hive_lane's reply (agents)
   const note = [applied, kept, gone, queued, shared].filter(Boolean).join(' ') || undefined
   return { lane, did: r.did, replaced: replaced ?? null, ...(note ? { note } : {}) }
