@@ -16,7 +16,7 @@ import { wakesOn } from './loopWakes'
 import { sessions } from './sessions'
 import { HISTORY } from '../shared/taskHistory'
 import type { StoredText } from '../shared/types'
-import { allTasks, getTask, noteOnCard } from './tasks'
+import { allTasks, commentAsHive, getTask, noteOnCard } from './tasks'
 import { lanesNowIn } from './watches'
 import { onAction, type ActionHandler } from './workflow/actionWorker'
 import type { ActionRow } from './workflow/factStore'
@@ -93,6 +93,17 @@ async function notifyFromAction(a: ActionRow, ws: WorkspaceService, ctx: Paramet
   const body: TextPart[] = shown ? [{ shown, english: text || shown }] : text ? [{ shown: gist(text, NOTICE_GIST), english: text }] : []
   // Shown once its dispatch is counted under a lease that holds (uncertain until the action is marked).
   await ctx.dispatch(() => tell(at.projectPath, withValues(M.forYou, { card: cardLabel(at.card) }), body))
+}
+
+/**
+ * A `comment` action (HI-2087: the merge queue's return): Hive's comment on the card, its English for whoever reads the
+ * card and its message for the window, written once (its id the action's).
+ */
+async function commentFromAction(a: ActionRow, ws: WorkspaceService): Promise<void> {
+  const text = typeof a.payload.text === 'string' ? a.payload.text : ''
+  const shown = a.payload.shown as StoredText | undefined
+  if (!ws.path || !text) return
+  await commentAsHive(a.card, shown ? { text, shown } : text, ws, undefined, `action-${a.id}`).catch((e) => log.warn('commenting on a card the merge queue returned', e))
 }
 
 /** How much of an agent's question a request's notice shows (its first sentence or two). */
@@ -312,6 +323,8 @@ export function initWorkflowNotices(): void {
   // A notice leaves nothing to find once shown: repeatable (never lost, repeated at most once).
   onAction('notify', notifyFromAction, 'repeatable')
   onAction('laneNotice', laneNoticeFromAction, 'repeatable')
+  // The comment, its id the action's, is the record that it was made: a run again finds it and writes nothing.
+  onAction('comment', commentFromAction, 'delivered')
   onHiveEvent((e) => {
     if (e.type !== 'tasks-changed' && e.type !== 'lanes-changed') return
     const ws = openWorkspaces().find((w) => w.path?.toLowerCase() === e.workspacePath.toLowerCase())

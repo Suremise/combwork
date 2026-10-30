@@ -56,6 +56,17 @@ describe('delivery records (#647)', () => {
     expect(inboxSummary([rec({ state: 'acked' })], t)).toBeUndefined()
   })
 
+  it("HI-2087: a card's events with the merge queue's return among them lead with the return and its reason", () => {
+    const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
+    const back = '[Hive] HI-46 came back from the merge queue: a conflict with main in src/main/bundledHistory.json. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).'
+    const items = inboxItems([
+      rec({ id: 'm1', seq: 1, kind: 'card-event', from: hive, card: 46, body: '[Hive] HI-46 is in Passed: HR1 passed it' }),
+      rec({ id: 'm2', seq: 2, kind: 'card-event', from: hive, card: 46, body: back }),
+      rec({ id: 'm3', seq: 3, kind: 'card-event', from: hive, card: 46, body: '[Hive] HI-46 is in Doing; latest comment by HR1: "Round 2: PASSED"' })
+    ])
+    expect(items.map((i) => i.text)).toEqual([`${back} (with 2 more changes: read the card)`])
+  })
+
   it("coalesces a card's events into one item, where its first one was; a message stays its own", () => {
     const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
     const items = inboxItems([

@@ -3495,7 +3495,15 @@ switches to "The agent merges", and one started afterwards reports its merge.
   path whole, or else "Its log path: hive_read_task" (a card read has room for it); the output's last lines, cut from
   their start ("…"). `IntegrationFailed` keeps `check` and `logPath`, and of the output (`log`) its start and its end
   within 4,000 characters, the middle replaced by a line saying how many characters were left out, so the last lines
-  quoted are the output's own. A card that left the queue (`skip`)
+  quoted are the output's own. **The return leads every line about it** (HI-2087: on 30 Oct HB2's watch for Done
+  read "HI-2046 is in Doing; latest comment by HR1: Round 2: PASSED", and HB2 took the card as merged): a card watch's
+  line for a card moved back to work by the queue (`queueReturnOf` in `watches.ts`, `WakeAbout.queueReturn`) is the
+  return's own words in place of where it is and its latest comment, with others or alone; an inbox item telling
+  several of a card's events leads with its latest return ("… (with 2 more changes: read the card)"). And the queue
+  leaves a **comment of Hive's on the card** (a `comment` action after the change commits, written once by the action's
+  id): its English is the return's words with more room (1,500 characters, 10 of the output's last lines), what agents
+  read with `latestComment`; the window shows a message of its own (`tasks.history.queueReturned`: why, the target, the
+  check, up to 10 files), pointing at the card's Work section for the run. A card that left the queue (`skip`)
   says why: its pass stale (`IntegrationCancelled` reason `stale`), or a decision since its approval (`decision`, no
   pass at the current generation).
 - **Card reads**: the Agent API's card has `merge`, a sentence from `queueState.ts` (where a card is with the queue,

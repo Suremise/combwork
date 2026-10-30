@@ -13,6 +13,7 @@
 import type { TaskCard, TaskColumn } from './types'
 import { COLUMN_CHOICES, COLUMN_IDS, TASK_COLUMNS, columnLabel, isLoopStepEntry } from './tasks'
 import { cardRef } from './projectKeys'
+import { CAME_BACK } from './workflow/queue'
 
 /**
  * What counts as a change: a column move, a new comment, a review verdict, a change of agent. Default: any. `blocked` (a
@@ -372,6 +373,12 @@ export interface WakeAbout {
   verdict: { passed: boolean; by: string } | null
   /** The round a failed card came back into Review for, when it was returned without leaving Review (#214). */
   returned?: number
+  /**
+   * HI-2087: the merge queue returned the card to its builder (it moved back for that): the return's own words (its key,
+   * what came back, what to do next), which the line leads with in place of where it is and its latest comment (a
+   * reviewer's pass, saying the opposite of what happened).
+   */
+  queueReturn?: string
 }
 
 /**
@@ -479,8 +486,12 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
   const said = text ? [...text.replace(/\s+/g, ' ').trim()] : []
   const max = kind === 'request' || kind === 'step' || kind === 'stepAnswer' || kind === 'stepNotice' ? REQUEST_MAX : kind === 'answer' ? ANSWER_MAX : NOTE_MAX
   const whose = kind === 'request' ? 'The reviewer asks' : kind === 'step' || kind === 'stepNotice' ? 'The builder' : kind === 'stepAnswer' ? 'The reviewer' : 'Hive'
+  const tail = `. ${who} (hive_read_task with latestComment for the comment in full).`
+  // HI-2087: Hive's note that the merge queue returned the card leads the line, as a watch's does: its column and the
+  // review's pass first made HB2 take HI-2046 for merged.
+  if (kind === 'note' && said.join('').includes(` ${CAME_BACK}: `)) return lineOf({ ...change, about: { owner: null, verdict: null, ...change.about, queueReturn: said.slice(0, max).join('') } }, tail)
   const what = !said.length ? '' : `. ${whose}: "${said.length > max ? `${said.slice(0, max - 1).join('')}…` : said.join('')}"`
-  return lineOf(change, `${what}. ${who} (hive_read_task with latestComment for the comment in full).`)
+  return lineOf(change, `${what}${tail}`)
 }
 
 /**
@@ -527,6 +538,8 @@ export function loopStepWords(step: string, text: string, design?: string, of?: 
 export type LoopWakeKind = (typeof LOOP_WAKE_KINDS)[number]
 
 function lineOf(change: CardChange, tail: string): string {
+  // HI-2087: a card the merge queue returned leads with the return and its reason (its words name the card).
+  if (change.about?.queueReturn) return `[Hive] ${change.about.queueReturn.replace(/\.$/, '')}${tail}`
   const head = `[Hive] ${cardRef(change.number)}${whereNow(change)}`
   if (!change.comment) return head + tail
   // The card, its state and what to do always fit (names are short); the comment's first line gives way, cut with "…".
@@ -575,6 +588,12 @@ const MANY_TAIL = '. Your card watch has ended: carry on (hive_read_task with la
  * `max` characters (0: left out). A lane watch's line tells its cards with it.
  */
 export function cardPart(c: CardChange, max: number): string {
+  // HI-2087: a card the merge queue returned: the return, its reason as far as `max` allows (none: that it came back).
+  const back = c.about?.queueReturn
+  if (back && c.changes !== 'gone') {
+    const t = [...back.replace(/\.$/, '')]
+    return max > 0 ? (t.length > max * 2 ? `${t.slice(0, max * 2 - 1).join('')}…` : t.join('')) : `${cardRef(c.number)} ${CAME_BACK}`
+  }
   const head = `${cardRef(c.number)}${whereNow(c, max)}`
   if (!c.comment || max <= 0 || c.changes === 'gone') return head
   const t = [...c.comment.firstLine]

@@ -31,7 +31,7 @@ import { isUnknown, type Maybe, type Unknown } from '../platform/types'
 import { withWriteFence, type CardRecord } from './factStore'
 import { endedBy, LeaseLost } from './queueRunner'
 import { reconcile } from './reconcile'
-import { leftWake, returnedWake } from './queueState'
+import { leftWake, returnedComment, returnedWake } from './queueState'
 import { readConflicts } from './conflictRead'
 import { mergeMessage, updateMessage } from './mergeMessage'
 
@@ -1878,6 +1878,8 @@ export class MergeQueue {
       w.move('active', 'derived')
       // What came back and what to do next (#1354): the files, the check, its log and last lines, bounded.
       this.wf.wake(w, w.state().started?.builder, returnedWake(card.key, failed))
+      // HI-2087: and on the card, for whoever reads it (its latest comment was the review's pass).
+      w.action('comment', { ...returnedComment(card.key, failed) })
       return true
     })
     if (!wrote) return { card: card.key, entry: entry.id, outcome: 'skipped', why: 'cancelled' } // i18n-ignore: a reason's key, not text

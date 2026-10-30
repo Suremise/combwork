@@ -4,11 +4,13 @@
 // entries in the order they were requested, and the one testing now). One order for every place that says it: a card
 // read, a lane's next, a refusal's next step, and the window's queue model (#1353, queueControls.ts's queueView).
 import { openEntry, type CardState, type Fact, type FactData, type IntegrationFailReason } from '../../shared/workflow/facts'
-import type { QueueQueued, QueueStep, QueueTesting } from '../../shared/workflow/queue'
+import { CAME_BACK, type QueueQueued, type QueueStep, type QueueTesting } from '../../shared/workflow/queue'
 import type { CardRecord } from './factStore'
 import type { PauseReason, QueueStepInfo } from './mergeQueue'
 import type { Workflow } from './runtime'
 import { conflictPlaces } from '../../shared/workflow/conflicts'
+import { HISTORY, storedText } from '../../shared/taskHistory'
+import type { StoredText } from '../../shared/types'
 
 export type QueueState =
   /** Waiting in the queue: `position` 1 is next, after the one testing now. */
@@ -305,7 +307,7 @@ function lastLines(log: string, n: number): string {
  */
 export function returnedText(subject: string, f: FactData['IntegrationFailed'], max = WAKE_NOTE_MAX, lines = WAKE_LINES): string {
   const named: FactData['IntegrationFailed'] = { ...f, target: clip(f.target, NAME_MAX), ...(f.check ? { check: clip(f.check, NAME_MAX) } : {}), ...(f.code ? { code: clip(f.code, NAME_MAX) } : {}) }
-  const lead = `${clip(subject, NAME_MAX)} came back from the merge queue: `
+  const lead = `${clip(subject, NAME_MAX)} ${CAME_BACK}: `
   const next = ` ${nextStep(named)}`
   // The reason and the next step are fixed; the files take what's left, keeping LINES_MIN for the rest.
   const fixed = lead.length + '.'.length + next.length
@@ -337,6 +339,23 @@ export const staleWake = (key: string, approved: string | null | undefined, curr
 
 /** A returned card's wake (#1354): its key, what came back, and what to do next. */
 export const returnedWake = (key: string, f: FactData['IntegrationFailed']): string => returnedText(key, f)
+
+/** How long the queue's comment on a returned card is, and how many of its output's last lines it quotes (HI-2087). */
+const COMMENT_MAX = 1500
+const COMMENT_LINES = 10
+/** How many of the files a returned card's comment names in the window. */
+const COMMENT_FILES = 10
+
+/**
+ * HI-2087: the comment the queue writes on a card it returned: in English for whoever reads the card (agents: what came
+ * back and what to do next, as its wake says it, with more room), and as a message for the window (`shown`): why, and
+ * the files.
+ */
+export function returnedComment(key: string, f: FactData['IntegrationFailed']): { text: string; shown: StoredText } {
+  const reason = f.reason === 'checks' ? (f.check === 'install' ? 'install' : f.transient ? 'checksEnv' : f.check ? 'checks' : 'checksSome') : f.reason
+  const files = f.files?.length ? `${f.files.slice(0, COMMENT_FILES).join(', ')}${f.files.length > COMMENT_FILES ? ', …' : ''}` : 'none'
+  return { text: returnedText(key, f, COMMENT_MAX, COMMENT_LINES), shown: storedText(HISTORY.queueReturned, { reason, target: f.target, check: f.check ?? '', files }) }
+}
 
 /** A card that left the queue, not approved any more (#1354): why, and what to do next (`to`: where it went). */
 export function leftWake(key: string, why: 'stale' | 'decision', to: 'review' | 'active'): string {

@@ -24,6 +24,7 @@ import { isResuming } from './restartResume'
 import { sessions } from './sessions'
 import { cardsNow, getTask, inScope, liveCardHeads, noteOnCard, unknownTask } from './tasks'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
+import { queueReturnOf } from './queueReturn'
 import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { isUnread, type DeliveryRecord } from '../shared/deliveries'
 import { cancelFromSource, createDelivery, deliveryNow, followAgent, inFlightNow as deliveriesInFlight, load as loadDeliveries, offerNow, registerSource, settled as deliveriesSettled } from './deliveries'
@@ -2217,7 +2218,15 @@ async function check(store: Store, rec: WatchRecord, cards?: CardReads, ctx: Rel
       kinds = changesBetween(rec.marks[n], after, rec.cond, into)
       if (kinds !== 'gone') kinds.push(...handoffsSince(card, rec.since, rec.cond, rec.watcherName))
     }
-    if (kinds === 'gone' || kinds.length) hits.push({ ...cardChange(n, card, kinds), about: wakeAbout(card, kinds, rec.agentId) })
+    if (kinds === 'gone' || kinds.length) {
+      const about = wakeAbout(card, kinds, rec.agentId)
+      // HI-2087: moved back to work because the merge queue returned it: the line leads with the return and its reason.
+      if (kinds !== 'gone' && kinds.includes('column') && card && (card.column === 'doing' || card.column === 'todo') && card.project && store.path) {
+        const back = await queueReturnOf(store.ws, join(store.path, card.project), n).catch(() => null)
+        if (back) about.queueReturn = back.text
+      }
+      hits.push({ ...cardChange(n, card, kinds), about })
+    }
     if (card?.project && rec.scope === null && rec.replySeq !== undefined) {
       const projectPath = join(store.path, card.project)
       for (const id of new Set([card.agent, card.review?.agent].filter((x): x is string => !!x))) {

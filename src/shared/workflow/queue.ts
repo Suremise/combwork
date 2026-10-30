@@ -5,6 +5,12 @@
 
 import type { FactData } from './facts'
 
+/**
+ * HI-2087: how a returned card's wake begins after its key ("HI-12 came back from the merge queue: …", queueState's
+ * returnedText), so a line that tells several changes of a card leads with the return.
+ */
+export const CAME_BACK = 'came back from the merge queue' // i18n-ignore: agent-facing, the wake's words
+
 /** The step the entry testing now is at: its test merge, its merge checks (an install first when one is due), the advance. */
 export type QueueStep = 'testMerge' | 'checks' | 'advance'
 

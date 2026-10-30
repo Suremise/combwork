@@ -62,18 +62,29 @@ async function call(h, who, method, url, body) {
     const read = await call(h, card.builder, 'GET', `/v1/tasks/${encodeURIComponent(key)}`)
     check("its card read says Hive merges it and where it is", read.status === 200 && String(read.body?.merge).startsWith('Hive merges this card (its rules)'), JSON.stringify(read.body?.merge))
 
+    // HI-2087: its builder watches it for Done, as a builder whose card passed does (HB2 on HI-2046): when the queue
+    // returns it, that watch's line must say so too, never lead with the review's pass.
+    const watching = await call(h, card.builder, 'POST', '/v1/tasks/wait', { cards: [card.n], column: 'done', wake: true, limitMinutes: 60 })
+    check('its builder watches it for Done', watching.status === 200, JSON.stringify(watching))
+
     // --- The first card merges; then the queue tests this one: a conflict with the target returns it, its wake naming
     // the file and the next step.
     fs.writeFileSync(fx.go, 'go')
     check('the first card is merged: Done', !!(await until(async () => (await column(first.n)) === 'done', HUNG_MS)), JSON.stringify(await h.kinds(first.n)))
     const failure = await until(async () => (await h.facts(card.n)).find((f) => f.kind === 'IntegrationFailed') ?? null, HUNG_MS)
     check('the queue returns it for a conflict naming a.txt', failure?.data?.reason === 'conflict' && JSON.stringify(failure.data.files) === '["a.txt"]', JSON.stringify(failure))
+    // Its inbox read until the return has come (the queue's own wake, a loop wake's note; its watch for Done stays on).
+    const seen = []
     const wake = await until(async () => {
       const r = await call(h, card.builder, 'POST', '/v1/inbox', {})
-      const text = JSON.stringify(r.body?.items ?? [])
+      seen.push(...(r.body?.items ?? []).filter((i) => i.card === card.n))
+      const text = JSON.stringify(seen)
       return text.includes('came back from the merge queue') ? text : null
     }, HUNG_MS)
     check("its builder's wake says what came back and what to do", !!wake && wake.includes('a conflict with integration in a.txt') && wake.includes('Merge integration into your worktree'), String(wake))
+    check("…and every line about it leads with the return, none with the review's pass (HI-2087)", seen.length > 0 && seen.every((i) => String(i.text).includes(`${key} came back from the merge queue`)) && !JSON.stringify(seen).includes('latest comment by'), JSON.stringify(seen))
+    const said = await until(async () => (await h.card(card.n))?.comments?.findLast((c) => c.by === 'Hive') ?? null, HUNG_MS)
+    check('…and Hive says so on the card (its latest comment): what came back, in English for agents and as a message for the window', !!said && String(said.text).startsWith(`${key} came back from the merge queue: a conflict with integration in a.txt`) && said.hiveText?.id === 'tasks.history.queueReturned', JSON.stringify(said))
     const after = await call(h, card.builder, 'GET', `/v1/tasks/${encodeURIComponent(key)}`)
     check('its card read now says it came back, and what to do', String(after.body?.merge).includes('came back from the merge queue'), JSON.stringify(after.body?.merge))
 

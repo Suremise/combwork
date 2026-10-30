@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { basename, join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { alreadyThere, changesBetween, decodeSince, encodeSince, limitLine, markOf, movedIntoSince, readCondition, returnRound, WAKE_MAX_BYTES, wakeAbout, wakeLine, wakeLines, carriedOver, changesSince, entryWithin, seenOf, watchLabel, cardChange, LANES_RUNNING_TAIL, withLanesTail, brief, handoffsSince, hearsHandoffs } from '../src/shared/watch'
+import { alreadyThere, loopWakeLine, changesBetween, decodeSince, encodeSince, limitLine, markOf, movedIntoSince, readCondition, returnRound, WAKE_MAX_BYTES, wakeAbout, wakeLine, wakeLines, carriedOver, changesSince, entryWithin, seenOf, watchLabel, cardChange, LANES_RUNNING_TAIL, withLanesTail, brief, handoffsSince, hearsHandoffs } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
 import { hookStep } from '../src/main/hookStatus'
 import type { TaskCard } from '../src/shared/types'
@@ -289,6 +289,25 @@ describe('what counts as a change', () => {
     expect(readCondition({ cards: Array.from({ length: 21 }, (_, i) => i + 1) })).toMatch(/at most 20/)
     expect(readCondition({ cards: [1], changes: ['everything'] })).toMatch(/changes must be/)
     expect(readCondition({ cards: [1], column: 'archive' })).toMatch(/column must be/)
+  })
+
+  it("HI-2087: a card the merge queue returned: the line leads with the return and its reason, never the review's pass; alone or with others", () => {
+    const c = cardOf({ column: 'doing', comments: [{ at: at(5), by: 'HR1 (hive)', text: 'Round 2: PASSED — no findings' }] })
+    const back = '#7 came back from the merge queue: a conflict with main in src/main/bundledHistory.json. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).'
+    const returned = { ...cardChange(7, c, ['column']), about: { owner: null, verdict: null, queueReturn: back } }
+    const line = wakeLine(returned)
+    expect(line).toBe(`[Hive] ${back.slice(0, -1)}. Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`)
+    expect(line).not.toMatch(/PASSED|latest comment by/)
+    expect(Buffer.byteLength(JSON.stringify(line))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
+    // With another card: still its reason first.
+    const other = cardChange(8, cardOf({ column: 'review' }), ['column'])
+    expect(wakeLines([returned, other])).toMatch(/^\[Hive\] #7 came back from the merge queue: a conflict with main in src\/main\/bundledHistory\.json[.;]/)
+    // The queue's own wake (a loop wake's note, HB2's on HI-2046): the return first too, not the column and the pass.
+    const passed = { ...cardChange(7, c, ['column']), about: { owner: null, verdict: { passed: true, by: 'HR1 (hive)' } } }
+    const note = loopWakeLine(passed, 'note', back)
+    expect(note).toBe(`[Hive] ${back.slice(0, -1)}. This is your card in its loop: carry on (hive_read_task with latestComment for the comment in full).`)
+    // Another note of Hive's (a stale pass) is quoted after where the card is, as before.
+    expect(loopWakeLine(passed, 'note', '#7: its pass is stale')).toMatch(/^\[Hive\] #7 is in Doing: HR1 \(hive\) passed it; latest comment by HR1 \(hive\): "Round 2: PASSED — no findings"\. Hive: "#7: its pass is stale"/)
   })
 
   it('the wake line is one short line with the card, its column and the latest comment; the reply is lean', () => {

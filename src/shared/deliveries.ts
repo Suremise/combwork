@@ -8,6 +8,7 @@
 import type { InboxBrief, InboxSummary } from './types'
 import { inboxNotice } from './doorbell'
 import { cardRef } from './projectKeys'
+import { CAME_BACK } from './workflow/queue'
 
 /** What a delivery is: a task, a re-brief (a message for the work it is on), a card event, the user's answer, a handover, a control notice. */
 export const DELIVERY_KINDS = ['task', 'rebrief', 'card-event', 'answer', 'handover', 'control'] as const
@@ -195,8 +196,19 @@ export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
     }
     out.push({ ids: [r.id], kind: r.kind, from: r.from.name, ...(r.card ? { card: r.card } : {}), text: r.body, at: r.created })
   }
-  for (const { item, bodies } of byCard.values()) item.text = bodies.length === 1 && bodies[0] ? bodies[0] : `${bodies.length} ${bodies.length === 1 ? 'change' : 'changes'}, read the card`
+  for (const { item, bodies } of byCard.values()) item.text = coalesced(bodies)
   return out
+}
+
+/**
+ * A card's events in one line: one as it is; several counted, led by the merge queue's return when one is among them
+ * (HI-2087: its reason is what the builder needs, not "read the card"), the latest return.
+ */
+function coalesced(bodies: readonly string[]): string {
+  if (bodies.length === 1 && bodies[0]) return bodies[0]
+  const back = bodies.findLast((b) => b.includes(` ${CAME_BACK}: `))
+  const counted = `${bodies.length} ${bodies.length === 1 ? 'change' : 'changes'}, read the card`
+  return back ? `${back} (with ${bodies.length - 1} more ${bodies.length === 2 ? 'change' : 'changes'}: read the card)` : counted
 }
 
 const idList = (ids: readonly string[]): string => ids.join(', ')

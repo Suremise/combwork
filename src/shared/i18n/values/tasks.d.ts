@@ -135,6 +135,7 @@ interface HiveMessageValues {
   'tasks.history.noDependencies': undefined
   'tasks.history.notified': { event: string; lane: string | number; hasWhy: string; why: string | number }
   'tasks.history.placed': { place: number; column: string }
+  'tasks.history.queueReturned': { reason: string; target: string | number; check: string | number; files: string }
   'tasks.history.renamed': { title: string | number }
   'tasks.history.repaired': { from: string | number; to: string | number }
   'tasks.history.requestClosed': { why: string }
