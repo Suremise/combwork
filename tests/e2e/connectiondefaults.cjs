@@ -1,8 +1,9 @@
 // Model, effort and context belong to the connection (HI-1770, S3;
 // the test seam off so the real rule applies): with Connections on, a project's own model, effort and context move onto
 // its agents once (an agent's own kept), recorded in project.json; an account's first connection is edited in its dialog
-// (Settings → Accounts & Connections, HI-2107) and a launch with none of its own runs it (the fake's launch log), an agent's own winning; Agent Settings
-// names "Connection default"; the CLI's and the project's model rows give way; a moved effort its model doesn't take is
+// (Settings → Accounts & Connections, HI-2107) and a launch with none of its own runs it (the fake's launch log), an agent's own winning; the Agents
+// list and Agent Settings show the agent's connection with its values, and neither Agent Settings nor Settings → Assistant
+// has a model, effort or context of its own (HI-2108, decision B); the CLI's model rows give way; a moved effort its model doesn't take is
 // listed once, and stays dismissed. Screenshots in both themes. The fake Claude Code signs in, no browser.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -125,33 +126,32 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
     await lib.openProjectSettings(page)
     // The list of agents is Project Settings → Agents' (HI-1765: it opens on General).
     await page.locator('.tab-body .settings-nav .row').filter({ has: page.locator('.label', { hasText: /^Agents$/ }) }).click()
+    // Its row names its connection and that connection's values (HI-2108, decision B: no model, effort or context of its own).
     const agentRow = page.locator(`.agent-list-row[data-agent="${three.id}"]`)
-    check("the Agents list: Three runs its connection's defaults", !!(await lib.until(async () => /Its connection's defaults \(Sonnet/.test(await agentRow.innerText().catch(() => '')), HUNG_MS)), await agentRow.innerText().catch(() => ''))
+    check("the Agents list: Three's row names Max 1's connection and its values (Sonnet · Low)", !!(await lib.until(async () => /Max 1[\s\S]*Sonnet · Low/.test(await agentRow.innerText().catch(() => '')), HUNG_MS)), await agentRow.innerText().catch(() => ''))
     await agentRow.getByRole('button', { name: 'Agent Settings' }).click()
     const dialog = page.locator('.dialog').last()
-    const base = await lib.until(async () => {
-      // The model's choice: the first select whose first option is a "Connection default" (the Connection picker comes before it).
-      const first = await dialog.locator('.agent-form select').evaluateAll((all) => all.map((s) => s.options[0]?.textContent ?? '').find((x) => x.startsWith('Connection default')) ?? '').catch(() => '')
-      return /Connection default/.test(first ?? '') ? first : null
-    }, HUNG_MS)
-    check('Agent Settings: an empty model reads "Connection default (Sonnet…)"', !!base && /Connection default \(Sonnet/.test(base), String(base))
-    const mode = await dialog.locator('.agent-form select').evaluateAll((all) => all.map((s) => s.options[0]?.textContent ?? '').find((x) => x.startsWith("Project's")) ?? '').catch(() => '')
-    check("…its permission mode still follows the project's (never \"Connection default\")", mode.startsWith("Project's ("), mode)
+    // Agent Settings (HI-2108): the connection picker on Three's connection, its values under it; nothing to choose of its own.
+    const picker = dialog.locator('[data-connection-choice]')
+    check("Agent Settings: the picker is on Max 1's connection", !!(await lib.until(async () => (await picker.getAttribute('data-connection-choice').catch(() => null)) === edited?.id, HUNG_MS)), await picker.getAttribute('data-connection-choice').catch(() => ''))
+    check('…its values under it (Sonnet · Low)', !!(await lib.until(async () => /Sonnet · Low/.test(await dialog.locator('[data-connection-summary]').innerText().catch(() => '')), HUNG_MS)), await dialog.locator('[data-connection-summary]').innerText().catch(() => ''))
+    const firsts = await dialog.locator('.agent-form select').evaluateAll((all) => all.map((s) => s.options[0]?.textContent ?? '')).catch(() => [])
+    check('…and no model, effort, mode or context choice of its own', firsts.length > 0 && !firsts.some((x) => /^(Connection default|Project's)/.test(x)), JSON.stringify(firsts))
     await shots('agentsettings')
     await page.keyboard.press('Escape')
 
-    // --- Settings → Assistant: an empty model, effort and context name the Assistant's connection's defaults, not the CLI's.
+    // --- Settings → Assistant: no model, effort or context rows (HI-2108: the Assistant's connection holds them, chosen in its dialog).
     await page.keyboard.press('Control+,')
     // Settings' own row (Project Settings, still open behind it, has a nav of its own).
     const assistantRow = page.locator('.settings-nav .row[data-section="assistant"]')
     await assistantRow.waitFor({ timeout: HUNG_MS })
     await assistantRow.click()
-    const firsts = async () => page.locator('.assistant-defaults').first().locator('select').evaluateAll((all) => all.map((s) => s.options[0]?.textContent ?? '')).catch(() => [])
-    const shown = await lib.until(async () => {
-      const f = await firsts()
-      return f.some((x) => x.startsWith('Connection default')) ? f : null
-    }, HUNG_MS)
-    check("Settings → Assistant: Connection default (Sonnet…), (Low) and context (Off), never the CLI's Haiku, High, On", !!shown && shown.some((x) => x.startsWith('Connection default (Sonnet')) && shown.includes('Connection default (Low)') && shown.includes('Connection default (Off)') && !shown.some((x) => /Haiku|High|\(On\)/.test(x)), JSON.stringify(shown ?? (await firsts())))
+    // The Assistant's own page, shown (one of its rows), before looking for what it no longer has there.
+    const assistantPage = page.locator('.settings-content .settings-group[data-section="assistant"]')
+    const shownPage = !!(await lib.until(async () => (await assistantPage.locator('.setting', { hasText: 'Highlight Compact over' }).count()) >= 1, HUNG_MS))
+    check('Settings → Assistant is shown', shownPage)
+    const shown = await assistantPage.locator('select').evaluateAll((all) => all.map((s) => s.options[0]?.textContent ?? '')).catch(() => [])
+    check('Settings → Assistant: no model, effort or context rows (its connection holds them)', shownPage && shown.length > 0 && (await assistantPage.locator('.assistant-defaults').count()) === 0 && !shown.some((x) => x.startsWith('Connection default')), JSON.stringify(shown))
     await shots('assistant')
     await page.keyboard.press('Escape')
   } catch (e) {
