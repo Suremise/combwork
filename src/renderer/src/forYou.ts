@@ -19,10 +19,20 @@ let lastRead: ForYouSummary = NONE
 const readForYou = sharedRead<ForYouSummary>(() => window.hive.invoke('tasks:forYou').then((s) => (lastRead = keepSame(lastRead, s))))
 
 /**
- * Whether a card has an open request for the user that this agent asked, as For you was last read (HI-2080): the stall
- * check's, which isn't a hook. Read again with each board read, as the board itself is.
+ * For you as a view last accepted it, with its workspace (HI-2080, HR1's round 1): only a read its scoped load took (one
+ * that finished after a newer one started, or for another workspace, is dropped there), never `lastRead`, which every
+ * reply writes. The status bar's count (Shell) always shows For you, so the current workspace's is kept up to date.
  */
-export const askedByNow = (card: number, agentId: string): boolean => lastRead.items.some((i) => i.card === card && i.asker === agentId)
+let accepted: { ws: string; items: readonly ForYouItem[] } | null = null
+
+/**
+ * Whether a card has an open request for the user that this agent asked, as For you was last accepted for the workspace
+ * open now (HI-2080): the stall check's, which isn't a hook. None known for it (another workspace's, or not read yet): no.
+ */
+export const askedByNow = (card: number, agentId: string): boolean => {
+  const ws = useStore.getState().workspace?.path ?? ''
+  return !!ws && accepted?.ws === ws && accepted.items.some((i) => i.card === card && i.asker === agentId)
+}
 
 /** The workspace's requests for the user, and by card; empty while loading. */
 export function useForYou(): { summary: ForYouSummary; byCard: Map<number, ForYouItem[]> } {
@@ -34,6 +44,8 @@ export function useForYou(): { summary: ForYouSummary; byCard: Map<number, ForYo
     if (ws) load(ws, () => readForYou(ws, reads))
   }, [ws, reads, load])
   const summary = data ?? NONE
+  // The current scope's read, as accepted (useScopedLoad gives no other): what askedByNow reads.
+  if (ws && data) accepted = { ws, items: data.items }
   const byCard = useMemo(() => {
     const m = new Map<number, ForYouItem[]>()
     for (const i of summary.items) m.set(i.card, [...(m.get(i.card) ?? []), i])
