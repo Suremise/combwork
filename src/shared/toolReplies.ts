@@ -212,6 +212,11 @@ export interface IntentDone {
   next?: NextStep
   /** The card watch Hive armed for the agent after its submission or failed verdict in a lane (#1639, main/intentWatch.ts). */
   watch?: string
+  /**
+   * A lane's builder starting its lane's card itself (HI-2092): what Hive's start of it would have given it, the start
+   * prompt's skill line and the lane's brief, on lines of their own after the rest.
+   */
+  lane?: string
 }
 
 /** What a reply says comes next (#1530): an agent follows it rather than infer the step from a column. */
@@ -249,7 +254,7 @@ export function intentText(d: IntentDone): string {
   const facts = Object.entries(d.data ?? {})
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
     .map(([k, v]) => `${k}: ${value(v)}`)
-  return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}${d.next ? ` ${nextText(d.next)}` : ''}${d.watch ? ` ${d.watch}` : ''}`, ...(d.warnings ?? []).map((w) => `Warning: ${w}`)].join('\n')
+  return [`${d.card}: ${where}.${facts.length ? ` ${facts.join('; ')}` : ''}${d.next ? ` ${nextText(d.next)}` : ''}${d.watch ? ` ${d.watch}` : ''}`, ...(d.warnings ?? []).map((w) => `Warning: ${w}`), ...(d.lane ? ['', d.lane] : [])].join('\n')
 }
 
 /** What asking the Hive Assistant on a card did (HI-1866): the card, and the request's id in the Assistant's inbox ('' when it couldn't be given). */

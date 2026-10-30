@@ -46,6 +46,8 @@ export interface Moved {
   to: StageId
   data?: Record<string, unknown>
   warnings?: string[]
+  /** A start whose builder is given the card in a slot (#1438): that placement's new conversation carries its prompt. */
+  placed?: boolean
 }
 
 /** The user's drag across rules: what it would skip, asked before it's done (§16.8.4). */
@@ -882,7 +884,8 @@ export class Workflow {
       })
       if (out && laneMoved && !this.regathering.has(card.id)) return this.regather(card, () => this.start(ref, actor, opts))
       if (out) return (out.rule === 'move.notFromHere' ? forIt(this.state(this.store.card(card.id))) : null) ?? this.refuse(card, actor, 'start', out)
-      return this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
+      const moved = this.ok(card, s.stage, 'active', { folder: this.folderOf(this.state(card)), line: g.data.line, base: g.data.base, target: g.data.target }, g.warnings)
+      return g.data.lease && g.data.slot ? { ...moved, placed: true } : moved
     } finally {
       // A slot lent for it and not started with (refused, undone): given back (#1438).
       if (g.lent) await this.slotUnused(card, g.lent)
