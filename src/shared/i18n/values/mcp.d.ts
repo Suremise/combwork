@@ -37,12 +37,11 @@ interface HiveMessageValues {
   'mcp.catalog.http': { url: string | number; status: string | number }
   'mcp.catalog.installAction': undefined
   'mcp.catalog.installButton': undefined
-  'mcp.catalog.installMessage': undefined
+  'mcp.catalog.installMessageName': undefined
   'mcp.catalog.installTitle': { name: string | number; version: string | number }
   'mcp.catalog.installed': { name: string | number }
   'mcp.catalog.installedAt': { version: string | number }
   'mcp.catalog.installedNext': undefined
-  'mcp.catalog.installing': undefined
   'mcp.catalog.loading': undefined
   'mcp.catalog.mismatch': { name: string | number }
   'mcp.catalog.more': { left: number }
@@ -56,8 +55,7 @@ interface HiveMessageValues {
   'mcp.catalog.pick': undefined
   'mcp.catalog.placesChanged': { name: string | number }
   'mcp.catalog.redirects': { url: string | number }
-  'mcp.catalog.replaceButton': undefined
-  'mcp.catalog.replaceOther': { name: string | number }
+  'mcp.catalog.refreshAgain': undefined
   'mcp.catalog.requires': undefined
   'mcp.catalog.scheme': { url: string | number }
   'mcp.catalog.search': undefined
@@ -68,6 +66,7 @@ interface HiveMessageValues {
   'mcp.catalog.sourceUrl': undefined
   'mcp.catalog.timeout': { url: string | number; seconds: number }
   'mcp.catalog.tooLarge': { url: string | number; max: number }
+  'mcp.catalog.tooManySources': { max: number }
   'mcp.catalog.unknown': undefined
   'mcp.catalog.unvetted': undefined
   'mcp.catalog.updateAction': { version: string | number }

@@ -28,8 +28,10 @@ const log = createLogger('mcpCatalog')
 /** Bounds (HI-545/s17): a catalogue's JSON, its servers, the cache, a zip, and the redirects one download may follow. */
 const CATALOG_MAX_BYTES = 8 * 1024 * 1024
 const CATALOG_MAX_SERVERS = 5000
-const CACHE_MAX_SOURCES = 8
-const CACHE_MAX_BYTES = 16 * 1024 * 1024
+/** The user's own sources at most (ours besides): the cache holds every source listed, so none is evicted by count. */
+export const MAX_USER_SOURCES = 15
+const CACHE_MAX_SOURCES = MAX_USER_SOURCES + 1
+const CACHE_MAX_BYTES = 32 * 1024 * 1024
 const ZIP_MAX_BYTES = 200 * 1024 * 1024
 const MAX_REDIRECTS = 5
 /** A page of a source's rows. */
@@ -62,6 +64,8 @@ const M = {
   placesChanged: msg({ id: 'mcp.catalog.placesChanged', defaultMessage: 'Where {name} is added changed while the update waited: look again.', description: "An error updating a server from an MCP catalogue (HI-545): a project (or the Hive Assistant) gained or lost the server after the Update dialog showed where it is added, so nothing was changed." }),
   notInstalled: msg({ id: 'mcp.catalog.notInstalled', defaultMessage: "{name} isn't installed from this catalogue: install it instead.", description: 'An error updating a server from an MCP catalogue (HI-545): no server of the name came from it.' }),
   sourceUrl: msg({ id: 'mcp.catalog.sourceUrl', defaultMessage: 'A catalogue is an https:// or file:// address of its catalog.json.', description: 'An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the address is neither.' }),
+  tooManySources: msg({ id: 'mcp.catalog.tooManySources', defaultMessage: 'Hive lists at most {max, number} catalogues of your own: remove one first.', description: 'An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the list is full.' }),
+  refreshAgain: msg({ id: 'mcp.catalog.refreshAgain', defaultMessage: 'Refresh (↻) to list this catalogue again: Hive keeps only so many in memory.', description: "A catalogue source in the MCP view's Catalogue (HI-545) whose list Hive no longer holds (too much in memory): ↻ reads it again." }),
   sourceTaken: msg({ id: 'mcp.catalog.sourceTaken', defaultMessage: 'That catalogue is listed already.', description: 'An error adding an MCP catalogue source (HI-545): it is in the list already.' }),
   check: {
     os: msg({ id: 'mcp.catalog.check.os', defaultMessage: 'Runs on {value}', description: "A requirement of a catalogue server (HI-545): the systems it runs on ({value}: windows, macos, linux, as the catalogue names them)." }),
@@ -92,6 +96,7 @@ export function setCatalogSources(next: McpCatalogSettings): McpCatalogSettings 
     seen.add(url)
     sources.push({ url, on: x.on !== false, ...(x.noted || was.find((w) => w.url === url)?.noted ? { noted: true } : {}) })
   }
+  if (sources.length > MAX_USER_SOURCES) throw hiveError(M.tooManySources, { max: MAX_USER_SOURCES }, { kind: 'conflict' })
   const saved = { oursOn: next?.oursOn !== false, sources }
   config.update((c) => {
     c.settings.mcpCatalogs = saved
@@ -118,7 +123,7 @@ type Policy = 'https' | 'file'
 const policyOf = (sourceUrl: string): Policy => (/^file:/i.test(sourceUrl) ? 'file' : 'https')
 
 /** For tests: what fetch and the PC probes are. */
-export const testHooks: { fetch?: typeof fetch; probe?: (cmd: string, args: string[]) => Promise<string>; facts?: PcFacts } = {}
+export const testHooks: { fetch?: typeof fetch; probe?: (cmd: string, args: string[]) => Promise<string>; facts?: PcFacts; stat?: (path: string) => Promise<{ size: number }> } = {}
 
 /**
  * Bytes from `url` within one budget: `ms` for the whole download, every redirect included, and `max` bytes, counted
@@ -131,9 +136,15 @@ export async function download(url: string, policy: Policy, max: number, ms: num
   const timedOut = (): Error => hiveError(M.timeout, { url, seconds: Math.round(ms / 1000) })
   if (/^file:/i.test(url)) {
     if (policy !== 'file') throw hiveError(M.scheme, { url })
+    // The same budget and the same end as a download: a share that stalls, or a workspace closed, stops it.
+    const ended = (): Error => (timeout.aborted ? timedOut() : (signal?.reason instanceof Error ? signal.reason : new Error('aborted'))) // i18n-ignore: an abort's cause, for the log
+    if (stop.aborted) throw ended()
     const path = fileURLToPath(url)
-    if ((await stat(path)).size > max) throw hiveError(M.tooLarge, { url, max })
-    const bytes = await readFile(path)
+    const size = await Promise.race([(testHooks.stat ?? stat)(path).then((s) => s.size), new Promise<never>((_, reject) => stop.addEventListener('abort', () => reject(ended()), { once: true }))])
+    if (size > max) throw hiveError(M.tooLarge, { url, max })
+    const bytes = await readFile(path, { signal: stop }).catch((e) => {
+      throw stop.aborted ? ended() : e
+    })
     if (bytes.length > max) throw hiveError(M.tooLarge, { url, max })
     return { bytes }
   }
@@ -201,23 +212,30 @@ function keep(url: string, c: Cached): void {
 /** For tests: how much the cache holds. */
 export const cacheSize = (): { sources: number; bytes: number } => ({ sources: cache.size, bytes: [...cache.values()].reduce((n, x) => n + x.size, 0) })
 
-/** A source read again (its ETag first: unchanged, the cached copy stands), or its error kept to show. */
-async function refreshSource(url: string): Promise<void> {
+/**
+ * A source read again (its ETag first: unchanged, the cached copy stands), or its error kept to show. Returns what it
+ * read, which the reply uses whatever the cache keeps.
+ */
+async function refreshSource(url: string): Promise<Cached> {
   const was = cache.get(url)
+  let read: Cached
   try {
     const got = await download(url, policyOf(url), CATALOG_MAX_BYTES, seconds(FETCH_SECONDS, 15) * 1000, undefined, was?.catalog ? was.etag : undefined)
-    if (!got) return keep(url, was!)
-    const raw = JSON.parse(got.bytes.toString('utf8')) as unknown
-    const read = readCatalog(raw, url)
-    if (read.servers.length > CATALOG_MAX_SERVERS) {
-      read.skipped += read.servers.length - CATALOG_MAX_SERVERS
-      read.servers = read.servers.slice(0, CATALOG_MAX_SERVERS)
+    if (!got) read = was!
+    else {
+      const catalog = readCatalog(JSON.parse(got.bytes.toString('utf8')) as unknown, url)
+      if (catalog.servers.length > CATALOG_MAX_SERVERS) {
+        catalog.skipped += catalog.servers.length - CATALOG_MAX_SERVERS
+        catalog.servers = catalog.servers.slice(0, CATALOG_MAX_SERVERS)
+      }
+      read = { etag: got.etag, size: got.bytes.length, catalog }
     }
-    keep(url, { etag: got.etag, size: got.bytes.length, catalog: read })
   } catch (e) {
     log.warn(`reading the MCP catalogue ${userText(url)}`, e)
-    keep(url, { size: 0, catalog: null, error: tr(M.notRead, { reason: e instanceof Error ? e.message : String(e) }) })
+    read = { size: 0, catalog: null, error: tr(M.notRead, { reason: e instanceof Error ? e.message : String(e) }) }
   }
+  keep(url, read)
+  return read
 }
 
 // ---------------------------------------------------------------------------
@@ -264,15 +282,17 @@ const checksOf = (server: McpCatalogServer, pc: PcFacts): McpCatalogCheck[] => c
 // The view: pages of each source's rows, for a search and a filter.
 // ---------------------------------------------------------------------------
 
-/** The installed servers by name: from which catalogue and version, or `other` (a server of the name not from it). */
-async function installedNow(): Promise<Map<string, McpServerDef | null>> {
-  return new Map((await listMcp()).map((m) => [m.name, m.def]))
-}
+/** An installed server from this catalogue entry (its provenance, whatever name it was installed under). */
+const fromEntry = (def: McpServerDef | null | undefined, source: string, name: string): boolean => def?.catalog?.source === source && def.catalog.name === name && typeof def.catalog.version === 'string'
 
-const installedAs = (def: McpServerDef | null | undefined, source: string, server: McpCatalogServer): string | null => {
-  if (def === undefined) return null
-  const from = def?.catalog
-  return from && from.source === source && from.name === server.name && typeof from.version === 'string' ? from.version : 'other'
+/**
+ * Whether a catalogue entry is installed: its version (found by provenance, under any name), `other` when its name is
+ * taken by a server not from it, else null.
+ */
+function installedAs(installed: { name: string; def: McpServerDef | null }[], source: string, server: McpCatalogServer): string | null {
+  const mine = installed.find((m) => fromEntry(m.def, source, server.name))
+  if (mine) return mine.def!.catalog!.version
+  return installed.some((m) => m.name === server.name) ? 'other' : null
 }
 
 /**
@@ -281,19 +301,21 @@ const installedAs = (def: McpServerDef | null | undefined, source: string, serve
  * source's next page (`offset`), the others empty.
  */
 export async function catalogPages(opts: { query?: string; filter?: McpCatalogFilter; source?: string; offset?: number; refresh?: boolean }): Promise<McpCatalogSourcePage[]> {
-  const sources = catalogSources()
+  const sources = catalogSources().filter((s) => !opts.source || s.url === opts.source)
   if (opts.refresh || !facts) facts = probeFacts()
-  await Promise.all(sources.filter((s) => opts.refresh || !cache.has(s.url)).filter((s) => !opts.source || s.url === opts.source).map((s) => refreshSource(s.url)))
+  // Read only on refresh (the view opening, ↻); this reply uses what it read, whatever the cache keeps afterwards. A
+  // search or a next page uses the copies kept; one no longer kept says to refresh, never read outside that cadence.
+  const fresh = new Map<string, Cached>()
+  if (opts.refresh) await Promise.all(sources.map(async (s) => fresh.set(s.url, await refreshSource(s.url))))
   const pc = await facts
-  const installed = await installedNow()
-  return sources
-    .filter((s) => !opts.source || s.url === opts.source)
-    .map((s) => {
-      const c = cache.get(s.url)
+  const installed = (await listMcp()).map((m) => ({ name: m.name, def: m.def }))
+  return sources.map((s) => {
+      const c = fresh.get(s.url) ?? cache.get(s.url)
       const base = { url: s.url, ours: s.ours, noteDue: !s.ours && !s.noted, offset: 0, total: 0, skipped: 0, rows: [] as McpCatalogRow[] }
-      if (!c?.catalog) return { ...base, name: s.url, ...(c?.error ? { error: c.error } : {}) }
+      if (!c) return { ...base, name: s.url, error: tr(M.refreshAgain) }
+      if (!c.catalog) return { ...base, name: s.url, ...(c.error ? { error: c.error } : {}) }
       const rows: McpCatalogRow[] = c.catalog.servers.map((server) => {
-        const at = installedAs(installed.get(server.name), s.url, server)
+        const at = installedAs(installed, s.url, server)
         return { ...server, source: s.url, installed: at, update: !!at && at !== 'other' && compareVersions(server.version, at) > 0, checks: checksOf(server, pc) }
       })
       const shown = rows.filter((r) => catalogRowShown(r, opts.query ?? '', opts.filter ?? 'all'))
@@ -310,6 +332,8 @@ interface Held {
   prepared: McpCatalogPrepared
   files: Map<string, Uint8Array>
   ws: WorkspaceService
+  /** The lifetime of the workspace's open that asked (not the service's current one: a reopen gives it a new one). */
+  life: AbortSignal
   path: string
   at: number
 }
@@ -329,31 +353,37 @@ function listed(source: string, name: string): McpCatalogServer {
  * answers, at most 10 minutes, a few at a time.
  */
 export async function prepareCatalogServer(source: string, name: string): Promise<McpCatalogPrepared> {
+  // The open that asked, before any await: a close, or a close and reopen of the same folder, ends what it started.
   const ws = currentWorkspace()
   const path = ws.path
-  if (!path) throw hiveError(M.workspaceGone, { name })
+  const life = ws.lifetime
+  if (!path || life.aborted) throw hiveError(M.workspaceGone, { name })
   // Read once if it isn't yet (the view reads it first; Install from elsewhere may not have).
   if (!cache.has(source) && catalogSources().some((s) => s.url === source)) await refreshSource(source)
   const server = listed(source, name)
   const unmet = checksOf(server, await (facts ?? (facts = probeFacts()))).filter((c) => c.state === 'no')
   if (unmet.length) throw hiveError(M.needs, { name, needs: { list: unmet.map((c) => c.label), type: 'conjunction' } }, { kind: 'conflict' })
-  const got = await download(server.zip.url, policyOf(source), Math.min(server.zip.size, ZIP_MAX_BYTES), seconds(DOWNLOAD_SECONDS, 60) * 1000, ws.lifetime)
+  const got = await download(server.zip.url, policyOf(source), Math.min(server.zip.size, ZIP_MAX_BYTES), seconds(DOWNLOAD_SECONDS, 60) * 1000, life)
+  if (life.aborted) throw hiveError(M.workspaceGone, { name })
   const bytes = got!.bytes
   if (bytes.length !== server.zip.size || createHash('sha256').update(bytes).digest('hex') !== server.zip.sha256) throw hiveError(M.mismatch, { name })
   const z = serverFromZip(bytes)
   if (z.folder !== name) throw hiveError(M.folder, { name })
   const def: McpServerDef = { ...retarget(z.def, z.folder, name), catalog: { source, name, version: server.version, sha256: server.zip.sha256 } }
-  const existing = await inWorkspace(ws, async () => {
-    const m = (await listMcp(true)).find((x) => x.name === name)
-    if (!m) return null
-    const from = m.def?.catalog
-    return { version: from && from.source === source && from.name === name ? from.version : null, def: m.def, revision: m.revision, runs: m.runs, projects: m.projects, assistant: m.assistant }
+  // Installed from this entry already (under any name: an update's), and whether its own name is taken.
+  const { existing, nameTaken } = await inWorkspace(ws, async () => {
+    const all = await listMcp(true)
+    const m = all.find((x) => fromEntry(x.def, source, name))
+    return { existing: m ? { name: m.name, version: m.def!.catalog!.version, def: m.def, revision: m.revision, runs: m.runs, projects: m.projects, assistant: m.assistant } : null, nameTaken: all.some((x) => x.name === name) }
   })
-  const prepared: McpCatalogPrepared = { id: randomUUID(), source, server, def, runs: mcpRuns(def), secretWarnings: findSecretWarnings(def), files: z.files.size, existing }
+  if (life.aborted) throw hiveError(M.workspaceGone, { name })
+  // An update of one installed under another name: shown, and written, under that name's folder.
+  const shown = existing && existing.name !== name ? retarget(def, name, existing.name) : def
+  const prepared: McpCatalogPrepared = { id: randomUUID(), source, server, def: shown, runs: mcpRuns(shown), secretWarnings: findSecretWarnings(shown), files: z.files.size, existing, nameTaken }
   const now = Date.now()
-  for (const [k, h] of held) if (now - h.at > PREPARED_MS || h.ws.lifetime.aborted) held.delete(k)
+  for (const [k, h] of held) if (now - h.at > PREPARED_MS || h.life.aborted) held.delete(k)
   while (held.size >= PREPARED_MAX) held.delete(held.keys().next().value!)
-  held.set(prepared.id, { prepared, files: z.files, ws, path, at: now })
+  held.set(prepared.id, { prepared, files: z.files, ws, life, path, at: now })
   return prepared
 }
 
@@ -364,7 +394,7 @@ function heldFor(id: string): Held {
     held.delete(id)
     throw hiveError(M.expired, undefined, { kind: 'conflict' })
   }
-  if (h.ws.lifetime.aborted || h.ws.path !== h.path) {
+  if (h.life.aborted || h.ws.lifetime !== h.life || h.ws.path !== h.path) {
     held.delete(id)
     throw hiveError(M.workspaceGone, { name: h.prepared.server.name }, { kind: 'conflict' })
   }
@@ -419,13 +449,13 @@ function keepOwnValues(next: McpServerDef, was: McpServerDef | null): McpServerD
 export async function updateCatalogServer(id: string, shown: McpShown, places: { projects: string[]; assistant: boolean }): Promise<{ stale?: string }> {
   const h = heldFor(id)
   const p = h.prepared
-  const name = p.server.name
+  // The name it was installed under (the user may have chosen another), found by its provenance.
+  const name = p.existing?.name ?? p.server.name
   const stale = await inTurn(() =>
     inWorkspace(h.ws, async () => {
       heldFor(id)
       const now = (await listMcp()).find((m) => m.name === name)
-      const from = now?.def?.catalog
-      if (!now || !from || from.source !== p.source || from.name !== name) throw hiveError(M.notInstalled, { name }, { kind: 'conflict' })
+      if (!now || !fromEntry(now.def, p.source, p.server.name)) throw hiveError(M.notInstalled, { name }, { kind: 'conflict' })
       try {
         await checkShown(name, shown)
       } catch (e) {

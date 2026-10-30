@@ -124,6 +124,29 @@ describe('downloads (HI-545/s17)', () => {
     life.abort()
     await expect(going).rejects.toThrow()
   })
+
+  it('holds a file:// download to the same end and time budget (HI-545 round 1)', async () => {
+    const d = tempDir('hive-mcp-catalog-file-')
+    writeFileSync(join(d, 'demo.zip'), 'bytes')
+    const url = pathToFileURL(join(d, 'demo.zip')).href
+    expect((await catalog.download(url, 'file', 100, 5000))!.bytes.toString()).toBe('bytes')
+    // Its workspace closed already: nothing is read.
+    const life = new AbortController()
+    life.abort()
+    await expect(catalog.download(url, 'file', 100, 5000, life.signal)).rejects.toThrow()
+    // A share that stalls: the time budget ends it.
+    catalog.testHooks.stat = () => new Promise(() => {})
+    try {
+      await expect(catalog.download(url, 'file', 100, 100)).rejects.toThrow('took too long')
+      // And so does its workspace closing meanwhile.
+      const closing = new AbortController()
+      const going = catalog.download(url, 'file', 100, 60_000, closing.signal)
+      closing.abort()
+      await expect(going).rejects.toThrow()
+    } finally {
+      catalog.testHooks.stat = undefined
+    }
+  })
 })
 
 describe('installing and updating (HI-545)', () => {
@@ -297,19 +320,63 @@ describe('installing and updating (HI-545)', () => {
     expect((await run(() => mcp.listMcp())).map((m) => m.name)).toEqual([])
   })
 
-  it('keeps the cache bounded while sources are added and removed, and forgets one removed', async () => {
+  it('lists every source, each with its servers, on refresh and in a search after it, and keeps the cache bounded (HI-545 round 1)', async () => {
     const urls: string[] = []
     for (let i = 0; i < 12; i++) {
       const d = tempDir('hive-mcp-catalog-src-')
-      writeFileSync(join(d, 'catalog.json'), JSON.stringify({ schemaVersion: 1, name: `Source ${i}`, servers: [] }))
+      writeFileSync(join(d, 'catalog.json'), JSON.stringify({ schemaVersion: 1, name: `Source ${i}`, servers: [entry({ description: `The demo of source ${i}` })] }))
       urls.push(pathToFileURL(join(d, 'catalog.json')).href)
     }
     catalog.setCatalogSources({ oursOn: false, sources: urls.map((url) => ({ url, on: true })) })
-    await pages()
-    expect(catalog.cacheSize().sources).toBeLessThanOrEqual(8)
+    const opened = await pages()
+    expect(opened.map((p) => [p.name, p.total, p.error ?? null])).toEqual(urls.map((_, i) => [`Source ${i}`, 1, null]))
+    // A search afterwards reads nothing again and still lists them all.
+    const searched = await run(() => catalog.catalogPages({ query: 'demo' }))
+    expect(searched.map((p) => p.total)).toEqual(urls.map(() => 1))
+    expect(catalog.cacheSize().sources).toBeLessThanOrEqual(catalog.MAX_USER_SOURCES + 1)
     catalog.setCatalogSources({ oursOn: false, sources: [{ url: urls[0], on: true }] })
     expect(catalog.cacheSize().sources).toBeLessThanOrEqual(1)
     expect(() => catalog.setCatalogSources({ oursOn: true, sources: [{ url: 'http://e.com/c.json', on: true }] })).toThrow('https:// or file://')
+    expect(() => catalog.setCatalogSources({ oursOn: true, sources: Array.from({ length: catalog.MAX_USER_SOURCES + 1 }, (_, i) => ({ url: `https://e.com/${i}.json`, on: true })) })).toThrow('at most 15 catalogues')
+  })
+
+  it("discards what it held when its workspace is closed and opened again in the same folder (HI-545 round 1)", async () => {
+    await pages()
+    const p = await run(() => catalog.prepareCatalogServer(source(), 'demo'))
+    await w.close()
+    await w.open(wsPath)
+    await expect(run(() => catalog.installCatalogServer(p.id, 'demo', false))).rejects.toThrow('The workspace closed before demo was installed')
+    expect((await run(() => mcp.listMcp())).map((m) => m.name)).toEqual([])
+    // An update's too.
+    await install()
+    publish('1.1.0', 'server2.js')
+    await pages()
+    const u = await prepareUpdate()
+    await w.close()
+    await w.open(wsPath)
+    await expect(run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).rejects.toThrow('The workspace closed before demo was installed')
+    expect(readFileSync(join(mcpDir(), 'demo.json'), 'utf8')).toContain('server.js')
+  })
+
+  it('installs under another name when its own is taken, and is found by where it came from for its update (HI-545 round 1)', async () => {
+    await run(() => mcp.createMcp('demo'))
+    await pages()
+    const p = await run(() => catalog.prepareCatalogServer(source(), 'demo'))
+    expect(p).toMatchObject({ nameTaken: true, existing: null })
+    await run(() => catalog.installCatalogServer(p.id, 'demo-cat', false))
+    const m = (await run(() => mcp.listMcp(true))).find((x) => x.name === 'demo-cat')!
+    expect(m.def?.catalog).toMatchObject({ name: 'demo', version: '1.0.0' })
+    expect(m.def?.args?.[0]).toBe('${HIVE_MCP_DIR}/demo-cat/server.js')
+    expect(readFileSync(join(mcpDir(), 'demo-cat', 'server.js'), 'utf8')).toBe('// demo 1.0.0')
+    // The local demo is untouched; the catalogue row is installed (by its provenance), not "name in use".
+    expect(JSON.parse(readFileSync(join(mcpDir(), 'demo.json'), 'utf8')).catalog).toBeUndefined()
+    expect(await row()).toMatchObject({ installed: '1.0.0', update: false })
+    publish('1.1.0', 'server2.js')
+    await pages()
+    const u = await prepareUpdate()
+    expect(u.p.existing?.name).toBe('demo-cat')
+    expect(await run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).toEqual({})
+    expect((await run(() => mcp.listMcp(true))).find((x) => x.name === 'demo-cat')?.def?.args?.[0]).toBe('${HIVE_MCP_DIR}/demo-cat/server2.js')
   })
 
   it("shows a requirement whose probe failed or timed out as not checkable, never as met", async () => {

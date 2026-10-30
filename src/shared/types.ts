@@ -2800,8 +2800,10 @@ export interface McpCatalogPrepared {
   runs: string[]
   secretWarnings: string[]
   files: number
-  /** A server of the name is installed: from this catalogue (its version) or not (null). */
-  existing: { version: string | null; def: McpServerDef | null; revision?: string; runs: string[]; projects: string[]; assistant: boolean } | null
+  /** Installed from this catalogue entry already, under `name` (an update's: its version, where it is added). */
+  existing: { name: string; version: string; def: McpServerDef | null; revision?: string; runs: string[]; projects: string[]; assistant: boolean } | null
+  /** A server of the entry's own name is in the workspace (from it or not): Install asks to replace it or choose another name. */
+  nameTaken: boolean
 }
 
 /** Where an installed catalogue server came from (HI-545): Hive's own field in its definition, never a CLI's. */

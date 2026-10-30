@@ -1052,34 +1052,31 @@ const MCP_ASSISTANT = msg({ id: 'mcp.where.assistantName', defaultMessage: 'the 
 const CATALOG_FAILED = msg({ id: 'mcp.catalog.failed', defaultMessage: 'Could not get {name}', description: "An error's title (HI-545): downloading or checking a server from an MCP catalogue for Install or Update failed. {name} is the server." })
 
 /**
- * Install (HI-545): the catalogue server downloaded and checked against its catalogue (size, sha256) first, then what
- * it runs shown before it is written. A server of the name not from this catalogue is replaced only if the user says
- * so. Installed, it is added to no project yet (HI-2059): its view opens, for Add to….
+ * Install (HI-545): the catalogue server downloaded and checked against its catalogue (size, sha256) first, then #550's
+ * Add dialog: what it runs, and its name, another one when it is taken, or Replace only if the user says so. Installed,
+ * it is added to no project yet (HI-2059): its view opens, for Add to….
  */
 export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | 'name' | 'version'>): Promise<boolean> {
   const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
   if (!p) return false
-  const replacing = !!p.existing
-  const ok = await confirm({
+  // #550's Add: what it runs, the name (another if it is taken, or Replace).
+  const picked = await chooseServerName({
     title: tr(msg({ id: 'mcp.catalog.installTitle', defaultMessage: 'Install {name} {version}?', description: 'Title of the question before installing a server from an MCP catalogue (HI-545). {name} is the server, {version} its version.' }), { name: p.server.name, version: p.server.version }),
-    message: tr(msg({ id: 'mcp.catalog.installMessage', defaultMessage: 'Downloaded and checked against its catalogue. It is added to the workspace and to no project yet. It runs:', description: 'The question before installing a catalogue server (HI-545), above what it runs: its download matched its catalogue; installed, it runs nowhere until added.' })),
+    message: tr(msg({ id: 'mcp.catalog.installMessageName', defaultMessage: 'Downloaded and checked against its catalogue. It is added to the workspace under this name, and to no project yet. It runs:', description: 'The question before installing a catalogue server (HI-545), above the name box and what it runs: its download matched its catalogue; installed, it runs nowhere until added.' })),
     list: p.runs,
-    detail:
-      [
-        ...p.secretWarnings,
-        ...(replacing ? [tr(msg({ id: 'mcp.catalog.replaceOther', defaultMessage: 'A server named {name} is in the workspace already, not from this catalogue: installing replaces it (the old one goes to the Recycle Bin), and where it was added it is removed.', description: 'The question before installing a catalogue server (HI-545) whose name a server of the workspace has. Recycle Bin: Windows\' name for it.' }), { name: p.server.name })] : [])
-      ].join('\n') || undefined,
-    confirmLabel: replacing ? tr(msg({ id: 'mcp.catalog.replaceButton', defaultMessage: 'Replace and Install', description: 'Button (HI-545): installs the catalogue server over a server of the same name.' })) : tr(msg({ id: 'mcp.catalog.installButton', defaultMessage: 'Install', description: 'Button (HI-545): installs the catalogue server.' })),
-    busyLabel: tr(msg({ id: 'mcp.catalog.installing', defaultMessage: 'Installing…', description: 'The Install button while it works (HI-545).' })),
-    danger: replacing,
-    run: () => call('mcp:catalogInstall', p.id, p.server.name, replacing)
+    detail: p.secretWarnings.join('\n') || undefined,
+    initial: p.server.name,
+    initialTaken: p.nameTaken,
+    confirmLabel: tr(msg({ id: 'mcp.catalog.installButton', defaultMessage: 'Install', description: 'Button (HI-545): installs the catalogue server.' }))
   })
-  if (!ok) {
+  if (!picked) {
     void call('mcp:catalogDrop', p.id).catch(() => undefined)
     return false
   }
-  set((s) => ({ skillsVersion: s.skillsVersion + 1, mcpCatalogVersion: s.mcpCatalogVersion + 1, mcpTab: 'installed', selectedMcp: p.server.name }))
-  notify('success', tr(msg({ id: 'mcp.catalog.installed', defaultMessage: 'Installed {name}', description: "A notification's title (HI-545): a catalogue server was installed." }), { name: p.server.name }), tr(msg({ id: 'mcp.catalog.installedNext', defaultMessage: 'It runs nowhere yet: Add to… in its view adds it to the projects (and the Hive Assistant) that need it.', description: 'Under "Installed {name}" (HI-545): what to do next. Add to… is the button in the server\'s view in the MCP view.' })))
+  const done = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogInstall', p.id, picked.name, picked.replace).then(() => true))
+  if (!done) return false
+  set((s) => ({ skillsVersion: s.skillsVersion + 1, mcpCatalogVersion: s.mcpCatalogVersion + 1, mcpTab: 'installed', selectedMcp: picked.name }))
+  notify('success', tr(msg({ id: 'mcp.catalog.installed', defaultMessage: 'Installed {name}', description: "A notification's title (HI-545): a catalogue server was installed." }), { name: picked.name }), tr(msg({ id: 'mcp.catalog.installedNext', defaultMessage: 'It runs nowhere yet: Add to… in its view adds it to the projects (and the Hive Assistant) that need it.', description: 'Under "Installed {name}" (HI-545): what to do next. Add to… is the button in the server\'s view in the MCP view.' })))
   await refreshWorkspace()
   return true
 }
@@ -1093,7 +1090,7 @@ export async function updateCatalogServer(row: Pick<McpCatalogRow, 'source' | 'n
   const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
   if (!p) return false
   const ex = p.existing
-  if (!ex || ex.version === null) {
+  if (!ex) {
     void call('mcp:catalogDrop', p.id).catch(() => undefined)
     return installCatalogServer(row)
   }
@@ -1158,49 +1155,65 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
   if (!file) return null
   const server = await attempt(addServerFailed(), () => call('mcp:previewFile', file))
   if (!server) return null
-  let name = server.name
+  const picked = await chooseServerName({
+    title: tr(msg({ id: 'actions.mcp.addTitle', defaultMessage: 'Add MCP Server from File', description: 'Title of the Add MCP Server from File dialog (the command of the same name). MCP is a name: keep it.' })),
+    message: tr(
+      msg({
+        id: 'mcp.addFile.messageAdded',
+        defaultMessage: 'Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Hive Assistant’s view, or Add to… here. It runs:',
+        description: 'Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.'
+      }),
+      { file: basename(file), files: server.files }
+    ),
+    list: server.runs,
+    detail: server.secretWarnings.length ? server.secretWarnings.join('\n') : undefined,
+    initial: server.name,
+    initialTaken: server.exists,
+    confirmLabel: tr(msg({ id: 'actions.mcp.add', defaultMessage: 'Add', description: 'Button: adds the MCP server to the workspace.' }))
+  })
+  if (!picked) return null
+  const added = await attempt(addServerFailed(), () => call('mcp:addFromFile', file, picked.name, picked.replace))
+  if (!added) return null
+  set((s) => ({ skillsVersion: s.skillsVersion + 1, selectedMcp: added.name }))
+  await refreshWorkspace()
+  return added
+}
+
+/**
+ * The name a server is added under (#550, HI-545's Install): the prompt shows what it runs, with the name to change; a
+ * name in use asks to Replace that server or choose another. `initialTaken`: whether the name offered is in use. Null
+ * when cancelled.
+ */
+async function chooseServerName(o: { title: string; message: string; list: string[]; detail?: string; initial: string; initialTaken: boolean; confirmLabel: string }): Promise<{ name: string; replace: boolean } | null> {
+  let name = o.initial
   for (;;) {
     const picked = await prompt({
-      title: tr(msg({ id: 'actions.mcp.addTitle', defaultMessage: 'Add MCP Server from File', description: 'Title of the Add MCP Server from File dialog (the command of the same name). MCP is a name: keep it.' })),
-      message: tr(
-        msg({
-          id: 'mcp.addFile.messageAdded',
-          defaultMessage: 'Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Hive Assistant’s view, or Add to… here. It runs:',
-          description: 'Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.'
-        }),
-        { file: basename(file), files: server.files }
-      ),
-      list: server.runs,
-      detail: server.secretWarnings.length ? server.secretWarnings.join('\n') : undefined,
+      title: o.title,
+      message: o.message,
+      list: o.list,
+      detail: o.detail,
       placeholder: tr(msg({ id: 'actions.mcp.namePlaceholder', defaultMessage: 'server-name', description: "Placeholder of the server's name box: an example name (lower case, a dash)." })),
       initial: name,
-      confirmLabel: tr(msg({ id: 'actions.mcp.add', defaultMessage: 'Add', description: 'Button: adds the MCP server to the workspace.' })),
+      confirmLabel: o.confirmLabel,
       validate: (v) => (/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(v.trim()) && v.trim().toLowerCase() !== 'hive' ? null : tr(msg({ id: 'actions.mcp.badName', defaultMessage: 'Use letters, numbers, "-" and "_". "hive" is reserved.', description: "Why an MCP server's name can't be used. Keep \"hive\" as it is: it is the built-in server's name." })))
     })
     if (!picked) return null
     name = picked.trim()
-    const taken = name === server.name ? server.exists : ((await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:list'))) ?? []).some((m) => m.name.toLowerCase() === name.toLowerCase())
-    let replace = false
-    if (taken) {
-      const choice = await choose({
-        title: tr(msg({ id: 'actions.mcp.replaceTitle', defaultMessage: 'Replace {name}?', description: 'Title of the question when the workspace already has an MCP server of that name ({name}).' }), { name }),
-        message: tr(msg({ id: 'actions.mcp.replaceMessage', defaultMessage: 'The workspace has a server named {name}.', description: 'The question when the workspace already has an MCP server of that name ({name}).' }), { name }),
-        detail: tr(msg({ id: 'mcp.addFile.replaceDetailAdded', defaultMessage: 'Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Hive Assistant that had the old one lose it. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name (HI-2059).' })),
-        danger: true,
-        choices: [
-          { label: tr(msg({ id: 'actions.mcp.rename', defaultMessage: 'Choose Another Name', description: 'Button: goes back to choose another name for the MCP server.' })), value: 'rename' },
-          { label: tr(msg({ id: 'actions.mcp.replace', defaultMessage: 'Replace', description: 'Button: replaces the MCP server of that name.' })), value: 'replace' }
-        ]
-      })
-      if (!choice) return null
-      if (choice === 'rename') continue
-      replace = true
-    }
-    const added = await attempt(addServerFailed(), () => call('mcp:addFromFile', file, name, replace))
-    if (!added) return null
-    set((s) => ({ skillsVersion: s.skillsVersion + 1, selectedMcp: added.name }))
-    await refreshWorkspace()
-    return added
+    const taken = name === o.initial ? o.initialTaken : ((await attempt(tr(msg({ id: 'actions.mcp.listFailed', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers failed." })), () => call('mcp:list'))) ?? []).some((m) => m.name.toLowerCase() === name.toLowerCase())
+    if (!taken) return { name, replace: false }
+    const choice = await choose({
+      title: tr(msg({ id: 'actions.mcp.replaceTitle', defaultMessage: 'Replace {name}?', description: 'Title of the question when the workspace already has an MCP server of that name ({name}).' }), { name }),
+      message: tr(msg({ id: 'actions.mcp.replaceMessage', defaultMessage: 'The workspace has a server named {name}.', description: 'The question when the workspace already has an MCP server of that name ({name}).' }), { name }),
+      detail: tr(msg({ id: 'mcp.addFile.replaceDetailAdded', defaultMessage: 'Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Hive Assistant that had the old one lose it. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name (HI-2059).' })),
+      danger: true,
+      choices: [
+        { label: tr(msg({ id: 'actions.mcp.rename', defaultMessage: 'Choose Another Name', description: 'Button: goes back to choose another name for the MCP server.' })), value: 'rename' },
+        { label: tr(msg({ id: 'actions.mcp.replace', defaultMessage: 'Replace', description: 'Button: replaces the MCP server of that name.' })), value: 'replace' }
+      ]
+    })
+    if (!choice) return null
+    if (choice === 'rename') continue
+    return { name, replace: true }
   }
 }
 

@@ -143,9 +143,9 @@
     "defaultMessage": "Install",
     "description": "Button (HI-545): installs the catalogue server."
   },
-  "mcp.catalog.installMessage": {
-    "defaultMessage": "Downloaded and checked against its catalogue. It is added to the workspace and to no project yet. It runs:",
-    "description": "The question before installing a catalogue server (HI-545), above what it runs: its download matched its catalogue; installed, it runs nowhere until added."
+  "mcp.catalog.installMessageName": {
+    "defaultMessage": "Downloaded and checked against its catalogue. It is added to the workspace under this name, and to no project yet. It runs:",
+    "description": "The question before installing a catalogue server (HI-545), above the name box and what it runs: its download matched its catalogue; installed, it runs nowhere until added."
   },
   "mcp.catalog.installTitle": {
     "defaultMessage": "Install {name} {version}?",
@@ -162,10 +162,6 @@
   "mcp.catalog.installedNext": {
     "defaultMessage": "It runs nowhere yet: Add to… in its view adds it to the projects (and the Hive Assistant) that need it.",
     "description": "Under \"Installed {name}\" (HI-545): what to do next. Add to… is the button in the server's view in the MCP view."
-  },
-  "mcp.catalog.installing": {
-    "defaultMessage": "Installing…",
-    "description": "The Install button while it works (HI-545)."
   },
   "mcp.catalog.loading": {
     "defaultMessage": "Reading the catalogues…",
@@ -219,13 +215,9 @@
     "defaultMessage": "Too many redirects downloading {url}.",
     "description": "An error downloading from an MCP catalogue (HI-545): more than 5 redirects. {url} is the address asked for."
   },
-  "mcp.catalog.replaceButton": {
-    "defaultMessage": "Replace and Install",
-    "description": "Button (HI-545): installs the catalogue server over a server of the same name."
-  },
-  "mcp.catalog.replaceOther": {
-    "defaultMessage": "A server named {name} is in the workspace already, not from this catalogue: installing replaces it (the old one goes to the Recycle Bin), and where it was added it is removed.",
-    "description": "The question before installing a catalogue server (HI-545) whose name a server of the workspace has. Recycle Bin: Windows' name for it."
+  "mcp.catalog.refreshAgain": {
+    "defaultMessage": "Refresh (↻) to list this catalogue again: Hive keeps only so many in memory.",
+    "description": "A catalogue source in the MCP view's Catalogue (HI-545) whose list Hive no longer holds (too much in memory): ↻ reads it again."
   },
   "mcp.catalog.requires": {
     "defaultMessage": "Requirements",
@@ -266,6 +258,10 @@
   "mcp.catalog.tooLarge": {
     "defaultMessage": "{url} is larger than its catalogue says ({max, number} bytes at most): not used.",
     "description": "An error downloading from an MCP catalogue (HI-545): the download went past the size its catalogue gives, or the limit. {url} is the address."
+  },
+  "mcp.catalog.tooManySources": {
+    "defaultMessage": "Hive lists at most {max, number} catalogues of your own: remove one first.",
+    "description": "An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the list is full."
   },
   "mcp.catalog.unknown": {
     "defaultMessage": "Hive can't check this: make sure it's there",
