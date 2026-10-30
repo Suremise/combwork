@@ -177,13 +177,16 @@ export function ProgressPanel() {
   // The merge queues that show (#1356 item 0: by their state), of the filtered project; their projects are choices too.
   const allQueues = shownQueues(queues, now)
   const queueProjects = allQueues.map((v) => v.projectPath)
-  const filter = activeFilter(runs, chosen, queueProjects)
+  // All projects leaves out an inactive project's idle queue (HI-2165); the filter is then offered, even for one
+  // project, so choosing it there shows its queue.
+  const allProjects = allProjectsQueues(allQueues, activePaths, now)
+  const someHidden = allProjects.length < allQueues.length
+  const filter = activeFilter(runs, chosen, queueProjects, someHidden)
   // The filter (#251): one project's runs (and one agent's), or all; offered when the runs span more than one project.
   const nameOf = (p: string): string => names[p.toLowerCase()] ?? p.split(/[\\/]/).pop() ?? p
   const choices = filterChoices(runs, nameOf, tr, queueProjects)
-  // All projects leaves out an inactive project's idle queue (HI-2165) while the filter is offered: chosen there, it
-  // shows. With no filter to choose it from (one project), every queue shows.
-  const shownQueue = filter.project !== ALL_PROJECTS ? allQueues.filter((v) => v.projectPath.toLowerCase() === filter.project) : choices.length > 1 ? allProjectsQueues(allQueues, activePaths, now) : allQueues
+  const filterOffered = choices.length > 1 || someHidden
+  const shownQueue = filter.project === ALL_PROJECTS ? allProjects : allQueues.filter((v) => v.projectPath.toLowerCase() === filter.project)
   // Looking at the Merges tab counts as seeing the returns it shows (#1356; HR3's round 1 finding 1): the filtered
   // project's only, and not while a dialog covers the panel. Each leaves its queue's card a few seconds later.
   const covered = useStore((s) => s.dialog !== null || s.taskOpen !== null)
@@ -257,7 +260,7 @@ export function ProgressPanel() {
         <div className="grow" />
         <IconButton icon="chevron-right" title={withKey(tr(msg({ id: 'board.progress.fold', defaultMessage: 'Fold the Progress panel', description: "Tooltip of the button folding the Progress panel to a strip at the window's edge. A shortcut may follow in brackets." })), kb)} onClick={() => setProgressOpen(false)} />
       </div>
-      {choices.length > 1 && (
+      {filterOffered && (
         <div className="progress-filter">
           <select className="select" aria-label={tr(msg({ id: 'board.progress.filterProject', defaultMessage: 'Show the runs of', description: "Accessible name of the Progress panel's project filter (a list of projects follows; the agent filter's name continues the sentence: …and of the agent)." }))} value={filter.project} onChange={(e) => setProgressFilter({ project: e.target.value })}>
             <option value={ALL_PROJECTS}>{tr(msg({ id: 'board.progress.allProjects', defaultMessage: 'All projects', description: "A choice of the Progress panel's project filter: every project's runs." }))}</option>

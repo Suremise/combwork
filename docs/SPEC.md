@@ -5185,9 +5185,8 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   out of flight, and their outcomes seen. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
   from inactive projects") a queue shows only for a project being worked on (the sidebar's Working on) or while it is
   busy (`queueBusy`: an entry testing or queued, a pause, a return not seen, or a merge in the last hour), so an
-  inactive project's idle *Nothing queued.* card is left out; chosen in the filter, its queue shows as above. The rule
-  holds only while the filter is offered (more than one choice): with nothing to choose a project from, every queue
-  shows. Pulse's
+  inactive project's idle *Nothing queued.* card is left out; chosen in the filter, its queue shows as above. While a
+  queue is left out the filter is offered, even with one project to choose (`activeFilter`'s `offered`). Pulse's
   queue lines, the merge cards, Runs and Lanes need no such rule: each lists only what is going on or just happened (a
   queue testing or paused, a slot taken, a run reported, a lane running or ended in the last hour). Pulse has a line per queue testing or paused (*main: testing HI-61 · 2
   queued*), which opens Merges; the Merges badge counts queued entries plus agents waiting for a slot; the project
