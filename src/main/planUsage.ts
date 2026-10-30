@@ -203,7 +203,7 @@ export function usageLogin(identity: { email?: string; orgId?: string } | null |
  * pane included: its new sessions launch as it), else the one accepted. What a session launched on it now runs as.
  */
 export function connectionLoginNow(id: string): string | null {
-  const a = config.get().connections?.find((x) => x.id === id)
+  const a = config.get().accounts?.find((x) => x.id === id)
   if (!a) return null
   return (a.observed?.loggedIn === true ? usageLogin(a.observed) : null) ?? usageLogin(a.accepted)
 }

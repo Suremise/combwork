@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { CODEX_DESCRIPTOR } from '../src/shared/codex'
 import { acceptable } from '../src/shared/accounts'
-import type { Connection } from '../src/shared/types'
+import type { Account } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
 const base = tempDir('hive-codex-connections-')
@@ -45,7 +45,7 @@ codexCheckSeams.host = sharedHost
 const FIX = join(__dirname, 'fixtures', 'advanced', 'account-read-codex-0.164.0.jsonl')
 const FIELDS = { account: 'account', email: 'email', plan: 'planType' }
 const kept = join(home, 'sessions', '2026', '10', '24', 'rollout-2026-10-24T03-58-35-01a16bd8-8aa4-7253-ad14-d111a099496e.jsonl')
-const folderOf = (a: Connection): string => accounts.accountFolder(a.id)
+const folderOf = (a: Account): string => accounts.accountFolder(a.id)
 /** The environment each faked status check was given, by account folder. */
 const checked = new Map<string, NodeJS.ProcessEnv>()
 let statusSpy: { mockRestore(): void }

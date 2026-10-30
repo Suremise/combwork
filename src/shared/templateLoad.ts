@@ -51,7 +51,7 @@ export function templateAgentParts(a: TemplateAgent, cfg: Pick<ProjectConfig, 'p
   const effortValue = (chosenEffort && chosenEffort !== 'inherit' ? chosenEffort : ps.defaultEffort) || modelCaps(provider, runModel || null, info, settings).defaultEffort
   const effortText = effortValue ? effortLabel(provider, effortValue, undefined, undefined, null, settings) : null
   const effort = effortText ? { text: effortText, isDefault: !own(a.effort) } : null
-  const modeText = settings ? permissionLabel(provider, agentLaunchSettings({ provider, model: a.model, effort: a.effort, permissionMode: a.permissionMode, use200kContext: a.use200kContext }, cfg, settings).permissionMode, tr) : null
+  const modeText = settings ? permissionLabel(provider, agentLaunchSettings(provider, { permissionMode: a.permissionMode }, settings).permissionMode, tr) : null
   const mode = modeText ? { text: modeText, isDefault: !own(a.permissionMode) } : null
   return { model, effort, mode }
 }

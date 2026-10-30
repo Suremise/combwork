@@ -7,7 +7,7 @@ import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { accountState, connectionReadiness, duplicateLogins, movedConnection, switchedOn, topOfOrder, workspaceAccounts } from '../src/shared/accounts'
-import type { Connection } from '../src/shared/types'
+import type { Account } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
 /**
@@ -57,7 +57,7 @@ const asked: string[] = []
 
 const projects = join(home, 'projects')
 const keep = join(projects, 'C--work-alpha', 'conversation.jsonl')
-const folderOf = (a: Connection): string => accounts.accountFolder(a.id)
+const folderOf = (a: Account): string => accounts.accountFolder(a.id)
 const outcome = (p: Promise<unknown>): Promise<string> => p.then(() => 'ok', (e: Error) => e.message)
 const aside = (id: string): string => join(base, 'profile', 'accounts', `.removing-${id}`)
 /** Each open sign-in's end, by account: the faked terminal stays open until a test ends it. */
@@ -104,8 +104,8 @@ beforeEach(() => {
 })
 afterEach(async () => {
   accounts.accountTestHooks.beforeDelete = undefined
-  for (const a of [...(config.get().connections ?? [])]) await accounts.removeAccount(a.id).catch(() => undefined)
-  config.update((c) => (c.connections = []))
+  for (const a of [...(config.get().accounts ?? [])]) await accounts.removeAccount(a.id).catch(() => undefined)
+  config.update((c) => void ((c.accounts = []), (c.connections = [])))
 })
 
 describe('what `claude auth status --json` says (the recorded fixture)', () => {
@@ -143,7 +143,7 @@ describe('an account’s folder and its junction', () => {
     try {
       expect(await outcome(accounts.addAccount('claude-code', 'Nowhere'))).toMatch(/isn't there yet: run Claude Code once/)
       expect(existsSync(join(base, 'no-home'))).toBe(false)
-      expect(config.get().connections ?? []).toHaveLength(0)
+      expect(config.get().accounts ?? []).toHaveLength(0)
     } finally {
       process.env.CLAUDE_CONFIG_DIR = home
     }
@@ -436,7 +436,7 @@ describe("a sign-in connection's Set Up (HI-1826)", () => {
     expect(await outcome(accounts.setUpSignInConnection(a.id))).toMatch(/isn't the one Hive made/)
     expect(logins.has(a.id)).toBe(false)
     rmSync(folderOf(a))
-    config.update((c) => c.connections!.push({ id: 'acc-server1', provider: 'claude-code', name: 'Server', kind: 'server' } as Connection))
+    config.update((c) => c.accounts!.push({ id: 'acc-server1', provider: 'claude-code', name: 'Server', kind: 'server' } as Account))
     expect(await outcome(accounts.setUpSignInConnection('acc-server1'))).not.toBe('ok')
     expect(logins.has('acc-server1')).toBe(false)
   })
@@ -732,7 +732,7 @@ describe('who an account is signed in as', () => {
 
   it('two accounts on the same login are flagged', () => {
     const o = (email: string) => ({ at: '', loggedIn: true, email, orgId: 'org-1' })
-    const list: Connection[] = [
+    const list: Account[] = [
       { id: 'a', provider: 'claude-code', name: 'A', createdAt: '', observed: o('x@example.com') },
       { id: 'b', provider: 'claude-code', name: 'B', createdAt: '', observed: o('X@example.com') },
       { id: 'c', provider: 'claude-code', name: 'C', createdAt: '', observed: o('y@example.com') }
@@ -742,7 +742,7 @@ describe('who an account is signed in as', () => {
 })
 
 describe("a workspace's accounts", () => {
-  const acct = (id: string, cli: Connection['provider'] = 'claude-code'): Connection => ({ id, provider: cli, name: id, createdAt: '' })
+  const acct = (id: string, cli: Account['provider'] = 'claude-code'): Account => ({ id, provider: cli, name: id, createdAt: '' })
   const all = [acct('a1'), acct('a2'), acct('a3'), acct('x1', 'codex')]
 
   it('not set up is undefined; turned all off stays so; unknown or other providers’ ids are dropped', () => {
@@ -794,11 +794,11 @@ describe("a workspace's accounts", () => {
     })
     try {
       await accounts.migrateConnectionOrder()
-      const ids = () => (config.get().connections ?? []).filter((a) => a.provider === 'claude-code').map((a) => a.id)
+      const ids = () => (config.get().accounts ?? []).filter((a) => a.provider === 'claude-code').map((a) => a.id)
       expect(ids()).toEqual([two.id, one.id, three.id])
       expect(config.get().connectionOrderMigrated).toBe(true)
       // A new workspace starts with the top of the order on.
-      expect(accounts.newWorkspaceAccounts()?.['claude-code']).toEqual({ on: [two.id], default: two.id })
+      expect(accounts.newWorkspaceAccounts()?.['claude-code']).toEqual({ on: [two.id] })
       // Once only: reordered since, it stays as the user ordered it.
       accounts.moveConnection(three.id, 0)
       await accounts.migrateConnectionOrder()
@@ -818,7 +818,7 @@ describe("a workspace's accounts", () => {
 
   it('moving one reorders its own CLI only; the order decides which is used, on or off untouched (HI-1875)', () => {
     const mixed = [acct('a1'), acct('x1', 'codex'), acct('a2'), acct('x2', 'codex'), acct('a3')]
-    const ids = (l: Connection[]) => l.map((a) => a.id)
+    const ids = (l: Account[]) => l.map((a) => a.id)
     // To the top (Make Default): the other CLI's slots keep theirs.
     expect(ids(movedConnection(mixed, 'a3', 0))).toEqual(['a3', 'x1', 'a1', 'x2', 'a2'])
     expect(ids(movedConnection(mixed, 'a1', 1))).toEqual(['a2', 'x1', 'a1', 'x2', 'a3'])
@@ -849,9 +849,9 @@ describe("a workspace's accounts", () => {
     it('turning one on saves it in workspace.json, as its default, and remembers it for new workspaces', async () => {
       const a = await accounts.addAccount('claude-code', 'Here')
       await run(() => accounts.setAccountOn(a.id, true))
-      expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [a.id], default: a.id } })
+      expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [a.id] } })
       expect(config.get().lastUsedConnection?.['claude-code']).toBe(a.id)
-      expect(accounts.newWorkspaceAccounts()).toEqual({ 'claude-code': { on: [a.id], default: a.id } })
+      expect(accounts.newWorkspaceAccounts()).toEqual({ 'claude-code': { on: [a.id] } })
       await run(() => accounts.setAccountOn(a.id, false))
       expect(run(() => accounts.accountsView()).workspace['claude-code']).toEqual({ on: [], default: null })
     })
@@ -885,7 +885,7 @@ describe("a workspace's accounts", () => {
       // Each trust read held until the test answers it: how many projects it was asked about, and its answer.
       let held: { home: string; projects: number; answer: (v: (boolean | null | { at: string })[]) => void }[] = []
       let spy: ReturnType<typeof vi.spyOn>
-      let a: Connection
+      let a: Account
       const row = () => run(() => accounts.accountsView()).connections.find((c) => c.id === a.id)!
       // A project's config with one agent, and an id of its own: one written without is given its id by Hive whenever it
       // next reads the ids, in temp files and a .bak beside it, and a folder removed while that lands is found not empty
@@ -954,7 +954,7 @@ describe("a workspace's accounts", () => {
 
       it("follows the connection a project's agent would launch on now: reassigned, the project moves to the other's count; the order changed, the same (HR3, HI-1871)", async () => {
         const mine = () => held.filter((h) => h.home === folderOf(a))
-        const others = (o: Connection) => held.filter((h) => h.home === folderOf(o))
+        const others = (o: Account) => held.filter((h) => h.home === folderOf(o))
         mine()[0].answer([true, true])
         await vi.waitFor(() => expect(row().trust?.checking).toBeUndefined(), { timeout: HUNG_MS })
         const other = await accounts.addAccount('claude-code', 'Other')

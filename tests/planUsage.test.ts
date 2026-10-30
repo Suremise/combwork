@@ -136,8 +136,8 @@ describe('plan usage per connection (HI-1756)', () => {
   let off: () => void
   /** The connections Hive keeps, each accepted as (and now signed in as) its login. */
   const signedIn = (id: string, who: { email: string; orgId: string }, observed: { email: string; orgId: string } = who) => {
-    const all = (config.get().connections ?? []).filter((c) => c.id !== id)
-    config.get().connections = [...all, { id, provider: 'claude-code', name: id, createdAt: '2026-10-27T00:00:00Z', accepted: who, observed: { at: '2026-10-27T00:00:00Z', loggedIn: true, ...observed } }]
+    const all = (config.get().accounts ?? []).filter((c) => c.id !== id)
+    config.get().accounts = [...all, { id, provider: 'claude-code', name: id, createdAt: '2026-10-27T00:00:00Z', accepted: who, observed: { at: '2026-10-27T00:00:00Z', loggedIn: true, ...observed } }]
   }
   beforeEach(() => {
     events.length = 0
@@ -146,7 +146,7 @@ describe('plan usage per connection (HI-1756)', () => {
     config.get().planWarnings = {}
     config.get().planUsage = {}
     config.get().connectionPlanUsage = {}
-    config.get().connections = []
+    config.get().accounts = []
     signedIn(MAX1.id, ONE)
     signedIn(MAX2.id, TWO)
   })
@@ -251,7 +251,7 @@ describe('plan usage per connection (HI-1756)', () => {
     expect(usageLogin(codex)).not.toBe(usageLogin({ ...codex, orgId: 'org-1' }))
     expect(usageLogin({ orgId: 'org-1' })).toBeNull()
     const id = 'a-5d629d1e'
-    config.get().connections = [...config.get().connections!, { id, provider: 'codex', name: 'Codex-1', createdAt: '2026-10-27T00:00:00Z', accepted: codex, observed: { at: '2026-10-27T00:00:00Z', loggedIn: true, email: codex.email, plan: 'prolite' } }]
+    config.get().accounts = [...config.get().accounts!, { id, provider: 'codex', name: 'Codex-1', createdAt: '2026-10-27T00:00:00Z', accepted: codex, observed: { at: '2026-10-27T00:00:00Z', loggedIn: true, email: codex.email, plan: 'prolite' } }]
     const report = rolloutPlanUsage({ primary: { used_percent: 57, window_minutes: 10080, resets_at: Math.floor(Date.parse(WEEK_RESETS) / 1000) }, plan_type: 'prolite' }, new Date().toISOString())!
     reportPlanUsage('codex', report, 'HR3', { id, name: 'Codex-1', login: usageLogin(codex)! })
     expect(config.get().connectionPlanUsage![id]).toMatchObject({ plan: 'prolite', login: usageLogin(codex), limits: [{ id: 'w10080', usedPercent: 57, reportedBy: 'HR3' }] })

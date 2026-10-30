@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { Connection, LiveSessionState, ProviderId } from '@shared/types'
-import { connectionsApply, resolveConnection, type ConnectionsView } from '@shared/accounts'
+import type { LiveSessionState, ProviderId } from '@shared/types'
+import { connectionsApply, resolveConnection, type AccountView, type ConnectionsView } from '@shared/accounts'
 import { enabledProviders, providerDescriptor } from '@shared/providers'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call } from '../api'
@@ -62,7 +62,7 @@ export function useConnections(): ConnectionsView | null {
  * The connection a choice would start on (HI-1770), for its defaults: undefined where connections don't apply (a CLI
  * without them, or turned off), null when none can be used.
  */
-export function useLaunchConnection(own: string | undefined, provider: ProviderId): Connection | null | undefined {
+export function useLaunchConnection(own: string | undefined, provider: ProviderId): AccountView | null | undefined {
   const view = useConnections()
   // The layer is the connection's for every CLI with connections, a test copy on its CLI test home too (none: null).
   if (!view?.providers.includes(provider)) return undefined

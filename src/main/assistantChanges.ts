@@ -8,6 +8,9 @@ import { boardRead, boardReadOnly, boardWrite, boardWriteOp } from './boardStore
 import type { Db } from './db'
 import { changeActor } from './workflow/recorder'
 import type { WorkspaceService } from './workspace'
+import { agentViewOf } from './accounts'
+import { config } from './config'
+import { agentProvider } from '../shared/providers'
 
 /**
  * The record undo is built on (#1282, SPEC §16.14): each change the Hive Assistant makes, with what it replaced and what
@@ -413,7 +416,11 @@ export const PROVIDER_DEPENDENTS = ['model', 'effort', 'permissionMode', 'use200
  * An agent's settings the Assistant changed (as saved under the project's lock just before, and after), recorded for
  * undo: those that changed; with a provider change, everything it resets too.
  */
-export async function noteAgent(ws: WorkspaceService, project: string, was: AgentDef, now: AgentDef): Promise<void> {
+export async function noteAgent(ws: WorkspaceService, project: string, wasDef: AgentDef, nowDef: AgentDef): Promise<void> {
+  // As today's screens read them (HI-2106): its model, effort, mode and context are its connection's; a CLI it didn't name
+  // (one from before 0.2) is the one it ran, which the accounts migration pins it to (decision A: none is inherited).
+  const was = agentViewOf(wasDef.provider ? wasDef : { ...wasDef, provider: agentProvider(wasDef, null, config.settings) })
+  const now = agentViewOf(nowDef)
   const keys: (keyof AgentDef)[] = AGENT_FIELDS.filter((k) => !sameValue(was[k], now[k]))
   if (keys.includes('provider')) for (const k of PROVIDER_DEPENDENTS) if (!keys.includes(k)) keys.push(k)
   const fields = keys.map((k) => ({ field: k, old: was[k] ?? null, new: now[k] ?? null }))

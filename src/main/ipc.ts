@@ -12,19 +12,19 @@ import type { HiveChannel, HiveRequests } from '../shared/api'
 import * as updater from './updater'
 import type { LaneStartRequest, MergeResult, ProviderId, QuitChoice } from '../shared/types'
 import { instructionFiles, instructionsShared, shareInstructions, SHARED_INSTRUCTIONS, type InstructionsFile } from '../shared/instructions'
-import { extraArgsProblem, isKnownProvider, projectProviderConfig, providerDescriptor } from '../shared/providers'
+import { extraArgsProblem, isKnownProvider, providerDescriptor } from '../shared/providers'
 import { isProjectPref, projectPrefValue, withProjectPref } from '../shared/uiPrefs'
 import { applyBoardFold } from '../shared/tasks'
 import { keptLaneOrder } from '../shared/laneBar'
 import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../shared/tips'
 import { allProviders } from './providers'
 import { providerService } from './providerService'
-import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, setAssistantConnection, keepNewLogin, removeAccount, renameAccount, moveConnection, setAccountOn, setConnectionDefaults, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
+import { accountsView, addAccount, connectionHomes, dismissConnectionsIntro, keepNewLogin, removeAccount, renameAccount, moveConnection, setAccountOn, setConnectionDefaults, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
 import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
 import { maskDeep, maskKeys } from './keyMatcher'
-import { dismissMovedNotice, movedNotice } from './connectionMoves'
+import { dismissMovedNotice, movedNotice, setAssistantAccount } from './connectionMoves'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
 import { emit, emitTo, onHiveEvent } from './events'
@@ -975,7 +975,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       if (patch.workflow !== undefined) throw new HiveError({ lines: ["A project's workflow options change through workflow:setOptions"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
       // Its version control switches only with its checks and its options kept per platform (#1419): workflow:setPlatform.
       if (patch.platform !== undefined) throw new HiveError({ lines: ["A project's version control changes through workflow:setPlatform"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
-      return workspace.updateProjectConfig(workspace.assertProject(p), patch)
+      const projectPath = workspace.assertProject(p)
+      // Its provider pages (HI-2106, the adapter until HI-2107): its agents' connections take them; project.json keeps none.
+      const { providers, defaultProvider: _d, ...rest } = patch
+      if (providers) return projectAgents.applyProjectLaunch(projectPath, providers).then(() => workspace.updateProjectConfig(projectPath, rest))
+      return workspace.updateProjectConfig(projectPath, rest)
     },
     'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
@@ -1037,7 +1041,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'project:updateProvider': (p, provider, patch) => {
       const id = knownProvider(provider)
       assertExtraArgs(patch.extraArgs)
-      return workspace.mutateProjectConfig(workspace.assertProject(p), (cfg) => ({ providers: { ...cfg.providers, [id]: { ...projectProviderConfig(cfg, id), ...patch } } }))
+      // Its agents' connections take it (HI-2106, the adapter until HI-2107); project.json keeps none.
+      return projectAgents.applyProjectLaunch(workspace.assertProject(p), { [id]: patch }).then(() => workspace.projectConfig(workspace.assertProject(p)))
     },
     'project:openInExplorer': (p) => void shell.openPath(workspace.assertProject(p)),
     'project:openTerminal': async (p) => {
@@ -1708,7 +1713,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connections:keepLogin': (id) => keepNewLogin(id),
     'connections:setOn': (id, on) => setAccountOn(id, on),
     'connections:move': (id, index) => moveConnection(id, Number(index)),
-    'connections:setAssistant': (provider, id) => setAssistantConnection(provider, id),
+    'connections:setAssistant': (provider, id) => setAssistantAccount(workspace, provider, id),
     'connections:switchAffected': () => sessions.switchAffected(workspace.path!),
     'connections:setDefaults': (id, patch) => setConnectionDefaults(id, patch),
     'connections:notice': () => movedNotice(workspace),

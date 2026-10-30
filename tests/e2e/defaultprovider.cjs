@@ -2,7 +2,7 @@
 // 1. A Codex-only install (Codex turned on, the fake Codex its CLI; Claude Code and Copilot off) on a fresh profile: the
 //    default is Automatic, the empty project says nothing about Claude Code, Settings names Automatic's pick, and New
 //    Session adds its first agent, a Codex one, and starts it in one click. A default the user chose that can't run
-//    (Claude Code, turned off; Settings' or the project's) is named in the empty project, and Add Agent keeps it chosen,
+//    (Claude Code, turned off, in Settings; a project has none of its own since HI-2106) is named in the empty project, and Add Agent keeps it chosen,
 //    says why it can't add, and adds nothing until another provider is chosen.
 // 2. Claude Code turned on but not installed (hidden: a PATH without it, and a home and AppData of the suite's own, as
 //    the Copilot stand-in does), Codex installed: nothing warns about Claude Code (no banner, no Provider Setup opening, a
@@ -104,18 +104,10 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Escape')
   await lib.until(async () => (await dialog.count()) === 0, 5000)
   await inv('settings:update', { defaultProvider: 'auto' })
-  // Automatic clears the warning first: the one the project's default brings must be a new one, not the last one still
-  // shown (an Add Agent opened before the window has the project's default would start on Codex).
-  await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0, 10000)
-  await inv('project:updateConfig', alpha, { defaultProvider: 'claude-code' })
-  await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 1, 10000)
-  check("a project's own default that is off is named too", /Claude Code is turned off/.test(await card.locator('[data-provider-warning]').innerText().catch(() => '')))
-  await addAgentDialog('project default', "this project's")
-  await page.keyboard.press('Escape')
-  await lib.until(async () => (await dialog.count()) === 0, 5000)
   check('nothing was added meanwhile', (await agents()).length === 0, JSON.stringify(await agents()))
-  await inv('project:updateConfig', alpha, { defaultProvider: 'inherit' })
-  check('…and back on Automatic, no warning', !!(await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0, 10000)))
+  // A project has no default provider of its own any more (HI-2106, decision A): one sent is not kept.
+  await inv('project:updateConfig', alpha, { defaultProvider: 'claude-code' })
+  check("…a project's own default isn't kept, and Automatic warns of nothing", !JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).defaultProvider && !!(await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0, 10000)))
   await app.close()
 
   // --- 2. Claude Code turned on but not installed, Codex installed.

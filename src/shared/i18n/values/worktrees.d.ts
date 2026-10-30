@@ -4,6 +4,7 @@ interface HiveMessageValues {
   'worktrees.agent.badPlacement': undefined
   'worktrees.agent.badWorkflowRole': undefined
   'worktrees.agent.chooseMove': undefined
+  'worktrees.agent.effortRefused': { chosen: string; model: string | number; effort: string | number }
   'worktrees.agent.enterName': undefined
   'worktrees.agent.gone': undefined
   'worktrees.agent.nameTaken': { name: string | number }

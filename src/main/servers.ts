@@ -91,7 +91,7 @@ import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
 import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { connectionRef, connectionsFor, connectionShown, workspaceAccounts } from '../shared/accounts'
-import { connectionProblem, getAccount } from './accounts'
+import { connectionProblem, getAccount, hiveAccounts } from './accounts'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
@@ -1149,7 +1149,7 @@ function agentSettings(body: any): { provider?: ProviderId; model?: string; effo
 
 /** A workspace's connections per CLI, as they apply (dropping ids gone or another CLI's). */
 function workspaceConnections(ws: WorkspaceService): Partial<Record<ProviderId, WorkspaceConnections>> {
-  const all = config.get().connections ?? []
+  const all = hiveAccounts()
   return Object.fromEntries(PROVIDERS.flatMap((x) => (x.capabilities.connections ? [[x.id, workspaceAccounts(ws.config, x.id, all) ?? { on: [], default: null }]] : [])))
 }
 
@@ -1162,7 +1162,7 @@ function connectionArg(body: any, projectPath: string): { connection: string | n
   const v = body?.connection
   if (v === undefined) return undefined
   if (v === null || v === '') return { connection: null }
-  const all = config.get().connections ?? []
+  const all = hiveAccounts()
   const onHere = Object.values(workspaceConnections(workspaceOf(projectPath))).flatMap((w) => w?.on ?? [])
   const r = connectionRef(String(v), all, onHere)
   if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, `Several connections are named "${v}": use its id (${r.ids!.join(', ')}).`) : new HttpError(404, `No connection named "${v}" is on in this workspace, and none has that id. GET /v1/connections lists them.`)
@@ -1203,12 +1203,12 @@ function agentConnectionFields(p: string, a: AgentInfo, cli: ProviderId): Record
 route('GET', '/v1/connections', async () => {
   const ws = workspaceConnections(requireWorkspace())
   const defaults = Object.fromEntries(Object.entries(ws).map(([cli, w]) => [cli, w?.default ?? null]))
-  return { connections: connectionsFor(config.get().connections ?? [], ws, !agentCaller()), defaults }
+  return { connections: connectionsFor(hiveAccounts(), ws, !agentCaller()), defaults }
 })
 
 route('GET', '/v1/connections/:ref', async ({ params }) => {
   const ws = workspaceConnections(requireWorkspace())
-  const all = config.get().connections ?? []
+  const all = hiveAccounts()
   const onHere = Object.values(ws).flatMap((w) => w?.on ?? [])
   const ref = decodeURIComponent(params[0] ?? '')
   const r = connectionRef(ref, all, onHere)

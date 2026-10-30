@@ -40,6 +40,7 @@ vi.mock('../src/main/worktrees', async (original) => {
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const templates = await import('../src/main/templates')
+const { ensureMigrated } = await import('../src/main/connectionMoves')
 const { config } = await import('../src/main/config')
 const { providerService } = await import('../src/main/providerService')
 const { sessions } = await import('../src/main/sessions')
@@ -378,7 +379,8 @@ describe('saving and loading templates', () => {
     expect([r.created, r.removed]).toEqual([B, ['Old']])
     const cfg = cfgOf(beta)
     expect(await layoutOf(beta)).toBe('columns2')
-    // Each with its role in the workflow and note (alpha's "builder" note), in the project folder (#1436).
+    // Each with its role in the workflow and note (alpha's "builder" note), in the project folder (#1436); its model kept on
+    // it while its CLI has no account here (HI-2106), for the connection it gets once one is.
     expect(cfg.agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.role, a.model, a.provider, a.worktree])).toEqual([['BBuilder', 'builder', 'builder', 'opus', 'claude-code', undefined], ['BReviewer', 'reviewer', undefined, undefined, 'claude-code', undefined]])
     expect(cfg.agents.some((a: StoredAgent) => a.id === 'b1')).toBe(false)
     const card = (await run(() => tasks.allTasks())).find((c) => c.title === 'Old work')!
@@ -463,6 +465,8 @@ describe('saving and loading templates', () => {
   gitIt('staged, then published at once: a failure part-way leaves the project as it was, and no worktree is made', async () => {
     mkdirSync(join(alpha, '.hive', 'templates'), { recursive: true })
     writeFileSync(join(alpha, '.hive', 'templates', 'trees.json'), JSON.stringify(v2({ name: 'Trees', layout: 'rows2', agents: [{ name: 'Tree A', provider: 'claude-code' }, { name: 'Tree B', provider: 'claude-code', role: 'reviewer', note: 'checks' }] })))
+    // The project's own one-time accounts migration (HI-2106), which a load's agents wait on, first.
+    await run(() => ensureMigrated(alpha))
     const before = cfgOf(alpha)
     const trees = (): number => git(alpha, 'worktree', 'list', '--porcelain').toString().split('\n').filter((l) => l.startsWith('worktree ')).length
     const treesBefore = trees()

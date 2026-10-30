@@ -351,7 +351,7 @@ describe('providers migration', () => {
     expect(ws).toEqual({ version: 1, mcp: { enabled: ['github'] } })
   })
   it('resolves an agent from its own, the project and the global settings', async () => {
-    const { agentLaunchSettings } = await import('../src/shared/providers')
+    const { legacyLaunchSettings: agentLaunchSettings } = await import('../src/shared/connectionDefaults')
     const settings = mergeDefaults(DEFAULT_SETTINGS, { providers: { 'claude-code': { enabled: true, defaultModel: 'opus', defaultPermissionMode: 'auto' } } })
     const cfg = { defaultProvider: 'inherit', providers: { 'claude-code': { model: 'sonnet', effort: 'inherit', permissionMode: 'inherit', extraArgs: '--x', use200kContext: 'inherit' as const } } }
     expect(agentLaunchSettings({}, cfg, settings)).toMatchObject({ provider: 'claude-code', model: 'sonnet', permissionMode: 'auto', extraArgs: ['--x'] })
@@ -362,7 +362,7 @@ describe('providers migration', () => {
     expect(agentLaunchSettings({ permissionMode: 'full-access' }, cfg, settings).permissionMode).toBe('auto')
   })
   it('resolves the 200K context from the agent, the project and the global setting', async () => {
-    const { agentLaunchSettings } = await import('../src/shared/providers')
+    const { legacyLaunchSettings: agentLaunchSettings } = await import('../src/shared/connectionDefaults')
     const base = { model: 'inherit', effort: 'inherit', permissionMode: 'inherit', extraArgs: '' }
     const project = (use200kContext: 'inherit' | 'on' | 'off') => ({ defaultProvider: 'inherit', providers: { 'claude-code': { ...base, use200kContext }, codex: { ...base, use200kContext } } })
     const on = mergeDefaults(DEFAULT_SETTINGS, { providers: { 'claude-code': { enabled: true, use200kContext: true }, codex: { enabled: true, use200kContext: true } } })

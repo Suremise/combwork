@@ -487,7 +487,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
   ]
   const dangerous = settings
     ? project.agents.flatMap((a) => {
-        const l = agentLaunchSettings(a, project.config, settings)
+        const l = agentLaunchSettings(agentProviderOf(project, a), a, settings)
         // The mode in effect: on the CLI's own setting, the one its CLI showed (#1284).
         const m = modeOption(l.provider, (a.live ? modeInEffect(a.live) : undefined) ?? l.permissionMode)
         return m?.danger ? [many ? tr(M.dangerousMode, { agent: a.name, mode: m.label }) : m.label] : []

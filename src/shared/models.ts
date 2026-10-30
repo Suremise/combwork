@@ -1,4 +1,4 @@
-import type { AgentInstallInfo, AppSettings, CatalogModel, Connection, EffortLevel, EffortOption, FallbackModel, ModelAlias, ProviderId } from './types'
+import type { AgentInstallInfo, AppSettings, CatalogModel, Account, EffortLevel, EffortOption, FallbackModel, ModelAlias, ProviderId } from './types'
 import { OLDER_VERSIONS } from './claude'
 import { fmt } from './i18n'
 import { msg } from './i18n/msg'
@@ -25,7 +25,7 @@ const text = (v: unknown): v is string => typeof v === 'string' && v.trim() !== 
  * (its catalogue, as without connections); a server connection's its own list (HI-1772), each with the aliases it
  * stands in for, none taking an effort, its default the one standing in for Opus (else Sonnet, else its first).
  */
-export function connectionModels(conn: Pick<Connection, 'kind' | 'server'>, info: Info, tr?: Tr): Info {
+export function connectionModels(conn: Pick<Account, 'kind' | 'server'>, info: Info, tr?: Tr): Info {
   switch (conn.kind ?? 'signIn') {
     case 'signIn':
       return info

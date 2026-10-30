@@ -55,9 +55,9 @@ const check = (name, ok, extra = '') => {
       await inv('settings:update', { appearance: { theme: 'dark' } })
     }
 
-    // ---- 1. The project's Claude Code agents on the CLI's own setting.
-    await inv('project:updateConfig', alpha, { providers: { 'claude-code': { model: 'inherit', effort: 'inherit', permissionMode: 'cli-own', extraArgs: '', use200kContext: 'inherit' } }, layout: 'single' })
-    const def = await lib.addAgent(inv, alpha, { name: 'Tester' })
+    // ---- 1. A Claude Code agent on the CLI's own setting: its connection's mode (HI-2106: no project layer).
+    await inv('project:updateConfig', alpha, { layout: 'single' })
+    const def = await lib.addAgent(inv, alpha, { name: 'Tester', permissionMode: 'cli-own' })
     await inv('workspace:refresh')
     await page.getByText('alpha', { exact: true }).first().click()
     const badge = page.locator('.pane-footer-bar .mode-badge')

@@ -14,6 +14,7 @@ import { isWorkflowRole } from '../shared/workflow/roles'
 import { restoreProjectAgents } from './templates'
 import { setWorkflowOptions, workflowForm, WorkflowStale } from './workflow/optionsForm'
 import { inWorkspace, workspaceOf, type WorkspaceService } from './workspace'
+import { agentViewOf } from './accounts'
 
 /**
  * Undo for the Hive Assistant's changes (#1282, SPEC §16.14), from what assistantChanges.ts recorded: one change, or every
@@ -435,7 +436,8 @@ async function undoAgent(ws: WorkspaceService, c: RecordedChange, guard: Guard):
   const cfg = await ws.projectConfig(projectPath).catch(() => null)
   const def = cfg ? projectAgents(cfg).find((a) => a.id === agentId) : undefined
   if (!def) return goneAll(c.fields)
-  const current = (d: AgentDef, f: string): unknown => d[f as keyof AgentDef] ?? null
+  // As today's screens read it (HI-2106): its model, effort, mode and context are its connection's.
+  const current = (d: AgentDef, f: string): unknown => agentViewOf(d)[f as keyof AgentDef] ?? null
   const withProvider = c.values.some((v) => v.field === 'provider')
   const set = withProvider ? c.values.filter((v) => PROVIDER_SET.includes(v.field)) : []
   const others = c.values.filter((v) => !set.includes(v))
@@ -464,12 +466,20 @@ async function undoAgent(ws: WorkspaceService, c: RecordedChange, guard: Guard):
     if (set.every((v) => sameValue(current(def, v.field), v.old))) out.undone.push(...fields)
     else {
       try {
-        const raw: Partial<AgentDef> = Object.fromEntries(set.map((v) => [v.field, v.old ?? undefined]))
-        const saved = await workspaceOf(projectPath).updateAgent(projectPath, agentId, raw, (cur) => {
-          if (sessions.liveFor(projectPath, agentId)) throw new Error(AGENT_RUNNING)
-          if (set.some((v) => !sameValue(current(cur, v.field), v.new))) throw new ChangedSince(fields)
-          guard?.()
+        // Its CLI and launch settings through updateAgent (HI-2106: the connection on its old CLI with them), its last
+        // conversation after, in the agent's own write.
+        const launch = set.filter((v) => v.field !== 'lastSessionId')
+        const patch: AgentPatch = { ...agentPatch(launch), provider: (set.find((v) => v.field === 'provider')?.old ?? undefined) as AgentDef['provider'] }
+        if (sessions.liveFor(projectPath, agentId)) throw new Error(AGENT_RUNNING)
+        let saved = await updateAgent(projectPath, agentId, patch, {
+          check: (cur) => {
+            if (sessions.liveFor(projectPath, agentId)) throw new Error(AGENT_RUNNING)
+            if (set.some((v) => !sameValue(current(cur, v.field), v.new))) throw new ChangedSince(fields)
+            guard?.()
+          }
         })
+        const session = set.find((v) => v.field === 'lastSessionId')
+        if (session) saved = await workspaceOf(projectPath).updateAgent(projectPath, agentId, { lastSessionId: (session.old ?? undefined) as string | undefined })
         await workspaceOf(projectPath).refresh()
         const r = readBack(set, (f) => current(saved, f))
         out.undone.push(...r.undone)

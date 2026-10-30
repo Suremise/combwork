@@ -9,10 +9,11 @@ import { agentProviderOf, confirm, findProject, isAssistantPath, notify, set, us
 import { cx, formatKeybinding } from '../util'
 import { ContextMenu, Icon, Tooltip, type MenuEntry } from './ui'
 
-/** The mode an agent's next session starts in: its own setting, else the project's, else the global default. */
+/** The mode an agent's next session starts in: its connection's (HI-2106), else its CLI's default. */
 export function configuredMode(project: ProjectInfo, a: AgentInfo | null | undefined, settings: AppSettings | null): PermissionMode {
   if (!settings) return providerDescriptor(agentProviderOf(project, a)).defaultPermissionMode
-  return agentLaunchSettings(a ?? project.agents[0], project.config, settings).permissionMode
+  const agent = a ?? project.agents[0]
+  return agentLaunchSettings(agentProviderOf(project, agent), agent, settings).permissionMode
 }
 
 /** What the agent is in now if it runs (as its CLI reports it), else what it will start in. */

@@ -1,4 +1,4 @@
-import type { Connection, ProviderId, ServerConnection, ServerModel } from '../shared/types'
+import type { Account, ProviderId, ServerConnection, ServerModel } from '../shared/types'
 import type { ServerCaps, ServerListing } from '../shared/providers'
 import { providerDescriptor } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
@@ -50,7 +50,7 @@ function capsOf(cli: ProviderId): ServerCaps {
   return caps
 }
 
-function serverOf(id: string): { a: Connection; server: ServerConnection; caps: ServerCaps } {
+function serverOf(id: string): { a: Account; server: ServerConnection; caps: ServerCaps } {
   const a = mustGet(id)
   if (!isServer(a) || !a.server) throw hiveError(NOT_SERVER, undefined, { kind: 'invalid' })
   return { a, server: a.server, caps: capsOf(a.provider) }
@@ -90,7 +90,7 @@ export interface ServerInput {
  * Adds a server connection: its folder made, then its key (when given) saved for its base URL's origin. A key that
  * can't be saved leaves the connection added with no key, and says so.
  */
-export async function addServerConnection(input: ServerInput): Promise<Connection & { keyFailed?: boolean }> {
+export async function addServerConnection(input: ServerInput): Promise<Account & { keyFailed?: boolean }> {
   const caps = capsOf(input.cli)
   const b = checkedUrl(input.baseUrl)
   const preset = caps.presets.find((p) => p.id === input.preset)?.id

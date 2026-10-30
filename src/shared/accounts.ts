@@ -1,8 +1,10 @@
-import type { Connection, ProviderId, WorkspaceConnections, WorkspaceConfig } from './types'
+import type { Account, Connection, ConnectionDefaults, LaunchValues, ProviderId, WorkspaceConnections, WorkspaceConfig } from './types'
+import { permissionLabel, providerDescriptor } from './providers'
 
 /**
- * Hive's connections (HI-980): what an account's state is from its two identities, which connections share a login, and a
- * workspace's choice of them per provider. Pure, for main and the window alike.
+ * Hive's accounts (HI-980) and connections (HI-2106): what an account's state is from its two identities, which accounts
+ * share a login, a workspace's choice of them per provider, and the connections on them that agents choose. Pure, for
+ * main and the window alike.
  */
 
 /**
@@ -38,7 +40,11 @@ export interface ConnectionsView {
   providers: ProviderId[]
   /** `key`: a server connection's key is set (HI-1772), its last 4 characters and when; never the key. */
   /** `setUp` (HI-1870): its CLI's first-run setup done in its folder, as last read; null, can't be told; absent, not read yet. */
-  connections: (Connection & { signingIn: boolean; folder: string; key?: { last4: string; at: string }; setUp?: boolean | null; trust?: ConnectionTrust })[]
+  /**
+   * The accounts (HI-2106; Hive's folders only, not the CLI's own homes), as today's screens show them until HI-2107:
+   * `defaults`, its base connection's model, effort and context.
+   */
+  connections: (Account & { defaults?: ConnectionDefaults; defaultsFrom?: 'cli'; signingIn: boolean; folder: string; key?: { last4: string; at: string }; setUp?: boolean | null; trust?: ConnectionTrust })[]
   /** Per provider, as it applies (workspaceAccounts); absent: not set up in this workspace. */
   workspace: Partial<Record<ProviderId, WorkspaceConnections>>
   /** Providers a test copy runs on its CLI test home where nothing is on (the test seam, HI-1755): no setup is asked for. */
@@ -54,6 +60,9 @@ export interface ConnectionsView {
    */
   masking?: { state: 'none' | 'pending' | 'ready' | 'unavailable'; gap: boolean; gapSince?: string; full: boolean }
 }
+
+/** An account as today's screens show it (ConnectionsView's). */
+export type AccountView = ConnectionsView['connections'][number]
 
 /**
  * Whether a CLI's agents run on connections here, for what the window shows (HI-1774): it has them and is on (the view
@@ -76,7 +85,7 @@ export function connectionsApply<V extends Pick<ConnectionsView, 'providers' | '
  */
 export type ConnectionState = 'missing' | 'unchecked' | 'failed' | 'signedOut' | 'changed' | 'signedIn'
 
-export function accountState(a: Pick<Connection, 'accepted' | 'observed'>): ConnectionState {
+export function accountState(a: Pick<Account, 'accepted' | 'observed'>): ConnectionState {
   const o = a.observed
   if (!o) return 'unchecked'
   if (o.missing) return 'missing'
@@ -92,7 +101,7 @@ export function sameLogin(a: { email?: string; orgId?: string }, b: { email?: st
 }
 
 /** Per account id, the other connections of its provider signed in as the same login (from their latest checks). */
-export function duplicateLogins(connections: readonly Connection[]): Map<string, string[]> {
+export function duplicateLogins(connections: readonly Account[]): Map<string, string[]> {
   const out = new Map<string, string[]>()
   for (const a of connections) {
     if (!a.observed?.loggedIn || !a.observed.email) continue
@@ -106,7 +115,7 @@ export function duplicateLogins(connections: readonly Connection[]): Map<string,
  * The identity a successful check gives, to accept: only signed in, with its email and, for a CLI whose sign-in names
  * one (`orgs`, its descriptor's connections.orgs: Claude Code's does, Codex's doesn't, HI-1757), its organisation.
  */
-export function acceptable(o: Connection['observed'], orgs = true): { email: string; orgId: string } | null {
+export function acceptable(o: Account['observed'], orgs = true): { email: string; orgId: string } | null {
   if (!o || o.missing || o.loggedIn !== true || !o.email) return null
   if (orgs && !o.orgId) return null
   return { email: o.email, orgId: o.orgId ?? '' }
@@ -118,7 +127,7 @@ export function acceptable(o: Connection['observed'], orgs = true): { email: str
  * connection in the order that's on here (`firstOn`), never a stored choice (one left in workspace.json is ignored).
  * `undefined`: not set up yet.
  */
-export function workspaceAccounts(cfg: Pick<WorkspaceConfig, 'connections'> | null | undefined, provider: ProviderId, connections: readonly Connection[]): WorkspaceConnections | undefined {
+export function workspaceAccounts(cfg: Pick<WorkspaceConfig, 'connections'> | null | undefined, provider: ProviderId, connections: readonly Account[]): WorkspaceConnections | undefined {
   const w = cfg?.connections?.[provider]
   if (!w) return undefined
   const on = connections.filter((a) => a.provider === provider && w.on.includes(a.id)).map((a) => a.id)
@@ -129,12 +138,12 @@ export function workspaceAccounts(cfg: Pick<WorkspaceConfig, 'connections'> | nu
  * The connection new launches use (HI-1875): the first in the preference order (each CLI's connections in the list's
  * order, Hive-wide) that's on; else none.
  */
-export function firstOn(on: readonly string[], connections: readonly Connection[]): string | null {
+export function firstOn(on: readonly string[], connections: readonly Account[]): string | null {
   return connections.find((a) => on.includes(a.id))?.id ?? null
 }
 
 /** The top of a CLI's preference order (HI-1875): the connection wearing the Default hint, on or not; else none. */
-export function topOfOrder(provider: ProviderId, connections: readonly Connection[]): string | null {
+export function topOfOrder(provider: ProviderId, connections: readonly Account[]): string | null {
   return connections.find((a) => a.provider === provider)?.id ?? null
 }
 
@@ -142,7 +151,7 @@ export function topOfOrder(provider: ProviderId, connections: readonly Connectio
  * A workspace's connections for a provider after turning one on or off, from how they apply now (`current`;
  * undefined: not set up yet, so this sets it up). Only `on` changes (HI-1875): which is used follows the order.
  */
-export function switchedOn(current: WorkspaceConnections | undefined, id: string, on: boolean, connections: readonly Connection[]): WorkspaceConnections {
+export function switchedOn(current: WorkspaceConnections | undefined, id: string, on: boolean, connections: readonly Account[]): WorkspaceConnections {
   const was = current ?? { on: [], default: null }
   const ids = on ? (was.on.includes(id) ? was.on : [...was.on, id]) : was.on.filter((x) => x !== id)
   const ordered = connections.filter((a) => ids.includes(a.id)).map((a) => a.id)
@@ -153,7 +162,7 @@ export function switchedOn(current: WorkspaceConnections | undefined, id: string
  * Connections with one moved to `index` among its own CLI's (HI-1875: the preference order), the other CLIs' left
  * where they are. An index past the end puts it last; the list unchanged when it is already there.
  */
-export function movedConnection<T extends Pick<Connection, 'id' | 'provider'>>(connections: readonly T[], id: string, index: number): T[] {
+export function movedConnection<T extends Pick<Account, 'id' | 'provider'>>(connections: readonly T[], id: string, index: number): T[] {
   const c = connections.find((a) => a.id === id)
   if (!c) return [...connections]
   const own = connections.filter((a) => a.provider === c.provider && a.id !== id)
@@ -174,7 +183,7 @@ export function movedConnection<T extends Pick<Connection, 'id' | 'provider'>>(c
  */
 export type ConnectionChoice = { ok: true; id: string; note?: 'offFallback' } | { ok: false; why: 'none' | 'offNoDefault' | 'deleted' | 'otherProvider'; wanted?: string }
 
-export function resolveConnection(cfg: Pick<WorkspaceConfig, 'connections'> | null | undefined, provider: ProviderId, wanted: string | null | undefined, connections: readonly Connection[]): ConnectionChoice {
+export function resolveConnection(cfg: Pick<WorkspaceConfig, 'connections'> | null | undefined, provider: ProviderId, wanted: string | null | undefined, connections: readonly Account[]): ConnectionChoice {
   const ws = workspaceAccounts(cfg, provider, connections)
   if (wanted) {
     const c = connections.find((x) => x.id === wanted)
@@ -192,7 +201,7 @@ export function resolveConnection(cfg: Pick<WorkspaceConfig, 'connections'> | nu
  */
 export type ConnectionRef = { ok: true; id: string } | { ok: false; why: 'ambiguous' | 'unknown'; ids?: string[] }
 
-export function connectionRef(ref: string, connections: readonly Connection[], onHere: readonly string[]): ConnectionRef {
+export function connectionRef(ref: string, connections: readonly Account[], onHere: readonly string[]): ConnectionRef {
   const r = ref.trim()
   if (connections.some((c) => c.id === r)) return { ok: true, id: r }
   const named = connections.filter((c) => onHere.includes(c.id) && c.name.trim().toLowerCase() === r.toLowerCase())
@@ -224,7 +233,7 @@ export interface ConnectionShownApi {
   host?: string
 }
 
-export function connectionShown(c: Connection, ws: Partial<Record<ProviderId, WorkspaceConnections>>, wide: boolean, all: readonly Connection[] = [c]): ConnectionShownApi {
+export function connectionShown(c: Account, ws: Partial<Record<ProviderId, WorkspaceConnections>>, wide: boolean, all: readonly Account[] = [c]): ConnectionShownApi {
   const state = accountState(c)
   const server = c.kind === 'server'
   const base: ConnectionShownApi = { id: c.id, name: c.name, cli: c.provider, kind: c.kind ?? 'signIn', signedIn: !server && (state === 'signedIn' || state === 'changed') }
@@ -246,6 +255,118 @@ function hostOf(url: string): string | null {
 }
 
 /** The connections a caller may see (HI-1771): `wide`, every one; else only those on in its workspace. */
-export function connectionsFor(connections: readonly Connection[], ws: Partial<Record<ProviderId, WorkspaceConnections>>, wide: boolean): ConnectionShownApi[] {
+export function connectionsFor(connections: readonly Account[], ws: Partial<Record<ProviderId, WorkspaceConnections>>, wide: boolean): ConnectionShownApi[] {
   return connections.filter((c) => wide || !!ws[c.provider]?.on.includes(c.id)).map((c) => connectionShown(c, ws, wide, connections))
+}
+
+// ---------------------------------------------------------------------------
+// Connections (HI-2106): the setups on an account that agents and the Assistant choose.
+// ---------------------------------------------------------------------------
+
+const VALUE_KEYS = ['model', 'effort', 'use200kContext', 'permissionMode', 'extraArgs'] as const
+
+/**
+ * Launch values as a connection keeps them: each one that is what the CLI would do anyway left out (an empty model or
+ * effort or arguments, a 1M context, the CLI's own default mode), and what its kind can't take dropped (a server
+ * account's effort and context; context where the CLI has no choice of it). Two setups are the same when these are.
+ */
+export function launchValues(v: LaunchValues | null | undefined, cli: ProviderId, server = false): LaunchValues {
+  const d = providerDescriptor(cli)
+  const out: LaunchValues = {}
+  if (v?.model?.trim()) out.model = v.model.trim()
+  if (v?.effort && !server) out.effort = v.effort
+  if (v?.use200kContext === true && !server && d.capabilities.contextLimit) out.use200kContext = true
+  if (v?.permissionMode && v.permissionMode !== d.defaultPermissionMode) out.permissionMode = v.permissionMode
+  if (v?.extraArgs?.trim()) out.extraArgs = v.extraArgs.trim()
+  return out
+}
+
+/** Whether two connections' values (as launchValues keeps them) are the same setup. */
+export function sameValues(a: LaunchValues, b: LaunchValues): boolean {
+  return VALUE_KEYS.every((k) => (a[k] ?? undefined) === (b[k] ?? undefined))
+}
+
+/** A connection's values alone (its id, account and name left out). */
+export const valuesOf = (c: LaunchValues): LaunchValues => Object.fromEntries(VALUE_KEYS.filter((k) => c[k] !== undefined).map((k) => [k, c[k]])) as LaunchValues
+
+/** An account's connections, in their order. */
+export const connectionsOn = (account: string, connections: readonly Connection[]): Connection[] => connections.filter((c) => c.account === account)
+
+/** An account's base connection (HI-2106): its first, made with it; none while it has none. */
+export const baseConnection = (account: string, connections: readonly Connection[]): Connection | undefined => connections.find((c) => c.account === account)
+
+/** The connection on an account whose values are these (as launchValues keeps them), the earliest; none if no such one. */
+export function matchingConnection(account: Pick<Account, 'id' | 'provider' | 'kind'>, values: LaunchValues, connections: readonly Connection[]): Connection | undefined {
+  const want = launchValues(values, account.provider, account.kind === 'server')
+  return connectionsOn(account.id, connections).find((c) => sameValues(launchValues(c, account.provider, account.kind === 'server'), want))
+}
+
+/** An effort level's name in a connection's name: "High", "Xhigh". */
+const effortWord = (e: string): string => e.charAt(0).toUpperCase() + e.slice(1)
+
+/**
+ * A new connection's name (HI-2106): its account's when its values are its base connection's (or it is the base), else
+ * the account's followed by what differs ("Personal · opus · High · Plan"), or by `label` ("Personal · Assistant"); never
+ * one the account's connections have already (a number added). A connection's name is the user's data once made, in
+ * English as made; the user renames it.
+ */
+export function connectionName(account: Pick<Account, 'name' | 'provider'>, values: LaunchValues, base: LaunchValues | undefined, taken: readonly string[], label?: string): string {
+  const parts: string[] = []
+  if (base && !sameValues(values, base)) {
+    if (label) parts.push(label)
+    else {
+      if ((values.model ?? '') !== (base.model ?? '')) parts.push(values.model ?? 'Default model') // i18n-ignore: a connection's name, the user's data once made
+      if ((values.effort ?? '') !== (base.effort ?? '')) parts.push(values.effort ? effortWord(values.effort) : 'Default effort') // i18n-ignore: a connection's name, the user's data once made
+      if (!!values.use200kContext !== !!base.use200kContext) parts.push(values.use200kContext ? '200K' : '1M') // i18n-ignore: a connection's name (token counts)
+      if ((values.permissionMode ?? '') !== (base.permissionMode ?? '')) parts.push(permissionLabel(account.provider, values.permissionMode ?? providerDescriptor(account.provider).defaultPermissionMode))
+      if ((values.extraArgs ?? '') !== (base.extraArgs ?? '')) parts.push(values.extraArgs ? values.extraArgs : 'No extra arguments') // i18n-ignore: a connection's name, the user's data once made
+    }
+  }
+  const name = [account.name, ...parts].join(' · ')
+  const used = new Set(taken.map((t) => t.trim().toLowerCase()))
+  if (!used.has(name.toLowerCase())) return name
+  for (let n = 2; ; n++) if (!used.has(`${name} (${n})`.toLowerCase())) return `${name} (${n})`
+}
+
+/** Whether an account can be used in a workspace: on there, or the CLI's own home (Copilot's sign-in, a test home), on everywhere. */
+export function accountOnIn(cfg: Pick<WorkspaceConfig, 'connections'> | null | undefined, a: Account, accounts: readonly Account[]): boolean {
+  return a.home === 'cli' || !!workspaceAccounts(cfg, a.provider, accounts)?.on.includes(a.id)
+}
+
+/**
+ * Which connection a launch uses (HI-2106, decision H), from the agent's (or the Assistant's) connection and the
+ * workspace's accounts:
+ * - its connection, on an account of its CLI that's on here: that one;
+ * - its account off here, or the connection removed (or another CLI's), or none: its CLI's first usable connection here
+ *   (the base connection of the first account in the order that's on here and has one), noted when it named one
+ *   (`offFallback`, `missing`);
+ * - none usable: refused (`none`: nothing named; `offNoDefault`: named, but none to fall back to).
+ */
+export type AgentConnection = { ok: true; connection: Connection; account: Account; note?: 'offFallback' | 'missing' } | { ok: false; why: 'none' | 'offNoDefault'; wanted?: string }
+
+export function resolveAgentConnection(cfg: Pick<WorkspaceConfig, 'connections'> | null | undefined, cli: ProviderId, wanted: string | null | undefined, accounts: readonly Account[], connections: readonly Connection[]): AgentConnection {
+  const c = wanted ? connections.find((x) => x.id === wanted) : undefined
+  const a = c ? accounts.find((x) => x.id === c.account) : undefined
+  if (c && a && a.provider === cli && accountOnIn(cfg, a, accounts)) return { ok: true, connection: c, account: a }
+  for (const x of accounts) {
+    if (x.provider !== cli || !accountOnIn(cfg, x, accounts)) continue
+    const base = baseConnection(x.id, connections)
+    if (base) return { ok: true, connection: base, account: x, ...(wanted ? { note: c && a && a.provider === cli ? ('offFallback' as const) : ('missing' as const) } : {}) }
+  }
+  return wanted ? { ok: false, why: 'offNoDefault', wanted } : { ok: false, why: 'none' } // i18n-ignore: a reason's code, not text
+}
+
+/**
+ * Extra arguments joined (HI-2106): the launch's parts (Settings → the CLI's, then the project's, as
+ * typed) as one string that splits (splitArgs) into exactly their arguments: joined by a space when that already does,
+ * else each argument quoted as needed.
+ */
+export function joinArgs(parts: readonly string[], split: (s: string) => string[]): string {
+  const kept = parts.filter((p) => p && p.trim())
+  const want = kept.flatMap((p) => split(p))
+  const plain = kept.map((p) => p.trim()).join(' ')
+  const same = (s: string): boolean => JSON.stringify(split(s)) === JSON.stringify(want)
+  if (same(plain)) return plain
+  const quoted = want.map((t) => (!/[\s"']/.test(t) && t ? t : !t.includes('"') ? `"${t}"` : `'${t}'`)).join(' ')
+  return same(quoted) ? quoted : plain
 }

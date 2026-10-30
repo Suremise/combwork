@@ -3,7 +3,8 @@
 // connection, a project agent only those on in its workspace, four fields; details=true widens nothing; never a folder
 // or defaults; another one asked after by id or name is 404 to an agent); the Assistant adds and changes agents by
 // connection name or id (two sharing a name: 409; unknown: 404; one off here: 409; another CLI than the provider: 409),
-// an unrelated change keeping it and null clearing it; the status shows the chosen and the running connection. The fake Claude Code signs in, no browser.
+// an unrelated change keeping it and null clearing it (HI-2106: to its CLI's first on here); the status shows the chosen
+// and the running connection. The fake Claude Code signs in, no browser.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -91,9 +92,9 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('…Other asked after by id or by name: 404, as if there were none', hidden.every((r) => r.status === 404), JSON.stringify(hidden.map((r) => r.status)))
     check('…one on here, by name: its four fields', (await api('GET', '/v1/connections/max%202', null, agentToken)).body?.id === max2.id)
 
-    // --- The status: One's chosen connection (the default: null) and the one its run is on.
+    // --- The status: One's connection (none of its own before HI-2106: pinned to the one it ran on) and its run's.
     const one = (await api('GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.id === 'a-one')
-    check('the status: One follows the default (connection null), runs on Max 1', one?.connection === null && one?.launchedConnection?.id === max1.id, JSON.stringify(one && { connection: one.connection, launchedConnection: one.launchedConnection }))
+    check('the status: One, which had none of its own, is pinned to Max 1 (HI-2106), and runs on it', one?.connection?.id === max1.id && one?.launchedConnection?.id === max1.id, JSON.stringify(one && { connection: one.connection, launchedConnection: one.launchedConnection }))
 
     // --- The Assistant: started on the workspace's default, its token, then agents by connection.
     await inv('session:start', assistantHome, { agentId: 'assistant' })
@@ -125,7 +126,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await asAssistant('PATCH', `/v1/projects/alpha/agents/${viaAgent.id}`, { model: 'opus' })
     check('an unrelated change keeps its connection', (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Vianame')?.connection?.id === max2.id)
     await asAssistant('PATCH', `/v1/projects/alpha/agents/${viaAgent.id}`, { connection: null })
-    check('…null clears it (the default again)', (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Vianame')?.connection === null)
+    check('…null clears it: its CLI’s first on here (HI-2106, decision H)', (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Vianame')?.connection?.id === max1.id)
     const projectAgent = await api('POST', '/v1/projects/alpha/agents', { name: 'Sneaky', connection: 'Max 1' }, agentToken)
     check('a project agent may not add agents (403), connection or not', projectAgent.status === 403, JSON.stringify(projectAgent))
 

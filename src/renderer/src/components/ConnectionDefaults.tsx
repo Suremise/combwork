@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Connection } from '@shared/types'
+import type { AccountView } from '@shared/accounts'
 import type { MovedNotice } from '@shared/connectionDefaults'
 import { providerDescriptor } from '@shared/providers'
 import { effortName, modelCaps } from '@shared/models'
@@ -37,7 +37,7 @@ const M = {
 }
 
 /** A connection's defaults, opened from its row: model, effort and context (each hidden where its CLI or model has none). */
-export function ConnectionDefaultsEditor({ connection: c }: { connection: Connection }) {
+export function ConnectionDefaultsEditor({ connection: c }: { connection: AccountView }) {
   const [open, setOpen] = useState(false)
   const settings = useStore((s) => s.settings)
   const info = useStore((s) => s.providers[c.provider])

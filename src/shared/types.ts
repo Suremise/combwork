@@ -648,10 +648,17 @@ export interface AppConfig {
   /** Highest warning shown per "provider:limit", and for which reset period. */
   planWarnings: Record<string, { resetsAt: string | null; level: number }>
   /**
-   * The CLI accounts Hive keeps (HI-980: Settings → Accounts), each a folder of its own. Their order, within each CLI,
-   * is its preference order (HI-1875): new launches use the first that's on in the workspace; the first wears Default.
+   * The accounts Hive keeps (HI-980; HI-2106), in one order for all CLIs (decision A): a CLI's first account on in a
+   * workspace is what a launch falls back to there. Before HI-2106 they were `connections`, with their defaults.
+   */
+  accounts?: Account[]
+  /**
+   * The connections (HI-2106): the setups agents and the Assistant choose, each on an account and ordered within it by
+   * their order here; an account's first is its base connection, made with it.
    */
   connections?: Connection[]
+  /** One-time changes to this file (HI-2106): `accounts1`, its connections became accounts, and their defaults connections. */
+  migrations?: { accounts1?: AccountsMigration }
   /** Per provider: the account last chosen as a workspace's default (or launched on). Since HI-1875 only its migration's. */
   lastUsedConnection?: Partial<Record<ProviderId, string>>
   /** HI-1875's one-time move (the most recently used default to the top of each CLI's order) is done. */
@@ -720,12 +727,14 @@ export interface ConnectionObserved {
 }
 
 /**
- * A CLI login Hive keeps (HI-980), in a folder of its own under the accounts folder (`<accounts>\<id>\`), linked to the
- * CLI's home by a junction for what all accounts share. `accepted` is who the user took it on as; `observed` the latest
- * check: they differ when its login changed (a /login typed in a pane), which the user answers.
+ * An account (HI-2106, HI-2105's design): a CLI login Hive keeps (HI-980) or a server it reaches (HI-1772), in a folder of
+ * its own under the accounts folder (`<accounts>\<id>\`), linked to the CLI's home by a junction for what all accounts
+ * share; or (`home: 'cli'`) the CLI's own home and sign-in. `accepted` is who the user took it on as; `observed` the
+ * latest check: they differ when its login changed (a /login typed in a pane), which the user answers. Agents don't
+ * choose an account: they choose a connection on one.
  */
-export interface Connection {
-  /** Stable and random ("a-3f9c2e1b"): its folder's name. A rename never changes it. */
+export interface Account {
+  /** Stable and random ("a-3f9c2e1b"): its folder's name, and its key-store and usage (`connectionPlanUsage`) entries'. A rename never changes it. */
   id: string
   provider: ProviderId
   /**
@@ -734,8 +743,13 @@ export interface Connection {
    * Hive's too. Absent in a record from before it: signIn.
    */
   kind?: 'signIn' | 'server'
-  /** A server connection's server (HI-1772). Its key is never here: only in the key store (keyStore.ts). */
+  /** A server account's server (HI-1772). Its key is never here: only in the key store (keyStore.ts). */
   server?: ServerConnection
+  /**
+   * `cli`: no folder of Hive's but the CLI's own home and sign-in, made by Hive and never removed (HI-2106): Copilot's one
+   * PC-wide sign-in (decision C), and a test copy's CLI test home (the test seam, connectionSeam.ts).
+   */
+  home?: 'cli'
   /** The user's name for it ("Personal", "Hive overnight"). */
   name: string
   createdAt: string
@@ -743,13 +757,63 @@ export interface Connection {
   observed?: ConnectionObserved
   /** A removal that stopped partway, in English: what is left, for Remove to try again. */
   leftover?: string
+}
+
+/**
+ * A connection (HI-2106): a named setup on an account ("Claude · High"), what agents and the Assistant choose. Each value
+ * absent: the CLI decides (its default model, effort and mode, no 200K context, no extra arguments). A server account's
+ * connections take no effort or context: its server's models aren't the CLI's.
+ */
+export interface Connection {
+  /** Stable and random ("c-3f9c2e1b"), never an account's. */
+  id: string
+  /** Its account's id. */
+  account: string
+  name: string
+  model?: string
+  effort?: EffortLevel
+  use200kContext?: boolean
+  permissionMode?: PermissionMode
+  /** Extra command-line arguments, as typed (split at launch: splitArgs). */
+  extraArgs?: string
+}
+
+/** What a connection launches with (HI-2106): two connections on one account with the same values are the same setup. */
+export type LaunchValues = Pick<Connection, 'model' | 'effort' | 'use200kContext' | 'permissionMode' | 'extraArgs'>
+
+/**
+ * A connection as config.json kept it before HI-2106 (HI-980 to HI-1875): an account with its defaults (HI-1770). Read
+ * by the accounts migration only, from its record (`migrations.accounts1.legacy`).
+ */
+export interface LegacyConnection extends Account {
   /**
-   * Its defaults for the agents on it (HI-1770): what an agent with no model, effort or context of its own runs with.
+   * Its defaults for the agents on it (HI-1770): what an agent with no model, effort or context of its own ran with.
    * Absent: not set yet (copied from the CLI's once, `defaultsFrom`); an empty object is the user's (the CLI decides).
    */
   defaults?: ConnectionDefaults
-  /** 'cli': `defaults` are still the CLI's per-CLI defaults as copied; cleared once they are edited. */
+  /** 'cli': `defaults` were still the CLI's per-CLI defaults as copied. */
   defaultsFrom?: 'cli'
+}
+
+/**
+ * config.json's accounts migration (HI-2106), recorded once: when, and its connections as they were then (`legacy`, read
+ * only), which each workspace's own files are migrated from when it next opens, however much later.
+ */
+export interface AccountsMigration {
+  at: string
+  legacy: LegacyConnection[]
+}
+
+/**
+ * A project's accounts migration (HI-2106), recorded in the write that made it: `unplaced`, agents whose CLI had no
+ * account to make a connection on, by id, with what they would have launched with; the Assistant's home (`assistant`),
+ * the connection made for each CLI it had a setup for in its workspace (its agent holds the active one's), which a change
+ * of its CLI picks.
+ */
+export interface ProjectAccountsMigration {
+  at: string
+  unplaced?: Record<string, LaunchValues>
+  assistant?: Partial<Record<ProviderId, string>>
 }
 
 /** The Claude names a server's model can stand in for (HI-1772): the CLI's aliases. */
@@ -778,7 +842,7 @@ export interface ServerConnection {
   modelsFrom: 'typed' | 'listed'
 }
 
-/** A connection's defaults (HI-1770); each absent: the CLI decides (its own default model, effort; context off). */
+/** A legacy connection's defaults (HI-1770); each absent: the CLI decides (its own default model, effort; context off). */
 export interface ConnectionDefaults {
   model?: string
   effort?: EffortLevel
@@ -797,7 +861,10 @@ export interface ConnectionsMoved {
   moved: { id: string; agent: string; field: MovedField; value: string | boolean }[]
 }
 
-/** A workspace's accounts for one provider (HI-980): those on in it, and its default among them (null: none). */
+/**
+ * A workspace's accounts for one provider (HI-980; workspace.json's `connections`, whose ids are accounts' since HI-2106):
+ * those on in it, and its default among them (derived, HI-1875; null: none).
+ */
 export interface WorkspaceConnections {
   on: string[]
   default: string | null
@@ -807,11 +874,20 @@ export interface WorkspaceConfig {
   version: 1
   /**
    * The accounts on in this workspace, per provider (HI-980). No entry for a provider: not set up yet (nothing is turned
-   * on by itself); `{ on: [], default: null }`: the user turned them all off.
+   * on by itself); `{ on: [] }`: the user turned them all off. `default` was HI-1875's migration input, ignored since
+   * and removed by the accounts migration (HI-2106).
    */
-  connections?: Partial<Record<ProviderId, WorkspaceConnections>>
-  /** The Assistant's own connection per provider in this workspace (HI-1755: Settings → Assistant); absent or null: the default. */
+  connections?: Partial<Record<ProviderId, { on: string[]; default?: string | null }>>
+  /**
+   * The Assistant's own account per provider in this workspace (HI-1755), before HI-2106: read once by the accounts
+   * migration (the Assistant's agent then holds its connection), and removed by it.
+   */
   assistantConnection?: Partial<Record<ProviderId, string | null>>
+  /**
+   * One-time changes to this file (HI-2106): `accounts1`, its own launch sources (`assistantConnection`, each provider's
+   * stored `default`) removed, once its Assistant's home was migrated (its record says what was made).
+   */
+  migrations?: { accounts1?: { at: string } }
   /** Where the workspace was last opened (#146): a different folder now means it was moved, and Repair… is offered. */
   lastPath?: string
   /**
@@ -1487,9 +1563,15 @@ export interface ProjectConfig {
   inboxCheckpoints: 'inherit' | 'on' | 'off'
   inboxStopContinuation: 'inherit' | 'on' | 'off'
   inboxIdleWakes: 'inherit' | 'on' | 'off'
-  /** The provider new agents get (Add Agent's quick add); inherit uses the global default. */
+  /**
+   * The provider new agents got (Add Agent's quick add), before HI-2106 (decision A: the one order of accounts instead);
+   * removed by the accounts migration, and only shown until the window's screens follow (HI-2107).
+   */
   defaultProvider: Inherit<ProviderId>
-  /** The project's settings per provider, over the global ones. */
+  /**
+   * The project's settings per provider, over the global ones, before HI-2106: read once by the accounts migration (its
+   * agents' connections then hold them), and removed by it.
+   */
   providers: Record<ProviderId, ProjectProviderConfig>
   /** Overrides settings.sessions.compactSuggestTokens for this project; null inherits. */
   compactSuggestTokens: number | null
@@ -1501,9 +1583,11 @@ export interface ProjectConfig {
   agents: AgentDef[]
   /**
    * One-time changes made to the project, recorded with what they did: `connections1`, per CLI, its model, effort and
-   * context overrides moved onto its agents (HI-1770), written with them in one write.
+   * context overrides moved onto its agents (HI-1770), written with them in one write; `accounts1` (HI-2106), each agent
+   * pointed at the connection it launched with, and the project's and agents' own launch settings removed, in one write
+   * (`unplaced`: agents whose CLI had no account to make one on, by id, with what they would have launched with).
    */
-  migrations?: { connections1?: Partial<Record<ProviderId, ConnectionsMoved>> }
+  migrations?: { connections1?: Partial<Record<ProviderId, ConnectionsMoved>>; accounts1?: ProjectAccountsMigration }
   /** The Session tab's layout (one for the project, #134); its pages hold as many agents as it has panes. */
   layout: PageLayout
   /**
@@ -1654,12 +1738,19 @@ export interface AgentDef {
   /** Random and never reused, so session records of removed agents don't attach to new ones. */
   id: string
   name: string
-  /** The CLI this agent runs. Always stored when the agent is added. */
+  /** The CLI this agent runs: its connection's account's (HI-2106), kept with it. Always stored when the agent is added. */
   provider?: ProviderId
+  /**
+   * Its own model, effort, mode and context before HI-2106: read once by the accounts migration (its connection then
+   * holds them) and removed by it. Stored since only while it has no connection because its CLI has no account here yet,
+   * for the connection it gets once one is (placeUnplaced). In a window's AgentInfo, its connection's values (the
+   * adapter until HI-2108); in a patch or a new agent's options, a change of them: the connection on its account with
+   * them, made if none is.
+   */
   model?: string
   effort?: EffortLevel
   permissionMode?: PermissionMode
-  /** 200K context instead of 1M (capabilities.contextLimit). */
+  /** 200K context instead of 1M (capabilities.contextLimit); as model. */
   use200kContext?: boolean
   /** Session to resume for this agent. */
   lastSessionId?: string
@@ -1680,8 +1771,9 @@ export interface AgentDef {
    */
   mcpServers?: string[]
   /**
-   * The connection it runs on (HI-1755: a Connection's id), for a provider that has connections; absent: the
-   * workspace's default for its provider. Off in the workspace, the default is used, and the agent says so.
+   * The connection it runs on (HI-2106: a Connection's id; before it, HI-1755, an account's). Its account off in the
+   * workspace, or the connection removed, or none: it launches on its CLI's first usable connection here and says so
+   * (decision H). In a window's AgentInfo, its account's id (the adapter until HI-2108; `connectionId` is the connection's).
    */
   connection?: string
 }
@@ -1778,6 +1870,9 @@ export interface AgentInfo extends AgentDef {
   start?: AgentStart
   /** The count of start changes main had made when `start` was read (HI-1977): a change told with a higher one is newer. */
   startSeq?: number
+  /** Its connection (HI-2106), while `connection` says its account to today's screens: its id and name. */
+  connectionId?: string
+  connectionName?: string
 }
 
 /** An agent's start as the stall check reads it (HI-1977): under way, or why it failed. */

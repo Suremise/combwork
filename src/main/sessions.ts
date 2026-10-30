@@ -66,10 +66,9 @@ import type {
 } from '../shared/types'
 import { provider as providerAdapter, allProviders } from './providers'
 import { runSwitch, type SwitchOp } from './connectionSwitch'
-import { checkAccount, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
-import { connectionLayerFor, effortUsable, ensureMoved } from './connectionMoves'
-import { assistantOwn } from '../shared/connectionDefaults'
-import { resolveConnection } from '../shared/accounts'
+import { agentLaunchView, allAccounts, allConnections, checkAccount, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
+import { effortUsable, ensureMigrated, migrationDue } from './connectionMoves'
+import { resolveAgentConnection } from '../shared/accounts'
 import { recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
@@ -1508,27 +1507,21 @@ class SessionManager {
     const s = config.settings
     let pc = readPc ?? (await workspace.projectConfig(projectPath))
     const assistant = workspace.isAssistantHome(projectPath)
-    // Where its model, effort and context come from (HI-1770), decided once for this resolution: Connections turned on or
-    // off while it reads the rest takes effect at the next, so the move, the agent read and the layer always agree.
-    const movedCli = agentProvider(agent ?? projectAgents(pc)[0], pc, s)
-    const layered = connectionLayerFor(movedCli)
-    if (layered && !assistant) {
-      // The project's own moved onto its agents first (once, under the project's lock), so nothing launches with the
-      // project's unread and not yet its agents'.
-      if (!pc.migrations?.connections1?.[movedCli]) {
-        try {
-          await ensureMoved(projectPath, movedCli)
-        } catch (e) {
-          throw hiveError(M.moveFailed, { project: basename(projectPath), error: errorText(e) })
-        }
-        pc = await workspace.projectConfig(projectPath)
+    // The accounts migration first (HI-2106: once, under the project's lock), so nothing launches with its agents' old
+    // settings unread and not yet their connections'.
+    if (migrationDue(pc, workspace)) {
+      try {
+        await ensureMigrated(projectPath)
+      } catch (e) {
+        throw hiveError(M.moveFailed, { project: basename(projectPath), error: errorText(e) })
       }
-      // The agent as saved now, whoever made the move (a start may hold one read before it): only its provider as
-      // given is kept (a run's own, pinProvider).
-      const was = agent
-      const fresh = was && projectAgents(pc).find((a) => a.id === was.id)
-      if (was && fresh) agent = { ...fresh, provider: was.provider ?? fresh.provider }
+      pc = await workspace.projectConfig(projectPath)
     }
+    // The agent as saved now, whoever migrated it (a start may hold one read before): only its provider as given is kept
+    // (a run's own, pinProvider).
+    const was = agent
+    const fresh = was && projectAgents(pc).find((a) => a.id === was.id)
+    if (was && fresh) agent = { ...fresh, provider: was.provider ?? fresh.provider }
     // Every Hive skill for its audience (SKILL.md's metadata.audience) reaches the session: project agents get those for
     // agents, unless the workspace or the project switched one off (#1431, Skills → Delivered to agents); the Assistant
     // gets those for it.
@@ -1563,16 +1556,13 @@ class SessionManager {
     // Its instructions name only the skills the session gets (#1431).
     if (hive) mcpServers.hive = skillsOff.length ? { ...hive, env: { ...hive.env, HIVE_SKILLS_OFF: skillsOff.sort().join(',') } } : hive
 
-    // The connection it would launch on (HI-1755): a change of choice asks for a restart.
+    // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
+    // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
+    // account on the CLI's own home (Copilot's sign-in, a test home).
     const cli = agentProvider(forAgent, pc, s)
-    const wanted = assistant ? workspace.config.assistantConnection?.[cli] : forAgent?.connection
-    const choice = layered && cli === movedCli ? resolveConnection(workspace.config, cli, wanted, config.get().connections ?? []) : null
-    const connection = choice ? (choice.ok ? choice.id : `!${choice.why}`) : null
-    // Model, effort and context (HI-1770): with connections, its own, else its connection's defaults (never the project's
-    // or the CLI's; none when no connection can be used). The Assistant's own are its agent's, else Settings → Assistant's.
-    const conn = choice?.ok ? ((config.get().connections ?? []).find((c) => c.id === choice.id) ?? null) : null
-    const own = choice && assistant ? assistantOwn(forAgent, s.assistant?.providers?.[cli]) : forAgent
-    const l = agentLaunchSettings(own, pc, s, choice ? { kind: 'connection', conn } : { kind: 'legacy' })
+    const choice = resolveAgentConnection(workspace.config, cli, forAgent?.connection, allAccounts(), allConnections())
+    const connection = choice.ok ? (choice.account.home ? null : choice.account.id) : `!${choice.why}`
+    const l = agentLaunchSettings(cli, choice.ok ? choice.connection : null, s, choice.ok && choice.account.kind === 'server')
     const extraArgs = l.extraArgs.flatMap((a) => splitArgs(a))
     const chime = pc.chime === 'inherit' ? s.notifications.chimeEnabled : pc.chime === 'on'
     return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode: l.permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection }
@@ -1615,7 +1605,7 @@ class SessionManager {
             // Settings can't be read right now; don't nag.
           }
         }
-        const provider = agentLaunchSettings(a, cfg, config.settings).provider
+        const provider = agentProvider(a, cfg, config.settings)
         // The Assistant's sessions ran in the workspace folder, not its home.
         const folder = workspace.isAssistantHome(projectPath) ? (workspaceOf(projectPath).path ?? projectPath) : projectPath
         const r = l ? null : resumeRecord(folder, a, records.filter((x) => recordProvider(x) === provider), openIds, ids, slotFolders)
@@ -1630,7 +1620,7 @@ class SessionManager {
         const shown = at ? shownPlace(shownFacts, folderAgent(a), at.now, at.branch, at.target) : { folder: projectPath, is: 'project' as const, name: null, branch: null }
         // Its 0.9 worktree's base, also for the slot it was carried into while that slot has no target (#1569).
         const place = (shown.is === 'legacy' || (shown.is === 'carried' && !shown.base)) && legacy?.base ? { ...shown, base: legacy.base } : shown
-        return { ...a, live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}), ...(home ? { home } : {}) },...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place }
+        return { ...a, ...agentLaunchView(a, cfg), live: l?.state ?? null, restartNeeded, resume: r && { id: r.id, name: r.name, lastActiveAt: r.lastActiveAt, createdAt: r.createdAt, titleAtRename: r.titleAtRename, ...(hold ? { hold } : {}), ...(home ? { home } : {}) },...(carried ? { carriedSlot: carried } : {}), ...(held.has(a.id) ? { heldSlot: held.get(a.id) } : {}), place }
     }))
     const primary = agents.find((a) => a.live)
     return { live: primary?.live ?? null, restartNeeded: primary?.restartNeeded ?? false, agents, folders: namedFolders(shownFacts) }
@@ -1953,7 +1943,7 @@ class SessionManager {
     const cfg = await workspace.projectConfig(projectPath)
     const agent = projectAgents(cfg).find((a) => a.id === agentId)
     if (!agent) return { is: 'none' }
-    const provider = agentLaunchSettings(agent, cfg, config.settings).provider
+    const provider = agentProvider(agent, cfg, config.settings)
     // The agent's records alone, newest first (HI-1236: by its index, not every record of the project).
     const rec = (await workspace.sessionsOfAgent(projectPath, agentId)).find((r) => r.agentId === agentId && r.lease === lease && !r.archived && !r.sub && recordProvider(r) === provider)
     if (!rec) return { is: 'none' }
@@ -1993,7 +1983,7 @@ class SessionManager {
     this.assertStarting(id)
     if (!recorded && !agent.provider && defaultProviderPending(cfg, config.settings)) await providerService.settle()
     this.assertStarting(id)
-    const providerId = recorded ?? agentLaunchSettings(agent, cfg, config.settings).provider
+    const providerId = recorded ?? agentProvider(agent, cfg, config.settings)
     // At start, Hive may still be looking for that CLI.
     await providerService.settle(providerId)
     times.mark('providerSettle')
@@ -2181,7 +2171,7 @@ class SessionManager {
     this.followConnections()
     const ws = workspaceOf(projectPath)
     // On its choice as saved now (not as it was when its start began), looked at again as launchOn's last await.
-    await launchOnChosen({ provider: l.adapter.id, workspaceConfig: ws.path ? ws.config : null, agentName: agent.name, chosen: () => this.chosenConnection(projectPath, agent, l.adapter.id) }, async (conn, lastLook) => {
+    await launchOnChosen({ provider: l.adapter.id, workspaceConfig: ws.path ? ws.config : null, agentName: agent.name, chosen: () => this.chosenConnection(projectPath, agent) }, async (conn, lastLook) => {
       times?.mark('connection')
       await this.launchOn(projectPath, agent, opts, times, conn, lastLook)
     })
@@ -2277,13 +2267,11 @@ class SessionManager {
   }
 
   /**
-   * The connection an agent (or the Assistant) has chosen, as saved now (HI-1755): an agent's own, read under the lock
-   * its changes take; the Assistant's, its workspace's setting. Undefined: none chosen (the workspace's default).
+   * The connection an agent (or the Assistant) has chosen, as saved now (HI-1755; HI-2106: a connection's id), read under
+   * the lock its changes take. Undefined: none (its CLI's first usable here).
    */
-  private async chosenConnection(projectPath: string, agent: AgentDef, provider: ProviderId): Promise<string | null | undefined> {
-    const ws = workspaceOf(projectPath)
-    if (workspace.isAssistantHome(projectPath)) return ws.config.assistantConnection?.[provider]
-    return ((await ws.savedAgent(projectPath, agent.id)) ?? agent).connection
+  private async chosenConnection(projectPath: string, agent: AgentDef): Promise<string | null | undefined> {
+    return ((await workspaceOf(projectPath).savedAgent(projectPath, agent.id)) ?? agent).connection
   }
 
   private async launchOn(projectPath: string, agent: AgentDef, opts: { sessionId: string; name: string; resume: boolean }, times: StepTimes | undefined, conn: LaunchConnection | null, lastLook: () => Promise<void>): Promise<void> {
@@ -4035,7 +4023,7 @@ class SessionManager {
     projectPath = workspace.assertSessionHost(projectPath)
     const { agent, cfg } = await this.agentDef(projectPath, agentId)
     const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
-    const adapter = providerAdapter((await this.resumeProvider(projectPath, sessionId, rec)) ?? agentLaunchSettings(agent, cfg, config.settings).provider)
+    const adapter = providerAdapter((await this.resumeProvider(projectPath, sessionId, rec)) ?? agentProvider(agent, cfg, config.settings))
     const info = providerService.info(adapter.id)
     if (!adapter.stopBackgroundJob || !info.path) throw hiveError(msg({ id: 'session.background.cantStop', defaultMessage: "{provider} can't stop background sessions.", description: "Stop It and Resume is refused: the coding agent can't stop its background service's job. {provider} is its name." }), { provider: adapter.descriptor.name }, { kind: 'invalid' })
     await adapter.stopBackgroundJob(info.path, jobId)

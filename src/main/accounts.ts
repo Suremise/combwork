@@ -3,11 +3,11 @@ import { join, resolve, sep } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
-import type { AgentInfo, AppConfig, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, ProjectInfo, ProviderId, ServerConnection, ServerModel, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
+import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, EffortLevel, LaunchValues, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
 import { HIVE_DIR } from '../shared/defaults'
 import { readKeptJson } from './fsutil'
-import { cliDefaults } from '../shared/connectionDefaults'
-import { acceptable, accountState, type ConnectionTrust, movedConnection, resolveConnection, topOfOrder, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
+import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
+import { acceptable, accountState, baseConnection, resolveAgentConnection, type AgentConnection, type ConnectionTrust, movedConnection, resolveConnection, topOfOrder, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { profileFolder } from '../shared/appName'
 import { agentProvider, isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
@@ -24,6 +24,7 @@ import type { TrustReading, TrustTarget } from './providers/types'
 import { git } from './git'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
+import { modelCaps } from '../shared/models'
 import { openWorkspaces, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
 import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStore'
 import { coverageView } from './keyCoverage'
@@ -76,23 +77,32 @@ export const accountFolder = (id: string): string => join(accountsRoot(), id)
 
 const samePath = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase()
 
-function list(): Connection[] {
-  return config.get().connections ?? []
+/** Hive's accounts: its folders (never the CLI's own homes: Copilot's sign-in, a test home), in the order. */
+function list(): Account[] {
+  return (config.get().accounts ?? []).filter((a) => !a.home)
 }
 
-export function getAccount(id: string): Connection | undefined {
+/** Hive's accounts (list): what today's screens and the Agent API call connections, until HI-2107 and HI-2108. */
+export const hiveAccounts = (): Account[] => list()
+
+/** Every account, the CLI's own homes too (HI-2106: Copilot's sign-in, a test home), in the order. */
+export function allAccounts(): Account[] {
+  return config.get().accounts ?? []
+}
+
+export function getAccount(id: string): Account | undefined {
   return list().find((a) => a.id === id)
 }
 
-function changeAccounts(fn: (connections: Connection[]) => void): void {
+function changeAccounts(fn: (connections: Account[]) => void): void {
   config.update((c) => {
-    c.connections = [...(c.connections ?? [])]
-    fn(c.connections)
+    c.accounts = [...(c.accounts ?? [])]
+    fn(c.accounts)
   })
   emit({ type: 'connections-changed' })
 }
 
-function changeAccount(id: string, fn: (a: Connection) => void): void {
+function changeAccount(id: string, fn: (a: Account) => void): void {
   changeAccounts((all) => {
     const i = all.findIndex((a) => a.id === id)
     if (i >= 0) {
@@ -112,7 +122,7 @@ function changeAccount(id: string, fn: (a: Connection) => void): void {
 const NO_NAME = msg({ id: 'main.accounts.noName', defaultMessage: 'Give the connection a name.', description: 'An error adding or renaming a connection in Settings → Connections: its name is empty.' })
 const NO_ACCOUNT = msg({ id: 'main.accounts.notFound', defaultMessage: 'There is no such connection.', description: 'An error: a connection named by its id is not in Settings → Connections (removed meanwhile).' })
 
-function mustGet(id: string): Connection {
+function mustGet(id: string): Account {
   const a = getAccount(id)
   if (!a) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
   return a
@@ -122,7 +132,7 @@ function mustGet(id: string): Connection {
  * Refuses a sign-in or removal while the CLI's own check of the folder isn't confirmed ended (HI-1757: Codex's app
  * server, held by codexChecks.ts until it is gone, across a restart too).
  */
-function assertNotHeld(a: Connection): void {
+function assertNotHeld(a: Account): void {
   if (!provider(a.provider).accountHeld?.(accountFolder(a.id))) return
   throw hiveError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Hive is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
 }
@@ -185,18 +195,18 @@ export function setAccountSessions(fn: (id: string) => boolean): void {
 }
 
 /** Its sign-in's terminal (a server connection's Set Up, HI-1772): one per connection, refusing removal while open. */
-export const loginKey = (a: Pick<Connection, 'id' | 'provider'>): string => `task:${a.provider}:login:${a.id}`
+export const loginKey = (a: Pick<Account, 'id' | 'provider'>): string => `task:${a.provider}:login:${a.id}`
 
 /** A server connection's (HI-1772): nothing to sign in, check or watch; its key in the key store. */
-export const isServer = (a: Pick<Connection, 'kind'> | undefined): boolean => a?.kind === 'server'
+export const isServer = (a: Pick<Account, 'kind'> | undefined): boolean => a?.kind === 'server'
 
 /** For serverConnections.ts (HI-1772): a connection's lock, and its changes, as this module's own take them. */
 export const connectionInternals = {
   locked: <T>(id: string, fn: () => Promise<T>): Promise<T> => locked(id, fn),
-  mustGet: (id: string): Connection => mustGet(id),
-  change: (id: string, fn: (a: Connection) => void): void => changeAccount(id, fn),
-  inUse: (a: Connection): boolean => sessionsOn(a.id) || (claims.get(a.id) ?? 0) > 0 || loginsOpen.has(a.id) || hasPty(loginKey(a)),
-  assertUsable: (a: Connection): Promise<void> => assertUsable(a)
+  mustGet: (id: string): Account => mustGet(id),
+  change: (id: string, fn: (a: Account) => void): void => changeAccount(id, fn),
+  inUse: (a: Account): boolean => sessionsOn(a.id) || (claims.get(a.id) ?? 0) > 0 || loginsOpen.has(a.id) || hasPty(loginKey(a)),
+  assertUsable: (a: Account): Promise<void> => assertUsable(a)
 }
 
 /** Accounts whose sign-in is open (from its start, under the lock, to its end): removal is refused meanwhile. */
@@ -252,7 +262,7 @@ async function linkState(link: string, target: string): Promise<'absent' | 'ours
 }
 
 /** Makes an account's folder and its junctions (each checked), or throws, having removed what it made. */
-async function makeFolder(a: Connection): Promise<void> {
+async function makeFolder(a: Account): Promise<void> {
   const dir = accountFolder(a.id)
   const { shared } = support(a.provider)
   await mkdir(accountsRoot(), { recursive: true })
@@ -336,7 +346,7 @@ async function deleteTree(dir: string): Promise<void> {
  * it, the folder. Anything unexpected (a real folder where a junction should be, a link elsewhere, the folder itself a
  * link) stops it before anything is deleted. Throws Unsafe or the file system's error; what is left stays.
  */
-async function removeFolder(a: Connection): Promise<void> {
+async function removeFolder(a: Account): Promise<void> {
   const dir = accountFolder(a.id)
   // One renamed aside by an earlier try that stopped: finished first.
   await finishRemoving(removingFolder(a.id))
@@ -417,14 +427,15 @@ export async function finishLeftoverRemovals(): Promise<void> {
  * Adds a connection, its folder and junctions made and checked; then the window offers its Sign in (a sign-in
  * connection) or it is ready to use (a server connection, HI-1772: `server` given, checked by serverConnections.ts).
  */
-export async function addAccount(id: ProviderId, name: string, server?: ServerConnection): Promise<Connection> {
+export async function addAccount(id: ProviderId, name: string, server?: ServerConnection): Promise<Account> {
   support(id)
   const n = name.trim()
   if (!n) throw hiveError(NO_NAME, undefined, { kind: 'invalid' })
-  // Its defaults (HI-1770, HI-1774): the CLI's old per-CLI ones for its first sign-in connection only (they are migration
-  // input, taken once: takeCliDefaults), else none, the CLI deciding; a server's models aren't the CLI's, so none.
+  // Its base connection (HI-2106) holds what an agent with nothing of its own on it launched with before connections were
+  // setups: the CLI's old per-CLI model, effort and context for its CLI's first sign-in account only (taken once,
+  // HI-1774), and the CLI's mode and extra arguments; a server's models aren't the CLI's, so no model, effort or context.
   const base = { id: `a-${randomBytes(4).toString('hex')}`, provider: id, name: n, createdAt: new Date().toISOString() }
-  const a: Connection = server ? { ...base, kind: 'server', server, defaults: {} } : { ...base, kind: 'signIn', defaults: {} }
+  const a: Account = server ? { ...base, kind: 'server', server } : { ...base, kind: 'signIn' }
   return locked(a.id, async () => {
     try {
       await makeFolder(a)
@@ -434,66 +445,169 @@ export async function addAccount(id: ProviderId, name: string, server?: ServerCo
       throw e
     }
     generations.set(a.id, generation(a.id) + 1)
-    let added = a
     config.update((c) => {
-      added = a.kind === 'signIn' ? takeCliDefaults(c, a) : a
-      c.connections = [...(c.connections ?? []), added]
+      const defaults = a.kind === 'signIn' ? takeCliDefaults(c, a) : {}
+      c.accounts = [...(c.accounts ?? []), a]
+      c.connections = [...(c.connections ?? []), { id: newConnectionId(), account: a.id, name: a.name, ...baseValues(a, c.settings, defaults) }]
       // Its notice (HI-1774) has done its job: never shown again, even with every connection removed later.
       c.ui.connectionsIntroShown = true
     })
     emit({ type: 'connections-changed' })
     log.info(`account ${a.id} added (${a.provider})`)
     syncWatches()
-    return added
+    return a
   })
 }
 
 /**
- * A connection's defaults for the agents on it (HI-1770): model, effort and context, each '' or null to leave it to the
- * CLI. Edited, they are the user's (no longer the CLI's as copied).
+ * An account's defaults for the agents on it, as today's screens set them (HI-1770; until HI-2107): its base connection's
+ * model, effort and context, each '' or null to leave it to the CLI.
  */
 export function setConnectionDefaults(id: string, patch: { model?: string | null; effort?: string | null; use200kContext?: boolean | null }): void {
   const a = mustGet(id)
-  const next: ConnectionDefaults = { ...a.defaults }
+  const server = isServer(a)
+  const now = baseConnection(id, allConnections())
+  const next: Connection = { ...(now ?? { id: newConnectionId(), account: id, name: a.name }) }
   if (patch.model !== undefined) next.model = patch.model?.trim() || undefined
-  if (patch.effort !== undefined) next.effort = patch.effort?.trim() || undefined
-  if (patch.use200kContext !== undefined) next.use200kContext = providerDescriptor(a.provider).capabilities.contextLimit && typeof patch.use200kContext === 'boolean' ? patch.use200kContext : undefined
-  for (const k of Object.keys(next) as (keyof ConnectionDefaults)[]) if (next[k] === undefined) delete next[k]
-  changeAccount(id, (c) => {
-    c.defaults = next
-    delete c.defaultsFrom
+  if (patch.effort !== undefined) next.effort = (!server && (patch.effort?.trim() as EffortLevel)) || undefined
+  if (patch.use200kContext !== undefined) next.use200kContext = !server && providerDescriptor(a.provider).capabilities.contextLimit && patch.use200kContext === true ? true : undefined
+  for (const k of ['model', 'effort', 'use200kContext'] as const) if (next[k] === undefined) delete next[k]
+  // Decision E: a model and effort that don't go together are refused, nothing changed.
+  if (next.effort && (patch.model !== undefined || patch.effort !== undefined)) assertEffortTaken(a.provider, next.model ?? null, a, next.effort)
+  changeConnections((all) => {
+    const i = all.findIndex((x) => x.account === id)
+    // An account without one (all removed): its base connection made again.
+    if (i < 0) all.push(next)
+    else all[i] = { ...next, id: all[i].id }
   })
 }
 
 /**
- * A connection given the CLI's old per-CLI model, effort and context (Settings → <CLI> before connections, kept in
- * config only as migration input: HI-1774), if its CLI's haven't been given yet; recorded in the same write, so they
- * are taken once, by the first sign-in connection of an upgrade from 0.9. Inside the config.update adding it.
+ * The model that would run for a choice on an account (`model`: its connection's; else the CLI's own default in the
+ * account's home, else its catalogue's), and whether an effort is one that model takes (only where its efforts are
+ * known): an effort it doesn't take is kept but not used.
  */
-function takeCliDefaults(c: AppConfig, a: Connection): Connection {
-  const taken = c.connectionDefaultsTaken ?? []
-  if (taken.includes(a.provider)) return a
-  c.connectionDefaultsTaken = [...taken, a.provider]
-  // A connection of its CLI made before this record (a preview's) had them already: recorded as taken, not given again.
-  if ((c.connections ?? []).some((x) => x.provider === a.provider)) return a
-  return { ...a, defaults: cliDefaults(c.settings, a.provider), defaultsFrom: 'cli' }
+export function effortUsable(cli: ProviderId, model: string | null, conn: Pick<Account, 'id' | 'home'> | null, effort: string): boolean {
+  const info = providerService.info(cli)
+  const runs = model || (conn && !conn.home ? provider(cli).configuredDefaultModel(accountFolder(conn.id)) : null) || info.defaultModel || null
+  const caps = modelCaps(cli, runs, info, config.settings)
+  return !caps.perModel || caps.efforts.some((e) => e.value === effort)
+}
+
+const EFFORT_REFUSED = msg({ id: 'worktrees.agent.effortRefused', defaultMessage: "{chosen, select, yes {{model}} other {The CLI's default model}} doesn't take {effort} effort. Choose one of the levels it takes.", description: "An error saving an agent's (or a connection's) settings (HI-2106): the model that would run (its name, {model}, when one is chosen; else the CLI's own default) has no such reasoning effort level ({effort}: \"max\")." })
+
+/**
+ * Refuses a connection's model and effort that don't go together (HI-2106, decision E), at every save the user makes
+ * (Agent Settings, Add Agent, the Agent API, Settings → Connections' defaults, Settings → Assistant), before anything
+ * changes. One the migration carried over, or a later CLI's catalogue left, is kept and not passed at launch.
+ */
+export function assertEffortTaken(cli: ProviderId, model: string | null, account: Pick<Account, 'id' | 'home'> | null, effort: string): void {
+  if (!effortUsable(cli, model, account, effort)) throw hiveError(EFFORT_REFUSED, { chosen: model ? 'yes' : 'no', model: model ?? '', effort }, { kind: 'invalid' })
 }
 
 /**
- * The connections from before this record (a preview's, HI-1774 round 1): connections made before they had defaults
- * (HI-1755's) get the CLI's old ones (HI-1770), only where `defaults` is absent (one the user emptied or edited is never
- * filled in again); and every CLI with a connection, whatever its defaults, is recorded as having taken them, so none is
- * given them again, even once those connections are removed.
+ * The CLI's old per-CLI model, effort and context (Settings → <CLI> before connections, kept in config only as migration
+ * input: HI-1774) for a new sign-in account, if its CLI's haven't been given yet; recorded in the same write, so they
+ * are taken once, by the first sign-in account of an upgrade from 0.9. Inside the config.update adding it.
  */
-export function seedConnectionDefaults(): void {
-  const all = list()
-  const taken = config.get().connectionDefaultsTaken ?? []
-  if (!all.some((a) => a.defaults === undefined || !taken.includes(a.provider))) return
+function takeCliDefaults(c: AppConfig, a: Account): ConnectionDefaults {
+  const taken = c.connectionDefaultsTaken ?? []
+  if (taken.includes(a.provider)) return {}
+  c.connectionDefaultsTaken = [...taken, a.provider]
+  // An account of its CLI from before this record (a preview's) had them already: recorded as taken, not given again.
+  if ((c.accounts ?? []).some((x) => x.provider === a.provider && !x.home)) return {}
+  return cliDefaults(c.settings, a.provider)
+}
+
+// ---------------------------------------------------------------------------
+// Connections (HI-2106): the setups on the accounts that agents and the Assistant choose.
+// ---------------------------------------------------------------------------
+
+export const newConnectionId = (): string => `c-${randomBytes(4).toString('hex')}`
+
+/** Every connection, in the order. */
+export function allConnections(): Connection[] {
+  return config.get().connections ?? []
+}
+
+export function getConnection(id: string | null | undefined): Connection | undefined {
+  return id ? allConnections().find((c) => c.id === id) : undefined
+}
+
+/** An account by its id, the CLI's own homes too (allAccounts). */
+export function accountById(id: string | null | undefined): Account | undefined {
+  return id ? allAccounts().find((a) => a.id === id) : undefined
+}
+
+function changeConnections(fn: (connections: Connection[]) => void): void {
   config.update((c) => {
-    c.connections = (c.connections ?? []).map((a) => (a.defaults === undefined ? { ...a, defaults: cliDefaults(c.settings, a.provider), defaultsFrom: 'cli' as const } : a))
-    c.connectionDefaultsTaken = [...new Set([...(c.connectionDefaultsTaken ?? []), ...c.connections.map((a) => a.provider)])]
+    c.connections = [...(c.connections ?? [])]
+    fn(c.connections)
   })
   emit({ type: 'connections-changed' })
+}
+
+/**
+ * The connection on an account with these values (HI-2106's rule, for the adapter of today's screens and the Agent API
+ * until HI-2108): one that has them, else one made, named after what differs from the account's base connection
+ * (`label` instead: the Assistant's). Made in one config change, so two at once never make two.
+ */
+export function connectionWith(accountId: string, values: LaunchValues, label?: string): Connection {
+  let out: Connection | undefined
+  let made = false
+  config.update((c) => {
+    const store: AccountStore = { accounts: c.accounts ?? [], connections: [...(c.connections ?? [])], newId: newConnectionId }
+    out = connectionFor(store, accountId, values, label)
+    made = store.connections.length !== (c.connections ?? []).length
+    if (made) c.connections = store.connections
+  })
+  if (made) emit({ type: 'connections-changed' })
+  return out!
+}
+
+/**
+ * The account a CLI's agents use where they have no other here (decision H): its first on in the workspace; Copilot's
+ * sign-in (on everywhere); a test home's (the seam) where none is on; else none.
+ */
+export function accountHere(cli: ProviderId, cfg: WorkspaceConfig | null): Account | null {
+  const ws = cfg ? workspaceAccounts(cfg, cli, list()) : undefined
+  const on = ws?.default ? getAccount(ws.default) : undefined
+  if (on) return on
+  if (!providerDescriptor(cli).capabilities.connections) return accountById(COPILOT_ACCOUNT) ?? null
+  return seamOn(cli) ? (accountById(seamAccountId(cli)) ?? null) : null
+}
+
+/**
+ * The account a new agent named nothing for goes on (decision A, HI-2106: no default provider): the first in the one
+ * order that's usable here (on in the workspace, or the CLI's own home), whose CLI is on and installed.
+ */
+export function firstUsableAccount(cfg: WorkspaceConfig | null): Account | null {
+  for (const a of allAccounts()) {
+    if (!isProviderEnabled(config.settings, a.provider) || !providerService.info(a.provider).path) continue
+    if (accountHere(a.provider, cfg)?.id === a.id) return a
+  }
+  return null
+}
+
+/** Whether a test copy runs a CLI on its CLI test home (connectionSeam.ts). */
+const seamOn = (cli: ProviderId): boolean => {
+  const caps = providerDescriptor(cli).capabilities.connections
+  return !!caps && testHomeSeam(caps.homeEnv)
+}
+
+/** accountHere, with a test home's account (and its base connection) made the first time the seam needs it. */
+export function firstAccountHere(cli: ProviderId, cfg: WorkspaceConfig | null): Account | null {
+  const here = accountHere(cli, cfg)
+  if (here || !seamOn(cli)) return here
+  let a: Account | undefined
+  config.update((c) => {
+    const store: AccountStore = { accounts: [...(c.accounts ?? [])], connections: [...(c.connections ?? [])], newId: newConnectionId }
+    a = homeAccount(store, cli, new Date().toISOString())
+    if (!baseConnection(a.id, store.connections)) connectionFor(store, a.id, {})
+    c.accounts = store.accounts
+    c.connections = store.connections
+  })
+  return a ?? null
 }
 
 export function renameAccount(id: string, name: string): void {
@@ -557,6 +671,8 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
       syncWatches()
       throw hiveError(msg({ id: 'main.accounts.removeFailed', defaultMessage: "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.", description: "An error removing a connection ({name}): its folder couldn't all be deleted. {error} is the reason, in English." }), { name: a.name, error: why }, { kind: 'conflict' })
     }
+    // Its connections go with it (HI-2106): agents on one launch on their CLI's first usable connection, saying so (decision H).
+    config.update((c) => void (c.connections = (c.connections ?? []).filter((x) => x.account !== id)))
     changeAccounts((all) => all.splice(0, all.length, ...all.filter((x) => x.id !== id)))
     config.update((c) => {
       for (const [p, v] of Object.entries(c.lastUsedConnection ?? {})) if (v === id) delete c.lastUsedConnection![p as ProviderId]
@@ -835,7 +951,7 @@ export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']
  * outside it (a worktree project's main repository kept elsewhere: HR3's case) stays its own target, asked next.
  * Otherwise the first pending root (Codex: one per project; a trusted folder above a repository doesn't cover it).
  */
-function setUpTarget(a: Connection, pending: TrustAnswer['pending']): ConnectionTrust['setUpIn'] {
+function setUpTarget(a: Account, pending: TrustAnswer['pending']): ConnectionTrust['setUpIn'] {
   return chooseSetUpTarget(!!providerDescriptor(a.provider).capabilities.connections?.trustInherits, workspace.path, pending)
 }
 
@@ -848,14 +964,14 @@ export function chooseSetUpTarget(inherits: boolean, ws: string | null | undefin
 }
 
 /** Whether a connection is on in this window's workspace: its trust of the workspace's folders counts then. */
-const onHere = (a: Connection): boolean => !!workspace.path && !!workspaceAccounts(workspace.config, a.provider, list())?.on.includes(a.id)
+const onHere = (a: Account): boolean => !!workspace.path && !!workspaceAccounts(workspace.config, a.provider, list())?.on.includes(a.id)
 
 /**
  * The folders of this window's workspace a connection would be used in (HI-1871, Darren 27 Oct ~22:30): the projects
  * with an agent whose connection, resolved as its launch would be (its own if on here, else the first in the order
  * that's on), is this one, and the Assistant's home when the Assistant's is. "Needs set up" counts only these.
  */
-const projectsFor = (a: Connection): { name: string; path: string }[] => {
+const projectsFor = (a: Account): { name: string; path: string }[] => {
   const info = workspace.info()
   const cfg = workspace.config
   const all = list()
@@ -867,7 +983,7 @@ const projectsFor = (a: Connection): { name: string; path: string }[] => {
     })
   const projects = (info?.projects ?? []).filter((p) => usedBy(p, (ag) => ag.connection)).map((p) => ({ name: p.name, path: p.path }))
   const home = info?.assistant
-  return home && usedBy(home, () => cfg.assistantConnection?.[a.provider] ?? null) ? [...projects, { name: home.name, path: home.path }] : projects
+  return home && usedBy(home, (ag) => ag.connection ?? cfg.assistantConnection?.[a.provider] ?? null) ? [...projects, { name: home.name, path: home.path }] : projects
 }
 
 /** Reads a connection's set-up state again, telling the windows when it changed. */
@@ -1019,7 +1135,7 @@ async function openLoginTerminal(id: string, setUp: boolean, folder?: string): P
  * Refuses an account that can't be used now: half removed, or its folder not the one Hive made (missing, or replaced by
  * a link). Called under its lock, before anything is started on it.
  */
-async function assertUsable(a: Connection): Promise<void> {
+async function assertUsable(a: Account): Promise<void> {
   if (a.leftover) throw hiveError(msg({ id: 'main.accounts.leftover', defaultMessage: '{name} is half removed: remove it again first.', description: "An error signing a connection in ({name}): an earlier removal stopped partway, so it can't be used." }), { name: a.name }, { kind: 'conflict' })
   try {
     await assertRealFolder(accountFolder(a.id))
@@ -1267,7 +1383,7 @@ export function accountsView(check = false): ConnectionsView {
   const hereOf = new Map(workspace.path ? all.filter(onHere).map((a) => [a.id, projectsFor(a)] as const) : [])
   // Read when shown (a refresh joins the read under way), or when this set of projects hasn't been read yet.
   if (workspace.path) for (const [id, here] of hereOf) if (check || trustState.get(trustKey(id, workspace.path))?.sig !== JSON.stringify(here)) requestTrust(id, workspace.path, here)
-  const trustOf = (a: Connection): { trust?: ConnectionTrust } => {
+  const trustOf = (a: Account): { trust?: ConnectionTrust } => {
     const here = hereOf.get(a.id)
     if (!workspace.path || !here || !provider(a.provider).connectionTrusts) return {}
     const t = trustShown(a.id, workspace.path, here)
@@ -1284,12 +1400,18 @@ export function accountsView(check = false): ConnectionsView {
   }
   const testHome = providers.filter((p) => !connectionsManaged(p))
   // A server connection's key: only that one is set, its last 4 characters and when (keyStore.ts); never the key.
-  const keyOf = (a: Connection): { key?: { last4: string; at: string } } => {
+  const keyOf = (a: Account): { key?: { last4: string; at: string } } => {
     const k = isServer(a) ? keyInfo(a.id) : undefined
     return k && k.origin === originOf(a.server?.baseUrl ?? '') ? { key: { last4: k.last4, at: k.at } } : {}
   }
   const intro = !config.get().ui.connectionsIntroShown && !all.length ? providers.filter((p) => !testHome.includes(p)) : []
-  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a), ...(setUpRead.has(a.id) ? { setUp: setUpRead.get(a.id) } : {}), ...trustOf(a) })), workspace: ws, testHome, masking: coverageView() }
+  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), defaults: defaultsOf(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a), ...(setUpRead.has(a.id) ? { setUp: setUpRead.get(a.id) } : {}), ...trustOf(a) })), workspace: ws, testHome, masking: coverageView() }
+}
+
+/** An account's defaults as today's screens show them (HI-2106, until HI-2107): its base connection's model, effort and context. */
+function defaultsOf(a: Account): ConnectionDefaults {
+  const b = baseConnection(a.id, allConnections())
+  return { ...(b?.model ? { model: b.model } : {}), ...(b?.effort ? { effort: b.effort } : {}), ...(b?.use200kContext ? { use200kContext: true } : {}) }
 }
 
 /** Dismisses the one-time notice that agents run on connections (HI-1774), in every window. */
@@ -1313,7 +1435,8 @@ export async function setAccountOn(id: string, on: boolean): Promise<void> {
   await saveChoice((c) => {
     const next = switchedOn(workspaceAccounts(c, a.provider, list()), id, on, list())
     chosen = next.default
-    return { ...c.connections, [a.provider]: next }
+    // Only which are on (HI-2106): which is used follows the order.
+    return { ...c.connections, [a.provider]: { on: next.on } }
   })
   if (chosen) noteLastUsed(a.provider, chosen)
 }
@@ -1325,7 +1448,7 @@ export async function setAccountOn(id: string, on: boolean): Promise<void> {
 export function moveConnection(id: string, index: number): void {
   mustGet(id)
   const before = list().map((a) => a.id).join()
-  config.update((c) => void (c.connections = movedConnection(c.connections ?? [], id, Math.trunc(index))))
+  config.update((c) => void (c.accounts = movedConnection(c.accounts ?? [], id, Math.trunc(index))))
   if (list().map((a) => a.id).join() === before) return
   emit({ type: 'connections-changed' })
   // Running agents keep their connection; each open workspace is read again, so one now on another connection than
@@ -1355,23 +1478,20 @@ export async function migrateConnectionOrder(): Promise<void> {
   }
   config.update((c) => {
     if (c.connectionOrderMigrated) return
-    if ((c.connections ?? []).map((a) => a.id).join() === before) for (const id of tops.values()) c.connections = movedConnection(c.connections ?? [], id, 0)
+    if ((c.accounts ?? []).filter((a) => !a.home).map((a) => a.id).join() === before) {
+      for (const id of tops.values()) {
+        c.accounts = movedConnection(c.accounts ?? [], id, 0)
+        // As if moved before the accounts migration read them (HI-2106): the workspaces it reads them for later see this order too.
+        const m = c.migrations?.accounts1
+        if (m) m.legacy = movedConnection(m.legacy, id, 0)
+      }
+    }
     c.connectionOrderMigrated = true
   })
   if (tops.size) {
     log.info(`connections: preference order begins with each CLI's most recent workspace default (HI-1875): ${[...tops].map(([p, id]) => `${p} ${id}`).join(', ')}`)
     emit({ type: 'connections-changed' })
   }
-}
-
-/** The Assistant's own connection for a provider in the asking window's workspace (HI-1755); null: the default. */
-export async function setAssistantConnection(id: ProviderId, connection: string | null): Promise<void> {
-  if (connection) {
-    const a = mustGet(connection)
-    if (a.provider !== id) throw hiveError(NO_ACCOUNT, undefined, { kind: 'invalid' })
-  }
-  await workspace.saveWorkspaceConfigWith((c) => ({ assistantConnection: { ...c.assistantConnection, [id]: connection } }))
-  emit({ type: 'connections-changed' })
 }
 
 /** The account a new workspace starts with (Darren, 26 Oct): the last chosen as a default, or launched on (HI-1755). */
@@ -1388,9 +1508,31 @@ export function newWorkspaceAccounts(): WorkspaceConfig['connections'] | undefin
   const out: NonNullable<WorkspaceConfig['connections']> = {}
   for (const p of PROVIDERS) {
     const top = topOfOrder(p.id, list())
-    if (top) out[p.id] = { on: [top], default: top }
+    if (top) out[p.id] = { on: [top] }
   }
   return Object.keys(out).length ? out : undefined
+}
+
+/**
+ * An agent as today's screens and the Agent API read it (the adapter until HI-2108), once its project is migrated: its
+ * account's id as `connection` (none for the CLI's own home: Copilot's sign-in, a test home), its connection's id and
+ * name, and its connection's model, effort, mode and context as its own.
+ */
+/** An agent as today's screens read it (agentLaunchView, over the agent): its own fields from before the migration as they are. */
+export function agentViewOf(a: AgentDef): AgentDef {
+  return getConnection(a.connection) ? ({ ...a, ...agentLaunchView(a, { migrations: { accounts1: { at: '' } } }) } as AgentDef) : a
+}
+
+export function agentLaunchView(a: AgentDef, cfg: Pick<ProjectConfig, 'migrations'>): Partial<AgentInfo> {
+  // Not migrated yet, or no connection yet (its CLI has no account: its own, as kept): as it is.
+  if (!cfg.migrations?.accounts1 || !a.connection) return {}
+  const c = getConnection(a.connection)
+  const account = accountById(c?.account)
+  // Model, effort and context as its own only where they differ from its account's base connection (which today's
+  // screens show as its connection's defaults); its mode always (they read none from a connection).
+  const base = c ? baseConnection(c.account, allConnections()) : undefined
+  const own = <K extends 'model' | 'effort' | 'use200kContext'>(k: K): Connection[K] => (c && c[k] !== base?.[k] ? c[k] : undefined)
+  return { connection: account && !account.home ? account.id : undefined, connectionId: c?.id, connectionName: c?.name, model: own('model'), effort: own('effort'), permissionMode: c?.permissionMode, use200kContext: c && c.use200kContext !== base?.use200kContext ? !!c.use200kContext : undefined }
 }
 
 // ---------------------------------------------------------------------------
@@ -1486,7 +1628,7 @@ export function runsLocally(caps: ServerCaps, server: ServerConnection, local: b
 }
 
 /** A connection as a window sees it: a server connection's models as they run now (effectiveModels). */
-function shownServer(a: Connection): Connection {
+function shownServer(a: Account): Account {
   const caps = a.server ? providerDescriptor(a.provider).capabilities.connections?.server : undefined
   return caps && a.server ? { ...a, server: { ...a.server, models: effectiveModels(caps, a.server) } } : a
 }
@@ -1495,7 +1637,7 @@ function shownServer(a: Connection): Connection {
  * A server connection's part of a launch (HI-1772): its key decrypted for this launch's environment (refused without
  * one, unless its server is this machine's), and that key masked from now until the launch's process is gone.
  */
-async function serverPart(a: Connection, caps: ServerCaps, agentName: string): Promise<{ part: NonNullable<LaunchConnection['server']>; keyV: string | null; origin: string }> {
+async function serverPart(a: Account, caps: ServerCaps, agentName: string): Promise<{ part: NonNullable<LaunchConnection['server']>; keyV: string | null; origin: string }> {
   const b = parseBaseUrl(a.server?.baseUrl ?? '')
   if (!a.server || !b.ok) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
   const got = await withKey(a.id, b.origin)
@@ -1517,14 +1659,18 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
   // Never on the order from before its one-time move (HI-1875 round 1): agents and the Assistant alike come here.
   await connectionOrderReady()
   const cli = providerDescriptor(o.provider).name
-  const choose = (wanted: string | null | undefined): ReturnType<typeof resolveConnection> => resolveConnection(o.workspaceConfig, o.provider, wanted, list())
+  // Its connection's account, or its CLI's first usable here (HI-2106, decision H).
+  const choose = (wanted: string | null | undefined): AgentConnection => resolveAgentConnection(o.workspaceConfig, o.provider, wanted, allAccounts(), allConnections())
+  const sameAs = (now: AgentConnection, id: string): boolean => now.ok && now.account.id === id
   const choice = choose(o.wanted)
   if (!choice.ok) {
     if (choice.why === 'none' && testHomeSeam(caps.homeEnv)) return null
-    const name = choice.wanted ? (getAccount(choice.wanted)?.name ?? choice.wanted) : ''
+    const name = choice.wanted ? (getConnection(choice.wanted)?.name ?? choice.wanted) : ''
     throw hiveError(LAUNCH[choice.why], { agent: o.agentName, cli, name }, { kind: 'conflict' })
   }
-  const id = choice.id
+  // A test home's account (the seam): the CLI's own home, as before connections.
+  if (choice.account.home) return null
+  const id = choice.account.id
   const release = await claimAccount(id)
   try {
     const gen = generation(id)
@@ -1547,13 +1693,10 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
         name: a.name,
         folder: accountFolder(id),
         homeEnv: caps.homeEnv,
-        ...(choice.note ? { note: choice.note } : {}),
+        ...(choice.note ? { note: 'offFallback' as const } : {}),
         release,
         server: part,
-        stillValid: (wanted) => same() && (() => {
-          const now = choose(wanted)
-          return now.ok && now.id === id
-        })()
+        stillValid: (wanted) => same() && sameAs(choose(wanted), id)
       }
     }
     const { observed, fresh } = await confirmAccount(id)
@@ -1562,7 +1705,7 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
     if (!fresh) throw hiveError(LAUNCH.changing, { name: a.name, agent: o.agentName }, { kind: 'conflict' })
     if (observed?.missing) await assertUsable(a)
     if (observed?.loggedIn === false) throw hiveError(LAUNCH.signedOut, { name: a.name, agent: o.agentName }, { kind: 'conflict' })
-    const note = choice.note ?? (observed?.loggedIn === null ? 'unknownLogin' : accountState(a) === 'changed' ? 'loginChanged' : undefined)
+    const note = (choice.note ? 'offFallback' : undefined) ?? (observed?.loggedIn === null ? 'unknownLogin' : accountState(a) === 'changed' ? 'loginChanged' : undefined)
     noteLastUsed(o.provider, id)
     return {
       id,
@@ -1572,10 +1715,7 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
       ...(note ? { note } : {}),
       ...(usageLogin(observed) ? { login: usageLogin(observed)! } : {}),
       release,
-      stillValid: (wanted) => generation(id) === gen && !!getAccount(id) && (() => {
-        const now = choose(wanted)
-        return now.ok && now.id === id
-      })()
+      stillValid: (wanted) => generation(id) === gen && !!getAccount(id) && sameAs(choose(wanted), id)
     }
   } catch (e) {
     release()
@@ -1644,16 +1784,17 @@ const CHOICE: Record<ConnectionProblem, Msg> = {
  * in its workspace; null when it can. Read from memory, so it is checked again with the write that saves it.
  */
 export function connectionProblem(id: string, cli: ProviderId, projectPath: string): ConnectionProblem | null {
-  const a = getAccount(id)
+  const a = accountById(id)
   if (!a) return 'missing'
   if (a.provider !== cli) return 'otherCli'
-  return connectionOnHere(id, cli, projectPath) ? null : 'off'
+  // The CLI's own home (Copilot's sign-in, a test home) is on everywhere.
+  return a.home || connectionOnHere(id, cli, projectPath) ? null : 'off'
 }
 
 /** Refuses a connection that can't be an agent's own choice here (connectionProblem), saying why. */
 export function assertConnectionHere(id: string, cli: ProviderId, projectPath: string, agent: string): void {
   const why = connectionProblem(id, cli, projectPath)
-  if (why) throw hiveError(CHOICE[why], { agent, name: getAccount(id)?.name ?? id }, { kind: 'conflict' })
+  if (why) throw hiveError(CHOICE[why], { agent, name: accountById(id)?.name ?? id }, { kind: 'conflict' })
 }
 
 /** Whether a connection is one of the provider's on in the workspace a project (or host) belongs to (HI-1755). */
@@ -1680,8 +1821,6 @@ export const connectionOrderReady = (): Promise<void> => orderReady
 
 /** Returns once the order is final (index.ts waits for it before workspaces open and the Agent API starts). */
 export function initConnections(): Promise<void> {
-  // Connections from before the old per-CLI defaults' record (a preview's) count as having taken them, at once.
-  seedConnectionDefaults()
   // The most recent workspace default becomes the top of its CLI's preference order, once (HI-1875); what depends on
   // the order (a launch on a connection, a new workspace's seeding) waits for it.
   const ready = startConnectionOrder()

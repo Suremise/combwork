@@ -737,7 +737,8 @@ function migratePersonaNames(cfg: AppConfig, raw: Record<string, any> | undefine
 export function migrateProjectConfig(raw: Record<string, any>): Record<string, any> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw
   let out = withoutSkillSwitches(raw)
-  if (out.providers === undefined) {
+  // Since the accounts migration (HI-2106) a project has no provider settings: never made again from 0.1's fields.
+  if (out.providers === undefined && !out.migrations?.accounts1) {
     // 0.1's model, effort, mode and arguments were Claude Code's.
     const legacy: Partial<ProjectProviderConfig> = {}
     for (const k of ['model', 'effort', 'permissionMode', 'extraArgs'] as const) if (out[k] !== undefined) legacy[k] = out[k]
@@ -781,8 +782,16 @@ export function withMode<T extends Record<string, unknown>>(rec: T): T {
   return (typeof persona === 'string' && rest.mode === undefined ? { ...rest, mode: persona } : rest) as unknown as T
 }
 
-/** project.json as written: Claude Code's project settings are also kept in 0.1.x's flat fields. */
+/**
+ * project.json as written: Claude Code's project settings are also kept in 0.1.x's flat fields. Once the accounts
+ * migration removed the project's launch settings (HI-2106: its agents' connections hold them), neither they nor its
+ * default provider are written again.
+ */
 export function withLegacyProjectFields(cfg: ProjectConfig): ProjectConfig & Partial<ProjectProviderConfig> {
+  if (cfg.migrations?.accounts1) {
+    const { providers: _p, defaultProvider: _d, model: _m, effort: _e, permissionMode: _pm, extraArgs: _x, ...rest } = cfg as ProjectConfig & Partial<ProjectProviderConfig>
+    return rest as ProjectConfig
+  }
   const c = cfg.providers?.[CLAUDE_CODE]
   return c ? { ...cfg, model: c.model, effort: c.effort, permissionMode: c.permissionMode, extraArgs: c.extraArgs } : cfg
 }
