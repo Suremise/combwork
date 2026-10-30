@@ -1,4 +1,4 @@
-import { controlRules, hiveInstructions, journalRule } from '../shared/hiveGuidance'
+import { assistantSkillsLine, controlRules, hiveInstructions, journalRule } from '../shared/hiveGuidance'
 import { taskPrompt } from '../shared/tasks'
 import type { SkillInfo } from '../shared/types'
 import { ContentTooLarge, hashText } from './fsutil'
@@ -24,6 +24,7 @@ export const GUIDANCE_REVISION = hashText(
     controlRules('agents'),
     controlRules('projects'),
     journalRule(['{scope}']),
+    assistantSkillsLine(true),
     taskPrompt({ number: 0, title: '{title}', description: '', blockedBy: [], comments: [] } as never, true),
     taskPrompt({ number: 0, title: '{title}', description: '', blockedBy: [], comments: [] } as never, true, { inLane: true })
   ].join('\n')
