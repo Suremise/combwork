@@ -1,42 +1,53 @@
 // Generated from locales/en/mcp.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
-  'mcp.addFile.message': { file: string | number; files: number }
-  'mcp.addFile.replaceDetail': undefined
-  'mcp.assistant.confirmButton': undefined
-  'mcp.assistant.confirmMessage': undefined
-  'mcp.assistant.confirmTitle': { name: string | number }
-  'mcp.assistant.updateFailed': undefined
+  'mcp.add.busy': undefined
+  'mcp.add.button': undefined
+  'mcp.add.message': undefined
+  'mcp.add.title': { project: string | number }
+  'mcp.add.titleAssistant': undefined
+  'mcp.addFile.messageAdded': { file: string | number; files: number }
+  'mcp.addFile.replaceDetailAdded': undefined
   'mcp.enable.all': undefined
   'mcp.enable.assistant': undefined
-  'mcp.enable.confirmButton': undefined
-  'mcp.enable.confirmMessage': undefined
-  'mcp.enable.confirmTitle': { name: string | number }
-  'mcp.enable.noProjects': undefined
   'mcp.enable.none': undefined
-  'mcp.enable.projects': undefined
-  'mcp.enable.projectsLabel': undefined
+  'mcp.error.cannotClear': { project: string | number; name: string | number }
   'mcp.error.invalidName': undefined
-  'mcp.error.noServer': { name: string | number }
-  'mcp.error.offInWorkspace': { name: string | number }
-  'mcp.import.changed': { count: number; names: string | number }
-  'mcp.import.confirmButton': undefined
-  'mcp.import.confirmMessage': { count: number; project: string | number }
+  'mcp.error.noProject': { project: string | number }
+  'mcp.error.noServerAdd': { name: string | number }
+  'mcp.import.added': { project: string | number }
+  'mcp.import.changedAdded': { count: number; names: string | number }
+  'mcp.import.confirmButtonAdded': undefined
+  'mcp.import.confirmMessageAdded': { count: number; project: string | number }
   'mcp.import.confirmTitle': { count: number; name: string | number }
-  'mcp.import.on': { project: string | number }
   'mcp.import.readFailed': undefined
-  'mcp.list.allOffTip': undefined
-  'mcp.list.allOnTip': undefined
-  'mcp.list.allSwitch': { name: string | number }
-  'mcp.project.updateFailed': undefined
-  'mcp.tab.hint': undefined
-  'mcp.tab.projectDefined': undefined
-  'mcp.tab.switch': { name: string | number; project: string | number }
-  'mcp.tab.workspaceBadge': undefined
-  'mcp.view.allProjects': undefined
-  'mcp.where.assistantOnly': undefined
-  'mcp.where.none': undefined
-  'mcp.where.off': undefined
-  'mcp.where.some': { projects: string | number }
-  'mcp.where.someAndAssistant': { projects: string | number }
+  'mcp.picker.added': undefined
+  'mcp.picker.all': undefined
+  'mcp.picker.allAdded': undefined
+  'mcp.picker.choose': undefined
+  'mcp.picker.errors': undefined
+  'mcp.picker.filter': undefined
+  'mcp.picker.noMatch': undefined
+  'mcp.picker.nowhere': undefined
+  'mcp.picker.runs': undefined
+  'mcp.picker.search': undefined
+  'mcp.places.addedIn': { places: string | number }
+  'mcp.places.button': undefined
+  'mcp.places.failedIn': { place: string | number; error: string | number }
+  'mcp.places.message': undefined
+  'mcp.places.noProjects': undefined
+  'mcp.places.partial': { name: string | number }
+  'mcp.places.projects': undefined
+  'mcp.places.projectsLabel': undefined
+  'mcp.places.removedFrom': { places: string | number }
+  'mcp.places.title': { name: string | number }
+  'mcp.tab.hintAdded': undefined
+  'mcp.tab.projectDefinedAdded': undefined
+  'mcp.view.addTo': undefined
+  'mcp.where.addedAssistantOnly': undefined
+  'mcp.where.addedNone': undefined
+  'mcp.where.addedSome': { projects: string | number }
+  'mcp.where.addedSomeAndAssistant': { projects: string | number }
+  'mcp.where.assistantName': undefined
+  'mcp.where.hidden': { n: number }
 }

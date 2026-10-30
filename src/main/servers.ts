@@ -499,10 +499,11 @@ async function projectSummary(p: string) {
   // Where each agent is (#1451, #1434's contract): read once for all of them.
   const facts = await folderFacts(p)
   const places = new Map(await Promise.all(info.agents.map(async (a) => [a.id, await agentPlace(p, a, a.live ? { cwd: a.live.cwd } : null, facts)] as const)))
-  // The workspace's servers, available to every project, and those this project has on (#713): each agent gets them
+  // The workspace's servers, available to every project, and those added to this one (HI-2059): each agent gets them
   // all, or those of them it was given (#537).
   const servers = await inWorkspace(workspaceOf(p), () => listMcp()).catch(() => [])
-  const mcpOn = servers.filter((m) => serverOnIn(m, info.config.mcp)).map((m) => m.name)
+  const legacy = workspaceOf(p).config.mcp.enabled
+  const mcpOn = servers.filter((m) => serverOnIn(m, info.config.mcp, legacy)).map((m) => m.name)
   return {
     name: info.name,
     path: info.path,
@@ -542,15 +543,17 @@ async function projectSummary(p: string) {
     })),
     // Its builder and reviewer pairs (#1531): its running lanes', then by name; empty without either.
     pairs: workflowPairs(info.agents, await lanes.listLanes(workspaceOf(p), { project: basename(p) }).catch(() => [])),
-    // The workspace's MCP servers (#713): all available to the project, on only where turned on.
-    mcp: { available: servers.filter((m) => m.def).map((m) => m.name), on: mcpOn },
+    // The workspace's MCP servers (HI-2059): all available to the project, those added to it running; `on` is `added`'s
+    // old name, kept for 1.0 (deprecated).
+    mcp: { available: servers.filter((m) => m.def).map((m) => m.name), added: mcpOn, on: mcpOn },
     // Its version control, what Hive finds in its folder now, and the switch it offers when they differ (#1419): never
     // switched silently; the user switches it (the Assistant within Control: project.workflow.platform).
     ...(info.platform ? { versionControl: versionControlOf(info.platform) } : {}),
     // The workflow options in force (#1278), and which the project, the workspace or Hive's settings set.
     workflow: await inWorkspace(workspaceOf(p), () => workflowSummary(workspaceOf(p), p)).catch(() => null),
     // The project's configuration; its workflow options are `workflow`'s, resolved (not again here, raw).
-    settings: withoutWorkflow(info.config)
+    // Its MCP list as what is added (HI-2059), never its stored form (a list not yet converted means something else).
+    settings: { ...withoutWorkflow(info.config), mcp: { added: mcpOn } }
   }
 }
 
@@ -743,7 +746,9 @@ route('GET', '/v1/status', async () => ({
 route('GET', '/v1/workspace', async () => {
   if (!openWorkspaces().length) return null
   const w = requireWorkspace()
-  return { name: basename(w.path!), path: w.path, config: w.config }
+  // Its MCP settings aren't in it (HI-2059): the servers and where they are added are GET /v1/mcp's.
+  const { mcp: _mcp, ...cfg } = w.config
+  return { name: basename(w.path!), path: w.path, config: cfg }
 })
 
 route('GET', '/v1/workspaces', async () => openWorkspaces().map((w) => ({ name: basename(w.path!), path: w.path })))
@@ -3522,10 +3527,17 @@ route('POST', '/v1/launch/connected', async () => {
   return { ok: sessions.hiveToolsConnected(assistant.assistantHome(ws), ASSISTANT_AGENT_ID) }
 })
 
-// The Assistant's own choices (HI-1472) are the workspace's to read: a project agent sees each server as before, without them.
+// Where each server is added (HI-2059) is the workspace's to read: a project agent sees only whether its own project has
+// it, never another project's names or the Assistant's.
 route('GET', '/v1/mcp', async () => {
-  const agent = !!agentCaller()
-  return (await inWorkspace(requireWorkspace(), () => listMcp())).map(({ name, def, globallyEnabled, assistant: forAssistant, error }) => ({ name, description: def?.description ?? '', globallyEnabled, ...(agent ? {} : { assistant: forAssistant }), error }))
+  const caller = agentCaller()
+  const ws = requireWorkspace()
+  const servers = await inWorkspace(ws, () => listMcp(!caller))
+  if (caller) {
+    const own = await inWorkspace(ws, () => workspace.projectConfig(caller.projectPath))
+    return servers.map(({ name, def, error }) => ({ name, description: def?.description ?? '', added: serverOnIn({ name, def }, own.mcp, ws.config.mcp.enabled), error }))
+  }
+  return servers.map(({ name, def, projects, assistant: forAssistant, error }) => ({ name, description: def?.description ?? '', added: { projects: projects.map((p) => basename(p)), assistant: forAssistant }, error }))
 })
 
 route('POST', '/v1/notify', async ({ body }) => {

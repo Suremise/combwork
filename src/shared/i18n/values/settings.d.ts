@@ -650,11 +650,8 @@ interface HiveMessageValues {
   'settings.assistant.journal.desc': undefined
   'settings.assistant.journal.tip': undefined
   'settings.assistant.journal.title': undefined
-  'settings.assistant.mcp.desc': undefined
-  'settings.assistant.mcp.manage': undefined
-  'settings.assistant.mcp.noWorkspace': undefined
-  'settings.assistant.mcp.none': undefined
-  'settings.assistant.mcp.switch': { name: string | number }
+  'settings.assistant.mcp.descAdded': undefined
+  'settings.assistant.mcp.show': undefined
   'settings.assistant.mcp.title': undefined
   'settings.assistant.mode.desc': undefined
   'settings.assistant.mode.tip': undefined

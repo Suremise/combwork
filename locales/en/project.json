@@ -967,6 +967,10 @@
     "defaultMessage": "Loading…",
     "description": "A project tab while its data loads."
   },
+  "project.mcp.addServer": {
+    "defaultMessage": "Add Server…",
+    "description": "A button in a project's MCP tab and the Hive Assistant's view (HI-2059): opens the picker of the workspace's MCP servers to add."
+  },
   "project.mcp.builtIn": {
     "defaultMessage": "Built-in",
     "description": "Heading in a project's MCP tab: Hive's own server."
@@ -991,9 +995,9 @@
     "defaultMessage": "Given to {agents} only",
     "description": "Under an MCP server: the agents that get it, as a list."
   },
-  "project.mcp.heading": {
-    "defaultMessage": "Workspace MCP servers",
-    "description": "Heading in a project's MCP tab."
+  "project.mcp.headingAdded": {
+    "defaultMessage": "Added servers",
+    "description": "Heading in a project's MCP tab (HI-2059): the workspace's MCP servers added to this project."
   },
   "project.mcp.hiveDesc": {
     "defaultMessage": "Lets agents see other projects, read and write shared notes, create handovers and notify you.",
@@ -1007,9 +1011,13 @@
     "defaultMessage": "Manage MCP servers",
     "description": "Link: opens the workspace's MCP view."
   },
-  "project.mcp.none": {
-    "defaultMessage": "No MCP servers in this workspace.",
-    "description": "A project's MCP tab when the workspace has none."
+  "project.mcp.noneAdded": {
+    "defaultMessage": "No servers added. Add one to give this project's agents its tools.",
+    "description": "A project's MCP tab (HI-2059) when no MCP server is added to it."
+  },
+  "project.mcp.noneInWorkspace": {
+    "defaultMessage": "The workspace has no MCP servers yet.",
+    "description": "A project's MCP tab (HI-2059) when the workspace has no MCP servers to add."
   },
   "project.mcp.off": {
     "defaultMessage": "Off",
@@ -1018,6 +1026,14 @@
   "project.mcp.onAll": {
     "defaultMessage": "On for all sessions",
     "description": "Badge on Hive's own MCP server when it is on."
+  },
+  "project.mcp.remove": {
+    "defaultMessage": "Remove",
+    "description": "A button on an MCP server added to a project or the Hive Assistant (HI-2059): it no longer runs there (it stays in the workspace)."
+  },
+  "project.mcp.removeLabel": {
+    "defaultMessage": "Remove {name} from {project}",
+    "description": "Accessible name of Remove on an MCP server in a project's MCP tab (HI-2059). {name} is the server, {project} the project."
   },
   "project.mcp.target": {
     "defaultMessage": "the workspace's MCP servers",

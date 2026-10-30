@@ -5,7 +5,7 @@
   "content.mcp.badName": "サーバー名に使えるのは英字、数字、「-」、「_」です（最大64文字）。「hive」は予約されています。",
   "content.mcp.badRecord": "「{field}」は値がすべて文字列のオブジェクトにしてください。",
   "content.mcp.badUrl": "「url」はhttp://またはhttps://で始まるアドレスにしてください。",
-  "content.mcp.changed": "{name}は、表示された後に変更されています。実行内容を確認してから、もう一度有効にしてください。",
+  "content.mcp.changedAdd": "{name} は表示されたあとに変更されました。実行内容を確認してから、もう一度追加してください。",
   "content.mcp.chooseFile": ".jsonの定義ファイルか、サーバーのフォルダーをまとめた.zipを選んでください。",
   "content.mcp.connects": "接続先：{url}",
   "content.mcp.connectsType": "接続先：{url}（{type}）",

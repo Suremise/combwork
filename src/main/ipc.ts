@@ -414,6 +414,8 @@ function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): 
       .then(() => sayV09TemplatesOnce(ws))
       .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
   )
+  // HI-2059: choices dropped converting MCP servers to added servers, said once.
+  void mcp.sayMcpAddedOnce(ws).catch((e) => log.warn('the MCP added-servers notice', e))
 }
 
 export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info']>, quitControl: QuitControl): void {
@@ -1295,21 +1297,26 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       workspace.scheduleRefresh()
     },
 
-    'mcp:list': () => mcp.listMcp(),
-    'mcp:setGlobal': async (name, enabled, expected, projects, assistant) => {
-      // The projects to set are this window's workspace's.
-      const picks = projects && typeof projects === 'object' ? Object.fromEntries(Object.entries(projects).map(([p, on]) => [workspace.assertProject(p), on === true])) : {}
-      await mcp.setMcpGlobal(name, enabled, expected, picks, typeof assistant === 'boolean' ? assistant : undefined)
+    'mcp:list': () => mcp.listMcp(true),
+    'mcp:add': async (target, name, expected) => {
+      await mcp.addMcpTo(target === 'assistant' ? 'assistant' : { project: workspace.assertProject(target) }, name, expected)
       emit({ type: 'skills-changed' })
       workspace.scheduleRefresh()
     },
-    'mcp:setAssistant': async (name, enabled, expected) => {
-      await mcp.setMcpAssistant(name, enabled === true, expected)
+    'mcp:remove': async (target, name) => {
+      await mcp.removeMcpFrom(target === 'assistant' ? 'assistant' : { project: workspace.assertProject(target) }, name)
       emit({ type: 'skills-changed' })
+      workspace.scheduleRefresh()
     },
-    'mcp:setProject': async (p, name, enabled, expected) => {
-      await mcp.setMcpProject(workspace.assertProject(p), name, enabled, expected)
-      emit({ type: 'skills-changed' })
+    'mcp:places': async (name, expected, projects, assistant) => {
+      // The projects are this window's workspace's (checked again in the turn, before the first write).
+      const picks = projects && typeof projects === 'object' ? Object.fromEntries(Object.entries(projects).map(([p, on]) => [workspace.assertProject(p), on === true])) : {}
+      try {
+        return await mcp.setMcpPlaces(name, expected, picks, typeof assistant === 'boolean' ? assistant : undefined)
+      } finally {
+        emit({ type: 'skills-changed' })
+        workspace.scheduleRefresh()
+      }
     },
     'mcp:create': async (name) => {
       const m = await mcp.createMcp(name)

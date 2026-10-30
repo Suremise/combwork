@@ -18,7 +18,7 @@ import { workspaceNotesNotice, workspaceNotesTemplate, workspaceNotesTitle } fro
 import { workspaceNotesPath } from '@shared/workspaceNotes'
 import { CodeEditor } from '../components/Editors'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
-import { Icon, IconButton, LoadFailed, Markdown, StaleNote, Switch, useContextMenu } from '../components/ui'
+import { Icon, IconButton, LoadFailed, Markdown, StaleNote, useContextMenu } from '../components/ui'
 import { useScopedLoad } from '../scopedLoad'
 import { SkillDetail } from '../components/Skills'
 import { confirm, NO_PROJECTS, notify, set, useStore } from '../store'
@@ -451,7 +451,7 @@ function McpServerView({ selected }: { selected: string | null }) {
       setInfo(r)
     }
   }
-  const remove = (): Promise<boolean> => actions.deleteMcpServer(selected)
+  const remove = (): Promise<boolean> => actions.deleteMcpServer(info ?? { name: selected, def: null, projects: [], assistant: false })
 
   return (
     <div className="split">
@@ -465,15 +465,9 @@ function McpServerView({ selected }: { selected: string | null }) {
           {info && (
             <>
               {!info.error && <span className="faint mcp-where">{actions.mcpWhereText(info, projects)}</span>}
-              <label className="flex muted" style={{ fontSize: 12 }}>
-                <Switch
-                  small
-                  checked={info.globallyEnabled}
-                  disabled={!!info.error}
-                  onChange={(v) => void actions.setMcpServerEnabled(info, v)}
-                />
-                {tr(msg({ id: 'mcp.view.allProjects', defaultMessage: 'Workspace', description: "Beside the switch in an MCP server's view that turns it on or off in the workspace (on: it runs in the projects that have it on)." }))}
-              </label>
+              <button className="btn small" data-action="mcp-places" disabled={!!info.error} onClick={() => void actions.chooseMcpPlaces(info).then(() => call('mcp:list')).then((l) => setInfo((was) => l.find((m) => m.name === selected) ?? was))}>
+                <Icon name="add" /> {tr(msg({ id: 'mcp.view.addTo', defaultMessage: 'Add to…', description: "A button in an MCP server's view (HI-2059): chooses the projects, and the Hive Assistant, it is added to." }))}
+              </button>
             </>
           )}
           <IconButton icon="trash" title={tr(M.deleteServer)} onClick={() => void remove()} />

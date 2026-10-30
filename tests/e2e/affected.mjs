@@ -224,9 +224,9 @@ export const AREAS = [
   { paths: ['src/shared/footerModes.ts'], suites: ['mode', 'copilot', 'advanced'] },
   { paths: ['src/main/mcp.ts', 'src/main/mcpSecrets.ts'], suites: ['assistantmcp', 'drafts', 'mcp', 'mcpagents', 'mcpfile'] },
   // Per-agent MCP servers (#537): the agent's choice, its launch, the dialogs and the MCP tab.
-  { paths: ['src/shared/agentMcp.ts'], suites: ['mcpagents', 'mcpfile', 'templates'] },
+  { paths: ['src/shared/agentMcp.ts'], suites: ['assistantmcp', 'mcpagents', 'mcpfile', 'templates'] },
   // The MCP workspace switch's project picker (#1093): its enable dialog.
-  { paths: ['src/renderer/src/components/McpProjectPicker.tsx'], suites: ['assistantmcp', 'mcpfile', 'mcpagents', 'mcp'] },
+  { paths: ['src/renderer/src/components/McpProjectPicker.tsx', 'src/renderer/src/components/McpServerPicker.tsx'], suites: ['assistantmcp', 'mcpfile', 'mcpagents', 'mcp'] },
   { paths: ['tests/e2e/assistantmcp.cjs'], suites: ['assistantmcp'] },
   { paths: ['src/main/notes.ts'], suites: ['drafts', 'codex-handover'] },
   { paths: ['src/main/planUsage.ts', 'src/renderer/src/components/ModelPicker.tsx', 'src/shared/claude.ts', 'src/shared/codex.ts', 'src/shared/prices.ts'], suites: ['plan', 'planusage', 'providers', 'codex-setup', 'context', 'unpricedcost', 'models'] },

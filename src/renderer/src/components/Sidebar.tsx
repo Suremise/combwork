@@ -18,6 +18,8 @@ import { hasEditorDraftsUnder } from '../editorDrafts'
 import { useInbox } from '../inbox'
 import { useScopedLoad } from '../scopedLoad'
 import { AssistantSidePanel } from './AssistantView'
+import { McpSearch } from './McpServerPicker'
+import { mcpServerShown, type McpFilter } from '@shared/agentMcp'
 import { BoardPanel } from './Board'
 import { WorkspaceOverviewPanel } from '../views/WorkspaceOverview'
 import { PerformancePanel } from '../views/Performance'
@@ -120,11 +122,12 @@ const M = {
   newServerMessage: msg({ id: 'assistant.sidebar.newServerMessage', defaultMessage: 'Creates {file} in the workspace from a template you can edit.', description: 'New MCP Server. {file} is .hive/mcp/<name>.json, <name> standing for the name you type.' }),
   serverNameRule: msg({ id: 'assistant.sidebar.serverNameRule', defaultMessage: 'Use letters, numbers, "-" and "_". "hive" is reserved.', description: "New MCP Server: a name that can't be used. Keep hive as it is (the built-in server's name)." }),
   createServerFailed: msg({ id: 'assistant.sidebar.createServerFailed', defaultMessage: 'Could not create server', description: "An error notice: New MCP Server couldn't create the server's file; the reason follows." }),
-  mcpTip: msg({ id: 'assistant.sidebar.mcpTip', defaultMessage: "MCP servers deployed to the workspace (.hive/mcp) are available to every project and run in a project only when on here (its switch, which asks for the projects) and on in that project's MCP tab. Changes apply to new sessions.", description: 'Tooltip on MCP Servers. Keep .hive/mcp as it is.' }),
+  mcpTip: msg({ id: 'assistant.sidebar.mcpTipAdded', defaultMessage: "MCP servers deployed to the workspace (.hive/mcp) are available to every project and the Hive Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.", description: 'Tooltip on MCP Servers (HI-2059). Keep .hive/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.' }),
   newServer: msg({ id: 'assistant.sidebar.newServer', defaultMessage: 'New MCP Server…', description: "A button over the MCP servers: creates a server from a template." }),
   serverFromFile: msg({ id: 'assistant.sidebar.serverFromFile', defaultMessage: 'Add MCP Server from File (.json or .zip)…', description: 'The MCP sidebar: a button. Keep .json and .zip as they are.' }),
   openMcpFolder: msg({ id: 'assistant.sidebar.openMcpFolder', defaultMessage: 'Open MCP Folder', description: 'The MCP sidebar: a button that opens .hive/mcp in Explorer.' }),
   workspaceGroup: msg({ id: 'assistant.sidebar.workspaceGroup', defaultMessage: 'Workspace', description: "The MCP sidebar: the section of the workspace's servers." }),
+  noMatch: msg({ id: 'assistant.sidebar.mcpNoMatch', defaultMessage: 'No server matches.', description: "The MCP view (HI-2059) when no server matches its search and filter." }),
   noServers: msg({ id: 'assistant.sidebar.noServers', defaultMessage: 'No MCP servers yet. Create one with +, or add one from a .json definition or a .zip of a server folder.', description: 'The MCP sidebar with no servers. + is the add button.' }),
   deleteServer: msg({ id: 'assistant.sidebar.deleteServer', defaultMessage: 'Delete server', description: "A trash button beside an MCP server of the workspace: deletes it." }),
   builtIn: msg({ id: 'assistant.sidebar.builtIn', defaultMessage: 'Built-in', description: "The MCP sidebar: the section of Hive's own server." }),
@@ -781,6 +784,9 @@ function McpPanel() {
   const settings = useStore((s) => s.settings)
   const [servers, setServers] = useState<McpServerInfo[]>([])
   const loaded = useRef(false)
+  // Search and filter for a long list (HI-2059): by name, description and tags, and by where a server is added.
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<McpFilter>('all')
 
   const wsPath = workspace?.path
   const load = useCallback(() => {
@@ -816,6 +822,7 @@ function McpPanel() {
   }
 
   const hiveOn = !!(settings?.agentApi.enabled && settings.agentApi.provideHiveMcp && api?.running)
+  const shown = servers.filter((m) => mcpServerShown(m, query, filter))
 
   return (
     <>
@@ -830,9 +837,11 @@ function McpPanel() {
         </div>
       </div>
       <div className="pane-body">
+        {servers.length > 0 && <McpSearch query={query} filter={filter} onQuery={setQuery} onFilter={setFilter} errors />}
         <Section title={tr(M.workspaceGroup)} count={servers.length}>
           {loaded.current && servers.length === 0 && <div className="pane-empty">{tr(M.noServers)}</div>}
-          {servers.map((m) => (
+          {servers.length > 0 && !shown.length && <div className="pane-empty">{tr(M.noMatch)}</div>}
+          {shown.map((m) => (
             <div key={m.name} className={cx(/* i18n-ignore: class names */ 'row tall', selected === m.name && 'selected')} onClick={() => set({ selectedMcp: m.name })}>
               <Icon name={m.error ? 'error' : m.def?.url ? 'globe' : 'plug'} />
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -854,17 +863,8 @@ function McpPanel() {
                 )}
               </div>
               <div className="row-actions" onClick={(e) => e.stopPropagation()}>
-                <IconButton icon="trash" title={tr(M.deleteServer)} onClick={() => void actions.deleteMcpServer(m.name)} />
+                <IconButton icon="trash" title={tr(M.deleteServer)} onClick={() => void actions.deleteMcpServer(m)} />
               </div>
-              <Tooltip
-                content={
-                  m.globallyEnabled
-                    ? tr(msg({ id: 'mcp.list.allOnTip', defaultMessage: 'On in the workspace: it runs in the projects that have it on (new sessions). Click to turn it off everywhere; the projects keep their choices for when it is on again.', description: "The tooltip of a server's switch in the MCP view while it is on in the workspace." }))
-                    : tr(msg({ id: 'mcp.list.allOffTip', defaultMessage: 'Off in the workspace: it runs nowhere. Click to turn it on and choose the projects it runs in.', description: "The tooltip of a server's switch in the MCP view while it is off in the workspace." }))
-                }
-              >
-                <Switch small checked={m.globallyEnabled} disabled={!!m.error} label={tr(msg({ id: 'mcp.list.allSwitch', defaultMessage: '{name}: on in the workspace', description: "A server's switch in the MCP view, for screen readers. {name} is the server." }), { name: m.name })} onChange={(v) => void actions.setMcpServerEnabled(m, v).then(load)} />
-              </Tooltip>
             </div>
           ))}
         </Section>

@@ -707,6 +707,14 @@
     "defaultMessage": "Unknown lane {id}",
     "description": "An error: there is no lane (a card loop) with the id {id}, perhaps removed meanwhile."
   },
+  "service.mcp.addedDropped": {
+    "defaultMessage": "Each project and the Hive Assistant lists the servers that ran there. {n, plural, one {# choice kept for a server that was off in the workspace was} other {# choices kept for servers that were off in the workspace were}} dropped: add a server in a project’s MCP tab where you need it.",
+    "description": "A quiet notice once after the upgrade that made MCP servers added to projects and the Hive Assistant: nothing that ran changed; {n} choices remembered for servers the workspace had switched off were not carried over. \"MCP tab\" as Hive names it."
+  },
+  "service.mcp.addedTitle": {
+    "defaultMessage": "MCP servers are now added where they run",
+    "description": "A quiet notice's title, once after the upgrade that made a workspace's MCP servers added to projects and the Hive Assistant, in place of switches."
+  },
   "service.metrics.badProvider": {
     "defaultMessage": "provider must be a provider id",
     "description": "An error reading metrics: the provider filter isn't a provider's id. Keep provider as it is (a parameter's name)."

@@ -12,7 +12,7 @@ import { ASSISTANT_DIR, ASSISTANT_NAME, LEGACY_MODES_DIR, MODES_DIR, assistantPr
 import { DEFAULT_PROJECT_CONFIG, DEFAULT_WORKSPACE_CONFIG, HIVE_DIR, mergeDefaults, migrateProjectConfig, projectAgents, withLegacyProjectFields, withoutSkillSwitches } from '../shared/defaults'
 import { migrateWorkspacePreferences } from '../shared/workflow/preferences'
 import { settlePlacements } from '../shared/paneCells'
-import { migratedProjectMcp, migratedWorkspaceMcp } from '../shared/agentMcp'
+import { assistantMcpAdded, MCP_ADDED_MODEL, mcpAdded, mcpNames, migratedProjectMcp, migratedWorkspaceMcp } from '../shared/agentMcp'
 import { ASSISTANT_OTHER_MCP, advancedDef, checkAdvanced } from '../shared/advanced'
 import { advanced } from './advanced'
 import { fmt, msg, tr } from '../shared/i18n'
@@ -90,8 +90,8 @@ This folder is managed by [Hive](https://github.com/) and is meant to be committ
 
 - \`shared/\` — notes, instructions and handovers shared across AI sessions and projects.
 - \`skills/\` — Hive skills (one folder per skill, each with a \`SKILL.md\`). Every agent in every project gets them.
-- \`mcp/\` — MCP server definitions (one \`<name>.json\` per server). Enable them in Hive.
-- \`workspace.json\` — which MCP servers are on in the workspace (each runs only in the projects that turn it on too).
+- \`mcp/\` — MCP server definitions (one \`<name>.json\` per server). Add them to projects in Hive.
+- \`workspace.json\` — the workspace's settings, among them the MCP servers added for the Hive Assistant (a project's are in its \`.hive/project.json\`).
 - \`hive.db\` — the task board (Hive's database). It is this machine's, like the Assistant's sessions: \`.gitignore\` keeps it out of git.
 - \`usage.db\` — what each session used (the usage history the Overviews read). It is this machine's too, kept out of git.
 
@@ -445,6 +445,9 @@ export class WorkspaceService {
       await this.migrateMcpModel().catch((e) => log.warn('moving the MCP settings to the workspace and project switches', e))
       // Before the Assistant can start (HI-1472): its own MCP choices, from the old Advanced switch or none.
       await this.migrateAssistantMcp(fresh).catch((e) => log.warn("moving the Assistant's MCP servers to its own choices", e))
+      // Then (HI-2059) each project's and the Assistant's lists to mean added, each file on its own: one not converted
+      // keeps its old meaning until a later open converts it.
+      await this.convertMcpAdded().catch((e) => log.warn('converting the MCP servers to added servers', e))
       this.mcpMoving.done()
       done('MCP settings') // i18n-ignore: a part of a log line's timing
     } finally {
@@ -806,6 +809,51 @@ export class WorkspaceService {
       return { mcp: { ...c.mcp, assistant } }
     })
     log.info(`the Assistant's MCP servers are its own choices (HI-1472): ${legacyOn ? `${moved} from the old Advanced switch` : 'none'}`)
+  }
+
+  /**
+   * Each project's MCP list (hidden ones too) and the Assistant's converted to mean added (HI-2059), once: what runs now
+   * (mcpAdded: its own choices the workspace had on) is kept, a choice remembered while the workspace had the server off
+   * is dropped. Each file in its own locked write that marks it converted (`model`, `assistantModel` 3), changing only
+   * its MCP list; one that can't be read or written keeps the old meaning (mcpAdded reads it so, with workspace.json's
+   * frozen `mcp.enabled`) and is tried again at the next open. Choices dropped are counted for a notice (sayMcpAddedOnce).
+   */
+  private async convertMcpAdded(): Promise<void> {
+    let dropped = 0
+    let failed = 0
+    const paths = (await whenAll([this.listProjectPaths(), this.listProjectPaths({ hidden: true })])).flat()
+    for (const p of paths) {
+      try {
+        if ((await this.projectConfig(p)).mcp.model === MCP_ADDED_MODEL) continue
+        let lost = 0
+        await this.mutateProjectConfig(
+          p,
+          (c) => {
+            if (c.mcp.model === MCP_ADDED_MODEL) return {}
+            const added = mcpAdded(c.mcp, this.wsConfig.mcp.enabled)
+            lost = new Set(mcpNames(c.mcp.enabled)).size - new Set(added).size
+            return { mcp: { ...c.mcp, enabled: added, model: MCP_ADDED_MODEL } }
+          },
+          { existing: true }
+        )
+        dropped += lost
+      } catch (e) {
+        failed++
+        if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`converting the MCP servers of ${userText(p)} to added servers (tried again at the next open)`, e)
+      }
+    }
+    if (this.wsConfig.mcp.assistantModel !== MCP_ADDED_MODEL) {
+      let lost = 0
+      await this.saveWorkspaceConfigWith((c) => {
+        if (c.mcp.assistantModel === MCP_ADDED_MODEL) return {}
+        const assistant = assistantMcpAdded(c.mcp)
+        lost = new Set(mcpNames(c.mcp.assistant)).size - new Set(assistant).size
+        return { mcp: { ...c.mcp, assistant, assistantModel: MCP_ADDED_MODEL } }
+      })
+      dropped += lost
+    }
+    if (dropped) await this.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, droppedNotice: (c.mcp.droppedNotice ?? 0) + dropped } }))
+    if (dropped || failed) log.info(`MCP servers converted to added servers (HI-2059): ${dropped} choice(s) for servers off in the workspace dropped${failed ? `, ${failed} project(s) left for the next open` : ''}`)
   }
 
   /** Saves of workspace.json queued or running, and the text of the last one: the watcher sees Hive's own writes too. */

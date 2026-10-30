@@ -5,7 +5,7 @@
   "content.mcp.badName": "Servernamen dürfen Buchstaben, Ziffern, „-“ und „_“ enthalten (höchstens 64 Zeichen). „hive“ ist reserviert.",
   "content.mcp.badRecord": "„{field}“ muss ein Objekt aus Zeichenketten sein.",
   "content.mcp.badUrl": "„url“ muss eine http://- oder https://-Adresse sein.",
-  "content.mcp.changed": "Der Server {name} hat sich geändert, seit er dir angezeigt wurde. Prüfe, was er ausführt, und aktiviere ihn erneut.",
+  "content.mcp.changedAdd": "{name} hat sich geändert, seit er dir gezeigt wurde. Prüfe, was er ausführt, und füge ihn erneut hinzu.",
   "content.mcp.chooseFile": "Wähle eine .json-Definition oder eine .zip mit einem Serverordner.",
   "content.mcp.connects": "Verbindet mit: {url}",
   "content.mcp.connectsType": "Verbindet mit: {url} ({type})",

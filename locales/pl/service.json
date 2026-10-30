@@ -176,6 +176,8 @@
   "service.laneStarts.freshBlockedTitle": "Nowa rozmowa agenta {agent} się nie rozpoczęła",
   "service.lanes.noWorkspace": "Żaden obszar roboczy nie jest otwarty",
   "service.lanes.unknown": "Nieznany tor {id}",
+  "service.mcp.addedDropped": "Każdy projekt i Asystent Hive pokazują serwery, które tam działały. {n, plural, one {Odrzucono # wybór zapamiętany dla serwera wyłączonego w obszarze roboczym} few {Odrzucono # wybory zapamiętane dla serwerów wyłączonych w obszarze roboczym} many {Odrzucono # wyborów zapamiętanych dla serwerów wyłączonych w obszarze roboczym} other {Odrzucono # wyboru zapamiętanego dla serwerów wyłączonych w obszarze roboczym}}: dodaj serwer w zakładce MCP projektu, w którym go potrzebujesz.",
+  "service.mcp.addedTitle": "Serwery MCP dodaje się teraz tam, gdzie działają",
   "service.metrics.badProvider": "provider musi być identyfikatorem dostawcy",
   "service.metrics.badRange": "from i to muszą być czasami ISO, from wcześniejszy niż to",
   "service.metrics.badRole": "role musi mieć wartość agent, assistant, api lub viewer",

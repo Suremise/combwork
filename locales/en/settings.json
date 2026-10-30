@@ -2595,25 +2595,13 @@
     "defaultMessage": "Journal",
     "description": "A setting's title (Settings → Assistant): the Assistant's journal, its memory across sessions."
   },
-  "settings.assistant.mcp.desc": {
-    "defaultMessage": "The workspace's MCP servers the Assistant gets, as a project's MCP tab chooses them: each runs for it only while it is on in the workspace too (its switch in the MCP view). Off until you turn one on here. Applies from its next session.",
-    "description": "What the setting \"MCP servers (this workspace)\" does, under its title (Settings → Assistant). \"MCP view\" and \"MCP tab\" are places in Hive: keep them as Hive shows them."
+  "settings.assistant.mcp.descAdded": {
+    "defaultMessage": "The workspace's MCP servers added for the Assistant are chosen in its own view (the Hive Assistant on the activity bar), as a project's are in its MCP tab.",
+    "description": "What the setting \"MCP servers (this workspace)\" says, under its title (Settings → Assistant, HI-2059): the servers are added in the Hive Assistant’s view now. \"MCP tab\" is a place in Hive: keep it as Hive shows it."
   },
-  "settings.assistant.mcp.manage": {
-    "defaultMessage": "Open the MCP view",
-    "description": "A link in Settings → Assistant → MCP servers: shows the MCP view, where servers are added."
-  },
-  "settings.assistant.mcp.noWorkspace": {
-    "defaultMessage": "Open a workspace to choose its Assistant's MCP servers.",
-    "description": "Settings → Assistant → MCP servers with no workspace open."
-  },
-  "settings.assistant.mcp.none": {
-    "defaultMessage": "The workspace has no MCP servers.",
-    "description": "Settings → Assistant → MCP servers when the workspace has none."
-  },
-  "settings.assistant.mcp.switch": {
-    "defaultMessage": "{name} on for the Assistant",
-    "description": "A server's switch in Settings → Assistant → MCP servers, for screen readers. {name} is the server."
+  "settings.assistant.mcp.show": {
+    "defaultMessage": "Show in the Assistant's View",
+    "description": "A button in Settings → Assistant → MCP servers (HI-2059): shows the Hive Assistant's view on the activity bar, where its MCP servers are added."
   },
   "settings.assistant.mcp.title": {
     "defaultMessage": "MCP servers (this workspace)",

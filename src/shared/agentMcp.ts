@@ -4,21 +4,37 @@
  * a name chosen here that isn't one of them reaches nobody. The built-in hive server isn't one of them: every session
  * gets it, whatever this says.
  */
-import type { AgentDef, McpServerInfo, ProjectConfig } from './types'
-
-/**
- * Whether a workspace MCP server is on in a project (#1093): only when it is on in the workspace (its master switch,
- * workspace.json's mcp.enabled) and on in the project (the project's own choice, its MCP tab: project.json's
- * mcp.enabled). Turning the workspace off keeps the projects' choices. A list Hive can't read (a hand-edited file) turns
- * nothing on.
- */
-export function mcpOnInProject(name: string, workspaceOn: readonly string[], project: Partial<ProjectConfig['mcp']> | null | undefined): boolean {
-  const has = (list: unknown): boolean => Array.isArray(list) && list.includes(name)
-  return has(workspaceOn) && has(project?.enabled)
-}
+import type { AgentDef, McpServerInfo, ProjectConfig, WorkspaceConfig } from './types'
 
 /** The names in a list from a config file (a hand-edited file may hold anything). */
-const listed = (list: unknown): string[] => (Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : [])
+export const mcpNames = (list: unknown): string[] => (Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : [])
+const listed = mcpNames
+
+/** project.json's and workspace.json's MCP lists once they mean "added" (HI-2059): `mcp.model` and `mcp.assistantModel`. */
+export const MCP_ADDED_MODEL = 3
+
+/**
+ * The workspace servers added to a project (HI-2059): the ones that run there. A project converted to HI-2059's model
+ * (`mcp.model` 3) has its list as it is; one not yet converted (a write that failed, a hidden project that couldn't be
+ * read) keeps #1093's meaning, its own choices that the workspace has on (`legacy`, workspace.json's `mcp.enabled`,
+ * frozen at the upgrade). A list Hive can't read adds nothing: never more than ran.
+ */
+export function mcpAdded(project: Partial<ProjectConfig['mcp']> | null | undefined, legacy: unknown): string[] {
+  const own = listed(project?.enabled)
+  if (project?.model === MCP_ADDED_MODEL) return own
+  const on = listed(legacy)
+  return own.filter((n) => on.includes(n))
+}
+
+/** The servers added for the Hive Assistant (HI-2059), as a project's (mcpAdded): before its conversion, #1093's meaning. */
+export function assistantMcpAdded(wsMcp: Partial<WorkspaceConfig['mcp']> | null | undefined): string[] {
+  return mcpAdded({ enabled: wsMcp?.assistant, model: wsMcp?.assistantModel }, wsMcp?.enabled)
+}
+
+/** Whether a workspace MCP server is added to a project (mcpAdded), so it runs there. */
+export function mcpOnInProject(name: string, project: Partial<ProjectConfig['mcp']> | null | undefined, legacy: unknown): boolean {
+  return mcpAdded(project, legacy).includes(name)
+}
 
 /**
  * A project's choices moved to #1093's model, so what ran before still runs and nothing else starts: before, a server
@@ -37,9 +53,11 @@ export function migratedWorkspaceMcp(allProjects: readonly string[], projects: r
   return [...on].sort()
 }
 
-/** A listed server (mcp:list, listMcp) on in a project: a valid definition, on there (mcpOnInProject). */
-export const serverOnIn = (m: Pick<McpServerInfo, 'name' | 'def' | 'globallyEnabled'>, project: Partial<ProjectConfig['mcp']> | null | undefined): boolean =>
-  !!m.def && mcpOnInProject(m.name, m.globallyEnabled ? [m.name] : [], project)
+/** A listed server (mcp:list, listMcp) that runs in a project: a valid definition, added there (mcpOnInProject). */
+export const serverOnIn = (m: Pick<McpServerInfo, 'name' | 'def'>, project: Partial<ProjectConfig['mcp']> | null | undefined, legacy: unknown): boolean => !!m.def && mcpOnInProject(m.name, project, legacy)
+
+/** A listed server added to the project at `projectPath` (McpServerInfo.projects, worked out by main): the window's test. */
+export const serverAddedIn = (m: Pick<McpServerInfo, 'def' | 'projects'>, projectPath: string): boolean => !!m.def && m.projects.some((p) => p.toLowerCase() === projectPath.toLowerCase())
 
 /** The most servers an agent's choice names. */
 export const AGENT_MCP_MAX = 50
@@ -86,4 +104,25 @@ export function agentMcpText(agent: Pick<AgentDef, 'mcpServers'> | null | undefi
   const names = Array.isArray(agent!.mcpServers) ? agent!.mcpServers.filter((n) => typeof n === 'string') : []
   if (!names.length) return "none of the project's"
   return `only ${names.map((n) => (on && !on.includes(n) ? `${n} (not on here)` : n)).join(', ')}`
+}
+
+/** The MCP view's and the Add server picker's filters (HI-2059): every server, those added somewhere or nowhere, broken ones. */
+export type McpFilter = 'all' | 'added' | 'nowhere' | 'errors'
+
+/**
+ * Whether a listed server is shown for a search and a filter (HI-2059): every word of `query` in its name, description
+ * or tags (any case), and `filter` by where it is added.
+ */
+export function mcpServerShown(m: Pick<McpServerInfo, 'name' | 'def' | 'projects' | 'assistant' | 'error'>, query: string, filter: McpFilter): boolean {
+  const added = m.projects.length > 0 || m.assistant
+  if (filter === 'added' && !added) return false
+  if (filter === 'nowhere' && added) return false
+  if (filter === 'errors' && !m.error) return false
+  const tags = Array.isArray(m.def?.tags) ? m.def.tags.filter((t) => typeof t === 'string') : []
+  const text = [m.name, typeof m.def?.description === 'string' ? m.def.description : '', ...tags].join('\n').toLowerCase()
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((w) => text.includes(w))
 }

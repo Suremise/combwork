@@ -289,8 +289,9 @@ interface HiveMessageValues {
   'assistant.sidebar.loading': undefined
   'assistant.sidebar.markNotWorking': undefined
   'assistant.sidebar.markWorking': undefined
+  'assistant.sidebar.mcpNoMatch': undefined
   'assistant.sidebar.mcpServers': undefined
-  'assistant.sidebar.mcpTip': undefined
+  'assistant.sidebar.mcpTipAdded': undefined
   'assistant.sidebar.needYou': { count: number }
   'assistant.sidebar.newFolder': undefined
   'assistant.sidebar.newFolderButton': undefined
@@ -731,6 +732,7 @@ interface HiveMessageValues {
   'assistant.undo.why.verdict': undefined
   'assistant.undo.why.withdrawn': undefined
   'assistant.undo.working': undefined
+  'assistant.view.addMcp': undefined
   'assistant.view.allAttachments': undefined
   'assistant.view.allConversations': undefined
   'assistant.view.attachments': undefined
@@ -738,13 +740,17 @@ interface HiveMessageValues {
   'assistant.view.digests': undefined
   'assistant.view.journal': undefined
   'assistant.view.journalTip': undefined
+  'assistant.view.mcp': undefined
+  'assistant.view.mcpTip': undefined
   'assistant.view.modes': undefined
   'assistant.view.newMode': undefined
+  'assistant.view.noMcp': undefined
   'assistant.view.noWorkspace': undefined
   'assistant.view.noWorkspaceMain': undefined
   'assistant.view.openFolder': undefined
   'assistant.view.period': undefined
   'assistant.view.refresh': undefined
+  'assistant.view.removeMcp': { name: string | number }
   'assistant.view.showPanel': undefined
   'assistant.view.statConversations': undefined
   'assistant.view.statCost': undefined

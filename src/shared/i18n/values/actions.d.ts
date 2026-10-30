@@ -55,16 +55,18 @@ interface HiveMessageValues {
   'actions.mcp.badName': undefined
   'actions.mcp.copied': { names: string | number }
   'actions.mcp.copyFailed': undefined
+  'actions.mcp.deleteAdded': { where: string | number }
   'actions.mcp.deleteMessage': { name: string | number }
   'actions.mcp.deleteTitle': undefined
   'actions.mcp.listFailed': undefined
+  'actions.mcp.listFailedPicker': undefined
   'actions.mcp.namePlaceholder': undefined
   'actions.mcp.openFailed': undefined
   'actions.mcp.rename': undefined
   'actions.mcp.replace': undefined
   'actions.mcp.replaceMessage': { name: string | number }
   'actions.mcp.replaceTitle': { name: string | number }
-  'actions.mcp.updateFailed': undefined
+  'actions.mcp.updateFailedAdded': undefined
   'actions.pane.edge': { agent: string | number; dir: string }
   'actions.pane.moved': { agent: string | number; pages: string; page: string | number; row: string | number; column: string | number; other: string }
   'actions.project.activateFailed': undefined

@@ -199,9 +199,9 @@
     "defaultMessage": "A new conversation for each lane",
     "description": "A tip's title."
   },
-  "tips.assistantMcp.text": {
-    "defaultMessage": "The Assistant gets a workspace MCP server only once you turn it on for it, as for a project: Settings → Assistant → MCP servers, or tick Hive Assistant when turning a server on in the MCP view. A server with your own notes can reach it and no project.",
-    "description": "A tip (HI-1472). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Hive Assistant is a box to tick)."
+  "tips.assistantMcp.textAdded": {
+    "defaultMessage": "The Assistant gets a workspace MCP server only once you add it for it, as for a project: + in MCP Servers in its view on the activity bar, or tick Hive Assistant in Add to… in the MCP view. A server with your own notes can reach it and no project.",
+    "description": "A tip (HI-1472, HI-2059). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Hive Assistant is a box to tick; + is a button)."
   },
   "tips.assistantMcp.title": {
     "defaultMessage": "MCP servers for the Assistant only",
@@ -1131,9 +1131,9 @@
     "defaultMessage": "Your team size",
     "description": "A tip's title (HI-2001): the workflow option Maximum agents, how many agents a project has."
   },
-  "tips.mcpFromFile.text": {
-    "defaultMessage": "Got a server as a .json definition or a .zip of its folder? Add MCP Server from File in the MCP view shows what it runs and adds it turned off: switch it on there to choose its projects.",
-    "description": "A tip. Add MCP Server from File and the MCP view are names in Hive: keep them as Hive shows them."
+  "tips.mcpFromFile.textAdded": {
+    "defaultMessage": "Got a server as a .json definition or a .zip of its folder? Add MCP Server from File in the MCP view shows what it runs and adds it to the workspace: then add it to the projects that need it, with Add to… or in their MCP tab.",
+    "description": "A tip (HI-2059). Add MCP Server from File, the MCP view, Add to… and the MCP tab are names in Hive: keep them as Hive shows them."
   },
   "tips.mcpFromFile.title": {
     "defaultMessage": "Add an MCP server from a file",
@@ -1147,13 +1147,21 @@
     "defaultMessage": "MCP servers for some agents only",
     "description": "A tip's title."
   },
-  "tips.mcpPerProject.text": {
-    "defaultMessage": "A workspace MCP server runs in a project only when it's on in the workspace (its switch in the MCP view, which asks for the projects) and on in that project's MCP tab. Its tools stay out of the other projects' agents' context.",
-    "description": "A tip. The MCP tab and the MCP view are names in Hive: keep them as Hive shows them."
+  "tips.mcpPerProject.textAdded": {
+    "defaultMessage": "A workspace MCP server runs only where it is added: Add Server… in a project's MCP tab picks one, showing what it runs. Its tools stay out of the other projects' agents' context, and the tab lists only what that project uses.",
+    "description": "A tip (HI-2059). The MCP tab and Add Server… are names in Hive: keep them as Hive shows them."
   },
   "tips.mcpPerProject.title": {
     "defaultMessage": "MCP servers only where they are needed",
     "description": "A tip's title."
+  },
+  "tips.mcpSearch.text": {
+    "defaultMessage": "The MCP view and Add Server… search your servers by name, description and tags (a definition's \"tags\" list), and show those added somewhere or nowhere.",
+    "description": "A tip (HI-2059). The MCP view and Add Server… are names in Hive: keep them as Hive shows them; \"tags\" is a field of a server’s JSON definition: keep it."
+  },
+  "tips.mcpSearch.title": {
+    "defaultMessage": "Find a server in a long list",
+    "description": "A tip's title (HI-2059): searching the workspace's MCP servers."
   },
   "tips.memorySnapshot.text": {
     "defaultMessage": "Turn on Settings → Advanced → Save a memory snapshot if Hive is about to run out of memory, to find out what filled it. Snapshots can be gigabytes, hold what Hive had in memory (card text, transcripts, possibly tokens) and stay on this PC.",

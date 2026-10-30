@@ -12,7 +12,7 @@ import type { ResumeHold } from '@shared/agentFolders'
 import { samePath } from '@shared/movePaths'
 import { legacyOf, namedFolder } from './agentPlace'
 import { eachAgent, sessionsToArchive, type BatchResult } from '@shared/startAll'
-import { serverOnIn } from '@shared/agentMcp'
+import { serverAddedIn } from '@shared/agentMcp'
 import { shownText } from '@shared/advanced'
 import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
@@ -30,6 +30,7 @@ import { movesShown } from './pendingMoves'
 import { createElement } from 'react'
 import { TemplateLoadNames } from './components/TemplateLoad'
 import { McpProjectPicker } from './components/McpProjectPicker'
+import { McpServerPicker } from './components/McpServerPicker'
 import { AgentsDetail, batchAgentsData, projectAgentsData, tableText } from './components/AgentsTable'
 import { clearEditorDraft, clearEditorDraftsUnder } from './editorDrafts'
 import { keyProblemText, keysHeld } from './projectKeys'
@@ -952,43 +953,45 @@ export async function archiveCurrent(path: string | null = get().selectedProject
   if (archived) await newSession(path, id)
 }
 
-/** Deletes a workspace MCP server after asking; true when it was deleted. */
+/** Where a server is added (HI-2059): a project, or the Hive Assistant. */
+export type McpPlace = Pick<ProjectInfo, 'path' | 'name'> | 'assistant'
+
+const MCP_UPDATE_FAILED = msg({ id: 'actions.mcp.updateFailedAdded', defaultMessage: 'Could not update the server', description: "An error's title: adding an MCP server to a project or the Hive Assistant, or removing it, failed." })
+
 /**
- * Turns a workspace MCP server on or off in the workspace (#1093, its master switch). On asks first, showing what it
- * runs (#550) and which projects to turn it on in: those that have it on (their choices, kept while it was off) and the
- * selected project are ticked, and the Hive Assistant where it has it on (HI-1472). Off turns it off everywhere at once
- * and keeps the projects' and the Assistant's choices.
+ * Add server… (HI-2059): a picker of the workspace's servers not yet added to a project or the Hive Assistant, the one
+ * chosen showing what it runs (#550) before Add. Refused, in the dialog, if its definition was replaced or edited since
+ * it was listed. It runs there from their next session.
  */
-export async function setMcpServerEnabled(server: Pick<McpServerInfo, 'name' | 'def' | 'revision' | 'runs' | 'secretWarnings' | 'assistant'>, on: boolean): Promise<boolean> {
-  let picks: Record<string, boolean> | undefined
-  let forAssistant: boolean | undefined
-  if (on) {
-    const s = get()
-    const projects = s.workspace?.projects ?? []
-    const initial = projects.filter((p) => p.config.mcp.enabled.includes(server.name) || p.path === s.selectedProject).map((p) => p.path)
-    picks = Object.fromEntries(projects.map((p) => [p.path, initial.includes(p.path)]))
-    forAssistant = server.assistant
-    const ok = await confirm({
-      title: tr(msg({ id: 'mcp.enable.confirmTitle', defaultMessage: 'Turn on {name}?', description: 'Title of the confirmation before an MCP server is turned on in the workspace. {name} is the server.' }), { name: server.name }),
-      message: tr(msg({ id: 'mcp.enable.confirmMessage', defaultMessage: 'New sessions start it wherever you tick. It runs:', description: 'The confirmation before an MCP server is turned on in the workspace, above the command it runs and the projects (and the Hive Assistant) to tick.' })),
-      list: server.runs,
-      content: createElement(McpProjectPicker, {
-        projects,
-        initial,
-        assistant: server.assistant,
-        warnings: server.secretWarnings,
-        onChange: (now: Record<string, boolean>, assistant: boolean) => {
-          picks = now
-          forAssistant = assistant
-        }
-      }),
-      confirmLabel: tr(msg({ id: 'mcp.enable.confirmButton', defaultMessage: 'Turn On', description: 'Button: turns the MCP server on in the workspace and the projects ticked.' }))
-    })
-    if (!ok) return false
-  }
-  const done = await attempt(tr(msg({ id: 'actions.mcp.updateFailed', defaultMessage: 'Could not update the server', description: "An error's title: turning an MCP server on or off in the workspace failed." })), async () => {
-    // The definition shown: if it was replaced or edited meanwhile, Hive refuses, and the user looks again.
-    await call('mcp:setGlobal', server.name, on, on ? { def: server.def, revision: server.revision } : undefined, picks, forAssistant)
+export async function addMcpServer(place: McpPlace): Promise<boolean> {
+  const servers = await attempt(tr(msg({ id: 'actions.mcp.listFailedPicker', defaultMessage: 'Could not list the servers', description: "An error's title: reading the workspace's MCP servers for the Add server picker failed." })), () => call('mcp:list'))
+  if (!servers) return false
+  const can = servers.filter((m) => !!m.def && !(place === 'assistant' ? m.assistant : serverAddedIn(m, place.path)))
+  let picked: McpServerInfo | null = null
+  const ok = await confirm({
+    title:
+      place === 'assistant'
+        ? tr(msg({ id: 'mcp.add.titleAssistant', defaultMessage: 'Add a server for the Hive Assistant', description: "Title of the Add server picker (HI-2059) in the Hive Assistant's view." }))
+        : tr(msg({ id: 'mcp.add.title', defaultMessage: 'Add a server to {project}', description: "Title of the Add server picker (HI-2059) in a project's MCP tab. {project} is the project." }), { project: place.name }),
+    message: tr(msg({ id: 'mcp.add.message', defaultMessage: 'The workspace’s servers not added here yet. Sessions started from now on get the one you add.', description: 'The Add server picker (HI-2059), above its search and list: the workspace servers not added to this project (or the Hive Assistant); new sessions start the one added.' })),
+    content: createElement(McpServerPicker, { servers: can, onPick: (m: McpServerInfo | null) => (picked = m) }),
+    wide: true,
+    confirmLabel: tr(msg({ id: 'mcp.add.button', defaultMessage: 'Add', description: 'The Add server picker (HI-2059): the button that adds the chosen server.' })),
+    busyLabel: tr(msg({ id: 'mcp.add.busy', defaultMessage: 'Adding…', description: 'The Add server picker’s Add button while it works.' })),
+    run: async () => {
+      const m = picked
+      if (m) await call('mcp:add', place === 'assistant' ? 'assistant' : place.path, m.name, { def: m.def, revision: m.revision })
+    }
+  })
+  set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
+  if (ok) await refreshWorkspace()
+  return ok
+}
+
+/** Removes a server from a project or the Hive Assistant (HI-2059), at once: it is one Add away. */
+export async function removeMcpServer(place: McpPlace, server: Pick<McpServerInfo, 'name'>): Promise<boolean> {
+  const done = await attempt(tr(MCP_UPDATE_FAILED), async () => {
+    await call('mcp:remove', place === 'assistant' ? 'assistant' : place.path, server.name)
     return true
   })
   set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
@@ -997,70 +1000,76 @@ export async function setMcpServerEnabled(server: Pick<McpServerInfo, 'name' | '
 }
 
 /**
- * Turns a workspace MCP server on or off in one project (#1093), the project's own choice: it runs there while it is on
- * in the workspace too, whose enable showed what it runs.
+ * Add to… (the MCP view, HI-2059): which projects, and the Hive Assistant, a server is added to, showing what it runs
+ * (#550): those it is added to are ticked; unticking one removes it there. Files are written one by one, so a failure
+ * midway says what changed and what didn't.
  */
-export async function setMcpServerInProject(target: Pick<ProjectInfo, 'path' | 'name'>, server: Pick<McpServerInfo, 'name'>, on: boolean): Promise<boolean> {
-  const done = await attempt(tr(msg({ id: 'mcp.project.updateFailed', defaultMessage: 'Could not update the server', description: "An error's title: turning an MCP server on or off in a project failed." })), async () => {
-    await call('mcp:setProject', target.path, server.name, on)
-    return true
+export async function chooseMcpPlaces(server: Pick<McpServerInfo, 'name' | 'def' | 'revision' | 'runs' | 'secretWarnings' | 'assistant' | 'projects'>): Promise<boolean> {
+  const projects = get().workspace?.projects ?? []
+  const initial = projects.filter((p) => serverAddedIn(server, p.path)).map((p) => p.path)
+  let picks: Record<string, boolean> = Object.fromEntries(projects.map((p) => [p.path, initial.includes(p.path)]))
+  let forAssistant = server.assistant
+  const ok = await confirm({
+    title: tr(msg({ id: 'mcp.places.title', defaultMessage: 'Add {name} to…', description: 'Title of the dialog in the MCP view (HI-2059) that chooses the projects, and the Hive Assistant, an MCP server is added to. {name} is the server.' }), { name: server.name }),
+    message: tr(msg({ id: 'mcp.places.message', defaultMessage: 'Sessions started from now on get it wherever it is ticked; unticking removes it there. It runs:', description: 'The MCP view’s Add to… dialog (HI-2059), above the command the server runs and the projects (and the Hive Assistant) to tick.' })),
+    list: server.runs,
+    content: createElement(McpProjectPicker, {
+      projects,
+      initial,
+      assistant: server.assistant,
+      warnings: server.secretWarnings,
+      onChange: (now: Record<string, boolean>, assistant: boolean) => {
+        picks = now
+        forAssistant = assistant
+      }
+    }),
+    confirmLabel: tr(msg({ id: 'mcp.places.button', defaultMessage: 'Save', description: 'The MCP view’s Add to… dialog (HI-2059): the button that adds the server where ticked and removes it where unticked.' }))
   })
+  if (!ok) return false
+  // The definition shown: if it was replaced or edited meanwhile, Hive refuses before changing anything.
+  const r = await attempt(tr(MCP_UPDATE_FAILED), () => call('mcp:places', server.name, server.def ? { def: server.def, revision: server.revision } : undefined, picks, forAssistant))
+  if (r?.failed.length) {
+    const place = (p: string): string => (p === 'assistant' ? tr(MCP_ASSISTANT) : (projects.find((x) => samePath(x.path, p))?.name ?? basename(p)))
+    const lines = [
+      ...(r.added.length ? [tr(msg({ id: 'mcp.places.addedIn', defaultMessage: 'Added: {places}', description: 'After Add to… (HI-2059) failed in part: the places the server was added to. {places} lists projects (and the Hive Assistant).' }), { places: fmt.list(r.added.map(place)) })] : []),
+      ...(r.removed.length ? [tr(msg({ id: 'mcp.places.removedFrom', defaultMessage: 'Removed: {places}', description: 'After Add to… (HI-2059) failed in part: the places the server was removed from. {places} lists projects (and the Hive Assistant).' }), { places: fmt.list(r.removed.map(place)) })] : []),
+      ...r.failed.map((f) => tr(msg({ id: 'mcp.places.failedIn', defaultMessage: 'Not changed in {place}: {error}', description: 'After Add to… (HI-2059) failed in part: a place where the change could not be written, and why ({error}, as Hive or Windows said it).' }), { place: place(f.place), error: f.error }))
+    ]
+    notify('warning', tr(msg({ id: 'mcp.places.partial', defaultMessage: '{name} was changed in only some places', description: "A warning's title after the MCP view's Add to… (HI-2059): some of the places could not be written; the message says which changed and which didn't. {name} is the server." }), { name: server.name }), lines.join('\n'))
+  }
   set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
   await refreshWorkspace()
-  return !!done
+  return !!r && !r.failed.length
 }
 
-/**
- * Turns a workspace MCP server on or off for the Hive Assistant (HI-1472, Settings → Assistant), its own choice as a
- * project's: it runs for it while it is on in the workspace too. On asks first, showing what it runs and what to know
- * about its definition, and is refused if that definition was replaced or edited meanwhile; off is at once.
- */
-export async function setMcpServerForAssistant(server: Pick<McpServerInfo, 'name' | 'def' | 'revision' | 'runs' | 'secretWarnings'>, on: boolean): Promise<boolean> {
-  if (on) {
-    const ok = await confirm({
-      title: tr(msg({ id: 'mcp.assistant.confirmTitle', defaultMessage: 'Turn on {name} for the Assistant?', description: 'Title of the confirmation before an MCP server is turned on for the Hive Assistant (Settings → Assistant). {name} is the server.' }), { name: server.name }),
-      message: tr(msg({ id: 'mcp.assistant.confirmMessage', defaultMessage: "The Assistant's next session starts it. It runs:", description: 'The confirmation before an MCP server is turned on for the Hive Assistant, above the command it runs.' })),
-      list: server.runs,
-      detail: server.secretWarnings.length ? server.secretWarnings.join('\n') : undefined,
-      confirmLabel: tr(msg({ id: 'mcp.assistant.confirmButton', defaultMessage: 'Turn On', description: 'Button: turns the MCP server on for the Hive Assistant.' }))
-    })
-    if (!ok) return false
-  }
-  const done = await attempt(tr(msg({ id: 'mcp.assistant.updateFailed', defaultMessage: 'Could not update the server', description: "An error's title: turning an MCP server on or off for the Hive Assistant failed." })), async () => {
-    // The definition shown: if it was replaced or edited meanwhile, Hive refuses, and the user looks again.
-    await call('mcp:setAssistant', server.name, on, on ? { def: server.def, revision: server.revision } : undefined)
-    return true
-  })
-  set((s) => ({ skillsVersion: s.skillsVersion + 1 }))
-  return !!done
-}
+/** "Hive Assistant", where a server is added. */
+const MCP_ASSISTANT = msg({ id: 'mcp.where.assistantName', defaultMessage: 'the Hive Assistant', description: 'Where an MCP server is added (HI-2059), in a list of places beside project names.' })
 
 /** Why a workspace MCP server can't be used, in the window's language (#849): Hive's own words, else the JSON reader's as it gave them. */
 export const mcpErrorText = (server: Pick<McpServerInfo, 'error' | 'errorText'>): string | undefined => (server.errorText ? shownText(server.errorText) : server.error)
 
 /**
- * Where a workspace MCP server runs (#1093), in words, from the projects as the window has them: "Off in the
- * workspace", "On in Amberlight", "On in Amberlight and for the Hive Assistant", "On for the Hive Assistant only"
- * (HI-1472) or "On in no project".
+ * Where a workspace MCP server is added (HI-2059), in words, from the projects as the window has them: "Added in
+ * Amberlight", "Added in Amberlight and for the Hive Assistant", "Added for the Hive Assistant only" or "Not added
+ * anywhere". A hidden project it is added to counts, unnamed.
  */
-export function mcpWhereText(server: Pick<McpServerInfo, 'name' | 'def' | 'globallyEnabled' | 'assistant'>, projects: readonly ProjectInfo[]): string {
-  if (!server.globallyEnabled) return tr(MCP_OFF_IN_WORKSPACE)
-  const on = projects.filter((p) => serverOnIn(server, p.config.mcp)).map((p) => p.name)
+export function mcpWhereText(server: Pick<McpServerInfo, 'def' | 'projects' | 'assistant'>, projects: readonly ProjectInfo[]): string {
+  const named = projects.filter((p) => serverAddedIn(server, p.path)).map((p) => p.name)
+  const hidden = server.projects.filter((p) => !projects.some((x) => samePath(x.path, p))).length
+  const on = hidden ? [...named, tr(msg({ id: 'mcp.where.hidden', defaultMessage: '{n, plural, one {# hidden project} other {# hidden projects}}', description: 'Where an MCP server is added (HI-2059), after the projects named: the hidden projects it is added to.' }), { n: hidden })] : named
   const assistant = !!server.def && server.assistant
-  if (on.length && assistant) return tr(msg({ id: 'mcp.where.someAndAssistant', defaultMessage: 'On in {projects} and for the Hive Assistant', description: 'Where an MCP server is on, under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects.' }), { projects: fmt.list(on) })
-  if (assistant) return tr(msg({ id: 'mcp.where.assistantOnly', defaultMessage: 'On for the Hive Assistant only', description: 'Where an MCP server is on, under it in the MCP view: for the Hive Assistant, in no project.' }))
+  if (on.length && assistant) return tr(msg({ id: 'mcp.where.addedSomeAndAssistant', defaultMessage: 'Added in {projects} and for the Hive Assistant', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects.' }), { projects: fmt.list(on) })
+  if (assistant) return tr(msg({ id: 'mcp.where.addedAssistantOnly', defaultMessage: 'Added for the Hive Assistant only', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: for the Hive Assistant, in no project.' }))
   return on.length
-    ? tr(msg({ id: 'mcp.where.some', defaultMessage: 'On in {projects}', description: 'Where an MCP server is on, under it in the MCP view. {projects} lists the projects.' }), { projects: fmt.list(on) })
-    : tr(msg({ id: 'mcp.where.none', defaultMessage: 'On in no project', description: 'Where an MCP server is on, under it in the MCP view: on in the workspace, but no project has it on.' }))
+    ? tr(msg({ id: 'mcp.where.addedSome', defaultMessage: 'Added in {projects}', description: 'Where an MCP server is added (HI-2059), under it in the MCP view. {projects} lists the projects.' }), { projects: fmt.list(on) })
+    : tr(msg({ id: 'mcp.where.addedNone', defaultMessage: 'Not added anywhere', description: 'Where an MCP server is added (HI-2059), under it in the MCP view: no project and not the Hive Assistant, so it runs nowhere.' }))
 }
 
-/** "Off in the workspace": a server whose workspace switch is off (#1093), so it runs nowhere. */
-export const MCP_OFF_IN_WORKSPACE = msg({ id: 'mcp.where.off', defaultMessage: 'Off in the workspace', description: "Where an MCP server is on, under it in the MCP view, and beside a project's switch for it in its MCP tab: the workspace has it off, so it runs in no project." })
 
 /**
  * Add MCP Server from File (#550): a .json definition, or a .zip of a server folder. The dialog shows what it runs and
- * the name it gets (the file's, editable); a name in use asks to replace it or choose another. It is added off in the
- * workspace and in every project (#1093): turning it on in the workspace chooses the projects.
+ * the name it gets (the file's, editable); a name in use asks to replace it or choose another. It is added to no project
+ * (HI-2059): a project's MCP tab, the Assistant's view or Add to… adds it where it runs.
  */
 export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
   const file = await attempt(tr(msg({ id: 'actions.mcp.openFailed', defaultMessage: 'Could not open the file', description: "An error's title: picking an MCP server's file failed." })), () => call('mcp:pickFile'))
@@ -1073,9 +1082,9 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
       title: tr(msg({ id: 'actions.mcp.addTitle', defaultMessage: 'Add MCP Server from File', description: 'Title of the Add MCP Server from File dialog (the command of the same name). MCP is a name: keep it.' })),
       message: tr(
         msg({
-          id: 'mcp.addFile.message',
-          defaultMessage: 'Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, turned off. Turn it on in the MCP view to choose the projects it runs in. It runs:',
-          description: 'Add MCP Server from File, above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is.'
+          id: 'mcp.addFile.messageAdded',
+          defaultMessage: 'Adds {file} to the workspace (.hive/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Hive Assistant’s view, or Add to… here. It runs:',
+          description: 'Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .hive/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.'
         }),
         { file: basename(file), files: server.files }
       ),
@@ -1094,7 +1103,7 @@ export async function addMcpServerFromFile(): Promise<McpServerInfo | null> {
       const choice = await choose({
         title: tr(msg({ id: 'actions.mcp.replaceTitle', defaultMessage: 'Replace {name}?', description: 'Title of the question when the workspace already has an MCP server of that name ({name}).' }), { name }),
         message: tr(msg({ id: 'actions.mcp.replaceMessage', defaultMessage: 'The workspace has a server named {name}.', description: 'The question when the workspace already has an MCP server of that name ({name}).' }), { name }),
-        detail: tr(msg({ id: 'mcp.addFile.replaceDetail', defaultMessage: 'Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one, turned off: projects that had the old one on lose it. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name.' })),
+        detail: tr(msg({ id: 'mcp.addFile.replaceDetailAdded', defaultMessage: 'Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Hive Assistant that had the old one lose it. Or choose another name.', description: 'When a server of that name exists, under Replace or Choose Another Name (HI-2059).' })),
         danger: true,
         choices: [
           { label: tr(msg({ id: 'actions.mcp.rename', defaultMessage: 'Choose Another Name', description: 'Button: goes back to choose another name for the MCP server.' })), value: 'rename' },
@@ -1120,10 +1129,17 @@ const addServerFailed = (): string => tr(msg({ id: 'actions.mcp.addFailed', defa
 const deleteLabel = (): string => tr(msg({ id: 'actions.delete.confirm', defaultMessage: 'Delete', description: 'Button: moves it to the Recycle Bin.' }))
 const deletingLabel = (): string => tr(msg({ id: 'actions.delete.busy', defaultMessage: 'Deleting…', description: 'The Delete button while it works.' }))
 
-export async function deleteMcpServer(name: string): Promise<boolean> {
+/**
+ * Deletes a workspace MCP server after asking, saying where it is added (HI-2059): deleting removes it there too. True
+ * when it was deleted.
+ */
+export async function deleteMcpServer(server: Pick<McpServerInfo, 'name' | 'def' | 'projects' | 'assistant'>): Promise<boolean> {
+  const name = server.name
+  const added = server.projects.length > 0 || server.assistant
   const ok = await confirm({
     title: tr(msg({ id: 'actions.mcp.deleteTitle', defaultMessage: 'Delete MCP server?', description: 'Title of the question before deleting a workspace MCP server.' })),
     message: tr(msg({ id: 'actions.mcp.deleteMessage', defaultMessage: 'Move {name}.json to the Recycle Bin, with its folder if it was added from a .zip? Projects will no longer be able to use it.', description: "The question before deleting a workspace MCP server: its file ({name}.json) goes to the Recycle Bin (Windows' name for it)." }), { name }),
+    detail: added ? tr(msg({ id: 'actions.mcp.deleteAdded', defaultMessage: '{where}: deleting it removes it there too.', description: 'The question before deleting a workspace MCP server (HI-2059), when it is added somewhere: {where} says where, such as "Added in hive and for the Hive Assistant".' }), { where: mcpWhereText({ ...server, def: server.def ?? {} }, get().workspace?.projects ?? []) }) : undefined,
     confirmLabel: deleteLabel(),
     busyLabel: deletingLabel(),
     danger: true,
@@ -1806,15 +1822,15 @@ export async function importProjectMcp(path: string, names: string[]): Promise<v
     title: tr(msg({ id: 'mcp.import.confirmTitle', defaultMessage: '{count, plural, one {Copy {name} to the workspace?} other {Copy # MCP servers to the workspace?}}', description: "Title of Copy to workspace's confirmation. {count} servers a project defines in its own config; {name} the one when there is one." }), { count: servers.length, name: servers[0].name }),
     message: tr(
       msg({
-        id: 'mcp.import.confirmMessage',
-        defaultMessage: '{count, plural, one {It is turned on in {project} straight away; other projects can turn it on in their MCP tab. It runs:} other {They are turned on in {project} straight away; other projects can turn them on in their MCP tab. They run:}}',
+        id: 'mcp.import.confirmMessageAdded',
+        defaultMessage: '{count, plural, one {It is added to {project} straight away; other projects can add it in their MCP tab. It runs:} other {They are added to {project} straight away; other projects can add them in their MCP tab. They run:}}',
         description: "Copy to workspace's confirmation, above what the servers run. {count} is how many; {project} the project they come from."
       }),
       { count: servers.length, project: where }
     ),
     list: servers.flatMap((s) => (many ? s.runs.map((r) => `${s.name}: ${r}`) : s.runs)),
     detail: servers.flatMap((s) => s.secretWarnings).join('\n') || undefined,
-    confirmLabel: tr(msg({ id: 'mcp.import.confirmButton', defaultMessage: 'Copy and Turn On', description: "Button: copies the project's MCP servers to the workspace and turns them on in the project." }))
+    confirmLabel: tr(msg({ id: 'mcp.import.confirmButtonAdded', defaultMessage: 'Copy and Add', description: "Button (HI-2059): copies the project's MCP servers to the workspace and adds them to the project." }))
   })
   if (!ok) return
   const shown = Object.fromEntries(servers.map((s) => [s.name, s.def]))
@@ -1828,13 +1844,13 @@ export async function importProjectMcp(path: string, names: string[]): Promise<v
     off.length
       ? tr(
           msg({
-            id: 'mcp.import.changed',
-            defaultMessage: "{count, plural, one {{names} changed in the project's config after you saw it, so it was copied turned off: check what it runs and turn it on with its switch in the MCP view.} other {{names} changed in the project's config after you saw them, so they were copied turned off: check what they run and turn them on with their switches in the MCP view.}}",
+            id: 'mcp.import.changedAdded',
+            defaultMessage: "{count, plural, one {{names} changed in the project's config after you saw it, so it was copied but not added: check what it runs and add it in the project's MCP tab.} other {{names} changed in the project's config after you saw them, so they were copied but not added: check what they run and add them in the project's MCP tab.}}",
             description: 'After Copy to workspace, when servers changed between the confirmation and the copy. {names} lists them, {count} how many.'
           }),
           { count: off.length, names: fmt.list(off) }
         )
-      : tr(msg({ id: 'mcp.import.on', defaultMessage: 'On in {project} for new sessions.', description: 'After Copy to workspace: where the copied servers are on.' }), { project: where })
+      : tr(msg({ id: 'mcp.import.added', defaultMessage: 'Added to {project} for new sessions.', description: 'After Copy to workspace (HI-2059): where the copied servers are added.' }), { project: where })
   )
 }
 

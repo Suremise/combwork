@@ -2,7 +2,7 @@ import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
 import { HiveCommands, QuitPoint, WorkspaceCommands, WorkspacePoint } from '../components/CommandsSettings'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
-import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, McpServerInfo, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
+import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
 import { DEFAULT_MODE } from '@shared/assistant'
 import { PRICES_CHECKED, SHIPPED_PRICES, listedPriceModels, priceRows } from '@shared/prices'
@@ -647,46 +647,12 @@ function AssistantConnectionPicker() {
   )
 }
 
-/**
- * The open workspace's MCP servers the Assistant gets (HI-1472): a switch each, its own choice as a project's MCP tab
- * has, kept while the workspace has the server off.
- */
+/** Where the Assistant's MCP servers are chosen now (HI-2059): its own view, on the activity bar. */
 function AssistantMcpServers() {
-  const ws = useStore((s) => s.workspace?.path ?? null)
-  const version = useStore((s) => s.skillsVersion)
-  const [servers, setServers] = useState<McpServerInfo[] | null>(null)
-  useEffect(() => {
-    let current = true
-    if (ws) void call('mcp:list').then((l) => current && setServers(l), () => current && setServers([]))
-    return () => void (current = false)
-  }, [ws, version])
-  if (!ws) return <div className="faint">{tr(msg({ id: 'settings.assistant.mcp.noWorkspace', defaultMessage: "Open a workspace to choose its Assistant's MCP servers.", description: 'Settings → Assistant → MCP servers with no workspace open.' }))}</div>
-  if (!servers) return null
-  if (!servers.length)
-    return (
-      <p className="hint">
-        {tr(msg({ id: 'settings.assistant.mcp.none', defaultMessage: 'The workspace has no MCP servers.', description: 'Settings → Assistant → MCP servers when the workspace has none.' }))} <a onClick={() => showView('mcp')}>{tr(msg({ id: 'settings.assistant.mcp.manage', defaultMessage: 'Open the MCP view', description: 'A link in Settings → Assistant → MCP servers: shows the MCP view, where servers are added.' }))}</a>
-      </p>
-    )
   return (
-    <div className="toggle-list assistant-mcp">
-      {servers.map((m) => {
-        const on = !!m.def && m.globallyEnabled && m.assistant
-        const gated = !m.globallyEnabled && !m.error
-        return (
-          <div key={m.name} className={cx('toggle-item', !on && 'disabled')} data-mcp={m.name} data-gated={gated || undefined}>
-            <Icon name={m.def?.url ? 'globe' : 'plug'} />
-            <div className="ti-text">
-              <div className="ti-name">
-                {m.name} {gated && <span className="badge mcp-gated">{tr(actions.MCP_OFF_IN_WORKSPACE)}</span>}
-              </div>
-              <div className="ti-desc">{actions.mcpErrorText(m) ?? m.def?.description ?? m.def?.command}</div>
-            </div>
-            <Switch checked={m.assistant} disabled={!!m.error || (gated && !m.assistant)} label={tr(msg({ id: 'settings.assistant.mcp.switch', defaultMessage: '{name} on for the Assistant', description: "A server's switch in Settings → Assistant → MCP servers, for screen readers. {name} is the server." }), { name: m.name })} onChange={(v) => void actions.setMcpServerForAssistant(m, v)} />
-          </div>
-        )
-      })}
-    </div>
+    <button className="btn small" data-action="assistant-mcp-view" onClick={() => showView('assistant')}>
+      <Icon name="link-external" /> {tr(msg({ id: 'settings.assistant.mcp.show', defaultMessage: "Show in the Assistant's View", description: "A button in Settings → Assistant → MCP servers (HI-2059): shows the Hive Assistant's view on the activity bar, where its MCP servers are added." }))}
+    </button>
   )
 }
 

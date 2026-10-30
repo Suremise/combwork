@@ -7,7 +7,7 @@ interface HiveMessageValues {
   'content.mcp.badName': undefined
   'content.mcp.badRecord': { field: string | number }
   'content.mcp.badUrl': undefined
-  'content.mcp.changed': { name: string | number }
+  'content.mcp.changedAdd': { name: string | number }
   'content.mcp.chooseFile': undefined
   'content.mcp.connects': { url: string | number }
   'content.mcp.connectsType': { url: string | number; type: string | number }

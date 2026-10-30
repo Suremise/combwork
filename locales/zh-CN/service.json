@@ -176,6 +176,8 @@
   "service.laneStarts.freshBlockedTitle": "{agent} 的新对话未能开始",
   "service.lanes.noWorkspace": "未打开工作区",
   "service.lanes.unknown": "未知的通道 {id}",
+  "service.mcp.addedDropped": "每个项目和 Hive 助手都会列出曾在那里运行的服务器。{n, plural, other {为工作区中已关闭的服务器保存的 # 个选择已被丢弃}}：请在需要的项目的“MCP”标签页中添加服务器。",
+  "service.mcp.addedTitle": "MCP 服务器现在添加到它运行的地方",
   "service.metrics.badProvider": "provider 必须是提供方 id",
   "service.metrics.badRange": "from 和 to 必须是 ISO 时间，且 from 早于 to",
   "service.metrics.badRole": "role 必须是 agent、assistant、api 或 viewer",
