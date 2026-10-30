@@ -559,6 +559,8 @@ export interface EffectiveSettings {
   chime: boolean
   /** The connection it would launch on (HI-1755), `!<why>` when none can be used; null for a provider without connections. */
   connection: string | null
+  /** That connection's name, for messages (HI-2140); not part of the signature (a rename asks for no restart). */
+  connectionName?: string
 }
 
 /** Files read once for a whole session list (instead of once per session). */
@@ -1571,12 +1573,12 @@ class SessionManager {
     const chime = pc.chime === 'inherit' ? s.notifications.chimeEnabled : pc.chime === 'on'
     // Never the CLI's own setting for the Assistant (#1284: Control relies on knowing its mode), whatever its connection says.
     const permissionMode = assistant && isCliOwnMode(l.permissionMode) ? providerDescriptor(cli).assistantMode : l.permissionMode
-    return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection }
+    return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection, ...(choice.ok ? { connectionName: choice.connection.name } : {}) }
   }
 
   signature(e: EffectiveSettings): string {
     // The permission mode can be switched live (setPermissionMode), so it doesn't ask for a restart.
-    const { chime: _c, skills: _s, permissionMode: _p, ...rest } = e
+    const { chime: _c, skills: _s, permissionMode: _p, connectionName: _n, ...rest } = e
     return hashText(JSON.stringify(rest))
   }
 
@@ -2324,9 +2326,7 @@ class SessionManager {
     // Extra arguments saved before Settings refused a bare "--" (#523) stop the launch before anything changes.
     const argsProblem = capturedText((t) => extraArgsProblem(eff.extraArgs, t))
     if (argsProblem)
-      throw workspace.isAssistantHome(projectPath)
-        ? hiveError(msg({ id: 'session.start.argsAssistant', defaultMessage: '{problem} Fix it in Settings → Assistant.', description: "Starting the Assistant is refused: its extra arguments are wrong. {problem} says why, as a sentence." }), { problem: argsProblem }, { kind: 'conflict' })
-        : hiveError(msg({ id: 'session.start.args', defaultMessage: '{problem} Fix it in Project Settings or Settings → {provider}.', description: "Starting an agent is refused: its extra arguments are wrong. {problem} says why, as a sentence; {provider} is the coding agent's name (its Settings section)." }), { problem: argsProblem, provider: adapter.descriptor.name }, { kind: 'conflict' })
+      throw hiveError(msg({ id: 'session.start.args', defaultMessage: '{problem} Fix it in its connection, {connection}, in Settings → Accounts & Connections.', description: "Starting an agent or the Assistant is refused: its connection's extra arguments are wrong (HI-2140). {problem} says why, as a sentence; {connection} is the connection's name, as in Settings → Accounts & Connections." }), { problem: argsProblem, connection: eff.connectionName ?? '' }, { kind: 'conflict' })
     l.configuredMode = eff.permissionMode
     let mode = eff.permissionMode
     if (l.modeOverride && modeAllowed(adapter.id, l.modeOverride, config.settings) && !(workspace.isAssistantHome(projectPath) && isCliOwnMode(l.modeOverride))) mode = l.modeOverride

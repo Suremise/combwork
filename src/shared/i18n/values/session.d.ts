@@ -156,8 +156,7 @@ interface HiveMessageValues {
   'session.start.alreadyRunning': undefined
   'session.start.anotherAgent': undefined
   'session.start.archived': undefined
-  'session.start.args': { problem: string | number; provider: string | number }
-  'session.start.argsAssistant': { problem: string | number }
+  'session.start.args': { problem: string | number; connection: string | number }
   'session.start.beingOpened': undefined
   'session.start.cleaning': undefined
   'session.start.cliRequired': { provider: string | number }

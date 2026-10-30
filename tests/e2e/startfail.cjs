@@ -126,7 +126,9 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(inv2, page2, ws)
   await page2.getByText('alpha', { exact: true }).first().click()
   const started = await inv2('session:start', alpha, { agentId: agent.id, prompt: 'Work on card #12' }).then(() => '', (e) => String(e?.message ?? e))
-  check('a saved bare "--" stops the launch, saying why', started.includes(refused) && started.includes('Fix it in Project Settings or Settings → Claude Code.'), started)
+  // …and where to fix it: its connection, by name, in Settings → Accounts & Connections (HI-2140).
+  const fixIn = `Fix it in its connection, ${cfgNow.connections.find((c) => c.id === connectionOf()).name}, in Settings → Accounts & Connections.`
+  check('a saved bare "--" stops the launch, saying why and naming its connection', started.includes(refused) && started.includes(fixIn), started)
   check('and the CLI never started', !(await inv2('session:live')).some((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentId === agent.id))
   // Started from the window, the refusal shows as a notification.
   // New Session from its ⋯ (#977: the header shows Resume in Stop's place while it has a session to resume).
