@@ -67,7 +67,7 @@ describe("a workspace's pause (HI-2081)", () => {
     expect(existsSync(join(w.path, '.hive', 'team-pause.json'))).toBe(true)
     expect(tp.teamPauseOf(ws(w))).toEqual(p)
     expect(tp.pausedFor(join(w.path, 'alpha'))).toEqual(p)
-    expect(state.told).toEqual([expect.objectContaining({ agentId: 'b1', source: 'teamPause', ref: p.pauseId, body: TEAM_PAUSE_LINE })])
+    expect(state.told).toEqual([expect.objectContaining({ agentId: 'b1', source: 'team-pause', ref: p.pauseId, body: TEAM_PAUSE_LINE })])
     expect(state.events.at(-1)).toMatchObject({ type: 'team-pause-changed', pause: p })
     // Paused again with the same id (the user's pause reaching it twice): nothing more told.
     await tp.pauseTeam(ws(w), 'user', p.pauseId)

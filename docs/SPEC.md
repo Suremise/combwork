@@ -4591,7 +4591,7 @@ checked every agent and process by hand.
     actions still go: starting one agent, typing, a card's Start, Deliver Now; one that makes an agent work unparks it.
   - No stall is reported for a paused workspace's cards (parking is what was asked), and the Assistant's unwatched-lanes
     line (HI-2069) isn't added; after the resume each timed stall needs its own wait since the resume too.
-- **Telling the agents:** each running project agent gets one `control` delivery per pause (source `teamPause`, ref the id):
+- **Telling the agents:** each running project agent gets one `control` delivery per pause (source `team-pause`, ref the id):
   *The team is pausing for an update. Finish this turn, end the runs you started (tests, builds, dev servers, test copies of
   Hive), commit your work, then end your turn. Until the team resumes Hive starts no card and sends you no card events or
   watch wakes; a message or an answer can still reach you.*

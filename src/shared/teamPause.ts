@@ -60,7 +60,7 @@ export interface TeamPauseState {
 export const TEAM_PAUSE_REASON = 'teamPause' as const
 
 /**
- * The line each running agent is given once per pause (its delivery's source `teamPause`, ref the pause's id): Hive's own
+ * The line each running agent is given once per pause (its delivery's source `team-pause`, ref the pause's id): Hive's own
  * words, true to what the hold does (HR1's s8 check): no card starts or events, while a message or an answer still comes.
  */
 export const TEAM_PAUSE_LINE =

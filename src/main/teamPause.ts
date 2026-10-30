@@ -169,20 +169,21 @@ function changed(ws: WorkspaceService, was: TeamPause | null = null): void {
   emit({ type: 'team-pause-changed', workspacePath: ws.path, pause: known.get(keyOf(ws)) ?? null, ...(was ? { was } : {}) })
 }
 
-/** Each running project agent of the workspace, told once for this pause (its delivery: source teamPause, ref the id). */
+/** Each running project agent of the workspace, told once for this pause (its delivery: source team-pause, ref the id). */
 async function tellAgents(ws: WorkspaceService, p: TeamPause): Promise<void> {
   // Loaded here: deliveries.ts asks this module for its admission gate.
   const { createDelivery } = await import('./deliveries')
   const projects = ws.info()?.projects ?? []
-  await Promise.allSettled(
+  const told = await Promise.allSettled(
     projects.flatMap((proj) =>
       projectAgents(proj.config).flatMap((a) =>
         sessions.liveFor(proj.path, a.id)
-          ? [inWorkspace(ws, () => createDelivery(proj.path, { agentId: a.id, agentName: a.name, kind: 'control', from: { kind: 'hive', name: 'Hive' }, body: TEAM_PAUSE_LINE, source: 'teamPause', ref: p.pauseId, replace: true }))] // i18n-ignore: the product's name, as a delivery's sender
+          ? [inWorkspace(ws, () => createDelivery(proj.path, { agentId: a.id, agentName: a.name, kind: 'control', from: { kind: 'hive', name: 'Hive' }, body: TEAM_PAUSE_LINE, source: 'team-pause', ref: p.pauseId, replace: true }))] // i18n-ignore: the product's name, as a delivery's sender
           : []
       )
     )
   )
+  for (const r of told) if (r.status === 'rejected') log.warn('Telling an agent the team is pausing', r.reason)
 }
 
 /**
