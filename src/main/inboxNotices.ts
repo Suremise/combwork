@@ -5,9 +5,7 @@ import { running } from '../shared/lanes'
 import type { LiveSessionState } from '../shared/types'
 import { advanced } from './advanced'
 import { agentReadsInbox, countable, inboxSwitch } from './deliveries'
-import { rawLanes } from './lanes'
 import { sessions } from './sessions'
-import { loadedWatchFor } from './watches'
 import { workspaceFor } from './workspace'
 
 /**
@@ -68,6 +66,8 @@ async function unwatchedLanes(st: LiveSessionState): Promise<string> {
   if (!advanced.get<boolean>(LANES_UNWATCHED_NOTICE)) return ''
   const ws = workspaceFor(st.projectPath)
   if (!ws?.path || !ws.isAssistantHome(st.projectPath)) return ''
+  // Loaded here, for the Assistant only: the lanes and watches services aren't every notice's to start.
+  const [{ rawLanes }, { loadedWatchFor }] = await Promise.all([import('./lanes'), import('./watches')])
   const lanes = (await rawLanes(ws).catch(() => [])).filter(running)
   if (!lanes.length) return ''
   const watched = (await loadedWatchFor(ws, st.projectPath, st.agentId).catch(() => null))?.lanes ?? []
