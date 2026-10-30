@@ -44,7 +44,7 @@
   "panes.failed.title": "Não foi possível iniciar:",
   "panes.footer.compactionHistory": "Clique para ver o histórico de compactações",
   "panes.footer.compactions": "{n, plural, =0 {# compactações até agora} one {# compactação até agora} other {# compactações até agora}}{over, select, yes { — considere compactar} other {}}",
-  "panes.footer.connectionChanged": "O login dela mudou desde que ela foi adicionada: veja Configurações → Conexões.",
+  "panes.footer.connectionChanged": "O login da conta mudou desde que ela foi adicionada: veja Configurações → Contas e conexões.",
   "panes.footer.connectionEmail": "Conectado como {email}.",
   "panes.footer.connectionOff": "A conexão escolhida para ele está desativada neste espaço de trabalho, então ele roda na padrão do espaço de trabalho.",
   "panes.footer.connectionSwitching": "troca quando o turno dele terminar",

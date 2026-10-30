@@ -147,7 +147,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
       shared: ['sessions', 'archived_sessions'],
       userHome: '.codex',
       orgs: false,
-      setUp: msg({ id: 'providers.codex.connections.setUp', defaultMessage: "Set Up runs Codex on this connection so you can choose its Windows sandbox, which its commands run in, and trust this workspace's folders. Answer in the terminal; Windows may ask for Administrator permission.", description: "Settings → Connections, above a Codex connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button." })
+      setUp: msg({ id: 'providers.codex.connections.setUp', defaultMessage: "Set Up runs Codex on this connection so you can choose its Windows sandbox, which its commands run in, and trust this workspace's folders. Answer in the terminal; Windows may ask for Administrator permission.", description: "Settings → Accounts & Connections, above a Codex connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button." })
     }
   },
   // Ctrl+T opens Codex's transcript view; Ctrl+G its external editor.

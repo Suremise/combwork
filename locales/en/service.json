@@ -784,8 +784,8 @@
     "description": "Provider Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons."
   },
   "service.providers.signInConnections": {
-    "defaultMessage": "{cli} is signed in per connection: sign in from Settings → Connections.",
-    "description": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"Claude Code\") in, but its logins are Connections (Settings → Connections names a section)."
+    "defaultMessage": "{cli} signs in per account: sign in from Settings → Accounts & Connections.",
+    "description": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"Claude Code\") in, but its logins are accounts (Settings → Accounts & Connections names a section)."
   },
   "service.providers.stillLooking": {
     "defaultMessage": "Hive is still looking for {cli}. Try again in a moment.",

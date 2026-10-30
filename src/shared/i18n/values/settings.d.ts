@@ -1,7 +1,8 @@
 // Generated from locales/en/settings.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
-  'settings.accounts.addOne': undefined
+  'settings.accounts.addAccount': undefined
+  'settings.accounts.addConnection': undefined
   'settings.accounts.affected': { n: number }
   'settings.accounts.changeFailed': undefined
   'settings.accounts.changedTo': { now: string | number; was: string | number }
@@ -10,13 +11,17 @@ interface HiveMessageValues {
   'settings.accounts.closeRunningMessage': { cli: string | number }
   'settings.accounts.closeRunningTitle': undefined
   'settings.accounts.closeTerminal': undefined
-  'settings.accounts.default': undefined
-  'settings.accounts.defaults': undefined
-  'settings.accounts.defaults.context': undefined
-  'settings.accounts.defaults.copied': { cli: string | number }
-  'settings.accounts.defaults.effort': undefined
+  'settings.accounts.connection.base': undefined
+  'settings.accounts.connection.baseTip': undefined
+  'settings.accounts.connection.duplicate': undefined
+  'settings.accounts.connection.edit': undefined
+  'settings.accounts.connection.failed': undefined
+  'settings.accounts.connection.remove': undefined
+  'settings.accounts.connection.removeMessage': undefined
+  'settings.accounts.connection.removeTitle': { name: string | number }
+  'settings.accounts.copilotAs': { account: string | number }
+  'settings.accounts.copilotNotSignedIn': undefined
   'settings.accounts.defaults.failed': undefined
-  'settings.accounts.defaults.model': undefined
   'settings.accounts.keep': undefined
   'settings.accounts.keepFailed': undefined
   'settings.accounts.keepRename': { name: string | number }
@@ -25,29 +30,30 @@ interface HiveMessageValues {
   'settings.accounts.list.tip': undefined
   'settings.accounts.list.title': undefined
   'settings.accounts.loading': undefined
-  'settings.accounts.makeDefault': undefined
+  'settings.accounts.more': { name: string | number }
   'settings.accounts.moreProjects': { n: number }
-  'settings.accounts.move': { name: string | number }
+  'settings.accounts.moveAccount': { name: string | number }
   'settings.accounts.moveFailed': undefined
   'settings.accounts.name': undefined
   'settings.accounts.needName': undefined
-  'settings.accounts.noWorkspace': undefined
-  'settings.accounts.none': undefined
+  'settings.accounts.noWorkspace2': undefined
+  'settings.accounts.noneYet': undefined
   'settings.accounts.notTrusted': { projects: string | number }
   'settings.accounts.notice.context': { value: string | number }
   'settings.accounts.notice.dismiss': undefined
   'settings.accounts.notice.effort': { value: string | number }
-  'settings.accounts.notice.hint': undefined
+  'settings.accounts.notice.hint2': undefined
   'settings.accounts.notice.line': { project: string | number; agent: string | number; setting: string | number }
   'settings.accounts.notice.model': { value: string | number }
   'settings.accounts.notice.title': undefined
   'settings.accounts.onHere': undefined
-  'settings.accounts.ownLogin': { cli: string | number }
+  'settings.accounts.onHereShort': undefined
   'settings.accounts.plan': { email: string | number; plan: string | number }
+  'settings.accounts.providerSetup': undefined
   'settings.accounts.remove': undefined
+  'settings.accounts.removeAccountMessage': undefined
   'settings.accounts.removeConfirm': undefined
   'settings.accounts.removeFailed': undefined
-  'settings.accounts.removeMessage': undefined
   'settings.accounts.removeOpenConfirm': undefined
   'settings.accounts.removeOpenTitle': { name: string | number }
   'settings.accounts.removeTitle': { name: string | number }
@@ -55,7 +61,7 @@ interface HiveMessageValues {
   'settings.accounts.rename': undefined
   'settings.accounts.renameConfirm': undefined
   'settings.accounts.renameTitle': { name: string | number }
-  'settings.accounts.sameLogin': { names: string | number }
+  'settings.accounts.sameLoginAccount': { names: string | number }
   'settings.accounts.setUpChecking': undefined
   'settings.accounts.setUpDone': undefined
   'settings.accounts.setUpIn': { project: string | number; folder: string | number; cli: string | number }
@@ -73,8 +79,9 @@ interface HiveMessageValues {
   'settings.accounts.state.signedOut': undefined
   'settings.accounts.state.unchecked': undefined
   'settings.accounts.switchAffected': undefined
-  'settings.accounts.usedHere': undefined
-  'settings.accounts.usedHereTip': undefined
+  'settings.accounts.thisPc': undefined
+  'settings.accounts.usage': { window: string; label: string | number; used: number }
+  'settings.accounts.usedBy': { assistant: string; n: number }
   'settings.advanced.claude-code.accounts.dropEnv.desc': undefined
   'settings.advanced.claude-code.accounts.dropEnv.title': undefined
   'settings.advanced.claude-code.accounts.emailField.desc': undefined
@@ -741,6 +748,33 @@ interface HiveMessageValues {
   'settings.commands.titleEdit': undefined
   'settings.commands.titleNew': undefined
   'settings.commands.up': undefined
+  'settings.connection.add': undefined
+  'settings.connection.addTitle': { account: string | number; cli: string | number }
+  'settings.connection.args': undefined
+  'settings.connection.argsHint': { cli: string | number }
+  'settings.connection.cancel': undefined
+  'settings.connection.context': undefined
+  'settings.connection.context1m': undefined
+  'settings.connection.context200k': undefined
+  'settings.connection.editTitle': { account: string | number; cli: string | number; name: string | number }
+  'settings.connection.effort': undefined
+  'settings.connection.effortUnusable': { model: string | number; effort: string | number }
+  'settings.connection.gone': undefined
+  'settings.connection.itsModel': undefined
+  'settings.connection.mode': undefined
+  'settings.connection.model': undefined
+  'settings.connection.name': undefined
+  'settings.connection.namePlaceholder': undefined
+  'settings.connection.needName': undefined
+  'settings.connection.save': undefined
+  'settings.connection.saving': undefined
+  'settings.connection.summary.200k': undefined
+  'settings.connection.summary.args': { args: string | number }
+  'settings.connection.summary.effort': undefined
+  'settings.connection.summary.mode': undefined
+  'settings.connection.summary.model': undefined
+  'settings.connection.usedBy': { users: string | number }
+  'settings.connection.userIn': { agent: string | number; project: string | number }
   'settings.connections.add.addServer': undefined
   'settings.connections.add.addSignIn': undefined
   'settings.connections.add.adding': undefined
@@ -1048,7 +1082,6 @@ interface HiveMessageValues {
   'settings.path.project': { section: string | number; title: string | number }
   'settings.path.settings': { section: string | number; title: string | number }
   'settings.path.versionControl': { title: string | number }
-  'settings.permissionModes.modeLine': { mode: string | number; what: string | number }
   'settings.prices.add': undefined
   'settings.prices.back': undefined
   'settings.prices.cacheWrite': undefined
@@ -1085,9 +1118,6 @@ interface HiveMessageValues {
   'settings.project.compactSuggestTokens.off': undefined
   'settings.project.compactSuggestTokens.tip': undefined
   'settings.project.compactSuggestTokens.title': undefined
-  'settings.project.defaultProvider.desc': undefined
-  'settings.project.defaultProvider.tip': undefined
-  'settings.project.defaultProvider.title': undefined
   'settings.project.inboxCheckpoints.desc': undefined
   'settings.project.inboxCheckpoints.tip': undefined
   'settings.project.inboxCheckpoints.title': undefined
@@ -1121,21 +1151,6 @@ interface HiveMessageValues {
   'settings.project.worktreeSetup.desc': undefined
   'settings.project.worktreeSetup.tip': undefined
   'settings.project.worktreeSetup.title': undefined
-  'settings.projectProvider.effort.desc': undefined
-  'settings.projectProvider.effort.tip': { provider: string | number }
-  'settings.projectProvider.effort.title': undefined
-  'settings.projectProvider.extraArgs.desc': { cli: string | number }
-  'settings.projectProvider.extraArgs.tip': undefined
-  'settings.projectProvider.extraArgs.title': undefined
-  'settings.projectProvider.model.desc': { provider: string | number }
-  'settings.projectProvider.model.tip': { provider: string | number }
-  'settings.projectProvider.model.title': undefined
-  'settings.projectProvider.permissionMode.cycle': undefined
-  'settings.projectProvider.permissionMode.desc': { provider: string | number }
-  'settings.projectProvider.permissionMode.title': undefined
-  'settings.projectProvider.use200kContext.desc': { provider: string | number }
-  'settings.projectProvider.use200kContext.tip': undefined
-  'settings.projectProvider.use200kContext.title': undefined
   'settings.projectSection.advanced.desc': undefined
   'settings.projectSection.advanced.label': undefined
   'settings.projectSection.agents.desc': undefined
@@ -1144,7 +1159,6 @@ interface HiveMessageValues {
   'settings.projectSection.general.label': undefined
   'settings.projectSection.keys.desc': undefined
   'settings.projectSection.keys.label': undefined
-  'settings.projectSection.provider.desc': { provider: string | number }
   'settings.projectSection.sessions.desc': undefined
   'settings.projectSection.sessions.label': undefined
   'settings.projectSection.storage.desc': undefined
@@ -1165,14 +1179,6 @@ interface HiveMessageValues {
   'settings.provider.costSource.option.reported': { provider: string | number }
   'settings.provider.costSource.tip': { provider: string | number }
   'settings.provider.costSource.title': undefined
-  'settings.provider.defaultEffort.desc': undefined
-  'settings.provider.defaultEffort.tip': undefined
-  'settings.provider.defaultEffort.title': undefined
-  'settings.provider.defaultModel.desc': { provider: string | number }
-  'settings.provider.defaultModel.tip': undefined
-  'settings.provider.defaultModel.title': undefined
-  'settings.provider.defaultPermissionMode.desc': undefined
-  'settings.provider.defaultPermissionMode.title': undefined
   'settings.provider.effortFallback.desc': { provider: string | number }
   'settings.provider.effortFallback.tip': { provider: string | number }
   'settings.provider.effortFallback.title': undefined
@@ -1190,19 +1196,12 @@ interface HiveMessageValues {
   'settings.provider.executablePath.placeholder': undefined
   'settings.provider.executablePath.tip': undefined
   'settings.provider.executablePath.title': undefined
-  'settings.provider.extraArgs.desc': { cli: string | number }
-  'settings.provider.extraArgs.placeholder': undefined
-  'settings.provider.extraArgs.tip': undefined
-  'settings.provider.extraArgs.title': undefined
   'settings.provider.install': undefined
   'settings.provider.installed': { version: string | number }
   'settings.provider.manage': undefined
   'settings.provider.modelFallback.desc': { provider: string | number }
   'settings.provider.modelFallback.tip': undefined
   'settings.provider.modelFallback.title': undefined
-  'settings.provider.more': { provider: string | number }
-  'settings.provider.moveDown': undefined
-  'settings.provider.moveUp': undefined
   'settings.provider.notInstalled': undefined
   'settings.provider.notInstalledShort': undefined
   'settings.provider.off': { provider: string | number }
@@ -1210,16 +1209,11 @@ interface HiveMessageValues {
   'settings.provider.prices.descReported': { provider: string | number }
   'settings.provider.prices.tip': { checked: string | number; provider: string | number }
   'settings.provider.prices.title': undefined
-  'settings.provider.reorderFailed': undefined
-  'settings.provider.rowLabel': { provider: string | number; position: number; count: number }
   'settings.provider.settings': undefined
   'settings.provider.status.tip': { provider: string | number }
   'settings.provider.status.title': undefined
   'settings.provider.updateAvailable': { version: string | number }
   'settings.provider.use': { provider: string | number }
-  'settings.provider.use200kContext.desc': { provider: string | number }
-  'settings.provider.use200kContext.tip': { provider: string | number }
-  'settings.provider.use200kContext.title': undefined
   'settings.providerOff.detail': undefined
   'settings.providerOff.listFailed': undefined
   'settings.providerOff.message': { n: number; provider: string | number; agents: string | number }
@@ -1228,10 +1222,6 @@ interface HiveMessageValues {
   'settings.providerOff.stop': undefined
   'settings.providerOff.stopFailed': { provider: string | number }
   'settings.providerOff.title': { provider: string | number }
-  'settings.providers.automaticOrder': { order: string | number }
-  'settings.providers.defaultProvider.desc': undefined
-  'settings.providers.defaultProvider.tip': undefined
-  'settings.providers.defaultProvider.title': undefined
   'settings.providers.list.desc': undefined
   'settings.providers.list.tip': undefined
   'settings.providers.list.title': undefined

@@ -80,9 +80,9 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     await shots('agent-setup')
     await setupDialog.locator('[data-open-connections]').click()
     check('…Open Connections closes it and shows Settings → Connections', !!(await lib.until(async () => (await setupDialog.count()) === 0 && (await page.locator('.settings-nav .row.selected[data-section="accounts"]').count()) === 1, HUNG_MS)))
-    // Copilot has no connections (HI-1758): said, if it is on.
+    // Copilot's PC-wide sign-in is its account (HI-2107, decision C), listed while Copilot is on.
     const copilotOn = (await inv('settings:get')).providers?.copilot?.enabled === true
-    if (copilotOn) check("Settings → Connections says why Copilot has none", (await page.locator('[data-no-connections="copilot"]').count()) === 1)
+    if (copilotOn) check("Settings → Accounts & Connections lists Copilot's sign-in as its account", !!(await lib.until(async () => (await page.locator('[data-account="copilot"][data-home]').count()) === 1, HUNG_MS)))
     await page.locator('.activity-btn[aria-label="Projects"]').click()
 
     // --- Two connections, each signed in with the fake (no browser), the workspace's folders trusted in each.

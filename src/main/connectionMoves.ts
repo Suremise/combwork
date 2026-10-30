@@ -1,15 +1,14 @@
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
-import type { Account, AgentDef, AppSettings, Connection, LaunchValues, MovedField, ProjectConfig, ProviderId } from '../shared/types'
-import { baseConnection, launchValues, valuesOf } from '../shared/accounts'
-import { COPILOT_ACCOUNT, type LegacyInputs, type MovedNotice, type AccountStore, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, waitsForConnection } from '../shared/connectionDefaults'
+import type { AgentDef, Connection, LaunchValues, MovedField, ProjectConfig, ProviderId } from '../shared/types'
+import { type LegacyInputs, type MovedNotice, type AccountStore, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, waitsForConnection } from '../shared/connectionDefaults'
 import { autoProviderPending, providerDescriptor } from '../shared/providers'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { msg, tr } from '../shared/i18n'
 import { config } from './config'
 import { onHiveEvent, toast } from './events'
 import { createLogger, userText } from './logger'
-import { accountById, accountHere, allConnections, assertEffortTaken, effortUsable, getConnection, newConnectionId } from './accounts'
+import { accountById, accountHere, effortUsable, getConnection, newConnectionId } from './accounts'
 import { testHomeSeam } from './connectionSeam'
 import { providerService } from './providerService'
 import { openWorkspaces, workspaceOf, type WorkspaceService } from './workspace'
@@ -250,56 +249,6 @@ export async function dismissMovedNotice(ws: WorkspaceService, keys: string[]): 
 
 const MOVE_FAILED = msg({ id: 'main.connections.moveFailed', defaultMessage: "Hive couldn't move {project}'s model settings to its agents", description: "A notice's title (HI-1770): moving a project's own model, effort and context settings onto its agents (connections now hold the defaults) failed; it is tried again at the next start. {project} is the project's name." })
 
-/**
- * Decision E for Settings → GitHub Copilot (the adapter until HI-2107; the Assistant chooses a connection since HI-2108), checked
- * before a change of settings is saved (config.onSettingsCheck): a change of a model or effort that, merged with the
- * connection it goes to (the effort or model it keeps from it included), makes a pair the model doesn't take is refused
- * whole, its caller told, settings and connections unchanged: its account's base connection. What the migration carried over,
- * or a later catalogue left, isn't checked: only a change.
- */
-export function checkLaunchSettings(next: AppSettings, prev: AppSettings): void {
-  const c = next.providers?.copilot
-  const d = prev.providers?.copilot
-  const copilot = accountById(COPILOT_ACCOUNT)
-  if (c && copilot && (c.defaultModel !== d?.defaultModel || c.defaultEffort !== d?.defaultEffort)) checkPair('copilot', copilot, baseConnection(copilot.id, allConnections()), { model: c.defaultModel, effort: c.defaultEffort }, { model: d?.defaultModel, effort: d?.defaultEffort })
-}
-
-/** The pair a change makes with the connection it goes to (each value changed, else the connection's), refused when the model doesn't take the effort. */
-function checkPair(cli: ProviderId, account: Account, conn: Connection | undefined, now: { model?: string; effort?: string }, was: { model?: string; effort?: string }): void {
-  const base = baseConnection(account.id, allConnections())
-  const model = now.model !== was.model ? now.model || base?.model : conn?.model
-  const effort = now.effort !== was.effort ? now.effort || base?.effort : conn?.effort
-  if (effort) assertEffortTaken(cli, model ?? null, account, effort)
-}
-
-/**
- * Settings → GitHub Copilot's model, effort, mode and extra arguments changed (the adapter until HI-2107): its account's
- * base connection takes the change, as its agents without settings of their own ran with them before.
- */
-function followCopilotSettings(s: AppSettings, prev: AppSettings): void {
-  const now = s.providers?.copilot
-  const was = prev.providers?.copilot
-  if (!now || !was) return
-  const changed: Partial<LaunchValues> = {}
-  if (now.defaultModel !== was.defaultModel) changed.model = now.defaultModel || undefined
-  if (now.defaultEffort !== was.defaultEffort) changed.effort = now.defaultEffort || undefined
-  if (now.defaultPermissionMode !== was.defaultPermissionMode) changed.permissionMode = now.defaultPermissionMode
-  if (now.extraArgs !== was.extraArgs) changed.extraArgs = now.extraArgs || undefined
-  if (!Object.keys(changed).length) return
-  const account = accountById(COPILOT_ACCOUNT)
-  if (!account) return
-  const base = baseConnection(account.id, allConnections())
-  const next = launchValues({ ...valuesOf(base ?? {}), ...changed }, 'copilot')
-  // Decision E: a model and effort that don't go together aren't applied (the setting was saved: logged, kept as it was).
-  if (next.effort && !effortUsable('copilot', next.model ?? null, account, next.effort)) {
-    log.warn(`Settings → GitHub Copilot: ${userText(next.model ?? 'its default model')} doesn't take ${next.effort} effort; its connection is kept as it was`)
-    return
-  }
-  config.update((c) => {
-    const first = baseConnection(account.id, c.connections ?? [])
-    c.connections = (c.connections ?? []).map((x) => (x.id === first?.id ? { id: x.id, account: x.account, name: x.name, ...launchValues({ ...valuesOf(x), ...changed }, 'copilot') } : x))
-  })
-}
 
 /** Workspaces migrated since Hive started; an account added or turned on looks at them again (agents waiting for one). */
 const looked = new Set<string>()
@@ -313,10 +262,6 @@ export function initConnectionMoves(): void {
       void migrateWorkspace(ws)
     }
   }
-  config.onSettingsCheck(checkLaunchSettings)
-  config.onSettingsChanged((s, prev) => {
-    followCopilotSettings(s, prev)
-  })
   onHiveEvent((e) => {
     if (e.type === 'connections-changed' || e.type === 'settings-changed') looked.clear()
     if (e.type === 'workspace-changed' || e.type === 'connections-changed' || e.type === 'settings-changed') look()

@@ -3,7 +3,7 @@ import { join, resolve, sep } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
-import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, EffortLevel, LaunchValues, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
+import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, LaunchValues, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
 import { HIVE_DIR } from '../shared/defaults'
 import { readKeptJson } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
@@ -120,8 +120,8 @@ function changeAccount(id: string, fn: (a: Account) => void): void {
 // Refusals, in the user's language.
 // ---------------------------------------------------------------------------
 
-const NO_NAME = msg({ id: 'main.accounts.noName', defaultMessage: 'Give the connection a name.', description: 'An error adding or renaming a connection in Settings → Connections: its name is empty.' })
-const NO_ACCOUNT = msg({ id: 'main.accounts.notFound', defaultMessage: 'There is no such connection.', description: 'An error: a connection named by its id is not in Settings → Connections (removed meanwhile).' })
+const NO_NAME = msg({ id: 'main.accounts.noName', defaultMessage: 'Give the connection a name.', description: 'An error adding or renaming a connection in Settings → Accounts & Connections: its name is empty.' })
+const NO_ACCOUNT = msg({ id: 'main.accounts.notFound', defaultMessage: 'There is no such connection.', description: 'An error: a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile).' })
 
 function mustGet(id: string): Account {
   const a = getAccount(id)
@@ -135,7 +135,7 @@ function mustGet(id: string): Account {
  */
 function assertNotHeld(a: Account): void {
   if (!provider(a.provider).accountHeld?.(accountFolder(a.id))) return
-  throw hiveError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Hive is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
+  throw hiveError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Hive is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
 }
 
 /** Whether the CLI's sign-in names an organisation, which an identity then needs (HI-1757: Codex's names none). */
@@ -461,29 +461,6 @@ export async function addAccount(id: ProviderId, name: string, server?: ServerCo
 }
 
 /**
- * An account's defaults for the agents on it, as today's screens set them (HI-1770; until HI-2107): its base connection's
- * model, effort and context, each '' or null to leave it to the CLI.
- */
-export function setConnectionDefaults(id: string, patch: { model?: string | null; effort?: string | null; use200kContext?: boolean | null }): void {
-  const a = mustGet(id)
-  const server = isServer(a)
-  const now = baseConnection(id, allConnections())
-  const next: Connection = { ...(now ?? { id: newConnectionId(), account: id, name: a.name }) }
-  if (patch.model !== undefined) next.model = patch.model?.trim() || undefined
-  if (patch.effort !== undefined) next.effort = (!server && (patch.effort?.trim() as EffortLevel)) || undefined
-  if (patch.use200kContext !== undefined) next.use200kContext = !server && providerDescriptor(a.provider).capabilities.contextLimit && patch.use200kContext === true ? true : undefined
-  for (const k of ['model', 'effort', 'use200kContext'] as const) if (next[k] === undefined) delete next[k]
-  // Decision E: a model and effort that don't go together are refused, nothing changed.
-  if (next.effort && (patch.model !== undefined || patch.effort !== undefined)) assertEffortTaken(a.provider, next.model ?? null, a, next.effort)
-  changeConnections((all) => {
-    const i = all.findIndex((x) => x.account === id)
-    // An account without one (all removed): its base connection made again.
-    if (i < 0) all.push(next)
-    else all[i] = { ...next, id: all[i].id }
-  })
-}
-
-/**
  * The model that would run for a choice on an account (`model`: its connection's; else the CLI's own default in the
  * account's home, else its catalogue's), and whether an effort is one that model takes (only where its efforts are
  * known): an effort it doesn't take is kept but not used.
@@ -499,7 +476,7 @@ const EFFORT_REFUSED = msg({ id: 'worktrees.agent.effortRefused', defaultMessage
 
 /**
  * Refuses a connection's model and effort that don't go together (HI-2106, decision E), at every save the user makes
- * (Agent Settings, Add Agent, the Agent API, Settings → Connections' defaults, Settings → Assistant), before anything
+ * (Agent Settings, Add Agent, the Agent API, Settings → Accounts & Connections' defaults, Settings → Assistant), before anything
  * changes. One the migration carried over, or a later CLI's catalogue left, is kept and not passed at launch.
  */
 export function assertEffortTaken(cli: ProviderId, model: string | null, account: Pick<Account, 'id' | 'home'> | null, effort: string): void {
@@ -570,8 +547,8 @@ const NO_CONNECTION = msg({ id: 'main.connections.notFound', defaultMessage: 'Th
 const NO_CONNECTION_NAME = msg({ id: 'main.connections.noName', defaultMessage: 'Give the connection a name.', description: 'An error saving a connection (Settings → Accounts & Connections, HI-2107): its name is empty.' })
 const NAME_TAKEN = msg({ id: 'main.connections.nameTaken', defaultMessage: '{account} already has a connection named {name}. Choose another name.', description: 'An error saving a connection (Settings → Accounts & Connections, HI-2107): another connection on the same account ({account}, its name) has this name ({name}).' })
 const BAD_MODE = msg({ id: 'main.connections.badMode', defaultMessage: "{cli} has no permission mode {mode}.", description: 'An error saving a connection (HI-2107): the permission mode asked for ({mode}, as given) is not one of the coding agent CLI\'s ({cli}: "Codex").' })
-const CONNECTION_IN_USE = msg({ id: 'main.connections.inUse', defaultMessage: '{name} is used by {users}. Choose another connection for them first, then remove it.', description: 'An error removing a connection (Settings → Accounts & Connections, HI-2107): agents or the Assistant use it ({users}: their names, listed, each with its project).' })
-const USER_IN = msg({ id: 'main.connections.userIn', defaultMessage: '{agent} in {project}', description: 'One user of a connection in the error refusing its removal (HI-2107): an agent ({agent}) and its project ({project}).' })
+const CONNECTION_IN_USE = msg({ id: 'main.connections.inUse', defaultMessage: 'Still in use, so {name} was kept: {users}. Choose another connection for them first, then remove it.', description: 'An error removing a connection (Settings → Accounts & Connections, HI-2107): agents or the Assistant use it ({users}: their names, listed, each with its project).' })
+const USER_IN = msg({ id: 'main.connections.userIn', defaultMessage: '{agent} ({project})', description: 'One user of a connection in the error refusing its removal (HI-2107): an agent ({agent}) and its project ({project}).' })
 
 function mustConnection(id: string): { c: Connection; a: Account } {
   const c = getConnection(id)
@@ -767,8 +744,8 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
   const a = mustGet(id)
   const running = (): boolean => sessionsOn(id) || (claims.get(id) ?? 0) > 0
   const terminalOpen = (): boolean => loginsOpen.has(id) || hasPty(loginKey(a))
-  const RUNNING = msg({ id: 'main.accounts.running', defaultMessage: '{name} has agents running on it: stop them, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or one is starting.' })
-  const IN_USE = msg({ id: 'main.accounts.inUse', defaultMessage: '{name} is in use: stop the agents on it and close its sign-in, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or its sign-in terminal is open.' })
+  const RUNNING = msg({ id: 'main.accounts.running', defaultMessage: '{name} has agents running on it: stop them, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or one is starting.' })
+  const IN_USE = msg({ id: 'main.accounts.inUse', defaultMessage: '{name} is in use: stop the agents on it and close its sign-in, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or its sign-in terminal is open.' })
   const refuse = (): void => {
     if (running()) throw hiveError(RUNNING, { name: a.name }, { kind: 'conflict' })
     if (terminalOpen()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
@@ -793,7 +770,7 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
         await removeKey(id)
       } catch (e) {
         log.warn(`connection ${id}'s key couldn't be removed: ${userText(String((e as Error).message ?? e))}`)
-        throw hiveError(msg({ id: 'main.accounts.keyRemoveFailed', defaultMessage: "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.", description: "An error removing a server connection ({name}, its name in Settings → Connections): its stored API key couldn't be deleted, so the connection was left as it was." }), { name: a.name }, { kind: 'conflict' })
+        throw hiveError(msg({ id: 'main.accounts.keyRemoveFailed', defaultMessage: "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.", description: "An error removing a server connection ({name}, its name in Settings → Accounts & Connections): its stored API key couldn't be deleted, so the connection was left as it was." }), { name: a.name }, { kind: 'conflict' })
       }
     }
     // Checks started before are dropped from here (their result would bring it back).
@@ -1076,7 +1053,7 @@ export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']
   const st = requestTrust(id, workspace.path, projectsFor(a), true)
   const answer = await new Promise<TrustAnswer | null | 'cancelled'>((r) => st.waiters.push(r))
   // Removed, or its workspace closed, while Hive checked: Set Up opens nowhere (never its own folder instead).
-  if (answer === 'cancelled') throw hiveError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.", description: "An error opening a connection's Set Up (Settings → Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
+  if (answer === 'cancelled') throw hiveError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.", description: "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
   return answer ? setUpTarget(a, answer.pending) : undefined
 }
 
@@ -1706,14 +1683,14 @@ export function connectionReadyAgain(id: string): void {
 }
 
 const LAUNCH = {
-  none: msg({ id: 'main.connections.launch.none', defaultMessage: 'No {cli} connection is on in this workspace. Add one in Settings → Connections and sign it in, then start {agent} again.', description: "Starting an agent ({agent}, its name) is refused: its workspace has no connection on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Connections names a section." }),
-  offNoDefault: msg({ id: 'main.connections.launch.offNoDefault', defaultMessage: "{agent}'s connection, {name}, is off in this workspace, and no other {cli} connection is on. Turn one on in Settings → Connections.", description: "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI." }),
-  deleted: msg({ id: 'main.connections.launch.deleted', defaultMessage: "The connection chosen for {agent} no longer exists. Pick another in its Agent Settings, or let it use the workspace's default.", description: 'Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog.' }),
-  changedAgain: msg({ id: 'main.connections.launch.changedAgain', defaultMessage: "{agent}'s connection was changed again while it was starting. Start it again.", description: "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)." }),
+  none: msg({ id: 'main.connections.launch.none', defaultMessage: 'No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections and sign it in, then start {agent} again.', description: "Starting an agent ({agent}, its name) is refused: its workspace has no account on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Accounts & Connections names a section." }),
+  offNoDefault: msg({ id: 'main.connections.launch.offNoDefault', defaultMessage: "{agent}'s account, {name}, is off in this workspace, and no other {cli} account is on. Turn one on in Settings → Accounts & Connections.", description: "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI." }),
+  deleted: msg({ id: 'main.connections.launch.deleted', defaultMessage: "The connection chosen for {agent} no longer exists. Choose another in its Agent Settings.", description: 'Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog.' }),
+  changedAgain: msg({ id: 'main.connections.launch.changedAgain', defaultMessage: "{agent}'s connection was changed again while it was starting. Start it again.", description: "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)." }),
   otherProvider: msg({ id: 'main.connections.launch.otherProvider', defaultMessage: 'The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.', description: 'Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent\'s CLI ("Claude Code").' }),
-  signedOut: msg({ id: 'main.connections.launch.signedOut', defaultMessage: '{name} is signed out. Sign it in again in Settings → Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its connection ({name}) isn't signed in." }),
+  signedOut: msg({ id: 'main.connections.launch.signedOut', defaultMessage: '{name} is signed out. Sign it in again in Settings → Accounts & Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its account ({name}) isn't signed in." }),
   changing: msg({ id: 'main.connections.launch.changing', defaultMessage: "{name}'s login kept changing while Hive checked it. Try starting {agent} again in a moment.", description: "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as." }),
-  noKey: msg({ id: 'main.connections.launch.noKey', defaultMessage: '{name} has no key. Add one in Settings → Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its server connection ({name}) reaches a server that needs an API key, and none is saved for it. Settings → Connections names a section." })
+  noKey: msg({ id: 'main.connections.launch.noKey', defaultMessage: '{name} has no key. Add one in Settings → Accounts & Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its server account ({name}) reaches a server that needs an API key, and none is saved for it. Settings → Accounts & Connections names a section." })
 }
 
 /**
@@ -1903,9 +1880,9 @@ export function connectionHomes(id: ProviderId, cfg?: WorkspaceConfig | null): C
 }
 
 const CHOICE: Record<ConnectionProblem, Msg> = {
-  missing: msg({ id: 'main.connections.choice.missing', defaultMessage: "The connection chosen for {agent} no longer exists. Choose another, or the workspace's default.", description: "An error saving an agent's settings (or adding one): the connection chosen for it ({agent}, its name) was removed. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)." }),
+  missing: msg({ id: 'main.connections.choice.missing', defaultMessage: "The connection chosen for {agent} no longer exists. Choose another, or the workspace's default.", description: "An error saving an agent's settings (or adding one): the connection chosen for it ({agent}, its name) was removed. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)." }),
   otherCli: msg({ id: 'main.connections.choice.otherCli', defaultMessage: "{name} is for another CLI than {agent}'s. Choose one of its own.", description: "An error saving an agent's settings (or adding one): the connection chosen ({name}) belongs to another coding agent CLI than the agent's ({agent}, its name)." }),
-  off: msg({ id: 'main.connections.choice.off', defaultMessage: "{name} isn't on in this workspace. Turn it on in Settings → Connections, or choose another for {agent}.", description: "An error saving an agent's settings (or adding one): the connection chosen ({name}) is off in this workspace, so it can't be the agent's ({agent}, its name). Settings → Connections names a section." })
+  off: msg({ id: 'main.connections.choice.off', defaultMessage: "{name} isn't on in this workspace. Turn it on in Settings → Accounts & Connections, or choose another for {agent}.", description: "An error saving an agent's settings (or adding one): the connection chosen ({name}) is off in this workspace, so it can't be the agent's ({agent}, its name). Settings → Accounts & Connections names a section." })
 }
 
 /**

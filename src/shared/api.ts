@@ -1070,8 +1070,6 @@ export interface HiveRequests {
   'connection:remove': (id: string) => void
   /** Moves a connection to `index` among its account's (0: its base). */
   'connection:move': (id: string, index: number) => void
-  /** A connection's defaults for the agents on it (HI-1770): model, effort and context; '' or null leaves one to the CLI. */
-  'connections:setDefaults': (id: string, patch: { model?: string | null; effort?: string | null; use200kContext?: boolean | null }) => void
   /** Values moved from this window's workspace's projects onto their agents that their connection can't use (HI-1770), not dismissed. */
   'connections:notice': () => MovedNotice[]
   /** Dismisses those of the notice's entries (by key) that it lists now. */

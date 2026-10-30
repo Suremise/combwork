@@ -99,7 +99,7 @@ export function keyInfo(id: string): KeyInfo | undefined {
   return known.get(id)
 }
 
-const UNSAFE = msg({ id: 'main.keys.unsafe', defaultMessage: "Hive can't store a key safely on this system, so it wasn't saved.", description: "An error saving a server connection's API key (Settings → Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text." })
+const UNSAFE = msg({ id: 'main.keys.unsafe', defaultMessage: "Hive can't store a key safely on this system, so it wasn't saved.", description: "An error saving a server connection's API key (Settings → Accounts & Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text." })
 
 /** Whether a key can be stored encrypted: never in plain text (safeStorage's `basic_text` backend, off Windows). */
 function assertSafe(): void {
@@ -161,7 +161,7 @@ export function dropKeysExcept(keep: () => ReadonlySet<string>): Promise<string[
 }
 
 /**
- * Reset Masking Data (HI-1772; the user confirmed it, in Settings → Connections): the one decryption besides a launch,
+ * Reset Masking Data (HI-1772; the user confirmed it, in Settings → Accounts & Connections): the one decryption besides a launch,
  * Set Up and a model reading. The keys saved now that can still be read are fingerprinted again (keyCoverage.ts), under
  * this lock; what was lost leaves a coverage gap for good.
  */

@@ -180,8 +180,8 @@
     "description": "A line of the hover of a pane footer's context: how many times the conversation was compacted, and (over the user's threshold) a suggestion to compact."
   },
   "panes.footer.connectionChanged": {
-    "defaultMessage": "Its login changed since it was added: see Settings → Connections.",
-    "description": "Added to the hover of a pane footer's connection: the connection is signed in as another login than the one it was added with. Settings → Connections names a section."
+    "defaultMessage": "Its login changed since it was added: see Settings → Accounts & Connections.",
+    "description": "Added to the hover of a pane footer's connection: its account is signed in as another login than the one it was added with. Settings → Accounts & Connections names a section."
   },
   "panes.footer.connectionEmail": {
     "defaultMessage": "Signed in as {email}.",

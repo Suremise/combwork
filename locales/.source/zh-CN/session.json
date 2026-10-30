@@ -55,7 +55,7 @@
   "session.inUse.reserved": "Hive is already archiving, deleting or cleaning up this session.",
   "session.inUse.running": "It is running. Stop it first.",
   "session.inUse.writing": "Its CLI is still writing its transcript. Try again in a moment.",
-  "session.keyRefused.body": "Replace {name}'s key in Settings → Connections, then Resume in the project's header carries them on.",
+  "session.keyRefused.body": "Replace {name}'s key in Settings → Accounts & Connections, then Resume in the project's header carries them on.",
   "session.keyRefused.title": "{n, plural, one {{agent} stopped: {name}'s key was refused} other {# agents stopped: {name}'s key was refused}}",
   "session.leftovers.body": "{processes}. {n, plural, one {It was started by the agent and may hold the project's folder or ports.} other {They were started by the agent and may hold the project's folder or ports.}}",
   "session.leftovers.end": "End Them",

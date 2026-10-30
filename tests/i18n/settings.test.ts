@@ -116,7 +116,7 @@ describe('the settings catalogue as Settings shows it', () => {
       const s = shownSetting(e!)
       return [s.title, s.desc, s.tip, ...(e!.options ?? []).map((o) => shownText(o.text)), ...(e!.text.confirmOn ? [shownText(e!.text.confirmOn.title)] : [])]
     }
-    for (const id of ['workflow.git.fileLocks', 'workspace.workflow.none.fileLocks', 'project.workflow.fileLocks', 'claude-code.defaultPermissionMode', 'codex.defaultPermissionMode', 'copilot.defaultPermissionMode', 'claude-code.enableDangerousMode', 'codex.enableDangerousMode', 'copilot.enableDangerousMode', 'assistant.provider:codex'])
+    for (const id of ['workflow.git.fileLocks', 'workspace.workflow.none.fileLocks', 'project.workflow.fileLocks', 'claude-code.enableDangerousMode', 'codex.enableDangerousMode', 'copilot.enableDangerousMode', 'assistant.provider:codex'])
       for (const text of shown(id)) for (const name of english) expect(text, `${id}: ${name}`).not.toContain(name)
     expect(problems).toEqual([])
   })

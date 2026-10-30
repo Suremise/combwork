@@ -24,7 +24,7 @@ import { OPTION_TEXT, optionTitle, VALUE_TEXT } from './workflow/optionTexts'
 import { writeWorkflow } from './workflow/projectWorkflow'
 import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
-import { AUTO_PROVIDER, DEFAULT_PROJECT_PROVIDER, PROVIDERS, dangerModes, defaultProviderSettings, permissionLabel, projectProviderConfig, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
+import { PROVIDERS, dangerModes, defaultProviderSettings, permissionLabel, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
 import { LEGACY_CONSUMED, ownOrLegacy } from './workflow/preferences'
 import { EMPTY_HIVE, EMPTY_WORKSPACE, resolvePoint } from './commands'
 
@@ -81,12 +81,9 @@ interface Row {
   slotLevel?: WorkflowLevel | 'project'
 }
 
-/** A permission mode's name and what it does, as text: the window's words where the descriptor has them (#885). */
+/** A permission mode's name, as text: the window's words where the descriptor has them (#885). */
 function modeLabel(m: Pick<ModeOption, 'label' | 'text'>): TextPart {
   return m.text?.label ?? m.label
-}
-function modeWhat(m: Pick<ModeOption, 'description' | 'text'>): TextPart {
-  return m.text?.description ?? m.description
 }
 
 /** Advanced's values (#367) as catalog rows, drawn by Settings → Advanced's list: one each, and a workspace's own where it takes one. */
@@ -188,17 +185,17 @@ export const SETTINGS_SECTIONS: SettingsSectionInfo<SettingsSection>[] = [
   sectionInfo('general', msg({ id: 'settings.section.general.label', defaultMessage: 'General', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.general.desc', defaultMessage: 'Startup, window and tray behaviour.', description: 'Under the heading of the section "General" of Settings: what it holds.' })),
   sectionInfo('updates', msg({ id: 'settings.section.updates.label', defaultMessage: 'Updates', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.updates.desc', defaultMessage: "Keeping Hive itself up to date. New versions come from Hive's GitHub releases and are verified before they install.", description: 'Under the heading of the section "Updates" of Settings: what it holds.' })),
   sectionInfo('appearance', msg({ id: 'settings.section.appearance.label', defaultMessage: 'Appearance', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.appearance.desc', defaultMessage: 'Theme, fonts and terminal look.', description: 'Under the heading of the section "Appearance" of Settings: what it holds.' })),
-  sectionInfo('providers', msg({ id: 'settings.section.providers.label', defaultMessage: 'Providers', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.providers.desc', defaultMessage: 'The coding agents Hive can run. Turn on the ones you use; each has its own page below with its CLI and the defaults every project inherits.', description: 'Under the heading of the section "Providers" of Settings: what it holds.' })),
+  sectionInfo('providers', msg({ id: 'settings.section.providers.label', defaultMessage: 'Providers', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.providers.desc', defaultMessage: 'The coding agents Hive can run. Turn on the ones you use; each has its own page below with its CLI. Models, effort and modes are on connections (Accounts & Connections).', description: 'Under the heading of the section "Providers" of Settings: what it holds.' })),
   ...PROVIDERS.map((p) =>
     sectionInfo(
       providerSection(p.id),
       p.name,
-      withValues(msg({ id: 'settings.section.provider.desc', defaultMessage: 'The {provider} CLI (the standalone one — copies bundled with editor extensions are not used) and the defaults every project inherits for {provider} agents.', description: "Under the heading of a provider's page in Settings: what it holds. {provider} is a coding agent's name (Claude Code, Codex, GitHub Copilot)." }), { provider: p.name }),
+      withValues(msg({ id: 'settings.section.provider.desc', defaultMessage: 'The {provider} CLI (the standalone one — copies bundled with editor extensions are not used): where it is, its updates, its fallback lists and prices. Models, effort and modes are on connections.', description: "Under the heading of a provider's page in Settings: what it holds. {provider} is a coding agent's name (Claude Code, Codex, GitHub Copilot)." }), { provider: p.name }),
       p.id
     )
   ),
-  // Shown only with Settings → Advanced → Accounts (preview) on (HI-980, staged until HI-1755).
-  sectionInfo('accounts', msg({ id: 'settings.section.accounts.label', defaultMessage: 'Connections', description: "A section of Settings, in its list on the left: connections, the ways Hive's agents reach their models (a CLI signed in, or a server with a base URL and key)." }), msg({ id: 'settings.section.accounts.desc', defaultMessage: "How your agents reach their models: a Claude Code sign-in Hive keeps, signed in through Claude Code's own sign-in, or a server such as DeepSeek or Ollama, reached by its base URL and key. Each has a folder of its own, and every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the first in your order that's on in this workspace.", description: 'Under the heading of the section "Connections" of Settings: what it holds.' })),
+  // Accounts & Connections (HI-2107, HI-2105's design): the accounts, and the connections agents choose on them.
+  sectionInfo('accounts', msg({ id: 'settings.section.accounts.label', defaultMessage: 'Accounts & Connections', description: "A section of Settings, in its list on the left (HI-2107): accounts, the sign-ins and servers Hive's agents reach their models through, and connections, the named setups on them (model, effort, mode) that agents choose." }), msg({ id: 'settings.section.accounts.desc', defaultMessage: "An account is a sign-in Hive keeps (signed in through the CLI's own sign-in) or a server such as DeepSeek or Ollama, reached by its base URL and key. A connection is a setup on an account: its model, effort, context, permission mode and extra arguments. Agents and the Assistant each choose a connection, and every account shares your conversations.", description: 'Under the heading of the section "Accounts & Connections" of Settings (HI-2107): what it holds.' })),
   sectionInfo('notifications', msg({ id: 'settings.section.notifications.label', defaultMessage: 'Notifications', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.notifications.desc', defaultMessage: 'Chimes and desktop notifications when agents finish or need you.', description: 'Under the heading of the section "Notifications" of Settings: what it holds.' })),
   sectionInfo('sessions', msg({ id: 'settings.section.sessions.label', defaultMessage: 'Sessions', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.sessions.desc', defaultMessage: 'Transcript backups, cache estimates and session behaviour.', description: 'Under the heading of the section "Sessions" of Settings: what it holds.' })),
   sectionInfo('assistant', msg({ id: 'settings.section.assistant.label', defaultMessage: 'Assistant', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.assistant.desc', defaultMessage: "The Hive Assistant's defaults: the side panel's overseer of each workspace (Ctrl+Alt+I). Each workspace can change them in the panel's Assistant Settings.", description: 'Under the heading of the section "Assistant" of Settings: what it holds.' })),
@@ -278,8 +275,7 @@ const APP_ROWS: Row[] = [
   { section: 'appearance', key: 'terminalScrollback', title: msg({ id: 'settings.appearance.terminalScrollback.title', defaultMessage: 'Terminal scrollback', description: "A setting's title (Settings → Appearance)." }), desc: msg({ id: 'settings.appearance.terminalScrollback.desc', defaultMessage: 'Lines kept in each terminal for scrolling back.', description: 'What the setting "Terminal scrollback" does, under its title (Settings → Appearance).' }), tip: msg({ id: 'settings.appearance.terminalScrollback.tip', defaultMessage: 'Higher values use more memory per running session.', description: 'The info tip of the setting "Terminal scrollback" (Settings → Appearance): more on what it does and when it applies.' }), type: 'number', min: 1000, max: 100000, step: 1000 },
   { section: 'appearance', key: 'terminalCursorBlink', title: msg({ id: 'settings.appearance.terminalCursorBlink.title', defaultMessage: 'Blinking cursor', description: "A setting's title (Settings → Appearance)." }), desc: msg({ id: 'settings.appearance.terminalCursorBlink.desc', defaultMessage: 'Blink the terminal cursor.', description: 'What the setting "Blinking cursor" does, under its title (Settings → Appearance).' }), tip: msg({ id: 'settings.appearance.terminalCursorBlink.tip', defaultMessage: 'Purely cosmetic.', description: 'The info tip of the setting "Blinking cursor" (Settings → Appearance): more on what it does and when it applies.' }), type: 'boolean' },
   // Providers
-  { section: 'providers', key: 'list', title: msg({ id: 'settings.providers.list.title', defaultMessage: 'Providers', description: "A setting's title (Settings → Providers)." }), desc: msg({ id: 'settings.providers.list.desc', defaultMessage: "Turn on the coding agents you want to use. Agents of a provider that is off stay listed but can't start.", description: 'What the setting "Providers" does, under its title (Settings → Providers).' }), tip: msg({ id: 'settings.providers.list.tip', defaultMessage: 'Each project agent runs one provider, chosen when you add it (Add Agent) or in its settings. A provider needs its CLI installed and signed in.', description: 'The info tip of the setting "Providers" (Settings → Providers): more on what it does and when it applies.' }), type: 'custom', wide: true },
-  { section: 'providers', key: 'defaultProvider', title: msg({ id: 'settings.providers.defaultProvider.title', defaultMessage: 'Default provider', description: "A setting's title (Settings → Providers)." }), desc: msg({ id: 'settings.providers.defaultProvider.desc', defaultMessage: 'The provider Add Agent uses for new agents (one click, with its default settings) unless the project chooses another. Automatic uses the first provider that is turned on and installed, in the order of the list above: drag a provider, or use its ⋯ menu, to reorder it.', description: 'What the setting "Default provider" does, under its title (Settings → Providers).' }), tip: msg({ id: 'settings.providers.defaultProvider.tip', defaultMessage: 'Projects can choose their own default in Project Settings. Agents keep the provider they were given; Add Agent… (▾) can choose another.', description: 'The info tip of the setting "Default provider" (Settings → Providers): more on what it does and when it applies.' }), type: 'custom' },
+  { section: 'providers', key: 'list', title: msg({ id: 'settings.providers.list.title', defaultMessage: 'Providers', description: "A setting's title (Settings → Providers)." }), desc: msg({ id: 'settings.providers.list.desc', defaultMessage: "Turn on the coding agents you want to use. Agents of a provider that is off stay listed but can't start.", description: 'What the setting "Providers" does, under its title (Settings → Providers).' }), tip: msg({ id: 'settings.providers.list.tip', defaultMessage: "Each agent runs the CLI of the connection it chose (Settings → Accounts & Connections). A provider needs its CLI installed.", description: 'The info tip of the setting "Providers" (Settings → Providers): more on what it does and when it applies.' }), type: 'custom', wide: true },
   ...PROVIDERS.flatMap(providerRows),
   // Notifications
   { section: 'notifications', key: 'chimeEnabled', title: msg({ id: 'settings.notifications.chimeEnabled.title', defaultMessage: 'Completion chime', description: "A setting's title (Settings → Notifications)." }), desc: msg({ id: 'settings.notifications.chimeEnabled.desc', defaultMessage: 'Play a sound when an agent finishes or needs your input.', description: 'What the setting "Completion chime" does, under its title (Settings → Notifications).' }), tip: msg({ id: 'settings.notifications.chimeEnabled.tip', defaultMessage: 'Projects can override this in their settings.', description: 'The info tip of the setting "Completion chime" (Settings → Notifications): more on what it does and when it applies.' }), type: 'boolean' },
@@ -414,9 +410,9 @@ const APP_ROWS: Row[] = [
   {
     section: 'accounts',
     key: 'list',
-    title: msg({ id: 'settings.accounts.list.title', defaultMessage: 'Connections', description: "A setting's title (Settings → Connections): the list of connections." }),
-    desc: msg({ id: 'settings.accounts.list.desc', defaultMessage: "Add a connection (signed in, or a server) and choose which are on in this workspace. Drag to order each CLI's connections: new agents use the first one that's on here.", description: 'What the list "Connections" does, under its title (Settings → Connections, HI-1875: each coding agent CLI has an order of its connections; the first one on in the workspace is used).' }),
-    tip: msg({ id: 'settings.accounts.list.tip', defaultMessage: "A sign-in connection is a folder of its own that Hive made, signed in with Claude Code's own sign-in in your browser: Hive never sees or keeps its login. Its conversations and memory are shared with your other connections through a link to Claude Code's projects folder. Its settings, trusted folders and MCP servers are its own. Removing a connection deletes its folder and its login on this PC, never your conversations.", description: 'The info tip of the list "Connections" (Settings → Connections): more on what it does and when it applies.' }),
+    title: msg({ id: 'settings.accounts.list.title', defaultMessage: 'Accounts & Connections', description: "A setting's title (Settings → Accounts & Connections, HI-2107): the list of accounts, each with its connections." }),
+    desc: msg({ id: 'settings.accounts.list.desc', defaultMessage: "Add an account (signed in, or a server) and the connections agents choose on it, and turn accounts on in this workspace. Drag accounts into your order: a new agent gets the first connection of the first account that's on here.", description: 'What the list "Accounts & Connections" does, under its title (Settings → Accounts & Connections, HI-2107: one order of accounts for every coding agent CLI; a new agent gets the first connection of the first account on in the workspace).' }),
+    tip: msg({ id: 'settings.accounts.list.tip', defaultMessage: "A sign-in account is a folder of its own that Hive made, signed in with the CLI's own sign-in in your browser: Hive never sees or keeps its login. Its conversations and memory are shared with your other accounts through a link to the CLI's projects folder. Removing an account deletes its folder and its login on this PC, never your conversations. GitHub Copilot signs in once for the whole PC, in Provider Setup: its account is that sign-in.", description: 'The info tip of the list "Accounts & Connections" (Settings → Accounts & Connections, HI-2107): more on what it does and when it applies. Provider Setup names a dialog.' }),
     type: 'custom',
     wide: true
   },
@@ -537,7 +533,6 @@ const APP_ROWS: Row[] = [
 /** The settings on one provider's page, from its descriptor. */
 function providerRows(p: ProviderDescriptor): Row[] {
   const section = providerSection(p.id)
-  const safe = p.permissionModes.filter((m) => !m.danger)
   // Every danger mode the one opt-in unlocks, named in it (Copilot has two: Autopilot and Allow all, #461).
   const danger = dangerModes(p)
   const defs: Row[] = [
@@ -553,21 +548,6 @@ function providerRows(p: ProviderDescriptor): Row[] {
     { section, provider: p.id, key: 'status', title: msg({ id: 'settings.provider.status.title', defaultMessage: 'Installation', description: "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)." }), tip: withValues(msg({ id: 'settings.provider.status.tip', defaultMessage: 'Where Hive found {provider}, whether it is signed in and whether an update is available.', description: 'The info tip of the setting "Installation" (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is its name.' }), { provider: p.name }), type: 'custom' },
     { section, provider: p.id, key: 'executablePath', title: msg({ id: 'settings.provider.executablePath.title', defaultMessage: 'CLI path', description: "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)." }), desc: withValues(msg({ id: 'settings.provider.executablePath.desc', defaultMessage: 'Full path to the {provider} CLI ({cli}.exe). Leave empty to detect it automatically.', description: 'What the setting "CLI path" does (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is its name, {cli} its command: keep it.' }), { provider: p.name, cli: p.cliName }), tip: msg({ id: 'settings.provider.executablePath.tip', defaultMessage: 'Detection checks PATH and the usual install folders. Copies bundled with editor extensions (VS Code, Cursor…) are never used — Hive requires the standalone CLI.', description: 'The info tip of the setting "CLI path" (Settings → a provider page: Claude Code, Codex or GitHub Copilot): more on what it does and when it applies.' }), type: 'text', placeholder: msg({ id: 'settings.provider.executablePath.placeholder', defaultMessage: 'Auto-detect', description: 'The empty box\'s placeholder of the setting "CLI path" (Settings → a provider page: Claude Code, Codex or GitHub Copilot).' }) },
     { section, provider: p.id, key: 'checkUpdatesOnLaunch', title: msg({ id: 'settings.provider.checkUpdatesOnLaunch.title', defaultMessage: 'Check for updates on launch', description: "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)." }), desc: msg({ id: 'settings.provider.checkUpdatesOnLaunch.desc', defaultMessage: 'Compare the installed version with the latest release when Hive starts.', description: 'What the setting "Check for updates on launch" does, under its title (Settings → a provider page: Claude Code, Codex or GitHub Copilot).' }), tip: withValues(msg({ id: 'settings.provider.checkUpdatesOnLaunch.tip', defaultMessage: 'Hive never updates {provider} without asking. Standalone installs may also update themselves.', description: 'The info tip of the setting "Check for updates on launch" (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is its name.' }), { provider: p.name }), type: 'boolean' },
-    // A CLI with connections has its model, effort and context on each connection (HI-1770, S8: HI-1774); Copilot keeps its own.
-    ...(p.capabilities.connections
-      ? []
-      : ([{ section, provider: p.id, key: 'defaultModel', title: msg({ id: 'settings.provider.defaultModel.title', defaultMessage: 'Default model', description: "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)." }), desc: withValues(msg({ id: 'settings.provider.defaultModel.desc', defaultMessage: 'Model for {provider} sessions unless a project overrides it. {provider} default uses its own choice.', description: 'What the setting "Default model" does (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is its name; "<provider> default" is the first choice of the model list.' }), { provider: p.name }), tip: msg({ id: 'settings.provider.defaultModel.tip', defaultMessage: 'Whether your account can use a model is only known when a session starts.', description: 'The info tip of the setting "Default model" (Settings → a provider page: Claude Code, Codex or GitHub Copilot): more on what it does and when it applies.' }), type: 'custom' },
-          { section, provider: p.id, key: 'defaultEffort', title: msg({ id: 'settings.provider.defaultEffort.title', defaultMessage: 'Default effort', description: "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)." }), desc: msg({ id: 'settings.provider.defaultEffort.desc', defaultMessage: "Reasoning effort unless a project overrides it. The levels are the default model's, as the CLI reports them.", description: 'What the setting "Default effort" does, under its title (Settings → a provider page: Claude Code, Codex or GitHub Copilot).' }), tip: msg({ id: 'settings.provider.defaultEffort.tip', defaultMessage: 'Higher effort is more thorough but slower and uses more tokens.', description: 'The info tip of the setting "Default effort" (Settings → a provider page: Claude Code, Codex or GitHub Copilot): more on what it does and when it applies.' }), type: 'custom' }] as Row[])),
-    {
-      section,
-      provider: p.id,
-      key: 'defaultPermissionMode',
-      title: msg({ id: 'settings.provider.defaultPermissionMode.title', defaultMessage: 'Default permission mode', description: "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)." }),
-      desc: msg({ id: 'settings.provider.defaultPermissionMode.desc', defaultMessage: 'The mode sessions start in unless a project overrides it.', description: 'What the setting "Default permission mode" does, under its title (Settings → a provider page: Claude Code, Codex or GitHub Copilot).' }),
-      tip: linesOf(safe.map((m) => withValues(msg({ id: 'settings.permissionModes.modeLine', defaultMessage: '{mode}: {what}', description: 'A line of a permission mode setting\'s info tip: a mode\'s name and what it does.' }), { mode: modeLabel(m), what: modeWhat(m) }))),
-      type: 'select',
-      options: safe.map((m) => ({ value: m.value, label: modeLabel(m) }))
-    }
   ]
   if (danger.length) {
     // How many modes it unlocks decides the grammar: "the Autopilot and Allow all options are". The English names them
@@ -579,26 +559,15 @@ function providerRows(p: ProviderDescriptor): Row[] {
       provider: p.id,
       key: 'enableDangerousMode',
       title: withValues(msg({ id: 'settings.provider.enableDangerousMode.title', defaultMessage: '{n, plural, one {Enable the {names} option} other {Enable the {names} options}}', description: "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot): lets projects choose the modes that run every action without asking. {names} lists those modes' names; {n} is how many. If your language puts the names of modes and options in quotation marks, write {quotedNames} in place of {names}: the same list with each name in its own quotation marks." }), modes),
-      desc: withValues(msg({ id: 'settings.provider.enableDangerousMode.desc', defaultMessage: 'Allow projects and agents to choose {choices}, where the agent runs every action without asking.', description: 'What the setting "Enable the <mode> option" does (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {choices} lists the modes\' names, in quotes, joined with "or".' }), { choices: listOf(quoted, 'disjunction') }),
-      tip: withValues(msg({ id: 'settings.provider.enableDangerousMode.tip', defaultMessage: '{n, plural, one {{names} is never a global default. When turned off, projects and agents using it return to Inherit.} other {{names} are never a global default. When turned off, projects and agents using them return to Inherit.}}', description: 'The info tip of the setting "Enable the <mode> option" (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {names} lists the modes\' names; {n} is how many. If your language puts the names of modes and options in quotation marks, write {quotedNames} in place of {names}: the same list with each name in its own quotation marks. Inherit is a choice of the project\'s settings: keep it as Hive shows it.' }), modes),
+      desc: withValues(msg({ id: 'settings.provider.enableDangerousMode.desc', defaultMessage: 'Allow connections to choose {choices}, where the agent runs every action without asking.', description: 'What the setting "Enable the <mode> option" does (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {choices} lists the modes\' names, in quotes, joined with "or".' }), { choices: listOf(quoted, 'disjunction') }),
+      tip: withValues(msg({ id: 'settings.provider.enableDangerousMode.tip', defaultMessage: "{n, plural, one {Only a connection chooses {names}. When turned off, a connection that chose it launches in the CLI's own default mode and says so.} other {Only a connection chooses {names}. When turned off, a connection that chose one of them launches in the CLI's own default mode and says so.}}", description: 'The info tip of the setting "Enable the <mode> option" (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {names} lists the modes\' names; {n} is how many. If your language puts the names of modes and options in quotation marks, write {quotedNames} in place of {names}: the same list with each name in its own quotation marks. A connection is a named setup agents choose (Settings → Accounts & Connections).' }), modes),
       type: 'boolean',
       danger: true,
       confirmOn: {
         title: withValues(msg({ id: 'settings.provider.enableDangerousMode.confirm.title', defaultMessage: '{n, plural, one {Enable the {names} option?} other {Enable the {names} options?}}', description: 'The title of the confirmation before the setting "Enable the <mode> option" is turned on (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {names} lists the modes\' names; {n} is how many. If your language puts the names of modes and options in quotation marks, write {quotedNames} in place of {names}: the same list with each name in its own quotation marks.' }), modes),
-        message: withValues(msg({ id: 'settings.provider.enableDangerousMode.confirm.message', defaultMessage: 'Projects will be able to run sessions where {provider} executes every command, file edit and network request without asking.', description: 'The confirmation before the setting "Enable the <mode> option" is turned on (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is a coding agent\'s name.' }), { provider: p.name }),
+        message: withValues(msg({ id: 'settings.provider.enableDangerousMode.confirm.message', defaultMessage: 'Connections will be able to run sessions where {provider} executes every command, file edit and network request without asking.', description: 'The confirmation before the setting "Enable the <mode> option" is turned on (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is a coding agent\'s name.' }), { provider: p.name }),
         detail: msg({ id: 'settings.provider.enableDangerousMode.confirm.detail', defaultMessage: 'Recommended only for disposable environments. Each project still has to choose it, and doing so asks for confirmation.', description: "The confirmation before the setting is turned on (Settings → a provider page: Claude Code, Codex or GitHub Copilot): its detail." })
       }
-    })
-  }
-  if (p.capabilities.contextLimit && !p.capabilities.connections) {
-    defs.push({
-      section,
-      provider: p.id,
-      key: 'use200kContext',
-      title: msg({ id: 'settings.provider.use200kContext.title', defaultMessage: 'Use 200K context (instead of 1M)', description: "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)." }),
-      desc: withValues(msg({ id: 'settings.provider.use200kContext.desc', defaultMessage: "Run {provider} sessions with a 200K-token context window instead of the model's 1M one, unless a project or agent chooses otherwise. Applies to sessions started afterwards.", description: 'What the setting "Use 200K context (instead of 1M)" does (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is its name.' }), { provider: p.name }),
-      tip: withValues(msg({ id: 'settings.provider.use200kContext.tip', defaultMessage: 'Current models have a 1M window at no extra price per token, but a long conversation sends more tokens with every message, and answers slow down as the context fills. With 200K, {provider} compacts the conversation sooner.', description: 'The info tip of the setting "Use 200K context (instead of 1M)" (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is its name.' }), { provider: p.name }),
-      type: 'boolean'
     })
   }
   if (p.capabilities.backgroundSessions) {
@@ -619,7 +588,6 @@ function providerRows(p: ProviderDescriptor): Row[] {
       type: 'boolean'
     })
   }
-  defs.push({ section, provider: p.id, key: 'extraArgs', title: msg({ id: 'settings.provider.extraArgs.title', defaultMessage: 'Extra arguments', description: "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)." }), desc: withValues(msg({ id: 'settings.provider.extraArgs.desc', defaultMessage: 'Additional {cli} command-line arguments for every session.', description: 'What the setting "Extra arguments" does (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {cli} is the CLI\'s command: keep it.' }), { cli: p.cliName }), tip: msg({ id: 'settings.provider.extraArgs.tip', defaultMessage: 'Projects can add more in their own settings.', description: 'The info tip of the setting "Extra arguments" (Settings → a provider page: Claude Code, Codex or GitHub Copilot): more on what it does and when it applies.' }), type: 'text', placeholder: msg({ id: 'settings.provider.extraArgs.placeholder', defaultMessage: 'e.g. --verbose', description: 'The empty box\'s placeholder of the setting "Extra arguments" (Settings → a provider page: Claude Code, Codex or GitHub Copilot).' }) })
   defs.push({
     section,
     provider: p.id,
@@ -691,14 +659,6 @@ function providerRows(p: ProviderDescriptor): Row[] {
 export const PROJECT_SETTINGS_SECTIONS: SettingsSectionInfo[] = [
   sectionInfo('general', msg({ id: 'settings.projectSection.general.label', defaultMessage: 'General', description: 'A section of Project Settings, in its list on the left: the project’s key and its default provider.' }), msg({ id: 'settings.projectSection.general.desc', defaultMessage: 'The project’s key, which names its cards, and the provider its new agents use.', description: 'Under the heading of the section "General" of Project Settings: what it holds.' })),
   sectionInfo('agents', msg({ id: 'settings.projectSection.agents.label', defaultMessage: 'Agents', description: 'A section of Project Settings, in its list on the left: the project’s agents, with each CLI’s settings under it.' }), msg({ id: 'settings.projectSection.agents.desc', defaultMessage: 'The project’s agents and the settings of each CLI they run.', description: 'Under the heading of the section "Agents" of Project Settings: what it holds.' })),
-  ...PROVIDERS.map((p) =>
-    sectionInfo(
-      `provider:${p.id}`,
-      p.name,
-      withValues(msg({ id: 'settings.projectSection.provider.desc', defaultMessage: 'Model, effort and permissions for this project’s {provider} agents. Agents can override these for themselves.', description: "Under the heading of a provider's section of Project Settings: what it holds. {provider} is a coding agent's name." }), { provider: p.name }),
-      p.id
-    )
-  ),
   sectionInfo('sessions', msg({ id: 'settings.projectSection.sessions.label', defaultMessage: 'Sessions', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.sessions.desc', defaultMessage: 'Compacting and notifications for this project.', description: 'Under the heading of the section "Sessions" of Project Settings: what it holds.' })),
   sectionInfo('storage', msg({ id: 'settings.projectSection.storage.label', defaultMessage: 'Storage', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.storage.desc', defaultMessage: 'What Hive keeps for this project: transcript backups, archived sessions, attachments and the agents’ worktrees. Clean Up… moves old backups and attachments to the Recycle Bin; Purge… removes everything Hive keeps for its sessions.', description: 'Under the heading of the section "Storage" of Project Settings: what it holds. Clean Up… and Purge… are buttons: use their names as translated there.' })),
   sectionInfo('keys', msg({ id: 'settings.projectSection.keys.label', defaultMessage: 'Keyboard Shortcuts', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.keys.desc', defaultMessage: 'Shortcuts for project and session commands while this project is selected, over the global ones.', description: 'Under the heading of the section "Keyboard Shortcuts" of Project Settings: what it holds.' })),
@@ -707,34 +667,6 @@ export const PROJECT_SETTINGS_SECTIONS: SettingsSectionInfo[] = [
 
 const INHERIT: RowOption = { value: 'inherit', label: msg({ id: 'settings.option.inherit', defaultMessage: 'Inherit', description: "A choice of a project's setting: use Hive's own setting (Settings) instead of one of its own." }) }
 const ON_OFF: RowOption[] = [INHERIT, { value: 'on', label: msg({ id: 'settings.option.on', defaultMessage: 'On', description: 'A choice of a setting that is on or off, beside Inherit or Default.' }) }, { value: 'off', label: msg({ id: 'settings.option.off', defaultMessage: 'Off', description: 'A choice of a setting that is on or off, beside Inherit or Default.' }) }]
-
-/** A project's model, effort, mode, context and arguments for one provider (Project Settings → <provider>). */
-function projectProviderRows(p: ProviderDescriptor): Row[] {
-  const section = `provider:${p.id}`
-  return [
-    // A CLI with connections: none (each connection's, and the agents' own: HI-1770, HI-1774).
-    ...(p.capabilities.connections
-      ? []
-      : ([{ section, provider: p.id, key: 'model', title: msg({ id: 'settings.projectProvider.model.title', defaultMessage: 'Model', description: "A setting's title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot)." }), desc: withValues(msg({ id: 'settings.projectProvider.model.desc', defaultMessage: "Model for this project's {provider} agents. Inherit uses Settings → {provider} → Default model.", description: 'What the setting "Model" does (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {provider} is its name.' }), { provider: p.name }), tip: withValues(msg({ id: 'settings.projectProvider.model.tip', defaultMessage: 'Passed to {provider} when a session starts. Agents can choose their own.', description: 'The info tip of the setting "Model" (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {provider} is its name.' }), { provider: p.name }), type: 'custom' },
-          { section, provider: p.id, key: 'effort', title: msg({ id: 'settings.projectProvider.effort.title', defaultMessage: 'Effort', description: "A setting's title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot)." }), desc: msg({ id: 'settings.projectProvider.effort.desc', defaultMessage: 'How much reasoning effort the model uses. Higher is more thorough but slower and uses more tokens.', description: 'What the setting "Effort" does, under its title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot).' }), tip: withValues(msg({ id: 'settings.projectProvider.effort.tip', defaultMessage: 'Passed to {provider} when a session starts. Inherit uses Settings → {provider} → Default effort.', description: 'The info tip of the setting "Effort" (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {provider} is its name.' }), { provider: p.name }), type: 'custom' }] as Row[])),
-    {
-      section,
-      provider: p.id,
-      key: 'permissionMode',
-      title: msg({ id: 'settings.projectProvider.permissionMode.title', defaultMessage: 'Permission mode', description: "A setting's title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot)." }),
-      desc: withValues(msg({ id: 'settings.projectProvider.permissionMode.desc', defaultMessage: "The mode this project's {provider} sessions start in. Inherit uses Settings → {provider} → Default permission mode.", description: 'What the setting "Permission mode" does (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {provider} is its name.' }), { provider: p.name }),
-      tip: linesOf([
-        ...p.permissionModes.map((m) => withValues(msg({ id: 'settings.permissionModes.modeLine', defaultMessage: '{mode}: {what}', description: 'A line of a permission mode setting\'s info tip: a mode\'s name and what it does.' }), { mode: modeLabel(m), what: modeWhat(m) })),
-        ...(p.capabilities.liveModeSwitch === 'cycle' ? ['', msg({ id: 'settings.projectProvider.permissionMode.cycle', defaultMessage: 'You can still switch modes inside a running session with Shift+Tab.', description: 'The last line of the setting "Permission mode"\'s info tip (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot), for a provider that switches modes in a session.' })] : [])
-      ]),
-      type: 'custom'
-    },
-    ...(p.capabilities.contextLimit && !p.capabilities.connections
-      ? [{ section, provider: p.id, key: 'use200kContext', title: msg({ id: 'settings.projectProvider.use200kContext.title', defaultMessage: 'Use 200K context (instead of 1M)', description: "A setting's title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot)." }), desc: withValues(msg({ id: 'settings.projectProvider.use200kContext.desc', defaultMessage: "A 200K-token context window for this project's {provider} agents instead of the model's 1M one. Inherit uses Settings → {provider}.", description: 'What the setting "Use 200K context (instead of 1M)" does (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {provider} is its name.' }), { provider: p.name }), tip: msg({ id: 'settings.projectProvider.use200kContext.tip', defaultMessage: 'Applies to sessions started afterwards. Agents can choose for themselves.', description: 'The info tip of the setting "Use 200K context (instead of 1M)" (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot): more on what it does and when it applies.' }), type: 'select' as const, options: ON_OFF }]
-      : []),
-    { section, provider: p.id, key: 'extraArgs', title: msg({ id: 'settings.projectProvider.extraArgs.title', defaultMessage: 'Extra arguments', description: "A setting's title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot)." }), desc: withValues(msg({ id: 'settings.projectProvider.extraArgs.desc', defaultMessage: 'Additional {cli} command-line arguments for this project, added after the global ones.', description: 'What the setting "Extra arguments" does (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {cli} is the CLI\'s command: keep it.' }), { cli: p.cliName }), tip: msg({ id: 'settings.projectProvider.extraArgs.tip', defaultMessage: 'Split like a command line; quote arguments with spaces.', description: 'The info tip of the setting "Extra arguments" (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot): more on what it does and when it applies.' }), type: 'text', placeholder: '--add-dir ../lib' } // i18n-ignore: a pattern, not text
-  ]
-}
 
 /** What Project Settings → Project key does (#1221): Project Settings gives its example in the project's own key. */
 export const PROJECT_KEY_DESC = msg({ id: 'settings.project.key.desc', defaultMessage: 'The 2 to 4 letters this project’s cards are named by, as in {example}. If you change it, the old key still finds them.', description: 'What the setting "Project key" does, under its title (Project Settings → General). {example} is a card name with the project\'s own key, such as WB-12.' })
@@ -824,8 +756,6 @@ function workflowRows(): Row[] {
 
 const PROJECT_ROWS: Row[] = [
   { section: 'general', key: 'key', title: msg({ id: 'settings.project.key.title', defaultMessage: 'Project key', description: "A setting's title (Project Settings → General): the project's key, 2–4 letters such as AM that its cards are named by (AM-12)." }), desc: withValues(PROJECT_KEY_DESC, { example: 'AM-12' }), type: 'custom' },
-  { section: 'general', key: 'defaultProvider', title: msg({ id: 'settings.project.defaultProvider.title', defaultMessage: 'Default provider', description: "A setting's title (Project Settings → General)." }), desc: msg({ id: 'settings.project.defaultProvider.desc', defaultMessage: "The provider Add Agent uses for this project's new agents (the dialog can choose another). Inherit uses Settings → Providers → Default provider.", description: 'What the setting "Default provider" does, under its title (Project Settings → General).' }), tip: msg({ id: 'settings.project.defaultProvider.tip', defaultMessage: 'Each agent keeps the provider it was given; change it in the agent’s settings.', description: 'The info tip of the setting "Default provider" (Project Settings → General): more on what it does and when it applies.' }), type: 'custom' },
-  ...PROVIDERS.flatMap(projectProviderRows),
   { section: 'sessions', key: 'compactSuggestTokens', title: msg({ id: 'settings.project.compactSuggestTokens.title', defaultMessage: 'Suggest compacting above', description: "A setting's title (Project Settings → Sessions)." }), desc: msg({ id: 'settings.project.compactSuggestTokens.desc', defaultMessage: 'Context size (tokens) at which Compact is highlighted for this project. Empty inherits Settings → Sessions → Suggest compacting above.', description: 'What the setting "Suggest compacting above" does, under its title (Project Settings → Sessions).' }), tip: msg({ id: 'settings.project.compactSuggestTokens.tip', defaultMessage: 'Only changes when the Compact button turns orange; compacting is always available once the agent has finished.', description: 'The info tip of the setting "Suggest compacting above" (Project Settings → Sessions): more on what it does and when it applies.' }), type: 'number', min: 1000, max: 2000000, step: 10000, off: msg({ id: 'settings.project.compactSuggestTokens.off', defaultMessage: 'Never', description: 'The Off box of the number setting "Suggest compacting above" (Project Settings → Sessions): ticked, the setting is off (0).' }) },
   { section: 'sessions', key: 'transcriptWarnMB', title: msg({ id: 'settings.project.transcriptWarnMB.title', defaultMessage: 'Warn when a transcript is over', description: "A setting's title (Project Settings → Sessions)." }), desc: msg({ id: 'settings.project.transcriptWarnMB.desc', defaultMessage: "Size, in MB, at which a running conversation's transcript is flagged for this project. Empty inherits Settings → Sessions → Warn when a transcript is over.", description: 'What the setting "Warn when a transcript is over" does, under its title (Project Settings → Sessions).' }), tip: msg({ id: 'settings.project.transcriptWarnMB.tip', defaultMessage: 'A long conversation slows down the CLI and Hive; handing the work over to a new conversation makes it short again.', description: 'The info tip of the setting "Warn when a transcript is over" (Project Settings → Sessions): more on what it does and when it applies.' }), type: 'number', min: 1, max: 2000, step: 10, off: msg({ id: 'settings.project.transcriptWarnMB.off', defaultMessage: 'Never', description: 'The Off box of the number setting "Warn when a transcript is over" (Project Settings → Sessions): ticked, the setting is off (0).' }) },
   { section: 'sessions', key: 'chime', title: msg({ id: 'settings.project.chime.title', defaultMessage: 'Completion chime', description: "A setting's title (Project Settings → Sessions)." }), desc: msg({ id: 'settings.project.chime.desc', defaultMessage: 'Play a sound when an agent in this project finishes or needs input.', description: 'What the setting "Completion chime" does, under its title (Project Settings → Sessions).' }), tip: msg({ id: 'settings.project.chime.tip', defaultMessage: 'Inherit follows Settings → Notifications.', description: 'The info tip of the setting "Completion chime" (Project Settings → Sessions): more on what it does and when it applies.' }), type: 'select', options: ON_OFF },
@@ -921,20 +851,15 @@ const ACTIONS = new Set([
 const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
   'notifications.chimeSound': 'select',
   'general.language': 'select',
-  'providers.defaultProvider': 'select',
   'assistant.mode': 'text',
-  'project.defaultProvider': 'select',
   ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
   'board.colors': 'table',
   ...Object.fromEntries(
     PROVIDERS.flatMap((p): [string, SettingEntry['value']][] => [
       [`${p.id}.enabled`, 'boolean'],
-      // A CLI with connections has no model or effort of its own, nor its projects (HI-1774).
-      ...(p.capabilities.connections ? [] : ([[`${p.id}.defaultModel`, 'text'], [`${p.id}.defaultEffort`, 'effort'], [`project.${p.id}.model`, 'text'], [`project.${p.id}.effort`, 'effort']] as [string, SettingEntry['value']][])),
       [`${p.id}.modelFallback`, 'table'],
       [`${p.id}.effortFallback`, 'table'],
       [`${p.id}.prices`, 'table'],
-      [`project.${p.id}.permissionMode`, 'select'],
       [`assistant.${p.id}.model`, 'text'],
       [`assistant.${p.id}.effort`, 'effort'],
       [`assistant.${p.id}.permissionMode`, 'select'],
@@ -1002,7 +927,6 @@ const HELPS: Record<string, string> = {
   'project.transcriptWarnMB': "One project's conversations grow much bigger than others'.", // i18n-ignore: the Assistant's tools (English)
   'project.cardAttachmentCleanup': "A project's archived cards keep screenshots and logs that take a lot of disk space: fewer days removes them sooner.", // i18n-ignore: the Assistant's tools (English)
   'project.slotCopy': 'New slots and review copies of this project miss git-ignored files its builds need.', // i18n-ignore: the Assistant's tools (English)
-  ...Object.fromEntries(PROVIDERS.filter((p) => p.capabilities.contextLimit).map((p) => [`${p.id}.use200kContext`, `${p.name} conversations get slow and costly as they grow: a 200K window makes ${p.name} compact sooner.`])) // i18n-ignore: the Assistant's tools (English)
 }
 
 /** The id of the user guide's heading for each section (Help → User Guide). */
@@ -1163,10 +1087,8 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
     // With no options yet, its card loops and file locks from before HI-1766, as the form and the runtime read them.
     if (e.workflow) return ownOrLegacy(project as ProjectConfig & Record<string, unknown>)[e.workflow] ?? 'inherit'
     if (e.key === PLATFORM_SETTING_KEY) return project.platform ?? project.workflow?.platform ?? null
-    if (e.provider) return (projectProviderConfig(project, e.provider) as unknown as Record<string, unknown>)[e.key] ?? 'inherit'
     return (project as unknown as Record<string, unknown>)[e.key]
   }
-  if (e.id === 'providers.defaultProvider') return settings.defaultProvider
   if (e.provider) {
     const v = (providerSettings(settings, e.provider) as unknown as Record<string, unknown>)[e.key]
     // A fallback list nobody edited is Hive's own (an empty list).
@@ -1194,9 +1116,7 @@ export function settingDefault(e: SettingEntry): unknown {
   if (/^workspace\.(onClose|onOpen|commands)$|^general\.(onQuit|commands)$/.test(e.id)) return []
   if (e.advanced) return e.advanced.scope === 'workspace' ? null : advancedDef(e.advanced.id)?.default
   if (e.workflowLevel || e.slotLevel) return 'inherit'
-  // A project's provider settings inherit, but its Extra arguments are added to Hive's: empty (DEFAULT_PROJECT_PROVIDER).
-  if (e.scope === 'project') return e.provider ? (DEFAULT_PROJECT_PROVIDER as unknown as Record<string, unknown>)[e.key] : e.workflow ? 'inherit' : (DEFAULT_PROJECT_CONFIG as unknown as Record<string, unknown>)[e.key]
-  if (e.id === 'providers.defaultProvider') return DEFAULT_SETTINGS.defaultProvider
+  if (e.scope === 'project') return e.workflow ? 'inherit' : (DEFAULT_PROJECT_CONFIG as unknown as Record<string, unknown>)[e.key]
   if (e.provider) {
     if (e.key === 'modelFallback' || e.key === 'effortFallback') return []
     if (e.key === 'prices') return {}
@@ -1210,15 +1130,9 @@ export function settingDefault(e: SettingEntry): unknown {
 export function settingOptions(e: SettingEntry): { value: string; label: string }[] | null {
   // The tools' choices, in English: the Assistant sets a value by it or by its label as the tools name it.
   if (e.options) return e.options
-  const providers = PROVIDERS.map((p) => ({ value: p.id, label: p.name }))
-  const inherit = { value: INHERIT.value, label: englishText(INHERIT.label) }
   if (e.id === 'notifications.chimeSound') return ['chime', 'bell', 'soft', 'pop'].map((v) => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }))
-  if (e.id === 'providers.defaultProvider') return [{ value: AUTO_PROVIDER, label: 'Automatic' }, ...providers] // i18n-ignore: the Assistant's tools (English)
   // The Assistant's tools name languages in English (Polish, or pl); Settings shows each by its own name.
   if (e.id === 'general.language') return [{ value: 'auto', label: 'Automatic' }, ...LANGUAGES.map((l) => ({ value: l.code, label: l.english }))] // i18n-ignore: the Assistant's tools (English)
-  if (e.id === 'project.defaultProvider') return [inherit, ...providers]
-  const modes = (p: ProviderId) => providerDescriptor(p).permissionModes.map((m) => ({ value: m.value, label: englishText(m.label) }))
-  if (e.scope === 'project' && e.provider && e.key === 'permissionMode') return [inherit, ...modes(e.provider)]
   return null
 }
 
@@ -1420,11 +1334,8 @@ export function settingPatch(
     }
   }
   if (e.scope === 'project') {
-    const provider = e.provider
-    if (provider) return { project: (cfg) => ({ providers: { ...cfg.providers, [provider]: { ...projectProviderConfig(cfg, provider), [e.key]: value } } }) }
     return { project: () => ({ [e.key]: value }) as Partial<ProjectConfig> }
   }
-  if (e.id === 'providers.defaultProvider') return { settings: { defaultProvider: value } }
   if (e.provider && e.key === 'prices') return { prices: { provider: e.provider, value: value as Record<string, unknown> } }
   if (e.provider && (e.key === 'modelFallback' || e.key === 'effortFallback')) return { fallback: { provider: e.provider, kind: e.key === 'modelFallback' ? 'models' : 'efforts', list: Array.isArray(value) && value.length ? value : null } }
   if (e.provider) return { settings: { providers: { [e.provider]: { [e.key]: value } } } }

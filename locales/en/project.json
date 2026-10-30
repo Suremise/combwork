@@ -932,8 +932,8 @@
     "description": "Above the plan limits. {plan} is the plan's name (none when unknown); {when} how long ago they were reported."
   },
   "project.limit.noConnections": {
-    "defaultMessage": "No {provider} connection is on in this workspace. Turn one on in Settings → Connections to see its plan limits here.",
-    "description": "In place of the plan limits (HI-1756) when the workspace has no connection on for the coding agent ({provider}). Settings → Connections names a section."
+    "defaultMessage": "No {provider} account is on in this workspace. Turn one on in Settings → Accounts & Connections to see its plan limits here.",
+    "description": "In place of the plan limits (HI-1756) when the workspace has no account on for the coding agent ({provider}). Settings → Accounts & Connections names a section."
   },
   "project.limit.none": {
     "defaultMessage": "{provider} reports your plan’s limits while a session runs; they appear here after the next message in any {provider} session. Accounts that use an API key have no plan limits.",
@@ -1331,10 +1331,6 @@
     "defaultMessage": "No settings match.",
     "description": "Project Settings when the search finds nothing."
   },
-  "project.settings.now": {
-    "defaultMessage": "{desc} Now: {current}",
-    "description": "A setting's description followed by what the value in use does. {desc} is the description; {current} what is in use."
-  },
   "project.settings.off": {
     "defaultMessage": "Off",
     "description": "A choice: off."
@@ -1359,10 +1355,6 @@
     "defaultMessage": "Overrides the global default",
     "description": "Tooltip on the mark beside a project setting that is not Inherit."
   },
-  "project.settings.providerDefault": {
-    "defaultMessage": "{provider} default",
-    "description": "The provider's own default model, in \"Inherit (Claude Code default)\"."
-  },
   "project.settings.reset": {
     "defaultMessage": "Reset",
     "description": "The reset confirmation's button."
@@ -1386,10 +1378,6 @@
   "project.settings.search": {
     "defaultMessage": "Search {project} settings",
     "description": "Placeholder of Project Settings' search box."
-  },
-  "project.settings.sessionsIn": {
-    "defaultMessage": "Sessions in {project} will run every command, edit and network call without asking.",
-    "description": "The confirmation before choosing a no-guardrails permission mode for a project's sessions ({project}: the project's name)."
   },
   "project.settings.warnOver": {
     "defaultMessage": "Warn when a transcript is over",

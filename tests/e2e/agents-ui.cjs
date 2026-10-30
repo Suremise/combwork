@@ -130,9 +130,9 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('…starting on a merge commit for a project with no workflow', !!(await lib.until(async () => (await page.locator('.dialog .choice-list[data-merge-style="read"]').count()) === 1, HUNG_MS)) && (await page.locator('.dialog .choice-list input[type="radio"]').first().isChecked()))
   await page.keyboard.press('Escape'); await sleep(300)
 
-  // Project settings: General (opened first: key and provider), then Agents (HI-1765)
+  // Project settings: General (opened first: its key), then Agents (HI-1765)
   await lib.openProjectSettings(page)
-  check('project settings open on General, with the key and the default provider', !!(await lib.until(async () => (await page.locator('.settings-nav .row.selected .label').innerText().catch(() => '')) === 'General' && (await page.locator('.setting', { hasText: 'Project key' }).count()) === 1 && (await page.locator('.setting', { hasText: 'Default provider' }).count()) === 1, HUNG_MS)))
+  check('project settings open on General, with the key and no default provider (HI-2107)', !!(await lib.until(async () => (await page.locator('.settings-nav .row.selected .label').innerText().catch(() => '')) === 'General' && (await page.locator('.setting', { hasText: 'Project key' }).count()) === 1, HUNG_MS)) && (await page.locator('.setting', { hasText: 'Default provider' }).count()) === 0)
   check('…and no Slots and copies row', (await page.locator('[data-action="open-slot-options"]').count()) === 0)
   await page.screenshot({ path: path.join(scratch, 'ui-4-projgeneral.png') })
   await page.locator('.settings-nav .row', { hasText: /^\s*Agents\s*$/ }).first().click()

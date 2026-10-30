@@ -1,11 +1,15 @@
 {
-  "settings.accounts.addOne": {
-    "defaultMessage": "Add a Connection…",
-    "description": "Button under the list in Settings → Connections: adds a connection (asks which coding agent CLI, its name and where it gets its model), then opens its sign-in or sets up its server."
+  "settings.accounts.addAccount": {
+    "defaultMessage": "Add Account…",
+    "description": "Button in Settings → Accounts & Connections (HI-2107): adds an account (asks which coding agent CLI, its name and where it gets its model), then opens its sign-in or sets up its server. It comes with its first connection."
+  },
+  "settings.accounts.addConnection": {
+    "defaultMessage": "Add Connection",
+    "description": "Button under an account's connections (Settings → Accounts & Connections, HI-2107): adds a connection on it (a dialog)."
   },
   "settings.accounts.affected": {
     "defaultMessage": "{n, plural, one {# running agent runs on another connection than the one chosen for it now.} other {# running agents run on another connection than the one chosen for them now.}}",
-    "description": "Banner in Settings → Connections after a connection was turned off or the default changed (HI-1755): how many running agents are on a connection other than the one chosen now."
+    "description": "Banner in Settings → Accounts & Connections after a connection was turned off or the default changed (HI-1755): how many running agents are on a connection other than the one chosen now."
   },
   "settings.accounts.changeFailed": {
     "defaultMessage": "Couldn't change the connection",
@@ -13,11 +17,11 @@
   },
   "settings.accounts.changedTo": {
     "defaultMessage": "Now signed in as {now}, was {was}",
-    "description": "A warning on a connection (Settings → Connections): its login changed (a /login typed in a pane). {now} and {was} are emails."
+    "description": "A warning on a connection (Settings → Accounts & Connections): its login changed (a /login typed in a pane). {now} and {was} are emails."
   },
   "settings.accounts.checkedAt": {
     "defaultMessage": "Checked {when}",
-    "description": "The tooltip of a connection's state (Settings → Connections): when it was last checked. {when} is how long ago (\"5 min ago\")."
+    "description": "The tooltip of a connection's state (Settings → Accounts & Connections): when it was last checked. {when} is how long ago (\"5 min ago\")."
   },
   "settings.accounts.closeRunningConfirm": {
     "defaultMessage": "Close Terminal",
@@ -29,43 +33,59 @@
   },
   "settings.accounts.closeRunningTitle": {
     "defaultMessage": "Close the terminal?",
-    "description": "Title of the dialog asked by Close under a connection's sign-in or Set Up terminal while the CLI in it still runs (Settings → Connections)."
+    "description": "Title of the dialog asked by Close under a connection's sign-in or Set Up terminal while the CLI in it still runs (Settings → Accounts & Connections)."
   },
   "settings.accounts.closeTerminal": {
     "defaultMessage": "Close",
-    "description": "Button under a connection's sign-in or Set Up terminal (Settings → Connections): hides it, ending the CLI in it if it still runs (asks first then)."
+    "description": "Button under a connection's sign-in or Set Up terminal (Settings → Accounts & Connections): hides it, ending the CLI in it if it still runs (asks first then)."
   },
-  "settings.accounts.default": {
-    "defaultMessage": "Default",
-    "description": "Shown on the first connection in its coding agent CLI's order (Settings → Connections, HI-1875): a hint, Hive-wide. New agents use the first connection in the order that's on in the workspace."
+  "settings.accounts.connection.base": {
+    "defaultMessage": "First",
+    "description": "A mark on an account's first connection (HI-2107): the one a new agent on that account gets first. Keep it short."
   },
-  "settings.accounts.defaults": {
-    "defaultMessage": "Defaults for agents on it",
-    "description": "A button opening a connection's defaults (Settings → Connections; HI-1770): the model, effort and context an agent on it runs with when it has none of its own."
+  "settings.accounts.connection.baseTip": {
+    "defaultMessage": "The first of its account: what a new agent gets when this account is first in the order and on here.",
+    "description": "The tooltip of \"First\" on a connection (HI-2107)."
   },
-  "settings.accounts.defaults.context": {
-    "defaultMessage": "Use 200K context (instead of 1M)",
-    "description": "Label of a connection's default context choice (Settings → Connections → Defaults for agents on it): hold sessions to a 200K-token window instead of the model's 1M one."
+  "settings.accounts.connection.duplicate": {
+    "defaultMessage": "Duplicate",
+    "description": "An entry of a connection's ⋯ menu: adds a copy of it, named \"<name> (2)\"."
   },
-  "settings.accounts.defaults.copied": {
-    "defaultMessage": "Copied from Settings → {cli} when it was added. Change them here.",
-    "description": "Under a connection's defaults (Settings → Connections; HI-1770) while they are still the CLI's as copied ({cli}: \"Claude Code\"). Settings → {cli} names a section."
+  "settings.accounts.connection.edit": {
+    "defaultMessage": "Edit…",
+    "description": "An entry of a connection's ⋯ menu (Settings → Accounts & Connections, HI-2107): opens its dialog."
   },
-  "settings.accounts.defaults.effort": {
-    "defaultMessage": "Effort",
-    "description": "Label of a connection's default effort (reasoning) (Settings → Connections → Defaults for agents on it)."
+  "settings.accounts.connection.failed": {
+    "defaultMessage": "Couldn't change the connection",
+    "description": "An error's title: duplicating or removing a connection failed (Settings → Accounts & Connections, HI-2107)."
+  },
+  "settings.accounts.connection.remove": {
+    "defaultMessage": "Remove…",
+    "description": "An entry of a connection's ⋯ menu: removes it (asks first; refused while something uses it)."
+  },
+  "settings.accounts.connection.removeMessage": {
+    "defaultMessage": "Only this setup goes: its account and its other connections stay.",
+    "description": "The message of the dialog confirming a connection's removal (HI-2107)."
+  },
+  "settings.accounts.connection.removeTitle": {
+    "defaultMessage": "Remove the connection {name}?",
+    "description": "Title of the dialog confirming a connection's removal ({name}, its name; HI-2107)."
+  },
+  "settings.accounts.copilotAs": {
+    "defaultMessage": "Signed in: {account}",
+    "description": "GitHub Copilot's account (HI-2107): who its PC-wide sign-in is ({account}, a GitHub user name)."
+  },
+  "settings.accounts.copilotNotSignedIn": {
+    "defaultMessage": "Not signed in: sign in from Provider Setup",
+    "description": "GitHub Copilot's account when it isn't signed in (HI-2107). Provider Setup names a dialog."
   },
   "settings.accounts.defaults.failed": {
     "defaultMessage": "Couldn't change the connection's defaults",
-    "description": "An error's title (Settings → Connections; HI-1770): saving a connection's default model, effort or context failed."
-  },
-  "settings.accounts.defaults.model": {
-    "defaultMessage": "Model",
-    "description": "Label of a connection's default model (Settings → Connections → Defaults for agents on it)."
+    "description": "An error's title (Settings → Accounts & Connections; HI-1770): saving a connection's default model, effort or context failed."
   },
   "settings.accounts.keep": {
     "defaultMessage": "Keep the New Login",
-    "description": "Button on a connection whose login changed (Settings → Connections): takes on the login it is now signed in as."
+    "description": "Button on a connection whose login changed (Settings → Accounts & Connections): takes on the login it is now signed in as."
   },
   "settings.accounts.keepFailed": {
     "defaultMessage": "Couldn't keep the new login",
@@ -77,103 +97,111 @@
   },
   "settings.accounts.leftover": {
     "defaultMessage": "Not all removed: {what}. Remove tries again; nothing outside its folder was touched.",
-    "description": "A warning on a connection (Settings → Connections) whose removal stopped partway. {what} is what's left, in English."
+    "description": "A warning on a connection (Settings → Accounts & Connections) whose removal stopped partway. {what} is what's left, in English."
   },
   "settings.accounts.list.desc": {
-    "defaultMessage": "Add a connection (signed in, or a server) and choose which are on in this workspace. Drag to order each CLI's connections: new agents use the first one that's on here.",
-    "description": "What the list \"Connections\" does, under its title (Settings → Connections, HI-1875: each coding agent CLI has an order of its connections; the first one on in the workspace is used)."
+    "defaultMessage": "Add an account (signed in, or a server) and the connections agents choose on it, and turn accounts on in this workspace. Drag accounts into your order: a new agent gets the first connection of the first account that's on here.",
+    "description": "What the list \"Accounts & Connections\" does, under its title (Settings → Accounts & Connections, HI-2107: one order of accounts for every coding agent CLI; a new agent gets the first connection of the first account on in the workspace)."
   },
   "settings.accounts.list.tip": {
-    "defaultMessage": "A sign-in connection is a folder of its own that Hive made, signed in with Claude Code's own sign-in in your browser: Hive never sees or keeps its login. Its conversations and memory are shared with your other connections through a link to Claude Code's projects folder. Its settings, trusted folders and MCP servers are its own. Removing a connection deletes its folder and its login on this PC, never your conversations.",
-    "description": "The info tip of the list \"Connections\" (Settings → Connections): more on what it does and when it applies."
+    "defaultMessage": "A sign-in account is a folder of its own that Hive made, signed in with the CLI's own sign-in in your browser: Hive never sees or keeps its login. Its conversations and memory are shared with your other accounts through a link to the CLI's projects folder. Removing an account deletes its folder and its login on this PC, never your conversations. GitHub Copilot signs in once for the whole PC, in Provider Setup: its account is that sign-in.",
+    "description": "The info tip of the list \"Accounts & Connections\" (Settings → Accounts & Connections, HI-2107): more on what it does and when it applies. Provider Setup names a dialog."
   },
   "settings.accounts.list.title": {
-    "defaultMessage": "Connections",
-    "description": "A setting's title (Settings → Connections): the list of connections."
+    "defaultMessage": "Accounts & Connections",
+    "description": "A setting's title (Settings → Accounts & Connections, HI-2107): the list of accounts, each with its connections."
   },
   "settings.accounts.loading": {
     "defaultMessage": "Loading…",
-    "description": "Settings → Connections while its list loads."
+    "description": "Settings → Accounts & Connections while its list loads."
   },
-  "settings.accounts.makeDefault": {
-    "defaultMessage": "Make Default",
-    "description": "Button on a connection (Settings → Connections, HI-1875): moves it to the top of its coding agent CLI's order. It never turns a connection on or off."
+  "settings.accounts.more": {
+    "defaultMessage": "More for {name}",
+    "description": "The ⋯ button of an account or a connection (Settings → Accounts & Connections), for screen readers and its tooltip ({name}, its name)."
   },
   "settings.accounts.moreProjects": {
     "defaultMessage": "{n, plural, one {# more} other {# more}}",
     "description": "The last item of that list when it names only the first projects: how many more there are."
   },
-  "settings.accounts.move": {
+  "settings.accounts.moveAccount": {
     "defaultMessage": "Drag to change the order of {name}, or press Alt+Up or Alt+Down",
-    "description": "The tooltip and label of a connection's drag handle (Settings → Connections, HI-1875): it moves the connection in its coding agent CLI's order. Alt+Up and Alt+Down name keys."
+    "description": "The tooltip and label of an account's drag handle (Settings → Accounts & Connections, HI-2107): it moves the account in the one order of accounts. Alt+Up and Alt+Down name keys."
   },
   "settings.accounts.moveFailed": {
     "defaultMessage": "Couldn't change the order",
-    "description": "An error's title: moving a connection in its coding agent CLI's order failed (Settings → Connections)."
+    "description": "An error's title: moving a connection in its coding agent CLI's order failed (Settings → Accounts & Connections)."
   },
   "settings.accounts.name": {
     "defaultMessage": "Name",
-    "description": "The label of the box for a connection's name (Settings → Connections)."
+    "description": "The label of the box for a connection's name (Settings → Accounts & Connections)."
   },
   "settings.accounts.needName": {
     "defaultMessage": "Give it a name.",
-    "description": "Under the name box of a connection (Settings → Connections) while it's empty."
+    "description": "Under the name box of a connection (Settings → Accounts & Connections) while it's empty."
   },
-  "settings.accounts.noWorkspace": {
-    "defaultMessage": "Open a workspace to choose which connections are on in it.",
-    "description": "Settings → Connections with no workspace open: the On and Default choices are per workspace."
+  "settings.accounts.noWorkspace2": {
+    "defaultMessage": "Open a workspace to choose which accounts are on in it.",
+    "description": "Settings → Accounts & Connections with no workspace open: whether an account is on is per workspace (HI-2107)."
   },
-  "settings.accounts.none": {
-    "defaultMessage": "No connections yet. Add one, then sign it in.",
-    "description": "Settings → Connections when there are no connections."
+  "settings.accounts.noneYet": {
+    "defaultMessage": "No accounts yet. Add one, then sign it in.",
+    "description": "Settings → Accounts & Connections when there are no accounts (HI-2107)."
   },
   "settings.accounts.notTrusted": {
     "defaultMessage": "Not trusted yet in this workspace: {projects}",
-    "description": "Under a connection that needs set up (Settings → Connections, HI-1870): the projects of the open workspace whose folders its coding agent CLI hasn't been told to trust yet ({projects}: their names, listed). Set Up asks the CLI's trust question for each in turn."
+    "description": "Under a connection that needs set up (Settings → Accounts & Connections, HI-1870): the projects of the open workspace whose folders its coding agent CLI hasn't been told to trust yet ({projects}: their names, listed). Set Up asks the CLI's trust question for each in turn."
   },
   "settings.accounts.notice.context": {
     "defaultMessage": "Use 200K context: {value} (its CLI has no such choice)",
-    "description": "A moved setting in the notice (Settings → Connections; HI-1770): a context choice the agent's CLI doesn't have, kept on the agent but not used. {value} is On or Off."
+    "description": "A moved setting in the notice (Settings → Accounts & Connections; HI-1770): a context choice the agent's CLI doesn't have, kept on the agent but not used. {value} is On or Off."
   },
   "settings.accounts.notice.dismiss": {
     "defaultMessage": "Dismiss",
-    "description": "Button (Settings → Connections; HI-1770): hides the notice of moved settings for good."
+    "description": "Button (Settings → Accounts & Connections; HI-1770): hides the notice of moved settings for good."
   },
   "settings.accounts.notice.effort": {
     "defaultMessage": "Effort {value} (its model doesn't take it)",
-    "description": "A moved setting in the notice (Settings → Connections; HI-1770): an effort level ({value}) the agent's model doesn't offer, kept on the agent but not used."
+    "description": "A moved setting in the notice (Settings → Accounts & Connections; HI-1770): an effort level ({value}) the agent's model doesn't offer, kept on the agent but not used."
   },
-  "settings.accounts.notice.hint": {
-    "defaultMessage": "They stay on the agents, unused. Change them in each agent's Agent Settings.",
-    "description": "Under the notice of moved settings a connection can't use (Settings → Connections; HI-1770). Agent Settings names a dialog."
+  "settings.accounts.notice.hint2": {
+    "defaultMessage": "They weren't carried over. To use one, choose or make a connection with it for the agent.",
+    "description": "Under the notice of moved settings a connection can't use (Settings → Accounts & Connections; HI-1770, HI-2107): those values aren't part of the agent's connection."
   },
   "settings.accounts.notice.line": {
     "defaultMessage": "{project} · {agent}: {setting}",
-    "description": "A line of the notice of moved settings a connection can't use (Settings → Connections; HI-1770): the project, the agent and the setting with its value (\"Effort: high\")."
+    "description": "A line of the notice of moved settings a connection can't use (Settings → Accounts & Connections; HI-1770): the project, the agent and the setting with its value (\"Effort: high\")."
   },
   "settings.accounts.notice.model": {
     "defaultMessage": "Model {value}",
-    "description": "A moved setting in the notice (Settings → Connections; HI-1770): a model, kept on the agent."
+    "description": "A moved setting in the notice (Settings → Accounts & Connections; HI-1770): a model, kept on the agent."
   },
   "settings.accounts.notice.title": {
     "defaultMessage": "Some settings moved onto agents can't be used by their connection",
-    "description": "A notice's title (Settings → Connections; HI-1770): a project's own model, effort or context settings were moved onto its agents (connections hold the defaults now), and some of them the agent's connection can't use: they are kept on the agent but not used."
+    "description": "A notice's title (Settings → Accounts & Connections; HI-1770): a project's own model, effort or context settings were moved onto its agents (connections hold the defaults now), and some of them the agent's connection can't use: they are kept on the agent but not used."
   },
   "settings.accounts.onHere": {
     "defaultMessage": "On in this workspace",
-    "description": "The switch on a connection (Settings → Connections): whether it is on in the open workspace."
+    "description": "The switch on a connection (Settings → Accounts & Connections): whether it is on in the open workspace."
   },
-  "settings.accounts.ownLogin": {
-    "defaultMessage": "{cli} has no connections: it signs in once for the whole PC, in Help → Provider Setup, and its agents use that sign-in.",
-    "description": "A line in Settings → Connections for a coding agent CLI that is on but has no connections ({cli}: \"GitHub Copilot\", whose sign-in is machine-wide, HI-1758). Help → Provider Setup names a dialog: use its name as Hive shows it."
+  "settings.accounts.onHereShort": {
+    "defaultMessage": "On here",
+    "description": "The switch on an account (Settings → Accounts & Connections, HI-2107): whether it is on in the open workspace. Keep it short."
   },
   "settings.accounts.plan": {
     "defaultMessage": "{email} · {plan}",
-    "description": "A connection's identity in Settings → Connections: the email it is signed in as, and its plan as the CLI names it (\"max\")."
+    "description": "A connection's identity in Settings → Accounts & Connections: the email it is signed in as, and its plan as the CLI names it (\"max\")."
+  },
+  "settings.accounts.providerSetup": {
+    "defaultMessage": "Open Provider Setup",
+    "description": "The only entry of GitHub Copilot's account's ⋯ menu (HI-2107): opens the Provider Setup dialog, where its sign-in is."
   },
   "settings.accounts.remove": {
     "defaultMessage": "Remove…",
-    "description": "Button on a connection (Settings → Connections): removes it and deletes its folder (asks first)."
+    "description": "Button on a connection (Settings → Accounts & Connections): removes it and deletes its folder (asks first)."
+  },
+  "settings.accounts.removeAccountMessage": {
+    "defaultMessage": "Its folder is deleted for good, with its login on this PC (it doesn't go to the Recycle Bin), and its connections with it. Your conversations and the CLI's memory are kept: they are shared with your other accounts. The account itself stays yours with its provider.",
+    "description": "The message of the dialog confirming an account's removal (Settings → Accounts & Connections, HI-2107)."
   },
   "settings.accounts.removeConfirm": {
     "defaultMessage": "Remove",
@@ -182,10 +210,6 @@
   "settings.accounts.removeFailed": {
     "defaultMessage": "Couldn't remove the connection",
     "description": "An error's title: removing a connection failed."
-  },
-  "settings.accounts.removeMessage": {
-    "defaultMessage": "Its folder is deleted for good, with its login on this PC (it doesn't go to the Recycle Bin). Your conversations and Claude Code's memory are kept: they are shared with your other connections. The account itself stays yours at Anthropic.",
-    "description": "The message of the dialog confirming a connection's removal (Settings → Connections)."
   },
   "settings.accounts.removeOpenConfirm": {
     "defaultMessage": "Close Terminal and Remove",
@@ -205,7 +229,7 @@
   },
   "settings.accounts.rename": {
     "defaultMessage": "Rename…",
-    "description": "Button on a connection (Settings → Connections): changes its name only."
+    "description": "Button on a connection (Settings → Accounts & Connections): changes its name only."
   },
   "settings.accounts.renameConfirm": {
     "defaultMessage": "Rename",
@@ -215,17 +239,17 @@
     "defaultMessage": "Rename {name}",
     "description": "Title of the dialog renaming a connection ({name}, its name)."
   },
-  "settings.accounts.sameLogin": {
-    "defaultMessage": "Signed in to the same login as another connection: {names}",
-    "description": "A warning on a connection (Settings → Connections): other connections are signed in as the same login. {names} is their names, listed."
+  "settings.accounts.sameLoginAccount": {
+    "defaultMessage": "Signed in to the same login as another account: {names}",
+    "description": "A warning on an account (Settings → Accounts & Connections, HI-2107): other accounts are signed in as the same login. {names} is their names, listed."
   },
   "settings.accounts.setUpChecking": {
     "defaultMessage": "Checking…",
-    "description": "A connection's state (Settings → Connections, HI-1870): Hive is still reading whether its coding agent CLI trusts the open workspace's project folders, so it doesn't say yet whether it is set up."
+    "description": "A connection's state (Settings → Accounts & Connections, HI-1870): Hive is still reading whether its coding agent CLI trusts the open workspace's project folders, so it doesn't say yet whether it is set up."
   },
   "settings.accounts.setUpDone": {
     "defaultMessage": "Set up",
-    "description": "A connection's state (Settings → Connections, HI-1870): its CLI's one-time first-run setup is done. An adjective (\"is set up\"), not the button."
+    "description": "A connection's state (Settings → Accounts & Connections, HI-1870): its CLI's one-time first-run setup is done. An adjective (\"is set up\"), not the button."
   },
   "settings.accounts.setUpIn": {
     "defaultMessage": "It opens in {project}'s folder, {folder}: answer {cli}'s question to trust it.",
@@ -237,15 +261,15 @@
   },
   "settings.accounts.setUpNeeded": {
     "defaultMessage": "Needs set up",
-    "description": "A connection's state (Settings → Connections, HI-1870): its CLI's one-time first-run setup (Set Up, a button beside it) hasn't been done in its folder yet."
+    "description": "A connection's state (Settings → Accounts & Connections, HI-1870): its CLI's one-time first-run setup (Set Up, a button beside it) hasn't been done in its folder yet."
   },
   "settings.accounts.signIn": {
     "defaultMessage": "Sign In",
-    "description": "Button on a connection (Settings → Connections): opens the CLI's own sign-in for it, in a terminal of Hive's."
+    "description": "Button on a connection (Settings → Accounts & Connections): opens the CLI's own sign-in for it, in a terminal of Hive's."
   },
   "settings.accounts.signInAgain": {
     "defaultMessage": "Sign In Again",
-    "description": "Button on a connection (Settings → Connections) that is signed out, or whose login changed: opens the CLI's own sign-in for it again."
+    "description": "Button on a connection (Settings → Accounts & Connections) that is signed out, or whose login changed: opens the CLI's own sign-in for it again."
   },
   "settings.accounts.signInFailed": {
     "defaultMessage": "Couldn't open the sign-in",
@@ -253,47 +277,51 @@
   },
   "settings.accounts.signingIn": {
     "defaultMessage": "Signing in: finish in your browser, or in the terminal below. Hive doesn't type into it.",
-    "description": "Settings → Connections while a connection's sign-in terminal is open: the user signs in through the CLI's own flow."
+    "description": "Settings → Accounts & Connections while a connection's sign-in terminal is open: the user signs in through the CLI's own flow."
   },
   "settings.accounts.signingInElsewhere": {
     "defaultMessage": "Signing in, in another window",
-    "description": "A connection's line in Settings → Connections while its sign-in is open in another of Hive's windows."
+    "description": "A connection's line in Settings → Accounts & Connections while its sign-in is open in another of Hive's windows."
   },
   "settings.accounts.state.changed": {
     "defaultMessage": "Login changed",
-    "description": "A connection's state (Settings → Connections): signed in as another login than the one it was added with."
+    "description": "A connection's state (Settings → Accounts & Connections): signed in as another login than the one it was added with."
   },
   "settings.accounts.state.failed": {
     "defaultMessage": "Couldn't check",
-    "description": "A connection's state (Settings → Connections): Hive couldn't ask the CLI who it's signed in as (not the same as signed out)."
+    "description": "A connection's state (Settings → Accounts & Connections): Hive couldn't ask the CLI who it's signed in as (not the same as signed out)."
   },
   "settings.accounts.state.missing": {
     "defaultMessage": "Folder missing",
-    "description": "A connection's state (Settings → Connections): its folder isn't there, or isn't the one Hive made."
+    "description": "A connection's state (Settings → Accounts & Connections): its folder isn't there, or isn't the one Hive made."
   },
   "settings.accounts.state.signedIn": {
     "defaultMessage": "Signed in",
-    "description": "A connection's state (Settings → Connections)."
+    "description": "A connection's state (Settings → Accounts & Connections)."
   },
   "settings.accounts.state.signedOut": {
     "defaultMessage": "Signed out",
-    "description": "A connection's state (Settings → Connections): the CLI says its folder isn't signed in."
+    "description": "A connection's state (Settings → Accounts & Connections): the CLI says its folder isn't signed in."
   },
   "settings.accounts.state.unchecked": {
     "defaultMessage": "Not checked yet",
-    "description": "A connection's state (Settings → Connections): Hive hasn't asked the CLI yet."
+    "description": "A connection's state (Settings → Accounts & Connections): Hive hasn't asked the CLI yet."
   },
   "settings.accounts.switchAffected": {
     "defaultMessage": "Switch Them When Their Turn Is Over",
     "description": "Button on that banner: each of those agents ends once its turn is over and carries on, on the connection chosen now."
   },
-  "settings.accounts.usedHere": {
-    "defaultMessage": "Used here",
-    "description": "Shown on the connection new agents use in the open workspace when the Default (the top of the order) is off there (Settings → Connections, HI-1875): the first one in the order that's on."
+  "settings.accounts.thisPc": {
+    "defaultMessage": "Signed in for this PC",
+    "description": "On GitHub Copilot's account (Settings → Accounts & Connections, HI-2107): its one sign-in is the PC's, used in every workspace."
   },
-  "settings.accounts.usedHereTip": {
-    "defaultMessage": "New agents in this workspace use it: the Default is off here, and it's the first in the order that's on.",
-    "description": "The tooltip of \"Used here\" on a connection (Settings → Connections, HI-1875)."
+  "settings.accounts.usage": {
+    "defaultMessage": "{window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} {used, number, percent}",
+    "description": "An account's plan usage in Settings → Accounts & Connections (HI-2107), once per account: a limit's window (the 5-hour one, the weekly one, or the provider's own name for another) and how much of it is used."
+  },
+  "settings.accounts.usedBy": {
+    "defaultMessage": "{assistant, select, yes {{n, plural, =0 {Assistant} one {Assistant and # agent} other {Assistant and # agents}}} other {{n, plural, =0 {Not used here} one {# agent} other {# agents}}}}",
+    "description": "Who uses a connection, on its row (Settings → Accounts & Connections, HI-2107): the Assistant (assistant is yes) and how many agents ({n}) of the open workspaces. Its tooltip names them. \"Not used here\": none in the open workspaces."
   },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
     "defaultMessage": "The environment variables Hive leaves out when it runs Claude Code on a connection (its sign-in, its checks, Set Up and its agents), by name: a key, token, request header, server, provider switch or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login, a header or a server could make a connection run as someone else, or send a key elsewhere.",
@@ -328,7 +356,7 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.claude-code.accounts.onboardedField.desc": {
-    "defaultMessage": "The field of a connection folder's `.claude.json` that says Claude Code's first-run screens were answered there (read only). Wrong, every Claude Code connection shows \"Needs set up\" in Settings → Connections.",
+    "defaultMessage": "The field of a connection folder's `.claude.json` that says Claude Code's first-run screens were answered there (read only). Wrong, every Claude Code connection shows \"Needs set up\" in Settings → Accounts & Connections.",
     "description": "What the advanced setting \"Connections: set-up field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `.claude.json` as it is (a file name); \"Needs set up\" is a state Hive shows: use its name as Hive shows it."
   },
   "settings.advanced.claude-code.accounts.onboardedField.title": {
@@ -344,7 +372,7 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.claude-code.accounts.planField.desc": {
-    "defaultMessage": "The field of `claude auth status --json` with a connection's plan (\"max\"), shown beside its email in Settings → Connections. Wrong, no plan is shown.",
+    "defaultMessage": "The field of `claude auth status --json` with a connection's plan (\"max\"), shown beside its email in Settings → Accounts & Connections. Wrong, no plan is shown.",
     "description": "What the advanced setting \"Connections: plan field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `claude auth status --json` and \"max\" as they are."
   },
   "settings.advanced.claude-code.accounts.planField.title": {
@@ -360,7 +388,7 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.claude-code.accounts.trustField.desc": {
-    "defaultMessage": "The field of a folder's entry under `projects` in a connection folder's `.claude.json` that says Claude Code was told to trust that folder (read only). Wrong, every Claude Code connection on in a workspace shows \"Needs set up\" in Settings → Connections.",
+    "defaultMessage": "The field of a folder's entry under `projects` in a connection folder's `.claude.json` that says Claude Code was told to trust that folder (read only). Wrong, every Claude Code connection on in a workspace shows \"Needs set up\" in Settings → Accounts & Connections.",
     "description": "What the advanced setting \"Connections: trusted folder field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `projects` and `.claude.json` as they are; \"Needs set up\" is a state Hive shows: use its name as Hive shows it."
   },
   "settings.advanced.claude-code.accounts.trustField.title": {
@@ -720,7 +748,7 @@
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
   "settings.advanced.codex.accounts.planField.desc": {
-    "defaultMessage": "The field of Codex's account with a connection's plan (\"plus\", \"pro\"), shown beside its email in Settings → Connections. Wrong, no plan is shown.",
+    "defaultMessage": "The field of Codex's account with a connection's plan (\"plus\", \"pro\"), shown beside its email in Settings → Accounts & Connections. Wrong, no plan is shown.",
     "description": "What the advanced setting \"Connections: plan field\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep \"plus\" and \"pro\" as they are (plan names)."
   },
   "settings.advanced.codex.accounts.planField.title": {
@@ -2959,6 +2987,114 @@
     "defaultMessage": "Move up",
     "description": "A button beside a command in a list (Settings → Commands, or a point such as When this workspace opens, run; HI-1954)."
   },
+  "settings.connection.add": {
+    "defaultMessage": "Add",
+    "description": "The confirm button of the dialog adding a connection."
+  },
+  "settings.connection.addTitle": {
+    "defaultMessage": "{account} ({cli}): new connection",
+    "description": "Title of the dialog adding a connection (HI-2107) on an account ({account}, its name; {cli}, its coding agent CLI: \"Claude Code\")."
+  },
+  "settings.connection.args": {
+    "defaultMessage": "Extra arguments",
+    "description": "Label of a connection's extra command-line arguments in its dialog (HI-2107)."
+  },
+  "settings.connection.argsHint": {
+    "defaultMessage": "Added to {cli} when an agent on it starts.",
+    "description": "Under a connection's extra arguments: they are added to the coding agent CLI's command line ({cli}: its command, such as claude)."
+  },
+  "settings.connection.cancel": {
+    "defaultMessage": "Cancel",
+    "description": "A connection's dialog's button that closes it without saving."
+  },
+  "settings.connection.context": {
+    "defaultMessage": "Context",
+    "description": "Label of a connection's context window choice in its dialog (HI-2107): 1M tokens or 200K."
+  },
+  "settings.connection.context1m": {
+    "defaultMessage": "1M (the model's)",
+    "description": "A choice of a connection's context: the model's own 1M-token window. 1M is a number of tokens."
+  },
+  "settings.connection.context200k": {
+    "defaultMessage": "200K",
+    "description": "A choice of a connection's context: a 200K-token window, which compacts sooner. 200K is a number of tokens."
+  },
+  "settings.connection.editTitle": {
+    "defaultMessage": "{account} ({cli}): {name}",
+    "description": "Title of the dialog editing a connection (HI-2107): its name ({name}), its account ({account}) and its coding agent CLI ({cli})."
+  },
+  "settings.connection.effort": {
+    "defaultMessage": "Effort",
+    "description": "Label of a connection's reasoning effort in its dialog (HI-2107)."
+  },
+  "settings.connection.effortUnusable": {
+    "defaultMessage": "{model} doesn't take {effort} effort any more: agents on it start without it. Edit the connection to choose a level it takes.",
+    "description": "A warning on a connection (HI-2107, decision E): a CLI update left its effort ({effort}) one its model ({model}, or \"its model\") no longer offers, so it isn't passed at launch."
+  },
+  "settings.connection.gone": {
+    "defaultMessage": "It was removed meanwhile.",
+    "description": "A connection's dialog when its connection or account no longer exists."
+  },
+  "settings.connection.itsModel": {
+    "defaultMessage": "Its model",
+    "description": "In that warning, when the connection names no model: the CLI's default model (\"Its model doesn't take…\")."
+  },
+  "settings.connection.mode": {
+    "defaultMessage": "Permission mode",
+    "description": "Label of a connection's permission mode in its dialog (HI-2107)."
+  },
+  "settings.connection.model": {
+    "defaultMessage": "Model",
+    "description": "Label of a connection's model in its dialog (HI-2107)."
+  },
+  "settings.connection.name": {
+    "defaultMessage": "Name",
+    "description": "Label of a connection's name in its dialog (HI-2107)."
+  },
+  "settings.connection.namePlaceholder": {
+    "defaultMessage": "Claude · High, Reviewer, Plan…",
+    "description": "Placeholder of a connection's name box: examples of names."
+  },
+  "settings.connection.needName": {
+    "defaultMessage": "Give it a name.",
+    "description": "A connection's dialog's error while its name box is empty."
+  },
+  "settings.connection.save": {
+    "defaultMessage": "Save",
+    "description": "The confirm button of a connection's dialog."
+  },
+  "settings.connection.saving": {
+    "defaultMessage": "Saving…",
+    "description": "The confirm button of a connection's dialog while it saves."
+  },
+  "settings.connection.summary.200k": {
+    "defaultMessage": "200K context",
+    "description": "In a connection's summary line: it holds sessions to a 200K-token window."
+  },
+  "settings.connection.summary.args": {
+    "defaultMessage": "Arguments: {args}",
+    "description": "In a connection's summary line: its extra command-line arguments ({args}, as typed)."
+  },
+  "settings.connection.summary.effort": {
+    "defaultMessage": "Effort: CLI default",
+    "description": "In a connection's summary line: no effort chosen, the CLI's own default."
+  },
+  "settings.connection.summary.mode": {
+    "defaultMessage": "Mode: CLI default",
+    "description": "In a connection's summary line: no permission mode chosen, the CLI's own default."
+  },
+  "settings.connection.summary.model": {
+    "defaultMessage": "Model: CLI default",
+    "description": "In a connection's summary line (Settings → Accounts & Connections, HI-2107): no model chosen, the CLI's own default runs."
+  },
+  "settings.connection.usedBy": {
+    "defaultMessage": "In use: {users}. Running ones are offered Restart once you save (Switch Now for a new permission mode).",
+    "description": "In the dialog editing a connection (HI-2107): who uses it ({users}: agents and the Assistant, listed), and that running ones are offered a restart, or a live switch for a mode change."
+  },
+  "settings.connection.userIn": {
+    "defaultMessage": "{agent} ({project})",
+    "description": "One user of a connection in a list (HI-2107): an agent and its project."
+  },
   "settings.connections.add.addServer": {
     "defaultMessage": "Add",
     "description": "The confirm button of Add Connection for a server connection."
@@ -2973,11 +3109,11 @@
   },
   "settings.connections.add.cli": {
     "defaultMessage": "For",
-    "description": "Label of the choice in Add a Connection (Settings → Connections) of the coding agent CLI the connection is for (Claude Code, Codex), each shown with its icon."
+    "description": "Label of the choice in Add a Connection (Settings → Accounts & Connections) of the coding agent CLI the connection is for (Claude Code, Codex), each shown with its icon."
   },
   "settings.connections.add.from": {
     "defaultMessage": "Gets its model from",
-    "description": "Label of the choice in Add Connection (Settings → Connections): where the connection gets its model, its sign-in or a server (Darren, 27 Oct)."
+    "description": "Label of the choice in Add Connection (Settings → Accounts & Connections): where the connection gets its model, its sign-in or a server (Darren, 27 Oct)."
   },
   "settings.connections.add.fromServer": {
     "defaultMessage": "A server",
@@ -2989,7 +3125,7 @@
   },
   "settings.connections.add.name": {
     "defaultMessage": "Name",
-    "description": "Label of a new connection's name (Settings → Connections → Add Connection)."
+    "description": "Label of a new connection's name (Settings → Accounts & Connections → Add Connection)."
   },
   "settings.connections.add.namePlaceholder": {
     "defaultMessage": "Anthropic · Max 1, Work, DeepSeek…",
@@ -3000,28 +3136,28 @@
     "description": "Add Connection's error while the name box is empty."
   },
   "settings.connections.add.title": {
-    "defaultMessage": "Add a {cli} connection",
-    "description": "Title of the dialog adding a connection (Settings → Connections) when only one coding agent CLI can have them. {cli} is that CLI (\"Claude Code\")."
+    "defaultMessage": "Add a {cli} account",
+    "description": "Title of the dialog adding an account (Settings → Accounts & Connections, HI-2107) when only one coding agent CLI can have them. {cli} is that CLI (\"Claude Code\")."
   },
   "settings.connections.add.titleAny": {
-    "defaultMessage": "Add a connection",
-    "description": "Title of the dialog adding a connection (Settings → Connections) when it first asks which coding agent CLI it is for."
+    "defaultMessage": "Add an account",
+    "description": "Title of the dialog adding an account (Settings → Accounts & Connections, HI-2107) when it first asks which coding agent CLI it is for."
   },
   "settings.connections.cancel": {
     "defaultMessage": "Cancel",
-    "description": "A dialog's button in Settings → Connections that closes it without changing anything."
+    "description": "A dialog's button in Settings → Accounts & Connections that closes it without changing anything."
   },
   "settings.connections.masking.full": {
     "defaultMessage": "Hive is near the most API keys it can keep masking for. Past it, a new key is refused.",
-    "description": "A warning in Settings → Connections: Hive keeps a fingerprint of every API key ever saved (to hide it in logs and exports), and is nearly at its limit."
+    "description": "A warning in Settings → Accounts & Connections: Hive keeps a fingerprint of every API key ever saved (to hide it in logs and exports), and is nearly at its limit."
   },
   "settings.connections.masking.gap": {
     "defaultMessage": "Since {date}, Hive hides every long word in its logs, recordings and exports, for good: keys saved before its masking data was reset can't be recognised any more.",
-    "description": "A note in Settings → Connections after Reset Masking Data: Hive masks strictly from then on. {date} is when it was reset. A long word is 8 characters or more without a space."
+    "description": "A note in Settings → Accounts & Connections after Reset Masking Data: Hive masks strictly from then on. {date} is when it was reset. A long word is 8 characters or more without a space."
   },
   "settings.connections.masking.reset": {
     "defaultMessage": "Reset Masking Data…",
-    "description": "Button in Settings → Connections when Hive's key masking data can't be read: makes it again from the keys saved now (asks first)."
+    "description": "Button in Settings → Accounts & Connections when Hive's key masking data can't be read: makes it again from the keys saved now (asks first)."
   },
   "settings.connections.masking.resetConfirm": {
     "defaultMessage": "Reset",
@@ -3029,19 +3165,19 @@
   },
   "settings.connections.masking.resetFailed": {
     "defaultMessage": "Couldn't reset the masking data",
-    "description": "An error's title: Reset Masking Data failed (Settings → Connections)."
+    "description": "An error's title: Reset Masking Data failed (Settings → Accounts & Connections)."
   },
   "settings.connections.masking.resetMessage": {
     "defaultMessage": "Hive can no longer recognise keys saved before. From now on it hides every long word (8 characters or more with no spaces) in its logs, recordings and exports, for good, so none of them can show an old key. This can't be undone.",
-    "description": "The message of the dialog confirming Reset Masking Data (Settings → Connections): what the user gives up."
+    "description": "The message of the dialog confirming Reset Masking Data (Settings → Accounts & Connections): what the user gives up."
   },
   "settings.connections.masking.resetTitle": {
     "defaultMessage": "Reset masking data?",
-    "description": "Title of the dialog confirming Reset Masking Data (Settings → Connections)."
+    "description": "Title of the dialog confirming Reset Masking Data (Settings → Accounts & Connections)."
   },
   "settings.connections.masking.unavailable": {
     "defaultMessage": "Hive can't read the data it uses to hide your API keys in logs and exports. Until it is reset, every long word is hidden in its logs, and exports, Copy Diagnostics and recordings are refused.",
-    "description": "A warning in Settings → Connections: the data Hive keeps to recognise server connections' API keys (to hide them) can't be read. A long word is 8 characters or more without a space."
+    "description": "A warning in Settings → Accounts & Connections: the data Hive keeps to recognise server connections' API keys (to hide them) can't be read. A long word is 8 characters or more without a space."
   },
   "settings.connections.server.addModel": {
     "defaultMessage": "Add Model",
@@ -3049,18 +3185,18 @@
   },
   "settings.connections.server.baseUrl": {
     "defaultMessage": "Base URL",
-    "description": "Label of a server connection's base URL (Settings → Connections), such as https://api.deepseek.com/anthropic."
+    "description": "Label of a server connection's base URL (Settings → Accounts & Connections), such as https://api.deepseek.com/anthropic."
   },
   "settings.connections.server.changeFailed": {
     "defaultMessage": "Couldn't change the connection",
-    "description": "An error's title: changing a server connection failed (Settings → Connections)."
+    "description": "An error's title: changing a server connection failed (Settings → Accounts & Connections)."
   },
   "settings.connections.server.cloud": {
     "defaultMessage": "cloud",
     "description": "Beside a model in a server connection's model list: its server runs it in the cloud (an Ollama cloud model, on ollama.com), not on this PC."
   },
   "settings.connections.server.cloudTip": {
-    "defaultMessage": "Runs in the cloud, not on this PC: this connection's sessions aren't free (local).",
+    "defaultMessage": "Runs in the cloud, not on this PC: its sessions aren't free (local).",
     "description": "Tooltip of \"cloud\" beside a model in a server connection's model list (an Ollama cloud model). \"free (local)\" is how Hive shows the cost of sessions run only on this PC."
   },
   "settings.connections.server.contextAdvice": {
@@ -3085,7 +3221,7 @@
   },
   "settings.connections.server.hostKey": {
     "defaultMessage": "{host} · Key …{last4}",
-    "description": "A server connection's line in Settings → Connections: its server's host, and its key by its last 4 characters ({last4})."
+    "description": "A server connection's line in Settings → Accounts & Connections: its server's host, and its key by its last 4 characters ({last4})."
   },
   "settings.connections.server.hostLocal": {
     "defaultMessage": "{host} · On this PC, no key",
@@ -3097,7 +3233,7 @@
   },
   "settings.connections.server.key": {
     "defaultMessage": "API key",
-    "description": "Label of a server connection's API key box (Settings → Connections)."
+    "description": "Label of a server connection's API key box (Settings → Accounts & Connections)."
   },
   "settings.connections.server.keyCleared": {
     "defaultMessage": "{name}'s server changed, so its key was removed. Add the key for the new server.",
@@ -3105,7 +3241,7 @@
   },
   "settings.connections.server.keyFailed": {
     "defaultMessage": "Couldn't save the key",
-    "description": "An error's title: a server connection's API key wasn't saved (Settings → Connections)."
+    "description": "An error's title: a server connection's API key wasn't saved (Settings → Accounts & Connections)."
   },
   "settings.connections.server.keyFailedAdded": {
     "defaultMessage": "{name} was added without its key. Use Add Key on it to try again.",
@@ -3137,7 +3273,7 @@
   },
   "settings.connections.server.models": {
     "defaultMessage": "Models",
-    "description": "Label of a server connection's model list (Settings → Connections)."
+    "description": "Label of a server connection's model list (Settings → Accounts & Connections)."
   },
   "settings.connections.server.modelsHint": {
     "defaultMessage": "Each Claude name (Opus, Sonnet, Haiku) runs the model ticked for it. A model can stand in for several.",
@@ -3209,7 +3345,7 @@
   },
   "settings.connections.server.saving": {
     "defaultMessage": "Saving…",
-    "description": "A dialog's confirm button in Settings → Connections while it saves."
+    "description": "A dialog's confirm button in Settings → Accounts & Connections while it saves."
   },
   "settings.connections.server.setKey": {
     "defaultMessage": "Add Key…",
@@ -3244,7 +3380,7 @@
     "description": "Why reading a server connection's models failed: its reply isn't the list Hive expects."
   },
   "settings.connections.server.why.stale": {
-    "defaultMessage": "The connection changed while its models were read. Read them again.",
+    "defaultMessage": "The account changed while its models were read. Read them again.",
     "description": "Why reading a server connection's models was dropped: its server or key changed meanwhile, or a newer reading started."
   },
   "settings.connections.server.why.tooBig": {
@@ -4187,10 +4323,6 @@
     "defaultMessage": "Version Control → Workflow → {title}",
     "description": "Where a project's workflow option is: the project's Version Control tab, its Workflow section, and the option's title (glossary 2.1)."
   },
-  "settings.permissionModes.modeLine": {
-    "defaultMessage": "{mode}: {what}",
-    "description": "A line of a permission mode setting's info tip: a mode's name and what it does."
-  },
   "settings.prices.add": {
     "defaultMessage": "Add model",
     "description": "Button under a price table: adds the model typed beside it."
@@ -4335,18 +4467,6 @@
     "defaultMessage": "Suggest compacting above",
     "description": "A setting's title (Project Settings → Sessions)."
   },
-  "settings.project.defaultProvider.desc": {
-    "defaultMessage": "The provider Add Agent uses for this project's new agents (the dialog can choose another). Inherit uses Settings → Providers → Default provider.",
-    "description": "What the setting \"Default provider\" does, under its title (Project Settings → General)."
-  },
-  "settings.project.defaultProvider.tip": {
-    "defaultMessage": "Each agent keeps the provider it was given; change it in the agent’s settings.",
-    "description": "The info tip of the setting \"Default provider\" (Project Settings → General): more on what it does and when it applies."
-  },
-  "settings.project.defaultProvider.title": {
-    "defaultMessage": "Default provider",
-    "description": "A setting's title (Project Settings → General)."
-  },
   "settings.project.inboxCheckpoints.desc": {
     "defaultMessage": "Hive tells a working agent of what arrives in its inbox at the end of its next tool call. Off: it isn't told until its turn ends or it is idle; nothing is lost.",
     "description": "What the setting \"Tell a working agent at the end of a tool\" does, under its title (Project Settings → Sessions)."
@@ -4479,66 +4599,6 @@
     "defaultMessage": "Setup command",
     "description": "A setting's title (Project Settings → Agents)."
   },
-  "settings.projectProvider.effort.desc": {
-    "defaultMessage": "How much reasoning effort the model uses. Higher is more thorough but slower and uses more tokens.",
-    "description": "What the setting \"Effort\" does, under its title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot)."
-  },
-  "settings.projectProvider.effort.tip": {
-    "defaultMessage": "Passed to {provider} when a session starts. Inherit uses Settings → {provider} → Default effort.",
-    "description": "The info tip of the setting \"Effort\" (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {provider} is its name."
-  },
-  "settings.projectProvider.effort.title": {
-    "defaultMessage": "Effort",
-    "description": "A setting's title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot)."
-  },
-  "settings.projectProvider.extraArgs.desc": {
-    "defaultMessage": "Additional {cli} command-line arguments for this project, added after the global ones.",
-    "description": "What the setting \"Extra arguments\" does (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {cli} is the CLI's command: keep it."
-  },
-  "settings.projectProvider.extraArgs.tip": {
-    "defaultMessage": "Split like a command line; quote arguments with spaces.",
-    "description": "The info tip of the setting \"Extra arguments\" (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot): more on what it does and when it applies."
-  },
-  "settings.projectProvider.extraArgs.title": {
-    "defaultMessage": "Extra arguments",
-    "description": "A setting's title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot)."
-  },
-  "settings.projectProvider.model.desc": {
-    "defaultMessage": "Model for this project's {provider} agents. Inherit uses Settings → {provider} → Default model.",
-    "description": "What the setting \"Model\" does (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {provider} is its name."
-  },
-  "settings.projectProvider.model.tip": {
-    "defaultMessage": "Passed to {provider} when a session starts. Agents can choose their own.",
-    "description": "The info tip of the setting \"Model\" (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {provider} is its name."
-  },
-  "settings.projectProvider.model.title": {
-    "defaultMessage": "Model",
-    "description": "A setting's title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot)."
-  },
-  "settings.projectProvider.permissionMode.cycle": {
-    "defaultMessage": "You can still switch modes inside a running session with Shift+Tab.",
-    "description": "The last line of the setting \"Permission mode\"'s info tip (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot), for a provider that switches modes in a session."
-  },
-  "settings.projectProvider.permissionMode.desc": {
-    "defaultMessage": "The mode this project's {provider} sessions start in. Inherit uses Settings → {provider} → Default permission mode.",
-    "description": "What the setting \"Permission mode\" does (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {provider} is its name."
-  },
-  "settings.projectProvider.permissionMode.title": {
-    "defaultMessage": "Permission mode",
-    "description": "A setting's title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot)."
-  },
-  "settings.projectProvider.use200kContext.desc": {
-    "defaultMessage": "A 200K-token context window for this project's {provider} agents instead of the model's 1M one. Inherit uses Settings → {provider}.",
-    "description": "What the setting \"Use 200K context (instead of 1M)\" does (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot). {provider} is its name."
-  },
-  "settings.projectProvider.use200kContext.tip": {
-    "defaultMessage": "Applies to sessions started afterwards. Agents can choose for themselves.",
-    "description": "The info tip of the setting \"Use 200K context (instead of 1M)\" (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot): more on what it does and when it applies."
-  },
-  "settings.projectProvider.use200kContext.title": {
-    "defaultMessage": "Use 200K context (instead of 1M)",
-    "description": "A setting's title (Project Settings → a provider section: Claude Code, Codex or GitHub Copilot)."
-  },
   "settings.projectSection.advanced.desc": {
     "defaultMessage": "Where the settings are stored, and resetting them.",
     "description": "Under the heading of the section \"Advanced\" of Project Settings: what it holds."
@@ -4570,10 +4630,6 @@
   "settings.projectSection.keys.label": {
     "defaultMessage": "Keyboard Shortcuts",
     "description": "A section of Project Settings, in its list on the left."
-  },
-  "settings.projectSection.provider.desc": {
-    "defaultMessage": "Model, effort and permissions for this project’s {provider} agents. Agents can override these for themselves.",
-    "description": "Under the heading of a provider's section of Project Settings: what it holds. {provider} is a coding agent's name."
   },
   "settings.projectSection.sessions.desc": {
     "defaultMessage": "Compacting and notifications for this project.",
@@ -4655,38 +4711,6 @@
     "defaultMessage": "Session costs",
     "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
   },
-  "settings.provider.defaultEffort.desc": {
-    "defaultMessage": "Reasoning effort unless a project overrides it. The levels are the default model's, as the CLI reports them.",
-    "description": "What the setting \"Default effort\" does, under its title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
-  },
-  "settings.provider.defaultEffort.tip": {
-    "defaultMessage": "Higher effort is more thorough but slower and uses more tokens.",
-    "description": "The info tip of the setting \"Default effort\" (Settings → a provider page: Claude Code, Codex or GitHub Copilot): more on what it does and when it applies."
-  },
-  "settings.provider.defaultEffort.title": {
-    "defaultMessage": "Default effort",
-    "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
-  },
-  "settings.provider.defaultModel.desc": {
-    "defaultMessage": "Model for {provider} sessions unless a project overrides it. {provider} default uses its own choice.",
-    "description": "What the setting \"Default model\" does (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is its name; \"<provider> default\" is the first choice of the model list."
-  },
-  "settings.provider.defaultModel.tip": {
-    "defaultMessage": "Whether your account can use a model is only known when a session starts.",
-    "description": "The info tip of the setting \"Default model\" (Settings → a provider page: Claude Code, Codex or GitHub Copilot): more on what it does and when it applies."
-  },
-  "settings.provider.defaultModel.title": {
-    "defaultMessage": "Default model",
-    "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
-  },
-  "settings.provider.defaultPermissionMode.desc": {
-    "defaultMessage": "The mode sessions start in unless a project overrides it.",
-    "description": "What the setting \"Default permission mode\" does, under its title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
-  },
-  "settings.provider.defaultPermissionMode.title": {
-    "defaultMessage": "Default permission mode",
-    "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
-  },
   "settings.provider.effortFallback.desc": {
     "defaultMessage": "The effort levels offered when {provider} doesn't report a model's own. With the CLI's answer, each model offers just the levels it takes.",
     "description": "What the setting \"Effort levels (fallback)\" is (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is its name."
@@ -4704,7 +4728,7 @@
     "description": "The confirmation before the setting is turned on (Settings → a provider page: Claude Code, Codex or GitHub Copilot): its detail."
   },
   "settings.provider.enableDangerousMode.confirm.message": {
-    "defaultMessage": "Projects will be able to run sessions where {provider} executes every command, file edit and network request without asking.",
+    "defaultMessage": "Connections will be able to run sessions where {provider} executes every command, file edit and network request without asking.",
     "description": "The confirmation before the setting \"Enable the <mode> option\" is turned on (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is a coding agent's name."
   },
   "settings.provider.enableDangerousMode.confirm.title": {
@@ -4712,7 +4736,7 @@
     "description": "The title of the confirmation before the setting \"Enable the <mode> option\" is turned on (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {names} lists the modes' names; {n} is how many. If your language puts the names of modes and options in quotation marks, write {quotedNames} in place of {names}: the same list with each name in its own quotation marks."
   },
   "settings.provider.enableDangerousMode.desc": {
-    "defaultMessage": "Allow projects and agents to choose {choices}, where the agent runs every action without asking.",
+    "defaultMessage": "Allow connections to choose {choices}, where the agent runs every action without asking.",
     "description": "What the setting \"Enable the <mode> option\" does (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {choices} lists the modes' names, in quotes, joined with \"or\"."
   },
   "settings.provider.enableDangerousMode.quoted": {
@@ -4720,8 +4744,8 @@
     "description": "A mode's name in quotes, in a list of the modes a setting unlocks. Use your language's quotation marks."
   },
   "settings.provider.enableDangerousMode.tip": {
-    "defaultMessage": "{n, plural, one {{names} is never a global default. When turned off, projects and agents using it return to Inherit.} other {{names} are never a global default. When turned off, projects and agents using them return to Inherit.}}",
-    "description": "The info tip of the setting \"Enable the <mode> option\" (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {names} lists the modes' names; {n} is how many. If your language puts the names of modes and options in quotation marks, write {quotedNames} in place of {names}: the same list with each name in its own quotation marks. Inherit is a choice of the project's settings: keep it as Hive shows it."
+    "defaultMessage": "{n, plural, one {Only a connection chooses {names}. When turned off, a connection that chose it launches in the CLI's own default mode and says so.} other {Only a connection chooses {names}. When turned off, a connection that chose one of them launches in the CLI's own default mode and says so.}}",
+    "description": "The info tip of the setting \"Enable the <mode> option\" (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {names} lists the modes' names; {n} is how many. If your language puts the names of modes and options in quotation marks, write {quotedNames} in place of {names}: the same list with each name in its own quotation marks. A connection is a named setup agents choose (Settings → Accounts & Connections)."
   },
   "settings.provider.enableDangerousMode.title": {
     "defaultMessage": "{n, plural, one {Enable the {names} option} other {Enable the {names} options}}",
@@ -4755,22 +4779,6 @@
     "defaultMessage": "CLI path",
     "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
   },
-  "settings.provider.extraArgs.desc": {
-    "defaultMessage": "Additional {cli} command-line arguments for every session.",
-    "description": "What the setting \"Extra arguments\" does (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {cli} is the CLI's command: keep it."
-  },
-  "settings.provider.extraArgs.placeholder": {
-    "defaultMessage": "e.g. --verbose",
-    "description": "The empty box's placeholder of the setting \"Extra arguments\" (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
-  },
-  "settings.provider.extraArgs.tip": {
-    "defaultMessage": "Projects can add more in their own settings.",
-    "description": "The info tip of the setting \"Extra arguments\" (Settings → a provider page: Claude Code, Codex or GitHub Copilot): more on what it does and when it applies."
-  },
-  "settings.provider.extraArgs.title": {
-    "defaultMessage": "Extra arguments",
-    "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
-  },
   "settings.provider.install": {
     "defaultMessage": "Install",
     "description": "Button on a provider's page: opens Provider Setup to install its CLI."
@@ -4794,18 +4802,6 @@
   "settings.provider.modelFallback.title": {
     "defaultMessage": "Models (fallback)",
     "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
-  },
-  "settings.provider.more": {
-    "defaultMessage": "More for {provider}",
-    "description": "The ⋯ button of a provider's row in Settings → Providers, for screen readers and its tooltip: opens its menu (Move Up, Move Down). {provider} is its name."
-  },
-  "settings.provider.moveDown": {
-    "defaultMessage": "Move Down",
-    "description": "A provider row's menu in Settings → Providers: moves it one place down the list (Automatic picks from the list's order)."
-  },
-  "settings.provider.moveUp": {
-    "defaultMessage": "Move Up",
-    "description": "A provider row's menu in Settings → Providers: moves it one place up the list (Automatic picks from the list's order)."
   },
   "settings.provider.notInstalled": {
     "defaultMessage": "CLI not installed",
@@ -4835,14 +4831,6 @@
     "defaultMessage": "API prices",
     "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
   },
-  "settings.provider.reorderFailed": {
-    "defaultMessage": "Couldn't save the providers' order",
-    "description": "An error's title: saving the order of Settings → Providers' list failed."
-  },
-  "settings.provider.rowLabel": {
-    "defaultMessage": "{provider}, {position, number} of {count, number}. Drag, or Alt+Up and Alt+Down, to reorder.",
-    "description": "A provider's row in Settings → Providers, for screen readers: its place in the list, which Automatic picks from, and how to move it. {provider} is its name."
-  },
   "settings.provider.settings": {
     "defaultMessage": "Settings",
     "description": "Button beside a provider in Settings → Providers: opens its page."
@@ -4862,18 +4850,6 @@
   "settings.provider.use": {
     "defaultMessage": "Use {provider}",
     "description": "The switch that turns a provider on (Settings → Providers, and its own page). {provider} is its name."
-  },
-  "settings.provider.use200kContext.desc": {
-    "defaultMessage": "Run {provider} sessions with a 200K-token context window instead of the model's 1M one, unless a project or agent chooses otherwise. Applies to sessions started afterwards.",
-    "description": "What the setting \"Use 200K context (instead of 1M)\" does (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is its name."
-  },
-  "settings.provider.use200kContext.tip": {
-    "defaultMessage": "Current models have a 1M window at no extra price per token, but a long conversation sends more tokens with every message, and answers slow down as the context fills. With 200K, {provider} compacts the conversation sooner.",
-    "description": "The info tip of the setting \"Use 200K context (instead of 1M)\" (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {provider} is its name."
-  },
-  "settings.provider.use200kContext.title": {
-    "defaultMessage": "Use 200K context (instead of 1M)",
-    "description": "A setting's title (Settings → a provider page: Claude Code, Codex or GitHub Copilot)."
   },
   "settings.providerOff.detail": {
     "defaultMessage": "Stop them now, or let them run until they are stopped. Either way no new ones start while it is off.",
@@ -4907,28 +4883,12 @@
     "defaultMessage": "Turn off {provider}?",
     "description": "Title of the question before a provider is turned off while its agents run. {provider} is its name."
   },
-  "settings.providers.automaticOrder": {
-    "defaultMessage": "Automatic tries {order}, in that order.",
-    "description": "Under Settings → Providers → Default provider while it is Automatic: the providers that are turned on, in the list's order, which Automatic picks the first installed one of. {order} is their names joined as a list (\"Codex, Claude Code and GitHub Copilot\")."
-  },
-  "settings.providers.defaultProvider.desc": {
-    "defaultMessage": "The provider Add Agent uses for new agents (one click, with its default settings) unless the project chooses another. Automatic uses the first provider that is turned on and installed, in the order of the list above: drag a provider, or use its ⋯ menu, to reorder it.",
-    "description": "What the setting \"Default provider\" does, under its title (Settings → Providers)."
-  },
-  "settings.providers.defaultProvider.tip": {
-    "defaultMessage": "Projects can choose their own default in Project Settings. Agents keep the provider they were given; Add Agent… (▾) can choose another.",
-    "description": "The info tip of the setting \"Default provider\" (Settings → Providers): more on what it does and when it applies."
-  },
-  "settings.providers.defaultProvider.title": {
-    "defaultMessage": "Default provider",
-    "description": "A setting's title (Settings → Providers)."
-  },
   "settings.providers.list.desc": {
     "defaultMessage": "Turn on the coding agents you want to use. Agents of a provider that is off stay listed but can't start.",
     "description": "What the setting \"Providers\" does, under its title (Settings → Providers)."
   },
   "settings.providers.list.tip": {
-    "defaultMessage": "Each project agent runs one provider, chosen when you add it (Add Agent) or in its settings. A provider needs its CLI installed and signed in.",
+    "defaultMessage": "Each agent runs the CLI of the connection it chose (Settings → Accounts & Connections). A provider needs its CLI installed.",
     "description": "The info tip of the setting \"Providers\" (Settings → Providers): more on what it does and when it applies."
   },
   "settings.providers.list.title": {
@@ -4968,12 +4928,12 @@
     "description": "Placeholder of Settings' search box."
   },
   "settings.section.accounts.desc": {
-    "defaultMessage": "How your agents reach their models: a Claude Code sign-in Hive keeps, signed in through Claude Code's own sign-in, or a server such as DeepSeek or Ollama, reached by its base URL and key. Each has a folder of its own, and every connection shares your conversations and Claude Code's memory. Each agent and the Assistant runs on its own connection, or the first in your order that's on in this workspace.",
-    "description": "Under the heading of the section \"Connections\" of Settings: what it holds."
+    "defaultMessage": "An account is a sign-in Hive keeps (signed in through the CLI's own sign-in) or a server such as DeepSeek or Ollama, reached by its base URL and key. A connection is a setup on an account: its model, effort, context, permission mode and extra arguments. Agents and the Assistant each choose a connection, and every account shares your conversations.",
+    "description": "Under the heading of the section \"Accounts & Connections\" of Settings (HI-2107): what it holds."
   },
   "settings.section.accounts.label": {
-    "defaultMessage": "Connections",
-    "description": "A section of Settings, in its list on the left: connections, the ways Hive's agents reach their models (a CLI signed in, or a server with a base URL and key)."
+    "defaultMessage": "Accounts & Connections",
+    "description": "A section of Settings, in its list on the left (HI-2107): accounts, the sign-ins and servers Hive's agents reach their models through, and connections, the named setups on them (model, effort, mode) that agents choose."
   },
   "settings.section.advanced.desc": {
     "defaultMessage": "Developer features, the details Hive relies on that a CLI update can break (advanced.json), logs, data and resetting Hive.",
@@ -5056,11 +5016,11 @@
     "description": "A section of Settings, in its list on the left."
   },
   "settings.section.provider.desc": {
-    "defaultMessage": "The {provider} CLI (the standalone one — copies bundled with editor extensions are not used) and the defaults every project inherits for {provider} agents.",
+    "defaultMessage": "The {provider} CLI (the standalone one — copies bundled with editor extensions are not used): where it is, its updates, its fallback lists and prices. Models, effort and modes are on connections.",
     "description": "Under the heading of a provider's page in Settings: what it holds. {provider} is a coding agent's name (Claude Code, Codex, GitHub Copilot)."
   },
   "settings.section.providers.desc": {
-    "defaultMessage": "The coding agents Hive can run. Turn on the ones you use; each has its own page below with its CLI and the defaults every project inherits.",
+    "defaultMessage": "The coding agents Hive can run. Turn on the ones you use; each has its own page below with its CLI. Models, effort and modes are on connections (Accounts & Connections).",
     "description": "Under the heading of the section \"Providers\" of Settings: what it holds."
   },
   "settings.section.providers.label": {

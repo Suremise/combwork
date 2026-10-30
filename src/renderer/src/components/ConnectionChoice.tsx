@@ -1,9 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { Connection, LiveSessionState, ProviderId } from '@shared/types'
+import type { AppSettings, Connection, LiveSessionState, ProviderId } from '@shared/types'
+import { connectionSummary } from './ConnectionDefaults'
 import { connectionsOn, type ConnectionsView } from '@shared/accounts'
-import { enabledProviders, permissionLabel, providerDescriptor, providerName } from '@shared/providers'
-import { modelLabel } from '@shared/defaults'
-import { effortName } from '@shared/models'
+import { enabledProviders, providerDescriptor, providerName } from '@shared/providers'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call } from '../api'
 import { set, setActivity, useStore } from '../store'
@@ -29,9 +28,6 @@ const M = {
   newConnection: msg({ id: 'connections.choice.new', defaultMessage: 'New Connection…', description: "Button beside the choice of connection (Add Agent, HI-2108): opens the connection dialog to make another setup (model, effort, mode) on the chosen connection's account." }),
   none: msg({ id: 'connections.choice.noneHere', defaultMessage: 'No account is on in this workspace. Add one in Settings → Accounts & Connections.', description: 'Under the choice of connection when no account is on in this workspace (HI-2108). Settings → Accounts & Connections names a section.' }),
   noneCli: msg({ id: 'connections.choice.noneCli', defaultMessage: 'No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections.', description: 'Under the choice of connection when no account of the coding agent CLI it is limited to ({cli}: "Claude Code") is on in this workspace (HI-2108). Settings → Accounts & Connections names a section.' }),
-  defaultModel: msg({ id: 'connections.summary.defaultModel', defaultMessage: 'Default model', description: "In a connection's summary (HI-2108: \"Opus 5.5 · High · Auto\"): it sets no model, so the CLI's default runs. Keep it short." }),
-  context200k: msg({ id: 'connections.summary.context200k', defaultMessage: '200K context', description: "In a connection's summary (HI-2108): it holds sessions to a 200K-token context window instead of 1M. Keep it short." }),
-  extraArgs: msg({ id: 'connections.summary.extraArgs', defaultMessage: 'extra arguments', description: "In a connection's summary (HI-2108): it passes extra command-line arguments to its CLI. Lower case, short." })
 }
 
 /**
@@ -68,13 +64,10 @@ export function useConnections(): ConnectionsView | null {
   return view
 }
 
-/**
- * A connection's values in a line (HI-2108): "Opus 5.5 · High · Auto": its model (else "Default model"), its effort and
- * 200K context where set, its mode (else the CLI's default mode), and "extra arguments" when it has some.
- */
-export function connectionSummary(c: Pick<Connection, 'model' | 'effort' | 'use200kContext' | 'permissionMode' | 'extraArgs'>, cli: ProviderId, settings?: Parameters<typeof effortName>[2]): string {
-  const parts = [c.model ? modelLabel(c.model, cli) : tr(M.defaultModel), c.effort ? effortName(cli, c.effort, settings, tr) : '', c.use200kContext ? tr(M.context200k) : '', permissionLabel(cli, c.permissionMode ?? providerDescriptor(cli).defaultPermissionMode, tr), c.extraArgs ? tr(M.extraArgs) : '']
-  return parts.filter(Boolean).join(' · ')
+/** A connection's values in a line (Settings' connection rows' own: connectionSummary), with its account found in the view. */
+export function connectionLine(view: ConnectionsView | null, c: Connection, settings: AppSettings | null): string | null {
+  const account = view ? orderedAccounts(view).find((a) => a.id === c.account) : undefined
+  return account ? connectionSummary(c, account, settings) : null
 }
 
 /**
@@ -91,7 +84,6 @@ export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew,
   const accounts = orderedAccounts(view).filter((a) => offered.some((c) => c.account === a.id))
   const chosen = value ? view.connectionRows?.find((c) => c.id === value) : undefined
   const chosenOffered = offered.some((c) => c.id === value)
-  const chosenCli = connectionCli(view, value)
   const newOn = chosen && chosenOffered ? chosen.account : offered[0]?.account
   return (
     <>
@@ -120,9 +112,9 @@ export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew,
             </button>
           )}
         </div>
-        {summary && chosen && chosenCli && (
+        {summary && chosen && (
           <div className="hint" data-connection-summary>
-            {connectionSummary(chosen, chosenCli, settings ?? undefined)}
+            {connectionLine(view, chosen, settings)}
           </div>
         )}
         {!offered.length && <div className="hint">{cli ? tr(M.noneCli, { cli: providerName(cli) }) : tr(M.none)}</div>}

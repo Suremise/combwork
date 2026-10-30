@@ -195,7 +195,7 @@
   "service.providers.notInstalled": "{cli} nie jest zainstalowany.",
   "service.providers.pickNotFound": "{task}: Hive nie znalazł pozycji {item}. Zrób to w terminalu albo zaktualizuj Hive.",
   "service.providers.retryUnavailable": "Ponowienie tej aktualizacji nie jest już dostępne. Wybierz Sprawdź ponownie, a następnie Zaktualizuj.",
-  "service.providers.signInConnections": "{cli} loguje się osobno dla każdego połączenia: zaloguj się w Ustawienia → Połączenia.",
+  "service.providers.signInConnections": "{cli} loguje się osobno dla każdego konta: zaloguj się w Ustawienia → Konta i połączenia.",
   "service.providers.stillLooking": "Hive wciąż szuka {cli}. Spróbuj ponownie za chwilę.",
   "service.providers.stillLookingAll": "Hive wciąż szuka CLI agentów programistycznych. Spróbuj ponownie za chwilę.",
   "service.providers.stopFirst": "Przed aktualizacją zatrzymaj wszystkich działających agentów {cli}.",

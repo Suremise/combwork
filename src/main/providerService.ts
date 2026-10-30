@@ -406,8 +406,8 @@ class ProviderService {
       return key
     }
     if (task === 'login') {
-      // Signed in per connection (HI-1755): its sign-in is Settings → Connections', never ~/.claude's.
-      if (connectionsManaged(id)) throw hiveError(msg({ id: 'service.providers.signInConnections', defaultMessage: '{cli} is signed in per connection: sign in from Settings → Connections.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "Claude Code") in, but its logins are Connections (Settings → Connections names a section).' }), { cli: name }, { kind: 'conflict' })
+      // Signed in per connection (HI-1755): its sign-in is Settings → Accounts & Connections', never ~/.claude's.
+      if (connectionsManaged(id)) throw hiveError(msg({ id: 'service.providers.signInConnections', defaultMessage: '{cli} signs in per account: sign in from Settings → Accounts & Connections.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "Claude Code") in, but its logins are accounts (Settings → Accounts & Connections names a section).' }), { cli: name }, { kind: 'conflict' })
       const cmd = adapter.loginCommand(info.path)
       return this.runTask(id, task, cmd.file, cmd.args, `${name} sign-in`, undefined, shown) // i18n-ignore: the task's name in the log
     }
