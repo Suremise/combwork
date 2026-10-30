@@ -3555,18 +3555,6 @@
     "defaultMessage": "Its processes are ended from its own window",
     "description": "The tooltip of Show Its Window in the paused team's band (HI-2095): End It is offered only in the window of the workspace a process belongs to."
   },
-  "board.team.stillPaused": {
-    "defaultMessage": "The team is still paused",
-    "description": "A notice as Hive's window opens (HI-2081): the team was paused before Hive last closed (not for an update that has now been installed), so Hive starts no lane card and wakes no agent until the user resumes it."
-  },
-  "board.team.stillPausedBody": {
-    "defaultMessage": "No lane starts a card and no agent is woken until you resume the team. The Progress panel's Lanes says what still runs.",
-    "description": "The notice that the team is still paused as the window opens (HI-2081)."
-  },
-  "board.team.stillPausedResume": {
-    "defaultMessage": "Resume the Team",
-    "description": "A button in the notice that the team is still paused (HI-2081): resumes it."
-  },
   "board.team.thisWorkspace": {
     "defaultMessage": "This workspace",
     "description": "A heading in the paused team's band, over what still runs in the window's own workspace (HI-2081), when several are open."
