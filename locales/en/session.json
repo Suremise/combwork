@@ -620,12 +620,8 @@
     "description": "Resuming an archived session is refused (Sessions tab: Unarchive)."
   },
   "session.start.args": {
-    "defaultMessage": "{problem} Fix it in Project Settings or Settings → {provider}.",
-    "description": "Starting an agent is refused: its extra arguments are wrong. {problem} says why, as a sentence; {provider} is the coding agent's name (its Settings section)."
-  },
-  "session.start.argsAssistant": {
-    "defaultMessage": "{problem} Fix it in Settings → Assistant.",
-    "description": "Starting the Assistant is refused: its extra arguments are wrong. {problem} says why, as a sentence."
+    "defaultMessage": "{problem} Fix it in its connection, {connection}, in Settings → Accounts & Connections.",
+    "description": "Starting an agent or the Assistant is refused: its connection's extra arguments are wrong (HI-2140). {problem} says why, as a sentence; {connection} is the connection's name, as in Settings → Accounts & Connections."
   },
   "session.start.beingOpened": {
     "defaultMessage": "This conversation is already being opened in another agent.",
