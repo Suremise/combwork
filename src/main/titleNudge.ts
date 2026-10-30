@@ -44,7 +44,7 @@ export function titleNudge(title: unknown, actor: TaskActor, keys: readonly stri
   const details = titleDetails(title, keys)
   if (details.length) {
     const quoted = details.map((d) => `"${d}"`)
-    const list = quoted.length > 1 ? `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}` : quoted[0]
+    const list = quoted.length > 1 ? `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}` : quoted[0] // i18n-ignore: agent-facing (a tool reply's line)
     lines.push(`A title says the outcome or the problem in words: put ${list} in the description.`) // i18n-ignore: agent-facing (a tool reply's line)
   }
   return lines.length ? lines.join(' ') : null

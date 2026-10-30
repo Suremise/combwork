@@ -427,10 +427,10 @@ function requestWorkspace(req: IncomingMessage, url: URL): WorkspaceService | nu
   return open.length === 1 ? open[0] : null
 }
 
-/** The request's workspace, for calls about a whole workspace (shared notes, MCP servers…). */
 /** The workspace's project keys, current and old, for a title naming a card (HI-2061). */
 const titleKeys = (): string[] => keysForSearch(requireWorkspace()).flatMap((k) => [k.key, ...k.aliases])
 
+/** The request's workspace, for calls about a whole workspace (shared notes, MCP servers…). */
 function requireWorkspace(): WorkspaceService {
   const w = contextWorkspace()
   if (w) return w
