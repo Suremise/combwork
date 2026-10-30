@@ -11,6 +11,9 @@
 // 4. HI-2014 (Legible's LE-249): the second lane's card 3, committed and not merged, moved to Done by the user's override:
 //    slot-a leaves its line (detached at the target's head), the line kept; card 4, which depends on it, is told it
 //    starts without card 3's work, and starts as the lane's next card in slot-a.
+// 5. HI-2170: no card of the lanes was ever asked about slot-a's uncommitted changes (the pool's detach as a lane ended
+//    read halfway through); card 4 moved to Done with a file left uncommitted in slot-a, the second lane ends and slot-a
+//    stays on card 4's line, the user asked on card 4 (For you).
 // After each Done, the lane's slot leaves the card's line once its builder is quiet (HI-2014, HI-1986).
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -239,6 +242,16 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check("the lane goes on: card 4 is its next, nothing waits", next4?.state === 'active' && next4?.status?.reason !== 'you', JSON.stringify(next4?.status))
     const s4 = await intent(tb2, c4, 'start')
     check('card 4 starts (its dependency counts as accepted) in slot-a, from the target', s4.status === 200 && same(s4.body?.data?.folder, slotA) && !!(await until(() => branchIn(slotA) === line(c4, 'slot-four'), HUNG_MS)), JSON.stringify(s4.body))
+
+    // --- 5. HI-2170: asked about slot-a's uncommitted changes only when they are really there.
+    const slotAsks = async (n) => (await inv('tasks:facts', n)).filter((f) => f.kind === 'ApprovalRequested' && f.data?.gate === 'slotDirty')
+    const before = await Promise.all([c1, c2, c3].map(slotAsks))
+    check("no card was asked about slot-a through the lanes' merges and ends", before.every((a) => a.length === 0), JSON.stringify(before))
+    fs.writeFileSync(path.join(slotA, 'wip.txt'), 'not committed\n')
+    const moved4 = await inv('tasks:move', c4, 'done', { confirm: true, reason: 'Done by hand' })
+    check('card 4 moved to Done with a file left uncommitted in slot-a: the second lane ends', !!(await until(async () => (await card(c4))?.column === 'done' && !!(await lane(second.lane.id))?.endedAt, HUNG_MS)), JSON.stringify(moved4))
+    check("…its builder stopped, card 4 is asked about slot-a once (For you)", !!(await until(async () => !(await live(b2.id)) && (await slotAsks(c4)).length === 1 && (await inv('tasks:forYou')).items.some((i) => i.card === c4 && i.gate === 'slotDirty'), HUNG_MS)), JSON.stringify(await slotAsks(c4)))
+    check("…slot-a stays on card 4's line, the file kept", branchIn(slotA) === line(c4, 'slot-four') && fs.existsSync(path.join(slotA, 'wip.txt')), branchIn(slotA))
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
   } finally {

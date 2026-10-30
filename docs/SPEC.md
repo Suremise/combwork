@@ -1909,7 +1909,11 @@ action, and everything that follows a Done hangs off that action, never off the 
     longer checked out and, once its target contains it, is deleted (§16.10.1). Committed work that isn't merged stays
     on its line, which is kept. **Uncommitted changes** keep the slot on its line: the user is asked once on the card
     (For you, Hive's own gate `slotDirty`), and the question closes once the slot is clean (then detached) or another
-    lease's. A lane's next card waits while its finished card's slot is in that state.
+    lease's. A lane's next card waits while its finished card's slot is in that state. It is asked only of changes
+    really left there (HI-2170): never while an operation holds the slot (the pool's look and detach of a released one
+    is one, in every Hive), its builder still works or drains there, the pool hasn't looked at a released one since its
+    lease ended, or a later card of the running lane is under way there (its own start moves the slot on, or tells its
+    builder); the slot as read is checked again after git's reads, right before asking.
   - *The lane*: read again (one whose cards are all Done ends).
   - Watches on the card end or fire as every board change makes them; stalls are read from the column.
 - **Put back and an abandoned lane** aren't finishes: their slot is released and detached the same way, its line kept,

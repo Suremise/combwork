@@ -809,9 +809,12 @@ export class SlotStore {
     return this.conn.write((db) => Number(db.prepare('UPDATE slots SET op = ?, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND op = ?').run(token, holder.pid, holder.started, this.project, name, was).changes) === 1)
   }
 
-  /** Sets a free slot's state from what it was (no operation, lease or writer meanwhile): whether it changed. */
-  async look(name: string, from: SlotState, to: SlotState): Promise<boolean> {
-    return this.conn.write((db) => Number(db.prepare(`UPDATE slots SET state = ? WHERE project = ? AND name = ? AND state = ? AND op IS NULL AND writer_run IS NULL AND NOT EXISTS (SELECT 1 FROM slot_leases l WHERE l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL)`).run(to, this.project, name, from).changes) === 1)
+  /**
+   * A free slot's settle begun (HI-2170): a warm-kind operation with no lease (no lend's warming has none), taken only
+   * while the slot is free and still in state `from`. Whether it was.
+   */
+  async beginSettle(name: string, from: SlotState, token: string, holder: Holder): Promise<boolean> {
+    return this.conn.write((db) => Number(db.prepare(`UPDATE slots SET op = ?, op_kind = 'warm', op_lease = NULL, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND state = ? AND ${FREE}`).run(token, holder.pid, holder.started, this.project, name, from).changes) === 1)
   }
 
   /**
@@ -997,6 +1000,8 @@ export interface PoolDeps {
   removeSkillCopies?: (folder: string) => Promise<unknown>
   /** A rename's steps (#1441); none: slots aren't renamed. */
   renamer?: SlotRenamer
+  /** A free slot's settle changed its state (HI-2170): what it is now. A finished card's slot question is looked at again. */
+  looked?: (slot: string, state: SlotState) => void
   now?: () => number
 }
 
@@ -1328,18 +1333,39 @@ export class SlotPool {
     await this.settle(name)
   }
 
-  /** A slot no operation, lease or writer holds, looked at: ready, dirty or gone. Otherwise left to its holder. */
+  /**
+   * A slot no operation, lease or writer holds, looked at: ready, dirty or gone. Otherwise left to its holder. The look
+   * and its detach are a settle operation (HI-2170: a warm-kind one with no lease), taken in one write while the slot is
+   * free and as it was read, so another look of it (this pool's or another Hive's, a finished card's slot question)
+   * sees it busy while its files may change, and one settle runs at a time. `looked` is told when its state changed.
+   */
   private async settle(name: string): Promise<void> {
     const s = this.store.slot(name)
     if (!s || s.op || s.writer || this.store.openLease(name)) return
     if (s.state === 'creating' || s.state === 'removing') return
-    const to = await this.look(s)
-    // Clean, it waits for its next card detached at the target's head (HI-2014, HI-1986), before it is ready to lend: its
-    // card's line is no longer checked out (committed work stays on that line), so a merged one can be deleted.
-    // Not detached (git couldn't read or switch it: an index lock, say): not ready yet either, so the next look tries again
-    // (HR2's HI-2014 round 1, finding 4), never a ready slot left on its card's line.
-    if (to === 'ready' && s.state !== 'ready' && !(await this.detach(s))) return
-    if (to !== s.state) await this.store.look(name, s.state, to)
+    const token = newToken()
+    if (!(await this.store.beginSettle(name, s.state, token, await this.deps.holder.self()))) return
+    let to: SlotState = s.state
+    try {
+      await this.op(token, async () => {
+        try {
+          const now = await this.look(s)
+          // Clean, it waits for its next card detached at the target's head (HI-2014, HI-1986), before it is ready to lend:
+          // its card's line is no longer checked out (committed work stays on that line), so a merged one can be deleted.
+          // Not detached (git couldn't read or switch it: an index lock, say): not ready yet either, so the next look tries
+          // again (HR2's HI-2014 round 1, finding 4), never a ready slot left on its card's line.
+          if (!(now === 'ready' && s.state !== 'ready' && !(await this.detach(s)))) to = now
+        } finally {
+          // Its operation ends with what it found, or the slot as it was (a failure: the next look tries again).
+          await this.store.fenced(name, token, (db) => this.store.setIn(db, name, to, {}, { op: null })).catch((e) => {
+            if (!(e instanceof OpLost)) throw e
+          })
+        }
+      })
+    } finally {
+      // Only a change: a pass that settles slots asks for itself again, so a slot that stays dirty mustn't loop it.
+      if (to !== s.state) this.deps.looked?.(name, to)
+    }
   }
 
   /**
@@ -1479,6 +1505,11 @@ export class SlotPool {
         const settled = !s.job || (await this.deps.settle(s.job))
         if (!settled) log.warn(`Slot ${userText(s.name)}'s job ${s.job} couldn't be emptied: it stays out of the pool`)
         const job = settled ? { job: null } : {}
+        // A settle cut short (HI-2170, a warm with no lease): the slot as it was, looked at again by the next refresh.
+        if (was.kind === 'warm' && was.lease === null) {
+          await this.store.fenced(s.name, token, (db) => this.store.setIn(db, s.name, s.state, {}, { op: null, ...job }))
+          return
+        }
         // A gone slot's recreation (#1447, its intent recorded with it): finished if git lists it on its line, else put
         // back as it was; its lease kept either way (never ended as an interrupted warming).
         const recreating = was.kind === 'warm' ? this.store.recreateOf(s.name) : null

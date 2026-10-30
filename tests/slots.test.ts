@@ -32,6 +32,28 @@ vi.mock('fs/promises', async (original) => {
   }
 })
 
+/**
+ * A slot's dirty read held at a gate, or failing (HI-2170: what a settle owns while its files may change), by folder; set by
+ * a test and cleared after.
+ */
+const gitGate = vi.hoisted(() => ({ hold: null as { folder: string; entered: () => void; go: Promise<void> } | null, fail: null as string | null }))
+vi.mock('../src/main/platform/git', async (original) => {
+  const g = await original<typeof import('../src/main/platform/git')>()
+  return {
+    ...g,
+    dirty: async (folder: string, paths?: string[]) => {
+      if (gitGate.fail && folder.toLowerCase() === gitGate.fail.toLowerCase()) throw new Error('git failed for the test')
+      const h = gitGate.hold
+      if (h && folder.toLowerCase() === h.folder.toLowerCase()) {
+        gitGate.hold = null
+        h.entered()
+        await h.go
+      }
+      return g.dirty(folder, paths)
+    }
+  }
+})
+
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
@@ -54,7 +76,7 @@ interface World {
   pool: SlotPool
   runs: (SlotRun & SlotRunEnd)[]
   opts: { setup: string; archive: string; copy: string }
-  set: { builders: number; removeIdle: boolean; sessions: Map<string, string>; inFlight: Set<number>; ended: string[]; writersOver: Set<string> }
+  set: { builders: number; removeIdle: boolean; sessions: Map<string, string>; inFlight: Set<number>; ended: string[]; writersOver: Set<string>; looked: string[] }
   steer: Steer
   clock: { now: number }
   /** Pids of holder processes that have ended. */
@@ -70,6 +92,7 @@ const worlds: World[] = []
 const procs: ChildProcess[] = []
 
 afterEach(async () => {
+  Object.assign(gitGate, { hold: null, fail: null })
   for (const p of procs.splice(0)) {
     if (p.exitCode === null && p.signalCode === null) p.kill()
     await new Promise<void>((r) => (p.exitCode !== null || p.signalCode !== null ? r() : p.once('exit', () => r())))
@@ -91,7 +114,7 @@ function world(o: { setup?: string; builders?: number } = {}): World {
   const runs: World['runs'] = []
   const logs = tempDir('slots-logs-')
   const opts = { setup: o.setup ?? '', archive: '', copy: '.env' }
-  const set = { builders: o.builders ?? 2, removeIdle: true, sessions: new Map<string, string>(), inFlight: new Set<number>(), ended: [] as string[], writersOver: new Set<string>() }
+  const set = { builders: o.builders ?? 2, removeIdle: true, sessions: new Map<string, string>(), inFlight: new Set<number>(), ended: [] as string[], writersOver: new Set<string>(), looked: [] as string[] }
   const steer: Steer = { gates: new Map(), settled: true, noSupervisor: false, settle: true, settledJobs: [] }
   const dead = new Set<number>()
   const root = join(`${ws}.worktrees`, 'project')
@@ -133,6 +156,7 @@ function world(o: { setup?: string; builders?: number } = {}): World {
       removeIdle: () => set.removeIdle,
       ended: (l, s) => void set.ended.push(`${l.id} ${s.name}`),
       writerOver: (wr) => set.writersOver.has(wr.run),
+      looked: (name, state) => void set.looked.push(`${pid} ${name} ${state}`),
       now: () => clock.now
     })
     return { pool, store }
@@ -430,6 +454,89 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     await w.pool.release(r.lease.id, 'done')
     expect(w.store.slot('slot-a')?.state).toBe('dirty')
     expect(sh(r.slot.folder, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('hive/AM-1-work')
+  })
+
+  describe("a free slot's settle owns it while its files may change (HI-2170)", () => {
+    const branch = (folder: string): string => sh(folder, 'rev-parse', '--abbrev-ref', 'HEAD').trim()
+    /** Holds the pool's next dirty read of a folder: resolves once it has started; `open()` lets it go. */
+    const holdDirty = (folder: string): { started: Promise<void>; open: () => void } => {
+      let entered!: () => void
+      let open!: () => void
+      const started = new Promise<void>((r) => (entered = r))
+      gitGate.hold = { folder, entered, go: new Promise<void>((r) => (open = r)) }
+      return { started, open: () => open() }
+    }
+    /** A slot lent to card 1, its card's line checked out with a commit on it. */
+    const onLine = async (w: World) => {
+      const r = await lent(w, { agent: 'a1', card: 1 })
+      sh(r.slot.folder, 'switch', '-q', '-c', 'hive/AM-1-work')
+      commit(r.slot.folder, { 'work.txt': 'work\n' }, 'work')
+      return r
+    }
+
+    it('holds the slot as an operation with no lease through its look and detach; an overlapping settle, here or in another Hive, does nothing', async () => {
+      const w = world({ builders: 1 })
+      const r = await onLine(w)
+      const held = holdDirty(r.slot.folder)
+      const release = w.pool.release(r.lease.id, 'done')
+      await held.started
+      expect(w.store.slot('slot-a')?.op).toMatchObject({ kind: 'warm', lease: null, pid: 1 })
+      // This pool's refresh (a refresh overlapping drained's settle) and another Hive's: nothing taken or changed.
+      await w.pool.refresh()
+      await w.another(2).pool.refresh()
+      expect(w.store.slot('slot-a')?.op).toMatchObject({ kind: 'warm', lease: null, pid: 1 })
+      expect(w.store.slot('slot-a')?.state).toBe('lent')
+      expect(branch(r.slot.folder)).toBe('hive/AM-1-work')
+      expect(await w.pool.lend({ agent: 'a2', card: 2 })).toMatchObject({ ok: false })
+      held.open()
+      expect(await release).toBe(true)
+      expect(w.store.slot('slot-a')).toMatchObject({ op: null, state: 'ready' })
+      expect(branch(r.slot.folder)).toBe('HEAD')
+      expect(w.set.looked).toEqual(['1 slot-a ready'])
+    })
+
+    it('a look that throws ends its operation, the slot as it was; the next look settles it', async () => {
+      const w = world({ builders: 1 })
+      const r = await onLine(w)
+      gitGate.fail = r.slot.folder
+      await expect(w.pool.release(r.lease.id, 'done')).rejects.toThrow('git failed for the test')
+      expect(w.store.slot('slot-a')).toMatchObject({ op: null, state: 'lent' })
+      expect(w.set.looked).toEqual([])
+      gitGate.fail = null
+      await w.pool.refresh()
+      expect(w.store.slot('slot-a')).toMatchObject({ op: null, state: 'ready' })
+      expect(branch(r.slot.folder)).toBe('HEAD')
+    })
+
+    it("a settle whose Hive has gone: taken over with the slot as it was (never failed as a warming), then looked at again", async () => {
+      const w = world({ builders: 1 })
+      const r = await onLine(w)
+      await w.store.end(r.lease.id, 'done')
+      const gone = w.another(5)
+      expect(await gone.store.beginSettle('slot-a', 'lent', 'o-gone', { pid: 5, started: 1005 })).toBe(true)
+      // While it holds the slot, another settle can't begin.
+      expect(await w.store.beginSettle('slot-a', 'lent', 'o-mine', { pid: 1, started: 1001 })).toBe(false)
+      w.dead.add(5)
+      await w.pool.refresh()
+      expect(w.store.slot('slot-a')).toMatchObject({ op: null, state: 'lent', warmError: null })
+      expect(w.store.lease(r.lease.id)?.why).toBe('done')
+      await w.pool.refresh()
+      expect(w.store.slot('slot-a')).toMatchObject({ op: null, state: 'ready' })
+    })
+
+    it('told only when a settle changes the slot: one that stays dirty is not told again', async () => {
+      const w = world({ builders: 1 })
+      const r = await onLine(w)
+      writeFileSync(join(r.slot.folder, 'wip.txt'), 'not committed\n')
+      await w.pool.release(r.lease.id, 'done')
+      expect(w.set.looked).toEqual(['1 slot-a dirty'])
+      await w.pool.refresh()
+      expect(w.set.looked).toEqual(['1 slot-a dirty'])
+      rmSync(join(r.slot.folder, 'wip.txt'))
+      await w.pool.refresh()
+      expect(w.set.looked).toEqual(['1 slot-a dirty', '1 slot-a ready'])
+      expect(branch(r.slot.folder)).toBe('HEAD')
+    })
   })
 })
 
