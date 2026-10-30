@@ -136,7 +136,7 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
     check("Agent Settings: the picker is on Max 1's connection", !!(await lib.until(async () => (await picker.getAttribute('data-connection-choice').catch(() => null)) === edited?.id, HUNG_MS)), await picker.getAttribute('data-connection-choice').catch(() => ''))
     check('…its values under it (Sonnet · Low)', !!(await lib.until(async () => /Sonnet · Low/.test(await dialog.locator('[data-connection-summary]').innerText().catch(() => '')), HUNG_MS)), await dialog.locator('[data-connection-summary]').innerText().catch(() => ''))
     const firsts = await dialog.locator('.agent-form select').evaluateAll((all) => all.map((s) => s.options[0]?.textContent ?? '')).catch(() => [])
-    check('…and no model, effort, mode or context choice of its own', !firsts.some((x) => /^(Connection default|Project's)/.test(x)), JSON.stringify(firsts))
+    check('…and no model, effort, mode or context choice of its own', firsts.length > 0 && !firsts.some((x) => /^(Connection default|Project's)/.test(x)), JSON.stringify(firsts))
     await shots('agentsettings')
     await page.keyboard.press('Escape')
 
@@ -146,9 +146,12 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
     const assistantRow = page.locator('.settings-nav .row[data-section="assistant"]')
     await assistantRow.waitFor({ timeout: HUNG_MS })
     await assistantRow.click()
-    await lib.until(async () => (await page.locator('.setting', { hasText: 'Highlight Compact over' }).count()) >= 1, HUNG_MS)
-    const shown = await page.locator('select').evaluateAll((all) => all.map((s) => s.options[0]?.textContent ?? '')).catch(() => [])
-    check('Settings → Assistant: no model, effort or context rows (its connection holds them)', (await page.locator('.assistant-defaults').count()) === 0 && !shown.some((x) => x.startsWith('Connection default')), JSON.stringify(shown))
+    // The Assistant's own page, shown (one of its rows), before looking for what it no longer has there.
+    const assistantPage = page.locator('.settings-content .settings-group[data-section="assistant"]')
+    const shownPage = !!(await lib.until(async () => (await assistantPage.locator('.setting', { hasText: 'Highlight Compact over' }).count()) >= 1, HUNG_MS))
+    check('Settings → Assistant is shown', shownPage)
+    const shown = await assistantPage.locator('select').evaluateAll((all) => all.map((s) => s.options[0]?.textContent ?? '')).catch(() => [])
+    check('Settings → Assistant: no model, effort or context rows (its connection holds them)', shownPage && shown.length > 0 && (await assistantPage.locator('.assistant-defaults').count()) === 0 && !shown.some((x) => x.startsWith('Connection default')), JSON.stringify(shown))
     await shots('assistant')
     await page.keyboard.press('Escape')
   } catch (e) {
