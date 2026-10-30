@@ -6,7 +6,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSyn
 import { join, resolve } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import { accountState, connectionReadiness, duplicateLogins, movedConnection, switchedOn, topOfOrder, workspaceAccounts } from '../src/shared/accounts'
+import { accountState, baseConnection, connectionReadiness, duplicateLogins, movedConnection, switchedOn, topOfOrder, workspaceAccounts } from '../src/shared/accounts'
 import type { Account } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -937,8 +937,9 @@ describe("a workspace's accounts", () => {
         expect(mine().map((h) => h.projects)).toEqual([2])
         const other = await accounts.addAccount('claude-code', 'Other')
         await run(() => accounts.setAccountOn(other.id, true))
-        // beta: a Codex agent; gamma: a Claude Code agent pinned to Other. Neither would use this connection.
-        const agentsOf = [{ provider: 'claude-code' }, { provider: 'codex' }, { provider: 'claude-code', connection: other.id }]
+        // beta: a Codex agent; gamma: a Claude Code agent pinned to Other's connection (HI-2108: an agent names a connection,
+        // HI-2162). Neither would use this one.
+        const agentsOf = [{ provider: 'claude-code' }, { provider: 'codex' }, { provider: 'claude-code', connection: baseConnection(other.id, accounts.allConnections())!.id }]
         for (const i of folders.keys()) writeProject(i, agentsOf[i])
         await refreshedTo((info) => info.projects.filter((p) => p.agents.length).length === 3)
         await vi.waitFor(() => expect(row().trust?.checking).toBe(true), { timeout: HUNG_MS })
@@ -963,9 +964,10 @@ describe("a workspace's accounts", () => {
         // Other, on but second in the order: no agent here would use it.
         await vi.waitFor(() => expect(rowOf(other.id).trust?.checking).toBeUndefined(), { timeout: HUNG_MS })
         expect(others(other)).toHaveLength(0)
-        // alpha's agent given Other as its own: alpha now counts for Other, and no longer for this one.
-        writeProject(0, { provider: 'claude-code', connection: other.id })
-        await refreshedTo((info) => alphaConnection(info) === other.id)
+        // alpha's agent given Other's connection as its own (HI-2108, HI-2162): alpha now counts for Other, and no longer for this one.
+        const otherBase = baseConnection(other.id, accounts.allConnections())!.id
+        writeProject(0, { provider: 'claude-code', connection: otherBase })
+        await refreshedTo((info) => alphaConnection(info) === otherBase)
         rowOf(other.id)
         await vi.waitFor(() => expect(others(other).map((h) => h.projects)).toEqual([1]), { timeout: HUNG_MS })
         await vi.waitFor(() => expect(mine().at(-1)!.projects).toBe(1), { timeout: HUNG_MS })

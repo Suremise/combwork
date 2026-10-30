@@ -7,7 +7,7 @@ import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDef
 import { HIVE_DIR } from '../shared/defaults'
 import { readKeptJson, withFileLock } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
-import { acceptable, accountState, baseConnection, connectionsOn, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, resolveConnection, topOfOrder, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
+import { acceptable, accountState, baseConnection, connectionsOn, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, topOfOrder, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { ASSISTANT_NAME } from '../shared/assistant'
 import { profileFolder } from '../shared/appName'
 import { agentProvider, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS } from '../shared/providers'
@@ -1127,20 +1127,25 @@ const onHere = (a: Account): boolean => !!workspace.path && !!workspaceAccounts(
  * The folders of this window's workspace a connection would be used in (HI-1871, Darren 27 Oct ~22:30): the projects
  * with an agent whose connection, resolved as its launch would be (its own if on here, else the first in the order
  * that's on), is this one, and the Assistant's home when the Assistant's is. "Needs set up" counts only these.
+ * Resolved as sessions.ts launches (HI-2162): an agent names a connection (HI-2108), whose account is the one counted.
  */
 const projectsFor = (a: Account): { name: string; path: string }[] => {
   const info = workspace.info()
   const cfg = workspace.config
-  const all = list()
-  const usedBy = (p: ProjectInfo, own: (agent: AgentInfo) => string | null | undefined): boolean =>
+  const accounts = allAccounts()
+  const connections = allConnections()
+  const usedBy = (p: ProjectInfo, cliOf: (agent: AgentInfo) => ProviderId): boolean =>
     p.agents.some((ag) => {
-      if (agentProvider(ag, config.settings) !== a.provider) return false
-      const r = resolveConnection(cfg, a.provider, own(ag), all)
-      return r.ok && r.id === a.id
+      const cli = cliOf(ag)
+      if (cli !== a.provider) return false
+      const r = resolveAgentConnection(cfg, cli, ag.connection, accounts, connections)
+      return r.ok && r.account.id === a.id
     })
-  const projects = (info?.projects ?? []).filter((p) => usedBy(p, (ag) => ag.connection)).map((p) => ({ name: p.name, path: p.path }))
+  const projects = (info?.projects ?? []).filter((p) => usedBy(p, (ag) => agentProvider(ag, config.settings))).map((p) => ({ name: p.name, path: p.path }))
   const home = info?.assistant
-  return home && usedBy(home, (ag) => ag.connection ?? cfg.assistantConnection?.[a.provider] ?? null) ? [...projects, { name: home.name, path: home.path }] : projects
+  // An Assistant that names no CLI yet: the first usable account's, as its launch (decision A).
+  const assistantCli = (ag: AgentInfo): ProviderId => (!ag.provider && !ag.connection ? (firstUsableAccount(cfg)?.provider ?? agentProvider(ag, config.settings)) : agentProvider(ag, config.settings))
+  return home && usedBy(home, assistantCli) ? [...projects, { name: home.name, path: home.path }] : projects
 }
 
 /** Reads a connection's set-up state again, telling the windows when it changed. */
