@@ -99,11 +99,23 @@ function readPause(file: string): TeamPause | null {
  */
 const liftedByVersion = (p: TeamPause): boolean => !!p.version && p.version !== app.getVersion()
 
+/** The same saved pause: its id and since (a pause saved again under the same id is another). */
+const samePause = (a: TeamPause | null, b: TeamPause): boolean => !!a && a.pauseId === b.pauseId && a.since === b.since
+
+/**
+ * Removes a lifted pause's file (HR1's round 2 finding): later, under its lock, and only while it still holds that very
+ * pause, so a pause saved meanwhile in its place is kept.
+ */
+async function removeLifted(file: string, p: TeamPause): Promise<void> {
+  if (samePause(readPause(file), p)) await rm(file, { force: true })
+}
+
 /** The user's pause of every open workspace, as the profile keeps it (read again each time: tiny, and rare). */
 export const appPause = (): AppPauseFile | null => {
   const p = readPause(appFile())
   if (p && ((closing && /^(install|update)$/.test(closing.reason) && closing.app === p.pauseId) || liftedByVersion(p))) {
-    void rm(appFile(), { force: true }).catch(() => undefined)
+    const file = appFile()
+    void withAppLock(() => removeLifted(file, p)).catch(() => undefined)
     return null
   }
   return p
@@ -154,7 +166,9 @@ export function teamPauseOf(ws: WorkspaceService | null | undefined): TeamPause 
   // resumes on its own (the restart's resume offer). Only this very pause, closed under an install or an update, in the
   // close just before this start: a crash, a plain quit or an older record keeps it.
   if (p && (liftedByClosing(ws, p) || liftedByVersion(p))) {
-    void withLock(ws, () => rm(fileOf(ws), { force: true })).catch((e) => log.warn("Removing a team pause lifted by the update's restart", e))
+    const file = fileOf(ws)
+    const lifted = p
+    void withLock(ws, () => removeLifted(file, lifted)).catch((e) => log.warn("Removing a team pause lifted by the update's restart", e))
     log.info(`The team of ${userText(ws.path)} resumes after the update it was paused for (${p.pauseId})`)
     p = null
   }

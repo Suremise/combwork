@@ -250,6 +250,39 @@ describe("the user's pause after a restart (HI-2156)", () => {
     expect(tp.teamPauseOf(ws(e))).toBeNull()
   })
 
+  it("paused again over one saved by another version (HR1's round 2 finding): the lifted one's removal keeps the new pause", async () => {
+    // A workspace's: the Assistant's pause the first thing this start does.
+    profile()
+    const w = workspace()
+    state.open = [w]
+    setVersion('0.0.0-older')
+    const old = await tp.pauseTeam(ws(w), 'user')
+    setVersion('0.0.0-test')
+    tp.resetTeamPauseForTests()
+    tp.loadPauseClosing()
+    const p = await tp.pauseTeam(ws(w), 'assistant')
+    expect(p.pauseId).not.toBe(old.pauseId)
+    // Every queued step of its lock done (the lifted pause's removal among them).
+    await tp.withLock(ws(w), () => undefined)
+    expect(existsSync(join(w.path, '.hive', 'team-pause.json'))).toBe(true)
+    tp.resetTeamPauseForTests()
+    tp.loadPauseClosing()
+    expect(tp.teamPauseOf(ws(w))?.pauseId).toBe(p.pauseId)
+    // The profile's: Pause the Team over an older version's.
+    profile()
+    state.open = []
+    setVersion('0.0.0-older')
+    const oldApp = (await tp.pauseApp()).pause!
+    setVersion('0.0.0-test')
+    tp.resetTeamPauseForTests()
+    const first = (await tp.pauseApp()).pause!
+    expect(first.pauseId).not.toBe(oldApp.pauseId)
+    // Pausing again goes after the lifted pause's removal, and finds the new one kept.
+    const again = (await tp.pauseApp()).pause!
+    expect(again.pauseId).toBe(first.pauseId)
+    expect(tp.appPause()?.pauseId).toBe(first.pauseId)
+  })
+
   it('one saved by another version (its update installed, however Hive closed): lifted at start; by this version: kept', async () => {
     const { w } = await savedAppPause('0.0.0-older')
     expect(tp.teamPauseOf(ws(w))).toBeNull()
