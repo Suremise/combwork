@@ -152,6 +152,10 @@ const VERDICT_FAILED = /^Review failed/
 /** Whether a lane is still running (active or paused). */
 export const running = (l: Pick<LaneRecord, 'state'>): boolean => l.state === 'active'
 
+/** Whether an agent builds a card as a running lane's builder in its project (HI-2047: its start names card-loop). */
+export const laneBuilds = (lanes: readonly Pick<LaneRecord, 'state' | 'project' | 'builder' | 'cards'>[], project: string, agentId: string, card: number): boolean =>
+  lanes.some((l) => running(l) && l.project.toLowerCase() === project.toLowerCase() && l.builder.id === agentId && l.cards.includes(card))
+
 /**
  * A lane's card as the board has it (null: gone, archived, or in another project now). `of`: the running lane it is read
  * for, so an open card that isn't its own is marked held elsewhere (HI-1821): given to another agent than its builder,
