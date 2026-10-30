@@ -215,6 +215,7 @@ const check = (name, ok, extra = '') => {
   // A new agent's connection, not a provider (HI-2121, decision A): the connection picker, no provider choice.
   const picker = await until(async () => (await startDialog.locator('#start-agent-connection').count()) === 1, 5000)
   check("Start's new agent chooses a connection, not a provider", picker && (await startDialog.getByText('Provider', { exact: true }).count()) === 0)
+  await page.screenshot({ path: path.join(lib.WORK, 'board-start-new-agent.png') })
   await startDialog.getByRole('button', { name: 'Start' }).click()
   const project = async () => (await inv('workspace:get')).projects.find((p) => p.name === 'alpha')
   const agent = await until(async () => (await project())?.agents[0], HUNG_MS)
