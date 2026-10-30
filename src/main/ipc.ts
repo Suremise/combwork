@@ -704,10 +704,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       if (shownElsewhere(target)) return workspace.info()
       // A recent workspace whose folder was deleted or moved (#144): said plainly, so the window can offer to forget it.
       if (!existsSync(target)) throw hiveError(M.workspaceNotFound, { path: target }, { kind: 'notFound' })
-      // This window's workspace by another name (an 8.3 short name, a junction) is the same one: no switch, and it keeps
-      // the name it has, which its agents' sessions use (#455).
-      if (workspace.path && samePlace(target, workspace.path)) target = workspace.path
-      else if (workspace.path && workspaceLive(contextWorkspace()!)) {
+      // This window's workspace already, or the one it is opening (its restore at start), by any name (an 8.3 short name,
+      // a junction, #455): left as it is, never closed and opened again, which ended what its passes were writing
+      // (HI-2141); it keeps the name it has, which its agents' sessions use.
+      const here = await workspace.alreadyHere(target)
+      if (here) return here
+      if (workspace.path && workspaceLive(contextWorkspace()!)) {
         if (!(await quitControl.stopWorkspaceAgents(win(), 'switch'))) return workspace.info()
       }
       return openHere(target)

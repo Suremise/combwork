@@ -180,7 +180,7 @@ The Overview's notice has ✕ to stop showing it for that project; it comes back
 - **Remove one** with its **✕** (on hover) or by right-clicking it → **Remove from Recent**. Only the list forgets it: the folder is left alone.
 - **File → Open Recent → Clear Recently Opened…** (also in the command palette) forgets them all, after asking; workspaces open in a window stay.
 - **A folder that isn't there any more** (moved, deleted, or on a drive that isn't connected) is greyed, with *not found*. It stays in the list, since a drive may come back. Opening it says it can't be found and offers **Remove from Recent**.
-- **A workspace open in another window** says *open in another window*; choosing it brings that window forward. The same goes for the folder by another name (through a junction or a link, or a short name such as `C:\Users\RUNNER~1\…`): Hive goes by where the folder really is, so a workspace is never open in two windows, and opening the one a window shows by another name keeps it as it is.
+- **A workspace open in another window** says *open in another window*; choosing it brings that window forward. The same goes for the folder by another name (through a junction or a link, or a short name such as `C:\Users\RUNNER~1\…`): Hive goes by where the folder really is, so a workspace is never open in two windows, and opening the one a window shows, by any name, keeps it as it is (while Hive is still opening it, once it has opened).
 
 Every window's list follows a change made in another.
 
