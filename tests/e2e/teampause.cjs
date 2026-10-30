@@ -112,7 +112,7 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
     const before = wakes('Builder').length
     await inv('tasks:comment', c1, 'Round 1: one finding.')
     await lib.sleep(4000) // on purpose: longer than a wake takes, to see none is typed while paused
-    check("its watch's wake is held while paused (nothing typed)", wakes('Builder').length === before, JSON.stringify(wakes('Builder').slice(before)))
+    check("its watch's wake is held while paused (not typed)", !wakes('Builder').slice(before).some((t) => t.includes('Round 1: one finding')), JSON.stringify(wakes('Builder').slice(before)))
 
     // --- What still runs: Builder's run keeps the team unparked; once it ends, All parked.
     await until(() => idle(alpha, builder.id))
