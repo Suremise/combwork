@@ -84,6 +84,8 @@ async function settled(env) {
     const codex = select.locator('option[value="c-codex"]')
     check("…Codex's connection greyed out, saying Codex isn't installed", (await codex.count()) === 1 && (await codex.isDisabled()) && /Codex isn't installed/.test(await codex.innerText()), await codex.innerText().catch(() => ''))
     await add.screenshot({ path: path.join(lib.WORK, 'connectionfirst-add.png') })
+    const startUsable = add.locator('label', { hasText: 'Start a session now' }).locator('input')
+    check('…with a usable connection, "Start a session now" stays ticked and can be changed (HI-2127)', (await startUsable.isEnabled()) && (await startUsable.isChecked()) && (await add.locator('[data-start-now-why]').count()) === 0)
     await add.getByRole('button', { name: 'Cancel', exact: true }).click()
     await lib.until(async () => (await add.count()) === 0, HUNG_MS)
 
