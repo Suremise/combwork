@@ -1393,6 +1393,9 @@ module.exports.SCENARIOS = [
       await new Promise((r) => setTimeout(r, 20))
       await c.inv('tasks:update', c.cards.r, { decision: 'Greet with "Hi, <name>", never "Hello".' })
     },
+    // The decision tells Coder (its round 1 reviewer) in its inbox: that wake read first, or on Copilot its doorbell's
+    // turn can take the prompt's place (HI-2071, #1613).
+    beforePrompt: (c) => wakeRead(c, 'r'),
     prompt: (c) =>
       `You are the reviewer of card #${c.cards.r} in a card loop with the card-loop skill (rounds: 5); you failed it in round 1. [Hive] #${c.cards.r} is in Review; latest comment: "Fixed: greet.js says 'Hello, <name>' now.". Your card watch has ended: carry on.`,
     fake: (c) =>
