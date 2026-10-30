@@ -178,6 +178,8 @@ interface HiveMessageValues {
   'service.laneStarts.freshBlockedTitle': { agent: string | number }
   'service.lanes.noWorkspace': undefined
   'service.lanes.unknown': { id: string | number }
+  'service.mcp.addedDropped': { n: number }
+  'service.mcp.addedTitle': undefined
   'service.metrics.badProvider': undefined
   'service.metrics.badRange': undefined
   'service.metrics.badRole': undefined

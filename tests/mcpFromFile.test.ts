@@ -1,5 +1,5 @@
 // Add MCP Server from File (#550): a .json definition or a .zip of a server folder, checked, unpacked safely into
-// .hive/mcp/<name>/ and added turned off; a name in use is refused unless replaced; what it runs is shown by name.
+// .hive/mcp/<name>/ and added nowhere (HI-2059); a name in use is refused unless replaced; what it runs is shown by name.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -121,15 +121,14 @@ describe('Add MCP Server from File', () => {
     expect(mcp.checkMcpDef({ url: 'https://x/mcp', headers: { A: 'b' } })).toEqual({ url: 'https://x/mcp', headers: { A: 'b' } })
   })
 
-  it('adds a .json definition turned off, named after the file, and says what it runs', async () => {
-    // Enabled once under this name (its definition since deleted by hand): added, it is still off.
-    w.config.mcp.enabled = ['github']
-    await w.saveWorkspaceConfig()
+  it('adds a .json definition added nowhere, named after the file, and says what it runs', async () => {
+    // Added once for the Assistant under this name (its definition since deleted by hand): added again, it is nowhere.
+    await run(() => w.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, assistant: ['github'], assistantModel: 3 } })))
     const f = file('github.json', JSON.stringify(GITHUB))
     const preview = await run(() => mcp.previewMcpFile(f))
     expect(preview).toMatchObject({ name: 'github', files: 0, exists: false, runs: ['Runs: npx -y @modelcontextprotocol/server-github', 'Environment: GITHUB_TOKEN=${GITHUB_TOKEN}'] })
     const m = await run(() => mcp.addMcpFromFile(f, 'github'))
-    expect(m).toMatchObject({ name: 'github', globallyEnabled: false })
+    expect(m).toMatchObject({ name: 'github', projects: [], assistant: false })
     expect(m.error).toBeUndefined()
     expect(JSON.parse(readFileSync(join(mcpDir, 'github.json'), 'utf8')).args).toEqual(['-y', '@modelcontextprotocol/server-github'])
   })
@@ -154,7 +153,7 @@ describe('Add MCP Server from File', () => {
     expect(preview).toMatchObject({ name: 'ollama', files: 2, exists: false })
     expect(preview.runs).toEqual(['Runs: node ${HIVE_MCP_DIR}/ollama/server.js', 'Environment: OLLAMA_HOST (set), OLLAMA_KEY=${OLLAMA_KEY}'])
     const m = await run(() => mcp.addMcpFromFile(f, 'ollama'))
-    expect(m.globallyEnabled).toBe(false)
+    expect(m).toMatchObject({ projects: [], assistant: false })
     expect(readFileSync(join(mcpDir, 'ollama', 'server.js'), 'utf8')).toBe('// server')
     expect(existsSync(join(mcpDir, 'ollama', 'lib', 'util.js'))).toBe(true)
     // The definition is the server's .json, not a file in its folder; nothing else is left in .hive/mcp.
@@ -220,7 +219,8 @@ describe('Add MCP Server from File', () => {
 
   /**
    * Replaces `name` with `next`, holding the replace as it writes the new definition (the old one already in the
-   * trash) while the user enables the server, having been shown `old`: the enable is refused and the new one stays off.
+   * trash) while the user adds the server for the Assistant, having been shown `old`: the Add is refused and the new one is
+   * added nowhere.
    */
   async function enableDuringReplace(name: string, old: Awaited<ReturnType<typeof mcp.addMcpFromFile>>, next: string): Promise<Awaited<ReturnType<typeof mcp.addMcpFromFile>>> {
     let reached!: () => void
@@ -229,22 +229,22 @@ describe('Add MCP Server from File', () => {
     gate.hold = { path: new RegExp(`[\\\\/]${name}\\.json$`), reached, release: new Promise<void>((r) => (release = r)) }
     const replacing = run(() => mcp.addMcpFromFile(next, name, true))
     await atWrite
-    const enabling = run(() => mcp.setMcpGlobal(name, true, { def: old.def, revision: old.revision }))
+    const enabling = run(() => mcp.addMcpTo('assistant', name, { def: old.def, revision: old.revision }))
     release()
     const added = await replacing
-    await expect(enabling).rejects.toThrow(`${name} has changed since it was shown to you. Check what it runs and enable it again.`)
-    expect(added.globallyEnabled).toBe(false)
-    expect((await run(() => mcp.listMcp())).find((m) => m.name === name)?.globallyEnabled).toBe(false)
+    await expect(enabling).rejects.toThrow(`${name} has changed since it was shown to you. Check what it runs and add it again.`)
+    expect(added.assistant).toBe(false)
+    expect((await run(() => mcp.listMcp())).find((m) => m.name === name)?.assistant).toBe(false)
     return added
   }
-  const enabled = async (name: string): Promise<boolean | undefined> => (await run(() => mcp.listMcp())).find((m) => m.name === name)?.globallyEnabled
+  const enabled = async (name: string): Promise<boolean | undefined> => (await run(() => mcp.listMcp())).find((m) => m.name === name)?.assistant
 
-  it('an enable of the old server while a replace is under way is refused, and the new one stays off', async () => {
+  it('an Add of the old server while a replace is under way is refused, and the new one is added nowhere', async () => {
     const old = await run(() => mcp.addMcpFromFile(file('race.json', JSON.stringify({ command: 'node', args: ['old-server.js'] })), 'race'))
     const added = await enableDuringReplace('race', old, file('race.json', JSON.stringify({ command: 'node', args: ['new-server.js'] })))
     expect(added.def?.args).toEqual(['new-server.js'])
-    // Shown the new server, it can be enabled.
-    await run(() => mcp.setMcpGlobal('race', true, { def: added.def, revision: added.revision }))
+    // Shown the new server, it can be added.
+    await run(() => mcp.addMcpTo('assistant', 'race', { def: added.def, revision: added.revision }))
     expect(await enabled('race')).toBe(true)
   })
 
@@ -255,31 +255,32 @@ describe('Add MCP Server from File', () => {
     expect(added.def).toEqual(old.def)
     expect(added.revision).not.toBe(old.revision)
     expect(readFileSync(join(mcpDir, 'same', 'server.js'), 'utf8')).toBe('// new version')
-    // An enable from a view of the old installation, after the upgrade, is refused too; the new one's works.
-    await expect(run(() => mcp.setMcpGlobal('same', true, { def: old.def, revision: old.revision }))).rejects.toThrow('has changed since')
-    await run(() => mcp.setMcpGlobal('same', true, { def: added.def, revision: added.revision }))
+    // An Add from a view of the old installation, after the upgrade, is refused too; the new one's works.
+    await expect(run(() => mcp.addMcpTo('assistant', 'same', { def: old.def, revision: old.revision }))).rejects.toThrow('has changed since')
+    await run(() => mcp.addMcpTo('assistant', 'same', { def: added.def, revision: added.revision }))
     expect(await enabled('same')).toBe(true)
   })
 
-  it('an enable shown a definition since edited is refused', async () => {
+  it('an Add shown a definition since edited is refused', async () => {
     await addGithub()
     const shown = (await run(() => mcp.listMcp())).find((m) => m.name === 'github')!
     await run(() => mcp.saveMcp('github', JSON.stringify({ ...shown.def, args: ['-y', 'other-package'] }, null, 2)))
-    await expect(run(() => mcp.setMcpGlobal('github', true, { def: shown.def, revision: shown.revision }))).rejects.toThrow('has changed since')
+    await expect(run(() => mcp.addMcpTo('assistant', 'github', { def: shown.def, revision: shown.revision }))).rejects.toThrow('has changed since')
     expect(await enabled('github')).toBe(false)
   })
 
-  it("deletes a definition that can't be read, turning it off, and guesses no folder to delete", async () => {
+  it("deletes a definition that can't be read, removing it where it was added, and guesses no folder to delete", async () => {
     for (const [name, text] of [['broken', '{oops'], ['listed', '[1, 2]']]) {
       writeFileSync(join(mcpDir, `${name}.json`), text)
       mkdirSync(join(mcpDir, name), { recursive: true })
       writeFileSync(join(mcpDir, name, 'keep.txt'), 'not deleted')
-      await run(() => mcp.setMcpGlobal(name, true))
+      // Added before it broke.
+      await run(() => w.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, assistant: [name], assistantModel: 3 } })))
       expect((await run(() => mcp.listMcp())).find((m) => m.name === name)?.error).toBeTruthy()
       await run(() => mcp.deleteMcp(name))
       expect(existsSync(join(mcpDir, `${name}.json`))).toBe(false)
       expect(existsSync(join(mcpDir, name, 'keep.txt'))).toBe(true)
-      expect(w.config.mcp.enabled).not.toContain(name)
+      expect(w.config.mcp.assistant).not.toContain(name)
     }
   })
 

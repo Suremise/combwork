@@ -468,9 +468,8 @@ const APP_ROWS: Row[] = [
     section: 'assistant',
     key: 'mcp',
     title: msg({ id: 'settings.assistant.mcp.title', defaultMessage: 'MCP servers (this workspace)', description: "A setting's title (Settings → Assistant): which of the open workspace's MCP servers the Assistant gets. MCP is a protocol's name: keep it." }),
-    desc: msg({ id: 'settings.assistant.mcp.desc', defaultMessage: "The workspace's MCP servers the Assistant gets, as a project's MCP tab chooses them: each runs for it only while it is on in the workspace too (its switch in the MCP view). Off until you turn one on here. Applies from its next session.", description: 'What the setting "MCP servers (this workspace)" does, under its title (Settings → Assistant). "MCP view" and "MCP tab" are places in Hive: keep them as Hive shows them.' }),
-    type: 'custom',
-    wide: true
+    desc: msg({ id: 'settings.assistant.mcp.descAdded', defaultMessage: "The workspace's MCP servers added for the Assistant are chosen in its own view (the Hive Assistant on the activity bar), as a project's are in its MCP tab.", description: 'What the setting "MCP servers (this workspace)" says, under its title (Settings → Assistant, HI-2059): the servers are added in the Hive Assistant’s view now. "MCP tab" is a place in Hive: keep it as Hive shows it.' }),
+    type: 'custom'
   },
   { section: 'assistant', key: 'provider', title: msg({ id: 'settings.assistant.provider.title', defaultMessage: 'Provider', description: "A setting's title (Settings → Assistant)." }), desc: msg({ id: 'settings.assistant.provider.desc', defaultMessage: 'The coding agent the Assistant runs, unless a workspace chooses another.', description: 'What the setting "Provider" does, under its title (Settings → Assistant).' }), tip: msg({ id: 'settings.assistant.provider.tip', defaultMessage: 'The Assistant is independent of your project agents: a Codex Assistant can look after Claude Code agents, and the other way round.', description: 'The info tip of the setting "Provider" (Settings → Assistant): more on what it does and when it applies.' }), type: 'custom' },
   {

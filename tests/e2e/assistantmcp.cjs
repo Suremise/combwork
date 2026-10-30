@@ -1,10 +1,12 @@
-// The Hive Assistant's MCP servers (HI-1472), in the window: a workspace from before (its servers on in the workspace,
-// sandbox on in its project demo) opens with none for the Assistant. Settings → Assistant → MCP servers turns notes on
-// for it after showing what it runs; a server off in the workspace can't be turned on there. The MCP view says where
-// each runs, and its enable dialog lists the Hive Assistant after the projects. The Assistant's launch (the fake Claude
-// Code's --mcp-config) has notes and not sandbox; the project agent's sandbox and not notes. GET /v1/mcp says it for
-// the workspace's token and leaves it out for an agent's. Turning it off tells the running Assistant to restart.
-// Screenshots of Settings → Assistant, its confirmation, the MCP view and the enable dialog in both themes
+// The Hive Assistant's MCP servers (HI-1472, HI-2059), in the window: a workspace from #1093's switches (notes and
+// sandbox on in the workspace, extra off; demo has sandbox on and extra remembered while off; other has notes on) opens
+// converted to added servers: demo has sandbox only, other notes, the Assistant none, and the dropped choice is said
+// once. Settings → Assistant links to the Assistant's view, whose MCP Servers section adds one with the picker (search,
+// what it runs, then Add) and removes it. The MCP view says where each is added; Add to… lists the Hive Assistant after
+// the projects. The Assistant's launch (the fake Claude Code's --mcp-config) has notes and not sandbox; demo's agent
+// sandbox and not notes. GET /v1/mcp says where each is added for the workspace's token, and only its own project's for
+// an agent's (demo's and other's, each its own); a project's status says `added`. Removing it tells the running
+// Assistant to restart. Screenshots of the Assistant's view, the picker, the MCP view and Add to… in both themes
 // (assistantmcp-*.png in the run's folder). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -15,6 +17,7 @@ const HUNG_MS = 15000
 const userData = path.join(lib.WORK, 'assistantmcp-profile')
 const ws = path.join(lib.WORK, 'assistantmcp-ws')
 const proj = path.join(ws, 'demo')
+const other = path.join(ws, 'other')
 const home = path.join(lib.WORK, 'assistantmcp-claude-home')
 // Its own default, below the lanes' ports (47939 on, lanes.mjs) and no other suite's (HI-1921).
 const PORT = Number(lib.port(47703))
@@ -26,14 +29,16 @@ const check = (name, ok, extra = '') => {
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
-  fs.mkdirSync(path.join(proj, '.hive'), { recursive: true })
+  for (const p of [proj, other]) fs.mkdirSync(path.join(p, '.hive'), { recursive: true })
   // Three servers (they never run: the fake Claude Code only records its --mcp-config): notes and sandbox on in the
-  // workspace, extra off; sandbox on in demo. workspace.json has no Assistant choices yet (a workspace from before).
+  // workspace, extra off. demo has sandbox on and extra kept while the workspace has it off; other has notes on.
+  // workspace.json has no Assistant choices yet (a workspace from before).
   fs.mkdirSync(path.join(ws, '.hive', 'mcp'), { recursive: true })
-  for (const n of ['notes', 'sandbox', 'extra']) fs.writeFileSync(path.join(ws, '.hive', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`] }))
+  for (const n of ['notes', 'sandbox', 'extra']) fs.writeFileSync(path.join(ws, '.hive', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`], ...(n === 'notes' ? { tags: ['memory'] } : {}) }))
   fs.writeFileSync(path.join(ws, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox'], model: 2 } }))
-  fs.writeFileSync(path.join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: [], enabled: ['sandbox'] } }))
-  const env = lib.fakeClaude(userData, home, [proj, ws])
+  fs.writeFileSync(path.join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: [], enabled: ['extra', 'sandbox'] } }))
+  fs.writeFileSync(path.join(other, '.hive', 'project.json'), JSON.stringify({ version: 2, mcp: { disabled: [], enabled: ['notes'] } }))
+  const env = lib.fakeClaude(userData, home, [proj, other, ws])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
@@ -52,58 +57,79 @@ const check = (name, ok, extra = '') => {
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     }
     const wsMcp = () => JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'workspace.json'), 'utf8')).mcp
+    const projectMcp = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8')).mcp
     const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const api = async (route, token) => {
       const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { headers: { Authorization: `Bearer ${token}` } })
       return { status: r.status, body: await r.json().catch(() => null) }
     }
 
-    check('a workspace from before opens with no servers for the Assistant', !!(await lib.until(async () => JSON.stringify(wsMcp().assistant) === '[]', HUNG_MS)), JSON.stringify(wsMcp()))
+    // --- The upgrade: what ran is added, nothing else; the dropped choice is said once.
+    check('a workspace from before opens with no servers for the Assistant', !!(await lib.until(async () => JSON.stringify(wsMcp().assistant) === '[]' && wsMcp().assistantModel === 3, HUNG_MS)), JSON.stringify(wsMcp()))
+    check("demo is converted: sandbox added, extra (off in the workspace) dropped", JSON.stringify(projectMcp(proj)) === JSON.stringify({ disabled: [], enabled: ['sandbox'], model: 3 }), JSON.stringify(projectMcp(proj)))
+    check('other is converted: notes added', JSON.stringify(projectMcp(other).enabled) === '["notes"]' && projectMcp(other).model === 3, JSON.stringify(projectMcp(other)))
+    check('the dropped choice is said once, then cleared', !!(await lib.until(async () => wsMcp().droppedNotice === undefined, HUNG_MS)), JSON.stringify(wsMcp()))
 
-    // --- Settings → Assistant → MCP servers.
+    // --- Settings → Assistant links to the Assistant's view.
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav .row', { hasText: /^\s*Assistant\s*$/ }).click()
-    const list = page.locator('.assistant-mcp')
-    const item = (n) => list.locator(`.toggle-item[data-mcp="${n}"]`)
-    check('Settings → Assistant lists the workspace servers, all off for it', !!(await lib.until(async () => (await list.locator('.toggle-item').count()) === 3, HUNG_MS)) && (await list.getByRole('switch', { checked: true }).count()) === 0)
-    check('…extra, off in the workspace, says so and can\'t be turned on', (await item('extra').getAttribute('data-gated')) === 'true' && (await item('extra').innerText()).includes('Off in the workspace') && (await item('extra').getByRole('switch').isDisabled()))
-    await item('notes').scrollIntoViewIfNeeded()
-    await item('notes').getByRole('switch').click()
-    const confirm = page.getByRole('dialog', { name: 'Turn on notes for the Assistant?' })
-    check('turning notes on asks first, showing what it runs', !!(await lib.until(async () => (await confirm.count()) === 1, HUNG_MS)) && (await confirm.innerText()).includes('Runs: node notes.js'), JSON.stringify(await page.getByRole('dialog').allInnerTexts()))
-    await shots('confirm')
-    await confirm.getByRole('button', { name: 'Turn On', exact: true }).click()
-    check('…and it is on for the Assistant, in workspace.json, and no project', !!(await lib.until(async () => JSON.stringify(wsMcp().assistant) === '["notes"]', HUNG_MS)) && JSON.parse(fs.readFileSync(path.join(proj, '.hive', 'project.json'), 'utf8')).mcp.enabled.join() === 'sandbox', JSON.stringify(wsMcp()))
-    check('…its switch shows it', !!(await lib.until(async () => (await item('notes').getByRole('switch').getAttribute('aria-checked')) === 'true', HUNG_MS)))
-    await shots('settings')
+    const link = page.locator('[data-action="assistant-mcp-view"]')
+    check("Settings → Assistant shows a link to the Assistant's view, not a list", !!(await lib.until(async () => (await link.count()) === 1, HUNG_MS)) && (await page.locator('.assistant-mcp').count()) === 0)
+    await link.scrollIntoViewIfNeeded()
+    await link.click()
+    const section = page.locator('.sidebar .pane-body')
+    const none = page.locator('[data-assistant-mcp-none]')
+    check("…which shows the Assistant's view, its MCP Servers empty", !!(await lib.until(async () => (await page.locator('.assistant-summary').count()) === 1 && (await none.count()) === 1, HUNG_MS)))
 
-    // --- The MCP view says where each runs, and its enable dialog lists the Hive Assistant.
-    await page.keyboard.press('Escape')
+    // --- + opens the picker: search, what it runs, Add.
+    await page.locator('.sidebar').getByRole('button', { name: 'Add Server…', exact: true }).click()
+    const picker = page.getByRole('dialog', { name: 'Add a server for the Hive Assistant' })
+    const pickRow = (n) => picker.locator(`.mcp-picker-row[data-mcp="${n}"]`)
+    check('the picker lists every server not added for it', !!(await lib.until(async () => (await picker.locator('.mcp-picker-row').count()) === 3, HUNG_MS)))
+    const addButton = picker.getByRole('button', { name: 'Add', exact: true })
+    check('…Add is greyed out until one is chosen', await addButton.isDisabled())
+    await picker.locator('[data-mcp-search]').fill('memory')
+    check('searching by a tag finds notes only', !!(await lib.until(async () => (await picker.locator('.mcp-picker-row').count()) === 1 && (await pickRow('notes').count()) === 1, HUNG_MS)))
+    await pickRow('notes').click()
+    check('…chosen, it shows what it runs', !!(await lib.until(async () => (await picker.locator('[data-mcp-runs="notes"]').innerText().catch(() => '')).includes('Runs: node notes.js'), HUNG_MS)) && (await addButton.isEnabled()))
+    await shots('picker')
+    await addButton.click()
+    check('…added for the Assistant, in workspace.json, and no project', !!(await lib.until(async () => JSON.stringify(wsMcp().assistant) === '["notes"]', HUNG_MS)) && projectMcp(proj).enabled.join() === 'sandbox', JSON.stringify(wsMcp()))
+    check("…and listed in the Assistant's view", !!(await lib.until(async () => (await section.locator('.row[data-mcp="notes"]').count()) === 1, HUNG_MS)))
+    await shots('view')
+
+    // --- The MCP view says where each is added; Add to… lists the Hive Assistant last.
     await page.keyboard.press('Control+Shift+M')
     const row = (name) => page.locator('.pane-body .row', { has: page.locator('.label', { hasText: new RegExp(`^${name}\\s*$`) }) })
     const where = (name) => row(name).locator('.mcp-where').innerText().catch(() => '')
-    check('notes: on for the Hive Assistant only', !!(await lib.until(async () => (await where('notes')) === 'On for the Hive Assistant only', HUNG_MS)), await where('notes'))
-    check('sandbox: on in demo', (await where('sandbox')) === 'On in demo', await where('sandbox'))
-    await shots('view')
-    await row('extra').getByRole('switch').click()
-    const enable = page.getByRole('dialog', { name: 'Turn on extra?' })
-    const group = enable.getByRole('group', { name: 'Projects to turn it on in' })
-    check("extra's enable dialog lists the Hive Assistant after the projects, unticked", !!(await lib.until(async () => (await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).count()) === 1, HUNG_MS)) && !(await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).isChecked()) && (await group.locator('label').last().getAttribute('data-assistant')) !== null)
-    await shots('enable')
+    check('notes: added in other and for the Hive Assistant', !!(await lib.until(async () => (await where('notes')) === 'Added in other and for the Hive Assistant', HUNG_MS)), await where('notes'))
+    check('sandbox: added in demo', (await where('sandbox')) === 'Added in demo', await where('sandbox'))
+    check('extra: not added anywhere, and no switch in the list', (await where('extra')) === 'Not added anywhere' && (await row('extra').getByRole('switch').count()) === 0, await where('extra'))
+    await shots('mcp-view')
+    await row('extra').click()
+    await page.locator('[data-action="mcp-places"]').click()
+    const places = page.getByRole('dialog', { name: 'Add extra to…' })
+    const group = places.getByRole('group', { name: 'Projects to add it to' })
+    const box = (name) => group.getByRole('checkbox', { name, exact: true })
+    check("extra's Add to… lists the Hive Assistant after the projects, unticked", !!(await lib.until(async () => (await box('Hive Assistant').count()) === 1, HUNG_MS)) && !(await box('Hive Assistant').isChecked()) && (await group.locator('label').last().getAttribute('data-assistant')) !== null)
+    check('…and what it runs', (await places.innerText()).includes('Runs: node extra.js'))
+    await shots('add-to')
     // All projects and No projects: the Assistant only ever by its own box.
-    await enable.getByRole('button', { name: 'All projects', exact: true }).click()
-    check('…All projects ticks the projects, not the Assistant', (await group.getByRole('checkbox', { name: 'demo', exact: true }).isChecked()) && !(await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).isChecked()))
-    await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).check()
-    await enable.getByRole('button', { name: 'No projects', exact: true }).click()
-    check('…and No projects unticks them, leaving the Assistant as ticked', !(await group.getByRole('checkbox', { name: 'demo', exact: true }).isChecked()) && (await group.getByRole('checkbox', { name: 'Hive Assistant', exact: true }).isChecked()))
-    await enable.getByRole('button', { name: 'Cancel' }).click()
-    check('…cancelled, nothing changes', !!(await lib.until(async () => (await enable.count()) === 0, HUNG_MS)) && !wsMcp().enabled.includes('extra') && JSON.stringify(wsMcp().assistant) === '["notes"]')
+    await places.getByRole('button', { name: 'All projects', exact: true }).click()
+    check('…All projects ticks the projects, not the Assistant', (await box('demo').isChecked()) && (await box('other').isChecked()) && !(await box('Hive Assistant').isChecked()))
+    await box('Hive Assistant').check()
+    await places.getByRole('button', { name: 'No projects', exact: true }).click()
+    check('…and No projects unticks them, leaving the Assistant as ticked', !(await box('demo').isChecked()) && (await box('Hive Assistant').isChecked()))
+    await places.getByRole('button', { name: 'Cancel' }).click()
+    check('…cancelled, nothing changes', !!(await lib.until(async () => (await places.count()) === 0, HUNG_MS)) && JSON.stringify(wsMcp().assistant) === '["notes"]' && projectMcp(proj).enabled.join() === 'sandbox')
 
     // --- Each launch has only its own servers, the hive server in both.
     const assistantHome = (await inv('workspace:refresh')).assistant.path
     const agent = await lib.addAgent(inv, proj, { name: 'Builder' })
+    const otherAgent = await lib.addAgent(inv, other, { name: 'Writer' })
     await inv('session:start', assistantHome, { agentId: 'assistant' })
     await inv('session:start', proj, { agentId: agent.id })
+    await inv('session:start', other, { agentId: otherAgent.id })
     const launched = async (agentId) => {
       const file = path.join(home, 'fake-launches.jsonl')
       const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n') : []
@@ -116,30 +142,41 @@ const check = (name, ok, extra = '') => {
     }
     const a = await lib.until(() => launched('assistant'), 30000)
     const b = await lib.until(() => launched(agent.id), 30000)
+    const c = await lib.until(() => launched(otherAgent.id), 30000)
     check("the Assistant's launch has notes and the hive server, not sandbox", !!a?.notes && !!a?.hive && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
-    check("the project agent's has sandbox and the hive server, not notes", !!b?.sandbox && !!b?.hive && !b?.notes, JSON.stringify(Object.keys(b ?? {})))
+    check("demo's agent has sandbox and the hive server, not notes or extra", !!b?.sandbox && !!b?.hive && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
+    check("…without Hive's own fields (its tags)", !('tags' in (c?.notes ?? { tags: 1 })) && !('description' in (c?.notes ?? {})), JSON.stringify(c?.notes))
 
-    // --- The Agent API: the workspace's token reads the Assistant's choices; an agent's call doesn't get them.
-    const wide = await api('/v1/mcp', apiToken)
+    // --- The Agent API: where each is added for the workspace's token; only its own project's for an agent's.
     const of = (body, n) => body?.find((m) => m.name === n)
-    check('GET /v1/mcp says notes is on for the Assistant', wide.status === 200 && of(wide.body, 'notes')?.assistant === true && of(wide.body, 'sandbox')?.assistant === false, JSON.stringify(wide))
-    const agentToken = JSON.parse(fs.readFileSync(b.hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token
-    const narrow = await api('/v1/mcp', agentToken)
-    check("…and an agent's call lists the servers without it", narrow.status === 200 && narrow.body?.length === 3 && narrow.body.every((m) => !('assistant' in m)), JSON.stringify(narrow))
+    const wide = await api('/v1/mcp', apiToken)
+    check('GET /v1/mcp says where notes is added', wide.status === 200 && JSON.stringify(of(wide.body, 'notes')?.added) === JSON.stringify({ projects: ['other'], assistant: true }) && JSON.stringify(of(wide.body, 'extra')?.added) === JSON.stringify({ projects: [], assistant: false }) && !('globallyEnabled' in (of(wide.body, 'notes') ?? {})), JSON.stringify(wide))
+    const tokenOf = (servers) => JSON.parse(fs.readFileSync(servers.hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token
+    const demoView = await api('/v1/mcp', tokenOf(b))
+    check("demo's agent hears only about demo: sandbox added, notes not, no projects or Assistant", demoView.status === 200 && of(demoView.body, 'sandbox')?.added === true && of(demoView.body, 'notes')?.added === false && demoView.body.every((m) => typeof m.added === 'boolean' && !('assistant' in m) && !('projects' in m)) && !JSON.stringify(demoView.body).includes('other'), JSON.stringify(demoView))
+    const otherView = await api('/v1/mcp', tokenOf(c))
+    check("other's agent hears only about other: notes added, sandbox not", otherView.status === 200 && of(otherView.body, 'notes')?.added === true && of(otherView.body, 'sandbox')?.added === false && !JSON.stringify(otherView.body).includes('demo'), JSON.stringify(otherView))
+    const status = await api('/v1/projects/demo', tokenOf(b))
+    check("demo's status says what is added there", JSON.stringify(status.body?.mcp) === JSON.stringify({ available: ['extra', 'notes', 'sandbox'], added: ['sandbox'], on: ['sandbox'] }) && JSON.stringify(status.body?.settings?.mcp) === '{"added":["sandbox"]}', JSON.stringify([status.body?.mcp, status.body?.settings?.mcp]))
+    const workspace = await api('/v1/workspace', apiToken)
+    check("GET /v1/workspace's config has no MCP lists", workspace.status === 200 && !('mcp' in (workspace.body?.config ?? { mcp: 1 })), JSON.stringify(workspace.body?.config).slice(0, 300))
 
-    // --- Turned off for it (no question), the running Assistant is told to restart; the project agent isn't.
+    // --- Removed from it in its view (no question), the running Assistant is told to restart; the project agent isn't.
     const restartNeeded = async () => (await inv('workspace:refresh')).assistant?.agents?.[0]?.restartNeeded
     await lib.until(async () => (await inv('session:live')).some((x) => x.projectPath.toLowerCase() === assistantHome.toLowerCase()), HUNG_MS)
     check('the running Assistant needs no restart yet', (await restartNeeded()) === false)
-    await page.keyboard.press('Control+,')
-    await page.locator('.settings-nav .row', { hasText: /^\s*Assistant\s*$/ }).click()
-    await item('notes').scrollIntoViewIfNeeded()
-    await item('notes').getByRole('switch').click()
-    check('turning notes off for it saves at once', !!(await lib.until(async () => JSON.stringify(wsMcp().assistant) === '[]', HUNG_MS)), JSON.stringify(wsMcp()))
+    await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
+    const added = section.locator('.row[data-mcp="notes"]')
+    await lib.until(async () => (await added.count()) === 1, HUNG_MS)
+    await added.hover()
+    await added.getByRole('button', { name: 'Remove notes from the Assistant', exact: true }).click()
+    check('removing notes from it saves at once', !!(await lib.until(async () => JSON.stringify(wsMcp().assistant) === '[]', HUNG_MS)), JSON.stringify(wsMcp()))
+    check("…and its view says none is added", !!(await lib.until(async () => (await none.count()) === 1, HUNG_MS)))
     check('…and the running Assistant needs a restart for it', !!(await lib.until(async () => (await restartNeeded()) === true, HUNG_MS)))
     check("…the project agent doesn't", (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo').agents.find((x) => x.id === agent.id)?.restartNeeded === false)
 
     await inv('session:stop', proj, agent.id)
+    await inv('session:stop', other, otherAgent.id)
     await inv('session:stop', assistantHome, 'assistant')
   } catch (e) {
     check('the suite ran to its end', false, e?.stack ?? String(e))

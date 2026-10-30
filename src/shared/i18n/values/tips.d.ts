@@ -51,7 +51,7 @@ interface HiveMessageValues {
   'tips.assistantLaneWatch.title': undefined
   'tips.assistantLanes.text': undefined
   'tips.assistantLanes.title': undefined
-  'tips.assistantMcp.text': undefined
+  'tips.assistantMcp.textAdded': undefined
   'tips.assistantMcp.title': undefined
   'tips.assistantMessages.text': undefined
   'tips.assistantMessages.title': undefined
@@ -284,12 +284,14 @@ interface HiveMessageValues {
   'tips.mainProcessStalls.title': undefined
   'tips.maxAgents.text': undefined
   'tips.maxAgents.title': undefined
-  'tips.mcpFromFile.text': undefined
+  'tips.mcpFromFile.textAdded': undefined
   'tips.mcpFromFile.title': undefined
   'tips.mcpPerAgent.text': undefined
   'tips.mcpPerAgent.title': undefined
-  'tips.mcpPerProject.text': undefined
+  'tips.mcpPerProject.textAdded': undefined
   'tips.mcpPerProject.title': undefined
+  'tips.mcpSearch.text': undefined
+  'tips.mcpSearch.title': undefined
   'tips.memorySnapshot.text': undefined
   'tips.memorySnapshot.title': undefined
   'tips.mergeBranch.text': undefined

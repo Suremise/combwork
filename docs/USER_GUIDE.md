@@ -1369,39 +1369,42 @@ A server you add or change is used by sessions started afterwards; restart a run
 
 Hive approves only its own `hive` tools in advance, for every CLI (for the Assistant, only those its Control setting allows; [Hive's changes to the CLIs](#hives-changes-to-the-clis) can turn it off). A server you add is treated like the agent's other tools: whether the agent asks before using one depends on its CLI and its [permission mode](#permission-modes). Codex follows its own approval rules for them. In **Read only** and **Ask for approval** it asks before calling such a tool, except where the server marks the tool as read-only, or you chose **Allow for this session** or **Always allow** when it asked before. In **Approve for me**, its automatic reviewer decides, and asks you only about a call it thinks is risky. In **Full access**, it calls them without asking.
 
-### Turning servers on where they're needed <a id="turning-servers-on-where-theyre-needed"></a>
+### Adding servers where they're needed <a id="adding-servers-where-theyre-needed"></a>
 
-A server in the workspace is **available** to every project, and runs in a project only when it is **on in the workspace and on in that project**, so a big server you need in one project doesn't fill every other project's agents' context with its tools. A server you add starts off everywhere.
+A server in the workspace is **available** to every project and to the Hive Assistant, and runs only where it is **added**. That way a big server you need in one project doesn't fill every other project's agents' context with its tools. A server you create, or add from a file, starts added nowhere. There are no switches to turn on: a server is either added somewhere or it isn't.
 
-- **In the workspace:** the switch beside a server in the MCP view (**Workspace** in the server's own view) is its master switch. Turning it on shows what the server runs and asks which projects to turn it on in: the selected project, and any project that had it on before, are ticked; **All projects** and **No projects** tick or untick every project. Turning it off turns it off everywhere at once, and each project keeps its choice, so turning it on again shows the same projects ticked.
-- **In a project:** its **MCP** tab lists every workspace server with that project's own switch. Turn on the ones that project's agents need. While a server is off in the workspace, its row there is greyed and says **Off in the workspace**: the project's switch keeps its state, but no session gets the server until the workspace turns it on.
+- **In a project:** its **MCP** tab lists only the servers added to that project. Each has **Remove**, which takes it off that project only (the server stays in the workspace). **Add Server…** opens a picker of the workspace's servers not added there yet. Choosing one shows what it runs and anything to know about its definition, and **Add** adds it.
+- **In the MCP view:** a server's own view has **Add to…**. It shows what the server runs and ticks the projects it is added to, with **Hive Assistant** last. Tick or untick projects and **Save**: it is added where ticked and removed where unticked. **All projects** and **No projects** tick or untick every project and leave the Assistant as it is. If a project can't be written to partway through, Hive says which places changed and which didn't.
+- **Search and filter:** the MCP view and the picker find servers by name, description and tags (a definition's optional `"tags": ["godot", "game"]` list, which Hive doesn't pass to the CLIs). They can also show only the servers **Added somewhere** or **Added nowhere**, and in the MCP view only those **With problems**.
 
-New projects start with every server off. Each server in the MCP view says where it runs ("On in Amberlight", "On in Amberlight and for the Hive Assistant", "On for the Hive Assistant only", "On in no project", "Off in the workspace"). Sessions of every provider use **only** the servers on in the workspace and in their project.
+Each server in the MCP view says where it is added: "Added in Amberlight", "Added in Amberlight and for the Hive Assistant", "Added for the Hive Assistant only" or "Not added anywhere". Sessions of every provider use **only** the servers added to their project, from their next session: a running agent keeps what it started with until it restarts.
 
-Upgrading from 0.9.0 or earlier changes nothing that runs: a server that was on for all projects is on in the workspace and in every project that hadn't turned it off, and one you had turned on in some projects is on in the workspace and those projects.
+**Deleting a server** asks first, saying where it is added. Deleting removes it from those places too, and a server added later under the same name starts added nowhere.
 
-If a project has its own `.mcp.json` (or, for Codex, `.codex/config.toml` servers), Hive tells you which of its servers aren't in the workspace and offers to copy them there; until then they stay disabled. **Copy to workspace** shows what each runs, then copies it and turns it on in the workspace and in that project straight away (other projects can turn it on in their **MCP** tab).
+**Upgrading changes nothing that runs.** A server that ran in a project (on in the workspace and on in that project) is added there, and one that ran for the Assistant is added for it. A choice a project kept for a server the workspace had switched off is dropped, since that server wasn't running there; a notice says how many were dropped, once. Add those servers where you need them. Upgrading from 0.9.0 or earlier still keeps everything that ran: a server that was on for all projects is added to every project that hadn't turned it off.
+
+If a project has its own `.mcp.json` (or, for Codex, `.codex/config.toml` servers), Hive tells you which of its servers aren't in the workspace and offers to copy them there; until then they stay disabled. **Copy to workspace** shows what each runs, then copies it and adds it to that project straight away. Other projects can add it in their **MCP** tab.
 
 ### Servers for the Hive Assistant <a id="servers-for-the-hive-assistant"></a>
 
-The Hive Assistant gets a workspace server the way a project does: only while it is **on in the workspace and on for the Assistant**. It starts with none, so a server with personal notes, say, can reach the Assistant and no project's agents.
+The Hive Assistant gets a workspace server the way a project does: only once it is **added for the Assistant**. It starts with none, so a server with personal notes, say, can reach the Assistant and no project's agents.
 
-- **When you turn a server on in the workspace,** the list of projects to tick ends with **Hive Assistant**, unticked unless the Assistant had it on before. **All projects** and **No projects** leave it as it is.
-- **In Settings → Assistant, MCP servers (this workspace)** lists the workspace's servers with the Assistant's own switch. Turning one on shows what it runs first. A server off in the workspace is greyed there and says **Off in the workspace**: turn it on in the MCP view first. The Assistant keeps its choice while the workspace has a server off.
+- **In the Assistant's view** (the Hive Assistant on the activity bar), **MCP Servers** lists the servers added for it, each with a button to remove it. **+** opens the same picker as a project's **Add Server…**.
+- **In the MCP view,** **Add to…** ends with **Hive Assistant**.
+- **Settings → Assistant → MCP servers (this workspace)** links to the Assistant's view, where they are chosen now.
 - **It applies from the Assistant's next session;** a running Assistant shows that it needs a restart.
 
-The Assistant's own choice is separate from every project's: turning a server on for it never turns it on in a project, and the other way round.
+What is added for the Assistant is separate from every project's: adding a server for it never adds it to a project, and the other way round.
 
 Upgrading: if you had turned on **The Assistant uses the workspace's other MCP servers** in Settings → Advanced, each workspace you open gives the Assistant the servers that were on in it, so nothing it used goes away. That setting is gone; a new workspace's Assistant starts with none.
-
 ### Giving a server to some agents only <a id="giving-a-server-to-some-agents-only"></a>
 
-By default every agent in a project gets all the servers on in its project. To keep a server's tools away from agents that don't need it (each server's tools take up room in an agent's context), open the agent's settings (its pane's **⋯** → **Agent Settings…**) and under **MCP servers** choose **Only these**, then untick the servers it shouldn't have. For example, a release-testing agent can have a sandbox server that the builders don't. Choosing **Only these** starts with every server ticked, so nothing changes until you untick one; **All of the project's** puts it back.
+By default every agent in a project gets all the servers added to its project. To keep a server's tools away from agents that don't need it (each server's tools take up room in an agent's context), open the agent's settings (its pane's **⋯** → **Agent Settings…**) and under **MCP servers** choose **Only these**, then untick the servers it shouldn't have. For example, a release-testing agent can have a sandbox server that the builders don't. Choosing **Only these** starts with every server ticked, so nothing changes until you untick one; **All of the project's** puts it back.
 
 - Hive's own `hive` server is always given, whatever you choose.
-- An agent with **Only these** doesn't get a server enabled later: tick it in its settings. One with **All** gets it.
+- An agent with **Only these** doesn't get a server added to the project later: tick it in its settings. One with **All** gets it.
 - A running agent takes the change when it restarts.
-- Templates keep the choice, so an agent loaded from a template gets the same servers, where they're on.
+- Templates keep the choice, so an agent loaded from a template gets the same servers, where they're added.
 - The agent's tooltip shows its choice, and once any agent has one, the project's **MCP** tab says under each server which agents get it.
 
 ### Adding a server from a file <a id="adding-a-server-from-a-file"></a>
@@ -1411,7 +1414,7 @@ By default every agent in a project gets all the servers on in its project. To k
 - a **`.json`** definition, in the format above: it becomes `.hive/mcp/<name>.json`;
 - a **`.zip`** of a server's folder: its code is unpacked to `.hive/mcp/<name>/` and its definition becomes `.hive/mcp/<name>.json`. The definition is a file named `hive-mcp.json` (or `hive-mcp.example.json`) at the top of the zip, or inside one folder at its top. It refers to the server's code through `${HIVE_MCP_DIR}`, for example `"args": ["${HIVE_MCP_DIR}/notes/server.js"]` for a zip of a `notes` folder holding `hive-mcp.json` and `server.js`. Added under another name, Hive changes those references to the new folder.
 
-Before adding it, Hive shows the name it will have (the file's or the folder's, which you can change) and **what it runs**: the command and its arguments, or the address it connects to, and the names of its environment variables and headers (a `${NAME}` reference shown as itself, never a value). A name already in use asks whether to **Replace** that server (the old one goes to the Recycle Bin) or choose another name. It is added **turned off**, in the workspace and in every project, so nothing runs until you turn it on with its switch in the MCP view, which shows what it runs again and asks which projects to turn it on in (see [Turning servers on where they're needed](#turning-servers-on-where-theyre-needed)). Replacing a server adds the new one turned off too, even where the old one was on. A server's view shows what it runs above its definition, and deleting a server added from a `.zip` also moves its folder to the Recycle Bin.
+Before adding it, Hive shows the name it will have (the file's or the folder's, which you can change) and **what it runs**: the command and its arguments, or the address it connects to, and the names of its environment variables and headers (a `${NAME}` reference shown as itself, never a value). A name already in use asks whether to **Replace** that server (the old one goes to the Recycle Bin) or choose another name. It is added to the workspace **added nowhere**, so nothing runs until you add it to a project (its **MCP** tab's **Add Server…**, or **Add to…** in its view), which shows what it runs again (see [Adding servers where they're needed](#adding-servers-where-theyre-needed)). Replacing a server adds the new one added nowhere too, even where the old one was added. A server's view shows what it runs above its definition, and deleting a server added from a `.zip` also moves its folder to the Recycle Bin.
 
 Nothing in the file runs while it's added. Hive refuses a zip with files that would land outside the server's folder (`..`, a drive or a leading `/`), names Windows can't hold, links, more than 5,000 files or more than 200 MB unpacked, and a definition without a `command` or `url`.
 
@@ -1776,7 +1779,7 @@ Hive changes some of what each CLI does in the sessions it starts, never by edit
 
 Under **Hive**, **Hive's guidance for agents** (`hive.guidance`, on): with Hive's tools, each project agent gets Hive's guidance (how to use the tools, the board and handovers, and the project's latest handover), as the hive server's instructions on Claude Code and Copilot, and on Codex after the `developer_instructions` Codex itself would use (yours, a profile's or a trusted project's, as Codex reads them for the agent's own arguments), which Hive no longer replaces. If Codex can't say which those are (**Reading a session's instructions: timeout** under Codex), Hive never replaces them: the agent starts without Hive's guidance, and the Assistant with its role alone, and Hive tells you once. Off, agents get Hive's tools without the guidance, from their next session. The Hive Assistant always gets its own guidance and role: without them it would be just another agent, so there is no switch for them.
 
-The Hive Assistant's MCP servers are chosen per workspace in Settings → Assistant ([Servers for the Hive Assistant](#servers-for-the-hive-assistant)); the Advanced switch that gave it every workspace server is gone.
+The Hive Assistant's MCP servers are chosen per workspace in its own view ([Servers for the Hive Assistant](#servers-for-the-hive-assistant)); the Advanced switch that gave it every workspace server is gone.
 
 Under **Hive**, seven more switches cover what Hive does with a pane's keys and with what it types into the CLIs, the same for every CLI. Each is as Hive has always done by default, and applies at once (the start view at the Assistant's next start or compaction, a running Assistant's too):
 

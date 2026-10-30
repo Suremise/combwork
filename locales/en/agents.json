@@ -701,7 +701,7 @@
   },
   "agents.mcp.all": {
     "defaultMessage": "All of the project's",
-    "description": "A choice of an agent's MCP servers (Agent Settings): every MCP server on in its project. Keep it short."
+    "description": "A choice of an agent's MCP servers (Agent Settings): every MCP server added to its project. Keep it short."
   },
   "agents.mcp.its": {
     "defaultMessage": "Its MCP servers",
@@ -711,16 +711,16 @@
     "defaultMessage": "Loading…",
     "description": "Agent Settings while the list of MCP servers is read."
   },
-  "agents.mcp.none": {
-    "defaultMessage": "{where, select, workspace {No MCP servers are on in this workspace: it gets none.} other {No MCP servers are on in this project: it gets none.}}",
-    "description": "Agent Settings, Only these, when no MCP server is on where the agent is (its project, or, for a template's agent, the workspace)."
+  "agents.mcp.noneAdded": {
+    "defaultMessage": "{where, select, workspace {This workspace has no MCP servers: it gets none.} other {No MCP servers are added to this project: it gets none.}}",
+    "description": "Agent Settings, Only these, when no MCP server is added where the agent is (its project, HI-2059), or, for a template's agent, the workspace has none."
   },
-  "agents.mcp.notOn": {
-    "defaultMessage": "{where, select, workspace {not on in this workspace} other {not on in this project}}",
-    "description": "After an MCP server the agent was given that isn't on where it is now (its project, or the workspace). Lower case."
+  "agents.mcp.notAdded": {
+    "defaultMessage": "{where, select, workspace {not in this workspace} other {not added to this project}}",
+    "description": "After an MCP server the agent was given that isn't added to its project now (HI-2059), or isn't in the workspace. Lower case."
   },
-  "agents.mcp.note": {
-    "defaultMessage": "The built-in hive server is always given. A server enabled later reaches it only with All.",
+  "agents.mcp.noteAdded": {
+    "defaultMessage": "The built-in hive server is always given. A server added to the project later reaches it only with All.",
     "description": "Under an agent's MCP servers (Agent Settings). hive is the built-in server's name: keep it. All is the first choice above (\"All of the project's\")."
   },
   "agents.mcp.only": {

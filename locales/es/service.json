@@ -176,6 +176,8 @@
   "service.laneStarts.freshBlockedTitle": "La conversación nueva de {agent} no se inició",
   "service.lanes.noWorkspace": "No hay ningún espacio de trabajo abierto",
   "service.lanes.unknown": "No existe el carril {id}",
+  "service.mcp.addedDropped": "Cada proyecto y el Asistente de Hive muestran los servidores que se ejecutaban allí. {n, plural, one {Se descartó # elección guardada para un servidor que estaba desactivado en el espacio de trabajo} many {Se descartaron # elecciones guardadas para servidores que estaban desactivados en el espacio de trabajo} other {Se descartaron # elecciones guardadas para servidores que estaban desactivados en el espacio de trabajo}}: agrega un servidor en la pestaña MCP de un proyecto donde lo necesites.",
+  "service.mcp.addedTitle": "Los servidores MCP ahora se agregan donde se ejecutan",
   "service.metrics.badProvider": "provider debe ser el id de un proveedor",
   "service.metrics.badRange": "from y to deben ser horas ISO, con from antes que to",
   "service.metrics.badRole": "role debe ser agent, assistant, api o viewer",

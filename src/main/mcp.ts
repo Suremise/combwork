@@ -4,12 +4,14 @@ import { existsSync } from 'original-fs'
 import { fmt, tr } from '../shared/i18n'
 import { msg } from '../shared/i18n/msg'
 import { unzipSync } from 'fflate'
-import type { McpFileServer, McpProjectServer, McpServerDef, McpServerInfo, McpShown } from '../shared/types'
+import type { McpFileServer, McpPlacesResult, McpProjectServer, McpServerDef, McpServerInfo, McpShown } from '../shared/types'
 import { writeTextUnlessChanged } from './fsutil'
 import { HiveError, hiveError } from './hiveError'
 import { findSecretWarnings } from './mcpSecrets'
 import { allProviders } from './providers'
-import { currentWorkspace, inWorkspace, workspace } from './workspace'
+import { assistantMcpAdded, MCP_ADDED_MODEL, mcpAdded, mcpNames } from '../shared/agentMcp'
+import { randomUUID } from 'crypto'
+import { currentWorkspace, inWorkspace, workspace, type WorkspaceService } from './workspace'
 import { trash } from './trash'
 
 export { findSecretWarnings }
@@ -27,7 +29,6 @@ const M = {
   env: msg({ id: 'content.mcp.env', defaultMessage: 'Environment: {items}', description: "An MCP server's environment variables, shown before it is turned on: {items} lists them, each NAME=${VAR} (a reference, as it is) or \"NAME (set)\"." }),
   headers: msg({ id: 'content.mcp.headers', defaultMessage: 'Headers: {items}', description: "An MCP server's HTTP headers, shown before it is turned on: {items} lists them, each Name=${VAR} (a reference, as it is) or \"Name (set)\"." }),
   set: msg({ id: 'content.mcp.set', defaultMessage: '{name} (set)', description: "An environment variable or header ({name}) an MCP server's definition gives a value of its own, not shown (it may be a secret)." }),
-  offInWorkspace: msg({ id: 'mcp.error.offInWorkspace', defaultMessage: '{name} is off in the workspace: turn it on in the MCP view first (it can be turned on for the Hive Assistant there too).', description: 'An error turning an MCP server on for the Hive Assistant: the server is off in the workspace. {name} is the server; "MCP view" is a view in Hive: keep it as Hive shows it.' }),
   zipLarge: msg({ id: 'content.mcp.zipLarge', defaultMessage: 'The .zip is too large for an MCP server (over {mb} MB unpacked).', description: 'An error adding an MCP server from a .zip: its files take more than {mb} MB unpacked.' })
 }
 
@@ -55,10 +56,15 @@ export function mcpRuns(def: McpServerDef): string[] {
   return out
 }
 
-export async function listMcp(): Promise<McpServerInfo[]> {
+/**
+ * The workspace's servers. `places`: each with where it is added (HI-2059: the projects, hidden ones too, and the
+ * Assistant), for the window; without, `projects` is empty and `assistant` still says the Assistant's (a launch's read).
+ */
+export async function listMcp(places = false): Promise<McpServerInfo[]> {
   if (!workspace.path) return []
-  const enabled = new Set(workspace.config.mcp.enabled)
-  const assistant = new Set(listed(workspace.config.mcp.assistant))
+  const where = places ? await addedPlaces() : null
+  const assistant = new Set(where?.assistant ?? assistantMcpAdded(workspace.config.mcp))
+  const projectsOf = (name: string): string[] => (where ? [...where.projects].filter(([, added]) => added.includes(name)).map(([p]) => p) : [])
   let files: string[] = []
   try {
     files = (await readdir(workspace.mcpDir)).filter((f) => f.endsWith('.json'))
@@ -75,10 +81,10 @@ export async function listMcp(): Promise<McpServerInfo[]> {
       const def = JSON.parse(await readFile(path, 'utf8')) as McpServerDef
       if (!def || typeof def !== 'object' || Array.isArray(def)) throw hiveError(msg({ id: 'content.mcp.listNotObject', defaultMessage: 'Definition must be a JSON object', description: "Why an MCP server in the workspace can't be used: its definition file (.hive/mcp/<name>.json) holds JSON that isn't an object." }))
       if (!def.command && !def.url) throw hiveError(msg({ id: 'content.mcp.listNoCommand', defaultMessage: 'Definition needs a "command" (stdio) or a "url" (http/sse)', description: "Why an MCP server in the workspace can't be used: its definition has neither of the two fields that say what it is. Keep \"command\", \"url\", stdio, http and sse as they are." }))
-      out.push({ name, path, def, revision, globallyEnabled: enabled.has(name), assistant: assistant.has(name), secretWarnings: findSecretWarnings(def), runs: mcpRuns(def) })
+      out.push({ name, path, def, revision, projects: projectsOf(name), assistant: assistant.has(name), secretWarnings: findSecretWarnings(def), runs: mcpRuns(def) })
     } catch (e) {
       // Hive's own words are text the window shows in its language; JSON's reader's stay as it gave them.
-      out.push({ name, path, def: null, error: (e as Error).message, ...(e instanceof HiveError ? { errorText: e.text } : {}), globallyEnabled: enabled.has(name), assistant: assistant.has(name), secretWarnings: [], runs: [] })
+      out.push({ name, path, def: null, error: (e as Error).message, ...(e instanceof HiveError ? { errorText: e.text } : {}), projects: projectsOf(name), assistant: assistant.has(name), secretWarnings: [], runs: [] })
     }
   }
   return out
@@ -86,7 +92,8 @@ export async function listMcp(): Promise<McpServerInfo[]> {
 
 /** Converts a stored definition into the entry written to launch/mcp.json. */
 export function toLaunchDef(def: McpServerDef, mcpDir: string): McpServerDef {
-  const { description: _description, ...rest } = def
+  // Hive's own fields (its description and tags, HI-2059) aren't the CLIs'.
+  const { description: _description, tags: _tags, ...rest } = def
   const dir = mcpDir.replace(/\\/g, '/')
   const expand = (v: string): string => v.replace(/\$\{HIVE_MCP_DIR\}/g, dir)
   const out: McpServerDef = { ...rest }
@@ -98,8 +105,8 @@ export function toLaunchDef(def: McpServerDef, mcpDir: string): McpServerDef {
 }
 
 /**
- * Adding, replacing and deleting servers and turning them on take turns (#550), so an enable can't land in the
- * middle of a replace and leave the new server on. Callers inside a turn use setGlobalNow.
+ * Adding, replacing and deleting servers and adding them to projects take turns (#550, HI-2059), so an Add can't land
+ * in the middle of a replace and leave the new server added. Callers inside a turn use the *Now functions.
  */
 let mcpTurn: Promise<unknown> = Promise.resolve()
 function inTurn<T>(fn: () => Promise<T>): Promise<T> {
@@ -108,57 +115,118 @@ function inTurn<T>(fn: () => Promise<T>): Promise<T> {
   return run
 }
 
-async function setGlobalNow(name: string, enabled: boolean): Promise<void> {
-  const set = new Set(workspace.config.mcp.enabled)
-  if (enabled) set.add(name)
-  else set.delete(name)
-  workspace.config.mcp.enabled = [...set].sort()
-  await workspace.saveWorkspaceConfig()
+/** workspace.json's #1093 switch, frozen at HI-2059's upgrade: read for projects not yet converted (mcpAdded), never written. */
+const legacyOn = (): unknown => workspace.config.mcp.enabled
+
+/** Where a server is added (HI-2059): a project, by path, or the Hive Assistant. */
+export type McpTarget = { project: string } | 'assistant'
+
+/**
+ * A project's added servers changed (HI-2059), in one locked write: worked out from what runs there now (mcpAdded), so a
+ * project not yet converted is converted in the same write and a remembered choice its workspace had off never comes
+ * back with it. Only `mcp` changes: whatever else changed meanwhile is kept.
+ */
+async function changeProjectNow(projectPath: string, change: (added: string[]) => string[]): Promise<void> {
+  // A project's file that is there: never one made for a folder gone meanwhile.
+  await workspace.mutateProjectConfig(projectPath, (cfg) => ({ mcp: { ...cfg.mcp, enabled: [...new Set(change(mcpAdded(cfg.mcp, legacyOn())))].sort(), model: MCP_ADDED_MODEL } }), { existing: true })
 }
 
-/** The Hive Assistant's own choice for a server (HI-1472), as a project's: it runs for it while on in the workspace too. */
-async function setAssistantNow(name: string, enabled: boolean): Promise<void> {
-  await workspace.saveWorkspaceConfigWith((c) => {
-    const on = new Set(listed(c.mcp.assistant))
-    if (enabled) on.add(name)
-    else on.delete(name)
-    return { mcp: { ...c.mcp, assistant: [...on].sort() } }
-  })
+/** One of this workspace's projects as it is now (not hidden, its folder there): its path. */
+function projectHere(p: string): string {
+  const path = workspace.assertProject(p)
+  if (!existsSync(join(path, '.hive', 'project.json'))) throw hiveError(msg({ id: 'mcp.error.noProject', defaultMessage: '{project} is no longer a project in this workspace.', description: 'An error adding an MCP server to a project, or removing it (HI-2059): the project was removed or moved meanwhile. {project} is its folder name.' }), { project: basename(path) }, { kind: 'notFound' })
+  return path
 }
+
+/** The Hive Assistant's added servers changed (HI-2059), as a project's (changeProjectNow), in workspace.json. */
+async function changeAssistantNow(change: (added: string[]) => string[]): Promise<void> {
+  await workspace.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, assistant: [...new Set(change(assistantMcpAdded(c.mcp)))].sort(), assistantModel: MCP_ADDED_MODEL } }))
+}
+
+/** A target's added servers changed; a project is checked to be this workspace's as it is now. */
+async function changeTargetNow(target: McpTarget, change: (added: string[]) => string[]): Promise<void> {
+  if (target === 'assistant') await changeAssistantNow(change)
+  else await changeProjectNow(projectHere(target.project), change)
+}
+
+/** What runs where it is added, as the definition is now: refused when it isn't a usable server. */
+const usable = (def: unknown): def is McpServerDef => !!def && typeof def === 'object' && !Array.isArray(def) && (typeof (def as McpServerDef).command === 'string' || typeof (def as McpServerDef).url === 'string')
 
 /**
  * Refuses when the server's definition is no longer `expected`, the one the user was shown what it runs from (replaced
- * or edited meanwhile), so a server never goes on with a definition the user hasn't seen.
+ * or edited meanwhile), or isn't one Hive can run, so a server is never added with a definition the user hasn't seen.
  */
 async function checkShown(name: string, expected: McpShown): Promise<void> {
   const path = join(workspace.mcpDir, `${name}.json`)
   // The installation (a replace writes a new file, even with the same text and new code beside it) and the text.
   const revision = await mcpRevision(path)
   const now = await readFile(path, 'utf8').then((t) => JSON.parse(t) as unknown, () => null)
-  if (!now || !revision || revision !== expected.revision || JSON.stringify(now) !== JSON.stringify(expected.def)) throw hiveError(msg({ id: 'content.mcp.changed', defaultMessage: '{name} has changed since it was shown to you. Check what it runs and enable it again.', description: 'An error turning an MCP server on: its definition ({name} is the server) changed after Hive showed what it runs, so it stays off until checked again.' }), { name }, { kind: 'conflict' })
+  if (!usable(now) || !revision || revision !== expected.revision || JSON.stringify(now) !== JSON.stringify(expected.def)) throw hiveError(msg({ id: 'content.mcp.changedAdd', defaultMessage: '{name} has changed since it was shown to you. Check what it runs and add it again.', description: 'An error adding an MCP server to a project or the Hive Assistant: its definition ({name} is the server) changed after Hive showed what it runs, so it is not added until checked again.' }), { name }, { kind: 'conflict' })
+}
+
+const noServer = (name: string): Error => hiveError(msg({ id: 'mcp.error.noServerAdd', defaultMessage: 'The workspace has no MCP server named {name}.', description: 'An error adding a server to a project or the Hive Assistant. {name} is its name.' }), { name }, { kind: 'notFound' })
+
+/**
+ * Adds a workspace server to a project or the Hive Assistant (HI-2059): it runs there from their next session. In a turn
+ * with the server's other changes; refused when the target isn't this workspace's, or the definition is no longer
+ * `expected`, the one shown (checkShown).
+ */
+export function addMcpTo(target: McpTarget, name: string, expected: McpShown): Promise<void> {
+  if (!validMcpName(name)) return Promise.reject(hiveError(M.invalidName))
+  // The workspace asked (its window's, or the Agent API caller's), through every await in the turn.
+  const ws = currentWorkspace()
+  return inTurn(() =>
+    inWorkspace(ws, async () => {
+      if (target !== 'assistant') projectHere(target.project)
+      if (!existsSync(join(workspace.mcpDir, `${name}.json`))) throw noServer(name)
+      await checkShown(name, expected)
+      await changeTargetNow(target, (added) => [...added, name])
+    })
+  )
+}
+
+/** Removes a server from a project or the Hive Assistant (HI-2059): it no longer runs there, from their next session. */
+export function removeMcpFrom(target: McpTarget, name: string): Promise<void> {
+  if (!validMcpName(name)) return Promise.reject(hiveError(M.invalidName))
+  const ws = currentWorkspace()
+  return inTurn(() => inWorkspace(ws, () => changeTargetNow(target, (added) => added.filter((n) => n !== name))))
 }
 
 /**
- * Turns a server on or off in the workspace (#1093, its master switch): it runs in the projects that have it on, and
- * nowhere while off; off keeps the projects' own choices, so on again restores them. Turning it on with `expected`:
- * refused when the definition is no longer the one shown (checkShown). `projects` (path → on, the enable dialog's
- * picks) sets those projects' choices first, in the same turn, and `assistant` the Hive Assistant's (HI-1472).
+ * Add to… (the MCP view, HI-2059): the server added to the places ticked and removed from the others listed (`projects`,
+ * path → added; `assistant`, unless left out). Every place it changes is checked before the first write (this workspace's
+ * project, its settings readable; the definition the one shown when it adds anywhere); then one write per place, each
+ * checked again as it is made. Files are written one by one, so a failure midway leaves the earlier ones written: the
+ * result says which changed and which failed.
  */
-export function setMcpGlobal(name: string, enabled: boolean, expected?: McpShown, projects: Record<string, boolean> = {}, assistant?: boolean): Promise<void> {
+export function setMcpPlaces(name: string, expected: McpShown | undefined, projects: Record<string, boolean>, assistant?: boolean): Promise<McpPlacesResult> {
   if (!validMcpName(name)) return Promise.reject(hiveError(M.invalidName))
-  return inTurn(async () => {
-    if (enabled && !existsSync(join(workspace.mcpDir, `${name}.json`))) throw noServer(name)
-    if (enabled && expected) await checkShown(name, expected)
-    for (const [p, on] of Object.entries(projects)) {
-      const cfg = await workspace.projectConfig(p)
-      if (listed(cfg.mcp.enabled).includes(name) !== on) await setProjectNow(p, name, on)
-    }
-    if (assistant !== undefined && listed(workspace.config.mcp.assistant).includes(name) !== assistant) await setAssistantNow(name, assistant)
-    await setGlobalNow(name, enabled)
-  })
+  const ws = currentWorkspace()
+  return inTurn(() =>
+    inWorkspace(ws, async () => {
+      const changes: { place: string; target: McpTarget; add: boolean }[] = []
+      for (const [p, add] of Object.entries(projects)) {
+        const path = projectHere(p)
+        if (mcpAdded((await workspace.projectConfig(path)).mcp, legacyOn()).includes(name) !== add) changes.push({ place: path, target: { project: path }, add })
+      }
+      if (assistant !== undefined && assistantMcpAdded(workspace.config.mcp).includes(name) !== assistant) changes.push({ place: 'assistant', target: 'assistant', add: assistant })
+      if (changes.some((c) => c.add)) {
+        if (!existsSync(join(workspace.mcpDir, `${name}.json`))) throw noServer(name)
+        await checkShown(name, expected ?? { def: null })
+      }
+      const out: McpPlacesResult = { added: [], removed: [], failed: [] }
+      for (const c of changes) {
+        try {
+          await changeTargetNow(c.target, (added) => (c.add ? [...added, name] : added.filter((n) => n !== name)))
+          ;(c.add ? out.added : out.removed).push(c.place)
+        } catch (e) {
+          out.failed.push({ place: c.place, error: e instanceof Error ? e.message : String(e) })
+        }
+      }
+      return out
+    })
+  )
 }
-
-const noServer = (name: string): Error => hiveError(msg({ id: 'mcp.error.noServer', defaultMessage: 'The workspace has no MCP server named {name}.', description: 'An error turning a server on in a project. {name} is its name.' }), { name }, { kind: 'notFound' })
 
 /**
  * Which copy of a server's definition this is: its file's identity, modified time and size. Adding or replacing a
@@ -170,72 +238,49 @@ async function mcpRevision(path: string): Promise<string | null> {
   return s ? `${s.ino}:${s.mtimeNs}:${s.size}` : null
 }
 
+const listed = mcpNames
+
 /**
- * Turns a workspace server on or off in one project (#1093): the project's own choice; it runs there while the server
- * is on in the workspace too. Turning it on with `expected`: refused when the definition is no longer the one shown
- * (checkShown).
+ * Says once, quietly, in the workspace's window, that converting to added servers (HI-2059) dropped choices kept for
+ * servers the workspace had off: nothing that ran changed, and those servers are added where they're needed.
  */
-export function setMcpProject(projectPath: string, name: string, enabled: boolean, expected?: McpShown): Promise<void> {
-  if (!validMcpName(name)) return Promise.reject(hiveError(M.invalidName))
-  return inTurn(async () => {
-    if (enabled && !existsSync(join(workspace.mcpDir, `${name}.json`))) throw noServer(name)
-    if (enabled && expected) await checkShown(name, expected)
-    await setProjectNow(projectPath, name, enabled)
-  })
+export async function sayMcpAddedOnce(ws: WorkspaceService): Promise<void> {
+  const n = ws.config.mcp.droppedNotice
+  if (!n) return
+  const title = tr(msg({ id: 'service.mcp.addedTitle', defaultMessage: 'MCP servers are now added where they run', description: "A quiet notice's title, once after the upgrade that made a workspace's MCP servers added to projects and the Hive Assistant, in place of switches." }))
+  const message = tr(msg({ id: 'service.mcp.addedDropped', defaultMessage: 'Each project and the Hive Assistant lists the servers that ran there. {n, plural, one {# choice kept for a server that was off in the workspace was} other {# choices kept for servers that were off in the workspace were}} dropped: add a server in a project’s MCP tab where you need it.', description: "A quiet notice once after the upgrade that made MCP servers added to projects and the Hive Assistant: nothing that ran changed; {n} choices remembered for servers the workspace had switched off were not carried over. \"MCP tab\" as Hive names it." }), { n })
+  ws.emit({ type: 'toast', toast: { id: randomUUID(), level: 'info', title, message, timestamp: new Date().toISOString(), quiet: true } })
+  await inWorkspace(ws, () => ws.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, droppedNotice: undefined } })))
+}
+
+/** Every project, hidden ones too. */
+async function allProjectPaths(): Promise<string[]> {
+  return [...(await workspace.listProjectPaths()), ...(await workspace.listProjectPaths({ hidden: true }))]
 }
 
 /**
- * Turns a workspace server on or off for the Hive Assistant (HI-1472), its own choice as a project's: it runs for it
- * while the server is on in the workspace too. Turning it on with `expected`: refused when the definition is no longer
- * the one shown (checkShown).
+ * Removed everywhere it is added or remembered, in a turn (HI-2059): every project (hidden ones too) and the Hive
+ * Assistant, so a server added under a name used before (deleted, replaced, or its file removed by hand) starts added
+ * nowhere. A project changed here is converted in the same write (changeProjectNow), so no other remembered choice comes
+ * back with it.
  */
-export function setMcpAssistant(name: string, enabled: boolean, expected?: McpShown): Promise<void> {
-  if (!validMcpName(name)) return Promise.reject(hiveError(M.invalidName))
-  // The workspace asked (its window's, or the Agent API caller's), through every await in the turn.
-  const ws = currentWorkspace()
-  return inTurn(() =>
-    inWorkspace(ws, async () => {
-      if (enabled && !existsSync(join(workspace.mcpDir, `${name}.json`))) throw noServer(name)
-      // Turned on only where the workspace has it on (its enable shows what it runs and can tick the Assistant too); a
-      // choice made before stays while the workspace has it off.
-      if (enabled && !listed(workspace.config.mcp.enabled).includes(name)) throw hiveError(M.offInWorkspace, { name }, { kind: 'conflict' })
-      if (enabled) await checkShown(name, expected ?? { def: null })
-      await setAssistantNow(name, enabled)
-    })
-  )
-}
-
-/** A list from a config file: its names (a hand-edited file may hold anything). */
-const listed = (list: unknown): string[] => (Array.isArray(list) ? list.filter((n): n is string => typeof n === 'string') : [])
-
-async function setProjectNow(projectPath: string, name: string, enabled: boolean): Promise<void> {
-  await workspace.mutateProjectConfig(projectPath, (cfg) => {
-    const on = new Set(listed(cfg.mcp.enabled))
-    if (enabled) on.add(name)
-    else on.delete(name)
-    return { mcp: { ...cfg.mcp, enabled: [...on].sort() } }
-  })
-}
-
-/**
- * Every project's own choice for a server name goes (hidden projects' too), in a turn: a server added under a name used
- * before (deleted, replaced, or its file removed by hand) starts with no project's choice, so an old switch never turns
- * it on.
- */
-async function forgetInProjects(name: string): Promise<void> {
-  const paths = [...(await workspace.listProjectPaths()), ...(await workspace.listProjectPaths({ hidden: true }))]
-  for (const p of paths) {
+async function removeEverywhere(name: string): Promise<void> {
+  for (const p of await allProjectPaths()) {
     const cfg = await workspace.projectConfig(p).catch(() => null)
     if (!cfg || ![cfg.mcp.enabled, cfg.mcp.disabled].some((l) => listed(l).includes(name))) continue
-    await workspace.mutateProjectConfig(p, (c) => ({ mcp: { ...c.mcp, enabled: listed(c.mcp.enabled).filter((n) => n !== name), disabled: listed(c.mcp.disabled).filter((n) => n !== name) } }))
+    await workspace.mutateProjectConfig(p, (c) => ({ mcp: { ...c.mcp, enabled: mcpAdded(c.mcp, legacyOn()).filter((n) => n !== name), disabled: listed(c.mcp.disabled).filter((n) => n !== name), model: MCP_ADDED_MODEL } }))
   }
+  if (listed(workspace.config.mcp.assistant).includes(name)) await changeAssistantNow((added) => added.filter((n) => n !== name))
 }
 
-/** Off everywhere, in a turn: in the workspace and in each project, whatever an earlier server of the name had. */
-async function offEverywhere(name: string): Promise<void> {
-  await setGlobalNow(name, false)
-  await forgetInProjects(name)
-  if (listed(workspace.config.mcp.assistant).includes(name)) await setAssistantNow(name, false)
+/** The places a server is added (HI-2059): the projects' paths (hidden ones too) and whether the Assistant has it. */
+async function addedPlaces(): Promise<{ projects: Map<string, string[]>; assistant: string[] }> {
+  const projects = new Map<string, string[]>()
+  for (const p of await allProjectPaths()) {
+    const cfg = await workspace.projectConfig(p).catch(() => null)
+    if (cfg) projects.set(p, mcpAdded(cfg.mcp, legacyOn()))
+  }
+  return { projects, assistant: assistantMcpAdded(workspace.config.mcp) }
 }
 
 export function validMcpName(name: string): boolean {
@@ -251,14 +296,14 @@ export async function createMcp(name: string): Promise<McpServerInfo> {
     args: ['-y', 'your-mcp-server-package'],
     env: { EXAMPLE_TOKEN: '${EXAMPLE_TOKEN}' }
   }
-  // Off everywhere (#1093): a template runs nothing until it is written and turned on.
+  // Added nowhere (HI-2059): a template runs nothing until it is written and added.
   return inTurn(async () => {
     if (existsSync(path)) throw hiveError(M.exists, { name }, { kind: 'conflict' })
-    await offEverywhere(name)
+    await removeEverywhere(name)
     await writeFile(path, JSON.stringify(template, null, 2) + '\n', { flag: 'wx' }).catch((e: NodeJS.ErrnoException) => {
       throw e.code === 'EEXIST' ? hiveError(M.exists, { name }, { kind: 'conflict' }) : e
     })
-    return (await listMcp()).find((m) => m.name === name)!
+    return (await listMcp(true)).find((m) => m.name === name)!
   })
 }
 
@@ -271,7 +316,7 @@ export async function saveMcp(name: string, text: string, expected?: string): Pr
   if (!validMcpName(name)) throw hiveError(M.invalidName)
   JSON.parse(text) // throws a useful message on invalid JSON
   await writeTextUnlessChanged(join(workspace.mcpDir, `${name}.json`), text.endsWith('\n') ? text : text + '\n', expected)
-  return (await listMcp()).find((m) => m.name === name)!
+  return (await listMcp(true)).find((m) => m.name === name)!
 }
 
 export async function deleteMcp(name: string): Promise<void> {
@@ -295,7 +340,7 @@ export async function deleteMcp(name: string): Promise<void> {
     )
     if (def && existsSync(folder) && usesFolder(def, name)) await trash(folder)
     if (existsSync(file)) await trash(file)
-    await offEverywhere(name)
+    await removeEverywhere(name)
   })
 }
 
@@ -478,11 +523,11 @@ function serverExists(name: string, folder: boolean): boolean {
 }
 
 /**
- * Adds a server from a .json or .zip as `name`, off in the workspace and in every project (#1093): it runs nothing until
- * the workspace turns it on, which shows what it runs first. A name in use is refused unless `replace`, which moves the
+ * Adds a server from a .json or .zip as `name`, added nowhere (HI-2059): it runs nothing until it is added to a project
+ * or the Assistant, which shows what it runs first. A name in use is refused unless `replace`, which moves the
  * old definition (and its folder) to the Recycle Bin. Everything is read and checked before anything is written, and
- * the change is one turn with enables (inTurn): an enable waiting meanwhile was for the old definition, so it is refused
- * (setMcpGlobal's expected).
+ * the change is one turn with Adds (inTurn): an Add waiting meanwhile was for the old definition, so it is refused
+ * (addMcpTo's expected).
  */
 export async function addMcpFromFile(file: string, name: string, replace = false): Promise<McpServerInfo> {
   if (!validMcpName(name)) throw hiveError(M.badName, undefined, { kind: 'invalid' })
@@ -495,9 +540,9 @@ export async function addMcpFromFile(file: string, name: string, replace = false
     const folder = join(dir, name)
     if (serverExists(name, !!r.files) && !replace) throw taken()
     await mkdir(dir, { recursive: true })
-    // Off before it exists: a name enabled earlier (the old server, or a definition deleted by hand) mustn't turn it on,
-    // for all projects or in one.
-    await offEverywhere(name)
+    // Removed everywhere before it exists: a name added earlier (the old server, or a definition deleted by hand) mustn't
+    // add it anywhere.
+    await removeEverywhere(name)
     if (replace) {
       // A .zip brings its own folder; a .json keeps the one there (its definition may run what is in it).
       if (r.files && existsSync(folder)) await trash(folder)
@@ -526,7 +571,7 @@ export async function addMcpFromFile(file: string, name: string, replace = false
       if (claimed) await rm(folder, { recursive: true, force: true }).catch(() => undefined)
       throw e
     }
-    return (await listMcp()).find((m) => m.name === name)!
+    return (await listMcp(true)).find((m) => m.name === name)!
   })
 }
 
@@ -548,10 +593,10 @@ export async function projectMcpServers(projectPath: string): Promise<McpProject
 }
 
 /**
- * Copies servers defined in a project's own config (.mcp.json…) into the workspace, each turned on in the workspace and
- * in that project only (#713, #1093: added from the project, it is on there straight away; the copy's dialog showed
- * what it runs) when it is still the definition the user was shown (`shown`, by name); one changed meanwhile, or not
- * shown, is copied turned off. Returns the names copied and those on.
+ * Copies servers defined in a project's own config (.mcp.json…) into the workspace, each added to that project only
+ * (#713, HI-2059: copied from the project, it runs there straight away; the copy's dialog showed what it runs) when it
+ * is still the definition the user was shown (`shown`, by name); one changed meanwhile, or not shown, is copied added
+ * nowhere. Returns the names copied and those added.
  */
 export async function importFromProject(projectPath: string, names: string[], shown: Record<string, McpServerDef> = {}): Promise<{ copied: string[]; on: string[] }> {
   const defs = await projectDefs(projectPath)
@@ -564,7 +609,7 @@ export async function importFromProject(projectPath: string, names: string[], sh
     await inTurn(async () => {
       if (existsSync(path)) return
       // A name used before starts with no project's choice.
-      await offEverywhere(n)
+      await removeEverywhere(n)
       // Never over one that appeared meanwhile.
       // i18n-ignore: the definition file's text (a description the CLIs drop)
       const wrote = await writeFile(path, JSON.stringify({ description: `Imported from project ${basename(projectPath)}`, ...def }, null, 2) + '\n', { flag: 'wx' }).then(
@@ -577,8 +622,7 @@ export async function importFromProject(projectPath: string, names: string[], sh
       if (!wrote) return
       copied.push(n)
       if (shown[n] && JSON.stringify(shown[n]) === JSON.stringify(def)) {
-        await setProjectNow(projectPath, n, true)
-        await setGlobalNow(n, true)
+        await changeProjectNow(projectPath, (added) => [...added, n])
         on.push(n)
       }
     })

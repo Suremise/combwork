@@ -23,9 +23,9 @@
     "defaultMessage": "\"url\" must be an http:// or https:// address.",
     "description": "An error adding an MCP server from a file: its definition's \"url\" field (keep it as it is) isn't a web address."
   },
-  "content.mcp.changed": {
-    "defaultMessage": "{name} has changed since it was shown to you. Check what it runs and enable it again.",
-    "description": "An error turning an MCP server on: its definition ({name} is the server) changed after Hive showed what it runs, so it stays off until checked again."
+  "content.mcp.changedAdd": {
+    "defaultMessage": "{name} has changed since it was shown to you. Check what it runs and add it again.",
+    "description": "An error adding an MCP server to a project or the Hive Assistant: its definition ({name} is the server) changed after Hive showed what it runs, so it is not added until checked again."
   },
   "content.mcp.chooseFile": {
     "defaultMessage": "Choose a .json definition or a .zip of a server folder.",

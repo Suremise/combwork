@@ -179,9 +179,9 @@ interface HiveMessageValues {
   'agents.mcp.all': undefined
   'agents.mcp.its': undefined
   'agents.mcp.loading': undefined
-  'agents.mcp.none': { where: string }
-  'agents.mcp.notOn': { where: string }
-  'agents.mcp.note': undefined
+  'agents.mcp.noneAdded': { where: string }
+  'agents.mcp.notAdded': { where: string }
+  'agents.mcp.noteAdded': undefined
   'agents.mcp.only': undefined
   'agents.merge.blocked': { why: string; agent: string | number }
   'agents.merge.commits': { n: number; into: string | number }

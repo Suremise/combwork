@@ -5,7 +5,7 @@
   "content.mcp.badName": "Nazwa serwera może zawierać litery, cyfry, „-” i „_” (maks. 64 znaki). Nazwa „hive” jest zarezerwowana.",
   "content.mcp.badRecord": "„{field}” musi być obiektem z wartościami tekstowymi.",
   "content.mcp.badUrl": "„url” musi być adresem http:// lub https://.",
-  "content.mcp.changed": "Definicja serwera {name} zmieniła się, odkąd ją pokazano. Sprawdź, co uruchamia, i włącz go ponownie.",
+  "content.mcp.changedAdd": "Serwer {name} zmienił się od chwili, gdy go zobaczyłeś. Sprawdź, co uruchamia, i dodaj go ponownie.",
   "content.mcp.chooseFile": "Wybierz definicję .json lub archiwum .zip folderu serwera.",
   "content.mcp.connects": "Łączy się z: {url}",
   "content.mcp.connectsType": "Łączy się z: {url} ({type})",

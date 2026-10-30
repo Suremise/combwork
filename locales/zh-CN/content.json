@@ -5,7 +5,7 @@
   "content.mcp.badName": "服务器名称只能包含字母、数字、“-”和“_”（最多 64 个字符）。“hive”为保留名称。",
   "content.mcp.badRecord": "“{field}”必须是值为字符串的对象。",
   "content.mcp.badUrl": "“url”必须是 http:// 或 https:// 地址。",
-  "content.mcp.changed": "{name} 在显示给你之后已更改。请检查它运行的内容，然后重新启用。",
+  "content.mcp.changedAdd": "{name} 在向你显示后已更改。请检查它运行的内容，然后重新添加。",
   "content.mcp.chooseFile": "请选择 .json 定义或服务器文件夹的 .zip。",
   "content.mcp.connects": "连接到：{url}",
   "content.mcp.connectsType": "连接到：{url}（{type}）",

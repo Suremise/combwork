@@ -5,8 +5,8 @@ import { useAgentLimit } from '../advanced'
 import { agentProvider, chosenDefaultProvider, defaultProviderPending, isProviderEnabled, modeCaveat, modeOption, offeredModes, orderedProviders, projectDefaultProvider, projectProviderConfig, projectUse200k, providerDescriptor, providerName, providerSettings, shownText } from '@shared/providers'
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import type { MergeBranch } from '@shared/types'
-import type { AgentBranchStatus, Connection, EffortLevel, MergeResult, PermissionMode, ProjectConfig, ProjectInfo, ProviderId } from '@shared/types'
-import { serverOnIn } from '@shared/agentMcp'
+import type { AgentBranchStatus, Connection, EffortLevel, MergeResult, PermissionMode, ProjectInfo, ProviderId } from '@shared/types'
+import { serverAddedIn } from '@shared/agentMcp'
 import { agentNameProblem, nameTaken, nameTakenMessage, sameAgentName, suggestAgentName, workspaceAgentList } from '@shared/agentNames'
 import type { TemplateAgent } from '@shared/templates'
 import { agentWorkflowRole, ROLE_IN_WORKFLOW, WORKFLOW_ROLE_TEXT, WORKFLOW_ROLES, type WorkflowRole } from '@shared/workflow/roles'
@@ -471,18 +471,17 @@ interface AgentFields {
 }
 
 /**
- * The MCP servers an agent can be given (#537): those on in the project (`project`, its MCP choices, #713), or for a
- * template's agent (null), which may be loaded anywhere, every server the workspace has. Null until they are read.
+ * The MCP servers an agent can be given (#537): those added to the project (`projectPath`, HI-2059), or for a template's
+ * agent (null), which may be loaded anywhere, every server the workspace has. Null until they are read.
  */
-function useMcpOffered(project: ProjectConfig['mcp'] | null): string[] | null {
+function useMcpOffered(projectPath: string | null): string[] | null {
   const version = useStore((s) => s.skillsVersion)
   const [list, setList] = useState<string[] | null>(null)
-  const key = project ? JSON.stringify(project) : ''
+  const key = projectPath ?? ''
   useEffect(() => {
     let live = true
-    const mcp = key ? (JSON.parse(key) as ProjectConfig['mcp']) : null
     call('mcp:list')
-      .then((l) => live && setList(l.filter((m) => (mcp ? serverOnIn(m, mcp) : !!m.def)).map((m) => m.name)))
+      .then((l) => live && setList(l.filter((m) => (key ? serverAddedIn(m, key) : !!m.def)).map((m) => m.name)))
       .catch(() => live && setList([]))
     return () => {
       live = false
@@ -502,7 +501,7 @@ function McpChoice({ value, offered, where, onChange }: { value: string[] | null
     <div className="mcp-choice">
       <div className="segmented works-in" role="radiogroup" aria-label={tr(MCP_SERVERS)}>
         <button type="button" role="radio" aria-checked={value === null} className={cx(value === null && 'active')} onClick={() => onChange(null)}>
-          {tr(msg({ id: 'agents.mcp.all', defaultMessage: "All of the project's", description: "A choice of an agent's MCP servers (Agent Settings): every MCP server on in its project. Keep it short." }))}
+          {tr(msg({ id: 'agents.mcp.all', defaultMessage: "All of the project's", description: "A choice of an agent's MCP servers (Agent Settings): every MCP server added to its project. Keep it short." }))}
         </button>
         <button type="button" role="radio" aria-checked={value !== null} className={cx(value !== null && 'active')} disabled={value === null && offered === null} onClick={() => value === null && offered && onChange(offered)}>
           {tr(msg({ id: 'agents.mcp.only', defaultMessage: 'Only these', description: "A choice of an agent's MCP servers (Agent Settings): only the ones ticked below. Keep it short." }))}
@@ -514,26 +513,26 @@ function McpChoice({ value, offered, where, onChange }: { value: string[] | null
             <Icon name="loading" spin /> {tr(msg({ id: 'agents.mcp.loading', defaultMessage: 'Loading…', description: "Agent Settings while the list of MCP servers is read." }))}
           </p>
         ) : names.length === 0 ? (
-          <p className="hint">{tr(msg({ id: 'agents.mcp.none', defaultMessage: '{where, select, workspace {No MCP servers are on in this workspace: it gets none.} other {No MCP servers are on in this project: it gets none.}}', description: "Agent Settings, Only these, when no MCP server is on where the agent is (its project, or, for a template's agent, the workspace)." }), { where })}</p>
+          <p className="hint">{tr(msg({ id: 'agents.mcp.noneAdded', defaultMessage: '{where, select, workspace {This workspace has no MCP servers: it gets none.} other {No MCP servers are added to this project: it gets none.}}', description: "Agent Settings, Only these, when no MCP server is added where the agent is (its project, HI-2059), or, for a template's agent, the workspace has none." }), { where })}</p>
         ) : (
           <div className="choice-list" role="group" aria-label={tr(msg({ id: 'agents.mcp.its', defaultMessage: 'Its MCP servers', description: "Accessible name of the list of MCP servers to tick for an agent (Agent Settings)." }))}>
             {names.map((n) => (
               <label key={n} className="flex">
                 <input type="checkbox" className="checkbox" checked={value.includes(n)} onChange={(e) => onChange(e.target.checked ? [...value, n] : value.filter((x) => x !== n))} /> {n}
-                {!offered.includes(n) && <span className="faint">{tr(msg({ id: 'agents.mcp.notOn', defaultMessage: '{where, select, workspace {not on in this workspace} other {not on in this project}}', description: "After an MCP server the agent was given that isn't on where it is now (its project, or the workspace). Lower case." }), { where })}</span>}
+                {!offered.includes(n) && <span className="faint">{tr(msg({ id: 'agents.mcp.notAdded', defaultMessage: '{where, select, workspace {not in this workspace} other {not added to this project}}', description: "After an MCP server the agent was given that isn't added to its project now (HI-2059), or isn't in the workspace. Lower case." }), { where })}</span>}
               </label>
             ))}
           </div>
         ))}
-      <div className="faint">{tr(msg({ id: 'agents.mcp.note', defaultMessage: 'The built-in hive server is always given. A server enabled later reaches it only with All.', description: "Under an agent's MCP servers (Agent Settings). hive is the built-in server's name: keep it. All is the first choice above (\"All of the project's\")." }))}</div>
+      <div className="faint">{tr(msg({ id: 'agents.mcp.noteAdded', defaultMessage: 'The built-in hive server is always given. A server added to the project later reaches it only with All.', description: "Under an agent's MCP servers (Agent Settings). hive is the built-in server's name: keep it. All is the first choice above (\"All of the project's\")." }))}</div>
     </div>
   )
 }
 
 /**
  * The Agent Settings dialog (#126, #271): name, note, where it works, role in the workflow, coding agent, model, effort,
- * mode, context and MCP servers (#537: those on in the project, `mcpProject` its MCP choices, or every server of the
- * workspace for a template's agent, null; `mcpWhere` says where they are on, in words).
+ * mode, context and MCP servers (#537: those added to the project, `mcpProject` its path, HI-2059, or every server of
+ * the workspace for a template's agent, null; `mcpWhere` says where they are added, in words).
  * `works`: what the agent works in (a project's agent; a template's has none, #1436). `providerLocked`: why the coding
  * agent can't change now (a running agent). `config`: whose settings an empty choice follows. `nameProblem`: why a name
  * can't be used. `confirmSave`: asked first (false keeps it open); `save` runs with the dialog open, a failure staying in
@@ -561,7 +560,7 @@ function AgentSettingsModal({
   config: Pick<ProjectInfo, 'config'>
   roles: string[]
   works?: ReactNode
-  mcpProject: ProjectConfig['mcp'] | null
+  mcpProject: string | null
   mcpWhere: 'project' | 'workspace'
   providerLocked?: ReactNode
   note?: ReactNode
@@ -684,7 +683,7 @@ export function AgentSettingsDialog() {
       initial={initial}
       config={project}
       roles={roleSuggestions(project.agents)}
-      mcpProject={project.config.mcp}
+      mcpProject={project.path}
       mcpWhere="project"
       works={
         // Where it works now (#1442): its 0.9 worktree, a slot, carried slot or home, or the project folder.
