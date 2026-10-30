@@ -26,8 +26,8 @@ export interface ParkedItem {
   what: string
   /** What the window shows it as: a code and its values, worded there. */
   kind: 'working' | 'starting' | 'background' | 'run' | 'process' | 'writer' | 'merge' | 'copy' | 'status' | 'scan'
-  /** A process the user may end (End it): its pid and start time, as recorded. */
-  process?: { pid: number; startedAt: number; name: string }
+  /** A process the user may end (End it): its pid and its recorded start (a Windows FILETIME, as text), with its name. */
+  process?: { pid: number; created: string; name: string }
   /** A Progress run the user may end: its id. */
   run?: string
   /** For a run or process: since when, ISO. */

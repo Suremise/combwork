@@ -120,6 +120,8 @@ import { consoleSources } from './devConsoleSources'
 import { englishError, HiveError, shownError } from './hiveError'
 import { CONSOLE_KINDS, hiveName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
 import { cardLabel, cardName, cardRef, namesOf } from '../shared/projectKeys'
+import { pauseTeam, resumeTeam } from './teamPause'
+import { scanWorkspace } from './teamParked'
 
 const log = createLogger('servers')
 const MAX_BODY = 2 * 1024 * 1024
@@ -646,6 +648,8 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'lane-fresh-start': UNDO_FINAL.freshRetried,
   'queue-pause': UNDO_FINAL.queuePaused,
   'queue-resume': UNDO_FINAL.queueResumed,
+  'team-pause': UNDO_FINAL.teamPaused,
+  'team-resume': UNDO_FINAL.teamResumed,
   'release-slot': UNDO_FINAL.slotReleased
 }
 
@@ -2118,6 +2122,66 @@ route('POST', '/v1/queue/resume', async ({ body }) => {
     const target = await queueTargetOf(ws, p, body?.target)
     const r = await resumeQueue(ws, p, target, guard)
     return { done: r.resumed ? `Resumed the merge queue for ${target} in ${basename(p)}` : `The merge queue for ${target} in ${basename(p)} is still paused (${r.view.paused?.reason ?? 'paused'})`, result: { resumed: r.resumed, queue: publicQueue(r.view) } }
+  })
+})
+
+// --- Pausing the team before an update (HI-2081): the Assistant's, for its own workspace only (HR1's s12 check); the
+// user's pause of every workspace is the window's. Another open workspace is told as one line, with none of its agents.
+
+/** Agents (and scripts) don't pause or resume the team: the user's, and the Assistant's within Control agents. */
+function notTeamAgents(what: string): void {
+  if (agentCaller()) throw new HttpError(403, `Project agents can't ${what}: pausing the team is the user's, and the Hive Assistant's within Settings → Assistant → Control. Tell the user if it should be done.`)
+}
+
+/** The team's state as the Assistant sees it: its workspace's in full, any other open one as one line with no names. */
+async function teamFor(ws: WorkspaceService): Promise<{ paused: boolean; pausedBy: string | null; since: string | null; parked: boolean; safeToInstall: boolean; running: { project: string; agent: string; state: string; what: string }[]; others: string[] }> {
+  const own = await scanWorkspace(ws)
+  const others = openWorkspaces().filter((w) => w.path && w !== ws)
+  const lines: string[] = []
+  let othersOk = true
+  for (const w of others) {
+    const v = await scanWorkspace(w)
+    if (!v.pause) {
+      othersOk = false
+      lines.push("Another open workspace isn't paused: the user pauses it from its window, or with Pause the Team.")
+    } else if (!v.parked) {
+      othersOk = false
+      lines.push('Another open workspace is paused, not parked yet.')
+    }
+  }
+  return {
+    paused: !!own.pause,
+    pausedBy: own.pause?.by ?? null,
+    since: own.pause?.since ?? null,
+    parked: own.parked,
+    safeToInstall: own.parked && othersOk,
+    running: own.items.map((i) => ({ project: i.project, agent: i.agent, state: i.state, what: i.what })),
+    others: lines
+  }
+}
+
+route('GET', '/v1/team', async () => {
+  notTeamAgents('read the team pause')
+  return teamFor(requireWorkspace())
+})
+
+route('POST', '/v1/team/pause', async () => {
+  notTeamAgents('pause the team')
+  const ws = requireWorkspace()
+  return assistantChange('agents', 'pause the team', { kind: 'team-pause' }, async (guard) => {
+    guard()
+    const p = await pauseTeam(ws, 'assistant')
+    return { done: `Paused the team (${p.pauseId})`, result: await teamFor(ws) }
+  })
+})
+
+route('POST', '/v1/team/resume', async () => {
+  notTeamAgents('resume the team')
+  const ws = requireWorkspace()
+  return assistantChange('agents', 'resume the team', { kind: 'team-resume' }, async (guard) => {
+    guard()
+    const was = await resumeTeam(ws)
+    return { done: was ? 'Resumed the team' : 'The team was not paused', result: await teamFor(ws) }
   })
 })
 

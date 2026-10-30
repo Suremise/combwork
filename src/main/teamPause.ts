@@ -25,6 +25,18 @@ import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from
 const log = createLogger('teamPause')
 
 const FILE = 'team-pause.json'
+/** What the last close left of the pauses (the profile's): its reason and each paused workspace's pause, by its .hive. */
+const CLOSING_FILE = 'team-pause-closing.json'
+
+interface PauseClosing {
+  reason: string
+  at: string
+  pauses: { hiveDir: string; pauseId: string }[]
+  app?: string
+}
+
+/** The last close's pauses, read once at this start (and its file removed): what an install's restart lifts. */
+let closing: PauseClosing | null = null
 
 /** Each workspace's pause as read (by its .hive folder): null, none. */
 const known = new Map<string, TeamPause | null>()
@@ -57,7 +69,43 @@ function readPause(file: string): TeamPause | null {
 }
 
 /** The user's pause of every open workspace, as the profile keeps it (read again each time: tiny, and rare). */
-export const appPause = (): TeamPause | null => readPause(appFile())
+export const appPause = (): TeamPause | null => {
+  const p = readPause(appFile())
+  if (p && closing && /^(install|update)$/.test(closing.reason) && closing.app === p.pauseId) {
+    void rm(appFile(), { force: true }).catch(() => undefined)
+    return null
+  }
+  return p
+}
+
+const liftedByClosing = (ws: WorkspaceService, p: TeamPause): boolean => !!closing && /^(install|update)$/.test(closing.reason) && closing.pauses.some((x) => x.hiveDir === keyOf(ws) && x.pauseId === p.pauseId)
+
+/**
+ * Hive closing (quitNow, with its reason): each open workspace's pause written down with this close, replacing what an
+ * earlier close wrote, so the next start lifts only these, and only after an install or an update.
+ */
+export async function recordPauseClosing(reason: string): Promise<void> {
+  const pauses = openWorkspaces().flatMap((ws) => {
+    const p = ws.path ? teamPauseOf(ws) : null
+    return p ? [{ hiveDir: keyOf(ws), pauseId: p.pauseId }] : []
+  })
+  const all = readPause(appFile())
+  const rec: PauseClosing = { reason, at: new Date().toISOString(), pauses, ...(all ? { app: all.pauseId } : {}) }
+  if (!pauses.length && !all) return void (await rm(join(app.getPath('userData'), CLOSING_FILE), { force: true }).catch(() => undefined))
+  await writeJsonAtomic(join(app.getPath('userData'), CLOSING_FILE), rec)
+}
+
+/** Reads (and removes) what the last close left of the pauses, once at start, before any workspace opens. */
+export function loadPauseClosing(): void {
+  const file = join(app.getPath('userData'), CLOSING_FILE)
+  try {
+    const v = JSON.parse(readFileSync(file, 'utf8')) as PauseClosing
+    closing = v && typeof v.reason === 'string' && Array.isArray(v.pauses) ? v : null
+  } catch {
+    closing = null
+  }
+  void rm(file, { force: true }).catch(() => undefined)
+}
 
 /**
  * A workspace's pause now (null: none). Read once from its file; a workspace with none, opened while the user's pause
@@ -68,6 +116,14 @@ export function teamPauseOf(ws: WorkspaceService | null | undefined): TeamPause 
   const k = keyOf(ws)
   if (known.has(k)) return known.get(k)!
   let p = readPause(fileOf(ws))
+  // Hive restarting for the update this pause was for (HR1's s10 check): lifted before anything reads it, so the team
+  // resumes on its own (the restart's resume offer). Only this very pause, closed under an install or an update, in the
+  // close just before this start: a crash, a plain quit or an older record keeps it.
+  if (p && liftedByClosing(ws, p)) {
+    void withLock(ws, () => rm(fileOf(ws), { force: true })).catch((e) => log.warn("Removing a team pause lifted by the update's restart", e))
+    log.info(`The team of ${userText(ws.path)} resumes after the update it was paused for (${p.pauseId})`)
+    p = null
+  }
   if (!p) {
     const all = appPause()
     if (all) {

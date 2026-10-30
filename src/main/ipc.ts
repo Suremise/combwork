@@ -141,6 +141,8 @@ import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
 import { withSkillDelivered } from '../shared/skillDelivery'
+import { pauseApp, resumeApp } from './teamPause'
+import { endParkedProcess, installIfParked, teamPauseState } from './teamParked'
 
 /**
  * What the window is told when a call is refused (#845): thrown as HiveErrors, so the window reads them in its language
@@ -523,6 +525,17 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'update:download': () => updater.download(),
     'update:install': () => updater.restartAndInstall(),
     'update:skip': (version) => updater.skip(version),
+    'team:state': () => teamPauseState(),
+    'team:pause': async () => {
+      const r = await pauseApp()
+      return { done: r.done, failed: r.failed }
+    },
+    'team:resume': async () => {
+      const r = await resumeApp()
+      return { done: r.done, failed: r.failed }
+    },
+    'team:endProcess': (p, agentId, pid, created) => endParkedProcess(workspace.assertSessionHost(p), String(agentId), Number(pid), String(created)),
+    'team:install': () => installIfParked(),
     'app:openChromiumLicenses': () => {
       const file = join(dirname(process.execPath), 'LICENSES.chromium.html')
       if (!existsSync(file)) return false
