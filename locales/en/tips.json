@@ -1131,6 +1131,14 @@
     "defaultMessage": "Your team size",
     "description": "A tip's title (HI-2001): the workflow option Maximum agents, how many agents a project has."
   },
+  "tips.mcpCatalogue.text": {
+    "defaultMessage": "The MCP view's Catalogue lists servers you can install, Hive's own first. Each download is checked against its catalogue and shows what it runs; updates are offered, never automatic. Add a company's catalogue in Settings → MCP Catalogues.",
+    "description": "A tip (HI-545). The MCP view, Catalogue and Settings → MCP Catalogues are names in Hive: keep them as Hive shows them."
+  },
+  "tips.mcpCatalogue.title": {
+    "defaultMessage": "Install a server from a catalogue",
+    "description": "A tip's title (HI-545): the MCP view's Catalogue."
+  },
   "tips.mcpFromFile.textAdded": {
     "defaultMessage": "Got a server as a .json definition or a .zip of its folder? Add MCP Server from File in the MCP view shows what it runs and adds it to the workspace: then add it to the projects that need it, with Add to… or in their MCP tab.",
     "description": "A tip (HI-2059). Add MCP Server from File, the MCP view, Add to… and the MCP tab are names in Hive: keep them as Hive shows them."

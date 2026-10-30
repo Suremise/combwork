@@ -543,6 +543,42 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   {
+    id: 'hive.mcpCatalog.fetchSeconds',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.mcpCatalog.fetchSeconds.title', defaultMessage: 'MCP catalogues: reading one', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds. An MCP catalogue is a list of servers to install (HI-545)." }),
+    desc: msg({ id: 'settings.advanced.hive.mcpCatalog.fetchSeconds.desc', defaultMessage: "How long the MCP view waits for a catalogue's list, redirects included, before it shows that catalogue couldn't be read. Raise it on a slow connection.", description: 'What the advanced setting "MCP catalogues: reading one" is for (Settings → Advanced, HI-545).' }),
+    kind: 'number',
+    default: 15,
+    min: 5,
+    max: 300,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: 'hive.mcpCatalog.downloadSeconds',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.mcpCatalog.downloadSeconds.title', defaultMessage: 'MCP catalogues: downloading a server', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (HI-545)." }),
+    desc: msg({ id: 'settings.advanced.hive.mcpCatalog.downloadSeconds.desc', defaultMessage: "How long Install and Update wait for a catalogue server's zip, redirects included, before they stop with nothing installed. Raise it on a slow connection.", description: 'What the advanced setting "MCP catalogues: downloading a server" is for (Settings → Advanced, HI-545).' }),
+    kind: 'number',
+    default: 60,
+    min: 10,
+    max: 1800,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: 'hive.mcpCatalog.probeSeconds',
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.mcpCatalog.probeSeconds.title', defaultMessage: "MCP catalogues: checking this PC's requirements", description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (HI-545)." }),
+    desc: msg({ id: 'settings.advanced.hive.mcpCatalog.probeSeconds.desc', defaultMessage: "How long each check of this PC for a catalogue server's requirements (its Windows edition and build, Node.js, Docker) may take before it shows as not checked.", description: 'What the advanced setting "MCP catalogues: checking this PC’s requirements" is for (Settings → Advanced, HI-545).' }),
+    kind: 'number',
+    default: 5,
+    min: 1,
+    max: 60,
+    unit: 's',
+    applies: 'now'
+  },
+  {
     id: 'hive.retry.tellAssistantAfterSeconds',
     group: 'hive',
     title: msg({ id: 'settings.advanced.hive.retry.tellAssistantAfterSeconds.title', defaultMessage: 'Retry wait: tell the Assistant after', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again." }),

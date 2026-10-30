@@ -228,6 +228,8 @@ export const AREAS = [
   // The MCP workspace switch's project picker (#1093): its enable dialog.
   { paths: ['src/renderer/src/components/McpProjectPicker.tsx', 'src/renderer/src/components/McpServerPicker.tsx'], suites: ['assistantmcp', 'mcpfile', 'mcpagents', 'mcp'] },
   { paths: ['tests/e2e/assistantmcp.cjs'], suites: ['assistantmcp'] },
+  // MCP catalogues (HI-545): reading, checking and installing their servers, the Catalogue tab and Settings → MCP Catalogues.
+  { paths: ['src/main/mcpCatalog.ts', 'src/shared/mcpCatalog.ts', 'src/renderer/src/components/McpCatalog.tsx', 'tests/e2e/mcpcatalog.cjs'], suites: ['mcpcatalog', 'mcpfile'] },
   { paths: ['src/main/notes.ts'], suites: ['drafts', 'codex-handover'] },
   { paths: ['src/main/planUsage.ts', 'src/renderer/src/components/ModelPicker.tsx', 'src/shared/claude.ts', 'src/shared/codex.ts', 'src/shared/prices.ts'], suites: ['plan', 'planusage', 'providers', 'codex-setup', 'context', 'unpricedcost', 'models'] },
   // Models and capabilities from the CLIs, and their fallbacks (#125).

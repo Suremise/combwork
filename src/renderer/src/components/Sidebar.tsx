@@ -19,6 +19,7 @@ import { useInbox } from '../inbox'
 import { useScopedLoad } from '../scopedLoad'
 import { AssistantSidePanel } from './AssistantView'
 import { McpSearch } from './McpServerPicker'
+import { McpCatalogPanel } from './McpCatalog'
 import { mcpServerShown, type McpFilter } from '@shared/agentMcp'
 import { BoardPanel } from './Board'
 import { WorkspaceOverviewPanel } from '../views/WorkspaceOverview'
@@ -127,6 +128,8 @@ const M = {
   serverFromFile: msg({ id: 'assistant.sidebar.serverFromFile', defaultMessage: 'Add MCP Server from File (.json or .zip)…', description: 'The MCP sidebar: a button. Keep .json and .zip as they are.' }),
   openMcpFolder: msg({ id: 'assistant.sidebar.openMcpFolder', defaultMessage: 'Open MCP Folder', description: 'The MCP sidebar: a button that opens .hive/mcp in Explorer.' }),
   workspaceGroup: msg({ id: 'assistant.sidebar.workspaceGroup', defaultMessage: 'Workspace', description: "The MCP sidebar: the section of the workspace's servers." }),
+  installedTab: msg({ id: 'assistant.sidebar.mcpInstalled', defaultMessage: 'Installed', description: "The MCP view's first tab (HI-545): the workspace's servers." }),
+  catalogueTab: msg({ id: 'assistant.sidebar.mcpCatalogue', defaultMessage: 'Catalogue', description: "The MCP view's second tab (HI-545): servers from the MCP catalogues, to install." }),
   noMatch: msg({ id: 'assistant.sidebar.mcpNoMatch', defaultMessage: 'No server matches.', description: "The MCP view (HI-2059) when no server matches its search and filter." }),
   noServers: msg({ id: 'assistant.sidebar.noServers', defaultMessage: 'No MCP servers yet. Create one with +, or add one from a .json definition or a .zip of a server folder.', description: 'The MCP sidebar with no servers. + is the add button.' }),
   deleteServer: msg({ id: 'assistant.sidebar.deleteServer', defaultMessage: 'Delete server', description: "A trash button beside an MCP server of the workspace: deletes it." }),
@@ -787,6 +790,8 @@ function McpPanel() {
   // Search and filter for a long list (HI-2059): by name, description and tags, and by where a server is added.
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<McpFilter>('all')
+  // Installed, or the catalogues' servers to install (HI-545).
+  const tab = useStore((s) => s.mcpTab)
 
   const wsPath = workspace?.path
   const load = useCallback(() => {
@@ -832,10 +837,25 @@ function McpPanel() {
         <div className="actions">
           <IconButton icon="add" title={tr(M.newServer)} onClick={() => void create()} />
           <IconButton icon="file-add" title={tr(M.serverFromFile)} onClick={() => void actions.addMcpServerFromFile().then((m) => m && load())} />
-          <IconButton icon="refresh" title={tr(M.refresh)} onClick={load} />
+          <IconButton icon="refresh" title={tr(M.refresh)} onClick={() => (tab === 'catalogue' ? set((s) => ({ mcpCatalogVersion: s.mcpCatalogVersion + 1 })) : load())} />
           <IconButton icon="folder-opened" title={tr(M.openMcpFolder)} onClick={() => void call('mcp:openFolder')} />
         </div>
       </div>
+      <div className="mcp-tabs">
+        <div className="segmented" role="tablist" aria-label={tr(M.mcpServers)}>
+          <button role="tab" aria-selected={tab === 'installed'} className={cx(tab === 'installed' && 'active')} data-mcp-tab="installed" onClick={() => set({ mcpTab: 'installed' })}>
+            {tr(M.installedTab)}
+          </button>
+          <button role="tab" aria-selected={tab === 'catalogue'} className={cx(tab === 'catalogue' && 'active')} data-mcp-tab="catalogue" onClick={() => set({ mcpTab: 'catalogue' })}>
+            {tr(M.catalogueTab)}
+          </button>
+        </div>
+      </div>
+      {tab === 'catalogue' ? (
+        <div className="pane-body">
+          <McpCatalogPanel />
+        </div>
+      ) : (
       <div className="pane-body">
         {servers.length > 0 && <McpSearch query={query} filter={filter} onQuery={setQuery} onFilter={setFilter} errors />}
         <Section title={tr(M.workspaceGroup)} count={servers.length}>
@@ -881,6 +901,7 @@ function McpPanel() {
           </div>
         </Section>
       </div>
+      )}
     </>
   )
 }

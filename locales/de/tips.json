@@ -282,6 +282,8 @@
   "tips.mainProcessStalls.title": "Sehen, warum Hive langsam war",
   "tips.maxAgents.text": "Die Höchstzahl an Agenten unter Versionsverwaltung → Workflow gibt an, wie viele Agenten ein Projekt hat, damit niemand Agenten hinzuholt, die du nicht eingeplant hast, auch der Assistant nicht. Jede Voreinstellung setzt ihr Team: Solo einen Agenten, Pair einen Bearbeiter und einen Reviewer. Erhöhe sie dort, um weitere hinzuzufügen.",
   "tips.maxAgents.title": "Deine Teamgröße",
+  "tips.mcpCatalogue.text": "Der Katalog der Ansicht „MCP“ listet Server, die du installieren kannst, Hives eigene zuerst. Jeder Download wird mit seinem Katalog abgeglichen und zeigt, was er ausführt; Updates werden angeboten, nie automatisch. Füge den Katalog einer Firma unter Einstellungen → MCP-Kataloge hinzu.",
+  "tips.mcpCatalogue.title": "Einen Server aus einem Katalog installieren",
   "tips.mcpFromFile.textAdded": "Einen Server als .json-Definition oder als .zip seines Ordners bekommen? „MCP-Server aus Datei hinzufügen“ in der Ansicht „MCP“ zeigt, was er ausführt, und fügt ihn dem Arbeitsbereich hinzu: Füge ihn dann den Projekten hinzu, die ihn brauchen, mit „Hinzufügen zu…“ oder in ihrem Tab „MCP“.",
   "tips.mcpFromFile.title": "Einen MCP-Server aus einer Datei hinzufügen",
   "tips.mcpPerAgent.text": "In den Einstellungen eines Agenten gibt ihm „MCP-Server: Nur diese“ genau die Server, die er braucht, etwa einen Sandbox-Server für einen Release-Tester, und hält die Werkzeuge der anderen aus seinem Kontext heraus.",

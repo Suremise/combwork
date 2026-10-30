@@ -287,6 +287,8 @@
   "assistant.sidebar.loading": "Wczytywanie…",
   "assistant.sidebar.markNotWorking": "Oznacz jako nieaktywny",
   "assistant.sidebar.markWorking": "Oznacz jako aktywny",
+  "assistant.sidebar.mcpCatalogue": "Katalog",
+  "assistant.sidebar.mcpInstalled": "Zainstalowane",
   "assistant.sidebar.mcpNoMatch": "Żaden serwer nie pasuje.",
   "assistant.sidebar.mcpServers": "Serwery MCP",
   "assistant.sidebar.mcpTipAdded": "Serwery MCP wdrożone w obszarze roboczym (.hive/mcp) są dostępne dla każdego projektu i dla Asystenta Hive, a działają tylko tam, gdzie zostały dodane: w zakładce MCP projektu, w widoku Asystenta albo tutaj przez Dodaj do…. Zmiany obowiązują w nowych sesjach.",

@@ -1420,6 +1420,19 @@ Before adding it, Hive shows the name it will have (the file's or the folder's, 
 
 Nothing in the file runs while it's added. Hive refuses a zip with files that would land outside the server's folder (`..`, a drive or a leading `/`), names Windows can't hold, links, more than 5,000 files or more than 200 MB unpacked, and a definition without a `command` or `url`.
 
+### Installing servers from a catalogue <a id="installing-servers-from-a-catalogue"></a>
+
+The MCP view's **Catalogue** tab lists servers you can install from **catalogues**. A catalogue is a list of servers with a zip for each, published as a `catalog.json`. Hive's own catalogue (Suremise/hive-mcp, with servers such as Windows Sandbox) comes first. You can add others, such as a company's internal servers or a community list, in **Settings → MCP Catalogues**.
+
+- **Each catalogue is its own category.** Search finds servers by name, description and tags. The filter shows **Not installed**, **Installed**, **Updates available** or **Runs on this PC**, and the source picker narrows the list to one catalogue. A long catalogue loads a page at a time (**Show more**).
+- **A server's requirements** are checked on this PC: its system, its Windows edition and build, Node.js and Docker. Hive can't check every Windows feature without administrator rights; Windows Sandbox it can. A requirement Hive can't check says so. A server this PC can't run shows **Can't run here**, and its **Install** is greyed out.
+- **Install…** downloads the server's zip and checks its size and checksum against the catalogue. Anything that doesn't match is refused and nothing is written. Hive then shows what the server runs, as **Add MCP Server from File** does. Installed, it is in the workspace and added nowhere: use **Add to…** in its view, or **Add Server…** in a project's **MCP** tab, to add it where it should run.
+- **Updates are never automatic.** When a catalogue has a newer version of a server you installed from it, the server shows **Update to x.y.z**. **Update…** downloads and checks the new version, says where the server is added (those places keep it), keeps your own values for its environment variables and headers, and shows which lines of what it runs change. If where it is added changes while the dialog is open, Hive writes nothing and shows the dialog again.
+- **Hive reads catalogues only when the Catalogue opens or you refresh it** (↻), never in the background. A catalogue Hive can't read shows why in its category.
+- **A catalogue you add isn't checked by Hive.** The first time its servers are listed, a note says so. Look at what a server runs before you install it.
+
+In **Settings → MCP Catalogues**, turn each catalogue on or off, put yours in order, remove one (servers installed from it stay), or add one by its `https://` or `file://` address (a `file://` catalogue on a share can point at `file://` zips). Removing a server is **Delete** in the MCP view, as for any other.
+
 ### The built-in `hive` server <a id="the-built-in-hive-server"></a>
 
 Every session also gets Hive's own MCP server, which lets agents list projects, read and write shared notes, write handovers, read and update the task board, and notify you. Try: *"Write a handover for the next session using the hive tools."* A new session is told about these tools and about the project's latest handover, so *"read the handover"* is enough to pick up where the last session stopped. See the [Agent API reference](AGENT_API.md).

@@ -66,6 +66,11 @@ describe('the settings catalog', () => {
         for (const id of ['general.commands', 'general.onQuit']) if (!ids.has(id)) missing.push(id)
         continue
       }
+      // The MCP catalogues (HI-545): one row, ours and the user's sources together.
+      if (section === 'mcpCatalogs') {
+        if (!ids.has('mcpCatalogs.sources')) missing.push('mcpCatalogs.sources')
+        continue
+      }
       if (section === 'providers') {
         for (const p of PROVIDERS) {
           // A setting the provider's capabilities don't give it has no row (Codex has no 200K switch, nor a cost source: it reports no cost).

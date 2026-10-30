@@ -25,6 +25,7 @@ import { confirm, NO_PROJECTS, notify, set, useStore } from '../store'
 import { basename, cx, formatKeybinding, recentNote, recentTip } from '../util'
 import { tr, tRich, type Msg } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
+import { McpCatalogDetail } from '../components/McpCatalog'
 
 const M = {
   tagline: msg({ id: 'workspace.welcome.tagline', defaultMessage: 'Run AI coding agents across your projects, side by side.', description: "The welcome page (no workspace open), under Hive's name." }),
@@ -334,6 +335,9 @@ export function McpView() {
   const selected = useStore((s) => s.selectedMcp)
   // One editor per server (and workspace): a load or save still running for one can't land in another's.
   const ws = useStore((s) => s.workspace?.path ?? '')
+  // The Catalogue tab (HI-545) shows the catalogue server chosen in it.
+  const tab = useStore((s) => s.mcpTab)
+  if (tab === 'catalogue') return <McpCatalogDetail />
   return <McpServerView key={`${ws}|${selected ?? ''}`} selected={selected} />
 }
 

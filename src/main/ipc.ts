@@ -60,6 +60,7 @@ import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
 import * as mcp from './mcp'
+import * as mcpCatalog from './mcpCatalog'
 import * as notes from './notes'
 import * as removal from './projectRemoval'
 import * as tasks from './tasks'
@@ -1357,6 +1358,27 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       emit({ type: 'skills-changed' })
       workspace.scheduleRefresh()
       return m
+    },
+    'mcp:catalog': (opts) => mcpCatalog.catalogPages(opts && typeof opts === 'object' ? opts : {}),
+    'mcp:catalogNoted': (url) => mcpCatalog.noteCatalogSource(String(url)),
+    'mcp:catalogPrepare': (source, name) => mcpCatalog.prepareCatalogServer(String(source), String(name)),
+    'mcp:catalogDrop': (id) => mcpCatalog.dropPrepared(String(id)),
+    'mcp:catalogInstall': async (id, name, replace) => {
+      await mcpCatalog.installCatalogServer(String(id), String(name), replace === true)
+      emit({ type: 'skills-changed' })
+      workspace.scheduleRefresh()
+    },
+    'mcp:catalogUpdate': async (id, shown, places) => {
+      const r = await mcpCatalog.updateCatalogServer(String(id), shown, { projects: Array.isArray(places?.projects) ? places.projects.filter((p): p is string => typeof p === 'string') : [], assistant: places?.assistant === true })
+      emit({ type: 'skills-changed' })
+      workspace.scheduleRefresh()
+      return r
+    },
+    'mcp:catalogSources': () => config.settings.mcpCatalogs,
+    'mcp:catalogSetSources': (next) => {
+      const saved = mcpCatalog.setCatalogSources(next)
+      emit({ type: 'settings-changed', settings: config.settings })
+      return saved
     },
 
     'notes:tree': () => notes.notesTree(),

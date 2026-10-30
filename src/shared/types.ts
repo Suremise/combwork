@@ -151,6 +151,8 @@ export interface AppSettings {
   keybindings: KeybindingOverrides
   /** Hive's own commands (HI-1954, Settings → Commands at Hive's level) and When Hive quits, run. */
   commands: CommandsHive
+  /** The MCP catalogues the MCP view lists servers from (HI-545, Settings → MCP Catalogues). */
+  mcpCatalogs: McpCatalogSettings
   /** The global default workflow options (SPEC §16.6.6), under each workspace's and project's own; absent: all off. */
   workflow?: WorkflowDefaults
   /** The one-time steps settled in Hive's own defaults (HI-1997's `workflow.commitMessageDefault`), each saved with its change. */
@@ -2680,6 +2682,8 @@ export interface McpServerDef {
   description?: string
   /** Words to find it by in the MCP view and the Add server picker (HI-2059): Hive's, never given to the CLIs. */
   tags?: string[]
+  /** The MCP catalogue it was installed from (HI-545): Hive's, never given to the CLIs. */
+  catalog?: McpCatalogOrigin
   [key: string]: unknown
 }
 
@@ -2725,6 +2729,89 @@ export interface McpFileServer {
   files: number
   /** A server of this name exists already. */
   exists: boolean
+}
+
+/** A server's requirements in an MCP catalogue (HI-545, catalog.json v1's `requires`). */
+export interface McpCatalogRequires {
+  os: string[]
+  windows?: { editions?: string[]; minBuild?: number; features?: string[] }
+  node?: string
+  docker?: boolean
+  apps?: string[]
+}
+
+/** A server an MCP catalogue offers (HI-545, catalog.json v1), as Hive checked it. */
+export interface McpCatalogServer {
+  name: string
+  version: string
+  description: string
+  tags: string[]
+  requires: McpCatalogRequires
+  homepage?: string
+  zip: { url: string; sha256: string; size: number }
+}
+
+/** One requirement of a catalogue server checked on this PC: met, not met, or not something Hive can check. */
+export interface McpCatalogCheck {
+  kind: 'os' | 'edition' | 'build' | 'feature' | 'node' | 'docker' | 'app'
+  label: string
+  state: 'ok' | 'no' | 'unknown'
+}
+
+/** The catalogue view's filter (HI-545). */
+export type McpCatalogFilter = 'all' | 'notInstalled' | 'installed' | 'updates' | 'meets'
+
+/** A catalogue server in the MCP view: whether it is installed (its version, or `other` for a server of the name not from this catalogue), has an update, and meets this PC. */
+export interface McpCatalogRow extends McpCatalogServer {
+  source: string
+  installed: string | null
+  update: boolean
+  checks: McpCatalogCheck[]
+}
+
+/** A catalogue source's page in the MCP view (HI-545): its rows from `offset`, out of `total` matching. */
+export interface McpCatalogSourcePage {
+  url: string
+  name: string
+  ours: boolean
+  /** Its servers aren't checked by Hive, and the one-time note about it hasn't been shown yet. */
+  noteDue: boolean
+  /** Why it can't be used (not read, not a catalogue Hive reads), in the window's language. */
+  error?: string
+  skipped: number
+  total: number
+  offset: number
+  rows: McpCatalogRow[]
+}
+
+/** Hive's MCP catalogue sources (HI-545): ours first (on unless turned off), then the user's, each on or off. */
+export interface McpCatalogSettings {
+  oursOn: boolean
+  sources: { url: string; on: boolean; noted?: boolean }[]
+}
+
+/** A catalogue server downloaded and checked, held for the user's Install or Update (HI-545). */
+export interface McpCatalogPrepared {
+  id: string
+  source: string
+  server: McpCatalogServer
+  /** What it adds: its definition (moved to its name's folder), what it runs, what to know, its files. */
+  def: McpServerDef
+  runs: string[]
+  secretWarnings: string[]
+  files: number
+  /** Installed from this catalogue entry already, under `name` (an update's: its version, where it is added). */
+  existing: { name: string; version: string; def: McpServerDef | null; revision?: string; runs: string[]; projects: string[]; assistant: boolean } | null
+  /** A server of the entry's own name is in the workspace (from it or not): Install asks to replace it or choose another name. */
+  nameTaken: boolean
+}
+
+/** Where an installed catalogue server came from (HI-545): Hive's own field in its definition, never a CLI's. */
+export interface McpCatalogOrigin {
+  source: string
+  name: string
+  version: string
+  sha256: string
 }
 
 /** A server a project defines in its own config (.mcp.json…), as copying it to the workspace would add it. */
