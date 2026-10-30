@@ -1,6 +1,6 @@
 import type { Account, AccountsMigration, AgentDef, AppSettings, AssistantProviderSettings, Connection, ConnectionDefaults, ConnectionsMoved, EffortLevel, LaunchValues, LegacyConnection, MovedField, ProjectAccountsMigration, ProjectConfig, ProviderId, WorkspaceConfig } from './types'
 import { projectAgents } from './defaults'
-import { AUTO_PROVIDER, PROVIDERS, autoProvider, modeAllowed, projectProviderConfig, projectUse200k, providerDescriptor, providerSettings, splitArgs, type AgentLaunchSettings } from './providers'
+import { AUTO_PROVIDER, DEFAULT_PROVIDER, PROVIDERS, installedAsHeard, isProviderEnabled, modeAllowed, projectProviderConfig, projectUse200k, providerDescriptor, providerSettings, splitArgs, type AgentLaunchSettings } from './providers'
 import { baseConnection, connectionName, connectionsOn, joinArgs, launchValues, matchingConnection, resolveConnection } from './accounts'
 import { ASSISTANT_AGENT_ID, assistantProjectConfig } from './assistant'
 
@@ -93,17 +93,35 @@ export function moveProjectOverrides(cfg: ProjectConfig, provider: ProviderId, p
 // The launch at 16e8d6129, verbatim: the migration's reading of the old data.
 // ---------------------------------------------------------------------------
 
+/** The settings a 0.9 launch is read with: the providers, the default provider and the providers' order (`providerOrder`: where a caller has it). */
+type LegacySettings = Pick<AppSettings, 'providers' | 'defaultProvider'> & Partial<Pick<AppSettings, 'providerOrder'>>
+
+/**
+ * Automatic's pick at 16e8d6129 (its autoProvider over orderedProviders): the first provider turned on and installed in
+ * the user's order (`providerOrder`'s first, then Hive's), else the first turned on, else Claude Code. Its own, not
+ * today's autoProvider (Hive's order since HI-2139), so a 0.9 launch is read as it ran.
+ */
+function legacyAutoProvider(settings: LegacySettings): ProviderId {
+  const order = Array.isArray(settings.providerOrder) ? settings.providerOrder : []
+  const rank = (id: ProviderId): number => {
+    const i = order.indexOf(id)
+    return i < 0 ? order.length + PROVIDERS.findIndex((p) => p.id === id) : i
+  }
+  const on = [...PROVIDERS].sort((a, b) => rank(a.id) - rank(b.id)).filter((p) => isProviderEnabled(settings, p.id))
+  return (on.find((p) => installedAsHeard(p.id) !== false) ?? on[0])?.id ?? DEFAULT_PROVIDER
+}
+
 /**
  * The CLI an agent ran at 16e8d6129 (its agentProvider): its own, else its project's default (the Assistant's home:
- * Settings → Assistant's, assistantProjectConfig), else Settings' default, else Automatic's pick. Only the migration
- * reads the 0.9 default providers (decision A, HI-2132).
+ * Settings → Assistant's, assistantProjectConfig), else Settings' default, else Automatic's pick (legacyAutoProvider).
+ * Only the migration reads the 0.9 default providers and order (decision A, HI-2132, HI-2139).
  */
-function legacyProvider(agent: Pick<AgentDef, 'provider'> | null | undefined, cfg: Pick<ProjectConfig, 'defaultProvider'> | null | undefined, settings: Pick<AppSettings, 'defaultProvider' | 'providers'>): ProviderId {
+function legacyProvider(agent: Pick<AgentDef, 'provider'> | null | undefined, cfg: Pick<ProjectConfig, 'defaultProvider'> | null | undefined, settings: LegacySettings): ProviderId {
   if (agent?.provider) return agent.provider
   const own = cfg?.defaultProvider
   if (own && own !== 'inherit' && own !== AUTO_PROVIDER) return own
   const global = settings.defaultProvider
-  return global && global !== AUTO_PROVIDER ? global : autoProvider(settings)
+  return global && global !== AUTO_PROVIDER ? global : legacyAutoProvider(settings)
 }
 
 /**
@@ -115,7 +133,7 @@ function legacyProvider(agent: Pick<AgentDef, 'provider'> | null | undefined, cf
 export type LaunchLayer = { kind: 'legacy' } | { kind: 'connection'; conn: Pick<LegacyConnection, 'defaults' | 'kind'> | null }
 
 /** What an agent launched with before HI-2106 (16e8d6129's agentLaunchSettings): its own, else the project's, else the global defaults; with a connection (`layer`), else its defaults. */
-export function legacyLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' | 'effort' | 'permissionMode' | 'use200kContext'> | null | undefined, cfg: Pick<ProjectConfig, 'providers' | 'defaultProvider'>, settings: Pick<AppSettings, 'providers' | 'defaultProvider'>, layer: LaunchLayer = { kind: 'legacy' }): AgentLaunchSettings {
+export function legacyLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' | 'effort' | 'permissionMode' | 'use200kContext'> | null | undefined, cfg: Pick<ProjectConfig, 'providers' | 'defaultProvider'>, settings: LegacySettings, layer: LaunchLayer = { kind: 'legacy' }): AgentLaunchSettings {
   const provider = legacyProvider(agent, cfg, settings)
   const g = providerSettings(settings, provider)
   const pc = projectProviderConfig(cfg, provider)
@@ -138,7 +156,7 @@ export function legacyLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' 
 
 /** What the old data is read with: the global settings (never copied in bulk), the workspace's file, the old connections, and the CLIs a test copy ran on its CLI test home where none was on (the seam). */
 export interface LegacyInputs {
-  settings: Pick<AppSettings, 'providers' | 'defaultProvider' | 'assistant'>
+  settings: Pick<AppSettings, 'providers' | 'defaultProvider' | 'providerOrder' | 'assistant'>
   ws: Pick<WorkspaceConfig, 'connections' | 'assistantConnection'> | null
   legacy: readonly LegacyConnection[]
   seam: (cli: ProviderId) => boolean

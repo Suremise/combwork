@@ -476,6 +476,9 @@ export function setInstalledCheck(fn: (id: ProviderId) => boolean | null): void 
   installedCheck = fn
 }
 
+/** Whether a provider's CLI was found, as this process last heard (installedCheck); null while still looking. */
+export const installedAsHeard = (id: ProviderId): boolean | null => installedCheck(id)
+
 /**
  * Automatic's provider, in Hive's order (HI-2139): the first turned on and installed, else the first turned on, else
  * Claude Code. Never from

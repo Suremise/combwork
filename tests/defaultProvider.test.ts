@@ -148,11 +148,13 @@ describe("Hive's order (HI-2139: no order of the user's)", () => {
     expect(autoProvider(settings(['codex', 'copilot']))).toBe('copilot')
   })
 
-  it('a 0.9 saved order (and its revision) is dropped on load, and Automatic no longer follows it', () => {
+  it("a 0.9 saved order is kept as the migration's input (a damaged one as none), its revision dropped; Automatic no longer follows it", () => {
     const load = (raw: Record<string, unknown>) => migrateConfig(mergeDefaults(structuredClone(DEFAULT_APP_CONFIG), raw), raw)
     const c = load({ version: 8, settings: { providerOrder: ['copilot', 'codex', 'claude-code'], providerOrderRevision: 4 } })
-    expect('providerOrder' in c.settings).toBe(false)
+    expect(c.settings.providerOrder).toEqual(['copilot', 'codex', 'claude-code'])
     expect('providerOrderRevision' in c.settings).toBe(false)
+    expect(load({ version: 8, settings: { providerOrder: ['gemini', 'codex', 'codex', 7] } }).settings.providerOrder).toEqual(['gemini', 'codex'])
+    expect(load({ version: 8, settings: { providerOrder: 'codex' } }).settings.providerOrder).toEqual([])
     installed(ALL)
     expect(autoProvider(c.settings)).toBe('claude-code')
   })

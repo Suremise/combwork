@@ -172,7 +172,8 @@ class ConfigStore {
         if (problem) throw new Error(problem)
       }
     }
-    // The providers' order went with decision A (HI-2139): one sent (an older script's settings:update) isn't kept.
+    // The providers' order went with decision A (HI-2139): one sent (an older script's settings:update) isn't kept; a
+    // 0.9 one stays as it was, the migration's input.
     if ('providerOrder' in patch) {
       const { providerOrder: _o, ...rest } = patch as SettingsPatch & { providerOrder?: unknown }
       patch = rest

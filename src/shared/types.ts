@@ -209,6 +209,12 @@ export interface AppSettings {
   providers: Record<ProviderId, ProviderSettings>
   /** The provider Add Agent's quick add uses unless the project says otherwise. */
   defaultProvider: ProviderId
+  /**
+   * 0.9's order of the providers (HI-1965), which its Automatic picked from. No list follows it since HI-2139 (Hive's
+   * order): kept read-only in config.json, as defaultProvider is, for the migration's reading of a 0.9 launch
+   * (connectionDefaults.ts' legacyAutoProvider) in workspaces not opened yet. Never written.
+   */
+  providerOrder: ProviderId[]
   notifications: {
     chimeEnabled: boolean
     chimeSound: ChimeSound
