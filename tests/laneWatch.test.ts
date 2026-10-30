@@ -328,6 +328,16 @@ describe("a running lane's next card its builder hasn't started (HI-1741's laneN
     expect(laneNextWaitReason(card1, first, { name: 'LB1', status: 'finished' }, t + LANE_NEXT_STALL_MS - 1000)).toBeNull()
     expect(laneNextWaitReason(card1, first, { name: 'LB1', status: 'working' }, t + 2 * LANE_NEXT_STALL_MS)).toBeNull()
   })
+  it("not while its start waits for a card it depends on to be Done (HI-2129: HB5 watching HI-2108 for HI-2118); the usual stall once it doesn't", () => {
+    const first = { ...lane, startedAt: at, cards: [{ number: 2124, key: 'HI-2118', column: 'todo', movedAt: null }] }
+    const card1 = { ...c, number: 2124, key: 'HI-2118' }
+    const late = t + 2 * LANE_NEXT_STALL_MS
+    expect(laneNextWaitReason(card1, { ...first, waitsForDependency: { card: 2124, on: 'HI-2108' } }, { name: 'HB5', status: 'watching' }, late)).toBeNull()
+    expect(laneNextWaitReason(card1, { ...first, waitsForDependency: { card: 2124, on: 'HI-2108' } }, { name: 'HB5', status: 'finished' }, late)).toBeNull()
+    // Another card's wait says nothing of this one.
+    expect(laneNextWaitReason(card1, { ...first, waitsForDependency: { card: 9999, on: 'HI-2108' } }, { name: 'HB5', status: 'watching' }, late)).toMatch(/HI-2118 is the lane's first card: .* HB5 is only watching without starting it/)
+    expect(laneNextWaitReason(card1, first, { name: 'HB5', status: 'watching' }, late)).toMatch(/HB5 is only watching without starting it/)
+  })
 })
 
 describe('lane watches (main/watches.ts, #531)', async () => {

@@ -338,6 +338,43 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
     expect(pty.typed.join('')).not.toContain('New in your inbox')
   })
 
+  it("a first card whose rules wait for the card it depends on (HI-2129): the lane says it waits for that card to merge, never stalled, whatever its builder does; started once that card is Done", async () => {
+    await w.mutateProjectConfig(p, () => ({ workflow: { platform: 'none', preset: null, options: { dependenciesDone: true } } }))
+    const dep = await card('Choose the connection', 'o1')
+    const first = await card('Use the connection choice', 'b9')
+    await run(() => tasks.updateTask(first, { blockedBy: [dep] }, user))
+    const depKey = (await (await import('../src/main/workflow/service')).workflowFor(w, p))!.store.card(dep).key
+    const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'b9', reviewer: 'r1', cards: [first], by: 'B9 (alpha)' })).lane
+    // Its builder watching the card it depends on, as HB5 watched HI-2108 → Done.
+    const b = builder('watching', 'b9')
+    await checkLaneStarts(w)
+    expect(await columnOf(first)).toBe('todo')
+    const view = await lanes.getLane(w, lane.id)
+    expect(view.status).toMatchObject({ reason: 'startWait', card: first, why: 'dependencies', waitsFor: depKey })
+    const { laneStatusText } = await import('../src/shared/lanes')
+    expect(laneStatusText(view.status!)).toMatch(new RegExp(` waits to start: it waits for ${depKey} to merge$`))
+    // The stall check's reading of the lane: its first card waits on its dependency, so the lane-next stall says nothing.
+    const { laneOrderView, laneNextWaitReason, LANE_NEXT_STALL_MS } = await import('../src/main/cardStall')
+    const order = laneOrderView(view, () => undefined)
+    expect(order.waitsForDependency).toEqual({ card: first, on: depKey })
+    const c = await run(() => tasks.getTask(first, w))
+    expect(laneNextWaitReason(c, order, { name: 'B9', status: 'watching' }, Date.parse(view.startedAt) + 2 * LANE_NEXT_STALL_MS)).toBeNull()
+    // Idle too: Hive starts it once the card it depends on is Done, so nothing waits on its builder.
+    b.status = 'ready'
+    await checkLaneStarts(w)
+    expect(await columnOf(first)).toBe('todo')
+    expect((await lanes.getLane(w, lane.id)).status).toMatchObject({ why: 'dependencies' })
+    expect(rung()).toBe(false)
+    // Done (by hand, never started: nothing of it to find in the target): the wait is over, and Hive starts it on its
+    // free builder.
+    await run(() => tasks.updateTask(dep, { column: 'done' }, user))
+    await checkLaneStarts(w)
+    expect(await columnOf(first)).toBe('doing')
+    expect(rung()).toBe(true)
+    expect(laneOrderView(await lanes.getLane(w, lane.id), () => undefined).waitsForDependency).toBeUndefined()
+    await lanes.endLane(w, lane.id, { abandoned: true })
+  })
+
   // Last: it gives the project a workflow (no version control), so a card can carry a request for the user.
   it("a lane paused for the user meanwhile (a request on its next card) gets nothing until it is answered (HR1's round 2)", async () => {
     await w.mutateProjectConfig(p, () => ({ workflow: { platform: 'none', preset: null, options: { review: 'agent', noSelfReview: true } } }))

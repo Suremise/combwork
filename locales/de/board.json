@@ -541,6 +541,7 @@
   "board.lanes.waitedAtLeastTip": "Sie wartete schon, als Hive sie zum ersten Mal sah: Sie wartet mindestens so lange.",
   "board.lanes.waitingForYou": "{n, plural, one {# wartet auf dich} other {# warten auf dich}}",
   "board.lanes.waits": "{reason, select, blocked {{card} ist blockiert} hold {{card} ist geparkt} you {wartet auf dich ({ask, select, approve {Zustimmung} decide {eine Entscheidung} test {einen Test} signIn {eine Anmeldung} other {eine Antwort}}): {card}} roundLimit {wartet auf dich: {card} hat die Rundengrenze erreicht} notMerged {wartet: {card} nicht gemergt} merging {wartet: {card} wird gemergt} stale {veraltet: {card} muss erneut eingereicht werden} reviewer {wartet auf einen Reviewer für {card}} lineUpdate {wartet: der Branch des Bearbeiters wird vor {card} aktualisiert} hooks {pausiert: Hooks von {agent} kommen nicht an} checkCopy {wartet auf eine Check-Kopie für {card}} slot {wartet auf einen Slot} other {Änderungen an der Liste nach {card}}}",
+  "board.lanes.waitsDependency": "{card} wartet auf den Start: wartet darauf, dass {dependency} gemergt wird",
   "board.lanes.waitsFresh": "wartet: {agent} startet in einer neuen Unterhaltung, sobald der Agent frei ist",
   "board.lanes.waitsLink": "Zum Anzeigen klicken.",
   "board.lanes.waitsPreparing": "wartet: {slot} wird vorbereitet",

@@ -97,6 +97,24 @@ export function laneStartWait(wsPath: string, id: string): LaneStartWait | null 
 // Its lanes' start waits read into their status (lanes.ts views, HI-2029), from when this module is loaded.
 setLaneStartWaits(laneStartWait)
 
+/**
+ * The first card card n depends on (blockedBy) that isn't Done, by its key, where n's rules start it only once they are
+ * (`start.dependenciesIntegrated`, Dependencies must be Done); null otherwise, or when its workflow can't be read (its
+ * start then says why). One Done but not yet in n's target is left to the start's own refusal (`refused`).
+ */
+async function dependencyWait(ws: WorkspaceService, projectPath: string, n: number): Promise<string | null> {
+  const wf = await (await import('./workflow/service')).workflowFor(ws, projectPath).catch(() => null)
+  if (!wf) return null
+  try {
+    const card = wf.store.card(n)
+    if (!card.blockedBy.length || !wf.rulesetOf(card).guards.start.includes('start.dependenciesIntegrated')) return null
+    const first = card.blockedBy.find((id) => !wf.laneDone(id))
+    return first === undefined ? null : wf.store.card(first).key
+  } catch {
+    return null
+  }
+}
+
 /** A start the lane no longer asks for: its lane ended, was changed or isn't the builder's, or the card isn't its next. */
 class LaneChanged extends Error {}
 
@@ -152,7 +170,14 @@ async function lookAt(ws: WorkspaceService, path: string): Promise<void> {
     if (!next || laneWaitsForSlot(ws, lane.id) || builderOwed(ws, lane.id)) continue
     const projectPath = join(path, lane.project)
     waiting.set(builderKey(path, lane.project, lane.builder.id), next.number)
-    const wait = (why: LaneStartWhy): void => void waits.set(waitKey(path, lane.id), { card: next.number, why, agent: lane.builder.name })
+    const wait = (why: LaneStartWhy, waitsFor?: string): void => void waits.set(waitKey(path, lane.id), { card: next.number, why, agent: lane.builder.name, ...(waitsFor ? { waitsFor } : {}) })
+    // HI-2129: a card its rules won't start before the cards it depends on are Done waits for them, whatever its builder
+    // does meanwhile (watching one of them, as HB5 did): its start comes once they are, and the lane says what it waits on.
+    const dep = await dependencyWait(ws, projectPath, next.number)
+    if (dep) {
+      wait('dependencies', dep)
+      continue
+    }
     // Its start launching its agents (HI-2029): never started under it, as the builder's status then says (starting).
     const holds = laneStartHeld(ws, lane.project, lane.builder.id) ? 'busy' : await builderWait(projectPath, lane.builder)
     if (holds) {

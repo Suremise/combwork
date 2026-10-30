@@ -355,6 +355,8 @@ export interface LaneOrderView {
   startedAt?: string
   /** Its agent's new conversation no more tried (HI-2034), as its status says it: its next card is stalled at once. */
   freshBlocked?: string
+  /** Its next card waits for a card it depends on to be Done (HI-2129, its status's `dependencies`): its key. Not a stall. */
+  waitsForDependency?: { card: number; on: string }
   /** In the lane's order; `movedAt`: when it last came into its column (columnSince), where known. */
   cards: { number: number; column: string; key?: string; movedAt?: string | null }[]
 }

@@ -543,6 +543,7 @@ interface HiveMessageValues {
   'board.lanes.waitedAtLeastTip': undefined
   'board.lanes.waitingForYou': { n: number }
   'board.lanes.waits': { reason: string; card: string | number; ask: string; agent: string | number }
+  'board.lanes.waitsDependency': { card: string | number; dependency: string | number }
   'board.lanes.waitsFresh': { agent: string | number }
   'board.lanes.waitsLink': undefined
   'board.lanes.waitsPreparing': { slot: string | number }
