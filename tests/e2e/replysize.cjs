@@ -310,7 +310,13 @@ const prose = (seed, n) => {
   // Lanes (#483): a start, a join (a lane made for a builder that hasn't registered yet), the listing and an end. The
   // start, join and listing with the coder's own token, as a card loop calls them (HI-1933: with the workspace's, the
   // start is a script's, which since HI-1900 starts the lane's stopped agents and says so); the end (an abandon, the
-  // user's or the Assistant's) with the workspace's.
+  // user's or the Assistant's) with the workspace's. Coder waits on another card while the lane runs (HI-2082): Hive
+  // starts a lane's first card on its builder once it next looks at the board (HI-2029), and a look the moves above set
+  // off could land before the end and give Coder a turn of its own; a builder waiting on other work is never given one.
+  // Alpha's last card in Todo, which nothing here changes (a change would wake it).
+  const untouched = todo.findLast((n, i) => i > 41 && /^AL-/.test(K(n)))
+  const otherWork = tool('hive_wait_for_tasks', { cards: [untouched], wake: true }, 'own').text
+  check('Coder waits on another card while the lane runs', !!(await until(async () => (await live(alpha, coder.id))?.status === 'watching', HUNG_MS)), `${(await live(alpha, coder.id))?.status}: ${otherWork}`)
   const laneStarted = measure('hive_lane (start)', tool('hive_lane', { action: 'start', cards: [todo[0], todo[1], todo[2]], reviewer: 'Tester', rounds: 10, waitMinutes: 360, name: 'measured lane' }, 'own'), 400)
   check('a lane start: its pair, state, cards (by key, #1219) and id', /^Lane started: Coder \/ Tester \(alpha\) measured lane: active, on [A-Z]{2,4}-\d+; .+; rounds 10, wait 6 h\. lane-[0-9a-f]+$/.test(laneStarted), laneStarted)
   const laneId = laneStarted.match(/lane-[0-9a-f]+$/)?.[0]
@@ -318,6 +324,8 @@ const prose = (seed, n) => {
   const laneList = measure('hive_lane (list)', tool('hive_lane', { action: 'list' }, 'own'), 600)
   check('lanes listed a line each', laneList.split('\n').length === 2 && laneList.includes(laneId), laneList)
   check('a lane ended', measure('hive_lane (end)', tool('hive_lane', { action: 'end', lane: laneId, abandoned: true }), 400).startsWith('Lane abandoned: '), texts['hive_lane (end)'])
+  tool('hive_wait_for_tasks', { cancel: true }, 'own')
+  check('…and no longer waits once it has ended', !!(await until(async () => ['ready', 'finished'].includes((await live(alpha, coder.id))?.status), HUNG_MS)), (await live(alpha, coder.id))?.status)
   // The merge queue (#1353): alpha's workflow doesn't have Hive merge, so it has none, said in a line.
   check('hive_queue (list): no queue, in a line', measure('hive_queue (list)', tool('hive_queue', { action: 'list' }), 200).startsWith('No merge queue in alpha: '), texts['hive_queue (list)'])
   const skillList = measure('hive_list_skills', tool('hive_list_skills', {}), 4000)
@@ -736,11 +744,12 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
     const r = asCoder('tools/call', { name, arguments: args })
     return { text: r.content[0].text, isError: !!r.isError }
   }
-  // In a lane Tester reviews (#1382: a design needs a reviewer to check it), ended once the design is measured.
+  // In a lane Tester reviews (#1382: a design needs a reviewer to check it), ended once the design is measured. The card
+  // is started first (HI-2082): a card in Doing is never a lane's to start, so Hive's own look can't start it first.
+  const startedOwn = measure('hive_start_card', intent('hive_start_card', { card: `#${todo[40]}` }), 400)
   const designStart = tool('hive_lane', { action: 'start', cards: [todo[40]], reviewer: 'Tester', name: 'design step' }, 'own').text
   const designLane = designStart.match(/lane-[0-9a-f]+$/)?.[0]
   check('a lane for the design step, Tester reviewing', !!designLane, designStart)
-  const startedOwn = measure('hive_start_card', intent('hive_start_card', { card: `#${todo[40]}` }), 400)
   check('an intent says where the card went', new RegExp(`^[A-Z]+-\\d+: todo → active\\. folder: `).test(startedOwn), startedOwn)
   // …and what can come next on it, as its rules have it (#1530).
   check('…and what comes next on it', startedOwn.split('\n')[0].endsWith(' Next on it: hive_submit or hive_put_back.'), startedOwn)
