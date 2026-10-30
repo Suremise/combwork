@@ -128,14 +128,17 @@ export function TeamPauseBand(): React.JSX.Element | null {
           {tr(M.resume)}
         </button>
       </div>
-      {own && (several ? <div className="team-pause-ws">{tr(M.thisWorkspace)}</div> : null)}
+      {/* Each workspace with something to name: what still runs in it, or that it isn't paused. */}
+      {own && several && own.items.length > 0 && <div className="team-pause-ws">{tr(M.thisWorkspace)}</div>}
       {own && list(own)}
-      {others.map((o) => (
-        <div key={o.workspacePath}>
-          <div className="team-pause-ws">{o.pause ? basename(o.workspacePath) : tr(M.notPaused, { name: basename(o.workspacePath) })}</div>
-          {list(o)}
-        </div>
-      ))}
+      {others
+        .filter((o) => !o.pause || o.items.length)
+        .map((o) => (
+          <div key={o.workspacePath}>
+            <div className="team-pause-ws">{o.pause ? basename(o.workspacePath) : tr(M.notPaused, { name: basename(o.workspacePath) })}</div>
+            {list(o)}
+          </div>
+        ))}
     </div>
   )
 }

@@ -54,7 +54,7 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(inv)
     await lib.openWorkspace(inv, page, wsA)
-    const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 250)
+    const until = (fn, ms) => lib.until(fn, ms, 250)
     const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
     const idle = async (p, id) => ['ready', 'finished'].includes((await live(p, id))?.status)
     const say = (p, id, text) => lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
@@ -78,15 +78,15 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
     await lib.addAgent(inv, alpha, { name: 'Reviewer', workflowRole: 'reviewer' })
     fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([wsA.toLowerCase(), alpha.toLowerCase(), wsB.toLowerCase(), beta.toLowerCase()]))
     await inv('session:start', alpha, { agentId: builder.id })
-    check('Builder starts', !!(await until(() => idle(alpha, builder.id))))
+    check('Builder starts', !!(await until(() => idle(alpha, builder.id), HUNG_MS)))
     const c1 = (await inv('tasks:create', { title: 'Greeting says Hi', project: 'alpha', agent: builder.id, column: 'doing' })).number
     const c2 = (await inv('tasks:create', { title: 'Greeting trims', project: 'alpha', agent: builder.id })).number
     await say(alpha, builder.id, `hive hive_lane ${JSON.stringify({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', name: 'greetings' })}`)
     const lane = async () => (await inv('lanes:list')).find((l) => l.builder.id === builder.id && l.state !== 'ended')
-    check("Builder's lane runs", !!(await until(async () => (await lane())?.state === 'active')), JSON.stringify(await lane()))
-    await until(() => idle(alpha, builder.id))
+    check("Builder's lane runs", !!(await until(async () => (await lane())?.state === 'active', HUNG_MS)), JSON.stringify(await lane()))
+    await until(() => idle(alpha, builder.id), HUNG_MS)
     await say(alpha, builder.id, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [c1], changes: ['comment'], wake: true, limitMinutes: 60 })}`)
-    check('Builder watches its card', !!(await until(async () => (await live(alpha, builder.id))?.status === 'watching')))
+    check('Builder watches its card', !!(await until(async () => (await live(alpha, builder.id))?.status === 'watching', HUNG_MS)))
 
     // --- Window B, another workspace (opened before the pause: the user's pause covers it).
     const next = app.waitForEvent('window')
@@ -96,37 +96,37 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
     await lib.appReady(pageB)
     const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await invB('workspace:open', wsB)
-    await until(async () => (await invB('workspace:get'))?.path?.toLowerCase() === wsB.toLowerCase())
+    await until(async () => (await invB('workspace:get'))?.path?.toLowerCase() === wsB.toLowerCase(), HUNG_MS)
 
     // --- Pause the Team (the user's): both workspaces.
     const paused = await inv('team:pause')
     check('Pause the Team pauses both open workspaces', paused.failed.length === 0 && paused.done.length === 2, JSON.stringify(paused))
-    check("alpha's lane shows it is paused for the team", !!(await until(async () => (await lane())?.status?.reason === 'teamPause' && (await lane())?.state === 'paused')), JSON.stringify((await lane())?.status))
-    check('Builder is told once to park', !!(await until(async () => (await deliveries('Builder')).filter((b) => b.startsWith(PARK_LINE)).length === 1)), JSON.stringify(await deliveries('Builder')))
+    check("alpha's lane shows it is paused for the team", !!(await until(async () => (await lane())?.status?.reason === 'teamPause' && (await lane())?.state === 'paused', HUNG_MS)), JSON.stringify((await lane())?.status))
+    check('Builder is told once to park', !!(await until(async () => (await deliveries('Builder')).filter((b) => b.startsWith(PARK_LINE)).length === 1, HUNG_MS)), JSON.stringify(await deliveries('Builder')))
     const refused = await inv('lanes:start', alpha, { builder: builder.id, reviewer: null, cards: [c2] }).then(() => null, (e) => String(e.message ?? e))
     check('Start Lane is refused while paused', !!refused && /resume the team first/i.test(refused), String(refused))
     await page.screenshot({ path: at('band.png') }).catch(() => undefined)
 
     // A comment on its watched card: its watch's wake is held, typed into nothing.
-    await until(async () => ['ready', 'finished', 'watching'].includes((await live(alpha, builder.id))?.status))
+    await until(async () => ['ready', 'finished', 'watching'].includes((await live(alpha, builder.id))?.status), HUNG_MS)
     const before = wakes('Builder').length
     await inv('tasks:comment', c1, 'Round 1: one finding.')
     await lib.sleep(4000) // on purpose: longer than a wake takes, to see none is typed while paused
     check("its watch's wake is held while paused (not typed)", !wakes('Builder').slice(before).some((t) => t.includes('Round 1: one finding')), JSON.stringify(wakes('Builder').slice(before)))
 
     // --- What still runs: Builder's run keeps the team unparked; once it ends, All parked.
-    await until(() => idle(alpha, builder.id))
+    await until(() => idle(alpha, builder.id), HUNG_MS)
     await say(alpha, builder.id, `shell: hive-progress --title "probe run" -- node "${holder}" "${release}"`)
     const named = async () => (await inv('team:state')).workspaces.find((w) => w.workspacePath.toLowerCase() === wsA.toLowerCase())?.items ?? []
-    check('the run keeps the team unparked, named', !!(await until(async () => (await named()).some((i) => i.kind === 'run' && i.label === 'probe run'))), JSON.stringify(await named()))
+    check('the run keeps the team unparked, named', !!(await until(async () => (await named()).some((i) => i.kind === 'run' && i.label === 'probe run'), HUNG_MS)), JSON.stringify(await named()))
     check('…not All parked', (await inv('team:state')).allParked === false)
     // The status bar's Team paused opens the Progress panel, whose Lanes band names what still runs.
     await page.locator('.status-item.team-paused').click()
     const band = page.locator('.team-pause-band')
-    check("the status bar's item opens the Progress panel, where the band names the run, its process (End It…) and Builder at work", !!(await until(async () => /Pausing the team: \d+ still running/.test((await band.innerText().catch(() => '')) ?? '') && /Builder: probe run \(a run\)/.test((await band.innerText().catch(() => '')) ?? '') && /hold\.cjs.*\(process \d+\)/.test((await band.innerText().catch(() => '')) ?? '') && (await band.getByRole('button', { name: 'End It…' }).count()) > 0)), await band.innerText().catch(() => ''))
+    check("the status bar's item opens the Progress panel, where the band names the run, its process (End It…) and Builder at work", !!(await until(async () => /Pausing the team: \d+ still running/.test((await band.innerText().catch(() => '')) ?? '') && /Builder: probe run \(a run\)/.test((await band.innerText().catch(() => '')) ?? '') && /hold\.cjs.*\(process \d+\)/.test((await band.innerText().catch(() => '')) ?? '') && (await band.getByRole('button', { name: 'End It…' }).count()) > 0, HUNG_MS)), await band.innerText().catch(() => ''))
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
-      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
       await band.screenshot({ path: at(`band-${theme}.png`) }).catch(() => undefined)
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
@@ -134,7 +134,7 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
     check('Install Now while not parked installs nothing', early.installed === false)
     fs.writeFileSync(release, '')
     check('once the run ends, All parked', !!(await until(async () => (await inv('team:state')).allParked, 60000)), JSON.stringify((await inv('team:state')).workspaces.map((w) => [w.workspacePath, w.pause?.by, w.items])))
-    check('…and the band says so', !!(await until(async () => /All parked: safe to install/.test((await band.innerText().catch(() => '')) ?? ''))), await band.innerText().catch(() => ''))
+    check('…and the band says so', !!(await until(async () => /All parked: safe to install/.test((await band.innerText().catch(() => '')) ?? ''), HUNG_MS)), await band.innerText().catch(() => ''))
     await band.screenshot({ path: at('band-parked.png') }).catch(() => undefined)
     const install = await inv('team:install')
     check('Install Now with no update ready installs nothing', install.installed === false && install.state.allParked === true)
@@ -142,9 +142,9 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
     // --- The Assistants' authority (HR1's s12 check): B's reads and pauses its own workspace only.
     const homeB = (await invB('workspace:refresh')).assistant.path
     await invB('session:start', homeB, { agentId: 'assistant' })
-    await until(async () => ['ready', 'finished'].includes((await invB('session:live')).find((s) => s.projectPath.toLowerCase() === homeB.toLowerCase() && s.agentId === 'assistant')?.status))
+    await until(async () => ['ready', 'finished'].includes((await invB('session:live')).find((s) => s.projectPath.toLowerCase() === homeB.toLowerCase() && s.agentId === 'assistant')?.status), HUNG_MS)
     const tokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(wsB.toLowerCase()).digest('hex').slice(0, 16)}.json`)
-    const tokenB = (await until(() => fs.existsSync(tokenFile))) ? JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token : null
+    const tokenB = (await until(() => fs.existsSync(tokenFile), HUNG_MS)) ? JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token : null
     const seen = await api(tokenB, 'GET', '/v1/team')
     check("B's Assistant reads its own team, with A only as a line (no names)", seen.status === 200 && seen.body?.paused === true && !JSON.stringify(seen.body).includes('Builder') && !JSON.stringify(seen.body).toLowerCase().includes('alpha'), JSON.stringify(seen.body))
     const resumedB = await api(tokenB, 'POST', '/v1/team/resume', {})
@@ -158,8 +158,8 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
     // --- Resume the Team: the held wake is typed once, the lane runs again.
     const back = await inv('team:resume')
     check('Resume the Team resumes both', back.failed.length === 0 && back.done.length === 2, JSON.stringify(back))
-    check('the held wake is typed once after the resume', !!(await until(async () => wakes('Builder').slice(before).filter((t) => t.includes('Round 1: one finding')).length === 1)), JSON.stringify(wakes('Builder').slice(before)))
-    check("the lane isn't paused for the team any more", !!(await until(async () => (await lane())?.status?.reason !== 'teamPause')), JSON.stringify((await lane())?.status))
+    check('the held wake is typed once after the resume', !!(await until(async () => wakes('Builder').slice(before).filter((t) => t.includes('Round 1: one finding')).length === 1, HUNG_MS)), JSON.stringify(wakes('Builder').slice(before)))
+    check("the lane isn't paused for the team any more", !!(await until(async () => (await lane())?.status?.reason !== 'teamPause', HUNG_MS)), JSON.stringify((await lane())?.status))
   } catch (err) {
     check('no unexpected error', false, err.stack)
   } finally {
