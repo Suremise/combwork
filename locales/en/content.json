@@ -275,6 +275,10 @@
     "defaultMessage": "That agent is no longer in the template.",
     "description": "An error adding one agent from a template: the template no longer has it (edited meanwhile)."
   },
+  "content.templates.agentsChangedChoose": {
+    "defaultMessage": "The project's agents changed since you chose their connections: nothing was changed. Choose them again.",
+    "description": "An error choosing connections for a project's agents (HI-2109): an agent was added, removed or moved after the dialog showed them, so nothing changed."
+  },
   "content.templates.bullet": {
     "defaultMessage": "• {item}",
     "description": "A line of a list of reasons: a bullet, then the reason {item}."

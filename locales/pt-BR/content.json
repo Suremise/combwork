@@ -68,6 +68,7 @@
   "content.skill.zipTooMany": "O .zip tem arquivos demais para uma skill (mais de {max}).",
   "content.skill.zipUnsafe": "O .zip tem um arquivo com um caminho inseguro: {path}",
   "content.templates.agentGone": "Esse agente não está mais no modelo.",
+  "content.templates.agentsChangedChoose": "Os agentes do projeto mudaram desde que você escolheu as conexões: nada foi alterado. Escolha-as de novo.",
   "content.templates.bullet": "• {item}",
   "content.templates.cantLoad": "Ainda não é possível carregar o modelo:",
   "content.templates.cantUse": "Não é possível usar “{name}”: {problem}",

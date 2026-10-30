@@ -57,10 +57,10 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange, 
   })
   const [planError, setPlanError] = useState<string | null>(null)
   // The connections (HI-2109): each role's preselected (the first on the CLI it suggests, else the first usable), changed
-  // in the Connections section; the load takes its answers, each agent's by its place.
+  // in the Connections section; the load takes its answers, each agent's by its name in the template (its key).
   const [picker, setPicker] = useState<PickerState>(() => initialPicker(initial.create, initial.options))
-  const picked = names.map((n, i) => ({ name: n, role: initial.create[i]?.role ?? 'generalist', provider: initial.create[i]?.provider }))
-  const answers = pickerAnswers(picker)
+  const picked = names.map((n, i) => ({ key: initial.templateNames[i] ?? '', name: n, role: initial.create[i]?.role ?? 'generalist', provider: initial.create[i]?.provider }))
+  const answers = pickerAnswers(picker, picked)
   const answersKey = JSON.stringify(answers)
   useEffect(() => onConnections?.(JSON.parse(answersKey) as ConnectionAnswers), [answersKey, onConnections])
   // This project's agents don't count: the load replaces them.

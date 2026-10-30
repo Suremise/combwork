@@ -57,20 +57,26 @@ export const optionOf = (c: Connection, account: { name: string; provider: Provi
 
 /**
  * What a picker answers (the dialogs', and `hive_template` `connections` once read: templateApi.ts): one connection for
- * every agent (`all`), one per role, and one per agent by its place among them (over its role's, over all's). Kept apart,
- * so an agent called Builder never stands for the builders (HR3's HI-2109 round 1). Each value a connection's id or name.
+ * every agent (`all`), one per role, and one per agent by its **key** (over its role's, over all's): an existing agent's
+ * id, a template's agent's name in the template as made for the project (`templateNames`). Kept apart, so an agent called
+ * Builder never stands for the builders (HR3's round 1), and bound to the agent it was chosen for, never to a place a
+ * list that changed meanwhile gives another (HR3's round 2). Each value a connection's id or name.
  */
 export interface ConnectionAnswers {
   all?: string
   roles?: Partial<Record<WorkflowRole, string>>
-  agents?: Record<number, string>
+  agents?: Record<string, string>
 }
 
 /** The answer's keys for all and the roles, in the order the picker shows them. */
 export const ALL_KEY = '*'
 
-/** An agent as the picker reads it: its name, role in the workflow and the CLI it suggests (a template's) or runs (an existing one's). */
+/**
+ * An agent as the picker reads it: its key (an existing agent's id, a template's agent's name in the template), name, role
+ * in the workflow and the CLI it suggests (a template's) or runs (an existing one's).
+ */
 export interface PickedAgent {
+  key: string
   name: string
   role: WorkflowRole
   provider?: string
@@ -80,29 +86,30 @@ export interface PickedAgent {
 export const rolesOf = (agents: readonly Pick<PickedAgent, 'role'>[]): WorkflowRole[] => WORKFLOW_ROLES.filter((r) => agents.some((a) => a.role === r))
 
 /** The CLI a role's agents suggest: the first of them that names one. */
-export const suggestedCli = (agents: readonly PickedAgent[], role: WorkflowRole | typeof ALL_KEY): string | undefined => agents.find((a) => (role === ALL_KEY || a.role === role) && a.provider)?.provider
+export const suggestedCli = (agents: readonly Pick<PickedAgent, 'role' | 'provider'>[], role: WorkflowRole | typeof ALL_KEY): string | undefined => agents.find((a) => (role === ALL_KEY || a.role === role) && a.provider)?.provider
 
 /** What a picker preselects for a CLI suggested (HI-2105's wireframe): the first connection on it, else the first there is. */
 export const preselected = (options: readonly ConnectionOption[], cli: string | undefined): string | undefined => (options.find((o) => o.cli === cli) ?? options[0])?.id
 
 /**
- * Each agent's answer, by the agents' order: its own (by its place), else its role's, else all's, else `fallback(agent)`
+ * Each agent's answer, by the agents' order: its own (by its key), else its role's, else all's, else `fallback(agent)`
  * (a load: its role's preselected connection; Choose Connections…: none, it keeps its own). Values as answered (an id or a
  * name: the caller finds the connection).
  */
 export function answerFor(agents: readonly PickedAgent[], answers: ConnectionAnswers | undefined, fallback: (a: PickedAgent) => string | undefined): (string | undefined)[] {
   const given = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
-  return agents.map((a, i) => given(answers?.agents?.[i]) ?? given(answers?.roles?.[a.role]) ?? given(answers?.all) ?? fallback(a))
+  return agents.map((a) => given(answers?.agents?.[a.key]) ?? given(answers?.roles?.[a.role]) ?? given(answers?.all) ?? fallback(a))
 }
 
 /** A load's fallback: the connection its role's picker preselects (the first on the CLI its role's agents suggest). */
-export const loadFallback = (agents: readonly PickedAgent[], options: readonly ConnectionOption[]) => (a: PickedAgent): string | undefined => preselected(options, suggestedCli(agents, a.role))
+export const loadFallback = (agents: readonly Pick<PickedAgent, 'role' | 'provider'>[], options: readonly ConnectionOption[]) => (a: Pick<PickedAgent, 'role'>): string | undefined => preselected(options, suggestedCli(agents, a.role))
 
 /**
- * What of answers (untrusted: a window's or main's caller's) isn't one: a role that isn't one, an agent's place that isn't
- * one of `count`'s, a value that isn't text. Each named as it was given ("role boss", "agent 7"); none: [].
+ * What of answers (untrusted: a window's or main's caller's) isn't one: a role that isn't one, an agent whose key isn't
+ * among `keys` (the agents now: one removed or renamed since it was chosen for), a value that isn't text. Each named as
+ * it was given ("role boss", "agent a-3f9c"); none: [].
  */
-export function badAnswers(count: number, answers: unknown): string[] {
+export function badAnswers(keys: readonly string[], answers: unknown): string[] {
   if (answers === undefined || answers === null) return []
   if (typeof answers !== 'object' || Array.isArray(answers)) return [String(answers)]
   const a = answers as Record<string, unknown>
@@ -113,7 +120,7 @@ export function badAnswers(count: number, answers: unknown): string[] {
   if (a.roles !== undefined && (typeof a.roles !== 'object' || Array.isArray(a.roles))) bad.push('roles')
   if (a.agents !== undefined && (typeof a.agents !== 'object' || Array.isArray(a.agents))) bad.push('agents')
   for (const [k, v] of Object.entries(map('roles'))) if (!(WORKFLOW_ROLES as readonly string[]).includes(k) || !text(v)) bad.push(`role ${k}`) // i18n-ignore: what was given, named as it was (role or agent and its key), not prose
-  for (const [k, v] of Object.entries(map('agents'))) if (!/^\d+$/.test(k) || Number(k) >= count || !text(v)) bad.push(`agent ${k}`) // i18n-ignore: what was given, named as it was (role or agent and its key), not prose
+  for (const [k, v] of Object.entries(map('agents'))) if (!keys.includes(k) || !text(v)) bad.push(`agent ${k}`) // i18n-ignore: what was given, named as it was (role or agent and its key), not prose
   return bad
 }
 
@@ -141,15 +148,18 @@ export interface PickerState {
 }
 
 /** A picker's first state: Same for all unticked, each role's preselected, no agent's own. */
-export function initialPicker(agents: readonly PickedAgent[], options: readonly ConnectionOption[], keep?: (role: WorkflowRole | typeof ALL_KEY) => string): PickerState {
+export function initialPicker(agents: readonly Pick<PickedAgent, 'role' | 'provider'>[], options: readonly ConnectionOption[], keep?: (role: WorkflowRole | typeof ALL_KEY) => string): PickerState {
   const pre = (role: WorkflowRole | typeof ALL_KEY): string => (keep ? keep(role) : (preselected(options, suggestedCli(agents, role)) ?? ''))
   return { same: false, all: pre(ALL_KEY), roles: Object.fromEntries(rolesOf(agents).map((r) => [r, pre(r)])), agents: {} }
 }
 
-/** A picker's state as answers: all's alone when Same for all is ticked, else each role's and each agent's own (by its place); '' left out. */
-export function pickerAnswers(state: PickerState): ConnectionAnswers {
+/**
+ * A picker's state as answers: all's alone when Same for all is ticked, else each role's and each agent's own, by the key
+ * of the agent at that place in the list the dialog showed (`agents`); '' left out.
+ */
+export function pickerAnswers(state: PickerState, shown: readonly Pick<PickedAgent, 'key'>[]): ConnectionAnswers {
   if (state.same) return state.all ? { all: state.all } : {}
   const roles = Object.fromEntries(Object.entries(state.roles).filter(([, id]) => !!id)) as ConnectionAnswers['roles']
-  const agents = Object.fromEntries(Object.entries(state.agents).filter(([, id]) => !!id))
+  const agents = Object.fromEntries(Object.entries(state.agents).flatMap(([i, id]) => (id && shown[Number(i)] ? [[shown[Number(i)].key, id] as const] : [])))
   return { ...(Object.keys(roles ?? {}).length ? { roles } : {}), ...(Object.keys(agents).length ? { agents } : {}) }
 }

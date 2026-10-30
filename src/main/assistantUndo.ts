@@ -442,16 +442,17 @@ async function undoConnection(projectPath: string, agentId: string, def: AgentDe
   const provider = values.find((v) => v.field === 'provider')
   try {
     if (provider && sessions.liveFor(projectPath, agentId)) throw new Error(AGENT_RUNNING)
-    let saved = await updateAgent(projectPath, agentId, { connection: (connection.old ?? null) as string | null, ...(provider ? { provider: provider.old as AgentDef['provider'] } : {}) }, {
+    const session = values.find((v) => v.field === 'lastSessionId')
+    // One write, under the project's lock: every field it recorded (its last conversation too) still as the change left
+    // it, and all of them set back together.
+    const saved = await updateAgent(projectPath, agentId, { connection: (connection.old ?? null) as string | null, ...(provider ? { provider: provider.old as AgentDef['provider'] } : {}) }, {
+      ...(session ? { session: (session.old ?? null) as string | null } : {}),
       check: (cur) => {
         if (provider && sessions.liveFor(projectPath, agentId)) throw new Error(AGENT_RUNNING)
-        // Its last conversation is the agent's own write, after: the rest must be as the change left them.
-        if (values.some((v) => v.field !== 'lastSessionId' && !sameValue(raw(cur, v.field), v.new))) throw new ChangedSince(fields)
+        if (values.some((v) => !sameValue(raw(cur, v.field), v.new))) throw new ChangedSince(fields)
         guard?.()
       }
     })
-    const session = values.find((v) => v.field === 'lastSessionId')
-    if (session) saved = await workspaceOf(projectPath).updateAgent(projectPath, agentId, { lastSessionId: (session.old ?? undefined) as string | undefined })
     await workspaceOf(projectPath).refresh()
     return readBack(values, (f) => raw(saved, f))
   } catch (e) {

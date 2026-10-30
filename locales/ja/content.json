@@ -68,6 +68,7 @@
   "content.skill.zipTooMany": "この.zipはスキルとしてはファイルが多すぎます（{max}件超）。",
   "content.skill.zipUnsafe": "この.zipには安全でないパスのファイルがあります：{path}",
   "content.templates.agentGone": "そのエージェントはもうテンプレートにありません。",
+  "content.templates.agentsChangedChoose": "接続を選んだ後にプロジェクトのエージェントが変わりました。何も変更していません。もう一度選んでください。",
   "content.templates.bullet": "• {item}",
   "content.templates.cantLoad": "テンプレートはまだ読み込めません：",
   "content.templates.cantUse": "「{name}」は使えません：{problem}",

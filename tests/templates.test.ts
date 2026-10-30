@@ -435,14 +435,14 @@ describe('saving and loading templates', () => {
     expect([card.agent, card.column]).toEqual([null, 'todo'])
   })
 
-  it("loads each agent on the picker's answer (HI-2109): its own (by its place) over its role's over all's; one that can't be used refuses it all", async () => {
+  it("loads each agent on the picker's answer (HI-2109): its own (by its name in the template) over its role's over all's; one that can't be used, or chosen for an agent the template no longer has, refuses it all", async () => {
     const ids = () => cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     const connOf = () => cfgOf(beta).agents.map((a: StoredAgent) => [a.name, a.provider, a.connection])
-    // A role, then the second agent's own: the reviewer on Codex.
-    await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ids(), undefined, B, { roles: { builder: 'Personal · High' }, agents: { 1: 'c-cx' } }))
+    // A role, then the reviewer's own (by its name in the template, Reviewer, whatever it is called here): on Codex.
+    await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ids(), undefined, B, { roles: { builder: 'Personal · High' }, agents: { Reviewer: 'c-cx' } }))
     expect(connOf()).toEqual([['BBuilder', 'claude-code', 'c-cc-high'], ['BReviewer', 'codex', 'c-cx']])
-    // All (a name, any case), under the first agent's own.
-    await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ids(), undefined, B, { all: 'work', agents: { 0: 'c-cc' } }))
+    // All (a name, any case), under the builder's own.
+    await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ids(), undefined, B, { all: 'work', agents: { Builder: 'c-cc' } }))
     expect(connOf()).toEqual([['BBuilder', 'claude-code', 'c-cc'], ['BReviewer', 'codex', 'c-cx']])
     // Refused, nothing changed: a connection that isn't usable here, a name two have, a role or a place it hasn't.
     const before = ids()
@@ -453,7 +453,18 @@ describe('saving and loading templates', () => {
     } finally {
       providersOn()
     }
-    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { roles: { builders: 'c-cc' }, agents: { 2: 'c-cc' } } as never))).rejects.toThrow(/don't fit its agents: role builders and agent 2/)
+    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { roles: { builders: 'c-cc' }, agents: { Tester: 'c-cc' } } as never))).rejects.toThrow(/don't fit its agents: role builders and agent Tester/)
+    // The template changed after the dialog showed it (HR3's round 2): Reviewer renamed, so its choice names none of its
+    // agents now and is refused; never given to the agent in its place.
+    const file = join(wsPath, '.hive', 'templates', 'pair-2.json')
+    const kept = readFileSync(file, 'utf8')
+    const t = JSON.parse(kept)
+    writeFileSync(file, JSON.stringify({ ...t, agents: [t.agents[0], { ...t.agents[1], name: 'Checker' }], pairs: [{ builder: t.agents[0].name, reviewer: 'Checker' }] }))
+    try {
+      await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { agents: { Reviewer: 'c-cx' } }))).rejects.toThrow(/don't fit its agents: agent Reviewer/)
+    } finally {
+      writeFileSync(file, kept)
+    }
     expect(ids()).toEqual(before)
     // One agent added from a template: its role's preselected one, or the one named.
     const one = await run(() => templates.addAgentFromTemplate(beta, 'workspace', 'pair-2.json', 1, undefined, 'BExtra', 'user'))
@@ -469,7 +480,7 @@ describe('saving and loading templates', () => {
     expect(plan.options.map((o) => o.id)).toEqual(['c-cc', 'c-cc-high', 'c-cx'])
     const before = cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     // "High effort for every builder here": the builders only; the ids (and so their conversations) stay.
-    const done = await run(() => templates.applyConnections(beta, { roles: { builder: 'Personal · High' } }))
+    const done = await run(() => templates.applyConnections(beta, { roles: { builder: 'Personal · High' } }, { expected: before }))
     expect(done).toEqual({ changed: ['BBuilder'], restart: [], skipped: [] })
     expect(cfgOf(beta).agents.map((a: StoredAgent) => [a.id, a.connection])).toEqual([[before[0], 'c-cc-high'], [before[1], 'c-cx']])
     // Another CLI's connection for a stopped agent: its CLI follows; for a running one: skipped, said; nothing else changes.
@@ -477,13 +488,18 @@ describe('saving and loading templates', () => {
     const running = await run(() => templates.applyConnections(beta, { all: 'c-cc' }))
     expect(running).toEqual({ changed: ['BBuilder'], restart: [], skipped: [{ name: 'BReviewer', why: 'running' }] })
     live.clear()
-    const moved = await run(() => templates.applyConnections(beta, { agents: { 1: 'c-cc' } }))
+    const moved = await run(() => templates.applyConnections(beta, { agents: { [before[1]]: 'c-cc' } }))
     expect(moved.changed).toEqual(['BReviewer'])
     expect(cfgOf(beta).agents.map((a: StoredAgent) => [a.provider, a.connection])).toEqual([['claude-code', 'c-cc'], ['claude-code', 'c-cc']])
     // On its own CLI while it runs: changed, to restart.
     live.add(before[0])
-    expect(await run(() => templates.applyConnections(beta, { agents: { 0: 'c-cc-high' } }))).toEqual({ changed: ['BBuilder'], restart: [{ id: before[0], name: 'BBuilder' }], skipped: [] })
+    expect(await run(() => templates.applyConnections(beta, { agents: { [before[0]]: 'c-cc-high' } }))).toEqual({ changed: ['BBuilder'], restart: [{ id: before[0], name: 'BBuilder' }], skipped: [] })
     live.clear()
+    // The agents changed after the dialog showed them (HR3's round 2): one removed, or moved, refuses it all, so an agent's
+    // own choice is never given to another; one chosen for an agent removed names none here and is refused too.
+    await expect(run(() => templates.applyConnections(beta, { agents: { [before[0]]: 'c-cc' } }, { expected: [before[0], 'a-gone', before[1]] }))).rejects.toThrow(/agents changed since you chose their connections: nothing was changed/)
+    await expect(run(() => templates.applyConnections(beta, { agents: { [before[0]]: 'c-cc' } }, { expected: [before[1], before[0]] }))).rejects.toThrow(/agents changed since you chose/)
+    await expect(run(() => templates.applyConnections(beta, { agents: { 'a-gone': 'c-cc' } }))).rejects.toThrow(/don't fit its agents: agent a-gone/)
     // Checked first: nothing changes for an unknown role or connection.
     await expect(run(() => templates.applyConnections(beta, { roles: { nobody: 'c-cc' }, all: 'c-cx' } as never))).rejects.toThrow(/don't fit its agents: role nobody/)
     await expect(run(() => templates.applyConnections(beta, { roles: { reviewer: 'Gone' } }))).rejects.toThrow(/No connection "Gone"/)

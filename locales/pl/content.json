@@ -68,6 +68,7 @@
   "content.skill.zipTooMany": "Archiwum .zip ma za dużo plików na umiejętność (ponad {max}).",
   "content.skill.zipUnsafe": "Archiwum .zip zawiera plik z niebezpieczną ścieżką: {path}",
   "content.templates.agentGone": "Tego agenta nie ma już w szablonie.",
+  "content.templates.agentsChangedChoose": "Agenci projektu zmienili się, odkąd wybrano ich połączenia: nic nie zostało zmienione. Wybierz je ponownie.",
   "content.templates.bullet": "• {item}",
   "content.templates.cantLoad": "Nie można jeszcze wczytać szablonu:",
   "content.templates.cantUse": "Nie można użyć „{name}”: {problem}",

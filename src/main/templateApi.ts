@@ -219,12 +219,12 @@ const ROLE_KEYS: readonly string[] = WORKFLOW_ROLES
  * place out of range and a key that is none of them are said (English); an agent named exactly as a role is named by its
  * place.
  */
-function answersOf(connections: unknown, agents: readonly { name: string; also?: readonly string[] }[]): { answers: ConnectionAnswers; problems: string[] } {
+function answersOf(connections: unknown, agents: readonly { key: string; name: string; also?: readonly string[] }[]): { answers: ConnectionAnswers; problems: string[] } {
   if (connections === undefined || connections === null) return { answers: {}, problems: [] }
   if (typeof connections !== 'object' || Array.isArray(connections)) return { answers: {}, problems: [`connections is an object: "*", a role (${ROLE_KEYS.join(', ')}), or an agent's place ("1") or name → a connection's id or name.`] }
   const listed = (): string => agents.map((a, i) => `${i + 1} (${a.name})`).join(', ')
   const roles: NonNullable<ConnectionAnswers['roles']> = {}
-  const own: Record<number, string> = {}
+  const own: Record<string, string> = {}
   const by = new Map<number, string>()
   let all: string | undefined
   const problems: string[] = []
@@ -255,7 +255,7 @@ function answersOf(connections: unknown, agents: readonly { name: string; also?:
       else if (by.has(at[0])) problems.push(`connections: "${by.get(at[0])}" and "${k}" both name agent ${at[0] + 1} (${agents[at[0]].name}): give it one connection.`)
       else {
         by.set(at[0], k)
-        own[at[0]] = v
+        own[agents[at[0]].key] = v
       }
     }
   }
@@ -285,7 +285,8 @@ export async function planReply(projectPath: string, e: TemplateEntry, names: un
   const { plan, why } = chosen ? await templatePlanEnglish(projectPath, e.scope, e.file, from, chosen) : first
   const wf = await workflowOf(projectPath, plan)
   // Each agent's connection (HI-2109): as the load would give it.
-  const agents = plan.create.map((a, i) => ({ name: a.name, role: a.role, provider: a.provider, also: [plan.templateNames[i], e.agents[i]?.name ?? ''] }))
+  // Each by its name in the template as made for the project (`templateNames`): what the load binds its own choice to.
+  const agents = plan.create.map((a, i) => ({ key: plan.templateNames[i], name: a.name, role: a.role, provider: a.provider, also: [plan.templateNames[i], e.agents[i]?.name ?? ''] }))
   const asked = answersOf(connections, agents)
   const conn = namedConnections(answerFor(agents, asked.answers, loadFallback(agents, plan.options)), plan.options)
   const name = (i: number): string | undefined => plan.create[i]?.name
@@ -354,7 +355,7 @@ export async function loadForAssistant(projectPath: string, e: TemplateEntry, na
     names: chosen,
     // The answers for its agents (HI-2109), by the names they get; none for one: its role's preselected connection, as
     // the window's dialog starts with.
-    connections: answersOf(connections, shown.create.map((a, i) => ({ name: a.name, also: [shown.templateNames[i], e.agents[i]?.name ?? ''] }))).answers,
+    connections: answersOf(connections, shown.create.map((a, i) => ({ key: shown.templateNames[i], name: a.name, also: [shown.templateNames[i], e.agents[i]?.name ?? ''] }))).answers,
     // The Assistant's guard at the publish itself, and every name taken since this plan refused with a free one too.
     guard,
     taken: (clash) => takenRefusal(projectPath, clash, chosenNames),
@@ -410,12 +411,14 @@ const SKIPPED: Record<'running' | 'gone', string> = { running: "it runs, and tha
 export async function applyForAssistant(projectPath: string, connections: unknown, guard?: () => void): Promise<ConnectionsApplyReply> {
   const ws = workspaceOf(projectPath)
   const plan = await connectionsPlan(projectPath)
-  const asked = answersOf(connections, plan.agents)
+  // Each agent by its id, and the apply bound to these agents (`expected`): one added, removed or moved since refuses it.
+  const agents = plan.agents.map((a) => ({ ...a, key: a.id }))
+  const asked = answersOf(connections, agents)
   if (asked.problems.length) throw refused(asked.problems.join(' '), 'invalid')
   if (!asked.answers.all && !Object.keys(asked.answers.roles ?? {}).length && !Object.keys(asked.answers.agents ?? {}).length) throw refused(`connections is required: "*", a role (${ROLE_KEYS.join(', ')}), or an agent's place ("1") or name → a connection's id or name. Its agents: ${plan.agents.map((a) => `${a.name} (${a.role})`).join(', ')}. Usable here: ${plan.options.map((o) => `${o.name} (${o.id})`).join(', ') || 'none'}.`, 'invalid')
-  const named = namedConnections(answerFor(plan.agents, asked.answers, () => undefined), plan.options)
+  const named = namedConnections(answerFor(agents, asked.answers, () => undefined), plan.options)
   if (named.problems.length) throw refused(named.problems.join(' '), 'conflict')
-  const done = await applyConnections(projectPath, asked.answers, { check: () => guard?.(), changed: (was, now) => noteConnection(ws, basename(projectPath), was, now) })
+  const done = await applyConnections(projectPath, asked.answers, { expected: plan.agents.map((a) => a.id), check: () => guard?.(), changed: (was, now) => noteConnection(ws, basename(projectPath), was, now) })
   const byName = new Map(plan.agents.map((a, i) => [a.name, named.names[i]]))
   return {
     project: basename(projectPath),

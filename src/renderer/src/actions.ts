@@ -1659,7 +1659,8 @@ export async function chooseConnections(path: string): Promise<void> {
     confirmLabel: tr(msg({ id: 'actions.chooseConnections.confirm', defaultMessage: 'Apply', description: 'The Choose Connections dialog\'s button (HI-2109): gives the agents the connections chosen.' })),
     busyLabel: tr(msg({ id: 'actions.chooseConnections.busy', defaultMessage: 'Applying…', description: "The Choose Connections dialog's button while it works (HI-2109)." })),
     run: async () => {
-      done = await call('templates:applyConnections', path, answers)
+      // Bound to the agents the dialog showed (HR3's round 2): changed since, it is refused, nothing changed.
+      done = await call('templates:applyConnections', path, answers, plan.agents.map((a) => a.id))
     }
   })
   if (!ok || !done) return

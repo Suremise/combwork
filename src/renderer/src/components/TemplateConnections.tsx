@@ -176,9 +176,9 @@ const CHOOSE = {
  * (greyed out, saying why). `onAnswers` hears what the section answers, by the agents' names.
  */
 export function ChooseConnectionsBody({ plan, onAnswers }: { plan: ConnectionsPlan; onAnswers: (a: ConnectionAnswers) => void }) {
-  const agents = plan.agents.map((a) => ({ name: a.name, role: a.role, provider: a.provider, current: a.connection }))
+  const agents = plan.agents.map((a) => ({ key: a.id, name: a.name, role: a.role, provider: a.provider, current: a.connection }))
   const [state, setState] = useState<PickerState>(() => initialPicker(agents, plan.options, () => ''))
-  const answers = pickerAnswers(state)
+  const answers = pickerAnswers(state, agents)
   const key = JSON.stringify(answers)
   useEffect(() => onAnswers(JSON.parse(key) as ConnectionAnswers), [key, onAnswers])
   const after = answerFor(agents, answers, (a) => (a as (typeof agents)[number]).current)

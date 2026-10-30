@@ -365,12 +365,14 @@ describe('loading a template for the Assistant, and undoing it', () => {
       config.update((c) => {
         c.accounts = [
           { id: 'acc-a', provider: 'claude-code', name: 'Personal', createdAt: '', home: 'cli' },
-          { id: 'acc-b', provider: 'claude-code', name: 'Work', createdAt: '', home: 'cli' }
+          { id: 'acc-b', provider: 'claude-code', name: 'Work', createdAt: '', home: 'cli' },
+          { id: 'acc-cx', provider: 'codex', name: 'Codex', createdAt: '', home: 'cli' }
         ]
         c.connections = [
           { id: 'c-a', account: 'acc-a', name: 'Personal', effort: 'high' },
           { id: 'c-b', account: 'acc-b', name: 'Work', effort: 'high' },
-          { id: 'c-x', account: 'acc-a', name: 'Personal · args', effort: 'high', extraArgs: '--verbose' }
+          { id: 'c-x', account: 'acc-a', name: 'Personal · args', effort: 'high', extraArgs: '--verbose' },
+          { id: 'c-codex', account: 'acc-cx', name: 'Codex' }
         ]
       })
     /** beta's agents: two builders, one called Builder, and a reviewer called reviewer (its role's word), all on c-a. */
@@ -378,7 +380,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
       const file = join(beta, '.hive', 'project.json')
       const kept = JSON.parse(readFileSync(file, 'utf8'))
       writeFileSync(file, JSON.stringify({ ...kept, version: 2, migrations: { ...kept.migrations, accounts1: { at: '2026-10-30T00:00:00.000Z' } }, agents: [
-        { id: 'p1', name: 'Builder', workflowRole: 'builder', provider: 'claude-code', connection: 'c-a' },
+        { id: 'p1', name: 'Builder', workflowRole: 'builder', provider: 'claude-code', connection: 'c-a', lastSessionId: 'old-claude-conversation' },
         { id: 'p2', name: 'Second', workflowRole: 'builder', provider: 'claude-code', connection: 'c-a' },
         { id: 'p3', name: 'reviewer', workflowRole: 'reviewer', provider: 'claude-code', connection: 'c-a' }
       ] }))
@@ -430,6 +432,44 @@ describe('loading a template for the Assistant, and undoing it', () => {
       await expect(apply({ 4: 'c-b' })).rejects.toThrow(/4 is out of range: there are 3 agents/)
       await expect(apply({ reviewer: 'Nowhere' })).rejects.toThrow(/no connection "Nowhere" can be used here/)
       expect(conns()).toEqual(['c-a', 'c-a', 'c-a'])
+    })
+
+    it("apply is bound to the agents it planned (HR3's round 2): one removed before it applies refuses it all, never another agent given its choice", async () => {
+      accounts()
+      setBeta()
+      templates.testHooks.applying = async () => {
+        await w.mutateProjectConfig(beta, (c) => ({ agents: c.agents.filter((a: StoredAgent) => a.id !== 'p1') }))
+      }
+      try {
+        await expect(apply({ Builder: 'c-x' })).rejects.toThrow(/agents changed since you chose their connections: nothing was changed/)
+      } finally {
+        templates.testHooks.applying = undefined
+      }
+      expect(conns()).toEqual(['c-a', 'c-a'])
+    })
+
+    it('undo across CLIs: connection, CLI and conversation back in one checked write; a newer conversation since keeps them all, said', async () => {
+      accounts()
+      setBeta()
+      const live = () => cfgOf(beta).agents.find((a: StoredAgent) => a.id === 'p1')
+      const first = await apply({ Builder: 'c-codex' })
+      expect([live().provider, live().connection, live().lastSessionId]).toEqual(['codex', 'c-codex', undefined])
+      // Undone at once: all three back, in one write of the project's file.
+      const writes = vi.spyOn(w, 'updateAgent')
+      try {
+        const back = await undo(first.group)
+        expect(back.flatMap((u) => u.undone).sort()).toEqual(['connectionId', 'lastSessionId', 'provider'])
+        expect(writes).toHaveBeenCalledTimes(1)
+      } finally {
+        writes.mockRestore()
+      }
+      expect([live().provider, live().connection, live().lastSessionId]).toEqual(['claude-code', 'c-a', 'old-claude-conversation'])
+      // Again, then a new Codex conversation before the undo: the group is skipped whole, nothing overwritten.
+      const second = await apply({ Builder: 'c-codex' })
+      await w.updateAgent(beta, 'p1', { lastSessionId: 'new-codex-conversation' })
+      const kept = await undo(second.group)
+      expect([kept.flatMap((u) => u.undone), kept.flatMap((u) => u.skipped.map((x) => `${x.field}:${x.why}`)).sort()]).toEqual([[], ['connectionId:changed', 'lastSessionId:changed', 'provider:changed']])
+      expect([live().provider, live().connection, live().lastSessionId]).toEqual(['codex', 'c-codex', 'new-codex-conversation'])
     })
   })
 })

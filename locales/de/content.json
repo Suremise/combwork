@@ -68,6 +68,7 @@
   "content.skill.zipTooMany": "Die .zip hat zu viele Dateien für einen Skill (über {max}).",
   "content.skill.zipUnsafe": "Die .zip enthält eine Datei mit unsicherem Pfad: {path}",
   "content.templates.agentGone": "Dieser Agent ist nicht mehr in der Vorlage.",
+  "content.templates.agentsChangedChoose": "Die Agenten des Projekts haben sich geändert, seit du ihre Verbindungen gewählt hast: Es wurde nichts geändert. Wähle sie erneut.",
   "content.templates.bullet": "• {item}",
   "content.templates.cantLoad": "Die Vorlage kann noch nicht geladen werden:",
   "content.templates.cantUse": "„{name}“ kann nicht verwendet werden: {problem}",

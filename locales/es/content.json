@@ -68,6 +68,7 @@
   "content.skill.zipTooMany": "El .zip tiene demasiados archivos para una habilidad (más de {max}).",
   "content.skill.zipUnsafe": "El .zip contiene un archivo con una ruta no segura: {path}",
   "content.templates.agentGone": "Ese agente ya no está en la plantilla.",
+  "content.templates.agentsChangedChoose": "Los agentes del proyecto cambiaron desde que elegiste sus conexiones: no se cambió nada. Vuelve a elegirlas.",
   "content.templates.bullet": "• {item}",
   "content.templates.cantLoad": "Todavía no se puede cargar la plantilla:",
   "content.templates.cantUse": "No se puede usar “{name}”: {problem}",

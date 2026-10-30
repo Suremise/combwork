@@ -678,8 +678,8 @@ export interface HiveRequests {
   'templates:addAgent': (projectPath: string, scope: TemplateScope, file: string, index: number, from?: string, name?: string, connection?: string) => AgentDef
   /** Choose Connections… (HI-2109): the project's agents by their roles, with their connections, and the connections usable here. */
   'templates:connectionsPlan': (projectPath: string) => ConnectionsPlan
-  /** Choose Connections…: the project's agents given the connections answered, nothing else changed. */
-  'templates:applyConnections': (projectPath: string, connections: ConnectionAnswers) => ConnectionsApplied
+  /** Choose Connections…: the project's agents given the connections answered, nothing else changed; `expected`: their ids as shown (else refused). */
+  'templates:applyConnections': (projectPath: string, connections: ConnectionAnswers, expected: string[]) => ConnectionsApplied
   /** Every template of the workspace (#127, the Templates view): Hive's own (#1436), the workspace's, then each project's. */
   'templates:all': () => TemplateEntry[]
   /** Renames a template where it is kept (another of that name there refuses it). */

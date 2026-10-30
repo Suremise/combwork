@@ -67,10 +67,10 @@ describe('the Load template dialog (#268)', () => {
 
 describe('the connection picker (HI-2109)', () => {
   const agents = [
-    { name: 'HB1', role: 'builder' as const, provider: 'claude-code' },
-    { name: 'HB2', role: 'builder' as const, provider: 'claude-code' },
-    { name: 'HR1', role: 'reviewer' as const, provider: 'codex' },
-    { name: 'G1', role: 'generalist' as const }
+    { key: 'k1', name: 'HB1', role: 'builder' as const, provider: 'claude-code' },
+    { key: 'k2', name: 'HB2', role: 'builder' as const, provider: 'claude-code' },
+    { key: 'k3', name: 'HR1', role: 'reviewer' as const, provider: 'codex' },
+    { key: 'k4', name: 'G1', role: 'generalist' as const }
   ]
 
   it('each role preselects the first connection on the CLI its agents suggest, else the first usable', () => {
@@ -82,8 +82,8 @@ describe('the connection picker (HI-2109)', () => {
     expect(answerFor(agents, {}, loadFallback(agents, options))).toEqual(['Personal', 'Personal', 'Work', 'Personal'])
   })
 
-  it("an agent's own answer (by its place) over its role's over all's", () => {
-    const answers = { all: 'Work', roles: { builder: 'Claude · High' }, agents: { 1: 'Personal' } }
+  it("an agent's own answer (by its key) over its role's over all's", () => {
+    const answers = { all: 'Work', roles: { builder: 'Claude · High' }, agents: { k2: 'Personal' } }
     expect(answerFor(agents, answers, loadFallback(agents, options))).toEqual(['Claude · High', 'Personal', 'Work', 'Work'])
     // Choose Connections…: none for an agent keeps its own (undefined).
     expect(answerFor(agents, { roles: { reviewer: 'Personal' } }, () => undefined)).toEqual([undefined, undefined, 'Personal', undefined])
@@ -91,25 +91,40 @@ describe('the connection picker (HI-2109)', () => {
 
   it("an agent called Builder never stands for the builders (HR3's round 1): its own choice is its alone", () => {
     const two = [
-      { name: 'Builder', role: 'builder' as const, provider: 'claude-code' },
-      { name: 'Second', role: 'builder' as const, provider: 'claude-code' }
+      { key: 'a', name: 'Builder', role: 'builder' as const, provider: 'claude-code' },
+      { key: 'b', name: 'Second', role: 'builder' as const, provider: 'claude-code' }
     ]
     const state = { same: false, all: '', roles: { builder: 'c-default' }, agents: { 0: 'c-special' } }
-    expect(answerFor(two, pickerAnswers(state), () => undefined)).toEqual(['c-special', 'c-default'])
+    expect(answerFor(two, pickerAnswers(state, two), () => undefined)).toEqual(['c-special', 'c-default'])
   })
 
-  it("the picker's state as answers: Same for all alone, else each role's and each agent's own by its place", () => {
+  it("an agent's own choice stays with that agent when the list changes before it is used (HR3's round 2): never another's", () => {
+    const shown = [
+      { key: 'a', name: 'A', role: 'builder' as const },
+      { key: 'b', name: 'Second', role: 'builder' as const }
+    ]
+    const answers = pickerAnswers({ same: false, all: '', roles: {}, agents: { 0: 'c-special' } }, shown)
+    expect(answers).toEqual({ agents: { a: 'c-special' } })
+    // A removed: Second never gets A's choice, and the answer names an agent the list hasn't (refused where it is used).
+    expect(answerFor([shown[1]], answers, () => undefined)).toEqual([undefined])
+    expect(badAnswers(['b'], answers)).toEqual(['agent a'])
+    // Moved: the choice follows A.
+    expect(answerFor([shown[1], shown[0]], answers, () => undefined)).toEqual([undefined, 'c-special'])
+  })
+
+  it("the picker's state as answers: Same for all alone, else each role's and each agent's own by its key", () => {
     const state = { same: false, all: 'Work', roles: { builder: 'Claude · High', reviewer: '' }, agents: { 1: 'Personal', 3: '' } }
-    expect(pickerAnswers(state)).toEqual({ roles: { builder: 'Claude · High' }, agents: { 1: 'Personal' } })
-    expect(pickerAnswers({ ...state, same: true })).toEqual({ all: 'Work' })
+    expect(pickerAnswers(state, agents)).toEqual({ roles: { builder: 'Claude · High' }, agents: { k2: 'Personal' } })
+    expect(pickerAnswers({ ...state, same: true }, agents)).toEqual({ all: 'Work' })
     // Keep (''), all of it: nothing answered.
-    expect(pickerAnswers(initialPicker(agents, options, () => ''))).toEqual({})
+    expect(pickerAnswers(initialPicker(agents, options, () => ''), agents)).toEqual({})
   })
 
-  it("answers name a role or an agent's place it has, each a connection's id or a name only one has", () => {
-    expect(badAnswers(4, { all: 'x', roles: { builder: 'x', builders: 'x' }, agents: { 3: 'x', 4: 'x' } })).toEqual(['role builders', 'agent 4'])
-    expect(badAnswers(4, { builder: 'x' })).toEqual(['builder'])
-    expect([badAnswers(4, undefined), badAnswers(4, 'x'), badAnswers(4, { roles: { builder: 5 } })]).toEqual([[], ['x'], ['role builder']])
+  it("answers name a role or an agent it has, each a connection's id or a name only one has", () => {
+    const keys = agents.map((a) => a.key)
+    expect(badAnswers(keys, { all: 'x', roles: { builder: 'x', builders: 'x' }, agents: { k3: 'x', k9: 'x' } })).toEqual(['role builders', 'agent k9'])
+    expect(badAnswers(keys, { builder: 'x' })).toEqual(['builder'])
+    expect([badAnswers(keys, undefined), badAnswers(keys, 'x'), badAnswers(keys, { roles: { builder: 5 } })]).toEqual([[], ['x'], ['role builder']])
     const two = [...options, opt('c-1', 'codex', { name: 'Same' }), opt('c-2', 'codex', { name: 'Same', account: 'acc-2' })]
     expect(optionNamed(two, 'personal')).toMatchObject({ ok: true, option: { id: 'Personal' } })
     expect(optionNamed(two, 'c-2')).toMatchObject({ ok: true, option: { id: 'c-2' } })

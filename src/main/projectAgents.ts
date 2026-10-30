@@ -413,7 +413,7 @@ export function cleanWorkflowRole(role: unknown): WorkflowRole {
   throw hiveError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer, either or generalist.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English." }), undefined, { kind: 'invalid' })
 }
 
-export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void } = {}): Promise<AgentDef> {
+export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void; session?: string | null } = {}): Promise<AgentDef> {
   // The Hive Assistant's settings for this workspace are its agent's, too (it keeps its name).
   projectPath = workspace.assertSessionHost(projectPath)
   // The Assistant gets Hive's own tools, not the projects' MCP servers, whatever it is given (sessions.ts).
@@ -454,6 +454,8 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
       clean.lastSessionId = undefined
     }
   }
+  // Undo putting an agent back on its old CLI (HI-2109): the conversation it had there, in the same write.
+  if (opts.session !== undefined) clean.lastSessionId = opts.session ?? undefined
   if (touches && before) {
     const cli = patch.provider ?? agentProvider(before, cfgNow, config.settings)
     const changedCli = cli !== agentProvider(before, cfgNow, config.settings)

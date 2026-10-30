@@ -4452,8 +4452,10 @@ repeating them (#533) [note §8].
     installed, in the order (accounts', then within each); a test copy's CLI test home gets its account as an agent's
     start would. **Same for all** (`*`), else a choice per role the agents have (builder, reviewer, either, generalist),
     and **Per agent** over its role's (`PickerState`, `pickerAnswers`). An answer (`ConnectionAnswers`: `all`, `roles`
-    and `agents` by place, **kept apart** so an agent called Builder never stands for the builders: HR3's round 1; each a
-    connection's id or name) resolves agent > role > all > fallback (`answerFor`); a name two connections share is
+    and `agents` by key, **kept apart** so an agent called Builder never stands for the builders (HR3's round 1), and
+    each agent's choice **bound to that agent**, never to a place another can take when the list changes (round 2): an
+    existing agent's id, a template's agent's name in the template as made for the project; each value a connection's
+    id or name) resolves agent > role > all > fallback (`answerFor`); a name two connections share is
     refused naming their ids, one not usable here now is refused, and a role or place it hasn't is refused (`badAnswers`),
     each before anything changes. A role's **preselected** connection is the first on the CLI its agents
     suggest (the first agent of the role naming one), else the first option (`preselected`, `loadFallback`).
@@ -4462,11 +4464,14 @@ repeating them (#533) [note §8].
     suggests that's off or not installed no longer blocks a load. The load (`loadTemplateWith`'s `connections`; IPC
     `templates:load`) gives each agent its connection (its CLI follows: `prepareAgent`); with no option at all, the
     agents are made on the CLI they suggest without one (HI-2106's unplaced agents), as Add Agent makes one.
-    `templates:addAgent` takes an optional `connection` (else its role's preselected one). The window sends each agent's
-    choice by its place, so a name changed in the dialog keeps it.
+    `templates:addAgent` takes an optional `connection` (else its role's preselected one). Each agent's own choice is
+    keyed by its name in the template, so a name changed in the dialog keeps it, and a template edited meanwhile (that
+    agent renamed or removed) refuses it rather than give it to another.
   - **Choose Connections…** (Project Settings → Agents; `templates:connectionsPlan`, `templates:applyConnections`,
     `applyConnections`): the picker over the project's existing agents by their roles, every choice starting at "keep"
-    (an agent no answer names keeps its own); each change through `updateAgent` (its CLI with it, under the project's
+    (an agent no answer names keeps its own); bound to the agents shown (`expected`, their ids in order: one added,
+    removed or moved since refuses it all, `content.templates.agentsChangedChoose`; the Assistant's `apply` binds its own
+    plan the same way); each change through `updateAgent` (its CLI with it, under the project's
     lock), nothing loaded or replaced, ids and conversations kept. A running agent can't take another CLI's connection
     (greyed out; skipped, said: `skipped`, `running`); one on its own CLI is changed and listed in `restart`, and the
     window offers **Switch Them When Their Turn Is Over** (`connections:switchAffected`) or Later. An agent removed
@@ -4480,8 +4485,9 @@ repeating them (#533) [note §8].
     the key or as a pattern); a name several agents share, two keys for one agent, a place out of range or an unknown key
     is said (a plan's `blocked`, `400` for apply). **Undo** (`noteConnection`, `assistantUndo.ts` `undoConnection`):
     each agent's connection by its id (`connectionId`, never the adapter's account id, so connections alike in every
-    value are told apart), with its CLI and last conversation when they changed with it, set back together through
-    `updateAgent`, only while each is as the change left it.
+    value are told apart), with its CLI and last conversation when they changed with it, set back together in one
+    `updateAgent` write (its `session` option), only while every one of them, the conversation too, is as the change
+    left it under the project's lock: a newer conversation since keeps the whole group, said.
 - **Names: patterns and the names table** [#1440] **Built [#1440]**: an agent's name in a template may hold `{key}` (the
   project's key, `projectKeyOf`; never guessed: a plan, load or added agent whose names hold `{key}` is refused when the
   key can't be read, `content.templates.noKey`, and the window shows `{key}` unexpanded) and `{n}` (its number among the template's agents with the same

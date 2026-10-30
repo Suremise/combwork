@@ -68,6 +68,7 @@
   "content.skill.zipTooMany": "The .zip has too many files for a skill (over {max}).",
   "content.skill.zipUnsafe": "The .zip has a file with an unsafe path: {path}",
   "content.templates.agentGone": "That agent is no longer in the template.",
+  "content.templates.agentsChangedChoose": "The project's agents changed since you chose their connections: nothing was changed. Choose them again.",
   "content.templates.bullet": "• {item}",
   "content.templates.cantLoad": "The template can't be loaded yet:",
   "content.templates.cantUse": "\"{name}\" can't be used: {problem}",

@@ -1139,7 +1139,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'templates:load': (p, scope, file, expected, from, names, connections, applyWorkflow) => templates.loadTemplate(p, scope, file, expected, from, names, connections, applyWorkflow === true),
     'templates:addAgent': (p, scope, file, index, from, name, connection) => templates.addAgentFromTemplate(p, scope, file, index, from, name, 'user', connection),
     'templates:connectionsPlan': (p) => templates.connectionsPlan(p),
-    'templates:applyConnections': (p, connections) => templates.applyConnections(p, connections),
+    'templates:applyConnections': (p, connections, expected) => templates.applyConnections(p, connections, { expected: Array.isArray(expected) ? expected : [] }),
     'templates:all': () => templates.listAllTemplates(),
     'templates:rename': (ref, name) => templates.renameTemplate(ref, name),
     'templates:update': (ref, edited, savedAt) => templates.updateTemplate(ref, edited, savedAt),

@@ -89,6 +89,7 @@ const M = {
   nameTaken: msg({ id: 'content.templates.nameTaken', defaultMessage: 'There is already a template called "{name}" there.', description: 'An error renaming or editing a template: another template where it is kept (the workspace or a project) is called {name}.' }),
   connectionUnknown: msg({ id: 'content.templates.connectionUnknown', defaultMessage: 'No connection "{ref}" can be used in this workspace now: choose another.', description: "An error loading a template or choosing connections (HI-2109): the connection chosen ({ref}, its name or id) was removed, or its account turned off here, since it was offered." }),
   connectionAmbiguous: msg({ id: 'content.templates.connectionAmbiguous', defaultMessage: 'Several connections are called "{ref}": name one by its id ({ids}).', description: "An error loading a template or choosing connections (HI-2109): the name given ({ref}) is several connections' names; {ids} lists their ids." }),
+  agentsChanged: msg({ id: 'content.templates.agentsChangedChoose', defaultMessage: "The project's agents changed since you chose their connections: nothing was changed. Choose them again.", description: "An error choosing connections for a project's agents (HI-2109): an agent was added, removed or moved after the dialog showed them, so nothing changed." }),
   connectionKeys: msg({ id: 'content.templates.connectionChoices', defaultMessage: "These connection choices don't fit its agents: {keys}. Open it again.", description: "An error loading a template or choosing connections (HI-2109): choices sent for a role it doesn't know or an agent it doesn't have (another window's, or the template changed meanwhile). {keys} lists them as given ('role boss', 'agent 7'): keep role and agent in English." }),
   taken: msg({ id: 'content.templates.taken', defaultMessage: '{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}.', description: "Why a template can't be loaded: agents of other projects ({projects}) have its agents' names {names} ({count} of them). {names} and {projects} are lists, in the language's way (\"B1 and R1\")." }),
   takenNothing: msg({ id: 'content.templates.takenNothing', defaultMessage: '{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}. Nothing was changed.', description: "An error loading a template: agents of other projects ({projects}) took its agents' names {names} ({count} of them) while it loaded, so nothing changed. {names} and {projects} are lists, in the language's way (\"B1 and R1\")." }),
@@ -638,6 +639,8 @@ function withNames(agents: TemplateAgent[], names: unknown): TemplateAgent[] {
 /** Seams for unit tests: called after each of a load's agents is staged (its name), before the load is published. */
 export const testHooks: {
   staged?: (name: string) => Promise<void>
+  /** Choose Connections… about to read the project's agents again (HR3's round 2: a change between plan and apply). */
+  applying?: () => Promise<void>
 } = {}
 
 /** Loads under way, by project: one at a time each. */
@@ -846,7 +849,9 @@ export async function restoreProjectAgents(projectPath: string, back: { agents: 
  * again as the agent is prepared and with the write.
  */
 function connectionsFor(plan: TemplateLoadPlan, answers: ConnectionAnswers | undefined): string[] {
-  const agents: PickedAgent[] = plan.create.map((a) => ({ name: a.name, role: a.role, provider: a.provider }))
+  // Each agent's own choice by its name in the template, as made for the project: one edited since (renamed, removed,
+  // another in its place) has none of the choices made for another, which are refused (HR3's round 2).
+  const agents: PickedAgent[] = plan.create.map((a, i) => ({ key: plan.templateNames[i], name: a.name, role: a.role, provider: a.provider }))
   return resolveAnswers(agents, plan.options, answers, loadFallback(agents, plan.options)).map((id) => id ?? '')
 }
 
@@ -858,8 +863,8 @@ const onConnection = (a: TemplateAgent, connection: string | undefined): { conne
 
 /** Each agent's connection id from answers (`answerFor`), the refs checked against `options`; none answered: undefined. */
 function resolveAnswers(agents: readonly PickedAgent[], options: readonly ConnectionOption[], answers: ConnectionAnswers | undefined, fallback: (a: PickedAgent) => string | undefined): (string | undefined)[] {
-  // Untrusted (a window's, the Agent API's once read): a role or an agent's place it doesn't have is refused, said.
-  const bad = badAnswers(agents.length, answers)
+  // Untrusted (a window's, the Agent API's once read): a role or an agent (by its key) it doesn't have is refused, said.
+  const bad = badAnswers(agents.map((a) => a.key), answers)
   if (bad.length) throw refusal(M.connectionKeys, { keys: listOf(bad) }, 'invalid')
   return answerFor(agents, answers, fallback).map((ref) => {
     if (ref === undefined) return undefined
@@ -886,12 +891,17 @@ export async function connectionsPlan(projectPath: string): Promise<ConnectionsP
  * that runs keeps running on its old connection until it restarts (`restart`); one whose answer is another CLI's can't
  * change while it runs (its conversations stay with its CLI), and one removed meanwhile is skipped: both said
  * (`skipped`), the others changed. Every answer is checked before anything changes. `check` (the Assistant's guard and
- * undo's record) runs in each agent's write.
+ * undo's record) runs in each agent's write. `expected` (HR3's round 2): the agents' ids as the choices were made for
+ * them, in order; the project's agents otherwise now (one added, removed or moved) refuse it all, nothing changed, and
+ * each agent's own choice is bound to its id.
  */
-export async function applyConnections(projectPath: string, answers: ConnectionAnswers | undefined, o: { check?: (current: AgentDef) => void; changed?: (was: AgentDef, now: AgentDef) => Promise<void> } = {}): Promise<ConnectionsApplied> {
+export async function applyConnections(projectPath: string, answers: ConnectionAnswers | undefined, o: { expected?: readonly string[]; check?: (current: AgentDef) => void; changed?: (was: AgentDef, now: AgentDef) => Promise<void> } = {}): Promise<ConnectionsApplied> {
+  await testHooks.applying?.()
   const plan = await connectionsPlan(projectPath)
   projectPath = workspace.assertProject(projectPath)
-  const ids = resolveAnswers(plan.agents, plan.options, answers, () => undefined)
+  const now = plan.agents.map((a) => a.id)
+  if (o.expected && (o.expected.length !== now.length || o.expected.some((id, i) => id !== now[i]))) throw refusal(M.agentsChanged, undefined, 'conflict')
+  const ids = resolveAnswers(plan.agents.map((a) => ({ ...a, key: a.id })), plan.options, answers, () => undefined)
   const out: ConnectionsApplied = { changed: [], restart: [], skipped: [] }
   for (const [i, a] of plan.agents.entries()) {
     const id = ids[i]
@@ -938,7 +948,7 @@ export async function addAgentFromTemplate(projectPath: string, scope: TemplateS
   const own = (await namesIn(projectPath, t.agents))[index]
   const name = typeof chosen === 'string' && chosen.trim() ? withNames([{ ...a, name: own }], [chosen])[0].name : uniqueName(own, (await workspaceAgents(projectPath)).map((x) => x.name))
   const options = connectionOptions(projectPath)
-  const picked = { name, role: a.role, provider: a.provider }
-  const [id] = resolveAnswers([picked], options, typeof connection === 'string' && connection.trim() ? { agents: { 0: connection } } : undefined, loadFallback([picked], options))
+  const picked = { key: name, name, role: a.role, provider: a.provider }
+  const [id] = resolveAnswers([picked], options, typeof connection === 'string' && connection.trim() ? { agents: { [name]: connection } } : undefined, loadFallback([picked], options))
   return addAgent(projectPath, { name, role: a.note, workflowRole: a.role, mcpServers: a.mcpServers, ...onConnection(a, id), location: 'project' }, by)
 }

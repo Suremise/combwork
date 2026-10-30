@@ -68,6 +68,7 @@
   "content.skill.zipTooMany": "该 .zip 中的文件太多，不能用作技能（超过 {max} 个）。",
   "content.skill.zipUnsafe": "该 .zip 中有路径不安全的文件：{path}",
   "content.templates.agentGone": "该智能体已不在模板中。",
+  "content.templates.agentsChangedChoose": "选择连接后项目的智能体发生了变化：未做任何更改。请重新选择。",
   "content.templates.bullet": "• {item}",
   "content.templates.cantLoad": "暂时无法加载该模板：",
   "content.templates.cantUse": "“{name}”无法使用：{problem}",
