@@ -31,7 +31,8 @@ let accepted: { ws: string; items: readonly ForYouItem[] } | null = null
  */
 export const askedByNow = (card: number, agentId: string): boolean => {
   const ws = useStore.getState().workspace?.path ?? ''
-  return !!ws && accepted?.ws === ws && accepted.items.some((i) => i.card === card && i.asker === agentId)
+  const now = accepted
+  return !!ws && now?.ws === ws && now.items.some((i) => i.card === card && i.asker === agentId)
 }
 
 /** The workspace's requests for the user, and by card; empty while loading. */

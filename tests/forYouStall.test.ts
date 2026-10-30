@@ -37,7 +37,9 @@ vi.stubGlobal('window', {
   }
 })
 
-const { askedByNow, useForYou } = await import('../src/renderer/src/forYou')
+// Through a variable, as the other window modules' tests import them: the node typecheck can't follow the window's aliases.
+const forYouModule = '../src/renderer/src/forYou'
+const { askedByNow, useForYou } = (await import(/* @vite-ignore */ forYouModule)) as { askedByNow: (card: number, agentId: string) => boolean; useForYou: () => unknown }
 const asked = (card: number, asker: string) => ({ items: [{ card, asker, request: `r${card}` }], count: 1 })
 const none = { items: [], count: 0 }
 /** Lets each reply's handlers run (scopedLoads settles on the promise's then). */
