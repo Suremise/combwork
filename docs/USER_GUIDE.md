@@ -859,6 +859,7 @@ Lanes can share their reviewers instead of each having its own. A project whose 
 - **Hive tells it**: *#12 (HI-B1's card) is in Review: you review it from the pool*, typed into its conversation, or it is started for the review in the project folder (it reviews in a review copy).
 - **Nobody free:** the card waits, and its lane says *waiting for a reviewer*. A verdict frees the reviewer for the next card.
 - **Two reviewers per card** (**Reviewers per card: 2**): a second reviewer, another agent, gets the card once the first has passed it.
+- **A card outside a lane** (one started on its builder alone, or whose lane has ended) that reaches Review in a project whose work an agent reviews is given out the same way, whichever **Reviewers** option the project has: a free running reviewer is told *#12 (HI-B1's card) is in Review, outside a lane: you review it*, or a stopped one is started for it. Nobody, the Hive Assistant included, needs to start a reviewer for it.
 - With **Workflow rules are enforced** off (Settings → Advanced), nothing is given out: name a reviewer for each lane yourself.
 
 #### The merge queue in the Progress panel <a id="the-merge-queue-in-the-progress-panel"></a>

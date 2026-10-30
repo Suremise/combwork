@@ -708,9 +708,10 @@ describe('coordinator guidance', () => {
   describe("the lane skills' written defaults (#1527)", () => {
     const both = (): [string, string][] => ['coordinate-agents', 'run-lanes'].map((n) => [n, catalog.get(n)!.text])
     const line = (skill: string, starts: string): string => catalog.get(skill)!.text.split(/\r?\n/).find((l) => l.includes(starts)) ?? ''
-    it('run even one card of a builder and reviewer pair as a lane, and start a reviewer on a card in Review without asking, where an agent reviews', () => {
+    it('run even one card of a builder and reviewer pair as a lane, and start no reviewer on a card in Review outside a lane (Hive gives it out, HI-2046), where an agent reviews', () => {
       const review = line('coordinate-agents', '**Its review**')
-      expect(review).toMatch(/in a project whose work is reviewed by an agent: start an idle reviewer on it .* without asking the user/)
+      expect(review).toMatch(/in a project whose work is reviewed by an agent: Hive gives it to a free reviewer of the project itself; start none\./)
+      expect(review).not.toMatch(/without asking the user/)
     })
     // Every sentence on how a card starts, moves or finishes holds across the options it depends on (HR3's rounds 1 and 2,
     // the Assistant's grid): kind × review × finish × enforcement. Each cell names the sentence that covers it.
