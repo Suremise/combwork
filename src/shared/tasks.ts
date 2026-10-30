@@ -723,6 +723,9 @@ export function rawTaskPrompt(card: Pick<TaskCard, 'title' | 'description'>, not
 /** At most this many of a card's attachments named in its start prompt (HI-1700); hive_read_task lists them all. */
 const PROMPT_ATTACHMENTS_MAX = 10
 
+/** The skill a running lane's builder is pointed at as it starts a lane card (HI-2047), by Hive's start or its own (HI-2092). */
+export const LANE_BUILDER_SKILL = "Use the card-loop skill as this lane's builder." // i18n-ignore: agent-facing: the prompt an agent starts a card with
+
 export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: TaskColumn; note?: string; context?: ContextLine[]; attachments?: Pick<CardAttachment, 'id' | 'path'>[]; inLane?: boolean } = {}): string {
   // Its attachments (HI-1700): the text's links to them as their paths, and their paths listed.
   const files = opts.attachments ?? []
@@ -742,7 +745,7 @@ export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: Ta
     parts.push(`Its latest comment (${latest.by}, ${latest.at.slice(0, 10)}):\n\n${text.length > PROMPT_COMMENT_MAX ? `${text.slice(0, PROMPT_COMMENT_MAX)}… (cut short: hive_read_task has it all)` : text}`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
   }
   // A running lane's builder (HI-2047) works its cards in turn with card-loop, which does each with work-on-card.
-  const skill = opts.inLane ? "Use the card-loop skill as this lane's builder." : 'Use the work-on-card skill.' // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  const skill = opts.inLane ? LANE_BUILDER_SKILL : 'Use the work-on-card skill.' // i18n-ignore: agent-facing: the prompt an agent starts a card with
   if (withTools) parts.push(`${skill}${card.comments.length ? ` The card has ${card.comments.length} comment${card.comments.length === 1 ? '' : 's'}: read ${again ? 'the rest' : 'them'} with hive_read_task.` : ''}`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
   return parts.join('\n\n')
 }

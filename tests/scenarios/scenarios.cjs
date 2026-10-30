@@ -2480,12 +2480,15 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const b = o.cards.b
       const started = (b?.history ?? []).find((h) => /^Moved to (the (top|bottom) of )?Doing\b/.test(h.what))
+      // Coder's own start of #b, whose reply gives what Hive's would have (HI-2092: Codex starts it rather than end its turn).
+      const own = hiveReplies(o, 'hive_start_card').find((t) => (namesCard([argsOf({ args: t.input }).card], c.cards.b) || (!!b?.key && String(t.result).includes(`${b.key} is a card of your lane`))) && /card-loop skill as this lane's builder/.test(String(t.result)))
+      const start = c.start ?? (own ? String(own.result) : null)
       return [
         // In Review once Coder has built it (HI-2047: its project has the first card's work, so it can be).
         [`#${c.cards.b} is started on Coder (in Doing or on to Review, its agent)`, ['doing', 'review'].includes(b?.column) && (b?.agent?.id ?? b?.agent) === c.agents.coder.id, `${b?.column} / ${JSON.stringify(b?.agent)}`],
-        [`Coder is given #${c.cards.b} (its task's doorbell in its pane)`, !!c.given, String(c.given)],
+        [`Coder is given #${c.cards.b} (by Hive's start, its task's doorbell in its pane; or by its own start's reply)`, !!c.given || !!own, `${c.given} / own start: ${!!own}`],
         // HI-2047: a running lane's builder is pointed at card-loop alone.
-        ["its start names card-loop as the lane's builder, not work-on-card", /card-loop skill as this lane's builder/.test(c.start ?? '') && !/work-on-card/.test(c.start ?? ''), String(c.start)],
+        ["its start names card-loop as the lane's builder, not work-on-card", /card-loop skill as this lane's builder/.test(start ?? '') && !/work-on-card/.test(start ?? ''), String(start)],
         ['started by Hive or by Coder itself, nobody else', !!started && /^(Hive|Coder)/.test(started.by), JSON.stringify(started ?? null)],
         ["didn't ask the user (no hive_notify, no question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
       ]

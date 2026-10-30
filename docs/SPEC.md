@@ -4021,6 +4021,10 @@ Whether a conversation may resume there is its **hold** (none: it may):
     current one. It is never offered into the builder's conversation running as its lane began (`notIn`: the one a
     new lane's start replaces), only to its next one, or to any while it wasn't running; an edit keeps that exclusion and
     takes no other, so an edited brief reaches the lane's working conversation.
+    **Its builder starting a lane card itself** (HI-2092: `hive_start_card` rather than ending its turn for Hive's start,
+    as Codex did): where no placement follows (outside slots), the start's reply ends with what Hive's start would have
+    given it, "Use the card-loop skill as this lane's builder." and the lane's brief as it is now, so the lane's
+    instructions reach it either way; a start in a slot gets both with its placement.
     **Its builder stopped** (HI-1746: Hive quit between the card's start and its placement), the placement resumes the
     builder's newest conversation of its provider bound to the card's lease (a handover or a takeover binds it there),
     the card's prompt that launch's own line (`BuilderPlaced` `how: 'resumed'`); a new conversation only when there is

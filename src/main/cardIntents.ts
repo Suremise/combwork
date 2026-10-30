@@ -8,7 +8,7 @@ import { actorOf } from './workflow/recorder'
 import { isRefusal, type Moved, type Reply, type Workflow } from './workflow/runtime'
 import { refusal } from '../shared/workflow/refusals'
 import { workflowFor } from './workflow/service'
-import { workspace } from './workspace'
+import { workspace, type WorkspaceService } from './workspace'
 import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n'
 import { LOOP_STEP_WAIT_MINUTES } from '../shared/lanes'
@@ -16,6 +16,10 @@ import { projectPreferences } from './workflow/preferences'
 import { loopReviewerOf } from './loopReviewer'
 import { cardRef } from '../shared/projectKeys'
 import { HISTORY, storedText } from '../shared/taskHistory'
+import { laneBuilds } from '../shared/lanes'
+import { LANE_BUILDER_SKILL } from '../shared/tasks'
+import { rawLanes } from './lanes'
+import { briefOf } from './laneBriefs'
 
 /**
  * Agents act by intent (#1267, SPEC §16.8.1): start, put back, submit, declare paths, start review, verdict, report
@@ -177,8 +181,21 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   const m = reply as Moved
   // A start: how long a design waits for its check here (Card loops → Design check wait), for a watch set before posting one.
   if (intent.kind === 'start') m.data = { ...m.data, designWaitMinutes: stepWait }
+  const lane = intent.kind === 'start' && self && !m.placed && m.from !== m.to ? await laneStartWords(ws, before.project, self.agentId, ref.n, card.key ?? `#${ref.n}`) : null
   // What comes next on it (#1530), from its state and rules, after the intents that change what's next (a submit or a
   // verdict that leaves it where it was too: the agent merges, a quorum); the verdict after a review starts.
   const next = intent.kind === 'startReview' ? { step: 'intents' as const, intents: ['verdict'] } : NEXT_AFTER.has(intent.kind) ? wf.nextFor(ref.n) : null // i18n-ignore: an intent's name, agent-facing
-  return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: m.from, to: m.to, ...(m.data ? { data: m.data } : {}), ...(m.warnings?.length ? { warnings: m.warnings } : {}), ...(next ? { next } : {}) }, card }
+  return { done: { ok: true, card: card.key ?? `#${ref.n}`, from: m.from, to: m.to, ...(m.data ? { data: m.data } : {}), ...(m.warnings?.length ? { warnings: m.warnings } : {}), ...(next ? { next } : {}), ...(lane ? { lane } : {}) }, card }
+}
+
+/**
+ * A running lane's builder starting one of its lane's cards itself (HI-2092: Codex took its next card rather than end its
+ * turn for Hive's start), outside a slot: the reply gives it what Hive's start would have (the start prompt's card-loop
+ * line, and the lane's brief), so the lane's instructions reach it either way. Null for any other start. Agent-facing.
+ */
+async function laneStartWords(ws: WorkspaceService, project: string, agentId: string, n: number, key: string): Promise<string | null> {
+  const lane = (await rawLanes(ws).catch(() => [])).find((l) => laneBuilds([l], project, agentId, n))
+  if (!lane) return null
+  const brief = briefOf(lane)
+  return `${key} is a card of your lane (${lane.id}). ${LANE_BUILDER_SKILL}${brief ? `\n\n${brief}` : ''}` // i18n-ignore: agent-facing, the start's reply
 }

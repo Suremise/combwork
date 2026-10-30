@@ -347,6 +347,27 @@ describe('a card by intent (#1267)', () => {
     expect(watches.watchFor(repo, 'a1')).toBeNull()
   })
 
+  it("a lane's builder starting its lane's card itself is told what Hive's start would have: card-loop and the brief (HI-2092)", async () => {
+    const { w } = await workspace()
+    const [card, loose, others] = [await create(w), await create(w), await create(w)]
+    await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], by: 'Assistant', brief: 'Run the lanestages suite only.' })
+    const started = await act(w, card, builder, { kind: 'start' })
+    expect(started.done.lane).toMatch(/is a card of your lane \(lane-\w+\)\. Use the card-loop skill as this lane's builder\.\n\nYour lane's brief \(lane lane-\w+, from Assistant\):\nRun the lanestages suite only\.$/)
+    // Its reply's text ends with it, on lines of its own after the start's.
+    const text = intentText(started.done)
+    expect(text.endsWith(`\n\n${started.done.lane}`)).toBe(true)
+    expect(text.split('\n')[0]).toMatch(/: todo → active\./)
+    // A card outside the lane, or another agent's start of a lane card: nothing of the lane.
+    expect((await act(w, loose, builder, { kind: 'start' })).done.lane).toBeUndefined()
+    await lanes.startLane(w, { project: 'p', builder: 'a3', reviewer: 'a2', cards: [others], by: 'Assistant' })
+    expect((await act(w, others, builder, { kind: 'start' })).done.lane).toBeUndefined()
+    // A lane with no brief: the skill line alone.
+    const { w: w2 } = await workspace()
+    const plain = await create(w2)
+    await lanes.startLane(w2, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [plain], by: 'Assistant' })
+    expect((await act(w2, plain, builder, { kind: 'start' })).done.lane).toMatch(/Use the card-loop skill as this lane's builder\.$/)
+  })
+
   it("a card loop's design step (#1382): named and due, it wakes the reviewer; the reviewer's answer to it wakes the builder", async () => {
     const { w } = await workspace()
     const card = await create(w)
