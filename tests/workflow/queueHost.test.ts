@@ -19,7 +19,10 @@ const ctx = vi.hoisted(() => ({
   readOnly: false,
   upgraded: new Set<(ws: WorkspaceService) => void>(),
   open: [] as WorkspaceService[],
-  workflowsAsked: 0
+  workflowsAsked: 0,
+  // HI-2079: how many runners (in order) their git host fails at their first git, and what the runners did, in order.
+  hostFails: 0,
+  events: [] as string[]
 }))
 vi.mock('../../src/main/workflow/service', () => ({ workflowFor: async () => (ctx.workflowsAsked++, ctx.wf), workflowEnforced: () => ctx.enforced }))
 vi.mock('../../src/main/boardStore', async (original) => ({
@@ -31,26 +34,55 @@ vi.mock('../../src/main/workspace', async (original) => ({ ...(await original<ty
 vi.mock('../../src/main/agentProcesses', () => ({ processSupervisor: () => ({}), setHiveIdentity: () => undefined }))
 vi.mock('../../src/main/workflow/queueChecksApp', () => ({ appQueueChecks: () => ({ runCheck: async () => ({ ok: true, output: '' }) }) }))
 vi.mock('../../src/main/repoLock', () => ({ withRepoLock: async (_p: string, fn: () => Promise<unknown>) => fn() }))
-vi.mock('../../src/main/workflow/queueRunner', () => ({
-  LeaseLost: class LeaseLost extends Error {},
-  queueFolderNeeded: () => true,
-  releaseQueueRunners: async () => undefined,
-  QueueRunner: {
-    // Held by another Hive while ctx.heldBy says so (#1455); else this Hive's.
-    acquire: async () => (ctx.acquired++, ctx.heldBy ? { ok: false, heldBy: ctx.heldBy } : {
-      ok: true,
-      runner: {
-        folder: () => ctx.folder,
-        holds: () => true,
-        git: async (cwd: string, args: string[]) => (await import('../../src/main/git')).git(cwd, args),
-        release: async () => undefined,
-        spawnNow: () => {
-          throw new Error('no checks run here')
+vi.mock('../../src/main/workflow/queueRunner', () => {
+  class LeaseLost extends Error {}
+  return {
+    LeaseLost,
+    queueFolderNeeded: () => true,
+    releaseQueueRunners: async () => undefined,
+    QueueRunner: {
+      // Held by another Hive while ctx.heldBy says so (#1455); else this Hive's. HI-2079: the first ctx.hostFails runners
+      // fail at their first git, as a runner whose git host went does (failed, its writes refused: LeaseLost).
+      acquire: async () => {
+        const n = ++ctx.acquired
+        if (ctx.heldBy) return { ok: false, heldBy: ctx.heldBy }
+        ctx.events.push(`acquire ${n}`)
+        let failed = false
+        const breaks = n <= ctx.hostFails
+        return {
+          ok: true,
+          runner: {
+            folder: () => ctx.folder,
+            holds: () => !failed,
+            get failed() {
+              return failed
+            },
+            git: async (cwd: string, args: string[]) => {
+              if (failed || breaks) {
+                if (!failed) ctx.events.push(`fail ${n}`)
+                failed = true
+                throw new LeaseLost()
+              }
+              return (await import('../../src/main/git')).git(cwd, args)
+            },
+            // Its release is awaited (its job ended, seen empty) before the next lease is taken.
+            release: async () => {
+              await new Promise((res) => setImmediate(res))
+              ctx.events.push(`released ${n}`)
+            },
+            pauseForHost: async () => {
+              ctx.events.push(`pause ${n}`)
+              ctx.wf!.store.setQueuePause('main', { reason: 'needsYou', card: '' })
+            },
+            spawnNow: () => {
+              throw new Error('no checks run here')
+            }
+          }
         }
       }
-    })
+    }
   }
-}))
+})
 
 
 let env: Env | null = null
@@ -64,6 +96,8 @@ afterEach(() => {
   ctx.readOnly = false
   ctx.open = []
   ctx.workflowsAsked = 0
+  ctx.hostFails = 0
+  ctx.events = []
   stopQueueHosts()
   setHolderWatch(null)
 })
@@ -113,6 +147,32 @@ describe('the merge queue host (#1348)', () => {
     expect(e.wf.state(card).stage).toBe('done')
     expect(e.kinds(card.id).filter((k) => k === 'Integrated')).toHaveLength(1)
     expect(queueRefs(e)).toEqual([])
+  })
+})
+
+describe("a runner its git host failed (HI-2079)", () => {
+  it('released and awaited, then a new lease, whose queue recovers the begun entry and merges it', async () => {
+    const { e, card, ws } = await begun('afterStarted')
+    ctx.hostFails = 1
+    await kickQueue(ws, e.project, 'main')
+    expect(ctx.events).toEqual(['acquire 1', 'fail 1', 'released 1', 'acquire 2', 'released 2'])
+    expect(e.wf.state(card).stage).toBe('done')
+    expect(e.store.queuePause('main')).toBeNull()
+  })
+
+  it('a second in a row: the queue paused (needs you) by a third lease, nothing more run, and no run again by itself', async () => {
+    const { e, card, ws } = await begun('afterStarted')
+    ctx.hostFails = 5
+    // A kick while it runs would run it again once it ends: not after this pause.
+    const run = kickQueue(ws, e.project, 'main')
+    void kickQueue(ws, e.project, 'main')
+    await run
+    // A bound for a hung run only: its last release comes as its run ends.
+    await vi.waitFor(() => expect(ctx.events.at(-1)).toBe('released 3'), { timeout: 10_000 })
+    expect(ctx.events).toEqual(['acquire 1', 'fail 1', 'released 1', 'acquire 2', 'fail 2', 'released 2', 'acquire 3', 'pause 3', 'released 3'])
+    expect(e.store.queuePause('main')).toMatchObject({ reason: 'needsYou', card: '' })
+    expect(e.wf.state(card).stage).toBe('merging')
+    expect(ctx.acquired).toBe(3)
   })
 })
 

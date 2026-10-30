@@ -192,6 +192,8 @@ export function queueHostsStamp(ws: WorkspaceService, projectPath: string): stri
 
 async function runHost(h: Host): Promise<void> {
   let runner: QueueRunner | null = null
+  // HI-2079: runners of this run failed by their git host: the first is replaced by a new lease, the second pauses the queue.
+  let hostFailures = 0
   try {
     do {
       h.again = false
@@ -220,19 +222,41 @@ async function runHost(h: Host): Promise<void> {
         runner = got.runner
         // An earlier runner's processes it couldn't end: paused (needs you), nothing runs.
         if (got.paused !== undefined) return
+        // HI-2079: a second runner failed by its git host in this run: paused (needs you), nothing runs. Not run again by a
+        // kick that came meanwhile: the next run is asked for anew (the pause's resume, or a card's change).
+        if (hostFailures > 1) {
+          await runner.pauseForHost()
+          h.again = false
+          return
+        }
       }
-      // Each queue recovers its target's begun entries first: what to run again is the queue's own (an entry recovered to
-      // run again by an earlier queue, paused meanwhile, is found again here, not left Merging).
-      const q = new MergeQueue(wf, queueConfig(h, runner))
-      const recovered = await q.recover(h.target)
-      for (const o of recovered) if (o.outcome === 'integrated' || o.outcome === 'failed') await dropQueuePin(h.projectPath, o.card)
-      // Rules off: open entries wait (paused) before their advance; recovery above finished any advance begun.
-      if (!workflowEnforced()) {
-        await pauseForRulesOff(wf, q, h.target)
-        return
+      const r = runner
+      try {
+        // Each queue recovers its target's begun entries first: what to run again is the queue's own (an entry recovered to
+        // run again by an earlier queue, paused meanwhile, is found again here, not left Merging).
+        const q = new MergeQueue(wf, queueConfig(h, r))
+        const recovered = await q.recover(h.target)
+        for (const o of recovered) if (o.outcome === 'integrated' || o.outcome === 'failed') await dropQueuePin(h.projectPath, o.card)
+        // Rules off: open entries wait (paused) before their advance; recovery above finished any advance begun.
+        if (!workflowEnforced()) {
+          await pauseForRulesOff(wf, q, h.target)
+          return
+        }
+        const outcomes = await q.drain(h.target)
+        for (const o of outcomes) if (o.outcome !== 'paused') await dropQueuePin(h.projectPath, o.card)
+      } catch (e) {
+        // Its git host failed it part way: what it was doing is uncertain, never a card's outcome (its writes refused).
+        if (!r.failed) throw e
       }
-      const outcomes = await q.drain(h.target)
-      for (const o of outcomes) if (o.outcome !== 'paused') await dropQueuePin(h.projectPath, o.card)
+      if (r.failed) {
+        // HI-2079: its release awaited (its job ended, or its duties kept for the next settle); then a new lease, whose
+        // settle ends whatever this one left, and the begun entries recovered.
+        await r.release()
+        runner = null
+        hostFailures++
+        h.again = true
+        continue
+      }
       await prunePins(wf, h.projectPath)
     } while (h.again && alive(h))
   } finally {
