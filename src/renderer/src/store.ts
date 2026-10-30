@@ -764,10 +764,6 @@ export const set: typeof useStore.setState = ((partial: Parameters<typeof useSto
     // the parts unchanged stay the objects the window has, so only what shows a changed one renders again, and a part
     // the same throughout changes nothing.
     const rest: Partial<State> = { ...update }
-    // The provider order only goes forward (HI-1965): settings from a reply older than main's newer settings-changed (a
-    // settings:get or settings:update answered late) keep the newer order and its revision.
-    const was = before.settings
-    if (rest.settings && was && rest.settings.providerOrderRevision < was.providerOrderRevision) rest.settings = { ...rest.settings, providerOrder: was.providerOrder, providerOrderRevision: was.providerOrderRevision }
     for (const k of KEPT_SAME) {
       if (!(k in rest) || !rest[k] || !before[k]) continue
       const kept = keepSame(before[k], rest[k])

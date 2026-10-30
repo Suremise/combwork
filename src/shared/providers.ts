@@ -453,9 +453,10 @@ export function isProviderEnabled(settings: Pick<AppSettings, 'providers'> | nul
 type OrderedSettings = Pick<AppSettings, 'providers'> & Partial<Pick<AppSettings, 'providerOrder'>>
 
 /**
- * Every provider in the user's order (HI-1965: Settings → Providers, reordered): those `providerOrder` names first, as
- * listed, then any it doesn't (one added since, or none saved) in Hive's own order (PROVIDERS'). Ids it names that
- * this Hive doesn't know (a newer Hive's) are skipped, not dropped from the setting. Automatic picks from this order.
+ * Every provider in the user's order (HI-1965; one saved by 0.9's Settings → Providers, which no screen sets since
+ * decision A, HI-2113): those `providerOrder` names first, as listed, then any it doesn't (one added since, or none
+ * saved) in Hive's own order (PROVIDERS'). Ids it names that this Hive doesn't know (a newer Hive's) are skipped, not
+ * dropped from the setting. Automatic picks from this order.
  */
 export function orderedProviders(settings: Partial<Pick<AppSettings, 'providerOrder'>> | null | undefined): ProviderDescriptor[] {
   const order = Array.isArray(settings?.providerOrder) ? settings.providerOrder : []
@@ -489,20 +490,6 @@ export function inProviderOrder<T>(items: readonly T[], providerOf: (t: T) => Pr
     out.push(...run.sort((a, b) => rank.get(providerOf(a)!)! - rank.get(providerOf(b)!)!))
   }
   return out
-}
-
-/**
- * The order with one provider moved to place `toIndex` (0 first; past the end: last), as `providerOrder` saves it:
- * every known provider, in order, with ids of providers this Hive doesn't know kept at the end. A move names where the
- * user put it, so main applies it to the order as it is when the move comes (HI-1965, HR2's round 2).
- */
-export function providerOrderWith(settings: Partial<Pick<AppSettings, 'providerOrder'>> | null | undefined, id: ProviderId, toIndex: number): ProviderId[] {
-  const ids = orderedProviders(settings).map((p) => p.id)
-  const from = ids.indexOf(id)
-  const to = Math.max(0, Math.min(ids.length - 1, toIndex))
-  if (from >= 0 && to !== from) ids.splice(to, 0, ...ids.splice(from, 1))
-  const unknown = (Array.isArray(settings?.providerOrder) ? settings.providerOrder : []).filter((x) => !isKnownProvider(x))
-  return [...ids, ...unknown]
 }
 
 export function enabledProviders(settings: OrderedSettings | null | undefined): ProviderDescriptor[] {

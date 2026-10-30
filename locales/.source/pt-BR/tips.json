@@ -388,8 +388,6 @@
   "tips.projectTabsKeys.title": "Alt and a number for each tab",
   "tips.projectTabsSettings.text": "The last item of More ▾, at the end of a project's tabs, is Project Settings…, with its shortcut (Alt+0 unless you change it).",
   "tips.projectTabsSettings.title": "Project Settings from More ▾",
-  "tips.providerOrder.text": "Reorder the list in Settings → Providers by dragging a provider, or with Move Up and Move Down in its ⋯ menu: Automatic gives new agents the first one in that order that is turned on and installed, say Codex before Claude Code.",
-  "tips.providerOrder.title": "Choose which coding agent Automatic tries first",
   "tips.quitWhenDone.text": "Quitting while an agent works offers Quit when agents finish: Hive hides and quits by itself once they're done. Conversations are always kept.",
   "tips.quitWhenDone.title": "Quit when agents finish",
   "tips.recentWorkspaces.text": "Remove a workspace from File → Open Recent or the welcome page with its ✕, or right-click it. Clear Recently Opened forgets them all; folders that are gone show as not found.",
