@@ -1247,9 +1247,8 @@ const eligible = (store: Store, r: DeliveryRecord, by: HandOut = 'offer'): boole
  * The Assistant's own wakes aren't held (it follows the pause).
  */
 function pauseHeld(store: Store, r: DeliveryRecord): boolean {
-  if (!pauseHolds(r)) return false
-  const ws = workspaceFor(store.host)
-  return !!ws && !ws.isAssistantHome(store.host) && !!pausedFor(store.host)
+  if (!pauseHolds(r) || workspaceFor(store.host)?.isAssistantHome(store.host)) return false
+  return !!pausedFor(store.host)
 }
 
 /** Whether a delivery's source still holds it (its `holds`), for this way of giving it out; one with no source does. */
@@ -1924,7 +1923,7 @@ export function initDeliveries(): void {
  * The deliveries a team's pause held in a workspace (HI-2081): unread, and of a held kind, each with its expiry moved on
  * by how long the pause lasted, then offered (made again from its source first, so what is no longer due is cancelled).
  */
-async function rebaseHeld(workspacePath: string, since: string): Promise<void> {
+export async function rebaseHeld(workspacePath: string, since: string): Promise<void> {
   const held = Math.max(0, Date.now() - (Date.parse(since) || Date.now()))
   for (const store of [...stores.values()]) {
     if (!inFolder(store.host, workspacePath) || workspaceFor(store.host)?.isAssistantHome(store.host)) continue
