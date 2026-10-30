@@ -244,15 +244,8 @@ describe("the summary read again only when what it's read from changed (HI-2115)
     git(proj, 'branch', '--unset-upstream')
     expect((await reread()).upstream).toBeNull()
     await same()
-    // An include the repository's config names, its file written only once the summary is kept: its remote shows.
-    mkdirSync(outer, { recursive: true })
-    const included = join(outer, 'included.gitconfig')
-    git(proj, 'config', 'include.path', included.replace(/\\/g, '/'))
-    await same()
-    writeFileSync(included, `[remote "inc"]\n\turl = ${remote.replace(/\\/g, '/')}\n`)
-    expect((await reread()).remotes).toEqual(['backup', 'inc', 'origin'])
-    await same()
     // The global config (a file of this test's): a remote added there only, nothing of the repository changed.
+    mkdirSync(outer, { recursive: true })
     const global = join(outer, 'global.gitconfig')
     writeFileSync(global, '')
     const was = process.env.GIT_CONFIG_GLOBAL
@@ -260,11 +253,26 @@ describe("the summary read again only when what it's read from changed (HI-2115)
     try {
       await same()
       writeFileSync(global, `[remote "glob"]\n\turl = ${remote.replace(/\\/g, '/')}\n`)
-      expect((await reread()).remotes).toEqual(['backup', 'glob', 'inc', 'origin'])
+      expect((await reread()).remotes).toEqual(['backup', 'glob', 'origin'])
       await same()
+      // An include in the global config: not plain, so git each time.
+      writeFileSync(global, `[remote "glob"]\n\turl = ${remote.replace(/\\/g, '/')}\n[include]\n\tpath = elsewhere.config\n`)
+      expect((await reread()).remotes).toEqual(['backup', 'glob', 'origin'])
+      await reread()
     } finally {
       process.env.GIT_CONFIG_GLOBAL = was
     }
+  })
+
+  it("an include in the repository's config: not plain, so git each time (HR3's HI-2115 round 2, finding 2)", async () => {
+    await same()
+    // HR3's case: an include whose path line carries a comment, its file written only after the summary was read.
+    writeFileSync(join(proj, '.git', 'config'), `${readFileSync(join(proj, '.git', 'config'), 'utf8')}[include]\n\tpath = later.config # this file arrives later\n`)
+    expect((await reread()).remotes).toEqual(['origin'])
+    await reread()
+    writeFileSync(join(proj, '.git', 'later.config'), `[remote "later"]\n\turl = ${remote.replace(/\\/g, '/')}\n`)
+    expect((await reread()).remotes).toEqual(['later', 'origin'])
+    await reread()
   })
 
   it("a branch whose commit the files can't give (reftable, unborn) is never kept (HR3's HI-2115 round 1, finding 2)", async () => {

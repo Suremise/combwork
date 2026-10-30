@@ -2,7 +2,7 @@
 // which git's worker runs off main's thread (HI-1814), and refSync for the reads that must be synchronous. Only Node's
 // built-ins here: git's worker loads it, and a worker can't load Electron.
 
-import { readdirSync, readFileSync, statSync } from 'original-fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'original-fs'
 import { dirname, join, resolve } from 'path'
 
 /** A line or folder name → the commit it is at, read from the ref files. */
@@ -119,6 +119,31 @@ function foldersOf(common: string): { folder: string; gitDir: string }[] {
 /** Whether a common git dir is a main folder's `.git` (not a bare repository). */
 export function isMainGitDir(common: string): boolean {
   return /[\\/]\.git$/i.test(common)
+}
+
+/**
+ * HI-2115's one rule for Hive's git caches (the Assistant's design call after HR3's round 2): only a plain repository's
+ * answers are reused, anything else is git's every time. Plain: refs in files (no reftable); no replacements, grafts or
+ * shallow history (in the repository, or named in the environment); and no `include` or `includeIf` anywhere in the
+ * config files given (a plain text search, never parsed): `gitDir`'s `config.worktree` and the common dir's `config`
+ * always, and `configs` (others git reads). Checked before every reuse.
+ */
+export function plainRepo(common: string, gitDir: string = common, configs: readonly string[] = []): boolean {
+  const env = process.env
+  if (env.GIT_SHALLOW_FILE || env.GIT_GRAFT_FILE || env.GIT_REPLACE_REF_BASE) return false
+  if (existsSync(join(common, 'reftable')) || existsSync(join(common, 'shallow')) || existsSync(join(common, 'info', 'grafts')) || existsSync(join(common, 'refs', 'replace'))) return false
+  if (/ refs\/replace\//.test(textOf(join(common, 'packed-refs')))) return false
+  for (const f of [join(common, 'config'), join(gitDir, 'config.worktree'), ...configs]) if (/include/i.test(textOf(f))) return false
+  return true
+}
+
+/** A file's text, or '' when there's none to read. */
+function textOf(file: string): string {
+  try {
+    return readFileSync(file, 'utf8')
+  } catch {
+    return ''
+  }
 }
 
 /** What a git dir's HEAD names (`refs/heads/x`), when it is a symbolic ref. */

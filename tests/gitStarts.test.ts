@@ -99,6 +99,31 @@ describe('answers about fixed commits, kept', () => {
     expect(plain).toEqual({ v: true, ran: [] })
   })
 
+  it("a reftable repository is never plain: a replacement inside the reftable is git's answer at once (HR3's round 2, finding 1)", async () => {
+    const repo = join(tempDir('kept-reftable-'), 'repo')
+    sh(join(repo, '..'), 'init', '-q', '--ref-format=reftable', '-b', 'main', repo)
+    const a = commit(repo, { 'a.txt': 'a\n' }, 'a')
+    const b = commit(repo, { 'b.txt': 'b\n' }, 'b')
+    sh(repo, 'switch', '-q', '-c', 'line', a)
+    const c = commit(repo, { 'c.txt': 'c\n' }, 'c')
+    const before = await counted(() => isAncestor(repo, c, b))
+    expect(before.v).toBe(false)
+    expect((await counted(() => isAncestor(repo, c, b))).ran.length).toBe(1)
+    sh(repo, 'replace', b, sh(repo, 'commit-tree', `${b}^{tree}`, '-p', c, '-m', 'fake'))
+    expect(await isAncestor(repo, c, b)).toBe(true)
+  })
+
+  it('another replace namespace named in the environment: never kept', async () => {
+    const { repo, a, b } = history()
+    process.env.GIT_REPLACE_REF_BASE = 'refs/other-replace/'
+    try {
+      expect((await counted(() => isAncestor(repo, a, b))).ran.length).toBe(1)
+      expect((await counted(() => isAncestor(repo, a, b))).ran.length).toBe(1)
+    } finally {
+      delete process.env.GIT_REPLACE_REF_BASE
+    }
+  })
+
   it('a shallow repository: asked each time; deepened, the answers are the whole history’s', async () => {
     const { repo, a, b } = history()
     const shallow = join(repo, '..', 'shallow')

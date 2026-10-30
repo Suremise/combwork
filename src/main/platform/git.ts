@@ -9,7 +9,7 @@ import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync
 import { access } from 'original-fs/promises'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
 import { git } from '../git'
-import { refSync } from './repoRefs'
+import { plainRepo, refSync } from './repoRefs'
 import type { FileChange } from '../../shared/workflow/facts'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 import { isUnknown, unknown, withDetail, type Change, type Containment, type Maybe } from './types'
@@ -80,17 +80,18 @@ const kept = new Map<string, unknown>()
  * HI-2115: an answer about fixed commits (full ids) that can't change, kept for as long as Hive runs, not only for a
  * step: whether one is another's ancestor, their merge base, a range's first parents. The reconciler asked them again
  * at every ref change for every card under way (a git each, several a second while lanes build). Unknown answers are
- * asked again. Kept only for the plain commit graph: while history can be rewritten under the same ids (a shallow
- * repository, replace refs, grafts: `rewritable`) nothing is kept or answered from what was, checked before each answer
- * kept is given and again before one is kept (it may have changed while git ran). An answer kept for the plain graph
- * holds whenever the repository is plain again: its commits are the same objects. Keyed by the common git dir, so a
+ * asked again. Kept only for a plain repository (`plainRepo`, the one rule of Hive's git caches): otherwise (replace
+ * refs, grafts or shallow history can give the same ids other answers; a reftable can hold replacements unseen) nothing
+ * is kept or answered from what was, checked before each answer kept is given and again before one is kept (it may
+ * have changed while git ran). An answer kept for a plain repository holds whenever it is plain again: its commits are
+ * the same objects. Keyed by the common git dir, so a
  * project and its linked worktrees share the answers about the same commits, and a slot reused for another repository
  * never sees the other's.
  */
 function onceForever<T>(repo: string, what: string, ids: string[], ask: () => Promise<Maybe<T>>): Promise<Maybe<T>> {
   if (!ids.every((id) => SHA.test(id))) return onceInStep(repo, what, ids, ask)
   const common = commonDirSync(repo)
-  if (!common || rewritable(common)) return onceInStep(repo, what, ids, ask)
+  if (!common || !plainRepo(common)) return onceInStep(repo, what, ids, ask)
   const key = [common.toLowerCase(), what, ...ids].join('\0')
   if (kept.has(key)) {
     const v = kept.get(key) as Maybe<T>
@@ -100,28 +101,11 @@ function onceForever<T>(repo: string, what: string, ids: string[], ask: () => Pr
     return Promise.resolve(v)
   }
   return onceInStep(repo, what, ids, ask).then((v) => {
-    if (isUnknown(v) || rewritable(common)) return v
+    if (isUnknown(v) || !plainRepo(common)) return v
     kept.set(key, v)
     if (kept.size > KEPT_MAX) kept.delete(kept.keys().next().value!)
     return v
   })
-}
-
-/**
- * Whether a repository's history can differ under the same commit ids: shallow (or another shallow file named), replace
- * refs (loose or packed), grafts (or another graft file named).
- */
-function rewritable(common: string): boolean {
-  if (process.env.GIT_SHALLOW_FILE || process.env.GIT_GRAFT_FILE) return true
-  return existsSync(join(common, 'shallow')) || existsSync(join(common, 'info', 'grafts')) || existsSync(join(common, 'refs', 'replace')) || / refs\/replace\//.test(packedRefs(common))
-}
-
-const packedRefs = (common: string): string => {
-  try {
-    return readFileSync(join(common, 'packed-refs'), 'utf8')
-  } catch {
-    return ''
-  }
 }
 
 /** Tests: forgets the answers kept between steps. */

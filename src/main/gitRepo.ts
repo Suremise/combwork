@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { homedir } from 'os'
-import { basename, dirname, isAbsolute, join, resolve } from 'path'
+import { basename, join, resolve } from 'path'
 import { agentPlace, folderFacts } from './agentFolders'
 import { readFile, stat } from 'original-fs/promises'
 import { projectAgents } from '../shared/defaults'
@@ -42,6 +42,7 @@ import {
 import { localUse, remoteKept } from '../shared/branchCleanup'
 import { samePath } from '../shared/movePaths'
 import * as G from './platform/git'
+import { plainRepo } from './platform/repoRefs'
 import { resolvedOf } from './workflow/rulesets'
 import { workBadges } from './workflow/cardWork'
 import { workflowWrite } from './workflow/writes'
@@ -201,18 +202,20 @@ interface KeyBasis {
 /**
  * HI-2115: what a folder's summary is read from, from its files with no git process: HEAD, the branch's and its
  * upstream's commits, the packed refs, and every config file git reads there (remotes and upstreams can come from any):
- * those its last read named, the repository's own, the global ones whether they exist yet or not, and each file an
- * include in them names. The status bar reads the summary again at each usage change of the project's agents (several a
- * second while lanes build): the same key is git's same answer. Null where the files can't say: no `.git` of its own,
- * an upstream whose ref isn't read from them, or config given in the environment.
+ * those its last read named, the repository's own, and the global ones whether they exist yet or not. The status bar
+ * reads the summary again at each usage change of the project's agents (several a second while lanes build): the same
+ * key is git's same answer. Only for a plain repository (plainRepo, the one rule of Hive's git caches), every one of
+ * those config files free of includes: null otherwise, as where the files can't say (no `.git` of its own, a branch or
+ * an upstream whose commit isn't read from them) or config is given in the environment.
  */
 async function summaryKey(root: string, basis: KeyBasis): Promise<string | null> {
   if (process.env.GIT_CONFIG_PARAMETERS || process.env.GIT_CONFIG_COUNT || process.env.GIT_CONFIG) return null
   const own = G.gitDirSync(root)
   const common = own ? G.commonDirSync(root) : null
   if (!own || !common) return null
-  // Refs in a reftable aren't in the files read here: nothing of them can be seen to change (HR3's HI-2115 round 1).
-  if (await exists(join(common, 'reftable'))) return null
+  const configs = [...new Set([...basis.configs, join(common, 'config'), join(own, 'config.worktree'), ...globalConfigs()].map((f) => resolve(f).toLowerCase()))].sort()
+  // A reftable's refs, an include's files, replacements: what can change the answer unseen gets no key (HR3's rounds 1, 2).
+  if (!plainRepo(common, own, configs)) return null
   const head = await readFile(join(own, 'HEAD'), 'utf8').then((h) => h.trim(), () => null)
   if (head === null) return null
   const ref = /^ref: (.+)$/.exec(head)?.[1]
@@ -225,7 +228,6 @@ async function summaryKey(root: string, basis: KeyBasis): Promise<string | null>
     if (!up) return null
   }
   const at = (p: string): Promise<string> => stat(p).then((s) => `${s.mtimeMs}:${s.size}`, () => '-')
-  const configs = await configFiles(basis.configs, [join(common, 'config'), join(own, 'config.worktree'), ...globalConfigs()])
   const stats = await Promise.all([join(common, 'packed-refs'), ...configs].map(at))
   return JSON.stringify([own.toLowerCase(), head, commit, up, configs, stats])
 }
@@ -235,27 +237,6 @@ function globalConfigs(): string[] {
   if (process.env.GIT_CONFIG_GLOBAL) return [process.env.GIT_CONFIG_GLOBAL]
   const home = process.env.HOME || homedir()
   return [join(home, '.gitconfig'), process.env.XDG_CONFIG_HOME ? join(process.env.XDG_CONFIG_HOME, 'git', 'config') : join(home, '.config', 'git', 'config')]
-}
-
-/**
- * The config files `named` and `more`, with each file an `include` or `includeIf` in them names (whatever its condition,
- * existing or not, as deep as they go), lower-cased and sorted: a file added, changed or removed changes the key.
- */
-async function configFiles(named: readonly string[], more: readonly string[]): Promise<string[]> {
-  const seen = new Map<string, string>()
-  const queue = [...named, ...more]
-  while (queue.length && seen.size < 64) {
-    const file = resolve(queue.shift()!)
-    if (seen.has(file.toLowerCase())) continue
-    seen.set(file.toLowerCase(), file)
-    const text = await readFile(file, 'utf8').catch(() => '')
-    for (const m of text.matchAll(/^\s*path\s*=\s*"?([^"\r\n]*?)"?\s*$/gim)) {
-      const p = m[1].trim()
-      if (!p) continue
-      queue.push(p.startsWith('~/') ? join(process.env.HOME || homedir(), p.slice(2)) : isAbsolute(p) ? p : join(dirname(file), p))
-    }
-  }
-  return [...seen.keys()].sort()
 }
 
 /** What a summary reads from the git dir's files each time: a merge or rebase under way, and the last fetch. */

@@ -21,7 +21,7 @@ import { dirname, isAbsolute, join, resolve, sep } from 'path'
 import { git, readRefsOffMain } from '../git'
 import { createLogger, userText } from '../logger'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { isMainGitDir, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
+import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { unknown, type Maybe } from './types'
 
@@ -618,9 +618,6 @@ export class Observer {
     const p = this.projects.get(resolve(project).toLowerCase())
     const r = p?.repo ? this.repos.get(p.repo.toLowerCase()) : undefined
     if (!r) return null
-    // Refs in a reftable aren't in the files these reads walk: nothing of them can be seen to move (HR3's HI-2115 round 1,
-    // finding 2).
-    if (existsSync(join(r.common, 'reftable'))) return null
     // The folder's own HEAD as it is written (the branch it names, or its commit): a switch between two branches at the
     // same commit with no reflog moves nothing the reads compare (HR3's round 1, finding 1).
     const gitDir = r.gitDirOf(folder)
@@ -630,7 +627,9 @@ export class Observer {
     } catch {
       return null
     }
-    if (!head) return null
+    // Only a plain repository (plainRepo, the one rule of Hive's git caches): a reftable's refs, say, aren't in the files
+    // these reads walk, so nothing of them can be seen to move (HR3's HI-2115 rounds 1 and 2).
+    if (!head || !plainRepo(r.common, gitDir!)) return null
     r.read()
     await r.current()
     if (this.repos.get(p!.repo!.toLowerCase()) !== r || !r.watches(folder) || r.gitDirOf(folder) !== gitDir) return null
