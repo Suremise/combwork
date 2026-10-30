@@ -14,6 +14,9 @@ import { tempDir } from './tempDir'
 // Every child gets the run context's allowlisted environment (tests/e2e/runContext.cjs), never this shell's; the
 // grandchild below is given its parent's, which is that.
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
+// A process the test holds no handle of (the grandchild below) is ended by its identity, never by its pid (#603).
+type Identity = { pid: number; started: number }
+const { identify, endExactly } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { identify: (pids: number[]) => Identity[]; endExactly: (targets: Identity[]) => number }
 
 // The next Hive's side (agentProcesses.ts) reads its profile: a folder of the test's own.
 const profile = vi.hoisted(() => ({ dir: '' }))
@@ -59,15 +62,6 @@ const started: ChildProcess[] = []
 afterEach(() => {
   for (const c of started.splice(0)) if (c.exitCode === null && c.signalCode === null) c.kill()
 })
-
-const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
-}
 
 /** A process that waits, the test's own. */
 function sleeper(): ChildProcess {
@@ -160,12 +154,15 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     await exited(middle)
     await waitFor(() => expect(existsSync(pidFile)).toBe(true))
     const grandchild = Number(readFileSync(pidFile, 'utf8'))
+    // Taken while it is known to run (it sleeps two minutes): what the clean-up below ends, and nothing given its pid since.
+    const identity = identify([grandchild])
     try {
+      expect(identity).toHaveLength(1)
       k.say('keep')
       await waitFor(() => expect(k.state('j4')).toMatchObject({ state: 'live', members: expect.arrayContaining([expect.objectContaining({ pid: grandchild })]) }))
       expect(k.proc.exitCode).toBeNull()
     } finally {
-      if (alive(grandchild)) process.kill(grandchild)
+      endExactly(identity)
     }
     await exited(k.proc)
     expect(k.state('j4')).toMatchObject({ state: 'ended', total: 0 })
