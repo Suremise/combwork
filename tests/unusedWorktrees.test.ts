@@ -36,7 +36,9 @@ const { addAgent, reserveForRemoval, worktreeChecks } = await import('../src/mai
 const { gitTestHooks } = await import('../src/main/git')
 const { gitOnPath, setGitToolForTests } = await import('../src/main/gitTool')
 // Paths compared as places: git lists the long names of folders Hive may know by short (8.3) ones, as on CI (#389).
-const { placeKey, withFileLock } = await import('../src/main/fsutil')
+const { fileLockDepth, placeKey, withFileLock } = await import('../src/main/fsutil')
+const { commonGitDir } = await import('../src/main/repoLock')
+const { REPO_LOCK_FILE } = await import('../src/main/repoLockCore')
 
 // Real git work, not a wait (#555): a test here runs 20 to 70 git commands, about 35 ms each alone, about 0.3 s each and
 // up to 1.3 s under a full unit run beside other runs (measured: 12 s for one test, against 2 s alone), and more under
@@ -645,20 +647,30 @@ describe('in the Changes tab (#400)', () => {
     const t = await tree(`fenced${++n}`)
     commit(t.path, `f${n}.txt`)
     const head = git(proj, 'rev-parse', 'main')
-    // Another merge into this project folder holds its turn, so this one waits after it was checked.
-    let done!: () => void
-    const other = withFileLock(join(w.assertProject(proj), '.git', 'hive-merge'), () => new Promise<void>((r) => (done = r)))
+    // Another merge into this repository holds its turn (its repository lock, held in this process as withRepoLock
+    // holds it: HI-2147, a file name from before #1347 fenced nothing), so this one waits after it was checked. Let go
+    // of whatever fails below, and the merge settled, so no later test here waits on the real lock behind it.
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    const lock = join(await commonGitDir(proj), REPO_LOCK_FILE)
+    const other = withFileLock(lock, () => held)
     const merging = run(() => mergeUnused(proj, t.path, { squash: false, message: `Work from ${t.branch}`, cleanup: false }))
-    // Meanwhile Add Agent picks it as an existing worktree: refused (no agent is pinned to a worktree in 1.0), the
-    // project's agents unchanged.
-    await expect(run(() => addAgent(proj, { name: 'Late', location: 'existing-worktree', worktreePath: t.path }))).rejects.toThrow(/aren’t pinned to worktrees/)
-    expect(JSON.parse(readFileSync(join(proj, '.hive', 'project.json'), 'utf8')).agents).toEqual([])
-    // A second merge or a removal of it waits for neither: refused while this one has it.
-    await expect(run(() => mergeUnused(proj, t.path, { squash: false, message: 'twice', cleanup: false }))).rejects.toThrow(/already being removed or merged/)
-    expect(await run(() => removeUnusedWorktree(proj, t.path))).toMatchObject({ deleted: false, reason: 'That worktree is already being removed or merged.' })
-    expect(git(proj, 'rev-parse', 'main')).toBe(head)
-    done()
-    await other
+    try {
+      await vi.waitFor(() => expect(fileLockDepth(lock)).toBe(2), { timeout: GIT_HUNG_MS, interval: 20 })
+      // Meanwhile Add Agent picks it as an existing worktree: refused (no agent is pinned to a worktree in 1.0), the
+      // project's agents unchanged.
+      await expect(run(() => addAgent(proj, { name: 'Late', location: 'existing-worktree', worktreePath: t.path }))).rejects.toThrow(/aren’t pinned to worktrees/)
+      expect(JSON.parse(readFileSync(join(proj, '.hive', 'project.json'), 'utf8')).agents).toEqual([])
+      // A second merge or a removal of it waits for neither: refused while this one has it.
+      await expect(run(() => mergeUnused(proj, t.path, { squash: false, message: 'twice', cleanup: false }))).rejects.toThrow(/already being removed or merged/)
+      expect(await run(() => removeUnusedWorktree(proj, t.path))).toMatchObject({ deleted: false, reason: 'That worktree is already being removed or merged.' })
+      expect(git(proj, 'rev-parse', 'main')).toBe(head)
+    } finally {
+      release()
+      await other
+      await merging.catch(() => undefined)
+    }
+    await vi.waitFor(() => expect(fileLockDepth(lock)).toBe(0), { timeout: GIT_HUNG_MS, interval: 20 })
     expect(await merging).toMatchObject({ ok: true })
     expect(existsSync(join(proj, `f${n}.txt`))).toBe(true)
     expect(existsSync(t.path)).toBe(true)
