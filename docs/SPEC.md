@@ -4691,12 +4691,14 @@ decided again in it):
 to park, and Hive's own automation started two of them again (a lane's next card, a verdict's loop wake), while someone
 checked every agent and process by hand.
 
-- **The pause** is a workspace's, saved in `.hive/team-pause.json` (`{ pauseId, since, by, version }`, version: Hive's, HI-2156) before anything is held or
-  told (a failed save holds and tells nothing), read once into memory, and asked by every gate; pause, resume and the gates'
-  final checks take the workspace's lock. **Pause the Team** (the Progress panel's Lanes, the command palette, Help → Check
-  for Updates' *Pause the Team First*) pauses every open workspace with one id, kept in the profile too, so a workspace
-  opened while it lasts is held by it; a workspace whose save fails is named, and the app is never parked while one isn't
-  paused. The Assistant's `hive_team` (Control agents, through `assistantChange`) pauses and resumes its own workspace only;
+- **The pause** is a workspace's (`{ pauseId, since, by }`), held in memory by the running Hive and asked by every gate,
+  status included (`hive_team`, `GET /v1/team`, the band), so they give one answer; pause, resume and the gates' final
+  checks take the workspace's lock. **Not kept across a restart** (HI-2156, the Assistant's design call): a restart (an
+  update, a reboot, a crash) ends every agent a pause held, so Hive starts unpaused, and removes the files earlier builds
+  saved a pause in (the profile's `team-pause.json` and `team-pause-closing.json` at start, a workspace's
+  `.hive/team-pause.json` as it is first asked). **Pause the Team** (the Progress panel's Lanes, the command palette,
+  Help → Check for Updates' *Pause the Team First*) pauses every open workspace with one id, so a workspace opened while
+  it lasts is held by it; a workspace it can't pause is named, and the app is never parked while one isn't paused. The Assistant's `hive_team` (Control agents, through `assistantChange`) pauses and resumes its own workspace only;
   its status names another open workspace only as one line, with none of its agents; project agents are refused (`403`).
   The same hold with the workflow rules off: it is about not starting new work.
 - **What it holds** (each at its last step, and never dropping anything):
@@ -4740,18 +4742,10 @@ checked every agent and process by hand.
   brings forward the window showing it and never switches this one; the band shows in a workspace with no lanes too, HI-2095), or *All parked: safe to install* with **Install Now**
   once an update is ready. Install Now scans every open workspace again in main, under their locks, and installs only if
   each is paused and parked. The Updates dialog shows the same band. The status bar says *Team paused* (or *Team parked*).
-- **Resume** lifts the pause (the user's resumes every open workspace and the profile's): lanes look again, the pool and the
-  merge queue pass, held deliveries are rebased and offered, restart recovery resumes what waited. **After an update's
-  restart** the pause is lifted before anything reads it only when the closing record (`team-pause-closing.json`, written as
-  Hive closes, replacing any earlier one, read and removed at the next start) says the close was an install or an update and
-  names this very pause; and a pause saved by another version of Hive (the workspace's or the profile's) is lifted as it
-  is read, however Hive closed for the update (the installer run by hand after a plain quit too, HI-2156). Otherwise a
-  crash, a plain quit or an older record keeps it, and the window asks once as it opens, *The team was paused at <time>
-  (before an update)*, *Resume it?*, with **Resume the Team**.
-- **One answer everywhere** (HI-2156): status (`hive_team`, `GET /v1/team`, the band) and every gate read the same
-  pause, the user's included where it holds a workspace. A workspace resumed on its own (the Assistant's resume) leaves the
-  user's pause: it no longer holds that workspace, in this run or after a restart (the profile's file names it,
-  `resumedIn`), and it goes once no other open workspace is held by it. **Pause the Team** again holds every one.
+- **Resume** lifts the pause (the user's resumes every open workspace and ends Pause the Team): lanes look again, the pool
+  and the merge queue pass, held deliveries are rebased and offered, restart recovery resumes what waited. The Assistant's
+  resume of its workspace takes it out of Pause the Team, which then ends with the last workspace it held (HI-2156).
+  **After any restart** the team runs: nothing of a pause is kept.
 - **Not here:** pausing the user's own sessions (they stop with the install as before), or a pause of one project.
 
 ### 16.11 Lanes, with or without the Assistant

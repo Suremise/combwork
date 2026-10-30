@@ -11,7 +11,7 @@ import { onHiveEvent } from './events'
 import { orphansOf } from './orphanProcesses'
 import { progress } from './progressService'
 import { sessions } from './sessions'
-import { appPause, pauseSaveState, teamPauseOf, withLock } from './teamPause'
+import { appPause, teamPauseOf, withLock } from './teamPause'
 import { restartAndInstall, updateState } from './updater'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { openWorkspaces, type WorkspaceService } from './workspace'
@@ -93,9 +93,6 @@ export async function scanWorkspace(ws: WorkspaceService, asker: ScanAsker = {})
   const items: ParkedItem[] = []
   const cant = (what: string): void => void items.push({ project: '', agent: '', agentId: '', state: 'unknown', kind: 'scan', what })
   try {
-    // Its pause not saved (round 1, finding 2): held, but not one the next start would know; never parked.
-    const saved = pauseSaveState(ws)
-    if (saved !== 'saved') cant(saved === 'pending' ? "its pause isn't saved yet" : `its pause couldn't be saved: ${saved.failed}`)
     // Every run still open in the workspace (a test run, a check in a copy, a merge, a slot's warming): by its agent.
     const open = progress.list(path).filter((r) => r.finishedAt === null)
     for (const r of open) items.push({ project: r.projectPath ? basename(r.projectPath) : '', agent: r.agentName, agentId: r.agentId ?? '', state: 'busy', kind: r.defaultName === 'mergeQueue' ? 'merge' : r.defaultName === 'copy' ? 'copy' : 'run', label: r.title, what: `${r.title} (Progress run, ${Math.max(0, Math.round((Date.now() - r.startedAt) / 60_000))} min)`, run: r.id, since: new Date(r.startedAt).toISOString() })

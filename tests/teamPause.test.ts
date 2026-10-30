@@ -1,8 +1,8 @@
-// Pausing the team before an update (HI-2081, SPEC §16.10.9): a workspace's pause saved before it holds anything (a
-// failed save holds and tells nothing), each running agent told once a pause, the user's pause holding a workspace opened
-// while it lasts, the update's restart lifting only the pause its close named (HR1's s10 check: a crash, a plain quit or
-// an older record keeps it); and a paused workspace's running lanes paused, so none is due a start.
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+// Pausing the team before an update (HI-2081, SPEC §16.10.9): each running agent told once a pause, the user's pause
+// holding a workspace opened while it lasts, kept for the running Hive only (HI-2156: a start is unpaused and removes
+// what earlier builds saved), one answer for status, resume and lane starts; and a paused workspace's running lanes
+// paused, so none is due a start.
+import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { laneStartDue, laneView, type LaneRecord } from '../src/shared/lanes'
@@ -57,13 +57,12 @@ const profile = (): string => {
 }
 
 describe("a workspace's pause (HI-2081)", () => {
-  it('is saved before it holds: then each running agent is told once, with its id', async () => {
+  it('holds at once: then each running agent is told once, with its id', async () => {
     profile()
     const w = workspace()
     state.open = [w]
     state.live.add(`${join(w.path, 'alpha')}#b1`)
     const p = await tp.pauseTeam(ws(w), 'user')
-    expect(existsSync(join(w.path, '.hive', 'team-pause.json'))).toBe(true)
     expect(tp.teamPauseOf(ws(w))).toEqual(p)
     expect(tp.pausedFor(join(w.path, 'alpha'))).toEqual(p)
     expect(state.told).toEqual([expect.objectContaining({ agentId: 'b1', source: 'team-pause', ref: p.pauseId, body: TEAM_PAUSE_LINE })])
@@ -73,35 +72,19 @@ describe("a workspace's pause (HI-2081)", () => {
     expect(state.told).toHaveLength(1)
   })
 
-  it("whose save fails holds nothing and tells no one (HR1's s10 condition)", async () => {
-    profile()
-    const w = workspace()
-    state.open = [w]
-    state.live.add(`${join(w.path, 'alpha')}#b1`)
-    // The pause's file can't be written: a folder stands in its place.
-    mkdirSync(join(w.path, '.hive', 'team-pause.json'))
-    await expect(tp.pauseTeam(ws(w), 'user')).rejects.toThrow()
-    expect(tp.teamPauseOf(ws(w))).toBeNull()
-    expect(state.told).toEqual([])
-    // The user's pause of every workspace names it, and the app isn't parked while it isn't paused.
-    const r = await tp.pauseApp()
-    expect(r.failed.map((f) => f.workspacePath)).toEqual([w.path])
-  })
-
-  it('resumed, its file goes and the change says what it was (for the held deliveries to move on)', async () => {
+  it('resumed, the change says what it was (for the held deliveries to move on)', async () => {
     profile()
     const w = workspace()
     state.open = [w]
     const p = await tp.pauseTeam(ws(w), 'assistant')
     expect(await tp.resumeTeam(ws(w))).toBe(true)
-    expect(existsSync(join(w.path, '.hive', 'team-pause.json'))).toBe(false)
     expect(tp.teamPauseOf(ws(w))).toBeNull()
     expect(state.events.at(-1)).toMatchObject({ type: 'team-pause-changed', pause: null, was: p })
     expect(tp.resumedAt(join(w.path, 'alpha'))).toBeGreaterThan(0)
     expect(await tp.resumeTeam(ws(w))).toBe(false)
   })
 
-  it("the user's pause holds a workspace opened while it lasts; the user's resume lifts every one", async () => {
+  it("the user's pause holds a workspace opened while it lasts, the window told; the user's resume lifts every one", async () => {
     profile()
     const a = workspace()
     state.open = [a]
@@ -111,7 +94,7 @@ describe("a workspace's pause (HI-2081)", () => {
     const b = workspace()
     state.open = [a, b]
     expect(tp.teamPauseOf(ws(b))?.pauseId).toBe(r.pause!.pauseId)
-    await vi.waitFor(() => expect(existsSync(join(b.path, '.hive', 'team-pause.json'))).toBe(true), { timeout: 10_000 })
+    expect(state.events.at(-1)).toMatchObject({ type: 'team-pause-changed', workspacePath: b.path, pause: r.pause })
     const back = await tp.resumeApp()
     expect(back.done.sort()).toEqual([a.path, b.path].sort())
     expect(tp.teamPauseOf(ws(a))).toBeNull()
@@ -120,177 +103,70 @@ describe("a workspace's pause (HI-2081)", () => {
   })
 })
 
-describe("the update's restart lifts only the pause its close named (HR1's s10 check)", () => {
-  /** Pauses a workspace, closes with `reason`, then starts again: its pause as the next start reads it. */
-  async function afterClose(reason: string | null, change?: (w: { path: string }) => Promise<void>): Promise<unknown> {
-    profile()
+describe('one answer, for this running Hive only (HI-2156)', () => {
+  it('a start with pauses an earlier build saved: unpaused, and their files removed', async () => {
+    const dir = profile()
     const w = workspace()
     state.open = [w]
-    await tp.pauseTeam(ws(w), 'user')
-    if (reason) await tp.recordPauseClosing(reason)
-    await change?.(w)
-    // The next start: nothing kept in memory, the closing record read once.
-    tp.resetTeamPauseForTests()
-    tp.loadPauseClosing()
-    return tp.teamPauseOf(ws(w))
-  }
-
-  it('an install or an update that closed under this pause: lifted', async () => {
-    expect(await afterClose('install')).toBeNull()
-    expect(await afterClose('update')).toBeNull()
-  })
-
-  it('a plain quit, a crash (no record), or a record naming an earlier pause: kept', async () => {
-    expect(await afterClose('quit')).not.toBeNull()
-    expect(await afterClose(null)).not.toBeNull()
-    // Closed for an install under one pause; resumed and paused again (another id) before a crash.
-    const kept = await afterClose('install', async (w) => {
-      await tp.resumeTeam(ws(w))
-      await tp.pauseTeam(ws(w), 'user')
-    })
-    expect(kept).not.toBeNull()
-  })
-
-  it('the record is read once: a later start keeps a newer pause', async () => {
-    profile()
-    const w = workspace()
-    state.open = [w]
-    await tp.pauseTeam(ws(w), 'user')
-    await tp.recordPauseClosing('install')
-    tp.resetTeamPauseForTests()
-    tp.loadPauseClosing()
+    const old = JSON.stringify({ pauseId: 'p-old', since: '2026-10-30T15:05:44.452Z', by: 'user' })
+    writeFileSync(join(dir, 'team-pause.json'), old)
+    writeFileSync(join(dir, 'team-pause-closing.json'), JSON.stringify({ reason: 'quit', at: '', pauses: [] }))
+    writeFileSync(join(w.path, '.hive', 'team-pause.json'), old)
+    tp.clearSavedPauses()
+    expect(tp.appPause()).toBeNull()
     expect(tp.teamPauseOf(ws(w))).toBeNull()
-    // Paused again, then a crash: the next start finds no record (removed as it was read).
-    await tp.pauseTeam(ws(w), 'user')
-    tp.resetTeamPauseForTests()
-    tp.loadPauseClosing()
-    expect(tp.teamPauseOf(ws(w))).not.toBeNull()
-  })
-})
-
-describe("the user's pause after a restart (HI-2156)", () => {
-  const appFile = (): string => join(state.profile, 'team-pause.json')
-  const setVersion = (v: string) => ((electron.app as unknown as { getVersion: () => string }).getVersion = () => v)
-  afterEach(() => setVersion('0.0.0-test'))
-
-  /** The user's pause of one workspace saved by `version` (none: before versions were recorded), then a start in this one. */
-  async function savedAppPause(version?: string): Promise<{ w: { path: string; info: () => unknown }; pauseId: string }> {
-    profile()
-    const w = workspace()
-    state.open = [w]
-    if (version) setVersion(version)
-    const r = await tp.pauseApp()
-    if (!version) {
-      // As one saved before versions were recorded: the profile's pause alone, the workspace's file gone.
-      writeFileSync(appFile(), JSON.stringify({ pauseId: r.pause!.pauseId, since: r.pause!.since, by: 'user' }))
-      rmSync(join(w.path, '.hive', 'team-pause.json'))
-    }
-    setVersion('0.0.0-test')
-    tp.resetTeamPauseForTests()
-    tp.loadPauseClosing()
-    return { w, pauseId: r.pause!.pauseId }
-  }
-
-  it('one saved without a version, its workspace resumed earlier: status and lane starts both see it, and resume lifts it for good', async () => {
-    const { w, pauseId } = await savedAppPause()
-    // Held, as lane starts see it, and the window's state says the same.
-    expect(tp.teamPauseOf(ws(w))?.pauseId).toBe(pauseId)
-    expect(() => refuseWhileTeamPaused(ws(w))).toThrow(/team is paused/)
-    const scan = await scanWorkspace(ws(w))
-    expect(scan.pause?.pauseId).toBe(pauseId)
-    // The Assistant's resume (its own workspace): lifted, the profile's pause with it (no other workspace held).
-    expect(await tp.resumeTeam(ws(w))).toBe(true)
     expect(() => refuseWhileTeamPaused(ws(w))).not.toThrow()
-    expect(existsSync(appFile())).toBe(false)
-    // The next start doesn't take it up again.
-    tp.resetTeamPauseForTests()
-    tp.loadPauseClosing()
-    expect(tp.teamPauseOf(ws(w))).toBeNull()
+    expect((await scanWorkspace(ws(w))).pause).toBeNull()
+    await vi.waitFor(() => expect([join(dir, 'team-pause.json'), join(dir, 'team-pause-closing.json'), join(w.path, '.hive', 'team-pause.json')].filter((f) => existsSync(f))).toEqual([]), { timeout: 10_000 })
   })
 
-  it('resumed on its own while another workspace is held: the user\'s pause stays for that one, not for this one after a restart', async () => {
+  it("the user's pause: status and lane starts agree; the Assistant's resume lifts it in its workspace, and it ends with the last workspace it held", async () => {
     profile()
-    const a = workspace()
-    const b = workspace()
+    const [a, b] = [workspace(), workspace()]
     state.open = [a, b]
     const r = await tp.pauseApp()
+    for (const w of [a, b]) {
+      expect((await scanWorkspace(ws(w))).pause?.pauseId).toBe(r.pause!.pauseId)
+      expect(() => refuseWhileTeamPaused(ws(w))).toThrow(/team is paused/)
+    }
     expect(await tp.resumeTeam(ws(a))).toBe(true)
-    expect(tp.teamPauseOf(ws(b))?.pauseId).toBe(r.pause!.pauseId)
-    expect(existsSync(appFile())).toBe(true)
-    tp.resetTeamPauseForTests()
-    tp.loadPauseClosing()
+    expect((await scanWorkspace(ws(a))).pause).toBeNull()
+    expect(() => refuseWhileTeamPaused(ws(a))).not.toThrow()
+    // Still held by it elsewhere; a isn't taken up by it again.
+    expect(tp.appPause()?.pauseId).toBe(r.pause!.pauseId)
     expect(tp.teamPauseOf(ws(a))).toBeNull()
-    expect(tp.teamPauseOf(ws(b))?.pauseId).toBe(r.pause!.pauseId)
-    // b resumed too: the profile's pause goes with the last workspace it held.
+    expect(() => refuseWhileTeamPaused(ws(b))).toThrow(/team is paused/)
     expect(await tp.resumeTeam(ws(b))).toBe(true)
-    expect(existsSync(appFile())).toBe(false)
+    expect(tp.appPause()).toBeNull()
+    // A workspace opened now isn't held.
+    const c = workspace()
+    state.open = [a, b, c]
+    expect(tp.teamPauseOf(ws(c))).toBeNull()
   })
 
-  it("resumed at once in several workspaces (HR1's round 1 finding): none is held again after a restart, and the last one held takes the user's pause with it", async () => {
+  it("resumed at once in several workspaces: each stays resumed, and the user's pause ends with the last", async () => {
     profile()
     const [a, b, c] = [workspace(), workspace(), workspace()]
     state.open = [a, b, c]
     const r = await tp.pauseApp()
     expect(await Promise.all([tp.resumeTeam(ws(a)), tp.resumeTeam(ws(b))])).toEqual([true, true])
-    tp.resetTeamPauseForTests()
-    tp.loadPauseClosing()
-    expect(tp.teamPauseOf(ws(a))).toBeNull()
-    expect(tp.teamPauseOf(ws(b))).toBeNull()
+    expect([tp.teamPauseOf(ws(a)), tp.teamPauseOf(ws(b))]).toEqual([null, null])
     expect(tp.teamPauseOf(ws(c))?.pauseId).toBe(r.pause!.pauseId)
-    // Every workspace resumed at once: the user's pause is gone.
-    profile()
-    const [d, e] = [workspace(), workspace()]
-    state.open = [d, e]
-    await tp.pauseApp()
-    expect(await Promise.all([tp.resumeTeam(ws(d)), tp.resumeTeam(ws(e))])).toEqual([true, true])
-    expect(existsSync(appFile())).toBe(false)
-    tp.resetTeamPauseForTests()
-    tp.loadPauseClosing()
-    expect(tp.teamPauseOf(ws(d))).toBeNull()
-    expect(tp.teamPauseOf(ws(e))).toBeNull()
+    expect(await tp.resumeTeam(ws(c))).toBe(true)
+    expect(tp.appPause()).toBeNull()
+    // Pause the Team again holds every one.
+    const again = await tp.pauseApp()
+    for (const w of [a, b, c]) expect(tp.teamPauseOf(ws(w))?.pauseId).toBe(again.pause!.pauseId)
   })
 
-  it("paused again over one saved by another version (HR1's round 2 finding): the lifted one's removal keeps the new pause", async () => {
-    // A workspace's: the Assistant's pause the first thing this start does.
+  it("the Assistant's own pause, then a restart: the next start is unpaused", async () => {
     profile()
     const w = workspace()
     state.open = [w]
-    setVersion('0.0.0-older')
-    const old = await tp.pauseTeam(ws(w), 'user')
-    setVersion('0.0.0-test')
+    await tp.pauseTeam(ws(w), 'assistant')
     tp.resetTeamPauseForTests()
-    tp.loadPauseClosing()
-    const p = await tp.pauseTeam(ws(w), 'assistant')
-    expect(p.pauseId).not.toBe(old.pauseId)
-    // Every queued step of its lock done (the lifted pause's removal among them).
-    await tp.withLock(ws(w), () => undefined)
-    expect(existsSync(join(w.path, '.hive', 'team-pause.json'))).toBe(true)
-    tp.resetTeamPauseForTests()
-    tp.loadPauseClosing()
-    expect(tp.teamPauseOf(ws(w))?.pauseId).toBe(p.pauseId)
-    // The profile's: Pause the Team over an older version's.
-    profile()
-    state.open = []
-    setVersion('0.0.0-older')
-    const oldApp = (await tp.pauseApp()).pause!
-    setVersion('0.0.0-test')
-    tp.resetTeamPauseForTests()
-    const first = (await tp.pauseApp()).pause!
-    expect(first.pauseId).not.toBe(oldApp.pauseId)
-    // Pausing again goes after the lifted pause's removal, and finds the new one kept.
-    const again = (await tp.pauseApp()).pause!
-    expect(again.pauseId).toBe(first.pauseId)
-    expect(tp.appPause()?.pauseId).toBe(first.pauseId)
-  })
-
-  it('one saved by another version (its update installed, however Hive closed): lifted at start; by this version: kept', async () => {
-    const { w } = await savedAppPause('0.0.0-older')
+    tp.clearSavedPauses()
     expect(tp.teamPauseOf(ws(w))).toBeNull()
-    expect(tp.appPause()).toBeNull()
-    await vi.waitFor(() => expect(existsSync(join(w.path, '.hive', 'team-pause.json'))).toBe(false), { timeout: 10_000 })
-    const same = await savedAppPause('0.0.0-test')
-    expect(tp.teamPauseOf(ws(same.w))?.pauseId).toBe(same.pauseId)
-    expect(tp.appPause()?.pauseId).toBe(same.pauseId)
   })
 })
 

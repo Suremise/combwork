@@ -1,15 +1,6 @@
 import { create } from 'zustand'
 import type { TeamPauseState } from '@shared/teamPause'
-import { msg, tr } from '@shared/i18n'
-import { formatWhen } from '@shared/dates'
 import { call } from './api'
-import { notify } from './store'
-
-const STILL = {
-  title: msg({ id: 'board.team.stillPaused', defaultMessage: 'The team was paused at {time} (before an update)', description: "A notice as Hive's window opens (HI-2081, HI-2156): the team was paused before Hive last closed, and no update has been installed since, so Hive starts no lane card and wakes no agent until the user resumes it. {time}: when it was paused, a time today (\"15:05\") or a date and time." }),
-  body: msg({ id: 'board.team.stillPausedBody', defaultMessage: "Resume it? Until you do, no lane starts a card and no agent is woken. The Progress panel's Lanes says what still runs.", description: 'The notice that the team is still paused as the window opens (HI-2081, HI-2156): it asks whether to resume the team (its button, Resume the Team).' }),
-  resume: msg({ id: 'board.team.stillPausedResume', defaultMessage: 'Resume the Team', description: 'A button in the notice that the team is still paused (HI-2081): resumes it.' })
-}
 
 /**
  * The team's pause as the window shows it (HI-2081): every open workspace's pause and what still runs, read from main
@@ -63,13 +54,7 @@ let started = false
 export function initTeamPause(): void {
   if (started) return
   started = true
-  // Still paused as the window opens (a crash or a plain quit while it was; an update's restart or install lifts it):
-  // asked once, with when it was paused and Resume the Team, as nothing restarts on its own until then (HI-2156).
-  void refreshTeamPause().then(() => {
-    const since = (useTeamPause.getState().state?.workspaces ?? []).flatMap((w) => (w.pause ? [w.pause.since] : [])).sort()[0]
-    if (!since) return
-    notify('warning', tr(STILL.title, { time: formatWhen(since) }), tr(STILL.body), [{ label: tr(STILL.resume), command: 'team.resume' }])
-  })
+  void refreshTeamPause()
   // Each read scans every agent's job in main: what changes often (statuses, runs) is read at most once a second.
   let soon: ReturnType<typeof setTimeout> | null = null
   const later = (): void => {
