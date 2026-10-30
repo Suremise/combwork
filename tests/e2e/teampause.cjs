@@ -127,7 +127,7 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
       await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
-      await band.screenshot({ path: at(`band-${theme}.png`) }).catch(() => undefined)
+      await band.screenshot({ path: at(`band-${theme}.png`) }).catch((e) => console.log(`screenshot: ${e.message}`))
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
     const early = await inv('team:install')
@@ -135,7 +135,7 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
     fs.writeFileSync(release, '')
     check('once the run ends, All parked', !!(await until(async () => (await inv('team:state')).allParked, 60000)), JSON.stringify((await inv('team:state')).workspaces.map((w) => [w.workspacePath, w.pause?.by, w.items])))
     check('…and the band says so', !!(await until(async () => /All parked: safe to install/.test((await band.innerText().catch(() => '')) ?? ''), HUNG_MS)), await band.innerText().catch(() => ''))
-    await band.screenshot({ path: at('band-parked.png') }).catch(() => undefined)
+    await band.screenshot({ path: at('band-parked.png') }).catch((e) => console.log(`screenshot: ${e.message}`))
     const install = await inv('team:install')
     check('Install Now with no update ready installs nothing', install.installed === false && install.state.allParked === true)
 
