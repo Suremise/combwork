@@ -1,3 +1,4 @@
+import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
 import { configDefaults, defineConfig } from 'vitest/config'
 import { progressWanted, VitestProgress } from './tests/progressReport.mts'
@@ -7,8 +8,10 @@ import { startRunTemp } from './tests/runTemp.mts'
 // modules it serves the workers (about 600 files a run, which it leaves behind), the temp files of Hive's code under test
 // and of the programs tests start (git) go there too, where Hive's Antivirus scanning setting covers them. Set before
 // Vitest starts its workers, which inherit it (TEMP, TMP and TMPDIR). It is the run's own folder, which tests/tempRun.ts
-// removes once the run has ended (#995); the next run's start removes one a stopped run left (HI-2102).
-startRunTemp()
+// removes once the run has ended (#995); the next run's start removes one a stopped run left (HI-2102), as the board's
+// evidence rules allow (tests/e2e/evidence.cjs: read only if there is one to remove).
+let evidence: { protects: (p: string) => string | null } | undefined
+startRunTemp((p) => (evidence ??= createRequire(import.meta.url)('./tests/e2e/evidence.cjs').evidenceFor(fileURLToPath(new URL('.', import.meta.url)))).protects(p))
 
 export default defineConfig({
   // Hive's main-process modules import Electron; unit tests use a stub (no Electron binary needed, e.g. in CI). They

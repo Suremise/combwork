@@ -44,13 +44,6 @@ import { autoClean } from '../e2e/clean.mjs'
 import { scenariosProgress, slotWaitProgress } from '../progressReport.mts'
 import { endRunTemp, startRunTemp } from '../runTemp.mts'
 
-// The run's own temp folder in hive-test\tmp (HI-2102): the test copies of Hive and the CLIs its scenarios start get it
-// as TEMP (e2e/runContext.cjs ALLOW), not %TEMP%. It goes as the runner exits.
-startRunTemp()
-process.on('exit', () => {
-  const failed = endRunTemp()
-  if (failed) console.warn(`The run's temp folder was left behind (the next run's start removes it after a day): ${failed}`)
-})
 const require = createRequire(import.meta.url)
 const lib = require('../e2e/lib.cjs')
 const runContext = require('../e2e/runContext.cjs')
@@ -63,6 +56,14 @@ if (!evidence.ok) {
   console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set HIVE_TEST_NO_BOARD=1 if no Hive board cites test output on this machine.`)
   process.exit(2)
 }
+// The run's own temp folder in hive-test\tmp (HI-2102): the test copies of Hive and the CLIs its scenarios start get it
+// as TEMP (e2e/runContext.cjs ALLOW), not %TEMP%. It goes as the runner exits; its start removes what stopped runs
+// left, as the evidence rules allow.
+startRunTemp(spare)
+process.on('exit', () => {
+  const failed = endRunTemp()
+  if (failed) console.warn(`The run's temp folder was left behind (the next run's start removes it after a day): ${failed}`)
+})
 const { runScenario, sourceFingerprint, claudeSignedIn, environmentAdvice, CLAUDE_TEST_HOME, PROVIDERS } = require('./harness.cjs')
 const { copilotInstalled } = require('../e2e/fake-copilot-api.cjs')
 const { SCENARIOS, FIXTURES_VERSION } = require('./scenarios.cjs')

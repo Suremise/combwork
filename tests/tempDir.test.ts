@@ -211,6 +211,11 @@ describe("a stopped run's temp folder goes at a later run's start, and every run
     return d
   }
 
+  // The board's rules as the runners give them (tests/e2e/evidence.cjs), over cards given here (their text as the board
+  // gives it: pathText).
+  const { evidence, pathText } = createRequire(__filename)('./e2e/evidence.cjs')
+  const nobody = evidence({ cards: [] })
+
   it("removes runs' folders older than a day whose run has ended, and nothing else", () => {
     const area = dir('hive-run-area-')
     const ended = at(area, 'run-4001-abcdef', DAY + 60_000)
@@ -218,13 +223,50 @@ describe("a stopped run's temp folder goes at a later run's start, and every run
     const recent = at(area, 'run-4003-abcdef', DAY - 60_000)
     const beforePids = at(area, 'run-Xy12Zq', 2 * DAY)
     const other = at(area, 'hive-gitrepo-abcdef', 2 * DAY)
-    const removed = pruneRunTemps(now, area, (pid) => pid === 4002)
+    const removed = pruneRunTemps((p) => nobody.protects(p), { now, area, isAlive: (pid) => pid === 4002 })
     expect(removed.sort()).toEqual([beforePids, ended].sort())
     expect([ended, live, recent, beforePids, other].map((d) => existsSync(d))).toEqual([false, true, true, false, true])
   })
 
+  it('keeps an old run whose files an open card cites, and removes an uncited one beside it', () => {
+    const area = dir('hive-run-area-')
+    const cited = at(area, 'run-4011-abcdef', 2 * DAY)
+    writeFileSync(join(cited, 'failure.txt'), 'x')
+    utimesSync(cited, new Date(now - 2 * DAY), new Date(now - 2 * DAY))
+    const uncited = at(area, 'run-4012-abcdef', 2 * DAY)
+    const ev = evidence({ cards: [{ number: 2102, text: pathText(`The failure is in ${join(cited, 'failure.txt')}`) }] })
+    expect(ev.protects(cited)).toBe('cited by #2102')
+    expect(pruneRunTemps((p) => ev.protects(p), { now, area, isAlive: () => false })).toEqual([uncited])
+    expect(existsSync(join(cited, 'failure.txt'))).toBe(true)
+    expect(existsSync(uncited)).toBe(false)
+  })
+
+  it("removes nothing while the board can't be read, or with no board found", () => {
+    const area = dir('hive-run-area-')
+    const old = at(area, 'run-4021-abcdef', 2 * DAY)
+    for (const ev of [evidence({ tasksDir: join(area, 'no-such-board') }), evidence({})]) {
+      expect(ev.ok).toBe(false)
+      expect(pruneRunTemps((p) => ev.protects(p), { now, area, isAlive: () => false })).toEqual([])
+    }
+    expect(existsSync(old)).toBe(true)
+  })
+
+  it('asks the board just before each removal: a card citing a run after the listing keeps it', () => {
+    const area = dir('hive-run-area-')
+    const run = at(area, 'run-4031-abcdef', 2 * DAY)
+    const cards: { number: number; text: string }[] = []
+    const ev = evidence({ cards })
+    // Its owner is looked up after the listing, before the removal: a card cites the run meanwhile.
+    const isAlive = (): boolean => {
+      cards.push({ number: 2103, text: pathText(`See ${run}`) })
+      return false
+    }
+    expect(pruneRunTemps((p) => ev.protects(p), { now, area, isAlive })).toEqual([])
+    expect(existsSync(run)).toBe(true)
+  })
+
   it('gives nothing for an area that is not there', () => {
-    expect(pruneRunTemps(now, join(dir('hive-run-area-'), 'none'))).toEqual([])
+    expect(pruneRunTemps((p) => nobody.protects(p), { now, area: join(dir('hive-run-area-'), 'none') })).toEqual([])
   })
 
   it("the run's folder is the temp folder of what it starts (TEMP, TMP, TMPDIR), in the e2e and scenario runners too", () => {
@@ -234,7 +276,10 @@ describe("a stopped run's temp folder goes at a later run's start, and every run
     for (const runner of ['e2e/run.mjs', 'scenarios/run.mjs']) {
       const text = readFileSync(join(here, runner), 'utf8')
       expect(text, runner).toMatch(/^import \{ endRunTemp, startRunTemp \} from '\.\.\/runTemp\.mts'$/m)
-      expect(text.indexOf('startRunTemp()'), runner).toBeLessThan(text.search(/\bspawn(Sync)?\(|require\('\.\/harness\.cjs'\)/))
+      // With the board's rules, once the runner has found the board readable (it doesn't start otherwise).
+      const start = text.search(/startRunTemp\((\(p\) => evidence\.protects\(p\)|spare)\)/)
+      expect(start, runner).toBeGreaterThan(text.indexOf('if (!evidence.ok)'))
+      expect(start, runner).toBeLessThan(text.search(/\bspawn(Sync)?\(|require\('\.\/harness\.cjs'\)/))
       expect(text, runner).toMatch(/process\.on\('exit'[^]*?endRunTemp\(\)/)
     }
     expect(createRequire(__filename)('./e2e/runContext.cjs').ALLOW).toEqual(expect.arrayContaining(['TEMP', 'TMP', 'TMPDIR']))

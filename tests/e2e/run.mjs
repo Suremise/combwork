@@ -71,15 +71,6 @@ if (opts.error) {
   console.error(opts.error.startsWith('Unknown suite') ? `${opts.error}. Suites: ${SUITES.map((s) => s.name).join(', ')}` : opts.error)
   process.exit(2)
 }
-// The run's own temp folder in hive-test\tmp (HI-2102): its suites, Playwright's playwright-artifacts-* folders, the
-// test copies of Hive and the CLIs they start get it as TEMP (runContext.cjs ALLOW), not %TEMP%. It goes as the runner
-// exits, unless the run is recorded for review (kept, as its logs are, until a run's start a day later removes it).
-const runTemp = startRunTemp()
-process.on('exit', () => {
-  if (opts.record) return console.log(`\nKept the run's temp folder with its record: ${runTemp}`)
-  const failed = endRunTemp()
-  if (failed) console.warn(`The run's temp folder was left behind (the next run's start removes it after a day): ${failed}`)
-})
 // At most SIDE_E2E_JOBS on the side slot (below).
 let { jobs } = opts
 
@@ -109,6 +100,16 @@ if (!evidence.ok) {
   console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set HIVE_TEST_NO_BOARD=1 if no Hive board cites test output on this machine.`)
   process.exit(2)
 }
+// The run's own temp folder in hive-test\tmp (HI-2102): its suites, Playwright's playwright-artifacts-* folders, the
+// test copies of Hive and the CLIs they start get it as TEMP (runContext.cjs ALLOW), not %TEMP%. It goes as the runner
+// exits, unless the run is recorded for review (kept, as its logs are, until a run's start a day later removes it,
+// while no open card cites it). A run's start removes what stopped runs left, by the same evidence rules.
+const runTemp = startRunTemp((p) => evidence.protects(p))
+process.on('exit', () => {
+  if (opts.record) return console.log(`\nKept the run's temp folder with its record: ${runTemp}`)
+  const failed = endRunTemp()
+  if (failed) console.warn(`The run's temp folder was left behind (the next run's start removes it after a day): ${failed}`)
+})
 
 // --- Which suites.
 let affected = null

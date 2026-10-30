@@ -13,7 +13,8 @@ scanning setting covers the test area, and thousands of folders made and removed
 Vitest's own copies of the modules, Hive's code under test and the programs tests start (git) put theirs there. The e2e
 and scenario runners do the same for their suites (HI-2102: Playwright's `playwright-artifacts-*`, the test copies of
 Hive, the CLIs), and remove theirs as they exit (an e2e run with `--record` keeps it). Each run has its own folder
-there, `run-<pid>-<random>` (`runTemp.mts`), and a run's start removes those older than a day whose run has ended. A
+there, `run-<pid>-<random>` (`runTemp.mts`), and a run's start removes those older than a day whose run has ended, as the board's evidence rules allow
+(`e2e/evidence.cjs`: nothing an open card cites, nothing while the board can't be read). A
 unit run's is removed once the run has ended (`tempRun.ts`, #995), with whatever Hive's code wrote
 late; and every folder `tempDir()` makes is removed when its test file ends (`tempCleanup.ts`), after the file's own
 `afterAll` hooks, so a run doesn't grow as it goes: close what holds files in it (watchers, services, processes) in the

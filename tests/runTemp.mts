@@ -5,8 +5,9 @@
 // removes it once the run has ended) and the e2e and scenario runners (before their suites, removed as they exit), so
 // Vitest's module copies, Playwright's playwright-artifacts-* folders, and the temp files of Hive's code under test, the
 // test copies of Hive, git and the CLIs go there. A run's start removes the folders older than a day that stopped runs
-// left; npm run test:clean (tests/e2e/clean.mjs) sweeps the rest of tmp. Where LOCALAPPDATA is unset (off Windows), it
-// is in the temp folder. LOCALAPPDATA is read once, as this loads: a test that changes it later doesn't move the folder.
+// left, where the board's evidence rules let them go; npm run test:clean (tests/e2e/clean.mjs) sweeps the rest of tmp.
+// Where LOCALAPPDATA is unset (off Windows), it is in the temp folder. LOCALAPPDATA is read once, as this loads: a test
+// that changes it later doesn't move the folder.
 // The runners' as well as the unit tests' (tests/tempDir.ts gives its exports to the tests), so it is a .mts the
 // runners load as they do tests/progressReport.mts.
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, statSync } from 'fs'
@@ -20,15 +21,22 @@ const STALE_MS = 24 * 60 * 60_000
 let root: string | undefined
 
 /**
+ * Why a path must stay, or nothing when it may go: the board's evidence rules (tests/e2e/evidence.cjs protects: a card
+ * that isn't Done cites it, or the board can't be read), asked afresh just before each removal.
+ */
+export type Protects = (path: string) => string | null | undefined
+
+/**
  * Makes this run's own folder in the test area, run-<pid>-<random>, and makes it the temp folder (TEMP, TMP and TMPDIR)
  * of this process and what it starts (vitest.config.ts, before the workers start; the e2e and scenario runners, before
- * their suites), unless a run that started this one has already (a run inside a test sees its parent's). First it
- * removes the folders stopped runs left (pruneRunTemps). The process that made it removes it (endRunTemp).
+ * their suites), unless a run that started this one has already (a run inside a test sees its parent's). First, given
+ * the evidence rules, it removes the folders stopped runs left (pruneRunTemps); without them it removes nothing. The
+ * process that made it removes it (endRunTemp).
  */
-export function startRunTemp(): string {
+export function startRunTemp(protects?: Protects): string {
   if (!process.env.HIVE_TEST_RUN_TMP) {
     mkdirSync(tempArea, { recursive: true })
-    pruneRunTemps()
+    if (protects) pruneRunTemps(protects)
     process.env.HIVE_TEST_RUN_TMP = realpathSync.native(mkdtempSync(join(tempArea, `run-${process.pid}-`)))
     process.env.HIVE_TEST_RUN_TMP_OWNER = String(process.pid)
   }
@@ -48,11 +56,12 @@ function alive(pid: number): boolean {
 }
 
 /**
- * Removes the runs' folders in the test area that are older than a day and whose run isn't live (by the pid in the
- * name; a folder from before HI-2102 has none, and goes by its age): what a run stopped before its end left. Replies
- * with those removed. npm run test:clean sweeps the rest of tmp.
+ * Removes the runs' folders in the test area that are older than a day, whose run isn't live (by the pid in the name;
+ * a folder from before HI-2102 has none, and goes by its age) and that the evidence rules let go, asked just before
+ * each removal (a recorded run's kept folder stays while a card cites it; nothing goes while the board can't be read):
+ * what a run stopped before its end left. Replies with those removed. npm run test:clean sweeps the rest of tmp.
  */
-export function pruneRunTemps(now = Date.now(), area = tempArea, isAlive = alive): string[] {
+export function pruneRunTemps(protects: Protects, { now = Date.now(), area = tempArea, isAlive = alive } = {}): string[] {
   const removed: string[] = []
   let names: string[]
   try {
@@ -65,7 +74,7 @@ export function pruneRunTemps(now = Date.now(), area = tempArea, isAlive = alive
     if (!m || (m[1] && isAlive(Number(m[1])))) continue
     const dir = join(area, name)
     try {
-      if (now - statSync(dir).mtimeMs < STALE_MS) continue
+      if (now - statSync(dir).mtimeMs < STALE_MS || protects(dir)) continue
       rmSync(dir, { recursive: true, force: true, maxRetries: 3 })
       removed.push(dir)
     } catch {
