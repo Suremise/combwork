@@ -162,11 +162,21 @@ const beta = path.join(fx.ws, 'beta')
 
     // The lane's next card, started after the change, keeps the lane's ruleset (§16.5.4): the one in force before it, as
     // the cards started then have.
-    // Unblocked, Hive starts it on BX, its lane's builder (HI-2029). The tag's hover left first: BX's lane then moves to the
-    // top, and a tooltip whose anchor moves from under the mouse stays up (HI-2052).
+    // Unblocked, Hive starts it on BX, its lane's builder (HI-2029), and the lanes' rows reorder. HI-2052: with the tag's
+    // tooltip up and the mouse still, its tag moves from under the mouse; the tooltip closes once the mouse moves, and the
+    // next hover's tooltip is the only one.
+    check("…the tag's tooltip up before the rows reorder", !!(await hover(tag(l1), (t) => t.includes('New lanes and cards'))), await tipText())
+    const at = await tag(l1).boundingBox()
+    await inv('tasks:update', nx, { blocked: null })
+    check('the rows reorder: the tag moves from under the still mouse', !!(await waitHung(async () => {
+      const now = await tag(l1).boundingBox()
+      return !!now && !!at && Math.abs(now.y - at.y) > 2
+    })), JSON.stringify({ at, now: await tag(l1).boundingBox() }))
+    await page.mouse.move(5, 5)
+    check('…and its tooltip closes once the mouse moves (HI-2052)', !!(await waitHung(async () => (await tips().count()) === 0)), await tipText())
+    check('…the next hover shows one tooltip, its own', !!(await hover(bar, (t) => t.includes('Each colour is a category'))) && (await tips().count()) === 1, String(await tips().count()))
     await page.mouse.move(5, 5)
     await waitHung(async () => (await tips().count()) === 0)
-    await inv('tasks:update', nx, { blocked: null })
     const started = await waitHung(async () => (await h.facts(nx)).find((x) => x.kind === 'Started') ?? null)
     // Its slot prepared (BX placed there), the work committed in it.
     if (started?.data?.folder && (await waitHung(async () => (await h.facts(nx)).some((x) => x.kind === 'BuilderPlaced')))) commitIn(started.data.folder, 'nx.txt', 'Next card')
