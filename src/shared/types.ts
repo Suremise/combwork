@@ -1361,9 +1361,9 @@ export interface TaskPatch {
  */
 export type TaskMoveResult = { moved: TaskCard; stopped?: Refusal } | { ask: string[] } | { refused: Refusal }
 
-/** Which agent Start gives a card to. */
+/** Which agent Start gives a card to; a new one runs on `connection` (its id: HI-2121), else the first usable here. */
 /** `worktree` (0.9's own worktree for a new agent) is refused since 1.0 (#1451); the window stops sending it (#1442). */
-export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree?: boolean; name?: string; provider?: ProviderId }
+export type TaskStartTarget = { kind: 'agent'; agentId: string } | { kind: 'new-agent'; worktree?: boolean; name?: string; connection?: string }
 
 /** How a project leaves Hive (the main menu's Project → Remove Project…). */
 export type ProjectRemoval = 'hide' | 'remove' | 'delete'

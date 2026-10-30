@@ -9,7 +9,7 @@ import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
-import { PROVIDERS, agentProvider, isKnownProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
+import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
 import { publicReason, UNDO_FINAL, type ActivityAgent, type ActivityKind, type ActivityTarget } from '../shared/assistantActivity'
@@ -3568,19 +3568,24 @@ route('POST', '/v1/tasks/:n/ask-assistant', async ({ params, body }) => {
 
 // An agent starting a card itself runs its start intent (#1267); the Assistant starts a card on an agent.
 route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
-  requireWorkspace()
+  const ws = requireWorkspace()
   if (agentCaller()) return cardIntent(params[0], { kind: 'start' })
   const n = taskNumber(params[0])
   const card = await tasks.readTask(n, await taskActor())
   // 1.0 (#1451): no agent gets a worktree of its own: asking for one is refused, never ignored.
   if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, NOT_PINNED)
+  // A new agent's connection (HI-2121, as hive_add_agent's: decisions A and D): the one named, else the first usable here.
+  if (body?.agent && body?.connection !== undefined) throw new HttpError(400, 'connection is for a new agent: an existing agent runs on its own (hive_update_agent changes it).')
+  const conn = !body?.agent && card.project && ws.path ? connectionArg(body, join(ws.path, card.project)) : undefined
+  // Decision D (HI-2108): provider, model, effort, mode and context are a connection's now, refused naming those there.
+  refuseOldFields(body, getConnection(conn?.connection)?.account ?? firstUsableAccount(ws.path ? ws.config : null)?.id)
+  if (conn?.cli && !isProviderEnabled(config.settings, conn.cli)) throw new HttpError(409, `${providerName(conn.cli)} is turned off in Settings → Providers.`)
   const target: TaskStartTarget = body?.agent
     ? { kind: 'agent', agentId: String(body.agent) }
-    : { kind: 'new-agent', name: body?.name ? String(body.name) : undefined, provider: body?.provider && isKnownProvider(String(body.provider)) ? (String(body.provider) as ProviderId) : undefined }
+    : { kind: 'new-agent', name: body?.name ? String(body.name) : undefined, ...(conn?.connection ? { connection: conn.connection } : {}) }
   // The agent it is started on, when it exists (a new one is named once added).
   const named = target.kind === 'agent' ? await knownAgent(card.project, target.agentId) : undefined
   return assistantChange('agents', `start ${cardRef(n)} ${target.kind === 'agent' ? `on ${named?.name ?? 'an agent'}` : 'on a new agent'}${card.project ? ` in ${card.project}` : ''}`, { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async () => {
-    if (target.kind === 'new-agent' && body?.provider && !isKnownProvider(String(body.provider))) throw new HttpError(400, `Unknown provider "${body.provider}". hive_list_providers lists them.`)
     const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined)
     return {
       done: `Started ${cardRef(n)} on ${r.added ? 'a new agent, ' : ''}${r.agentName} in ${card.project}: ${clip(card.title, 80)}`,
