@@ -451,9 +451,9 @@ describe('loading a template for the Assistant, and undoing it', () => {
     it('undo across CLIs: connection, CLI and conversation back in one checked write; a newer conversation since keeps them all, said', async () => {
       accounts()
       setBeta()
-      const live = () => cfgOf(beta).agents.find((a: StoredAgent) => a.id === 'p1')
+      const p1 = () => cfgOf(beta).agents.find((a: StoredAgent) => a.id === 'p1')
       const first = await apply({ Builder: 'c-codex' })
-      expect([live().provider, live().connection, live().lastSessionId]).toEqual(['codex', 'c-codex', undefined])
+      expect([p1().provider, p1().connection, p1().lastSessionId]).toEqual(['codex', 'c-codex', undefined])
       // Undone at once: all three back, in one write of the project's file.
       const writes = vi.spyOn(w, 'updateAgent')
       try {
@@ -463,13 +463,13 @@ describe('loading a template for the Assistant, and undoing it', () => {
       } finally {
         writes.mockRestore()
       }
-      expect([live().provider, live().connection, live().lastSessionId]).toEqual(['claude-code', 'c-a', 'old-claude-conversation'])
+      expect([p1().provider, p1().connection, p1().lastSessionId]).toEqual(['claude-code', 'c-a', 'old-claude-conversation'])
       // Again, then a new Codex conversation before the undo: the group is skipped whole, nothing overwritten.
       const second = await apply({ Builder: 'c-codex' })
       await w.updateAgent(beta, 'p1', { lastSessionId: 'new-codex-conversation' })
       const kept = await undo(second.group)
       expect([kept.flatMap((u) => u.undone), kept.flatMap((u) => u.skipped.map((x) => `${x.field}:${x.why}`)).sort()]).toEqual([[], ['connectionId:changed', 'lastSessionId:changed', 'provider:changed']])
-      expect([live().provider, live().connection, live().lastSessionId]).toEqual(['codex', 'c-codex', 'new-codex-conversation'])
+      expect([p1().provider, p1().connection, p1().lastSessionId]).toEqual(['codex', 'c-codex', 'new-codex-conversation'])
     })
   })
 })
