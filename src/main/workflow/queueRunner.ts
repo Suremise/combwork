@@ -494,6 +494,8 @@ export class QueueRunner {
    * failed, its lease another's), nothing starts: an outcome that never ran (`leaseLost`), never an answer.
    */
   async gitOutcome(m: Omit<GitRequest, 'id'>): Promise<GitOutcome> {
+    // As execFile checks its bound (the worker's path throws so too): a number, 0 or more (0: no output at all).
+    if (typeof m.maxBuffer !== 'number' || Number.isNaN(m.maxBuffer) || m.maxBuffer < 0) throw Object.assign(new RangeError(`The value of "maxBuffer" is out of range. It must be >= 0. Received ${String(m.maxBuffer)}`), { code: 'ERR_OUT_OF_RANGE' }) // i18n-ignore: Node's own error, as execFile throws it
     const r = await this.inHost({ command: 'git', args: m.args, cwd: m.cwd, env: m.env ?? process.env, ...(m.input !== undefined ? { input: m.input } : {}), maxBuffer: m.maxBuffer, ...(m.timeout ? { timeout: m.timeout } : {}) })
     return r ? outcomeOf(r, m.cwd) : { stdout: NO_BYTES, stderr: NO_BYTES, error: { code: 'leaseLost', killed: false, signal: null }, cwdExists: true }
   }

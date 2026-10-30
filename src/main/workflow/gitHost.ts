@@ -25,21 +25,34 @@ export type FrameKind = 'S' | 'O' | 'E' | 'X' | 'K' | 'N' | 'B'
 const KINDS = new Set<string>(['S', 'O', 'E', 'X', 'K', 'N', 'B'])
 /** kind (1 byte), id (u32), length (u32), then the payload. */
 const HEAD = 9
+/** A command's input goes to the host in pieces of this size (HI-2078). */
+const IN_CHUNK = 64 * 1024
+
+/** One frame (the host's input and output alike): its kind, the request's id, then the payload's length and bytes. */
+export function frameOf(kind: string, id: number, payload: Buffer | string = ''): Buffer {
+  const body = Buffer.isBuffer(payload) ? payload : Buffer.from(payload, 'utf8')
+  const head = Buffer.alloc(HEAD)
+  head.write(kind, 0, 'latin1')
+  head.writeUInt32BE(id, 1)
+  head.writeUInt32BE(body.length, 5)
+  return Buffer.concat([head, body])
+}
 
 /**
- * The host (run by Node): waits for its input's first line (the gate), then runs each request line's command with its
- * own cwd, environment and input, framing its output and end. Its input closing stops it taking more: it exits once
- * what runs has ended (before the gate: at once, having run nothing).
+ * The host (run by Node): its input is framed as its output is (HI-2078: a command's input streamed, not in its
+ * request): G, the gate, first; then R, a request (JSON: id, command, args, cwd, env, bounds), run at once; I, a piece of
+ * a request's input; J, its input's end. It frames each command's output and end. Its input closing stops it taking
+ * more: it exits once what runs has ended (before the gate: at once, having run nothing). Anything else ends it (65).
  */
 export const HOST = `
 // A process of its own, not Hive's: its exit isn't one of Hive's ways out (exitBy).
 const end = process.exit.bind(process)
 const cp = require('child_process')
-// Its input decoded whole: a character split between two reads is kept for the next (HR3's round 1 finding 2).
-const input = new (require('string_decoder').StringDecoder)('utf8')
 const QUIET = ${EXITED_QUIET_MS}, CHUNK = ${OUT_CHUNK}
 const live = new Map()
-let got = '', gated = false, closing = false, blocked = false
+// Each running command's input, until its end (J) comes.
+const stdins = new Map()
+let got = Buffer.alloc(0), gated = false, closing = false, blocked = false
 const frame = (kind, id, payload) => {
   const body = Buffer.isBuffer(payload) ? payload : Buffer.from(String(payload), 'utf8')
   const head = Buffer.alloc(${HEAD})
@@ -73,13 +86,14 @@ function run(s) {
   live.set(s.id, r)
   c.on('error', () => {})
   c.stdin.on('error', () => {})
-  c.stdin.end(s.input || '')
+  stdins.set(s.id, c.stdin)
   frame('S', s.id, String(c.pid))
   if (blocked) { c.stdout.pause(); c.stderr.pause() }
   // HI-2078: its bounds, as execFile's (git()'s): each output's bytes counted as they come, and its time. Past one, nothing
   // more of it is framed, its own child is ended by its handle (as execFile does: what it started stays in the job),
   // and B says which (':alive' when the kill failed). Nothing is framed after.
-  const max = s.maxBuffer > 0 ? s.maxBuffer : Infinity
+  // No bound given: none. Zero is a bound, as execFile's: any byte is past it (HR3's round 1 finding 2).
+  const max = typeof s.maxBuffer === 'number' ? s.maxBuffer : Infinity
   const sizes = { O: 0, E: 0 }
   const bound = (why) => {
     if (r.over) return
@@ -129,20 +143,48 @@ function run(s) {
   c.once('exit', (code, signal) => { r.exited = [code, signal]; r.wait() })
   c.once('close', (code, signal) => { if (!r.exited) r.exited = [code, signal]; settle() })
 }
-process.stdin.on('data', (d) => {
-  got += input.write(d)
-  for (let i; (i = got.indexOf('\\n')) >= 0; ) {
-    const line = got.slice(0, i)
-    got = got.slice(i + 1)
-    if (!gated) { gated = true; continue }
-    if (closing) continue
+// A command's input written as it comes (I), its end on J. One that takes no more for now holds every input back (this
+// host reads nothing more) until it does, or its input is gone (it exited, or ended its input).
+const feed = (id, piece) => {
+  const w = stdins.get(id)
+  if (!w || w.destroyed || w.writableEnded) return
+  if (w.write(piece)) return
+  process.stdin.pause()
+  const go = () => { w.off('drain', go); w.off('close', go); w.off('error', go); process.stdin.resume() }
+  w.on('drain', go); w.on('close', go); w.on('error', go)
+}
+const take = (kind, id, body) => {
+  if (!gated) { if (kind !== 'G') end(65); gated = true; return }
+  if (kind === 'R') {
+    if (closing) return
     let s
-    try { s = JSON.parse(line) } catch { end(65) }
-    run(s)
+    try { s = JSON.parse(body.toString('utf8')) } catch { end(65) }
+    return run(s)
+  }
+  if (kind === 'I') return feed(id, Buffer.from(body))
+  if (kind === 'J') { const w = stdins.get(id); stdins.delete(id); if (w && !w.destroyed) w.end(); return }
+  end(65)
+}
+process.stdin.on('data', (d) => {
+  got = got.length ? Buffer.concat([got, d]) : d
+  while (got.length >= ${HEAD}) {
+    const kind = got.toString('latin1', 0, 1), id = got.readUInt32BE(1), len = got.readUInt32BE(5)
+    if (len > ${REQUEST_MAX}) end(65)
+    if (got.length < ${HEAD} + len) break
+    const body = got.subarray(${HEAD}, ${HEAD} + len)
+    got = got.subarray(${HEAD} + len)
+    take(kind, id, body)
   }
 })
 process.stdin.on('error', () => {})
-process.stdin.on('end', () => { if (!gated) end(70); closing = true; done() })
+process.stdin.on('end', () => {
+  if (!gated) end(70)
+  closing = true
+  // No more input comes: what still waits for its own ends now.
+  for (const w of stdins.values()) if (!w.destroyed) w.end()
+  stdins.clear()
+  done()
+})
 `
 
 /**
@@ -286,7 +328,7 @@ export class GitHost {
 
   /** Its gate opened: it runs requests from here on. */
   go(): void {
-    this.child.stdin?.write('go\n') // i18n-ignore: the host's go-ahead, not text
+    this.child.stdin?.write(frameOf('G', 0))
   }
 
   /** Stops taking requests (its input ended): it exits once what runs has ended. */
@@ -299,24 +341,51 @@ export class GitHost {
   }
 
   /**
-   * Runs a command in it: its output and end, within its bounds (HI-2078: the host ends it there). A request over
-   * REQUEST_MAX is never sent (notRun 'E2BIG'); one sent while or before the host goes is lost, never taken for an answer.
-   * A host that sends more of an output than its bound allows is lost too (what is read here stays bounded).
+   * Runs a command in it: its output and end, within its bounds (HI-2078: the host ends it there). Its request (all but
+   * its input) over REQUEST_MAX is never sent (notRun 'E2BIG'); its input, however long (as git() takes it), follows in
+   * pieces as the host takes them (HR3's round 1 finding 1: a patch-id's input runs to the platform's own bounds). One
+   * sent while or before the host goes is lost, never taken for an answer. A host that sends more of an output than its
+   * bound allows is lost too (what is read here stays bounded).
    */
   request(spec: { command: string; args: readonly string[]; cwd: string; env: NodeJS.ProcessEnv; input?: string } & HostBounds): Promise<HostResult> {
     if (this.why) return Promise.resolve(nothing({ code: null, lost: this.why }))
     const id = this.next++
-    const line = JSON.stringify({ id, ...spec }) + '\n'
-    if (Buffer.byteLength(line) > REQUEST_MAX) return Promise.resolve(nothing({ err: `the command is too long for the merge queue's git host (${Buffer.byteLength(line)} bytes)`, code: null, notRun: 'E2BIG' })) // i18n-ignore: the command's side of an error, in English as git's messages are
-    const max = spec.maxBuffer && spec.maxBuffer > 0 ? spec.maxBuffer : Infinity
+    const { input, ...rest } = spec
+    const meta = Buffer.from(JSON.stringify({ id, ...rest }))
+    if (meta.length > REQUEST_MAX) return Promise.resolve(nothing({ err: `the command is too long for the merge queue's git host (${meta.length} bytes)`, code: null, notRun: 'E2BIG' })) // i18n-ignore: the command's side of an error, in English as git's messages are
+    // No bound given: none. Zero is one (any byte is past it), as execFile's.
+    const max = typeof spec.maxBuffer === 'number' ? spec.maxBuffer : Infinity
     return new Promise((done) => {
       this.pending.set(id, { out: [], err: [], sizes: { out: 0, err: 0 }, max, started: false, done })
-      try {
-        this.child.stdin!.write(line)
-      } catch (e) {
-        this.lose(`its input: ${(e as Error).message}`) // i18n-ignore: a reason, logged
-      }
+      void this.send(id, meta, Buffer.from(input ?? '', 'utf8'))
     })
+  }
+
+  /** A request's frames: R, then its input in pieces (each written once the host has taken the last), then J. */
+  private async send(id: number, meta: Buffer, input: Buffer): Promise<void> {
+    const w = this.child.stdin!
+    const put = async (b: Buffer): Promise<void> => {
+      if (this.why || w.write(b)) return
+      // The host takes no more for now: the next piece waits for it (or for the host to go: lost then).
+      await new Promise<void>((res) => {
+        const go = (): void => {
+          w.off('drain', go)
+          w.off('close', go)
+          w.off('error', go)
+          res()
+        }
+        w.on('drain', go)
+        w.on('close', go)
+        w.on('error', go)
+      })
+    }
+    try {
+      await put(frameOf('R', id, meta))
+      for (let i = 0; i < input.length && !this.why; i += IN_CHUNK) await put(frameOf('I', id, input.subarray(i, i + IN_CHUNK)))
+      if (!this.why) await put(frameOf('J', id))
+    } catch (e) {
+      this.lose(`its input: ${(e as Error).message}`) // i18n-ignore: a reason, logged
+    }
   }
 
   private take(f: Frame): void {

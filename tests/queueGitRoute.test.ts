@@ -14,6 +14,7 @@ import type { GitOutcome } from '../src/main/gitWorker'
 import { FactStore } from '../src/main/workflow/factStore'
 import { GitHost, startGitHost, type HostResult } from '../src/main/workflow/gitHost'
 import { outcomeOf, QueueRunner } from '../src/main/workflow/queueRunner'
+import * as G from '../src/main/platform/git'
 import { windowsProbe, type Listed } from '../src/main/workflow/queueProcs'
 import { B1, commit, gitRepo, moved, R1, setup, sh, type Env } from './workflow/harness'
 import { preset } from '../src/shared/workflow/options'
@@ -237,8 +238,14 @@ describe('git() through the runner, against the worker (HI-2078)', { timeout: 12
       expect(await same(w.project, ['config', '--get', 'no.such'])).toMatchObject({ ok: false, code: 1 })
       expect((await same(w.project, ['hash-object', '--stdin'], undefined, 'hello\n')).out.trim()).toBe('ce013625030ba8dba906f756967f9e9ca394464a')
       expect(await same(join(w.root, 'no-such-folder'), ['status'])).toMatchObject({ ok: false, code: -1, notRun: 'ENOENT' })
-      // Output past its bound: execFile's code, never git's answer.
+      // Output past its bound: execFile's code, never git's answer. Zero is a bound: any byte, on either output, is past it.
       expect(await same(w.project, ['rev-parse', 'HEAD'], 10)).toMatchObject({ ok: false, code: -1, notRun: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' })
+      expect(await same(w.project, ['rev-parse', 'HEAD'], 0)).toMatchObject({ ok: false, code: -1, notRun: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' })
+      expect(await same(w.project, ['rev-parse', '--verify', 'no-such-ref'], 0)).toMatchObject({ ok: false, code: -1, notRun: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' })
+      expect(await same(w.project, ['diff', '--quiet', 'HEAD', 'HEAD'], 0)).toMatchObject({ ok: true, code: 0, out: '' })
+      // A bound that isn't one: refused as execFile refuses it, either way.
+      await expect(git(w.project, ['status'], -1)).rejects.toMatchObject({ code: 'ERR_OUT_OF_RANGE' })
+      await expect(withGitRoute(route, () => git(w.project, ['status'], -1))).rejects.toMatchObject({ code: 'ERR_OUT_OF_RANGE' })
       // git missing (no PATH to it): noted as missing either way; then a git that runs notes it ran.
       setGitToolForTests({ state: 'ok', version: '2', path: 'git' })
       const noGit = { env: { ...baseEnv(), PATH: tempDir('no-git-') } }
@@ -253,6 +260,43 @@ describe('git() through the runner, against the worker (HI-2078)', { timeout: 12
       expect(worker).toBe(1)
     } finally {
       setGitToolForTests(was)
+      await runner.release()
+      w.close()
+    }
+  })
+
+  it("a change's key and its containment past 1 MiB of patch (escapes and other scripts in it): the same either way, never unknown", async () => {
+    const w = world()
+    const runner = await acquire(w)
+    try {
+      const route = (m: Parameters<GitRoute>[0]) => runner.gitOutcome(m)
+      // About 1.5 MiB of patch: quotes, backslashes, tabs, a JSON-looking line, and characters of other scripts.
+      const line = (i: number): string => `${i}\t"quoted" \\back\\slash {"id":${i},"x":"\\n"} héllo wörld ✓ 𝄞 日本語 🐝\n`
+      const body = Array.from({ length: 18_000 }, (_, i) => line(i)).join('')
+      expect(Buffer.byteLength(body)).toBeGreaterThan(1.4 * 1024 * 1024)
+      const base = sh(w.project, 'rev-parse', 'HEAD')
+      const main = sh(w.project, 'rev-parse', '--abbrev-ref', 'HEAD')
+      sh(w.project, 'checkout', '-q', '-b', 'feature')
+      writeFileSync(join(w.project, 'big.txt'), body)
+      sh(w.project, 'add', 'big.txt')
+      sh(w.project, '-c', 'user.name=T', '-c', 'user.email=t@example.com', 'commit', '-qm', 'big')
+      const revision = sh(w.project, 'rev-parse', 'HEAD')
+      // The same change squashed onto the target: containment keys the target's commits by patch-id, its input that log.
+      sh(w.project, 'checkout', '-q', main)
+      sh(w.project, 'merge', '-q', '--squash', 'feature')
+      sh(w.project, '-c', 'user.name=T', '-c', 'user.email=t@example.com', 'commit', '-qm', 'squashed')
+      countWorker()
+      const plainKey = await G.candidateKey(w.project, base, revision)
+      const plainIn = await G.contains(w.project, main, { base, revision })
+      expect(worker).toBeGreaterThan(0)
+      countWorker()
+      const [key, held] = await withGitRoute(route, async () => [await G.candidateKey(w.project, base, revision), await G.contains(w.project, main, { base, revision })] as const)
+      expect(worker).toBe(0)
+      expect(typeof plainKey).toBe('string')
+      expect(key).toBe(plainKey)
+      expect(plainIn).toMatchObject({ method: expect.any(String) })
+      expect(held).toEqual(plainIn)
+    } finally {
       await runner.release()
       w.close()
     }
