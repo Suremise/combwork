@@ -75,9 +75,10 @@ export function connectionLine(view: ConnectionsView | null, c: Connection, sett
  * The choice of connection (HI-2108): `value` its id ('' while none is chosen); grouped by account, only accounts usable
  * here; `cli` limits it to one CLI's. `unavailable` greys one out, saying why (the Assistant: one in the CLI's own mode).
  * `onNew` shows New Connection…, given the account of the one chosen (else the first offered). `summary` (default on): its
- * values under it. `label` false: no label (the caller has one).
+ * values under it. `label` false: no label (the caller has one). `empty`: a first choice of '' with that text, always
+ * there (HI-2118: the template dialogs' "Keep each one's", "Same as its role"); `ariaLabel` names it in place of "Connection".
  */
-export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew, summary = true, label = true }: { id?: string; value: string; onChange: (id: string) => void; cli?: ProviderId; unavailable?: (c: Connection) => string | null; onNew?: (account: string) => void; summary?: boolean; label?: boolean }) {
+export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew, summary = true, label = true, empty, ariaLabel }: { id?: string; value: string; onChange: (id: string) => void; cli?: ProviderId; unavailable?: (c: Connection) => string | null; onNew?: (account: string) => void; summary?: boolean; label?: boolean; empty?: string; ariaLabel?: string }) {
   const view = useConnections()
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
@@ -99,8 +100,8 @@ export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew,
       {label && <label htmlFor={id}>{tr(M.label)}</label>}
       <div className="connection-choice">
         <div className="flex">
-          <select id={id} className="input grow" aria-label={tr(M.label)} value={value} data-connection-choice={value} onChange={(e) => onChange(e.target.value)}>
-            {!value && <option value="">{tr(M.pick)}</option>}
+          <select id={id} className="input grow" aria-label={ariaLabel ?? tr(M.label)} value={value} data-connection-choice={value} onChange={(e) => onChange(e.target.value)}>
+            {empty !== undefined ? <option value="">{empty}</option> : !value && <option value="">{tr(M.pick)}</option>}
             {value && !chosenOffered && <option value={value}>{chosen ? tr(M.off, { name: chosen.name }) : tr(M.gone)}</option>}
             {accounts.map((a) => (
               <optgroup key={a.id} label={tr(M.account, { account: a.name, cli: providerName(a.provider) })}>

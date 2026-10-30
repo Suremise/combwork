@@ -762,6 +762,8 @@ export function firstAccountHere(cli: ProviderId, cfg: WorkspaceConfig | null): 
     c.accounts = store.accounts
     c.connections = store.connections
   })
+  // A window's choice of connection lists it now (HI-2118: the template dialogs make it as they ask for their options).
+  if (a) emit({ type: 'connections-changed' })
   return a ?? null
 }
 

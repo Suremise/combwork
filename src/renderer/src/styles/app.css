@@ -3462,7 +3462,7 @@ p.hint {
   gap: 8px;
   min-width: 0;
 }
-.template-connections-row .template-connection-choice {
+.template-connections-row .connection-choice {
   flex: 1;
   min-width: 0;
   max-width: 28em;
