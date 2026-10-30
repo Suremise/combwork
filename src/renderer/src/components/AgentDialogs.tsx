@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AGENT_LIMIT_MAX, OPEN_WORKFLOW_OPTIONS, ROLE_MAX, agentLimitText, mergeBlocked, projectAgents, transcriptWarnLimit } from '@shared/defaults'
 import { handOverNow, onRunningLane } from '@shared/handOver'
 import { useAgentLimit } from '../advanced'
-import { PROVIDERS, agentProvider, autoProvider, isProviderEnabled, modeCaveat, providerDescriptor } from '@shared/providers'
+import { PROVIDERS, agentProvider, autoProvider, isProviderEnabled, providerDescriptor } from '@shared/providers'
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import type { MergeBranch } from '@shared/types'
-import type { AgentBranchStatus, MergeResult, PermissionMode, ProviderId } from '@shared/types'
+import type { AgentBranchStatus, MergeResult, ProviderId } from '@shared/types'
 import { serverAddedIn } from '@shared/agentMcp'
 import { agentNameProblem, nameTaken, nameTakenMessage, sameAgentName, suggestAgentName, workspaceAgentList } from '@shared/agentNames'
 import type { TemplateAgent } from '@shared/templates'
@@ -24,7 +24,6 @@ import { cx } from '../util'
 import { formatSize } from '@shared/units'
 import { MergeSlotNote, projectSlots, useMergeSlots } from './MergeSlots'
 import { confirmLineMerge, LineCardNote, QUEUE_MERGES, QueueCardNote } from './BranchMerge'
-import { modelCaps } from '@shared/models'
 import { pasteIntoTerminal } from './TerminalView'
 import { BusyButton, Icon, Modal, Tooltip, useBusy } from './ui'
 
@@ -83,21 +82,6 @@ export function ProviderChoice({ value, current, onChange }: { value: ProviderId
           </label>
         )
       })}
-    </div>
-  )
-}
-
-/** Under a mode choice: the provider's warning when it may not run that mode with that model (as the CLI says, #125). */
-export function ModeCaveat({ provider, mode, model }: { provider: ProviderId; mode: string | null | undefined; model: string | null | undefined }) {
-  const info = useStore((s) => s.providers[provider])
-  const settings = useStore((s) => s.settings)
-  useLanguage()
-  const caps = modelCaps(provider, model, info, settings)
-  const text = modeCaveat(provider, mode as PermissionMode, model, { supportsAuto: caps.supportsAuto, label: caps.label }, tr)
-  if (!text) return null
-  return (
-    <div className="mode-caveat">
-      <Icon name="warning" /> <span>{text}</span>
     </div>
   )
 }

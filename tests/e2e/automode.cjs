@@ -1,7 +1,7 @@
 // Haiku asked for Auto (#129, #234), with the fake Claude Code acting out each thing a CLI may say about it
 // (fake-models.json): Haiku takes Auto, doesn't (Claude Code 2.1.289), or the CLI doesn't say. Each time the Assistant
 // starts with Haiku asking for Auto, and: the mode the CLI itself shows (modeObserved, from its hooks: never the mode
-// asked for) is the one it said, Hive shows that mode, and Settings → Assistant warns exactly when Auto isn't offered.
+// asked for) is the one it said, Hive shows that mode, and the connection dialog warns exactly when Auto isn't offered (HI-2145).
 // The same checks (lib.haikuAutoMode, lib.haikuAutoCaveat) run against the real Claude Code in claude-real. Dev
 // build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -55,7 +55,7 @@ const check = (name, ok, extra = '') => {
     // Not merely the mode asked for: where the CLI said nothing or Auto, it still showed it itself.
     check(`${says}: Hive shows the mode the CLI showed`, !!m.observed && m.shown === m.observed, `${m.shown} / ${m.observed}`)
     const [caveatRight, caveat] = await lib.haikuAutoCaveat(page, m.autoOffered)
-    check(`${says}: Settings → Assistant warns exactly as the CLI says`, caveatRight, caveat)
+    check(`${says}: the connection dialog warns exactly as the CLI says`, caveatRight, caveat)
     await page.keyboard.press('Control+Shift+E').catch(() => undefined)
     await inv('session:stop', home, 'assistant')
     await lib.until(async () => !(await live()), 15000)
