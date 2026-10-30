@@ -3420,6 +3420,12 @@ waiting is unknown (the step goes round again), the runner gives its lease up (i
 the queue takes a new lease, which settles what the old one left and recovers its begun entries. A second runner in a
 row whose host fails pauses the queue (needs you).
 
+**Its reads too** (HI-2078): every git the queue's run makes while it recovers and drains, the reads it asks of the
+repository included (where the target is checked out, the folder's status, containment, the identity), runs in that
+host, within the same output and time bounds as Hive's other git (the host ends a command past them). So a read stuck in
+a filesystem, a filter or a hook ends with the lease, as the queue's own git does. Once its runner no longer holds the
+lease, a read of that run starts nothing and is never an answer.
+
 **A runner works on a target only once every earlier lease of it is settled**, or the queue is paused (needs you),
 naming what couldn't be ruled out. Settled: its job, ended by its name (never the supervisor holding it, which may
 serve a living Hive's other targets and agents), is empty or gone; its journal is sealed (closed to writers for good:

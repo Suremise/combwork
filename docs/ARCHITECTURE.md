@@ -347,7 +347,12 @@ it is told to run the command. HI-2079: the runner's git with no bound goes inst
 (`gitHost.ts`), started, put in the job and recorded the same way, which starts each git as its child: requests are JSON
 lines on its input, and what comes back is framed (kind, id, length), so a start that failed or an end by a signal is a
 frame of its own. A host that exits or misbehaves fails the runner (`QueueRunner.fail`: nothing more starts, fenced
-writes refuse, one shared `release`), and `runHost` takes a new lease; a second failure in one run pauses the queue. Records are duties per target: `settle` (at every acquire) ends earlier leases' jobs by
+writes refuse, one shared `release`), and `runHost` takes a new lease; a second failure in one run pauses the queue.
+HI-2078: `runHost` runs `recover` and `drain` inside `withGitRoute` (git.ts, an AsyncLocalStorage scope): every `git()`
+there, the platform's reads included, goes to `QueueRunner.gitOutcome`, which runs it in the host within git()'s bounds
+(the host ends its own child past `maxBuffer` or `timeout`: frame `B`) and gives the worker's `GitOutcome`, so `git()`'s
+one mapping reads both; once the runner doesn't admit it starts nothing (`notRun: 'leaseLost'`). Work outliving the scope
+gets the worker again; the runner's release runs `withoutGitRoute`. Records are duties per target: `settle` (at every acquire) ends earlier leases' jobs by
 name, seals their journals (`sealJournal`: the file moved aside, a folder in its place, so an outlived supervisor can't
 append), reads them once, ends the processes their records and journals name still running, waits, removes their
 folders, and only then drops their duties and clears the journals (the seals stay); anything it can't rule out (a

@@ -14,7 +14,7 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { FactStore } from '../src/main/workflow/factStore'
-import { FRAME_MAX, FrameDecoder, GitHost, HOST, OUT_CHUNK, REQUEST_MAX, startGitHost, type Frame, type FrameKind, type HostResult } from '../src/main/workflow/gitHost'
+import { FRAME_MAX, frameOf, FrameDecoder, GitHost, HOST, OUT_CHUNK, REQUEST_MAX, startGitHost, type Frame, type FrameKind } from '../src/main/workflow/gitHost'
 import { endLeaseJob, queueHost } from '../src/main/workflow/queueJobs'
 import { LeaseLost, QueueRunner } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed } from '../src/main/workflow/queueProcs'
@@ -107,7 +107,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     const dirs = [tempDir('gh-a-'), tempDir('gh-b-'), tempDir('gh-c-')]
     const code = `process.stdin.pipe(process.stdout); process.stderr.write(process.cwd() + '|' + process.env.HI2079); process.stdin.on('end', () => { process.exitCode = Number(process.env.HI2079) })`
     const rs = await Promise.all(dirs.map((d, i) => host.request(node(d, code, { env: { ...baseEnv(), HI2079: String(i + 2) }, input: `in ${i}` }))))
-    rs.forEach((r, i) => expect(r).toEqual({ out: `in ${i}`, err: `${dirs[i]}|${i + 2}`, code: i + 2 }))
+    rs.forEach((r, i) => expect(r).toMatchObject({ out: `in ${i}`, err: `${dirs[i]}|${i + 2}`, code: i + 2 }))
     expect(lost).toEqual([])
   })
 
@@ -127,7 +127,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     const r = await host.request({ command: 'no-such-command-hi2079', args: [], cwd: tempDir('gh-'), env: baseEnv() })
     expect(r).toMatchObject({ code: null, notRun: 'ENOENT' })
     expect(r.err).toMatch(/ENOENT/)
-    expect(await host.request(node(tempDir('gh-'), 'process.exit(1)'))).toEqual({ out: '', err: '', code: 1 })
+    expect(await host.request(node(tempDir('gh-'), 'process.exit(1)'))).toMatchObject({ out: '', err: '', code: 1 })
     expect(lost).toEqual([])
   })
 
@@ -137,7 +137,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     const { host } = own({ ...baseEnv(), NODE_OPTIONS: `--require "${preload}"`, HIVE_GIT_HOST_TEST_SIGNAL: '1' })
     expect(await host.request(node(tempDir('gh-'), 'setInterval(() => {}, 1000)'))).toMatchObject({ code: null, signal: 'SIGTERM' })
     const plain = await host.request(node(tempDir('gh-'), `process.stderr.write('said'); process.exit(1)`))
-    expect(plain).toEqual({ out: '', err: 'said', code: 1 })
+    expect(plain).toMatchObject({ out: '', err: 'said', code: 1 })
   })
 
   it('output a descendant keeps open after the command exited: told after the quiet, and what it writes later never framed', async () => {
@@ -150,19 +150,30 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     const later = `const fs = require('fs'); process.stdout.on('error', () => {}); setTimeout(() => process.exit(0), 60000); const t = setInterval(() => { if (!fs.existsSync(${JSON.stringify(go)})) return; clearInterval(t); process.stdout.write('late', () => { fs.writeFileSync(${JSON.stringify(mark)}, String(process.pid)); process.exit(0) }) }, 50)`
     // Hidden, in the test's own environment (the command's, from baseEnv).
     const code = `const k = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(later)}], { stdio: ['ignore', 'inherit', 'inherit'], detached: true, windowsHide: true, env: process.env }); k.unref(); process.stdout.write('p')`
-    expect(await host.request(node(dir, code))).toEqual({ out: 'p', err: '', code: 0 })
+    expect(await host.request(node(dir, code))).toMatchObject({ out: 'p', err: '', code: 0 })
     writeFileSync(go, '')
     await vi.waitFor(() => expect(existsSync(mark)).toBe(true), { timeout: 30_000, interval: 100 })
     // Written to a pipe the host no longer reads: nothing framed, nothing lost, and the host goes on.
-    expect(await host.request(node(dir, `process.stdout.write('next')`))).toEqual({ out: 'next', err: '', code: 0 })
+    expect(await host.request(node(dir, `process.stdout.write('next')`))).toMatchObject({ out: 'next', err: '', code: 0 })
     expect(lost).toEqual([])
   })
 
-  it('a request over REQUEST_MAX: never sent (notRun E2BIG), and the host goes on', async () => {
+  it('a request (all but its input) over REQUEST_MAX: never sent (notRun E2BIG), and the host goes on', async () => {
     const { host, lost } = own()
-    const r = await host.request({ ...node(tempDir('gh-'), ''), input: 'x'.repeat(REQUEST_MAX) })
+    const r = await host.request(node(tempDir('gh-'), '', { env: { ...baseEnv(), HI2079: 'x'.repeat(REQUEST_MAX) } }))
     expect(r).toMatchObject({ code: null, notRun: 'E2BIG' })
-    expect(await host.request(node(tempDir('gh-'), `process.stdout.write('ok')`))).toEqual({ out: 'ok', err: '', code: 0 })
+    expect(await host.request(node(tempDir('gh-'), `process.stdout.write('ok')`))).toMatchObject({ out: 'ok', err: '', code: 0 })
+    expect(lost).toEqual([])
+  })
+
+  it('input past REQUEST_MAX (HI-2078): streamed whole, characters split across its pieces kept', async () => {
+    const { host, lost } = own()
+    // 3 MiB and more, a four-byte character every few bytes, so the 64 KiB pieces split them.
+    const input = 'ab🐝é'.repeat(400_000)
+    expect(Buffer.byteLength(input)).toBeGreaterThan(3 * REQUEST_MAX)
+    const r = await host.request(node(tempDir('gh-'), `process.stdin.pipe(process.stdout)`, { input }))
+    expect(r.code).toBe(0)
+    expect(r.outBuf.equals(Buffer.from(input))).toBe(true)
     expect(lost).toEqual([])
   })
 
@@ -177,7 +188,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     await identify(Number(readFileSync(pidFile, 'utf8')))
     await windowsProbe.end([await identify(child.pid!)])
     expect(await waiting).toMatchObject({ code: null, lost: expect.any(String) })
-    expect(told).toEqual({ out: 'done', err: '', code: 0 })
+    expect(told).toMatchObject({ out: 'done', err: '', code: 0 })
     expect(lost).toHaveLength(1)
     expect(host.usable).toBe(false)
     expect(await host.request(node(dir, ''))).toMatchObject({ code: null, lost: lost[0] })
@@ -188,13 +199,14 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
  * The host's own script (HOST) run in a VM, no process started: its input, its output (whether it takes more: `full`),
  * its timers (run when the test says), and the children it starts (fake ones, their pipes the test's).
  */
-function vmHost(): { send: (b: Buffer | string) => void; frames: () => string[]; setFull: (full: boolean) => void; kids: Fake[]; spawned: { command: string; args: string[]; opts: { cwd: string; env: NodeJS.ProcessEnv } }[]; runTimers: () => void; timers: () => number } {
+function vmHost(): { send: (b: Buffer | string) => void; paused: () => boolean; frames: () => string[]; setFull: (full: boolean) => void; kids: Fake[]; spawned: { command: string; args: string[]; opts: { cwd: string; env: NodeJS.ProcessEnv } }[]; runTimers: () => void; timers: () => number } {
   const timers = new Map<number, () => void>()
   let next = 0
   let full = false
   const written: Buffer[] = []
   const stdout = Object.assign(new EventEmitter(), { write: (b: Buffer) => (written.push(b), !full) })
-  const stdin = new EventEmitter()
+  let held = false
+  const stdin = Object.assign(new EventEmitter(), { pause: () => (held = true), resume: () => (held = false) })
   const kids: Fake[] = []
   const spawned: { command: string; args: string[]; opts: { cwd: string; env: NodeJS.ProcessEnv } }[] = []
   const cp = {
@@ -216,6 +228,7 @@ function vmHost(): { send: (b: Buffer | string) => void; frames: () => string[];
   })
   return {
     send: (b) => stdin.emit('data', Buffer.isBuffer(b) ? b : Buffer.from(b)),
+    paused: () => held,
     frames: () => new FrameDecoder().push(Buffer.concat(written)).map((f) => `${f.kind}${f.id}:${f.payload.toString('utf8')}`),
     setFull: (f) => {
       full = f
@@ -238,7 +251,7 @@ const turn = (): Promise<void> => new Promise((res) => setImmediate(res))
 describe("the git host's script, its streams the test's (HR3's round 1 findings 1 and 2)", () => {
   it('held back by the runner: no quiet counted, nothing cut off; once read, all of it framed before its end', async () => {
     const h = vmHost()
-    h.send('go\n' + JSON.stringify({ id: 1, command: 'git', args: [], cwd: '.', env: {} }) + '\n')
+    h.send(Buffer.concat([frameOf('G', 0), frameOf('R', 1, JSON.stringify({ id: 1, command: 'git', args: [], cwd: '.', env: {} })), frameOf('J', 1)]))
     const [c] = h.kids
     c.stdout.write('first')
     await turn()
@@ -267,18 +280,55 @@ describe("the git host's script, its streams the test's (HR3's round 1 findings 
   })
 
   it('a request split at any byte, characters too: its folder, arguments, environment and input as sent', () => {
-    const spec = { command: 'git', args: ['commit', '-m', 'héllo wörld ✓ 𝄞'], cwd: 'C:\\Users\\Zoë\\projet é', env: { HI2079: 'ünïcode ✓' }, input: 'naïve 🐝' }
-    const bytes = Buffer.from(JSON.stringify({ id: 1, ...spec }) + '\n')
+    const spec = { command: 'git', args: ['commit', '-m', 'héllo wörld ✓ 𝄞'], cwd: 'C:\\Users\\Zoë\\projet é', env: { HI2079: 'ünïcode ✓' } }
+    const input = 'naïve 🐝'
+    const bytes = Buffer.concat([frameOf('R', 1, JSON.stringify({ id: 1, ...spec })), frameOf('I', 1, input), frameOf('J', 1)])
     for (let at = 1; at < bytes.length; at++) {
       const h = vmHost()
-      h.send('go\n')
+      h.send(frameOf('G', 0))
       h.send(bytes.subarray(0, at))
       h.send(bytes.subarray(at))
       expect(h.spawned).toHaveLength(1)
       const s = h.spawned[0]
-      expect({ command: s.command, args: s.args, cwd: s.opts.cwd, env: s.opts.env }).toEqual({ command: spec.command, args: spec.args, cwd: spec.cwd, env: spec.env })
-      expect(String(h.kids[0].stdin.read())).toBe(spec.input)
+      expect({ command: s.command, args: s.args, cwd: s.opts.cwd, env: s.opts.env }).toEqual(spec)
+      expect(String(h.kids[0].stdin.read())).toBe(input)
+      expect(h.kids[0].stdin.writableEnded).toBe(true)
     }
+  })
+
+  it("a command taking no more input: the host reads nothing more until it does; then the rest, and its end (HI-2078)", async () => {
+    const h = vmHost()
+    h.send(Buffer.concat([frameOf('G', 0), frameOf('R', 1, JSON.stringify({ id: 1, command: 'git', args: [], cwd: '.', env: {} }))]))
+    const [c] = h.kids
+    const piece = Buffer.alloc(64 * 1024, 97)
+    h.send(frameOf('I', 1, piece))
+    // Its input full (nothing reads it yet): the host holds every input back.
+    expect(h.paused()).toBe(true)
+    let got = 0
+    c.stdin.on('data', (d: Buffer) => (got += d.length))
+    await turn()
+    expect(h.paused()).toBe(false)
+    h.send(Buffer.concat([frameOf('I', 1, piece), frameOf('J', 1)]))
+    await turn()
+    expect(got).toBe(2 * piece.length)
+    expect(c.stdin.writableEnded).toBe(true)
+  })
+
+  it("a zero bound: any byte is past it (as execFile's), an empty output isn't", async () => {
+    const h = vmHost()
+    const ask = (id: number) => frameOf('R', id, JSON.stringify({ id, command: 'git', args: [], cwd: '.', env: {}, maxBuffer: 0 }))
+    h.send(Buffer.concat([frameOf('G', 0), ask(1), frameOf('J', 1), ask(2), frameOf('J', 2)]))
+    const [a, b] = h.kids
+    a.stdout.write('x')
+    await turn()
+    expect(h.frames().filter((f) => f.startsWith('B') || f.startsWith('O'))).toEqual([expect.stringMatching(/^B1:maxBuffer/)])
+    b.emit('exit', 0, null)
+    b.stdout.end()
+    b.stderr.end()
+    await turn()
+    b.emit('close', 0, null)
+    await turn()
+    expect(h.frames().at(-1)).toBe('X2:0')
   })
 })
 
@@ -332,8 +382,16 @@ describe("what a git host says that it shouldn't (HI-2079)", () => {
     child.emit('exit', 0, null)
     // The frames it wrote before it exited arrive after.
     child.stdout!.end(frame('X', 1, '0'))
-    expect(await a).toEqual({ out: 'out', err: '', code: 0 } satisfies HostResult)
+    expect(await a).toMatchObject({ out: 'out', err: '', code: 0, outBuf: Buffer.from('out') })
     expect(await b).toMatchObject({ lost: expect.stringMatching(/ended/) })
+    expect(lost).toHaveLength(1)
+  })
+
+  it("more output than a request's bound (zero: any byte), however the host sends it: lost, what is read here bounded", async () => {
+    const { child, host, lost } = fake()
+    const a = host.request({ ...spec, maxBuffer: 0 })
+    child.stdout!.write(Buffer.concat([frame('S', 1, '5'), frame('E', 1, 'x')]))
+    expect(await a).toMatchObject({ lost: 'more err for 1 than its bound' })
     expect(lost).toHaveLength(1)
   })
 

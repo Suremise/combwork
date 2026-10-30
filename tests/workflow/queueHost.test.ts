@@ -22,7 +22,9 @@ const ctx = vi.hoisted(() => ({
   workflowsAsked: 0,
   // HI-2079: how many runners (in order) their git host fails at their first git, and what the runners did, in order.
   hostFails: 0,
-  events: [] as string[]
+  events: [] as string[],
+  // HI-2078: git() calls routed to the runner in the queue's run.
+  routed: 0
 }))
 vi.mock('../../src/main/workflow/service', () => ({ workflowFor: async () => (ctx.workflowsAsked++, ctx.wf), workflowEnforced: () => ctx.enforced }))
 vi.mock('../../src/main/boardStore', async (original) => ({
@@ -65,6 +67,12 @@ vi.mock('../../src/main/workflow/queueRunner', () => {
               }
               return (await import('../../src/main/git')).git(cwd, args)
             },
+            // HI-2078: the queue's reads, routed here as to the runner's git host: run as the worker runs them, while it holds.
+            gitOutcome: async (m: Parameters<typeof import('../../src/main/gitWorker').runGit>[0]) => {
+              ctx.routed++
+              if (failed) return { stdout: new Uint8Array(0), stderr: new Uint8Array(0), error: { code: 'leaseLost', killed: false, signal: null }, cwdExists: true }
+              return (await import('../../src/main/gitWorker')).runGit(m)
+            },
             // Its release is awaited (its job ended, seen empty) before the next lease is taken.
             release: async () => {
               await new Promise((res) => setImmediate(res))
@@ -98,6 +106,7 @@ afterEach(() => {
   ctx.workflowsAsked = 0
   ctx.hostFails = 0
   ctx.events = []
+  ctx.routed = 0
   stopQueueHosts()
   setHolderWatch(null)
 })
