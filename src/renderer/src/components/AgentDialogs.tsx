@@ -5,7 +5,8 @@ import { useAgentLimit } from '../advanced'
 import { agentProvider, chosenDefaultProvider, defaultProviderPending, isProviderEnabled, modeCaveat, modeOption, offeredModes, orderedProviders, projectDefaultProvider, projectProviderConfig, projectUse200k, providerDescriptor, providerName, providerSettings, shownText } from '@shared/providers'
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import type { MergeBranch } from '@shared/types'
-import type { AgentBranchStatus, Connection, EffortLevel, MergeResult, PermissionMode, ProjectInfo, ProviderId } from '@shared/types'
+import type { AccountView } from '@shared/accounts'
+import type { AgentBranchStatus, EffortLevel, MergeResult, PermissionMode, ProjectInfo, ProviderId } from '@shared/types'
 import { serverAddedIn } from '@shared/agentMcp'
 import { agentNameProblem, nameTaken, nameTakenMessage, sameAgentName, suggestAgentName, workspaceAgentList } from '@shared/agentNames'
 import type { TemplateAgent } from '@shared/templates'
@@ -123,7 +124,7 @@ export function Overrides({
    * The connection it would start on (HI-1770, useLaunchConnection): given (null: none usable), an empty choice follows
    * its defaults ("Connection default (…)"), not the project's or the CLI's; undefined, as before connections.
    */
-  connection?: Pick<Connection, 'defaults'> | null
+  connection?: Pick<AccountView, 'defaults'> | null
   /** What an empty choice is called (the project's, by default): the caller's own words. */
   inherit?: string
   /** That name says it is the default ("Default"): the effort then names the level alone, not "High, default" (#916). */

@@ -250,19 +250,20 @@ const check = (name, ok, extra = '') => {
     check('p.txt not edited again', !fs.readFileSync(path.join(proj2, 'p.txt'), 'utf8').includes('again'))
 
     // Copilot's danger opt-in unlocks Autopilot alone (#490: entering Autopilot approves everything for the session);
-    // Allow all needs no opt-in. Turning the opt-in off moves projects and agents in Autopilot back to Inherit, and
-    // leaves Allow all where it is (#461, #490).
-    const cfg2 = () => JSON.parse(fs.readFileSync(path.join(proj2, '.hive', 'project.json'), 'utf8'))
-    const modes2 = () => { const c2 = cfg2(); return { project: c2.providers?.copilot?.permissionMode ?? 'inherit', agent: (c2.agents ?? []).find((x) => x.id === c.id)?.permissionMode ?? 'inherit' } }
+    // Allow all needs no opt-in. Since HI-2106 a mode is its agent's connection's (Project Settings' page sets its
+    // agents'); turned off, the opt-in changes no connection: one in Autopilot launches in Copilot's default meanwhile.
+    const modeOfC = () => {
+      const saved = JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8'))
+      const conn = JSON.parse(fs.readFileSync(path.join(proj2, '.hive', 'project.json'), 'utf8')).agents?.find((x) => x.id === c.id)?.connection
+      return saved.connections?.find((x) => x.id === conn)?.permissionMode ?? 'default'
+    }
     await inv('settings:update', { providers: { copilot: { enableDangerousMode: true } } })
     await inv('project:updateProvider', proj2, 'copilot', { permissionMode: 'autopilot' })
+    check("paren(1)'s Autopilot, once allowed, is C's connection's", modeOfC() === 'autopilot', modeOfC())
     await inv('agents:update', proj2, c.id, { permissionMode: 'allow-all' })
-    check('paren(1) in Autopilot and C in Allow all, once allowed', JSON.stringify(modes2()) === JSON.stringify({ project: 'autopilot', agent: 'allow-all' }), JSON.stringify(modes2()))
+    check('…then C in Allow all', modeOfC() === 'allow-all', modeOfC())
     await inv('settings:update', { providers: { copilot: { enableDangerousMode: false } } })
-    const reverted = await lib.until(() => modes2().project === 'inherit', 15000, 300)
-    check('turning the opt-in off moves Autopilot back to Inherit', !!reverted, JSON.stringify(modes2()))
-    check('…and says so', !!(await lib.until(async () => (await page.getByText('Autopilot turned off').count()) > 0, 10000, 300)))
-    check('…and leaves C in Allow all, which needs no opt-in', modes2().agent === 'allow-all', JSON.stringify(modes2()))
+    check('turning the opt-in off leaves C in Allow all, which needs no opt-in', modeOfC() === 'allow-all', modeOfC())
     // With the opt-in off, A's mode menu offers Allow all and not Autopilot, and main allows the one and refuses the other.
     await page.locator('.mode-badge', { hasText: 'Ask' }).first().click()
     const menuText = await lib.until(async () => { const t = await page.locator('.menu .menu-item').allInnerTexts(); return t.length ? t.join(' | ') : null }, 5000, 200)

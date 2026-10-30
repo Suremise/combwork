@@ -41,7 +41,7 @@ import { config } from './config'
 import { placeKey, readKeptJson, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { addAgent, agentMax, agentsGone, prepareAgent, type AddedBy } from './projectAgents'
-import { assertConnectionHere, connectionProblem, getAccount } from './accounts'
+import { assertConnectionHere, connectionProblem, getAccount, getConnection } from './accounts'
 import { projectKeyOf } from './projectKeys'
 import { providerService } from './providerService'
 import { sessions } from './sessions'
@@ -828,7 +828,7 @@ async function replaceProjectAgents(projectPath: string, r: { next: AgentDef[]; 
       const limit = saves ?? max
       if (!r.anyMax && n > limit) throw r.by === 'agent' ? refusal(M.nothing, { problem: templateLimitText(n, limit) }) : refusal(M.overMax, { count: n, max: limit })
       // Each one's connection as it is now (HI-1769): one turned off or removed while they were prepared stops it.
-      for (const def of r.next) if (def.connection) assertConnectionHere(def.connection, def.provider!, projectPath, def.name)
+      for (const def of r.next) if (def.connection) assertConnectionHere(getConnection(def.connection)?.account ?? def.connection, def.provider!, projectPath, def.name)
       // The layout as kept (auto when none was chosen), so undo puts back exactly what was there. The template's own maximum
       // is saved even when it equals the one inherited now, so a later change to the defaults doesn't move this team's.
       const saved = saves !== null && r.loadedMax ? saves : undefined

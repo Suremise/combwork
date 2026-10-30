@@ -160,8 +160,8 @@ export function templateFrom(name: string, agents: AgentDef[], layout: PageLayou
       ...(a.effort ? { effort: a.effort } : {}),
       ...(a.permissionMode ? { permissionMode: a.permissionMode } : {}),
       ...(typeof a.use200kContext === 'boolean' ? { use200kContext: a.use200kContext } : {}),
-      ...(Array.isArray(a.mcpServers) ? { mcpServers: [...a.mcpServers] } : {}),
-      ...(a.connection ? { connection: a.connection } : {})
+      // Never its connection (HI-2106): a setup of this machine's, chosen when it is loaded.
+      ...(Array.isArray(a.mcpServers) ? { mcpServers: [...a.mcpServers] } : {})
     })),
     ...(suggestedPreset ? { suggestedPreset } : {}),
     ...(pairs.length ? { pairs } : {})
@@ -270,9 +270,9 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
       ...(a.effort ? { effort: a.effort as string } : {}),
       ...(a.permissionMode ? { permissionMode: a.permissionMode as string } : {}),
       ...(typeof a.use200kContext === 'boolean' ? { use200kContext: a.use200kContext } : {}),
-      ...(mcpServers ? { mcpServers } : {}),
-      ...(typeof a.connection === 'string' && a.connection ? { connection: a.connection } : {}),
-      ...(typeof a.connection === 'string' && a.connection && typeof a.connectionName === 'string' && a.connectionName ? { connectionName: a.connectionName } : {})
+      // Its connection and its name (HI-1769) are dropped as it is read (HI-2106: connections are this machine's setups,
+      // chosen when it is loaded; HI-2109 builds that choice).
+      ...(mcpServers ? { mcpServers } : {})
     })
   }
   // Two agents named alike once their patterns are made (`{key}-B{n}` twice is HI-B1 and HI-B2: different).

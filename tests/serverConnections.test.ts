@@ -40,7 +40,8 @@ const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
 const { withoutAccountEnv, withServerEnv } = await import('../src/main/providers/common')
 const { createWorkspaceService, inWorkspace } = await import('../src/main/workspace')
-const { agentLaunchSettings, providerDescriptor } = await import('../src/shared/providers')
+const { providerDescriptor } = await import('../src/shared/providers')
+const { legacyLaunchSettings: agentLaunchSettings } = await import('../src/shared/connectionDefaults')
 
 // Dummy keys shaped so no other masking rule catches them: only the key matcher can.
 const KEY = 'Zq!7#mP2&vL9^tR4~wX8'
@@ -68,8 +69,9 @@ beforeAll(async () => {
 afterEach(async () => {
   keys.keyStoreTestHooks.beforeWrite = undefined
   safe.available = true
-  for (const a of [...(config.get().connections ?? [])]) await accounts.removeAccount(a.id).catch(() => undefined)
+  for (const a of [...(config.get().accounts ?? [])]) await accounts.removeAccount(a.id).catch(() => undefined)
   config.update((c) => {
+    c.accounts = []
     c.connections = []
     c.lastUsedConnection = {}
   })
@@ -82,7 +84,8 @@ async function serverOn(input: Partial<Parameters<typeof servers.addServerConnec
   await here(() => accounts.setAccountOn(a.id, true))
   return a
 }
-const launch = (wanted?: string | null) => accounts.connectionForLaunch({ provider: 'claude-code', workspaceConfig: w.config, wanted, agentName: 'Builder' })
+/** A launch on an account's base connection (HI-2106: an agent names a connection). */
+const launch = (account?: string | null) => accounts.connectionForLaunch({ provider: 'claude-code', workspaceConfig: w.config, wanted: account ? (accounts.allConnections().find((c) => c.account === account)?.id ?? account) : account, agentName: 'Builder' })
 const store = (): Record<string, { v: number; origin: string; last4: string; blob: string }> => (existsSync(keyFile) ? JSON.parse(readFileSync(keyFile, 'utf8')) : {})
 const view = () => here(() => accounts.accountsView())
 
@@ -183,7 +186,7 @@ describe('a server connection and its key', () => {
     const inModel = await outcome(servers.addServerConnection({ ...deepseek, models: [{ id: `${plain}xyz` }], key: plain }))
     expect(inModel).toMatch(/appears in the model list/)
     expect(inModel).not.toContain(plain)
-    expect(config.get().connections!.some((c) => c.server?.models.some((m) => m.id === `${plain}xyz`))).toBe(false)
+    expect(config.get().accounts!.some((c) => c.server?.models.some((m) => m.id === `${plain}xyz`))).toBe(false)
     const inUrl = await outcome(servers.addServerConnection({ ...deepseek, baseUrl: `https://api.example.com/${plain}`, key: plain }))
     expect(inUrl).toMatch(/appears in the base URL/)
     expect(await outcome(servers.addServerConnection({ ...deepseek, baseUrl: 'https://api.example.com/?k=1' }))).toMatch(/query/)
@@ -241,7 +244,7 @@ describe('the key store: one write per change, one lock, no backup', () => {
     }
     const saving = servers.setServerKey(a.id, KEY)
     await inWrite
-    const cleaning = keys.dropKeysExcept(() => new Set(config.get().connections!.filter((c) => c.kind === 'server').map((c) => c.id)))
+    const cleaning = keys.dropKeysExcept(() => new Set(config.get().accounts!.filter((c) => c.kind === 'server').map((c) => c.id)))
     release()
     await Promise.all([saving, cleaning])
     expect(store()[a.id]).toBeDefined()
@@ -721,7 +724,7 @@ describe('Ollama cloud models: on this PC, but not local (HI-1773, Darren 27 Oct
     const a = await ollama([{ id: 'qwen3:8b', as: ['opus'] }])
     // As S6 saved it: a typed cloud model, never marked.
     config.update((c) => {
-      const s = c.connections!.find((x) => x.id === a.id)!.server!
+      const s = c.accounts!.find((x) => x.id === a.id)!.server!
       s.models = [{ id: 'gemma4:cloud', as: ['opus'] }]
     })
     expect(savedCloud(a.id)).toEqual([])

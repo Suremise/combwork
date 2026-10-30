@@ -61,7 +61,7 @@ import type {
   PurgeTarget,
   ModeInfo,
   RecentWorkspace,
-  Connection,
+  Account,
   ServerModel,
   AgentInstallInfo,
   AppConfig,
@@ -1029,7 +1029,7 @@ export interface HiveRequests {
   /** Hive's accounts (HI-980) and this window's workspace's choice of them; `check`: each checked again (Settings shown). */
   'connections:list': (check?: boolean) => ConnectionsView
   /** Adds an account (its folder and junctions made); returns it, for its Sign in. */
-  'connections:add': (provider: ProviderId, name: string) => Connection
+  'connections:add': (provider: ProviderId, name: string) => Account
   'connections:rename': (id: string, name: string) => void
   /** Removes an account and its folder for good (refused while it is in use; `closeTerminal`, HI-1870: its open sign-in or Set Up terminal ended first). */
   'connections:remove': (id: string, opts?: { closeTerminal?: boolean }) => void
@@ -1039,7 +1039,7 @@ export interface HiveRequests {
    * Adds a server connection (HI-1772): its server, its models, and its key once (when the server needs one), which is
    * stored encrypted and never sent back. Returns it.
    */
-  'connections:addServer': (input: { cli: ProviderId; name: string; baseUrl: string; preset?: string; models: ServerModel[]; modelsFrom: 'typed' | 'listed'; key?: string }) => Connection & { keyFailed?: boolean }
+  'connections:addServer': (input: { cli: ProviderId; name: string; baseUrl: string; preset?: string; models: ServerModel[]; modelsFrom: 'typed' | 'listed'; key?: string }) => Account & { keyFailed?: boolean }
   /** Changes a server connection's server; `keyCleared`: its base URL moved to another server, so its key was removed. */
   'connections:editServer': (id: string, patch: { baseUrl?: string; preset?: string | null; models?: ServerModel[]; modelsFrom?: 'typed' | 'listed' }) => { keyCleared: boolean }
   /** Saves or replaces a server connection's key; the reply has its last 4 characters only. */

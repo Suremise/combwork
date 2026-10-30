@@ -11,6 +11,10 @@
     "defaultMessage": "Choose where to move the agent.",
     "description": "An error: an agent was to be moved in the project's order, with no place given."
   },
+  "worktrees.agent.effortRefused": {
+    "defaultMessage": "{chosen, select, yes {{model}} other {The CLI's default model}} doesn't take {effort} effort. Choose one of the levels it takes.",
+    "description": "An error saving an agent's (or a connection's) settings (HI-2106): the model that would run (its name, {model}, when one is chosen; else the CLI's own default) has no such reasoning effort level ({effort}: \"max\")."
+  },
   "worktrees.agent.enterName": {
     "defaultMessage": "Enter a name.",
     "description": "An error: an agent's name was emptied."

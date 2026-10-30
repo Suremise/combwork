@@ -2,6 +2,7 @@
   "worktrees.agent.badPlacement": "W tym układzie nie można tak rozmieścić paneli.",
   "worktrees.agent.badWorkflowRole": "Rola w przepływie pracy to builder, reviewer, either lub generalist.",
   "worktrees.agent.chooseMove": "Wybierz, gdzie przenieść agenta.",
+  "worktrees.agent.effortRefused": "{chosen, select, yes {{model}} other {Domyślny model CLI}} nie obsługuje wysiłku „{effort}”. Wybierz jeden z obsługiwanych poziomów.",
   "worktrees.agent.enterName": "Wpisz nazwę.",
   "worktrees.agent.gone": "Ten agent już nie istnieje.",
   "worktrees.agent.nameTaken": "Agent o nazwie „{name}” już istnieje.",

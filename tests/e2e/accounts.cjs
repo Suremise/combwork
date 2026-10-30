@@ -173,7 +173,7 @@ const check = (name, ok, extra = '') => {
 
     // --- On in this workspace: its default.
     await row('Personal').getByRole('switch').click()
-    check('turned on here, it is this workspace’s default (workspace.json)', !!(await lib.until(async () => JSON.stringify(wsJson(ws1)) === JSON.stringify({ 'claude-code': { on: [personal.id], default: personal.id } }), HUNG_MS)), JSON.stringify(wsJson(ws1)))
+    check('turned on here, it is on in this workspace (workspace.json; HI-2106: no default kept, the order says which)', !!(await lib.until(async () => JSON.stringify(wsJson(ws1)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), HUNG_MS)), JSON.stringify(wsJson(ws1)))
     check('…and its row says so', !!(await lib.until(async () => (await row('Personal').locator('.account-default').count()) === 1, HUNG_MS)))
 
     // --- Set up for this workspace (HI-1870): on here, its CLI must trust the folders it would be used in too, read
@@ -291,7 +291,7 @@ const check = (name, ok, extra = '') => {
     await lib.appReady(p2)
     await lib.openWorkspace(invOn(p2), p2, ws2)
     // A new workspace starts with the last account chosen as a default (Darren, 26 Oct): Personal.
-    check('a new workspace starts with the top of the order on (HI-1875), the one used there', JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id], default: personal.id } }), JSON.stringify(wsJson(ws2)))
+    check('a new workspace starts with the top of the order on (HI-1875), the one used there', JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), JSON.stringify(wsJson(ws2)))
     // One connection, two workspaces (HI-1870): set up for the first one's folders, not yet for this one's.
     const alpha2 = fs.realpathSync.native(path.join(ws2, 'alpha'))
     check('one connection in two workspaces: each window says its own (here alpha untrusted, set up in the first)', !!(await lib.until(async () => !!(await trustOf(invOn(p2), personal.id))?.pending.some((p) => p.project === 'alpha' && p.folder === alpha2), HUNG_MS)) && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }), JSON.stringify([await trustOf(invOn(p2), personal.id), await trustOf(inv, personal.id), alpha2]))
@@ -301,11 +301,11 @@ const check = (name, ok, extra = '') => {
     check('…turned on there again, it needs set up there again', !!(await lib.until(async () => !!(await trustOf(invOn(p2), personal.id))?.pending.some((p) => p.project === 'alpha'), HUNG_MS)))
     await invOn(p2)('connections:setOn', personal.id, false)
     await invOn(p2)('connections:setOn', work.id, true)
-    check('a second window’s workspace has Work on, as its default', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [work.id], default: work.id } }), HUNG_MS)), JSON.stringify(wsJson(ws2)))
-    check('…and the first keeps its own', JSON.stringify(wsJson(ws1)) === JSON.stringify({ 'claude-code': { on: [personal.id], default: personal.id } }), JSON.stringify(wsJson(ws1)))
+    check('a second window’s workspace has Work on', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [work.id] } }), HUNG_MS)), JSON.stringify(wsJson(ws2)))
+    check('…and the first keeps its own', JSON.stringify(wsJson(ws1)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), JSON.stringify(wsJson(ws1)))
     check('…each window lists its own workspace’s choice', JSON.stringify((await list()).workspace) !== JSON.stringify((await invOn(p2)('connections:list')).workspace))
     await invOn(p2)('connections:setOn', work.id, false)
-    check('turned all off there, it stays off (no default)', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [], default: null } }), HUNG_MS)))
+    check('turned all off there, it stays off', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [] } }), HUNG_MS)))
     await p2.close()
 
     // --- A Codex connection in the same list (HI-1870), its Set Up the one-time Windows sandbox, said the same way.
@@ -377,7 +377,8 @@ const check = (name, ok, extra = '') => {
   }
   const mig = await lib.launch({ userData: migProfile, env: migEnv, viewport: { width: 1200, height: 800 } })
   try {
-    const order = () => (JSON.parse(fs.readFileSync(migCfgFile, 'utf8')).connections ?? []).map((c) => c.id).join(',')
+    // The accounts, as config.json's migration made them from its connections (HI-2106), the order's move with them.
+    const order = () => (JSON.parse(fs.readFileSync(migCfgFile, 'utf8')).accounts ?? []).filter((a) => !a.home).map((c) => c.id).join(',')
     check('migration: the most recent workspace default (Max 2) is the top of the order, the rest in their order', !!(await lib.until(async () => order() === 'a-max2,a-max1,a-max3', HUNG_MS)), order())
     check('…never the last launch on an agent’s own connection (Max 3), and done once', JSON.parse(fs.readFileSync(migCfgFile, 'utf8')).connectionOrderMigrated === true)
   } catch (e) {

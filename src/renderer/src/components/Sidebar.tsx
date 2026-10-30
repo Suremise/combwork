@@ -2,7 +2,7 @@ import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import type { McpServerInfo, NoteFile, ProjectInfo, SkillInfo } from '@shared/types'
 import { AgentsTable, agentsText } from './AgentsTable'
 import { useLanes, type Lane } from '../laneSource'
-import { agentLaunchSettings, modeOption } from '@shared/providers'
+import { agentLaunchSettings, agentProvider, modeOption } from '@shared/providers'
 import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume } from '@shared/resumeAll'
 import { hooksMissingText, shownMergeSlot, shownStatusMessage } from '@shared/runtime'
@@ -455,7 +455,7 @@ function ProjectsPanel() {
   const row = (p: ProjectInfo) => {
     // Marked when any agent starts (or runs) in its provider's no-guardrails mode.
     const bypass = !!settings && p.agents.some((a) => {
-      const l = agentLaunchSettings(a, p.config, settings)
+      const l = agentLaunchSettings(agentProvider(a, p.config, settings), a, settings)
       // The mode in effect: on the CLI's own setting, the one its CLI showed (#1284).
       return !!modeOption(l.provider, (a.live ? modeInEffect(a.live) : undefined) ?? l.permissionMode)?.danger
     })

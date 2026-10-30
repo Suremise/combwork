@@ -28,7 +28,7 @@ import { AccountsSettings } from '../components/AccountsSettings'
 import { ConnectionChoice, useLaunchConnection } from '../components/ConnectionChoice'
 import { AdvancedSettings } from '../components/AdvancedSettings'
 import { ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
-import { choose, chooseTab, confirm, get, notify, set, showView, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
+import { assistantAccountOf, choose, chooseTab, confirm, get, notify, set, showView, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
 import { TabPanel, Tabs } from '../components/Tabs'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
@@ -642,7 +642,7 @@ function AssistantConnectionPicker() {
   return (
     <div className="agent-form">
       {providers.map((p) => (
-        <ConnectionChoice key={p.id} id={`assistant-connection-${p.id}`} provider={p.id} value={ws.config.assistantConnection?.[p.id] ?? ''} onChange={(v) => void call('connections:setAssistant', p.id, v || null).then(() => actions.refreshWorkspace()).catch((e) => notify('error', tr(msg({ id: 'settings.assistant.connection.failed', defaultMessage: "Couldn't change the Assistant's connection", description: "An error's title: saving the Assistant's connection (Settings → Assistant) failed." })), errorMessage(e)))} />
+        <ConnectionChoice key={p.id} id={`assistant-connection-${p.id}`} provider={p.id} value={assistantAccountOf(ws, p.id) ?? ''} onChange={(v) => void call('connections:setAssistant', p.id, v || null).then(() => actions.refreshWorkspace()).catch((e) => notify('error', tr(msg({ id: 'settings.assistant.connection.failed', defaultMessage: "Couldn't change the Assistant's connection", description: "An error's title: saving the Assistant's connection (Settings → Assistant) failed." })), errorMessage(e)))} />
       ))}
     </div>
   )
@@ -773,7 +773,7 @@ function AssistantProviderDefaults({ provider }: { provider: ProviderId }) {
   const p = providerDescriptor(provider)
   const a = settings?.assistant.providers[provider] ?? { model: '', effort: '', permissionMode: '', extraArgs: '', use200kContext: '' as const }
   // With connections (HI-1770), what an empty choice runs is the Assistant's connection's default, not the CLI's.
-  const assistantChoice = useStore((s) => s.workspace?.config.assistantConnection?.[provider])
+  const assistantChoice = useStore((s) => assistantAccountOf(s.workspace, provider))
   const conn = useLaunchConnection(assistantChoice || undefined, provider)
   const legacy = providerSettings(settings, provider)
   const g = conn === undefined ? legacy : { ...legacy, defaultModel: conn?.defaults?.model ?? '', defaultEffort: conn?.defaults?.effort ?? '', use200kContext: !!conn?.defaults?.use200kContext }

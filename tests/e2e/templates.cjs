@@ -226,7 +226,8 @@ const check = (name, ok, extra = '') => {
   const loaded = await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer"]' && projectCfg(beta).layout === 'columns3', 15000)
   check('loading replaces the agents', !!loaded, JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
   const b = projectCfg(beta)
-  check('…recreating them exactly: role in the workflow, note, model, the layout; in the project folder', b.agents[0].workflowRole === 'builder' && b.agents[0].role === 'builder' && b.agents[1].workflowRole === 'reviewer' && b.agents[0].model === 'opus' && b.layout === 'columns3' && b.agents.every((a) => !a.worktree), JSON.stringify(b))
+  // Not its model (HI-2106: agents hold only a connection, which a template doesn't keep: HI-2109).
+  check('…recreating them exactly: role in the workflow, note, the layout; in the project folder', b.agents[0].workflowRole === 'builder' && b.agents[0].role === 'builder' && b.agents[1].workflowRole === 'reviewer' && b.layout === 'columns3' && b.agents.every((a) => !a.worktree), JSON.stringify(b))
   check("the removed worktree agent's worktree stays", fs.existsSync(tree.worktree.path))
   await lib.until(async () => (await lib.agentCount(page)) === 2, 5000)
 

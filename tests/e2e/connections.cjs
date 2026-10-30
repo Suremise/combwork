@@ -180,8 +180,12 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     check('Make Default moves Max 2 to the top of the order; it is used here now', JSON.stringify(await order()) === JSON.stringify([max2.id, max1.id]) && (await usedHere()) === max2.id)
     check('…One, running, keeps its connection (nothing restarts by itself)', runningOn === max1.id && (await live('a-one'))?.launchedConnection?.id === max1.id)
     const m2 = oneLaunches(max2.id)
-    // Its run says so, and the fake logs the launch in Max 2's folder (written as it starts: waited for).
-    check('…started again, One launches on the top of the order, Max 2', (await relaunchOne()) === max2.id && !!(await lib.until(async () => oneLaunches(max2.id) > m2, HUNG_MS)))
+    // Pinned to Max 1, the one it ran on, when its connection became its own (HI-2106): started again, it stays there.
+    check('…started again, One, pinned to Max 1, stays on it (HI-2106)', (await relaunchOne()) === max1.id)
+    // Its connection cleared: its CLI's first on here, the top of the order. Its run says so, and the fake logs the launch
+    // in Max 2's folder (written as it starts: waited for).
+    await inv('agents:update', alpha, 'a-one', { connection: null })
+    check('…its connection cleared, One launches on the top of the order, Max 2', (await relaunchOne()) === max2.id && !!(await lib.until(async () => oneLaunches(max2.id) > m2, HUNG_MS)))
     await inv('connections:setOn', max2.id, false)
     check('the top turned off: One, running, keeps it', (await live('a-one'))?.launchedConnection?.id === max2.id)
     check('…started again, the next on in the order, Max 1', (await relaunchOne()) === max1.id)

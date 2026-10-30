@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { Connection, ModelAlias, ProviderId, ServerModel } from '@shared/types'
+import type { Account, ModelAlias, ProviderId, ServerModel } from '@shared/types'
 import { providerDescriptor, type ServerPreset } from '@shared/providers'
 import { MODEL_ALIASES, parseBaseUrl, type ServerModelsRead } from '@shared/serverConnection'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
@@ -107,7 +107,7 @@ const hostOf = (url: string): string => {
 export const hasServers = (cli: ProviderId): boolean => !!providerDescriptor(cli).capabilities.connections?.server
 
 /** Reads a server connection's models, saying how it went; `request` is this reading's own id. */
-async function readModels(c: Pick<Connection, 'id' | 'name'>): Promise<void> {
+async function readModels(c: Pick<Account, 'id' | 'name'>): Promise<void> {
   const request = `${Date.now()}-${Math.random().toString(36).slice(2)}`
   try {
     const r = await call('connections:readModels', c.id, request)
@@ -290,7 +290,7 @@ export function AddConnectionDialog({ clis, onClose, onSignIn }: { clis: readonl
 }
 
 /** Asks a server connection's key, in a password box: sent once to main, cleared here as soon as it is saved. */
-function KeyDialog({ c, onClose }: { c: Connection; onClose: () => void }) {
+function KeyDialog({ c, onClose }: { c: Account; onClose: () => void }) {
   const [key, setKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -329,7 +329,7 @@ function KeyDialog({ c, onClose }: { c: Connection; onClose: () => void }) {
 }
 
 /** Changes a server connection's base URL and models; another server's URL removes its key (said before saving). */
-function EditServerDialog({ c, onClose }: { c: Connection; onClose: () => void }) {
+function EditServerDialog({ c, onClose }: { c: Account; onClose: () => void }) {
   const [baseUrl, setBaseUrl] = useState(c.server?.baseUrl ?? '')
   const [models, setModels] = useState<ServerModel[]>(c.server?.models ?? [])
   const [busy, setBusy] = useState(false)
@@ -378,7 +378,7 @@ function EditServerDialog({ c, onClose }: { c: Connection; onClose: () => void }
 }
 
 /** A server connection's part of its row: its server and key, and what can be done with them. */
-export function ServerConnectionDetail({ c, keyLast4, needsSetUp, onSetUp }: { c: Connection; keyLast4?: string; needsSetUp?: boolean; onSetUp: (id: string) => void }) {
+export function ServerConnectionDetail({ c, keyLast4, needsSetUp, onSetUp }: { c: Account; keyLast4?: string; needsSetUp?: boolean; onSetUp: (id: string) => void }) {
   const [dialog, setDialog] = useState<'key' | 'edit' | null>(null)
   const [reading, setReading] = useState(false)
   const url = parseBaseUrl(c.server?.baseUrl ?? '')

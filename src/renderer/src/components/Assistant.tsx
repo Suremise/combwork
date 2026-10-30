@@ -16,7 +16,7 @@ import { commandKeybinding } from '../commands'
 import { legacyOf, placeText, placeTip } from '../agentPlace'
 import { connectionCellText, NoConnectionBanner, useConnections, useLaunchConnection } from './ConnectionChoice'
 import { assistantDefaults } from '@shared/connectionDefaults'
-import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setLoaded, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
+import { agentProviderOf, assistantAccountOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setLoaded, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { loadAssistantChanges } from '../assistantUndo'
 import { useInbox } from '../inbox'
@@ -388,7 +388,7 @@ export function AssistantPanel() {
 function AssistantConnectionBanner({ project, a }: { project: ProjectInfo; a: AgentInfo }) {
   const provider = agentProviderOf(project, a)
   const view = useConnections()
-  const choice = useStore((s) => s.workspace?.config.assistantConnection?.[provider])
+  const choice = useStore((s) => assistantAccountOf(s.workspace, provider))
   const conn = useLaunchConnection(choice || undefined, provider)
   if (conn !== null || !view || view.testHome.includes(provider)) return null
   return <NoConnectionBanner cli={provider} where="assistant" />
@@ -932,7 +932,7 @@ export function AssistantSettingsDialog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openFlag])
   // Its connection (HI-1770): with connections, an empty model, effort or context follows Settings → Assistant's, then its defaults.
-  const assistantChoice = useStore((s) => s.workspace?.config.assistantConnection?.[provider])
+  const assistantChoice = useStore((s) => assistantAccountOf(s.workspace, provider))
   const launchConnection = useLaunchConnection(assistantChoice || undefined, provider)
   if (!openFlag || !a || !agent) return null
   const inheritedFrom = launchConnection === undefined ? undefined : { defaults: assistantDefaults(settings?.assistant.providers[provider], launchConnection) }

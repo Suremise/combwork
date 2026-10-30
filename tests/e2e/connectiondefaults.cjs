@@ -53,13 +53,14 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     }
 
-    // --- At the open: the project's own moved onto its agents, once, recorded.
-    const moved = await lib.until(() => project().migrations?.connections1?.['claude-code'] ?? null, HUNG_MS)
-    const agents = project().agents
-    const one = agents.find((a) => a.id === 'a-one')
-    const two = agents.find((a) => a.id === 'a-two')
-    check("the project's model, effort and context moved onto One (none of its own), recorded in project.json", !!moved && one.model === 'haiku' && one.effort === 'high' && one.use200kContext === true, JSON.stringify(one))
-    check("…Two's own model kept, the rest given", two.model === 'opus' && two.effort === 'high', JSON.stringify(two))
+    // --- At the open: the project's own moved onto its agents, once, recorded (HI-1770); with no connection yet to put them
+    // on, kept for the one each gets (HI-2106's migration record).
+    const moved = await lib.until(() => (project().migrations?.connections1?.['claude-code'] && project().migrations?.accounts1) ?? null, HUNG_MS)
+    const waiting = project().migrations?.accounts1?.unplaced ?? {}
+    const one = waiting['a-one']
+    const two = waiting['a-two']
+    check("the project's model, effort and context moved onto One (none of its own), recorded in project.json", !!moved && one?.model === 'haiku' && one?.effort === 'high' && one?.use200kContext === true, JSON.stringify(one))
+    check("…Two's own model kept, the rest given", two?.model === 'opus' && two?.effort === 'high', JSON.stringify(two))
 
     // --- A connection, its defaults edited in Settings → Connections.
     fs.mkdirSync(accountsRoot, { recursive: true })

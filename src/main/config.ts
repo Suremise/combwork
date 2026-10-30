@@ -1,9 +1,11 @@
 import { app } from 'electron'
+import { randomBytes } from 'crypto'
 import { join } from 'path'
 import { copyFileSync, existsSync, readFileSync } from 'original-fs'
 import { DEFAULT_APP_CONFIG, mergeDefaults, migrateConfig, withLegacySettings } from '../shared/defaults'
 import { extraArgsProblem, isKnownProvider, providerOrderWith } from '../shared/providers'
-import type { AppConfig, AppSettings, EffortOption, FallbackModel, ModelPrice, ProviderId, ProviderSettings, SlotDefaults } from '../shared/types'
+import { migrateAccounts } from '../shared/connectionDefaults'
+import type { AppConfig, AppSettings, EffortOption, FallbackModel, LegacyConnection, ModelPrice, ProviderId, ProviderSettings, SlotDefaults } from '../shared/types'
 import type { SettingsPatch } from '../shared/api'
 import type { PlatformId } from '../shared/platform/descriptors'
 import type { WorkflowOptions } from '../shared/workflow/options'
@@ -82,6 +84,9 @@ class ConfigStore {
       this.backupBeforeSave = (raw.version ?? 1) < DEFAULT_APP_CONFIG.version
       this.data = migrateConfig(mergeDefaults(structuredClone(DEFAULT_APP_CONFIG), raw), raw)
     }
+    // Accounts and connections (HI-2106), once, before anything reads them: the connections become accounts, each with
+    // its base connection; the old ones stay in the record, for the workspaces still to migrate from them.
+    if (!this.data.migrations?.accounts1) this.migrateAccounts()
     // Kept beside it since #1111; a config.json from before still has them, and its first save moves them.
     let text: string | null = null
     try {
@@ -96,6 +101,20 @@ class ConfigStore {
     if (state.boardFold || state.projectViews || state.modelCatalogs) this.stateWritten = text
     // Tests: no tip card over what a suite clicks, unless its profile turns tips on.
     if (testTipsOff() && raw?.settings?.general?.showTips === undefined) this.data.settings.general.showTips = false
+  }
+
+  /** config.json's accounts migration (HI-2106: migrateAccounts), saved at once: workspaces' migrations point at what it made. */
+  private migrateAccounts(): void {
+    // Records of the old shape only (a CLI's): one of the new shape (a connection's account) is never read as one.
+    const old = ((this.data.connections ?? []) as unknown as Record<string, unknown>[]).filter((c) => !!c && typeof c === 'object' && typeof c.provider === 'string') as unknown as LegacyConnection[]
+    const r = migrateAccounts(old, this.data.settings, new Date().toISOString(), () => `c-${randomBytes(4).toString('hex')}`)
+    this.data.accounts = r.accounts
+    this.data.connections = r.connections
+    this.data.migrations = { ...this.data.migrations, accounts1: r.migration }
+    // Every CLI with a connection took the old per-CLI defaults (seedConnectionDefaults did at each start): never again.
+    this.data.connectionDefaultsTaken = [...new Set([...(this.data.connectionDefaultsTaken ?? []), ...old.map((c) => c.provider)])]
+    log.info(`accounts: ${r.accounts.length} accounts and ${r.connections.length} connections made from ${old.length} connections (HI-2106)`)
+    this.scheduleSave()
   }
 
   /**
