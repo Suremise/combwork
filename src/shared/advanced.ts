@@ -231,6 +231,11 @@ export const LANES_GENTLE_END = 'hive.lanes.gentleEnd'
 export const LANES_END_WAIT_MINUTES = 'hive.lanes.endWaitMinutes'
 /** The longest Hive keeps trying to start a lane's busy agent in its new conversation, in minutes (HI-2034): read by main's laneStarts. */
 export const LANES_FRESH_START_WAIT_MINUTES = 'hive.lanes.freshStartWaitMinutes'
+/**
+ * Whether the Assistant, ending a turn while lanes run with no watch covering them, is told so before it finishes
+ * (HI-2069): read by main's inboxNotices, with the drain.
+ */
+export const LANES_UNWATCHED_NOTICE = 'hive.lanes.unwatchedNotice'
 
 /**
  * Settings Hive no longer has, dropped quietly from advanced.json as it is read (and so at its next write), never listed
@@ -953,6 +958,20 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 1440,
     unit: 'min',
+    applies: 'now'
+  },
+  // Lanes nothing will wake the Assistant about (HI-2069): told so as its turn ends.
+  {
+    id: LANES_UNWATCHED_NOTICE,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.lanes.unwatchedNotice.title', defaultMessage: 'Lanes: remind the Assistant to watch them', description: "An advanced setting's title (Settings → Advanced), listed under Hive. A lane is a card loop: a builder and a reviewer taking cards in turn; the Assistant is the Hive Assistant." }),
+    desc: msg({
+      id: 'settings.advanced.hive.lanes.unwatchedNotice.desc',
+      defaultMessage: "When the Hive Assistant is about to end its turn while lanes are running and no watch of its covers them, Hive keeps it going once to say so, naming the lanes' builders, so it watches them before it finishes. Turned off, its turn ends as its CLI ends it, and nothing wakes it about those lanes until it watches them again.",
+      description: 'What the advanced setting "Lanes: remind the Assistant to watch them" does (Settings → Advanced, under Hive). A lane is a card loop; a watch is what wakes an agent when the cards or lanes it follows change.'
+    }),
+    kind: 'boolean',
+    default: true,
     applies: 'now'
   },
   // A lane's end (HI-1706, SPEC §16.10.2): its builder finishes its turn, is told, and its CLI exits by itself.

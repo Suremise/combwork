@@ -67,3 +67,15 @@ export function inboxNotice(at: NoticeAt, items: readonly NoticeItem[]): string 
   if (at === 'drain') return `${NOTICE_PREFIX}Before you finish: your inbox has ${what} you haven't read. Call hive_inbox${ack ? `, act on ${it} and ack ${it}` : ` and act on ${it}`} before you end your turn.`
   return `${NOTICE_PREFIX}New in your inbox: ${what}. Call hive_inbox to read ${it}${ack ? `, act on ${it}, then ack ${it}` : ''}.`
 }
+
+/**
+ * The Assistant's notice before its turn ends with lanes running and no watch covering them (HI-2069), by their builders'
+ * names: Hive's fixed text, with names kept to what agent names hold (letters, digits, spaces, `.`, `_`, `-`; at most 40
+ * characters, 10 names, then "and n more"), since Codex takes it as a developer message. Empty with no lanes.
+ */
+export function unwatchedLanesNotice(builders: readonly string[]): string {
+  const names = [...new Set(builders.map((b) => b.replace(/[^\p{L}\p{N} ._-]/gu, '').trim().slice(0, 40)).filter(Boolean))]
+  if (!names.length) return ''
+  const shown = names.length > 10 ? `${names.slice(0, 10).join(', ')} and ${names.length - 10} more` : names.join(', ')
+  return `${NOTICE_PREFIX}Lanes are running (${shown}) and nothing will wake you about them: watch the lanes (hive_wait_for_tasks with lanes ["all"], wake) before you finish.`
+}
