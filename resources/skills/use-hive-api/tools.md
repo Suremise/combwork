@@ -79,6 +79,7 @@ Texts are clipped: the task to 300 characters, the reply to 500, the last 3 tool
 - `kind: no-code`: work with no commits (a decision, a write-up, a trial), finished by its summary; an agent's proposal of it, and of `skipReview`, waits for the user to confirm.
 - `context`: doc sections to read first, by file and heading slug as `hive_doc_outline` lists them ("docs/PLAN.md#setup", "shared:plans/notes.md#open-questions"), never line numbers. It replaces the card's list (`hive_update_task` too); `[]` clears it.
 - `attachments`: at most 10 files and 100 MB, each copied in (the same file once), and linked at the end of its description; with `hive_update_task`, in its comment, or at the end of its description without one.
+- `lane`: puts it on a lane as it is made, never by a guessed key: a builder's name (last on its running lane), or `{ builder, reviewer, … }` to start one if none.
 
 ## Submitting and reviewing
 
@@ -96,11 +97,11 @@ Texts are clipped: the task to 300 characters, the reply to 500, the last 3 tool
 ## Lanes (`hive_lane`)
 
 - `start` (the builder; the Assistant names `project`, `builder`, and `reviewer` or `pool=true`): `cards` in order, `rounds`, `waitMinutes` (left out: the project's Card loops options), `name`, `brief`.
-- `brief` is kept with the lane and given with each of its cards in the conversation that works it: never prompt it separately. Left out, a running lane keeps its own; `''` clears it.
-- `start` again on the builder's running lane with any of these cards updates it: while one of its cards is in flight the new list is queued until that card is Done, and its builder is told. `applyNow=true` applies it at once, putting that card back to Todo when it isn't first (refused while it is in Review or later, its builder in a turn, or its folder not committed).
+- `brief` is kept with the lane and given with each of its cards: never prompt it separately. Left out, a running lane keeps its own; `''` clears it.
+- `start` again on the builder's running lane with any of these cards updates it: while one of its cards is in flight the new list is queued until that card is Done, and its builder is told. `applyNow=true` applies it at once, putting that card back to Todo when it isn't first.
 - `join` (the reviewer): `builder`, and `cards` if it hasn't started one. `next`: your next card to start or carry on, or why the lane waits.
 - A lane ends by itself once every card is Done. Abandoning one is the user's: the Assistant ends it with `end`, `lane` and `abandoned=true`.
-- `list`: running and lately ended lanes, a line each (agents, state, cards, rounds, wait, id); the Assistant's `all=true` gives every one kept.
+- `list`: running and lately ended lanes, a line each; the Assistant's `all=true` gives every one kept.
 
 ## Merge slot (`hive_merge_slot`)
 

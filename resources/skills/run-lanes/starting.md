@@ -4,7 +4,7 @@
 
 - Split the cards so that agents sharing a folder never edit the same files: group them by the files they touch. Where the project builds cards in slots (its Version Control tab), Hive lends each builder a slot as its card starts; a reviewer needs none: it reviews in a review copy. Hive also warns when two lanes' cards look likely to touch the same files.
 - Cards that depend on each other go in the same lane, in order. Name overlaps between lanes in both briefs ("lane 2 also edits the settings view: keep to your sections").
-- A follow-up card belongs to the lane that owns its files: add it to that builder's list (changing-lanes.md), or put it in Todo saying which lane should take it.
+- A follow-up card belongs to the lane that owns its files: create it on that builder's lane (`hive_create_task` with `lane`, changing-lanes.md), or put it in Todo saying which lane should take it.
 
 ## Brief completely
 

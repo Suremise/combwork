@@ -123,6 +123,9 @@ const projectArg = {
 /** A reply worded with the card names the API sent with it (#1219: its `names`). */
 const named = <T>(r: T, text: (r: T) => string): string => namedBy(namesFrom((r as { names?: Record<string, string> } | null)?.names), () => text(r))
 const cardArg = { type: ['number', 'string'], description: 'Its key ("HI-12").' }
+// A card made and placed on a lane (HI-2167): the card, then the lane's change or why it wasn't placed.
+const createdLaneText = (r: TaskChange & { lane?: LaneChange; laneRefused?: string }): string =>
+  [createdText(r), ...(r.lane ? [named(r.lane, laneChangeText)] : []), ...(r.laneRefused ? [`Not placed on a lane: ${r.laneRefused}`] : [])].join('\n')
 const agentArg = { type: 'string', description: 'Its name or id; optional when the project has one agent.' }
 // An agent's MCP servers and its connection (HI-2108: a connection holds its model, effort, context and mode; its CLI
 // follows from it).
@@ -820,11 +823,18 @@ const tools: Tool[] = [
         context: contextArg,
         kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? 'no-code: work with no commits (a decision, a write-up), finished by its summary. Default code.' : 'no-code proposes work with no commits; the user confirms it. Default code.' },
         skipReview: { type: 'string', description: ASSISTANT ? "The user's reason it skips review, in their words." : 'Proposes it skip review, with your reason; the user confirms it.' },
-        attachments: attachmentsArg('linked in its description')
+        attachments: attachmentsArg('linked in its description'),
+        lane: {
+          type: ['string', 'object'],
+          description: ASSISTANT
+            ? "Put it on a lane as it is made, never by a guessed key: a builder's name, or { builder, reviewer, brief, position }."
+            : 'Onto your lane: your name, or { builder, reviewer, position }.',
+          properties: { builder: { type: 'string' }, reviewer: { type: 'string' }, brief: { type: 'string' }, name: { type: 'string' }, position: { type: 'string', enum: ['last', 'next'], ...(ASSISTANT ? { description: 'next: before its first card still in Todo.' } : {}) } }
+        }
       },
       required: ['title']
     },
-    run: async (a) => createdText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), reply: 'short' })) as TaskChange)
+    run: async (a) => createdLaneText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), ...(a.lane !== undefined ? { lane: a.lane } : {}), reply: 'short' })) as TaskChange & { lane?: LaneChange; laneRefused?: string })
   },
   {
     name: 'hive_update_task',

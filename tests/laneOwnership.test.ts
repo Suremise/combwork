@@ -137,6 +137,56 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     await vi.waitFor(async () => expect((await deliveriesOf(project, 'b1')).some((d) => d.kind === 'rebrief' && /card list changed, as queued/.test(d.body))).toBe(true), { timeout: HUNG_MS })
   })
 
+  it('HI-2167: a new card placed on its builder’s lane: refused with none when one is needed, else started; last or next, queued while a card is in flight, from the queued list', async () => {
+    const [p1, p2, p3, p4, p5] = [await make('Place 1'), await make('Place 2'), await make('Place 3'), await make('Place 4'), await make('Place 5')]
+    const nums = (r: { lane: { cards: { number: number }[] } }) => r.lane.cards.map((c) => c.number)
+    // hive_create_task's lane: "B2" with no running lane: refused, no lane started.
+    await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [], place: { card: p1, needsLane: true }, by: 'B2 (alpha)' })).rejects.toMatchObject({ status: 409, message: expect.stringMatching(/B2 has no running lane in alpha: the card was made but not placed/) })
+    expect((await lanes.listLanes(w)).some((l) => l.builder.id === 'b2')).toBe(false)
+    // { builder, reviewer }: starts one with the card alone (its `cards` ignored).
+    const started = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [p5], place: { card: p1 }, by: 'B2 (alpha)' })
+    expect([started.did, nums(started), started.lane.reviewer?.id]).toEqual(['started', [p1], 'r1'])
+    // Between cards: last, then next (before the first card still in Todo), at once.
+    expect(nums(await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [], place: { card: p2, needsLane: true }, by: 'B2 (alpha)' }))).toEqual([p1, p2])
+    const next = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [], place: { card: p3, position: 'next', needsLane: true }, by: 'B2 (alpha)' })
+    expect([next.did, next.lane.id, nums(next), next.lane.queued]).toEqual(['updated', started.lane.id, [p3, p1, p2], null])
+    // A card in flight: the placement is queued as hive_lane start's list change is, the reviewer kept.
+    await run(() => tasks.updateTask(p3, { column: 'doing', agent: 'b2' }, user))
+    const queued = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [], place: { card: p4, needsLane: true }, by: 'B2 (alpha)' })
+    expect([nums(queued), queued.lane.queued, queued.lane.reviewer?.id]).toEqual([[p3, p1, p2], [p3, p1, p2, p4], 'r1'])
+    expect(queued.note).toMatch(new RegExp(`queued: it applies once #${p3} is Done`))
+    // Placed again meanwhile: on the queued list, so the queued card stays; next goes after the card in flight.
+    const again = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [], place: { card: p5, position: 'next', needsLane: true }, by: 'B2 (alpha)' })
+    expect(again.lane.queued).toEqual([p3, p5, p1, p2, p4])
+    await lanes.endLane(w, started.lane.id, { abandoned: true })
+  })
+
+  it("HI-2167: hive_lane start's safety net names a card made by someone else since the caller's turn began, moments ago; never the caller's own, one from before its turn, an older one, or with no turn", async () => {
+    const c = await make('Fresh card')
+    const made = Date.parse((await run(() => tasks.getTask(c))).createdAt!)
+    const by = tasks.actorName(user)
+    const turn = made - 1000
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', turn, 'alpha', made + 3000)).toMatch(new RegExp(`^Warning: #${c} was created 3 s ago by ${by}: is it the card you meant\\? To put a new card on a lane, create it with hive_create_task's lane`))
+    expect(await lanes.freshCardsNote(w, [c], by, turn, 'alpha', made + 3000)).toBeNull()
+    // Made before the caller's turn began: a card it was told of (the user's, asking it to put it on a lane).
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', made + 1, 'alpha', made + 3000)).toBeNull()
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', turn, 'alpha', made + lanes.FRESH_CARD_MS)).toBeNull()
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', null, 'alpha', made + 3000)).toBeNull()
+  })
+
+  it("HI-2167 (HR3's round 1): the safety net reads only cards in the caller's scope; one outside it is told as one that doesn't exist", async () => {
+    const other = (await run(() => tasks.createTask({ title: 'Beta fresh', project: 'beta' }, user))).number
+    const loose = (await run(() => tasks.createTask({ title: 'Workspace fresh' }, user))).number
+    const moved = await make('Moved fresh')
+    await run(() => tasks.updateTask(moved, { project: 'beta' }, user))
+    const at = Date.now() + 1000
+    const turn = at - 60_000
+    // An alpha agent: beta's card, a workspace card and one moved out of alpha say no more than a card that doesn't exist.
+    for (const n of [other, loose, moved, 999_999]) expect(await lanes.freshCardsNote(w, [n], 'HB6', turn, 'alpha', at), `#${n}`).toBeNull()
+    // The Assistant and scripts (no scope): the workspace's cards.
+    expect(await lanes.freshCardsNote(w, [other], 'HB6', turn, null, at)).toMatch(/^Warning: .+ was created \d+ s ago by /)
+  })
+
   it('between cards a change applies at once; with rules off, at once even mid-card', async () => {
     const [a, b, c] = [await make('Now a'), await make('Now b'), await make('Now c')]
     await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'B1 (alpha)' })
