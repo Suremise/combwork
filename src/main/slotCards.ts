@@ -1268,6 +1268,11 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
         log.info(`Starting ${userText(agent.name)} in ${userText(cycle.started.slot)} for #${n}'s delivery ${made.id} (${made.state}${resumeId ? ', its conversation resumed' : ''})`)
         await launch()
         how = resumeId ? 'resumed' : 'started'
+      } else {
+        // Made by an earlier pass, whose fact wasn't written (its workspace closed meanwhile, HI-2134): placed as that pass
+        // placed it, never `typed` for a launch's line because its builder runs there now.
+        const was = made.meta?.how
+        if (isPlacedHow(was)) how = was
       }
     } else {
       const cardPrompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.hiveMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n), inLane: l.kind === 'lane' && !!l.lane })
@@ -1276,7 +1281,8 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       // A read that fails is unknown, never "no brief": it throws, and the pass tries again (HR4's round 1).
       const brief = l.kind === 'lane' && l.lane ? briefOf((await rawLanes(ws)).find((x) => x.id === l.lane)) : null
       const prompt = brief ? `${cardPrompt}\n\n${brief}` : cardPrompt
-      const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref } // i18n-ignore: who a delivery is from, as agents read it
+      // How it is placed kept with it (HI-2134): a later pass finding it made records the placement as this one made it.
+      const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref, meta: { how } } // i18n-ignore: who a delivery is from, as agents read it
       log.info(`Giving ${userText(agent.name)} #${n} in ${userText(cycle.started.slot)} (${how})`)
       // A refusal (NotGiven: its agent got busy) or a launch that couldn't start throws: nothing recorded, tried again.
       if (pausedLane()) throw new Waits()
@@ -1297,6 +1303,10 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
   })
   return 'done'
 }
+
+const PLACED_HOW: ReadonlySet<string> = new Set<FactData['BuilderPlaced']['how']>(['typed', 'newConversation', 'started', 'resumed'])
+/** A placement delivery's `meta.how` (HI-2134), as its fact records it. */
+const isPlacedHow = (x: unknown): x is FactData['BuilderPlaced']['how'] => typeof x === 'string' && PLACED_HOW.has(x)
 
 /** A placement's resumes reached RESUME_TRIES: told, and it waits for its builder to run. */
 class GaveUp extends Error {}
