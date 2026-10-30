@@ -64,7 +64,7 @@ export const TEAM_PAUSE_REASON = 'teamPause' as const
  * words, true to what the hold does (HR1's s8 check): no card starts or events, while a message or an answer still comes.
  */
 export const TEAM_PAUSE_LINE =
-  '[Hive] The team is pausing for an update. Finish this turn, end the runs you started (tests, builds, dev servers, test copies of Hive), commit your work, then end your turn. Until the team resumes Hive starts no card and sends you no card events or watch wakes; a message or an answer can still reach you.'
+  '[Hive] The team is pausing for an update. Finish this turn, end the runs you started (tests, builds, dev servers, test copies of Hive), commit your work, then end your turn. Until the team resumes Hive starts no card and sends you no card events or watch wakes; a message or an answer can still reach you.' // i18n-ignore: agent-facing, the line each running agent is given
 
 /** The delivery sources a pause holds (Hive's own wakes and hand-outs); the rest (messages, decisions, notices) still go. */
 export const PAUSE_HELD_SOURCES: readonly string[] = ['loop', 'watch', 'pool-review']

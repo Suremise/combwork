@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto'
 import { join } from 'path'
 import { readFileSync } from 'original-fs'
 import { rm } from 'original-fs/promises'
-import { projectAgents } from '../shared/defaults'
+import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { TEAM_PAUSE_LINE, type TeamPause } from '../shared/teamPause'
 import { emit } from './events'
 import { writeJsonAtomic } from './fsutil'
@@ -45,8 +45,10 @@ const resumed = new Map<string, number>()
 /** Each workspace's lock: pause, resume and the gates' admission checks go one at a time. */
 const locks = new Map<string, Promise<unknown>>()
 
-const keyOf = (ws: WorkspaceService): string => ws.hiveDir.toLowerCase()
-const fileOf = (ws: WorkspaceService): string => join(ws.hiveDir, FILE)
+/** A workspace's .hive folder, from its path (the same as its hiveDir, which a stand-in for one may not have). */
+const hiveOf = (ws: Pick<WorkspaceService, 'path'>): string => join(ws.path ?? '', HIVE_DIR)
+const keyOf = (ws: Pick<WorkspaceService, 'path'>): string => hiveOf(ws).toLowerCase()
+const fileOf = (ws: Pick<WorkspaceService, 'path'>): string => join(hiveOf(ws), FILE)
 const appFile = (): string => join(app.getPath('userData'), FILE)
 
 const valid = (v: unknown): v is TeamPause => !!v && typeof v === 'object' && typeof (v as TeamPause).pauseId === 'string' && typeof (v as TeamPause).since === 'string' && ((v as TeamPause).by === 'user' || (v as TeamPause).by === 'assistant')
