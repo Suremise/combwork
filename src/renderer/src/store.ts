@@ -463,7 +463,7 @@ interface State {
    * "How do you work?"'s Customise… (#1423): the Workflow section opens with this preset filled in, not saved. A loaded
    * template's workflow (HI-1910): its section for `platform`, laid over the project's options as the form reads them.
    */
-  workflowPrefill: { path: string; preset: PresetId | null; template?: { name: string; platform: PlatformId; section: TemplateWorkflow } } | null
+  workflowPrefill: { path: string; preset: PresetId | null; template?: { name: string; platform: PlatformId; section: TemplateWorkflow; savedMax?: number } } | null
   /**
    * A template waiting for its project's Git (HI-1910): its Load dialog's Set up Git… opened Version Control on Git's
    * page; once Initialise repository… has made the repository and the project is Git, its Load dialog opens again.

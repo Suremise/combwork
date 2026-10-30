@@ -672,7 +672,8 @@ export interface TemplateLoaded {
   removed: string[]
   workflow: TemplateWorkflow | null
   plan: TemplateLoadPlan
-  before: { agents: AgentDef[]; layout: PageLayout }
+  /** What it replaced, and the Maximum agents it saved with them (HI-2058), when it did. */
+  before: { agents: AgentDef[]; layout: PageLayout; maxAgents?: number }
   after: { agents: AgentDef[]; layout: PageLayout }
 }
 
@@ -693,9 +694,10 @@ export interface TemplateLoaded {
  * - The template's suggested preset is only offered (the window opens the Workflow section with it), never applied here;
  *   so is its workflow (HI-1910): returned as this load read it, for the window to fill in the Workflow form with.
  */
-export async function loadTemplate(projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>, applyWorkflow = false): Promise<{ created: string[]; removed: string[]; workflow: TemplateWorkflow | null }> {
+export async function loadTemplate(projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>, applyWorkflow = false): Promise<{ created: string[]; removed: string[]; workflow: TemplateWorkflow | null; maxAgents?: number }> {
   const r = await loadTemplateWith(projectPath, scope, file, expected, { from, names, connections, by: 'user', applyWorkflow })
-  return { created: r.created, removed: r.removed, workflow: r.workflow }
+  // The Maximum agents it saved with its agents (HI-2058), for the Workflow form's note to say so (HI-2083).
+  return { created: r.created, removed: r.removed, workflow: r.workflow, ...(r.before.maxAgents !== undefined ? { maxAgents: r.before.maxAgents } : {}) }
 }
 
 /**

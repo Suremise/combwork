@@ -108,7 +108,8 @@ const T = {
   lane: msg({ id: 'workflow.form.lane', defaultMessage: 'Builder {builder}: {name}', description: 'A running lane in the dialog before saving workflow options: its builder agent and its name.' }),
   laneUnnamed: msg({ id: 'workflow.form.laneUnnamed', defaultMessage: 'Builder {builder}', description: 'A running lane without a name in the dialog before saving workflow options: its builder agent.' }),
   inFlight: msg({ id: 'workflow.form.inFlight', defaultMessage: '{n, plural, one {This card in flight keeps the old rules. Tick it to apply the new options to it now.} other {These cards in flight keep the old rules. Tick one to apply the new options to it now.}}', description: 'In the dialog before saving workflow options, above the cards already started (glossary 2.1: old rules). Ticking a card records an override on it.' }),
-  fromTemplate: msg({ id: 'workflow.form.fromTemplate', defaultMessage: 'Filled in from the template {template}: nothing is saved yet. Check the options, then Save… (they apply from the next card), or Discard Changes.', description: "A note atop the Workflow section (HI-1910) after loading a template whose workflow was applied: its options are filled in but not saved. Save… and Discard Changes are the buttons below: as translated there." }),
+  fromTemplate: msg({ id: 'workflow.form.fromTemplateDraft', defaultMessage: 'Filled in from the template {template}: these options aren’t saved yet. Check them, then Save… (they apply from the next card), or Discard Changes.', description: "A note atop the Workflow section (HI-1910, HI-2083) after loading a template whose workflow was applied and saved nothing of it: its options are filled in but not saved. Save… and Discard Changes are the buttons below: as translated there." }),
+  fromTemplateMax: msg({ id: 'workflow.form.fromTemplateMax', defaultMessage: 'Filled in from the template {template}. Its Maximum agents ({max, number}) is saved already, with its agents; the other options aren’t saved yet. Check them, then Save… (they apply from the next card), or Discard Changes.', description: "A note atop the Workflow section (HI-2083) after loading a template whose workflow was applied: the load saved its Maximum agents ({max}) with its agents (HI-2058), the rest is filled in but not saved. Maximum agents, Save… and Discard Changes are names in the form: as translated there." }),
   templateNoCommand: msg({ id: 'workflow.form.templateNoCommand', defaultMessage: '{count, plural, one {This project has no command for the check {checks} yet: add it under Checks before cards need it.} other {This project has no commands for the checks {checks} yet: add them under Checks before cards need them.}}', description: "A note atop the Workflow section (HI-1910), with the template's options filled in: checks ({checks}, a list of names; {count} of them) have no command in this project. Checks is the group below: as translated there. Glossary: check." }),
   templateIdentityOff: msg({ id: 'workflow.form.templateIdentityOff', defaultMessage: 'The template turns the project identity on, but this project’s git config has no name and email, so it stays off.', description: "A note atop the Workflow section (HI-1910), with a template's options filled in: it turns the project identity (G12) on, but the project's git config has none. Glossary: identity." }),
   templateOtherPlatform: msg({ id: 'workflow.form.templateOtherPlatform', defaultMessage: 'The workflow of {template} is for {platform}, and {project} doesn’t use it now, so it wasn’t filled in.', description: "A notification (HI-1910): a loaded template's workflow ({template}) is for a version control ({platform}: None or Git) the project ({project}) no longer uses (switched meanwhile)." }),
@@ -308,7 +309,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   // "How do you work?"'s Customise… (#1423): the preset filled in once the project's form is read, not saved. A loaded
   // template's workflow (HI-1910): the project's options read again, its section laid over them, not saved either.
   const prefill = useStore((s) => s.workflowPrefill)
-  const [fromTemplate, setFromTemplate] = useState<{ for: string; name: string; identityOff: boolean } | null>(null)
+  const [fromTemplate, setFromTemplate] = useState<{ for: string; name: string; identityOff: boolean; savedMax?: number } | null>(null)
   useEffect(() => {
     if (!prefill || source.level || prefill.path !== source.key || loaded?.for !== source.key) return
     setStore({ workflowPrefill: null })
@@ -325,7 +326,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
           if (f.platform !== t.platform) return notify('warning', tr(T.templateOtherPlatform, { template: t.name, platform: tr(PLATFORM_NAME[t.platform]), project: project?.name ?? '' }))
           const o = overlayTemplateWorkflow(t.section, { platform: f.platform, options: f.options, own: f.own, identity: f.identity })
           setDraft({ preset: o.preset, options: o.own })
-          setFromTemplate({ for: path, name: t.name, identityOff: o.identityOff })
+          setFromTemplate({ for: path, name: t.name, identityOff: o.identityOff, ...(t.savedMax !== undefined ? { savedMax: t.savedMax } : {}) })
         },
         (e) => notify('error', errorMessage(e))
       )
@@ -633,7 +634,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         <div className="banner info workflow-note" role="status" data-from-template={filled.name}>
           <Icon name="info" />
           <span>
-            {tr(T.fromTemplate, { template: filled.name })}
+            {filled.savedMax !== undefined ? tr(T.fromTemplateMax, { template: filled.name, max: filled.savedMax }) : tr(T.fromTemplate, { template: filled.name })}
             {noCommand.length > 0 && <span data-template-no-command={noCommand.join(' ')}> {tr(T.templateNoCommand, { count: noCommand.length, checks: fmt.list(noCommand) })}</span>}
             {filled.identityOff && <span data-template-identity-off=""> {tr(T.templateIdentityOff)}</span>}
           </span>

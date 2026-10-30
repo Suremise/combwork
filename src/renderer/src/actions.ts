@@ -1528,7 +1528,7 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   let openWorkflow = false
   // The plan the dialog shows last, and what the load read (HR5's round 1: never a workflow other than the one shown).
   let shown = plan
-  const got: { loaded: { workflow: TemplateWorkflow | null } | null } = { loaded: null }
+  const got: { loaded: { workflow: TemplateWorkflow | null; maxAgents?: number } | null } = { loaded: null }
   const ok = await confirm({
     title: tr(msg({ id: 'actions.template.loadTitle', defaultMessage: 'Load "{name}"?', description: 'Title of the question before loading a template ({name}) into a project.' }), { name: plan.name }),
     message: plan.remove.length
@@ -1587,7 +1587,9 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
       // Laid over the project's options as the Workflow form reads them, and left for the user to save (HR5: never here).
       // Its Maximum agents isn't: the load saved it with the agents (HI-2058), and the form reads it as the project's own.
       const { maxAgents: _saved, ...rules } = seen.section.options
-      set({ workflowPrefill: { path, preset: seen.section.preset, template: { name: plan.name, platform: seen.platform, section: { ...seen.section, options: rules } } } })
+      // The Maximum agents it saved, if it did (HI-2083: the form's note says what is saved already).
+      const savedMax = got.loaded?.maxAgents
+      set({ workflowPrefill: { path, preset: seen.section.preset, template: { name: plan.name, platform: seen.platform, section: { ...seen.section, options: rules }, ...(savedMax !== undefined ? { savedMax } : {}) } } })
       openVersionControl(path, 'workflow')
     }
   } else if (suggested && switchPreset) {

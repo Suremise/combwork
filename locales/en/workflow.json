@@ -219,9 +219,13 @@
     "defaultMessage": "From the workspace",
     "description": "Where a workflow option’s value comes from: the workspace’s default."
   },
-  "workflow.form.fromTemplate": {
-    "defaultMessage": "Filled in from the template {template}: nothing is saved yet. Check the options, then Save… (they apply from the next card), or Discard Changes.",
-    "description": "A note atop the Workflow section (HI-1910) after loading a template whose workflow was applied: its options are filled in but not saved. Save… and Discard Changes are the buttons below: as translated there."
+  "workflow.form.fromTemplateDraft": {
+    "defaultMessage": "Filled in from the template {template}: these options aren’t saved yet. Check them, then Save… (they apply from the next card), or Discard Changes.",
+    "description": "A note atop the Workflow section (HI-1910, HI-2083) after loading a template whose workflow was applied and saved nothing of it: its options are filled in but not saved. Save… and Discard Changes are the buttons below: as translated there."
+  },
+  "workflow.form.fromTemplateMax": {
+    "defaultMessage": "Filled in from the template {template}. Its Maximum agents ({max, number}) is saved already, with its agents; the other options aren’t saved yet. Check them, then Save… (they apply from the next card), or Discard Changes.",
+    "description": "A note atop the Workflow section (HI-2083) after loading a template whose workflow was applied: the load saved its Maximum agents ({max}) with its agents (HI-2058), the rest is filled in but not saved. Maximum agents, Save… and Discard Changes are names in the form: as translated there."
   },
   "workflow.form.heir": {
     "defaultMessage": "Project {project}: {options}",
