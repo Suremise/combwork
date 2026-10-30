@@ -195,7 +195,7 @@
   "service.providers.notInstalled": "{cli} ist nicht installiert.",
   "service.providers.pickNotFound": "{task}: Hive konnte {item} nicht finden. Erledige es im Terminal oder aktualisiere Hive.",
   "service.providers.retryUnavailable": "Dieser erneute Aktualisierungsversuch ist nicht mehr verfügbar. Wähle Erneut prüfen und dann Aktualisieren.",
-  "service.providers.signInConnections": "{cli} wird pro Verbindung angemeldet: Melde dich unter Einstellungen → Verbindungen an.",
+  "service.providers.signInConnections": "{cli} wird pro Konto angemeldet: Melde dich unter Einstellungen → Konten & Verbindungen an.",
   "service.providers.stillLooking": "Hive sucht noch nach {cli}. Versuche es gleich noch einmal.",
   "service.providers.stillLookingAll": "Hive sucht noch nach den CLIs der Coding-Agenten. Versuche es gleich noch einmal.",
   "service.providers.stopFirst": "Stoppe alle laufenden Agenten mit {cli}, bevor du die CLI aktualisierst.",

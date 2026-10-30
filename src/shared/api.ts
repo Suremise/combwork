@@ -1072,8 +1072,6 @@ export interface HiveRequests {
   'connection:move': (id: string, index: number) => void
   /** The Assistant's own connection for a CLI in this window's workspace (HI-1755); null: the workspace's default. */
   'connections:setAssistant': (provider: ProviderId, id: string | null) => void
-  /** A connection's defaults for the agents on it (HI-1770): model, effort and context; '' or null leaves one to the CLI. */
-  'connections:setDefaults': (id: string, patch: { model?: string | null; effort?: string | null; use200kContext?: boolean | null }) => void
   /** Values moved from this window's workspace's projects onto their agents that their connection can't use (HI-1770), not dismissed. */
   'connections:notice': () => MovedNotice[]
   /** Dismisses those of the notice's entries (by key) that it lists now. */

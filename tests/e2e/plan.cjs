@@ -95,9 +95,8 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
   await sleep(300)
   await page.getByText('demo', { exact: true }).first().click()
   await lib.openProjectSettings(page)
-  await page.locator('.settings-nav .row', { hasText: 'Claude Code' }).click(); await sleep(300)
-  await lib.until(async () => (await page.locator('.setting', { hasText: 'Extra arguments' }).count()) >= 1, HUNG_MS)
-  check('Project Settings → Claude Code has no model picker (each connection and agent has its own, HI-1774)', (await page.locator('.setting .model-picker').count()) === 0)
+  await lib.until(async () => (await page.locator('.setting', { hasText: 'Project key' }).count()) >= 1, HUNG_MS)
+  check('Project Settings has no Claude Code page and no model picker (each connection has its own, HI-2107)', (await page.locator('.settings-nav .row', { hasText: 'Claude Code' }).count()) === 0 && (await page.locator('.setting .model-picker').count()) === 0)
   await page.screenshot({ path: path.join(shots, '4-project-settings.png') })
 
   // Real session: the status line reaches Hive and prints nothing.

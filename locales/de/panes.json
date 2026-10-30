@@ -44,7 +44,7 @@
   "panes.failed.title": "Start fehlgeschlagen:",
   "panes.footer.compactionHistory": "Klicken, um den Komprimierungsverlauf anzuzeigen",
   "panes.footer.compactions": "{n, plural, one {# Komprimierung bisher} other {# Komprimierungen bisher}}{over, select, yes { – Komprimieren empfohlen} other {}}",
-  "panes.footer.connectionChanged": "Ihre Anmeldung hat sich seit dem Hinzufügen geändert: siehe Einstellungen → Verbindungen.",
+  "panes.footer.connectionChanged": "Die Anmeldung des Kontos hat sich seit dem Hinzufügen geändert: siehe Einstellungen → Konten & Verbindungen.",
   "panes.footer.connectionEmail": "Angemeldet als {email}.",
   "panes.footer.connectionOff": "Die für ihn gewählte Verbindung ist in diesem Arbeitsbereich ausgeschaltet, daher läuft er mit dem Standard des Arbeitsbereichs.",
   "panes.footer.connectionSwitching": "wechselt, sobald sein Durchgang vorbei ist",

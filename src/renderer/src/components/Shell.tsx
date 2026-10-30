@@ -268,8 +268,8 @@ function shortLimit(l: PlanLimit): string {
 /**
  * Each enabled provider's plan limits, as Hive keeps them from its sessions' reports (the highest in each reset period,
  * #383): one item per provider. A limit whose reset has passed with no new report is left out, not shown as it was.
- * With connections (HI-1756, the preview on), a CLI that has them shows one item per connection a session of this
- * window's workspace runs on, named, each that login's own limits; its CLI-wide item (sessions not on one) goes.
+ * A CLI with accounts (HI-1756; HI-2107) shows one item per account a session of this window's workspace runs on, by its
+ * name now and in the one order of accounts, each that login's own limits; its CLI-wide item (sessions not on one) goes.
  */
 function PlanUsageStatus() {
   const all = useStore((s) => s.planUsage)
@@ -279,11 +279,14 @@ function PlanUsageStatus() {
   const inUse = useConnectionsInUse()
   const now = useNow(60000)
   const byConnections = new Set((view?.providers ?? []).filter((p) => connectionsApply(view, p)))
+  // In the one order of accounts, each by its name now (renamed since its session launched: the new one).
+  const order = view?.order ?? []
+  const accounts = [...inUse].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)).map((c) => ({ ...c, name: view?.connections.find((a) => a.id === c.id)?.name ?? c.name }))
   return (
     <>
       {enabledProviders(settings).map((p) =>
         byConnections.has(p.id)
-          ? inUse.filter((c) => c.provider === p.id).map((c) => <PlanItem key={c.id} provider={p.id} kept={byConnection[c.id]} now={now} label={c.name} first={tr(M.connectionLine, { name: c.name, provider: p.name, hasPlan: byConnection[c.id]?.plan ? 'yes' : 'no', plan: byConnection[c.id]?.plan ?? '' })} data={{ 'data-plan': p.id, 'data-plan-connection': c.id }} />)
+          ? accounts.filter((c) => c.provider === p.id).map((c) => <PlanItem key={c.id} provider={p.id} kept={byConnection[c.id]} now={now} label={c.name} first={tr(M.connectionLine, { name: c.name, provider: p.name, hasPlan: byConnection[c.id]?.plan ? 'yes' : 'no', plan: byConnection[c.id]?.plan ?? '' })} data={{ 'data-plan': p.id, 'data-plan-connection': c.id }} />)
           : <PlanItem key={p.id} provider={p.id} kept={all[p.id]} now={now} first={tr(M.planLine, { provider: p.name, hasPlan: all[p.id]?.plan ? 'yes' : 'no', plan: all[p.id]?.plan ?? '' })} data={{ 'data-plan': p.id }} />
       )}
     </>

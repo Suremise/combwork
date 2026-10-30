@@ -10,19 +10,19 @@ import { Icon, Modal } from './ui'
 import { ProviderIcon } from './ProviderIcon'
 
 /**
- * Server connections in Settings → Connections (HI-1772): Add Connection's choice of where a connection gets its model
+ * Server connections in Settings → Accounts & Connections (HI-1772): Add Connection's choice of where a connection gets its model
  * (its sign-in, or a server), a server's form with its presets, its key (typed into a password box, sent once to main,
  * never shown again: its row says only that one is set, by its last 4 characters), its models and the Claude names
  * each stands in for, and Set Up (the CLI's own first-run screens, in a terminal).
  */
 
 const M = {
-  addTitle: msg({ id: 'settings.connections.add.title', defaultMessage: 'Add a {cli} connection', description: 'Title of the dialog adding a connection (Settings → Connections) when only one coding agent CLI can have them. {cli} is that CLI ("Claude Code").' }),
-  addAny: msg({ id: 'settings.connections.add.titleAny', defaultMessage: 'Add a connection', description: 'Title of the dialog adding a connection (Settings → Connections) when it first asks which coding agent CLI it is for.' }),
-  cli: msg({ id: 'settings.connections.add.cli', defaultMessage: 'For', description: 'Label of the choice in Add a Connection (Settings → Connections) of the coding agent CLI the connection is for (Claude Code, Codex), each shown with its icon.' }),
-  name: msg({ id: 'settings.connections.add.name', defaultMessage: 'Name', description: "Label of a new connection's name (Settings → Connections → Add Connection)." }),
+  addTitle: msg({ id: 'settings.connections.add.title', defaultMessage: 'Add a {cli} account', description: 'Title of the dialog adding an account (Settings → Accounts & Connections, HI-2107) when only one coding agent CLI can have them. {cli} is that CLI ("Claude Code").' }),
+  addAny: msg({ id: 'settings.connections.add.titleAny', defaultMessage: 'Add an account', description: 'Title of the dialog adding an account (Settings → Accounts & Connections, HI-2107) when it first asks which coding agent CLI it is for.' }),
+  cli: msg({ id: 'settings.connections.add.cli', defaultMessage: 'For', description: 'Label of the choice in Add a Connection (Settings → Accounts & Connections) of the coding agent CLI the connection is for (Claude Code, Codex), each shown with its icon.' }),
+  name: msg({ id: 'settings.connections.add.name', defaultMessage: 'Name', description: "Label of a new connection's name (Settings → Accounts & Connections → Add Connection)." }),
   namePlaceholder: msg({ id: 'settings.connections.add.namePlaceholder', defaultMessage: 'Anthropic · Max 1, Work, DeepSeek…', description: "Placeholder of a new connection's name box: examples of names." }),
-  from: msg({ id: 'settings.connections.add.from', defaultMessage: 'Gets its model from', description: 'Label of the choice in Add Connection (Settings → Connections): where the connection gets its model, its sign-in or a server (Darren, 27 Oct).' }),
+  from: msg({ id: 'settings.connections.add.from', defaultMessage: 'Gets its model from', description: 'Label of the choice in Add Connection (Settings → Accounts & Connections): where the connection gets its model, its sign-in or a server (Darren, 27 Oct).' }),
   fromSignIn: msg({ id: 'settings.connections.add.fromSignIn', defaultMessage: 'Its sign-in', description: "A choice of Gets its model from (Add Connection): the CLI's own sign-in (a Claude account, for example), done in a terminal after it is added." }),
   fromServer: msg({ id: 'settings.connections.add.fromServer', defaultMessage: 'A server', description: 'A choice of Gets its model from (Add Connection): a server reached by its base URL, with an API key or none (DeepSeek, Ollama, a company gateway).' }),
   preset: msg({ id: 'settings.connections.server.preset', defaultMessage: 'Preset', description: "Label of a server connection's preset (Add Connection): a filled form for a known service." }),
@@ -31,12 +31,12 @@ const M = {
   docs: msg({ id: 'settings.connections.server.docs', defaultMessage: 'Its setup is documented at {url}.', description: "Under a server connection's preset: where the service documents using it with the CLI. {url} is a web address." }),
   contextAdvice: msg({ id: 'settings.connections.server.contextAdvice', defaultMessage: '{name} recommends a context length of {size, number} tokens or more for {cli}, especially in larger repositories. Set it in {name}\'s own settings: Hive doesn\'t change them.', description: 'Under a server connection\'s preset (Add Connection): the service ({name}: "Ollama") recommends a context window of at least {size} tokens (64,000) for the coding agent CLI ({cli}: "Claude Code"). Advice, not a requirement Hive enforces.' }),
   cloud: msg({ id: 'settings.connections.server.cloud', defaultMessage: 'cloud', description: "Beside a model in a server connection's model list: its server runs it in the cloud (an Ollama cloud model, on ollama.com), not on this PC." }),
-  cloudTip: msg({ id: 'settings.connections.server.cloudTip', defaultMessage: "Runs in the cloud, not on this PC: this connection's sessions aren't free (local).", description: "Tooltip of \"cloud\" beside a model in a server connection's model list (an Ollama cloud model). \"free (local)\" is how Hive shows the cost of sessions run only on this PC." }),
-  baseUrl: msg({ id: 'settings.connections.server.baseUrl', defaultMessage: 'Base URL', description: "Label of a server connection's base URL (Settings → Connections), such as https://api.deepseek.com/anthropic." }),
-  key: msg({ id: 'settings.connections.server.key', defaultMessage: 'API key', description: "Label of a server connection's API key box (Settings → Connections)." }),
+  cloudTip: msg({ id: 'settings.connections.server.cloudTip', defaultMessage: "Runs in the cloud, not on this PC: its sessions aren't free (local).", description: "Tooltip of \"cloud\" beside a model in a server connection's model list (an Ollama cloud model). \"free (local)\" is how Hive shows the cost of sessions run only on this PC." }),
+  baseUrl: msg({ id: 'settings.connections.server.baseUrl', defaultMessage: 'Base URL', description: "Label of a server connection's base URL (Settings → Accounts & Connections), such as https://api.deepseek.com/anthropic." }),
+  key: msg({ id: 'settings.connections.server.key', defaultMessage: 'API key', description: "Label of a server connection's API key box (Settings → Accounts & Connections)." }),
   keyHint: msg({ id: 'settings.connections.server.keyHint', defaultMessage: "Stored encrypted for your Windows account, never shown again. The agent's commands can read it from their environment.", description: "Under a server connection's API key box: how Hive keeps the key, and that an agent running on it can read it (it is in the agent's environment)." }),
   keyLocal: msg({ id: 'settings.connections.server.keyLocal', defaultMessage: 'Not needed for a server on this PC.', description: "Under a server connection's API key box when its base URL is this computer (localhost): the key may be left empty." }),
-  models: msg({ id: 'settings.connections.server.models', defaultMessage: 'Models', description: "Label of a server connection's model list (Settings → Connections)." }),
+  models: msg({ id: 'settings.connections.server.models', defaultMessage: 'Models', description: "Label of a server connection's model list (Settings → Accounts & Connections)." }),
   modelsHint: msg({ id: 'settings.connections.server.modelsHint', defaultMessage: "Each Claude name (Opus, Sonnet, Haiku) runs the model ticked for it. A model can stand in for several.", description: "Under a server connection's model list: the CLI asks for Claude models by name, and each name runs the server model ticked for it." }),
   modelId: msg({ id: 'settings.connections.server.modelId', defaultMessage: 'Model id', description: "Placeholder of a model's id box in a server connection's model list (\"deepseek-flash\")." }),
   addModel: msg({ id: 'settings.connections.server.addModel', defaultMessage: 'Add Model', description: "Button under a server connection's model list: adds a row." }),
@@ -45,10 +45,10 @@ const M = {
   addSignIn: msg({ id: 'settings.connections.add.addSignIn', defaultMessage: 'Add and Sign In', description: 'The confirm button of Add Connection for a sign-in connection: adds it, then opens its sign-in.' }),
   addServer: msg({ id: 'settings.connections.add.addServer', defaultMessage: 'Add', description: 'The confirm button of Add Connection for a server connection.' }),
   adding: msg({ id: 'settings.connections.add.adding', defaultMessage: 'Adding…', description: 'The confirm button of Add Connection while it adds the connection.' }),
-  cancel: msg({ id: 'settings.connections.cancel', defaultMessage: 'Cancel', description: "A dialog's button in Settings → Connections that closes it without changing anything." }),
+  cancel: msg({ id: 'settings.connections.cancel', defaultMessage: 'Cancel', description: "A dialog's button in Settings → Accounts & Connections that closes it without changing anything." }),
   needName: msg({ id: 'settings.connections.add.needName', defaultMessage: 'Give it a name.', description: "Add Connection's error while the name box is empty." }),
   needUrl: msg({ id: 'settings.connections.server.needUrl', defaultMessage: 'Give the base URL in full, starting with https:// (or http:// for this PC).', description: "A server connection form's error: the base URL is empty or can't be used." }),
-  hostKey: msg({ id: 'settings.connections.server.hostKey', defaultMessage: '{host} · Key …{last4}', description: "A server connection's line in Settings → Connections: its server's host, and its key by its last 4 characters ({last4})." }),
+  hostKey: msg({ id: 'settings.connections.server.hostKey', defaultMessage: '{host} · Key …{last4}', description: "A server connection's line in Settings → Accounts & Connections: its server's host, and its key by its last 4 characters ({last4})." }),
   hostNoKey: msg({ id: 'settings.connections.server.hostNoKey', defaultMessage: '{host} · No key', description: "A server connection's line: its server's host, with no key saved." }),
   hostLocal: msg({ id: 'settings.connections.server.hostLocal', defaultMessage: '{host} · On this PC, no key', description: "A server connection's line: its server is on this computer and has no key (none needed)." }),
   needsKey: msg({ id: 'settings.connections.server.needsKey', defaultMessage: 'Its server needs a key: agents on it are refused until one is added.', description: "A warning on a server connection with no key whose server isn't on this computer." }),
@@ -59,8 +59,8 @@ const M = {
   removeKeyMessage: msg({ id: 'settings.connections.server.removeKeyMessage', defaultMessage: "It's deleted from this PC. Agents running on it keep it until they restart; new ones are refused until a key is added.", description: "The message of the dialog confirming a server connection's key is deleted." }),
   keyTitle: msg({ id: 'settings.connections.server.keyTitle', defaultMessage: "{name}'s API key", description: "Title of the dialog asking a server connection's API key ({name}, its name)." }),
   keySave: msg({ id: 'settings.connections.server.keySave', defaultMessage: 'Save Key', description: "The confirm button of the dialog asking a server connection's API key." }),
-  saving: msg({ id: 'settings.connections.server.saving', defaultMessage: 'Saving…', description: "A dialog's confirm button in Settings → Connections while it saves." }),
-  keyFailed: msg({ id: 'settings.connections.server.keyFailed', defaultMessage: "Couldn't save the key", description: "An error's title: a server connection's API key wasn't saved (Settings → Connections)." }),
+  saving: msg({ id: 'settings.connections.server.saving', defaultMessage: 'Saving…', description: "A dialog's confirm button in Settings → Accounts & Connections while it saves." }),
+  keyFailed: msg({ id: 'settings.connections.server.keyFailed', defaultMessage: "Couldn't save the key", description: "An error's title: a server connection's API key wasn't saved (Settings → Accounts & Connections)." }),
   keyFailedAdded: msg({ id: 'settings.connections.server.keyFailedAdded', defaultMessage: '{name} was added without its key. Use Add Key on it to try again.', description: "The error's text when a server connection ({name}) was added but its API key couldn't be stored. Add Key names a button on it." }),
   edit: msg({ id: 'settings.connections.server.edit', defaultMessage: 'Edit Server…', description: "Button on a server connection: changes its base URL and its models." }),
   editTitle: msg({ id: 'settings.connections.server.editTitle', defaultMessage: "{name}'s server", description: "Title of the dialog changing a server connection's base URL and models ({name}, its name)." }),
@@ -74,7 +74,7 @@ const M = {
   readFailed: msg({ id: 'settings.connections.server.readFailed', defaultMessage: "Couldn't read {name}'s models", description: "An error's title: reading a server connection's models failed ({name}, its name)." }),
   setUp: msg({ id: 'settings.connections.server.setUp', defaultMessage: 'Set Up', description: "Button on a connection (a server one, or one signed in): opens the CLI on it in a terminal, for its first-run screens (its theme, its notes), answered by the user." }),
   setUpFailed: msg({ id: 'settings.connections.server.setUpFailed', defaultMessage: "Couldn't open the setup", description: "An error's title: a connection's Set Up terminal couldn't be opened." }),
-  changeFailed: msg({ id: 'settings.connections.server.changeFailed', defaultMessage: "Couldn't change the connection", description: "An error's title: changing a server connection failed (Settings → Connections)." })
+  changeFailed: msg({ id: 'settings.connections.server.changeFailed', defaultMessage: "Couldn't change the connection", description: "An error's title: changing a server connection failed (Settings → Accounts & Connections)." })
 }
 
 /** Why reading a server's models failed, by its kind only (never what the server said). */
@@ -86,7 +86,7 @@ const READ_WHY: Record<Exclude<ServerModelsRead, { ok: true }>['why'], Msg> = {
   shape: msg({ id: 'settings.connections.server.why.shape', defaultMessage: "The server's answer isn't a model list Hive can read. Type the models in instead.", description: "Why reading a server connection's models failed: its reply isn't the list Hive expects." }),
   redirect: msg({ id: 'settings.connections.server.why.redirect', defaultMessage: 'The server sent Hive elsewhere ({status}), which Hive doesn\'t follow with a key. Check the base URL.', description: "Why reading a server connection's models failed: the server answered with a redirect. {status} is its code (301)." }),
   tooBig: msg({ id: 'settings.connections.server.why.tooBig', defaultMessage: 'The model list is too large to read. Type the models in instead.', description: "Why reading a server connection's models failed: its reply was over Hive's size limit." }),
-  stale: msg({ id: 'settings.connections.server.why.stale', defaultMessage: 'The connection changed while its models were read. Read them again.', description: "Why reading a server connection's models was dropped: its server or key changed meanwhile, or a newer reading started." })
+  stale: msg({ id: 'settings.connections.server.why.stale', defaultMessage: 'The account changed while its models were read. Read them again.', description: "Why reading a server connection's models was dropped: its server or key changed meanwhile, or a newer reading started." })
 }
 
 const ALIAS_NAME: Record<ModelAlias, string> = { opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku' } // i18n-ignore: Claude's model names, the same in every language
@@ -422,14 +422,14 @@ export function ServerConnectionDetail({ c, keyLast4, needsSetUp, onSetUp }: { c
 }
 
 const MASKING = {
-  unavailable: msg({ id: 'settings.connections.masking.unavailable', defaultMessage: "Hive can't read the data it uses to hide your API keys in logs and exports. Until it is reset, every long word is hidden in its logs, and exports, Copy Diagnostics and recordings are refused.", description: "A warning in Settings → Connections: the data Hive keeps to recognise server connections' API keys (to hide them) can't be read. A long word is 8 characters or more without a space." }),
-  gap: msg({ id: 'settings.connections.masking.gap', defaultMessage: "Since {date}, Hive hides every long word in its logs, recordings and exports, for good: keys saved before its masking data was reset can't be recognised any more.", description: "A note in Settings → Connections after Reset Masking Data: Hive masks strictly from then on. {date} is when it was reset. A long word is 8 characters or more without a space." }),
-  full: msg({ id: 'settings.connections.masking.full', defaultMessage: 'Hive is near the most API keys it can keep masking for. Past it, a new key is refused.', description: 'A warning in Settings → Connections: Hive keeps a fingerprint of every API key ever saved (to hide it in logs and exports), and is nearly at its limit.' }),
-  reset: msg({ id: 'settings.connections.masking.reset', defaultMessage: 'Reset Masking Data…', description: "Button in Settings → Connections when Hive's key masking data can't be read: makes it again from the keys saved now (asks first)." }),
-  resetTitle: msg({ id: 'settings.connections.masking.resetTitle', defaultMessage: 'Reset masking data?', description: "Title of the dialog confirming Reset Masking Data (Settings → Connections)." }),
-  resetMessage: msg({ id: 'settings.connections.masking.resetMessage', defaultMessage: "Hive can no longer recognise keys saved before. From now on it hides every long word (8 characters or more with no spaces) in its logs, recordings and exports, for good, so none of them can show an old key. This can't be undone.", description: "The message of the dialog confirming Reset Masking Data (Settings → Connections): what the user gives up." }),
+  unavailable: msg({ id: 'settings.connections.masking.unavailable', defaultMessage: "Hive can't read the data it uses to hide your API keys in logs and exports. Until it is reset, every long word is hidden in its logs, and exports, Copy Diagnostics and recordings are refused.", description: "A warning in Settings → Accounts & Connections: the data Hive keeps to recognise server connections' API keys (to hide them) can't be read. A long word is 8 characters or more without a space." }),
+  gap: msg({ id: 'settings.connections.masking.gap', defaultMessage: "Since {date}, Hive hides every long word in its logs, recordings and exports, for good: keys saved before its masking data was reset can't be recognised any more.", description: "A note in Settings → Accounts & Connections after Reset Masking Data: Hive masks strictly from then on. {date} is when it was reset. A long word is 8 characters or more without a space." }),
+  full: msg({ id: 'settings.connections.masking.full', defaultMessage: 'Hive is near the most API keys it can keep masking for. Past it, a new key is refused.', description: 'A warning in Settings → Accounts & Connections: Hive keeps a fingerprint of every API key ever saved (to hide it in logs and exports), and is nearly at its limit.' }),
+  reset: msg({ id: 'settings.connections.masking.reset', defaultMessage: 'Reset Masking Data…', description: "Button in Settings → Accounts & Connections when Hive's key masking data can't be read: makes it again from the keys saved now (asks first)." }),
+  resetTitle: msg({ id: 'settings.connections.masking.resetTitle', defaultMessage: 'Reset masking data?', description: "Title of the dialog confirming Reset Masking Data (Settings → Accounts & Connections)." }),
+  resetMessage: msg({ id: 'settings.connections.masking.resetMessage', defaultMessage: "Hive can no longer recognise keys saved before. From now on it hides every long word (8 characters or more with no spaces) in its logs, recordings and exports, for good, so none of them can show an old key. This can't be undone.", description: "The message of the dialog confirming Reset Masking Data (Settings → Accounts & Connections): what the user gives up." }),
   resetConfirm: msg({ id: 'settings.connections.masking.resetConfirm', defaultMessage: 'Reset', description: 'The confirm button of the dialog confirming Reset Masking Data.' }),
-  resetFailed: msg({ id: 'settings.connections.masking.resetFailed', defaultMessage: "Couldn't reset the masking data", description: "An error's title: Reset Masking Data failed (Settings → Connections)." })
+  resetFailed: msg({ id: 'settings.connections.masking.resetFailed', defaultMessage: "Couldn't reset the masking data", description: "An error's title: Reset Masking Data failed (Settings → Accounts & Connections)." })
 }
 
 /** Key masking's state (HI-1772): unreadable (with Reset Masking Data…), strict for good since a reset, or near full. */

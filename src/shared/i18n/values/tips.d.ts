@@ -162,6 +162,8 @@ interface HiveMessageValues {
   'tips.conflictHunks.title': undefined
   'tips.connectionOrder.text': undefined
   'tips.connectionOrder.title': undefined
+  'tips.connectionSetups.text': undefined
+  'tips.connectionSetups.title': undefined
   'tips.connectionTrust.text': undefined
   'tips.connectionTrust.title': undefined
   'tips.connections.text': undefined
@@ -182,8 +184,6 @@ interface HiveMessageValues {
   'tips.customCommands.title': undefined
   'tips.dateFormat.text': { date: string | number; time: string | number }
   'tips.dateFormat.title': undefined
-  'tips.defaultProvider.text': undefined
-  'tips.defaultProvider.title': undefined
   'tips.designCheck.text': undefined
   'tips.designCheck.title': undefined
   'tips.developerConsole.text': undefined

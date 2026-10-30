@@ -152,7 +152,7 @@ describe('the test seam (testHomeSeam)', () => {
 
 describe('a launch on a connection (connectionForLaunch)', () => {
   it('none on here: refused, never the CLI’s own home', async () => {
-    expect(await outcome(launch())).toMatch(/No Claude Code connection is on in this workspace/)
+    expect(await outcome(launch())).toMatch(/No Claude Code account is on in this workspace/)
   })
 
   it('with the seam on and none on here, the old launch (null: the CLI test home), and only then', async () => {
@@ -1028,10 +1028,10 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     const info = providerService.info
     providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe', catalog: { source: 'cli', version: '1', models: [{ value: 'haiku', label: 'Haiku', efforts: [] }, { value: 'opus', label: 'Opus', efforts: ['low', 'high'] }] } })) as never
     try {
-      // Settings → Connections' defaults (its base connection).
-      accounts.setConnectionDefaults(a.id, { model: 'opus', effort: 'high' })
+      // Settings → Accounts & Connections' connection dialog (its base connection).
+      accounts.updateConnection(baseOf(a.id), { model: 'opus', effort: 'high' })
       const baseBefore = structuredClone(accounts.allConnections().find((c) => c.account === a.id))
-      expect(() => accounts.setConnectionDefaults(a.id, { model: 'haiku' })).toThrow(/haiku doesn't take high effort/)
+      expect(() => accounts.updateConnection(baseOf(a.id), { model: 'haiku' })).toThrow(/haiku doesn't take high effort/)
       expect(accounts.allConnections().find((c) => c.account === a.id)).toEqual(baseBefore)
       // An agent: its model switched with its effort kept.
       const alpha = join(wsPath, 'alpha')
@@ -1050,7 +1050,7 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     }
   })
 
-  it("decision E for Settings → Assistant and → GitHub Copilot: refused before it is saved, settings and connections unchanged (HR1, round 2)", async () => {
+  it("decision E for Settings → Assistant and GitHub Copilot's connections: refused before it is saved, settings and connections unchanged (HR1, round 2)", async () => {
     await signedInConnection('Personal', 'me@example.com')
     const info = providerService.info
     providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe', catalog: { source: 'cli', version: '1', models: [{ value: 'haiku', label: 'Haiku', efforts: [] }, { value: 'opus', label: 'Opus', efforts: ['low', 'high'] }] } })) as never
@@ -1077,16 +1077,15 @@ describe('model, effort and context from the connection (HI-1770)', () => {
       expect(await outcome(applySetting(entryOf('assistant.claude-code.model'), 'haiku', null, () => undefined))).toMatch(/It decides how the Assistant itself/)
       // A pair it takes goes through.
       expect(() => config.updateSettings({ assistant: { providers: { 'claude-code': { effort: 'low' } } } } as never)).not.toThrow()
-      // Settings → GitHub Copilot: its sign-in's base connection.
-      // Its sign-in's account, as config.json's migration makes it at a start (this file's profile never started).
+      // GitHub Copilot's sign-in's connection (HI-2107: Settings → GitHub Copilot has no model or effort; its connection
+      // dialog does). Its sign-in's account, as config.json's migration makes it at a start (this file's profile never started).
       if (!accounts.accountById('copilot'))
         config.update((c) => {
           c.accounts = [...(c.accounts ?? []), { id: 'copilot', provider: 'copilot', kind: 'signIn', home: 'cli', name: 'GitHub Copilot', createdAt: '' }]
           c.connections = [...(c.connections ?? []), { id: 'c-copilot1', account: 'copilot', name: 'GitHub Copilot' }]
         })
-      const copilotWas = config.settings.providers.copilot.defaultModel
-      expect(() => config.updateSettings({ providers: { copilot: { defaultModel: 'haiku', defaultEffort: 'high' } } } as never)).toThrow(/haiku doesn't take high effort/)
-      expect(config.settings.providers.copilot.defaultModel).toBe(copilotWas)
+      expect(() => accounts.addConnection('copilot', { name: 'Fast', model: 'haiku', effort: 'high' })).toThrow(/haiku doesn't take high effort/)
+      expect(accounts.allConnections().filter((c) => c.account === 'copilot').map((c) => c.name)).toEqual(['GitHub Copilot'])
     } finally {
       off()
       providerService.info = info
@@ -1094,7 +1093,7 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     }
   })
 
-  it("a new account's base connection: the CLI's old defaults for its CLI's first sign-in account only, and the CLI's mode and arguments; today's defaults editor edits it", async () => {
+  it("a new account's base connection: the CLI's old defaults for its CLI's first sign-in account only, and the CLI's mode and arguments; the connection dialog edits it", async () => {
     const g = config.settings.providers['claude-code']
     const was = { defaultModel: g.defaultModel, defaultEffort: g.defaultEffort, extraArgs: g.extraArgs }
     Object.assign(g, { defaultModel: 'sonnet', defaultEffort: 'medium', extraArgs: '--verbose' })
@@ -1106,10 +1105,10 @@ describe('model, effort and context from the connection (HI-1770)', () => {
       // Taken once: a second account of the CLI has none of them.
       const second = await accounts.addAccount('claude-code', 'Second')
       expect(accounts.allConnections().find((c) => c.account === second.id)).toEqual({ id: baseOf(second.id), account: second.id, name: 'Second', extraArgs: '--verbose' })
-      // Today's Settings → Connections defaults: its base connection's model, effort and context.
-      accounts.setConnectionDefaults(a.id, { model: null, effort: '' })
+      // Its base connection, edited in the connection dialog (HI-2107).
+      accounts.updateConnection(baseOf(a.id), { model: null, effort: null })
       expect(accounts.allConnections().find((c) => c.account === a.id)?.model).toBeUndefined()
-      accounts.setConnectionDefaults(a.id, { model: 'opus', use200kContext: true })
+      accounts.updateConnection(baseOf(a.id), { model: 'opus', use200kContext: true })
       expect(here(() => accounts.accountsView()).connections.find((c) => c.id === a.id)?.defaults).toEqual({ model: 'opus', use200kContext: true })
       // Removed, its connections go with it.
       await accounts.removeAccount(a.id)
@@ -1324,7 +1323,7 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
       expect(accounts.connectionUsers().get(c.id)).toEqual([{ projectPath: expect.any(String), project: 'cr1', agentId: 'u1', agent: 'Builder' }])
       const row = here(() => accounts.accountsView()).connectionRows.find((r) => r.id === c.id)
       expect(row?.users.map((u) => u.agent)).toEqual(['Builder'])
-      expect(await outcome(Promise.resolve().then(() => accounts.removeConnection(c.id)))).toMatch(/Used is used by Builder in cr1/)
+      expect(await outcome(Promise.resolve().then(() => accounts.removeConnection(c.id)))).toMatch(/Still in use, so Used was kept: Builder \(cr1\)/)
       writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [] }))
       await w.refresh()
       accounts.removeConnection(c.id)

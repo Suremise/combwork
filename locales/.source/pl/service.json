@@ -195,7 +195,7 @@
   "service.providers.notInstalled": "{cli} is not installed.",
   "service.providers.pickNotFound": "{task}: Hive couldn't find {item}. Do it in the terminal, or update Hive.",
   "service.providers.retryUnavailable": "This update retry is no longer available. Check again, then try Update.",
-  "service.providers.signInConnections": "{cli} is signed in per connection: sign in from Settings → Connections.",
+  "service.providers.signInConnections": "{cli} signs in per account: sign in from Settings → Accounts & Connections.",
   "service.providers.stillLooking": "Hive is still looking for {cli}. Try again in a moment.",
   "service.providers.stillLookingAll": "Hive is still looking for the coding agent CLIs. Try again in a moment.",
   "service.providers.stopFirst": "Stop all running {cli} agents before updating it.",

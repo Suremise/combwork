@@ -5,7 +5,7 @@
   },
   "main.accounts.checkHeld": {
     "defaultMessage": "{name} is being checked: Hive is still making sure {cli}'s check of it has ended. Try again in a moment.",
-    "description": "An error signing in or removing a connection ({name}, its name in Settings → Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held."
+    "description": "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held."
   },
   "main.accounts.folderNotUsable": {
     "defaultMessage": "{name}'s folder isn't the one Hive made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.",
@@ -13,11 +13,11 @@
   },
   "main.accounts.inUse": {
     "defaultMessage": "{name} is in use: stop the agents on it and close its sign-in, then remove it.",
-    "description": "An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or its sign-in terminal is open."
+    "description": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or its sign-in terminal is open."
   },
   "main.accounts.keyRemoveFailed": {
     "defaultMessage": "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.",
-    "description": "An error removing a server connection ({name}, its name in Settings → Connections): its stored API key couldn't be deleted, so the connection was left as it was."
+    "description": "An error removing a server connection ({name}, its name in Settings → Accounts & Connections): its stored API key couldn't be deleted, so the connection was left as it was."
   },
   "main.accounts.leftover": {
     "defaultMessage": "{name} is half removed: remove it again first.",
@@ -33,7 +33,7 @@
   },
   "main.accounts.noName": {
     "defaultMessage": "Give the connection a name.",
-    "description": "An error adding or renaming a connection in Settings → Connections: its name is empty."
+    "description": "An error adding or renaming a connection in Settings → Accounts & Connections: its name is empty."
   },
   "main.accounts.noProvider": {
     "defaultMessage": "{cli} can't have sign-in connections in Hive yet.",
@@ -41,7 +41,7 @@
   },
   "main.accounts.notFound": {
     "defaultMessage": "There is no such connection.",
-    "description": "An error: a connection named by its id is not in Settings → Connections (removed meanwhile)."
+    "description": "An error: a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile)."
   },
   "main.accounts.nothingToKeep": {
     "defaultMessage": "{name} isn't signed in as anyone Hive could check, so there's no login to keep.",
@@ -53,11 +53,11 @@
   },
   "main.accounts.running": {
     "defaultMessage": "{name} has agents running on it: stop them, then remove it.",
-    "description": "An error removing a connection ({name}, its name in Settings → Connections): agents run on it, or one is starting."
+    "description": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or one is starting."
   },
   "main.accounts.setUpCancelled": {
     "defaultMessage": "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.",
-    "description": "An error opening a connection's Set Up (Settings → Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started."
+    "description": "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started."
   },
   "main.antivirus.allExcluded": {
     "defaultMessage": "Every folder Hive may offer is already excluded.",
@@ -149,42 +149,42 @@
   },
   "main.connections.choice.missing": {
     "defaultMessage": "The connection chosen for {agent} no longer exists. Choose another, or the workspace's default.",
-    "description": "An error saving an agent's settings (or adding one): the connection chosen for it ({agent}, its name) was removed. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)."
+    "description": "An error saving an agent's settings (or adding one): the connection chosen for it ({agent}, its name) was removed. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)."
   },
   "main.connections.choice.off": {
-    "defaultMessage": "{name} isn't on in this workspace. Turn it on in Settings → Connections, or choose another for {agent}.",
-    "description": "An error saving an agent's settings (or adding one): the connection chosen ({name}) is off in this workspace, so it can't be the agent's ({agent}, its name). Settings → Connections names a section."
+    "defaultMessage": "{name} isn't on in this workspace. Turn it on in Settings → Accounts & Connections, or choose another for {agent}.",
+    "description": "An error saving an agent's settings (or adding one): the connection chosen ({name}) is off in this workspace, so it can't be the agent's ({agent}, its name). Settings → Accounts & Connections names a section."
   },
   "main.connections.choice.otherCli": {
     "defaultMessage": "{name} is for another CLI than {agent}'s. Choose one of its own.",
     "description": "An error saving an agent's settings (or adding one): the connection chosen ({name}) belongs to another coding agent CLI than the agent's ({agent}, its name)."
   },
   "main.connections.inUse": {
-    "defaultMessage": "{name} is used by {users}. Choose another connection for them first, then remove it.",
+    "defaultMessage": "Still in use, so {name} was kept: {users}. Choose another connection for them first, then remove it.",
     "description": "An error removing a connection (Settings → Accounts & Connections, HI-2107): agents or the Assistant use it ({users}: their names, listed, each with its project)."
   },
   "main.connections.launch.changedAgain": {
     "defaultMessage": "{agent}'s connection was changed again while it was starting. Start it again.",
-    "description": "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)."
+    "description": "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)."
   },
   "main.connections.launch.changing": {
     "defaultMessage": "{name}'s login kept changing while Hive checked it. Try starting {agent} again in a moment.",
     "description": "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as."
   },
   "main.connections.launch.deleted": {
-    "defaultMessage": "The connection chosen for {agent} no longer exists. Pick another in its Agent Settings, or let it use the workspace's default.",
+    "defaultMessage": "The connection chosen for {agent} no longer exists. Choose another in its Agent Settings.",
     "description": "Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog."
   },
   "main.connections.launch.noKey": {
-    "defaultMessage": "{name} has no key. Add one in Settings → Connections, then start {agent}.",
-    "description": "Starting an agent ({agent}) is refused: its server connection ({name}) reaches a server that needs an API key, and none is saved for it. Settings → Connections names a section."
+    "defaultMessage": "{name} has no key. Add one in Settings → Accounts & Connections, then start {agent}.",
+    "description": "Starting an agent ({agent}) is refused: its server account ({name}) reaches a server that needs an API key, and none is saved for it. Settings → Accounts & Connections names a section."
   },
   "main.connections.launch.none": {
-    "defaultMessage": "No {cli} connection is on in this workspace. Add one in Settings → Connections and sign it in, then start {agent} again.",
-    "description": "Starting an agent ({agent}, its name) is refused: its workspace has no connection on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Connections names a section."
+    "defaultMessage": "No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections and sign it in, then start {agent} again.",
+    "description": "Starting an agent ({agent}, its name) is refused: its workspace has no account on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Accounts & Connections names a section."
   },
   "main.connections.launch.offNoDefault": {
-    "defaultMessage": "{agent}'s connection, {name}, is off in this workspace, and no other {cli} connection is on. Turn one on in Settings → Connections.",
+    "defaultMessage": "{agent}'s account, {name}, is off in this workspace, and no other {cli} account is on. Turn one on in Settings → Accounts & Connections.",
     "description": "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI."
   },
   "main.connections.launch.otherProvider": {
@@ -192,8 +192,8 @@
     "description": "Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent's CLI (\"Claude Code\")."
   },
   "main.connections.launch.signedOut": {
-    "defaultMessage": "{name} is signed out. Sign it in again in Settings → Connections, then start {agent}.",
-    "description": "Starting an agent ({agent}) is refused: its connection ({name}) isn't signed in."
+    "defaultMessage": "{name} is signed out. Sign it in again in Settings → Accounts & Connections, then start {agent}.",
+    "description": "Starting an agent ({agent}) is refused: its account ({name}) isn't signed in."
   },
   "main.connections.moveFailed": {
     "defaultMessage": "Hive couldn't move {project}'s model settings to its agents",
@@ -212,7 +212,7 @@
     "description": "An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile)."
   },
   "main.connections.userIn": {
-    "defaultMessage": "{agent} in {project}",
+    "defaultMessage": "{agent} ({project})",
     "description": "One user of a connection in the error refusing its removal (HI-2107): an agent ({agent}) and its project ({project})."
   },
   "main.console.noWorkspace": {
@@ -428,12 +428,12 @@
     "description": "An error saving a server connection's API key: Hive keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit."
   },
   "main.keys.maskingUnreadable": {
-    "defaultMessage": "Hive can't check this for API keys: its masking data can't be read. See Settings → Connections.",
-    "description": "An error: an export, Copy Diagnostics or a recording was refused because the data Hive uses to hide server connections' API keys can't be read. Settings → Connections names a section, where it can be reset."
+    "defaultMessage": "Hive can't check this for API keys: its masking data can't be read. See Settings → Accounts & Connections.",
+    "description": "An error: an export, Copy Diagnostics or a recording was refused because the data Hive uses to hide server connections' API keys can't be read. Settings → Accounts & Connections names a section, where it can be reset."
   },
   "main.keys.unsafe": {
     "defaultMessage": "Hive can't store a key safely on this system, so it wasn't saved.",
-    "description": "An error saving a server connection's API key (Settings → Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text."
+    "description": "An error saving a server connection's API key (Settings → Accounts & Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text."
   },
   "main.leftovers.end": {
     "defaultMessage": "End Them",
@@ -1085,7 +1085,7 @@
   },
   "main.server.key.chars": {
     "defaultMessage": "A key has no spaces or special characters outside plain ASCII. Check what was pasted.",
-    "description": "An error saving a server connection's API key (Settings → Connections): it has spaces, line breaks or non-ASCII characters. The key itself is never shown."
+    "description": "An error saving a server connection's API key (Settings → Accounts & Connections): it has spaces, line breaks or non-ASCII characters. The key itself is never shown."
   },
   "main.server.key.inField": {
     "defaultMessage": "The key appears in the {field, select, name {name} url {base URL} other {model list}}: take it out of there first. Nothing was saved.",
@@ -1101,7 +1101,7 @@
   },
   "main.server.setUp.noKey": {
     "defaultMessage": "{name} has no key yet. Add its key first, then set it up.",
-    "description": "An error opening Set Up for a server connection ({name}, its name in Settings → Connections): its server needs an API key and none is saved."
+    "description": "An error opening Set Up for a server connection ({name}, its name in Settings → Accounts & Connections): its server needs an API key and none is saved."
   },
   "main.server.unsupported": {
     "defaultMessage": "{cli} can't get its model from a server in Hive.",
@@ -1113,7 +1113,7 @@
   },
   "main.server.url.invalid": {
     "defaultMessage": "That isn't a URL Hive can use: write it in full, such as https://api.example.com.",
-    "description": "An error saving a server connection's base URL (Settings → Connections): it can't be read as a URL."
+    "description": "An error saving a server connection's base URL (Settings → Accounts & Connections): it can't be read as a URL."
   },
   "main.server.url.remoteHttp": {
     "defaultMessage": "A server on another computer needs https://. Plain http:// is only for a server on this PC (localhost).",

@@ -93,7 +93,7 @@
   },
   "providers.claude.connections.setUp": {
     "defaultMessage": "Set Up runs Claude Code on this connection for its one-time first-run questions (its look, its notes) and to trust this workspace's folders. Answer them in the terminal.",
-    "description": "Settings → Connections, above a Claude Code connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button."
+    "description": "Settings → Accounts & Connections, above a Claude Code connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button."
   },
   "providers.claude.hint.args": {
     "defaultMessage": "Claude Code refused an argument: check Extra arguments in Agent Settings and Settings → Claude Code.",
@@ -117,7 +117,7 @@
   },
   "providers.codex.connections.setUp": {
     "defaultMessage": "Set Up runs Codex on this connection so you can choose its Windows sandbox, which its commands run in, and trust this workspace's folders. Answer in the terminal; Windows may ask for Administrator permission.",
-    "description": "Settings → Connections, above a Codex connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button."
+    "description": "Settings → Accounts & Connections, above a Codex connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button."
   },
   "providers.codex.developerUnread.agentMessage": {
     "defaultMessage": "Codex couldn't say which developer_instructions this session gets, so Hive leaves yours as they are and adds none of its guidance this time: the agent has Hive's tools without it. Restart the agent to try again.",

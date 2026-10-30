@@ -195,7 +195,7 @@
   "service.providers.notInstalled": "{cli} 未安装。",
   "service.providers.pickNotFound": "{task}：Hive 找不到 {item}。请在终端中操作，或更新 Hive。",
   "service.providers.retryUnavailable": "此更新重试已不可用。请选择“重新检查”，然后尝试“更新”。",
-  "service.providers.signInConnections": "{cli} 按连接分别登录：请在“设置”→“连接”中登录。",
+  "service.providers.signInConnections": "{cli} 按账号分别登录：请在“设置”→“账号与连接”中登录。",
   "service.providers.stillLooking": "Hive 仍在查找 {cli}。请稍后重试。",
   "service.providers.stillLookingAll": "Hive 仍在查找编程智能体 CLI。请稍后重试。",
   "service.providers.stopFirst": "请先停止所有正在运行的 {cli} 智能体，再更新它。",

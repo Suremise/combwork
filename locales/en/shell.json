@@ -515,6 +515,10 @@
     "defaultMessage": "Switch Between Panes and Tiles",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: switches the Session tab between Panes (the agents' terminals) and Tiles (a small tile per agent). Panes and Tiles: as the toggle says them."
   },
+  "shell.command.settings.accounts": {
+    "defaultMessage": "Accounts & Connections",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category (HI-2107): opens Settings → Accounts & Connections."
+  },
   "shell.command.settings.advanced": {
     "defaultMessage": "Advanced Settings",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category."
@@ -936,8 +940,8 @@
     "description": "Tooltip of an agent whose turn stopped because its server connection's ({name}) API key was refused."
   },
   "shell.keyRefused.then": {
-    "defaultMessage": "{name}'s key was refused. Replace it in Settings → Connections, then Resume in the project's header carries on the agents it stopped.",
-    "description": "Tooltip of an agent whose server connection's ({name}) API key was refused, its second line. Settings → Connections names a section; Resume is a button in the project's header."
+    "defaultMessage": "{name}'s key was refused. Replace it in Settings → Accounts & Connections, then Resume in the project's header carries on the agents it stopped.",
+    "description": "Tooltip of an agent whose server connection's ({name}) API key was refused, its second line. Settings → Accounts & Connections names a section; Resume is a button in the project's header."
   },
   "shell.loadFailed": {
     "defaultMessage": "Could not load {what}: {error}",

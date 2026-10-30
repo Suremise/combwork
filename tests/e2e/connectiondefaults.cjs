@@ -1,7 +1,7 @@
 // Model, effort and context belong to the connection (HI-1770, S3;
 // the test seam off so the real rule applies): with Connections on, a project's own model, effort and context move onto
-// its agents once (an agent's own kept), recorded in project.json; a connection's defaults are edited in Settings →
-// Connections and a launch with none of its own runs them (the fake's launch log), an agent's own winning; Agent Settings
+// its agents once (an agent's own kept), recorded in project.json; an account's first connection is edited in its dialog
+// (Settings → Accounts & Connections, HI-2107) and a launch with none of its own runs it (the fake's launch log), an agent's own winning; Agent Settings
 // names "Connection default"; the CLI's and the project's model rows give way; a moved effort its model doesn't take is
 // listed once, and stays dismissed. Screenshots in both themes. The fake Claude Code signs in, no browser.
 const lib = require('./lib.cjs')
@@ -62,7 +62,7 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
     check("the project's model, effort and context moved onto One (none of its own), recorded in project.json", !!moved && one?.model === 'haiku' && one?.effort === 'high' && one?.use200kContext === true, JSON.stringify(one))
     check("…Two's own model kept, the rest given", two?.model === 'opus' && two?.effort === 'high', JSON.stringify(two))
 
-    // --- A connection, its defaults edited in Settings → Connections.
+    // --- An account, its first connection edited in its dialog (Settings → Accounts & Connections, HI-2107).
     fs.mkdirSync(accountsRoot, { recursive: true })
     fs.writeFileSync(path.join(accountsRoot, 'fake-login-as.json'), JSON.stringify({ email: 'one@example.com', orgId: 'org-1' }))
     const max1 = await inv('connections:add', 'claude-code', 'Max 1')
@@ -72,14 +72,23 @@ const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'proj
     await inv('connections:setOn', max1.id, true)
     // The CLI's own defaults deliberately another: Haiku, high, 200K on; the connection's Sonnet, low, 200K off.
     await inv('settings:update', { providers: { 'claude-code': { defaultModel: 'haiku', defaultEffort: 'high', use200kContext: true } } })
-    await inv('connections:setDefaults', max1.id, { model: 'sonnet', effort: 'low', use200kContext: false })
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav').waitFor({ timeout: HUNG_MS })
     await page.locator('.settings-nav .row[data-section="accounts"]').click()
-    const row = page.locator(`.account-row[data-account="${max1.id}"]`)
-    await row.locator('.connection-defaults button').first().click()
-    const form = row.locator('.connection-defaults-form')
-    check("Settings → Connections: Max 1's defaults show the model and effort set", !!(await lib.until(async () => (await form.locator('select').first().inputValue().catch(() => '')) === 'sonnet', HUNG_MS)))
+    const baseRow = page.locator(`[data-connections-of="${max1.id}"] [data-connection]`).first()
+    check("Max 1's first connection is listed under it, named after it", !!(await lib.until(async () => /Max 1/.test(await baseRow.innerText().catch(() => '')), HUNG_MS)))
+    await baseRow.locator('[data-action="connection-menu"]').click()
+    await page.locator('.menu .menu-item', { hasText: 'Edit…' }).first().click()
+    const form = page.locator('[data-connection-form]')
+    await form.waitFor({ timeout: HUNG_MS })
+    await form.locator('select').first().selectOption('sonnet')
+    await lib.until(async () => (await form.locator('select').nth(1).locator('option[value="low"]').count()) === 1, HUNG_MS)
+    await form.locator('select').nth(1).selectOption('low')
+    await shots('dialog')
+    await page.locator('[data-save-connection]').click()
+    const edited = await lib.until(async () => (await inv('connections:list')).connectionRows.find((c) => c.account === max1.id && c.model === 'sonnet' && c.effort === 'low') ?? null, HUNG_MS)
+    check("the dialog saves Max 1's first connection: Sonnet, low", !!edited && !edited.use200kContext, JSON.stringify(edited))
+    check('…its row sums it up', !!(await lib.until(async () => /Sonnet · Low/.test(await baseRow.locator('[data-summary]').innerText().catch(() => '')), HUNG_MS)), await baseRow.locator('[data-summary]').innerText().catch(() => ''))
     await shots('defaults')
 
     // --- A launch with none of its own runs the connection's defaults; One's own (moved) wins.

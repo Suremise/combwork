@@ -55,7 +55,7 @@
   "session.inUse.reserved": "O Hive já está arquivando, excluindo ou limpando esta sessão.",
   "session.inUse.running": "Ela está em execução. Pare-a primeiro.",
   "session.inUse.writing": "A CLI dela ainda está escrevendo a transcrição. Tente de novo em instantes.",
-  "session.keyRefused.body": "Substitua a chave de {name} em Configurações → Conexões; depois, Retomar no cabeçalho do projeto os retoma.",
+  "session.keyRefused.body": "Substitua a chave de {name} em Configurações → Contas e conexões; depois, Retomar no cabeçalho do projeto os retoma.",
   "session.keyRefused.title": "{n, plural, one {{agent} parou: a chave de {name} foi recusada} many {# agentes pararam: a chave de {name} foi recusada} other {# agentes pararam: a chave de {name} foi recusada}}",
   "session.leftovers.body": "{processes}. {n, plural, one {Ele foi iniciado pelo agente e pode estar bloqueando a pasta ou as portas do projeto.} other {Eles foram iniciados pelo agente e podem estar bloqueando a pasta ou as portas do projeto.}}",
   "session.leftovers.end": "Encerrar",

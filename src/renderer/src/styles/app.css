@@ -3442,14 +3442,7 @@ p.hint {
   color: var(--warning);
   margin-bottom: 2px;
 }
-/* A connection's defaults for the agents on it (HI-1770), opened under its row; the notice of moved settings above the list. */
-.connection-defaults {
-  margin-top: 4px;
-}
-.connection-defaults-form {
-  margin-top: 6px;
-  max-width: 520px;
-}
+/* The notice of moved settings above Settings → Accounts & Connections' list (HI-1770). */
 .connections-notice {
   align-items: flex-start;
 }
@@ -4847,33 +4840,87 @@ h2.section#unused-worktrees {
   align-items: center;
   margin-top: 4px;
 }
-/* Always the row's own bottom line (HI-1875, Darren 27 Oct): the switch and buttons in the same place on every row,
-   on or off, however short its details are (a short row would otherwise wrap them up beside its name). */
+/* On the right of the account's own line (HI-2107): what it needs now, On here and its ⋯, in the same place on every row. */
 .account-actions {
-  flex-basis: 100%;
   display: flex;
   gap: 6px;
   align-items: center;
   flex-wrap: wrap;
+  margin-left: auto;
 }
-.account-default,
-.account-used-here {
+.account-on-here {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+/* An account and its connections (HI-2107): the account's line, its connections indented under it. */
+.account-block {
+  align-self: stretch;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.account-block > .account-row {
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+}
+.connection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 10px 6px 38px;
+}
+.connection-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) minmax(160px, 2fr) minmax(80px, auto) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 26px;
+}
+.connection-row:hover {
+  background: var(--bg-hover);
+}
+.connection-name {
+  font-weight: 600;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.connection-base {
   font-weight: normal;
   font-size: 11px;
   padding: 0 6px;
   border-radius: 8px;
   border: 1px solid var(--border);
-}
-/* The top of a CLI's order (HI-1875): a hint, Hive-wide. */
-.account-default {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-/* The one new agents use here when the Default is off here. */
-.account-used-here {
   color: var(--fg-muted);
 }
-/* Its handle: drag within its CLI's order, or Alt+Up/Down. */
+.connection-summary,
+.connection-users {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.connection-users {
+  text-align: right;
+}
+.connection-warning .codicon {
+  color: var(--warning);
+  margin-left: 4px;
+}
+.connection-add {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+@media (max-width: 700px) {
+  .connection-row {
+    grid-template-columns: 1fr auto;
+  }
+  .connection-users {
+    text-align: left;
+  }
+}
+/* Its handle: drag in the one order of accounts, or Alt+Up/Down. */
 .account-handle {
   align-self: center;
   background: none;
@@ -7837,31 +7884,6 @@ button.agent-place:hover {
   opacity: 0.6;
 }
 .provider-row .small {
-  font-size: 12px;
-}
-/* Reordering the providers (HI-1965): by its grip (drag), its ⋯ menu, or Alt+Up and Alt+Down while it has the focus. */
-.provider-row[draggable='true'] {
-  cursor: grab;
-}
-.provider-row:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
-}
-.provider-row.dragging {
-  opacity: 0.5;
-}
-.provider-row.drop-target {
-  border-color: var(--accent);
-}
-.provider-row .provider-grip {
-  margin-right: -4px;
-}
-.default-provider {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.default-provider-order {
   font-size: 12px;
 }
 .provider-choice {
