@@ -7,6 +7,7 @@ interface HiveMessageValues {
   'agents.add.full': { limit: string | number }
   'agents.add.nameTaken': { project: string | number; agent: string | number }
   'agents.add.nameTakenHere': { project: string | number; agent: string | number }
+  'agents.add.noAccountStart': undefined
   'agents.add.startNow': undefined
   'agents.add.title': { project: string | number }
   'agents.add.useSuggestion': { name: string | number }

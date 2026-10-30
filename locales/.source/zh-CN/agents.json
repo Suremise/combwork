@@ -6,6 +6,7 @@
   "agents.add.full": "{limit} Remove one first.",
   "agents.add.nameTaken": "{project} already has an agent called {agent}: agent names are unique across the workspace.",
   "agents.add.nameTakenHere": "{project} already has an agent called {agent}.",
+  "agents.add.noAccountStart": "No account is on here yet",
   "agents.add.providerOff": "{cli} is turned off{whose, select, project {, and it is this project's default provider} yours {, and it is your default provider} other {}}. Turn it on in Settings → Providers, or choose another provider.",
   "agents.add.startNow": "Start a session now",
   "agents.add.title": "Add an agent to {project}",

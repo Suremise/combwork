@@ -5,6 +5,7 @@
   "agents.add.full": "{limit}请先删除一个。",
   "agents.add.nameTaken": "{project} 已有名为 {agent} 的智能体：智能体名称在整个工作区内必须唯一。",
   "agents.add.nameTakenHere": "{project} 已有名为 {agent} 的智能体。",
+  "agents.add.noAccountStart": "此处尚未启用任何账号",
   "agents.add.startNow": "立即启动会话",
   "agents.add.title": "向 {project} 添加智能体",
   "agents.add.useSuggestion": "使用 {name}",

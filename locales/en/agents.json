@@ -23,6 +23,10 @@
     "defaultMessage": "{project} already has an agent called {agent}.",
     "description": "Under the name in the Add Agent dialog: an agent of this project ({project}) has that name ({agent})."
   },
+  "agents.add.noAccountStart": {
+    "defaultMessage": "No account is on here yet",
+    "description": "After Add Agent's \"Start a session now\", greyed out (HI-2127): why it can't start a session: no account (a sign-in or server a coding agent CLI uses) is on in this workspace. The agent can still be added, for later. Short."
+  },
   "agents.add.startNow": {
     "defaultMessage": "Start a session now",
     "description": "Checkbox in the Add Agent dialog: start the new agent at once."
