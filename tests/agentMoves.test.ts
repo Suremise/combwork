@@ -425,19 +425,20 @@ describe('a failed review by either route: back to Doing, its builder holding it
   const viaPatch = (w: WS, card: number) => () => update(w, card, reviewer, { review: 'failed' }, 'FAILED')
   const viaIntent = (w: WS, card: number) => () => inWorkspace(w, () => runCardIntent({ n: card, plain: false }, reviewer, { kind: 'verdict', pass: false, comment: 'FAILED' }))
 
-  it('in a project whose rules have no Review stage, with the rules on, off, and where they have one: the same', async () => {
-    for (const [name, make, enforce] of [
-      ['no Review stage', bare, true],
-      ['rules off', () => workspace(), false],
-      ['rules on, with Review', () => workspace(), true]
-    ] as const) {
+  // The same in each, a test each (HI-2075: the three in one reached the time limit on a loaded machine).
+  for (const [name, make, enforce] of [
+    ['whose rules have no Review stage', bare, true],
+    ['with the rules off', () => workspace(), false],
+    ['with the rules on, and a Review stage', () => workspace(), true]
+  ] as const) {
+    it(`in a project ${name}: the same, by PATCH and by the verdict intent`, async () => {
       await advanced.set(ENFORCE, enforce)
       const { w, wt } = await make()
       const [a, b] = [await reviewed(w, wt, 'a.txt'), await reviewed(w, wt, 'b.txt')]
-      expect(await after(w, a, viaPatch(w, a)), `${name}: PATCH`).toEqual(WANTED)
-      expect(await after(w, b, viaIntent(w, b)), `${name}: the verdict intent`).toEqual(WANTED)
-    }
-  })
+      expect(await after(w, a, viaPatch(w, a)), 'PATCH').toEqual(WANTED)
+      expect(await after(w, b, viaIntent(w, b)), 'the verdict intent').toEqual(WANTED)
+    })
+  }
 
   it('a card from before 1.0 (P3 until it starts): back to Doing, its builder holding it; one Verdict, then the move', async () => {
     const { w } = await bare()
