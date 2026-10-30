@@ -1,5 +1,6 @@
 // Reconciliation in the dev build (#1217; with workflow rules enforced since #1263, a Doing card still only gets marks): a card started by its agent, which works in a git worktree
-// (P7: its carried slot, where the slot's preparation makes the card's own line; never taken for gone before, #1551);
+// (P7: its carried slot once the opening has adopted it, HI-2126, where the slot's preparation makes the card's own line;
+// never taken for gone before, #1551);
 // a commit made there with plain git, outside Hive, is seen by the watcher and recorded on the card as
 // an observed HeadMoved within the debounce, read over IPC; the card doesn't move. Then the branch merged into main by
 // hand: Integrated, by outside, the card still where it was. No agents run. Dev build, throwaway profile and workspace.
@@ -40,6 +41,10 @@ const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'u
     await lib.appReady(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
+    // HI-2126: the opening adopts Builder's worktree as its carried slot after the window shows the workspace; a card
+    // started before that is started as 0.9 did (an agent not migrated yet works in its worktree), so wait for it.
+    const carried = await lib.until(async () => (await inv('slots:list', alpha)).find((s) => s.lease?.kind === 'carried' && s.lease.agent === 'b1'), HUNG_MS)
+    check("Builder's worktree adopted as its carried slot", !!carried, JSON.stringify(await inv('slots:list', alpha)))
 
     const n = (await inv('tasks:create', { title: 'Work in the worktree', project: 'alpha' })).number
     await inv('tasks:update', n, { column: 'doing', agent: 'b1' })
