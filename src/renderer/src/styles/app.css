@@ -4169,10 +4169,17 @@ p.hint {
   display: flex;
   gap: 12px;
   align-items: center;
+  min-width: 0;
 }
+/* The search box gives way in a narrow window; Modified only stays whole (HI-2164). */
 .settings-top .search-box {
   flex: 1;
+  min-width: 0;
   max-width: 560px;
+}
+.settings-top > label {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .settings-top .input {
   height: 30px;
@@ -13329,10 +13336,21 @@ button.progress-card-key:hover {
   letter-spacing: 0;
 }
 /* Start lane… (#1280): the Lanes tab's button, and the dialog's cards in order, each with its moves. */
+/* Its buttons wrap inside the panel, a long one's label too, never spilling over what is left of it (HI-2164: French). */
 .progress-lanes-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  row-gap: var(--space-1);
+  min-width: 0;
   padding: var(--space-2) var(--space-2) 0;
+}
+.progress-lanes-actions .btn {
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  white-space: normal;
+  text-align: start;
 }
 /* The paused team's band (HI-2081): what still runs, or All parked with Install Now. */
 .team-pause-band {
