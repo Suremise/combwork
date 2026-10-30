@@ -435,7 +435,7 @@ export async function noteConnection(ws: WorkspaceService, project: string, was:
  */
 export async function noteAgent(ws: WorkspaceService, project: string, wasDef: AgentDef, nowDef: AgentDef): Promise<void> {
   // A CLI it didn't name (one from before 0.2) is the one it ran, which the accounts migration pins it to (decision A).
-  const was = wasDef.provider ? wasDef : { ...wasDef, provider: agentProvider(wasDef, null, config.settings) }
+  const was = wasDef.provider ? wasDef : { ...wasDef, provider: agentProvider(wasDef, config.settings) }
   const now = nowDef
   const keys: (keyof AgentDef)[] = AGENT_FIELDS.filter((k) => !sameValue(was[k], now[k]))
   if (keys.includes('provider')) for (const k of PROVIDER_DEPENDENTS) if (!keys.includes(k)) keys.push(k)

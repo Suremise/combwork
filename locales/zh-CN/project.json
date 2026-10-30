@@ -175,6 +175,7 @@
   "project.empty.markActive": "将此项目标记为正在处理，即可运行会话并查看其状态。也可以直接启动会话。",
   "project.empty.markWorking": "标记为正在处理",
   "project.empty.noAccount": "此工作区中没有已启用的账号——“设置”→“账号与连接”",
+  "project.empty.noCli": "此处已启用的账号都未安装其编程智能体 CLI——“帮助”→“配置提供方”",
   "project.empty.noAgents": "还没有智能体",
   "project.empty.noSession": "没有正在运行的会话",
   "project.empty.notActive": "{project} 未启用",

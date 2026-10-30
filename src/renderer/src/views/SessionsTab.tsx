@@ -136,7 +136,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   // Branches start folded except the focused agent's (the Assistant's: its provider's); what the user opens or folds is
   // remembered for the project.
   const focused = assistant ? null : focusedAgentId(project)
-  const focusedProvider = assistant ? agentProviderOf(project, project.agents[0]) : focused ? agentProviderOf(project, project.agents.find((a) => a.id === focused)) : null
+  const focusedProvider = assistant ? agentProviderOf(project.agents[0]) : focused ? agentProviderOf(project.agents.find((a) => a.id === focused)) : null
   const defaultOpen = (n: TreeNode): boolean =>
     n.kind === 'provider' ? n.provider === focusedProvider && (assistant || n.children.some((c) => c.kind === 'agent' && c.agentId === focused)) : n.kind === 'agent' ? !!focused && n.agentId === focused : false
   const isOpen = (n: TreeNode): boolean => !!q || revealed.has(n.key) || (explicit[n.key] ?? defaultOpen(n))

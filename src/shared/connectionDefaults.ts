@@ -1,6 +1,6 @@
 import type { Account, AccountsMigration, AgentDef, AppSettings, AssistantProviderSettings, Connection, ConnectionDefaults, ConnectionsMoved, EffortLevel, LaunchValues, LegacyConnection, MovedField, ProjectAccountsMigration, ProjectConfig, ProviderId, WorkspaceConfig } from './types'
 import { projectAgents } from './defaults'
-import { PROVIDERS, agentProvider, modeAllowed, projectProviderConfig, projectUse200k, providerDescriptor, providerSettings, splitArgs, type AgentLaunchSettings } from './providers'
+import { AUTO_PROVIDER, PROVIDERS, autoProvider, modeAllowed, projectProviderConfig, projectUse200k, providerDescriptor, providerSettings, splitArgs, type AgentLaunchSettings } from './providers'
 import { baseConnection, connectionName, connectionsOn, joinArgs, launchValues, matchingConnection, resolveConnection } from './accounts'
 import { ASSISTANT_AGENT_ID, assistantProjectConfig } from './assistant'
 
@@ -94,6 +94,19 @@ export function moveProjectOverrides(cfg: ProjectConfig, provider: ProviderId, p
 // ---------------------------------------------------------------------------
 
 /**
+ * The CLI an agent ran at 16e8d6129 (its agentProvider): its own, else its project's default (the Assistant's home:
+ * Settings → Assistant's, assistantProjectConfig), else Settings' default, else Automatic's pick. Only the migration
+ * reads the 0.9 default providers (decision A, HI-2132).
+ */
+function legacyProvider(agent: Pick<AgentDef, 'provider'> | null | undefined, cfg: Pick<ProjectConfig, 'defaultProvider'> | null | undefined, settings: Pick<AppSettings, 'defaultProvider' | 'providers'>): ProviderId {
+  if (agent?.provider) return agent.provider
+  const own = cfg?.defaultProvider
+  if (own && own !== 'inherit' && own !== AUTO_PROVIDER) return own
+  const global = settings.defaultProvider
+  return global && global !== AUTO_PROVIDER ? global : autoProvider(settings)
+}
+
+/**
  * Where model, effort and context came from after an agent's own (HI-1770): `legacy`, the project's for its CLI, then
  * the per-CLI defaults; `connection`, the connection it ran on: its defaults, never the project's or the CLI's; `conn`
  * null when none could be used (then the agent's own alone). Permission mode and extra arguments were the CLI's and the
@@ -103,7 +116,7 @@ export type LaunchLayer = { kind: 'legacy' } | { kind: 'connection'; conn: Pick<
 
 /** What an agent launched with before HI-2106 (16e8d6129's agentLaunchSettings): its own, else the project's, else the global defaults; with a connection (`layer`), else its defaults. */
 export function legacyLaunchSettings(agent: Pick<AgentDef, 'provider' | 'model' | 'effort' | 'permissionMode' | 'use200kContext'> | null | undefined, cfg: Pick<ProjectConfig, 'providers' | 'defaultProvider'>, settings: Pick<AppSettings, 'providers' | 'defaultProvider'>, layer: LaunchLayer = { kind: 'legacy' }): AgentLaunchSettings {
-  const provider = agentProvider(agent, cfg, settings)
+  const provider = legacyProvider(agent, cfg, settings)
   const g = providerSettings(settings, provider)
   const pc = projectProviderConfig(cfg, provider)
   const fallbackMode = modeAllowed(provider, g.defaultPermissionMode, settings) ? g.defaultPermissionMode : providerDescriptor(provider).defaultPermissionMode
@@ -155,15 +168,15 @@ export function legacyEffective(agent: AgentDef, pc: ProjectConfig, assistant: b
   const s = inp.settings
   let cfg = pc
   let forAgent = agent
-  const movedCli = agentProvider(forAgent, cfg, s)
+  const movedCli = legacyProvider(forAgent, cfg, s)
   const layered = !!providerDescriptor(movedCli).capabilities.connections
   if (layered && !assistant && !cfg.migrations?.connections1?.[movedCli]) {
-    const patch = moveProjectOverrides(cfg, movedCli, (a) => agentProvider(a, cfg, s), at)
+    const patch = moveProjectOverrides(cfg, movedCli, (a) => legacyProvider(a, cfg, s), at)
     if (patch) cfg = { ...cfg, ...patch }
     const fresh = projectAgents(cfg).find((a) => a.id === forAgent.id)
     if (fresh) forAgent = { ...fresh, provider: forAgent.provider ?? fresh.provider }
   }
-  const cli = agentProvider(forAgent, cfg, s)
+  const cli = legacyProvider(forAgent, cfg, s)
   const wanted = assistant ? inp.ws?.assistantConnection?.[cli] : forAgent.connection
   const choice = layered && cli === movedCli ? (pick ? ({ ok: true, id: pick } as const) : resolveConnection(inp.ws, cli, wanted, inp.legacy)) : null
   const conn = choice?.ok ? (inp.legacy.find((c) => c.id === choice.id) ?? null) : null
@@ -306,9 +319,9 @@ export function migrateProject(cfg: ProjectConfig, inp: LegacyInputs, store: Acc
   if (cfg.migrations?.accounts1) return null
   let pc = cfg
   // HI-1770's move for each CLI with connections its agents run, as their launch would have made it: its record kept for the notice.
-  for (const cli of new Set(projectAgents(pc).map((a) => agentProvider(a, pc, inp.settings)))) {
+  for (const cli of new Set(projectAgents(pc).map((a) => legacyProvider(a, pc, inp.settings)))) {
     if (!providerDescriptor(cli).capabilities.connections) continue
-    const patch = moveProjectOverrides(pc, cli, (a) => agentProvider(a, pc, inp.settings), at)
+    const patch = moveProjectOverrides(pc, cli, (a) => legacyProvider(a, pc, inp.settings), at)
     if (patch) pc = { ...pc, ...patch }
   }
   const unplaced: Record<string, LaunchValues> = {}
@@ -339,7 +352,7 @@ export function migrateAssistant(raw: ProjectConfig, inp: LegacyInputs, store: A
   if (raw.migrations?.accounts1) return null
   const pc = assistantProjectConfig(raw, inp.settings as AppSettings)
   const agent = projectAgents(pc)[0] ?? { id: ASSISTANT_AGENT_ID, name: '' }
-  const active = agentProvider(agent, pc, inp.settings)
+  const active = legacyProvider(agent, pc, inp.settings)
   const made: Partial<Record<ProviderId, string>> = {}
   const unplaced: Record<string, LaunchValues> = {}
   let placed: AgentDef = { ...withoutOwn(agent), provider: active }

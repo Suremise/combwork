@@ -1,6 +1,7 @@
 import { Children, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
-import { agentLaunchSettings, defaultProviderWarning, isProviderEnabled, modeOption, providerName } from '@shared/providers'
+import { agentLaunchSettings, isProviderEnabled, modeOption, providerName } from '@shared/providers'
+import { cliReadyOf, connectionCli, firstReadyConnection } from '@shared/connectionLabel'
 import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume, stalledOnSignIn } from '@shared/resumeAll'
 import { batchCounts } from '@shared/startAll'
@@ -44,6 +45,7 @@ const M = {
   moreTip: msg({ id: 'project.tabs.moreTip', defaultMessage: "The project's {tabs}", description: "Tooltip on the project tabs' More ▾ button. {tabs} lists the tabs in its menu, such as Memory, Skills, Templates and MCP." }),
   tabTip: msg({ id: 'project.tabs.tip', defaultMessage: '{tab} ({key})', description: "A project tab's tooltip with its keyboard shortcut. {tab} is the tab's name, {key} the shortcut, such as Alt+4." }),
   noAccount: msg({ id: 'project.empty.noAccount', defaultMessage: 'No account is on in this workspace — Settings → Accounts & Connections', description: "Warning on the Session tab of a project with no agents (HI-2108): no account (a sign-in or server a coding agent CLI uses) is on in this workspace, so a new agent has no connection to run on. Settings → Accounts & Connections: name it as Settings does." }),
+  noCli: msg({ id: 'project.empty.noCli', defaultMessage: 'No account on here has its coding agent CLI installed — Help → Provider Setup', description: "Warning on the Session tab of a project with no agents (HI-2132): accounts are on in this workspace, but none of their CLIs (Claude Code, Codex…) is installed, so a new agent can't run. Help → Provider Setup is the menu item." }),
   providerOff: msg({ id: 'project.empty.providerOff', defaultMessage: '{provider} is turned off — Settings → Providers', description: "Warning on the Session tab when the agent's provider is turned off. Settings → Providers: name it as Settings does." }),
   providerMissing: msg({ id: 'project.empty.providerMissing', defaultMessage: '{provider} is required — Help → Provider Setup', description: "Warning on the Session tab when the agent's CLI isn't installed. Help → Provider Setup is the menu item." }),
   sessionEnded: msg({ id: 'project.session.ended', defaultMessage: 'The session has ended. Resume it, or start a new one.', description: "Over an agent's terminal when its session has ended." }),
@@ -283,16 +285,23 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
   const focused = useFocusedAgent(project)
   // Unbound in Keyboard Shortcuts: no key to show.
   const newKey = commandKeybinding('session.new')
-  // With no agent, the provider new agents get: Automatic's follows what's installed, so this re-renders with it.
   const providers = useStore((s) => s.providers)
   const settings = useStore((s) => s.settings)
-  const provider = agentProviderOf(project, focused)
+  const view = useConnections()
+  const offered = !focused && view ? offeredConnections(view, settings) : []
+  // With no agent, the connection a new one gets (decision A: the first usable, its CLI installed); none while Hive is
+  // still looking for a CLI before it.
+  const ready = offered.length ? firstReadyConnection(view, settings, cliReadyOf(providers)) : null
+  // The focused agent's provider, else the new agent's (its connection's CLI; Automatic's pick where none is usable),
+  // and what Hive found of its CLI.
+  const provider = (!focused && connectionCli(view, ready?.id)) || agentProviderOf(focused)
   const info = providers[provider]
   const on = isProviderEnabled(settings, provider)
-  const view = useConnections()
   // No agent and no account on here (HI-2108): a new agent has no connection to run on. Not for a test copy on a CLI test home.
-  const noAccount = !focused && !!view && !offeredConnections(view, settings).length && !view.testHome.length
-  // An agent's own provider by name; with none, only what the project's default needs (#474).
+  const noAccount = !focused && !!view && !offered.length && !view.testHome.length
+  // Accounts on here but none on an installed CLI: a new agent can't run.
+  const noCli = !!ready && !ready.id && !ready.checking
+  // An agent's own provider by name; with none, what a new agent's connection needs.
   const warning = noAccount
     ? tr(M.noAccount)
     : focused
@@ -301,7 +310,9 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
       : info && !info.checking && !info.found
         ? tr(M.providerMissing, { provider: providerName(provider) })
         : null
-    : defaultProviderWarning(project.config, settings, (id) => providers[id])?.text ?? null
+    : noCli
+      ? tr(M.noCli)
+      : null
   const epoch = useStore((s) => (focused ? s.sessionEpoch[projectKey(project.path, focused.id)] : undefined))
   const ended = epoch !== undefined
   // Its workspace's 1.0 upgrade waits (#1230): no session can start.
@@ -493,7 +504,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
   ]
   const dangerous = settings
     ? project.agents.flatMap((a) => {
-        const l = agentLaunchSettings(agentProviderOf(project, a), a, settings)
+        const l = agentLaunchSettings(agentProviderOf(a), a, settings)
         // The mode in effect: on the CLI's own setting, the one its CLI showed (#1284).
         const m = modeOption(l.provider, (a.live ? modeInEffect(a.live) : undefined) ?? l.permissionMode)
         return m?.danger ? [many ? tr(M.dangerousMode, { agent: a.name, mode: m.label }) : m.label] : []
@@ -671,7 +682,7 @@ function ConnectionSetupBanner({ project }: { project: ProjectInfo }) {
   useLanguage()
   const view = useConnections()
   const settings = useStore((s) => s.settings)
-  const cli = [...new Set(project.agents.map((a) => agentProviderOf(project, a)))].find((p) => needsConnection(view, p))
+  const cli = [...new Set(project.agents.map((a) => agentProviderOf(a)))].find((p) => needsConnection(view, p))
   if (!cli || !settings) return null
   return <NoConnectionBanner cli={cli} />
 }

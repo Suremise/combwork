@@ -105,7 +105,7 @@ export function TerminalLayer({ visibleFor, panes }: { visibleFor: string | null
               style={i >= 0 ? rectStyle(paneRect(panes.length, i)) : undefined}
               projectPath={p.path}
               agentId={a.id}
-              provider={agentProviderOf(p, a)}
+              provider={agentProviderOf(a)}
               autoFocus={i >= 0 && (panes.length === 1 || useStore.getState().focusedAgent[p.path] === a.id)}
               onFocus={() => focusAgent(p.path, a.id)}
               dimmed={!a.live && !starting[startingKey(p.path, a.id)] && !failures[key]}
@@ -807,7 +807,7 @@ function AgentTabTip({ project, a }: { project: ProjectInfo; a: AgentInfo }) {
     : failure
       ? tr(FAILED_TO_START, { why: failure.reason.split('\n')[0] })
       : tr(msg({ id: 'panes.tab.notRunning', defaultMessage: 'not running', description: "An agent's state in its tab's hover, after its name: its session isn't running. Lower case." }))
-  const lines = [tr(msg({ id: 'panes.tab.title', defaultMessage: '{agent} ({provider}): {state}', description: "The first line of an agent tab's hover: its name, its provider (\"Claude Code\") and its state." }), { agent: a.name, provider: providerName(agentProviderOf(project, a)), state })]
+  const lines = [tr(msg({ id: 'panes.tab.title', defaultMessage: '{agent} ({provider}): {state}', description: "The first line of an agent tab's hover: its name, its provider (\"Claude Code\") and its state." }), { agent: a.name, provider: providerName(agentProviderOf(a)), state })]
   const signIn = signInNote(live)
   if (signIn) lines.push(signIn)
   if (live?.safeguard) lines.push(safeguardText(live.safeguard, providerDescriptor(live.provider).modelLabel, tr))
@@ -1517,7 +1517,7 @@ export function PaneFooter({
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
   const { usage, pending } = useLiveUsageState(project, a.id)
-  const provider = agentProviderOf(project, a)
+  const provider = agentProviderOf(a)
   const pc = projectProviderConfig(project.config, provider)
   const ps = providerSettings(settings, provider)
   const live = a.live
@@ -1790,7 +1790,7 @@ function StartFailedBar({ project, a, failure, single }: { project: ProjectInfo;
           <Icon name={starting ? 'loading' : 'refresh'} spin={!!starting} /> {starting ? startingLabel(starting) : tr(msg({ id: 'panes.failed.retry', defaultMessage: 'Retry', description: 'Button on the bar of an agent that failed to start: tries the launch again. Keep it short.' }))}
         </button>
         {failure.fix === 'agent-setup' ? (
-          <button className="btn small subtle" onClick={() => set({ setupOpen: agentProviderOf(project, a) })}>
+          <button className="btn small subtle" onClick={() => set({ setupOpen: agentProviderOf(a) })}>
             {tr(msg({ id: 'panes.failed.setup', defaultMessage: 'Provider Setup…', description: "Button on the bar of an agent that failed to start: opens Provider Setup (installing or signing in to its CLI)." }))}
           </button>
         ) : (

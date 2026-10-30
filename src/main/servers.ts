@@ -519,7 +519,7 @@ async function projectSummary(p: string) {
     agents: info.agents.map((a) => ({
       id: a.id,
       name: a.name,
-      provider: a.live?.provider ?? agentProvider(a, info.config, config.settings),
+      provider: a.live?.provider ?? agentProvider(a, config.settings),
       // Its role in the workflow (#1430): its own, else the guess from its note or name.
       workflowRole: agentWorkflowRole(a),
       // Where it works now (#1451): its running session's folder, else where a new conversation would start, short (a
@@ -541,7 +541,7 @@ async function projectSummary(p: string) {
       // The guidance and skill revisions it launched with (compare with GET /v1/status's to spot an old launch).
       launched: a.live?.launched ?? null,
       // Its connection (HI-1771, for a CLI with connections): the one chosen (null: the default), the one its run is on, and a switch waiting.
-      ...agentConnectionFields(p, a, a.live?.provider ?? agentProvider(a, info.config, config.settings))
+      ...agentConnectionFields(p, a, a.live?.provider ?? agentProvider(a, config.settings))
     })),
     // Its builder and reviewer pairs (#1531): its running lanes', then by name; empty without either.
     pairs: workflowPairs(info.agents, await lanes.listLanes(workspaceOf(p), { project: basename(p) }).catch(() => [])),
@@ -1711,7 +1711,7 @@ async function agentActivity(p: string, agentId: string, detail = false) {
   const place = await agentPlace(p, a, st ? { cwd: st.cwd } : null)
   const folder = place.now.path
   const typed = sessions.userTypedAt(p, agentId)
-  const provider = st?.provider ?? agentProvider(a, info.config, config.settings)
+  const provider = st?.provider ?? agentProvider(a, config.settings)
   // What was left for it (#530, #647): unread and overdue, and its latest deliveries with their states and times.
   const inbox = await deliveryView(p, agentId, detail ? 20 : 5)
   // The model and effort it runs with, and its time waiting for its CLI to retry a throttled or failed request (HI-1996):
@@ -2521,7 +2521,7 @@ async function handoverAuthor(body: any): Promise<HandoverAuthor | null> {
     const a = projectAgents(cfg).find((x) => x.id === body.agent)
     if (!a) return null
     const st = sessions.liveFor(p, a.id)
-    return { author: `${a.name} (${providerName(st?.provider ?? agentProvider(a, cfg, config.settings))})`, session: st?.sessionId || undefined }
+    return { author: `${a.name} (${providerName(st?.provider ?? agentProvider(a, config.settings))})`, session: st?.sessionId || undefined }
   } catch {
     return null
   }
@@ -3787,7 +3787,7 @@ async function progressCallerIn(workspacePath: string): Promise<ProgressCaller> 
   if (a) {
     const cfg = await workspace.projectConfig(a.projectPath)
     const def = projectAgents(cfg).find((x) => x.id === a.agentId)
-    return { source: 'agent', workspacePath, projectPath: a.projectPath, agentId: a.agentId, agentName: def?.name ?? a.agentId, provider: def ? agentProvider(def, cfg, config.settings) : null }
+    return { source: 'agent', workspacePath, projectPath: a.projectPath, agentId: a.agentId, agentName: def?.name ?? a.agentId, provider: def ? agentProvider(def, config.settings) : null }
   }
   if (assistantCaller()) {
     const live = sessions.liveFor(join(workspacePath, HIVE_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID)

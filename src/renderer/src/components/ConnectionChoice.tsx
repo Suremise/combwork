@@ -1,8 +1,8 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AppSettings, Connection, LiveSessionState, ProviderId } from '@shared/types'
 import { connectionSummary } from './ConnectionDefaults'
 import { connectionsOn, type ConnectionsView } from '@shared/accounts'
-import { enabledProviders, providerDescriptor, providerName } from '@shared/providers'
+import { enabledProviders, providerDescriptor, providerName, providersInUse, providerWarnings } from '@shared/providers'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call } from '../api'
 import { set, setActivity, useStore } from '../store'
@@ -63,6 +63,23 @@ export function useConnections(): ConnectionsView | null {
     }
   }, [key])
   return view
+}
+
+/**
+ * Which providers' problems this window shows (#474): none of those turned on installed, or else those turned on that
+ * this workspace's agents (the Assistant's too) use, or that a new agent would (decision A: the first usable
+ * connection's CLI). Recomputed when settings, what's installed, the workspace or its connections change.
+ */
+export function useProviderWarnings(): ReturnType<typeof providerWarnings> {
+  const settings = useStore((s) => s.settings)
+  const providers = useStore((s) => s.providers)
+  const workspace = useStore((s) => s.workspace)
+  const view = useConnections()
+  return useMemo(() => {
+    const hosts = [...(workspace?.projects ?? []), ...(workspace?.assistant ? [workspace.assistant] : [])]
+    const first = connectionCli(view, firstReadyConnection(view, settings, cliReadyOf(providers)).id)
+    return providerWarnings(settings, (id) => providers[id], providersInUse(settings, hosts, first))
+  }, [settings, providers, workspace, view])
 }
 
 /** A connection's values in a line (Settings' connection rows' own: connectionSummary), with its account found in the view. */

@@ -173,7 +173,7 @@ export function projectAgentsData(p: ProjectInfo, tasks: readonly TaskCard[], la
   const role = !!opts.role
   const place = !!opts.place && rows.some(({ a }) => placeText(a.place))
   // Each one's connection (HI-1769), where any agent here has one shown (Connections on, a CLI with them).
-  const connection = (a: ProjectInfo['agents'][number]): string | null => connectionCellText(a.connection, agentProviderOf(p, a), a.live?.launchedConnection, opts.connections ?? null)
+  const connection = (a: ProjectInfo['agents'][number]): string | null => connectionCellText(a.connection, agentProviderOf(a), a.live?.launchedConnection, opts.connections ?? null)
   const conn = !!opts.connections && rows.some(({ a }) => connection(a) !== null)
   return {
     columns: [...(role ? [ROLE_COLUMN] : []), ...(conn ? [CONNECTION_COLUMN] : []), ...(place ? [SLOT_COLUMN] : []), STATE_COLUMN, CARD_COLUMN, ...(waits ? [WAITING_COLUMN] : [])],

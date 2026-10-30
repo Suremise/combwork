@@ -282,7 +282,7 @@ export async function saveTemplate(projectPath: string, scope: TemplateScope, na
   if (usePatterns && !key) throw refusal(M.noKeySave, { project: basename(projectPath) })
   // The project's workflow as a section (HI-1910): its options in force, never options that fell back to all off.
   const own = includeWorkflow ? await projectSection(projectPath) : null
-  const t = templateFrom(clean, agents, cfg.layout, (a) => agentProvider(a, cfg, config.settings), new Date(), presetOf(cfg), key ?? undefined)
+  const t = templateFrom(clean, agents, cfg.layout, (a) => agentProvider(a, config.settings), new Date(), presetOf(cfg), key ?? undefined)
   // What is saved must load: read as a file is.
   const checked = readTemplate(JSON.parse(JSON.stringify({ ...t, ...(own ? { workflow: { [own.platform]: own.section } } : {}) })))
   if (!isAgentTemplate(checked)) throw new TemplateError(checked, { kind: 'invalid' })
@@ -880,7 +880,7 @@ export async function connectionsPlan(projectPath: string): Promise<ConnectionsP
   // Each agent's connection is a connection's id once its project is migrated (HI-2106).
   await ensureMigrated(projectPath)
   const cfg = await workspace.projectConfig(projectPath)
-  const agents = projectAgents(cfg).map((a) => ({ id: a.id, name: a.name, role: agentWorkflowRole(a), provider: agentProvider(a, cfg, config.settings), ...(a.connection ? { connection: a.connection } : {}), running: busy(projectPath, a.id) }))
+  const agents = projectAgents(cfg).map((a) => ({ id: a.id, name: a.name, role: agentWorkflowRole(a), provider: agentProvider(a, config.settings), ...(a.connection ? { connection: a.connection } : {}), running: busy(projectPath, a.id) }))
   return { project: basename(projectPath), agents, options: connectionOptions(projectPath) }
 }
 

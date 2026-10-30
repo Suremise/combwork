@@ -455,7 +455,7 @@ function ProjectsPanel() {
   const row = (p: ProjectInfo) => {
     // Marked when any agent starts (or runs) in its provider's no-guardrails mode.
     const bypass = !!settings && p.agents.some((a) => {
-      const l = agentLaunchSettings(agentProvider(a, p.config, settings), a, settings)
+      const l = agentLaunchSettings(agentProvider(a, settings), a, settings)
       // The mode in effect: on the CLI's own setting, the one its CLI showed (#1284).
       return !!modeOption(l.provider, (a.live ? modeInEffect(a.live) : undefined) ?? l.permissionMode)?.danger
     })

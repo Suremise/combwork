@@ -1,6 +1,6 @@
 import { DEFAULT_PERF_FILTERS, type PerfFilters } from '@shared/metricsView'
 import { create } from 'zustand'
-import { useMemo, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { Period } from '@shared/usageTotals'
 import type { McpCatalogRow } from '@shared/types'
 import type { StartFailure } from '@shared/startFailure'
@@ -13,7 +13,7 @@ import { agentPtyKey, agentsPerPage, layoutFitting, layoutPanes, mostUrgent, pro
 import { cellPage, cellPageCount, pageCells, pageIds, placedCells, type PaneCells } from '@shared/paneCells'
 import { projectAgentStates, type AgentState } from '@shared/agentState'
 import { tileOrder, tilePageOf, tilePageShown, tilesOnPage, tilesPerPage } from '@shared/tiles'
-import { agentProvider, providersInUse, providerWarnings, setInstalledCheck } from '@shared/providers'
+import { agentProvider, setInstalledCheck } from '@shared/providers'
 import { setDateStyle } from '@shared/dates'
 import { language as shownLanguage, msg, onLanguageChange, tr } from '@shared/i18n'
 import { chooseFocus, deferredFocus } from './deferredFocus'
@@ -851,24 +851,9 @@ export function useFocusedAgent(p: ProjectInfo | null | undefined): AgentInfo | 
   return p.agents.find((a) => a.id === id) ?? p.agents[0] ?? null
 }
 
-/**
- * Which providers' problems this window shows (#474): none of those turned on installed, or else those turned on that
- * new agents or this workspace's agents (the Assistant's too) use. Recomputed when settings, what's installed or the
- * workspace change.
- */
-export function useProviderWarnings(): ReturnType<typeof providerWarnings> {
-  const settings = useStore((s) => s.settings)
-  const providers = useStore((s) => s.providers)
-  const workspace = useStore((s) => s.workspace)
-  return useMemo(() => {
-    const hosts = [...(workspace?.projects ?? []), ...(workspace?.assistant ? [workspace.assistant] : [])]
-    return providerWarnings(settings, (id) => providers[id], providersInUse(settings, hosts))
-  }, [settings, providers, workspace])
-}
-
-/** The provider an agent runs (its own, else the project's default, else the global default). */
-export function agentProviderOf(p: ProjectInfo | null | undefined, a: Pick<AgentInfo, 'provider' | 'live'> | null | undefined): ProviderId {
-  return a?.live?.provider || agentProvider(a, p?.config, get().settings)
+/** The provider an agent runs: the one its session runs, else its own (agentProvider). */
+export function agentProviderOf(a: Pick<AgentInfo, 'provider' | 'live'> | null | undefined): ProviderId {
+  return a?.live?.provider || agentProvider(a, get().settings)
 }
 
 /** The combined state shown by a project's single status dot: its most urgent agent. */

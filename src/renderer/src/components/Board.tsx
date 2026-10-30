@@ -2375,7 +2375,7 @@ function useStartPick(project: ProjectInfo | null) {
   useEffect(() => {
     if (!connectionChosen) setConnection(firstReady.id ?? '')
   }, [connectionChosen, firstReady.id])
-  const usable = (a: AgentInfo): boolean => !!project && freeAgent(a) && isProviderEnabled(settings, agentProviderOf(project, a))
+  const usable = (a: AgentInfo): boolean => !!project && freeAgent(a) && isProviderEnabled(settings, agentProviderOf(a))
   /** Back to the first choice: the card's own agent if it can take it, else the first that can, else a new agent. */
   const reset = (agentId: string | null): void => {
     const mine = agentId && project ? project.agents.find((a) => a.id === agentId) : null
@@ -2407,7 +2407,7 @@ function StartChoices({ project, pick }: { project: ProjectInfo; pick: StartPick
     <>
       <div className="choice-list">
         {project.agents.map((a) => {
-          const p = agentProviderOf(project, a)
+          const p = agentProviderOf(a)
           const enabled = isProviderEnabled(settings, p)
           const ok = enabled && freeAgent(a)
           return (

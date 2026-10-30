@@ -175,6 +175,7 @@
   "project.empty.markActive": "Oznacz ten projekt jako ten, nad którym pracujesz, aby uruchamiać sesje i widzieć jego stan. Możesz też od razu rozpocząć sesję.",
   "project.empty.markWorking": "Oznacz jako aktywny",
   "project.empty.noAccount": "W tym obszarze roboczym nie jest włączone żadne konto – Ustawienia → Konta i połączenia",
+  "project.empty.noCli": "Żadne włączone tu konto nie ma zainstalowanego CLI swojego agenta programistycznego – Pomoc → Konfiguracja dostawców",
   "project.empty.noAgents": "Brak agentów",
   "project.empty.noSession": "Brak działającej sesji",
   "project.empty.notActive": "Projekt {project} nie jest aktywny",
