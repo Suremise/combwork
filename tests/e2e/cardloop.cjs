@@ -292,8 +292,10 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await live(third.id))?.status === 'finished', HUNG_MS)
   // Cancel Card Watch in its ⋯ (#977): the watch ends, the status is finished again, and a change wakes nothing. A longer
   // label (three cards) in a narrow pane (three panes, under 340 px each): ⋯ stays clickable, and Cancel is chosen there.
-  await say(third.id, wait([c3, c1, c2], { changes: ['comment'] }))
-  await until(async () => (await live(third.id))?.status === 'watching', HUNG_MS)
+  // Cards not in Done: a watch on one already there answers at once and never watches (HI-2153), as c1 and c2 are now.
+  const open = [(await inv('tasks:create', { title: 'Open one', project: 'alpha' })).number, (await inv('tasks:create', { title: 'Open two', project: 'alpha' })).number]
+  await say(third.id, wait([c3, ...open], { changes: ['comment'] }))
+  check('Third watches three cards', !!(await until(async () => (await live(third.id))?.watch?.cards?.length === 3 && (await live(third.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(third.id)))
   await page.keyboard.press('Control+3')
   await lib.sleep(500)
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(1))
