@@ -9977,7 +9977,8 @@ body.pane-resizing-v .monaco-editor {
 }
 /* A column's name stays readable (#886; the Assistant's #1420 OK: seven columns at a normal width): never cut within a
    word. While it fits, the header is one row; in a narrow column the name keeps the first row beside the fold button,
-   wrapping between words, and the count, + and ⋯ move to a second row. Its tooltip gives it in full as well. */
+   wrapping between words, and the count, + and ⋯ move to a second row; a word too long for the column ends in "…".
+   Its tooltip gives it in full as well. */
 .board-column-header {
   flex-wrap: wrap;
   row-gap: 2px;
@@ -9990,10 +9991,12 @@ body.pane-resizing-v .monaco-editor {
   display: flex;
 }
 /* Never wider than the header beside the fold button: a name with a word longer than that (a stage's own name can be
-   24 letters, HR2's #1420 round 4) breaks within it rather than painting over the next column. */
+   24 letters, HR2's #1420 round 4; "Zatwierdzone" and "Fusionando" with every stage shown, HI-2160) ends that word
+   with "…" rather than painting over the next column or breaking within it. Its tooltip gives the name in full. */
 .board-column-header .board-column-label {
   max-width: calc(100cqw - 30px);
-  overflow-wrap: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 16px;
 }
 /* The count, + and ⋯ are one item (#1490): on the name's row while they fit, else together on a row of their own,
