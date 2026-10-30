@@ -75,17 +75,16 @@ describe('detection before Automatic decides (#506)', () => {
     await expect(providerService.settle('codex')).rejects.toThrow(/still looking for Codex/)
   })
 
-  it("doesn't wait for a provider turned off, or when a default was chosen", async () => {
+  // No default provider any more (decision A, HI-2106): an add naming no CLI or connection always waits (HI-2108 round 3).
+  it("doesn't wait for a provider turned off, nor for another CLI when one is named", async () => {
     config.update((c) => {
       c.settings.providers.copilot = { ...c.settings.providers.copilot, enabled: false }
     })
     hear('claude-code', false)
     hear('codex', true)
     expect(await providerService.detected()).toBe(true)
-    config.update((c) => {
-      c.settings.defaultProvider = 'codex'
-    })
     hear('claude-code', null)
-    expect((await prepareAgent(join(base, 'p'), DEFAULT_PROJECT_CONFIG, { location: 'project' }, 'Codex', [])).def.provider).toBe('codex')
+    await expect(prepareAgent(join(base, 'p'), DEFAULT_PROJECT_CONFIG, { location: 'project' }, 'Guess', [])).rejects.toThrow(/still looking/)
+    expect((await prepareAgent(join(base, 'p'), DEFAULT_PROJECT_CONFIG, { location: 'project', provider: 'codex' }, 'Codex', [])).def.provider).toBe('codex')
   })
 })
