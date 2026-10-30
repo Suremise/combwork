@@ -13,6 +13,7 @@
   "mcp.enable.all": "All projects",
   "mcp.enable.assistant": "Hive Assistant",
   "mcp.enable.none": "No projects",
+  "mcp.error.cannotClear": "Couldn't read the settings of {project}, so {name} wasn't changed: it may still be added there. Try again once the project can be read.",
   "mcp.error.fileChanged": "{file} has changed since it was shown to you. Add it again to see what it runs.",
   "mcp.error.invalidName": "Invalid server name",
   "mcp.error.noProject": "{project} is no longer a project in this workspace.",

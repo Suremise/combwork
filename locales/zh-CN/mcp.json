@@ -9,6 +9,7 @@
   "mcp.enable.all": "所有项目",
   "mcp.enable.assistant": "Hive 助手",
   "mcp.enable.none": "不选项目",
+  "mcp.error.cannotClear": "无法读取 {project} 的设置，因此未更改 {name}：它可能仍添加在那里。请在可以读取该项目后重试。",
   "mcp.error.invalidName": "服务器名称无效",
   "mcp.error.noProject": "{project} 已不再是此工作区中的项目。",
   "mcp.error.noServerAdd": "工作区中没有名为 {name} 的 MCP 服务器。",

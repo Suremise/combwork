@@ -9,6 +9,7 @@
   "mcp.enable.all": "Wszystkie projekty",
   "mcp.enable.assistant": "Asystent Hive",
   "mcp.enable.none": "Żadne projekty",
+  "mcp.error.cannotClear": "Nie udało się odczytać ustawień projektu {project}, więc serwer {name} nie został zmieniony: może być tam nadal dodany. Spróbuj ponownie, gdy projekt będzie można odczytać.",
   "mcp.error.invalidName": "Nieprawidłowa nazwa serwera",
   "mcp.error.noProject": "{project} nie jest już projektem w tym obszarze roboczym.",
   "mcp.error.noServerAdd": "Obszar roboczy nie ma serwera MCP o nazwie {name}.",

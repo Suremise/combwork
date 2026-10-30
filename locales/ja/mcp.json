@@ -9,6 +9,7 @@
   "mcp.enable.all": "すべてのプロジェクト",
   "mcp.enable.assistant": "Hive アシスタント",
   "mcp.enable.none": "プロジェクトなし",
+  "mcp.error.cannotClear": "{project} の設定を読み込めなかったため、{name} は変更されていません。そこにまだ追加されている可能性があります。プロジェクトを読み込めるようになってから、もう一度お試しください。",
   "mcp.error.invalidName": "サーバー名が無効です",
   "mcp.error.noProject": "{project} はもうこのワークスペースのプロジェクトではありません。",
   "mcp.error.noServerAdd": "ワークスペースに {name} という名前のMCPサーバーはありません。",

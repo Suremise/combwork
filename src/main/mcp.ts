@@ -4,7 +4,7 @@ import { existsSync } from 'original-fs'
 import { fmt, tr } from '../shared/i18n'
 import { msg } from '../shared/i18n/msg'
 import { unzipSync } from 'fflate'
-import type { McpFileServer, McpPlacesResult, McpProjectServer, McpServerDef, McpServerInfo, McpShown } from '../shared/types'
+import type { McpFileServer, McpPlacesResult, McpProjectServer, McpServerDef, McpServerInfo, McpShown, ProjectConfig } from '../shared/types'
 import { writeTextUnlessChanged } from './fsutil'
 import { HiveError, hiveError } from './hiveError'
 import { findSecretWarnings } from './mcpSecrets'
@@ -259,17 +259,44 @@ async function allProjectPaths(): Promise<string[]> {
 }
 
 /**
+ * A project's MCP lists as its file has them, or null when it has no project.json. One that can't be read is an error,
+ * never "no servers" (HI-2059 round 1): with no master switch, a membership left behind would add a new definition
+ * under the old name.
+ */
+async function membershipOf(projectPath: string, name: string): Promise<ProjectConfig['mcp'] | null> {
+  const file = join(projectPath, '.hive', 'project.json')
+  const unreadable = (e: unknown): Error => hiveError(msg({ id: 'mcp.error.cannotClear', defaultMessage: "Couldn't read the settings of {project}, so {name} wasn't changed: it may still be added there. Try again once the project can be read.", description: 'An error replacing, creating or deleting an MCP server (HI-2059): a project\'s settings file could not be read, so Hive could not make sure the server is removed there, and changed nothing. {project} is the project\'s folder name, {name} the server.' }), { project: basename(projectPath), name }, { kind: 'conflict', cause: e })
+  const exists = await stat(file).then(
+    () => true,
+    (e: NodeJS.ErrnoException) => {
+      if (e.code === 'ENOENT') return false
+      throw unreadable(e)
+    }
+  )
+  if (!exists) return null
+  // Read as it is (not a default for a file briefly locked), then as Hive reads it; either failing stops the change.
+  await readFile(file, 'utf8').catch((e) => {
+    throw unreadable(e)
+  })
+  return (await workspace.projectConfig(projectPath).catch((e) => {
+    throw unreadable(e)
+  })).mcp
+}
+
+/**
  * Removed everywhere it is added or remembered, in a turn (HI-2059): every project (hidden ones too) and the Hive
  * Assistant, so a server added under a name used before (deleted, replaced, or its file removed by hand) starts added
- * nowhere. A project changed here is converted in the same write (changeProjectNow), so no other remembered choice comes
- * back with it.
+ * nowhere. Every project is read first: one that can't be read refuses it before anything is written (HI-2059 round 1),
+ * so the caller changes no definition. A project changed here is converted in the same write (changeProjectNow), so no
+ * other remembered choice comes back with it.
  */
 async function removeEverywhere(name: string): Promise<void> {
+  const listing: string[] = []
   for (const p of await allProjectPaths()) {
-    const cfg = await workspace.projectConfig(p).catch(() => null)
-    if (!cfg || ![cfg.mcp.enabled, cfg.mcp.disabled].some((l) => listed(l).includes(name))) continue
-    await workspace.mutateProjectConfig(p, (c) => ({ mcp: { ...c.mcp, enabled: mcpAdded(c.mcp, legacyOn()).filter((n) => n !== name), disabled: listed(c.mcp.disabled).filter((n) => n !== name), model: MCP_ADDED_MODEL } }))
+    const cfg = await membershipOf(p, name)
+    if (cfg && [cfg.enabled, cfg.disabled].some((l) => listed(l).includes(name))) listing.push(p)
   }
+  for (const p of listing) await workspace.mutateProjectConfig(p, (c) => ({ mcp: { ...c.mcp, enabled: mcpAdded(c.mcp, legacyOn()).filter((n) => n !== name), disabled: listed(c.mcp.disabled).filter((n) => n !== name), model: MCP_ADDED_MODEL } }), { existing: true })
   if (listed(workspace.config.mcp.assistant).includes(name)) await changeAssistantNow((added) => added.filter((n) => n !== name))
 }
 
@@ -338,9 +365,10 @@ export async function deleteMcp(name: string): Promise<void> {
       },
       () => null
     )
+    // Removed everywhere first (HI-2059 round 1): refused there, the server is kept as it was.
+    await removeEverywhere(name)
     if (def && existsSync(folder) && usesFolder(def, name)) await trash(folder)
     if (existsSync(file)) await trash(file)
-    await removeEverywhere(name)
   })
 }
 

@@ -9,6 +9,7 @@
   "mcp.enable.all": "Todos os projetos",
   "mcp.enable.assistant": "Assistente do Hive",
   "mcp.enable.none": "Nenhum projeto",
+  "mcp.error.cannotClear": "Não foi possível ler as configurações de {project}, então {name} não foi alterado: ele pode ainda estar adicionado lá. Tente de novo quando o projeto puder ser lido.",
   "mcp.error.invalidName": "Nome de servidor inválido",
   "mcp.error.noProject": "{project} não é mais um projeto deste espaço de trabalho.",
   "mcp.error.noServerAdd": "O espaço de trabalho não tem nenhum servidor MCP chamado {name}.",

@@ -1379,7 +1379,7 @@ A server in the workspace is **available** to every project and to the Hive Assi
 
 Each server in the MCP view says where it is added: "Added in Amberlight", "Added in Amberlight and for the Hive Assistant", "Added for the Hive Assistant only" or "Not added anywhere". Sessions of every provider use **only** the servers added to their project, from their next session: a running agent keeps what it started with until it restarts.
 
-**Deleting a server** asks first, saying where it is added. Deleting removes it from those places too, and a server added later under the same name starts added nowhere.
+**Deleting a server** asks first, saying where it is added. Deleting removes it from those places too, and a server added later under the same name starts added nowhere. If a project's settings can't be read at that moment, Hive changes nothing and says so (a replaced or deleted server stays as it was): try again once the project can be read.
 
 **Upgrading changes nothing that runs.** A server that ran in a project (on in the workspace and on in that project) is added there, and one that ran for the Assistant is added for it. A choice a project kept for a server the workspace had switched off is dropped, since that server wasn't running there; a notice says how many were dropped, once. Add those servers where you need them. Upgrading from 0.9.0 or earlier still keeps everything that ran: a server that was on for all projects is added to every project that hadn't turned it off.
 

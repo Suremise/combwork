@@ -11,6 +11,7 @@ interface HiveMessageValues {
   'mcp.enable.all': undefined
   'mcp.enable.assistant': undefined
   'mcp.enable.none': undefined
+  'mcp.error.cannotClear': { project: string | number; name: string | number }
   'mcp.error.invalidName': undefined
   'mcp.error.noProject': { project: string | number }
   'mcp.error.noServerAdd': { name: string | number }

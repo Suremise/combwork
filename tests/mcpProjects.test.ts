@@ -325,6 +325,29 @@ describe('MCP servers per project (HI-2059)', () => {
     expect(await onIn('godot')).toEqual([])
   })
 
+  it("refuses to replace, delete or create a server while a project's settings can't be read, keeping the old one (HI-2059 round 1)", async () => {
+    await open()
+    await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
+    await add(amber, 'godot')
+    const read = w.projectConfig.bind(w)
+    const unreadable = (): void => void vi.spyOn(w, 'projectConfig').mockImplementation((p, o) => (p === amber ? Promise.reject(Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })) : read(p, o)))
+    unreadable()
+    await expect(run(() => mcp.addMcpFromFile(file('godot.json', { ...godot, args: ['unseen-new-server.js'] }), 'godot', true))).rejects.toThrow("Couldn't read the settings of amberlight, so godot wasn't changed")
+    await expect(run(() => mcp.deleteMcp('godot'))).rejects.toThrow("Couldn't read the settings of amberlight")
+    vi.restoreAllMocks()
+    // Reads back: the old definition is still there and the only one amberlight's launch can get.
+    expect((await listed('godot')).def?.args).toEqual(['godot.js'])
+    expect((await listed('godot')).projects).toEqual([amber])
+    expect(await run(async () => (await sessions.effective(amber, { id: 'a1', name: 'Builder', provider: 'claude-code' } as never)).mcpServers.godot?.args)).toEqual(['godot.js'])
+    // Deleted once it can be read: removed there. Creating one under the name is refused too while it can't be read.
+    await run(() => mcp.deleteMcp('godot'))
+    expect(projectMcp(amber).enabled).not.toContain('godot')
+    unreadable()
+    await expect(run(() => mcp.createMcp('godot'))).rejects.toThrow("Couldn't read the settings of amberlight")
+    vi.restoreAllMocks()
+    expect(await listed('godot')).toBeUndefined()
+  })
+
   it('creates a new server from the template added nowhere', async () => {
     await open()
     await add(amber, 'docs')

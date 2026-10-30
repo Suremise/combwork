@@ -39,6 +39,10 @@
     "defaultMessage": "No projects",
     "description": "The MCP view’s Add to… dialog: a button that unticks every project (not the Hive Assistant, which has its own box)."
   },
+  "mcp.error.cannotClear": {
+    "defaultMessage": "Couldn't read the settings of {project}, so {name} wasn't changed: it may still be added there. Try again once the project can be read.",
+    "description": "An error replacing, creating or deleting an MCP server (HI-2059): a project's settings file could not be read, so Hive could not make sure the server is removed there, and changed nothing. {project} is the project's folder name, {name} the server."
+  },
   "mcp.error.invalidName": {
     "defaultMessage": "Invalid server name",
     "description": "An error: an MCP server name Hive refuses."

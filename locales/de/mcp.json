@@ -9,6 +9,7 @@
   "mcp.enable.all": "Alle Projekte",
   "mcp.enable.assistant": "Hive-Assistent",
   "mcp.enable.none": "Keine Projekte",
+  "mcp.error.cannotClear": "Die Einstellungen von {project} konnten nicht gelesen werden, daher wurde {name} nicht geändert: Er ist dort vielleicht noch hinzugefügt. Versuche es erneut, sobald das Projekt gelesen werden kann.",
   "mcp.error.invalidName": "Ungültiger Servername",
   "mcp.error.noProject": "{project} ist kein Projekt in diesem Arbeitsbereich mehr.",
   "mcp.error.noServerAdd": "Der Arbeitsbereich hat keinen MCP-Server namens {name}.",
