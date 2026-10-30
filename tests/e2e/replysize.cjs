@@ -314,7 +314,7 @@ const prose = (seed, n) => {
   // starts a lane's first card on its builder once it next looks at the board (HI-2029), and a look the moves above set
   // off could land before the end and give Coder a turn of its own; a builder waiting on other work is never given one.
   // Alpha's last card in Todo, which nothing here changes (a change would wake it).
-  const untouched = todo.findLast((n, i) => i > 41 && /^AL-/.test(K(n)))
+  const untouched = todo.findLast((n, i) => i > 41 && K(n).startsWith('AL-'))
   const otherWork = tool('hive_wait_for_tasks', { cards: [untouched], wake: true }, 'own').text
   check('Coder waits on another card while the lane runs', !!(await until(async () => (await live(alpha, coder.id))?.status === 'watching', HUNG_MS)), `${(await live(alpha, coder.id))?.status}: ${otherWork}`)
   const laneStarted = measure('hive_lane (start)', tool('hive_lane', { action: 'start', cards: [todo[0], todo[1], todo[2]], reviewer: 'Tester', rounds: 10, waitMinutes: 360, name: 'measured lane' }, 'own'), 400)
