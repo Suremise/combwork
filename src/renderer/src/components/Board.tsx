@@ -1073,8 +1073,8 @@ export function Board({ project, scope = null, query, archived, forYouOnly = fal
 const MERGING_TIP = msg({ id: 'board.columns.mergingTip', defaultMessage: "Cards in Hive's merge queue. They come here through the queue once approved, never by a drag; Remove from queue takes one out.", description: "The Merging column's description (its hover; glossary 2.2: Merging, a stage inside Approved). Remove from queue is the button on the card's Work section and in the Progress panel." })
 
 /**
- * A board column's name in its header: wrapped to two lines when the column is narrow (cut with "…" only past them), and
- * always given in full in its tooltip with what the column is for (#886, #1420).
+ * A board column's name in its header: wrapped between words when the column is narrow, a word too long for it ending in
+ * "…" (never broken within, HI-2160), and always given in full in its tooltip with what the column is for (#886, #1420).
  */
 function ColumnLabel({ name, description }: { name: string; description: string }) {
   return (
