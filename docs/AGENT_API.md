@@ -622,7 +622,7 @@ From api.version 9 (#1561). The two releases an agent's ⋯ menu offers in Hive'
 
 From api.version 11 (HI-2081, SPEC §16.10.9). Before an update, a workspace's **team** (every agent of its projects) can be paused: Hive starts no lane card and no new conversation by itself, sends no card events, watch wakes or reviews from the pool (a message or the user's answer still goes), starts no merge queue entry, and tells each running agent once to finish its turn, end its runs and commit. The user's Pause the Team (in Hive's window) pauses every open workspace; the Hive Assistant pauses and resumes its own workspace only, within Settings → Assistant → Control (Control agents). Project agents are refused (`403`). Each pause and resume the Assistant makes is in its actions (`team-pause`, `team-resume`), and undo can't take it back.
 
-`GET /v1/team` — the workspace's pause and what still runs (a fresh scan):
+`GET /v1/team` — the workspace's pause and, while it is paused, what still runs (a fresh scan; none is made for a workspace that isn't paused):
 
 ```json
 { "paused": true, "pausedBy": "assistant", "since": "2026-10-30T05:00:00.000Z", "parked": false, "safeToInstall": false,

@@ -96,6 +96,8 @@ export async function scanWorkspace(ws: WorkspaceService): Promise<TeamPauseView
   const at = new Date().toISOString()
   const pause = teamPauseOf(ws)
   if (!ws.path) return { workspacePath: '', pause: null, parked: false, items: [], at }
+  // Not paused: nothing to scan (each agent's job and the slots are read only while a pause asks what still runs).
+  if (!pause) return { workspacePath: ws.path, pause: null, parked: false, items: [], at }
   const items: ParkedItem[] = []
   try {
     // Every run still open in the workspace (a test run, a check in a copy, a merge, a slot's warming): by its agent.
