@@ -1921,6 +1921,18 @@ What the agents had started can outlive Hive: a test run, a dev server, a copy o
 
 Quitting Hive, restarting it, installing an update or Windows shutting down or signing out never shows the notice. Help → Copy Diagnostics says whether the last run ended without quitting, and the log (**Help → Open Logs**) has the details.
 
+### Pausing the team before an update <a id="pausing-the-team-before-an-update"></a>
+
+Before you install an update while agents are at work, pause the team, so nothing starts again behind your back and you can see when it's safe. **Pause the Team** is in the Progress panel's Lanes, the command palette and Help → Check for Updates (**Pause the Team First**, when an update is ready and agents are working). It pauses every open workspace:
+
+- No lane starts its next card, no agent is woken by a card event (a verdict, a review to do, its card watch) and the reviewer pool gives out no reviews; the merge queue takes no new card. Each lane shows *paused: the team is pausing*. Nothing is lost: what was held is delivered once you resume, if it is still due.
+- Each running agent is told once to finish its turn, end the runs it started (tests, builds, dev servers, test copies of Hive) and commit its work. Your messages and your answers to their questions still reach them.
+- The Lanes section says what still runs: an agent working or with background tasks, a run in the Progress panel, a process an agent's session left running when it stopped (a test runner, a dev server), a slot still held. **End It…** ends such a process and what it started, after asking. Something Hive can't check is named, and never counted as parked.
+- Hive counts what it records. A server you, or an agent, started yourself from a terminal outside Hive's runs isn't in its records: end it before you install.
+- Once nothing runs, it says **All parked: safe to install**, with **Install Now** when an update is ready. Hive checks again as you click it, and installs only if every open workspace is still paused and parked.
+
+While the team is paused, starting a lane is refused, and the status bar says **Team paused**. You can still start an agent or type to it yourself. **Resume the Team** lifts the pause. After the update installs, the team resumes on its own, as below. If Hive closes for any other reason while the team is paused (you quit, or it crashes), the team stays paused, and Hive says so when it opens, with **Resume the Team**. The Hive Assistant can pause and resume its own workspace's team too, and tell you when it is safe to install.
+
 ### When Hive restarts for an update <a id="when-hive-restarts-for-an-update"></a>
 
 Installing a new version closes Hive: **Restart to Update**, or an installer you run yourself. Before it closes, Hive notes which agents were working, watching their cards or in a card loop, with each one's card, round and lane, and leaves each a line in its inbox: *Hive is restarting for an update. Your work is saved; you'll be resumed.* (An installer of this version or later asks the running Hive to close first; an older one ends it, and the next start then finds a newer version and treats it the same way.)

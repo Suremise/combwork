@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, STOP_ASK_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, templateListText, templatePlanText, templateLoadedText, type TemplatePlanPublic, type TemplateLoadPublic, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, templateListText, templatePlanText, templateLoadedText, type TemplatePlanPublic, type TemplateLoadPublic, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, teamText, type TeamPublic, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
@@ -670,6 +670,16 @@ const tools: Tool[] = [
       if (a.action === 'resume') return queueResumedText((await api('POST', '/v1/queue/resume', where)) as { resumed: boolean; queue: QueuePublic })
       if (a.action !== 'remove' && a.action !== 'retry') throw new Error('action must be list, pause, resume, remove or retry')
       return intentText((await api('POST', `/v1/queue/${a.action}`, { card: a.card, reason: a.reason })) as IntentDone)
+    }
+  },
+  {
+    name: 'hive_team',
+    description: `Pause the team before an update: Hive starts no card, wakes no agent with card events and gives no reviews out in your workspace until it resumes, and tells each agent once to park. status says whether it is parked (safe to install) and names what still runs. (detail: use-hive-api, tools.md)${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only status works.'}`,
+    inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['status', 'pause', 'resume'] } }, required: ['action'] },
+    run: async (a) => {
+      if (a.action === 'status') return teamText((await api('GET', '/v1/team')) as TeamPublic)
+      if (a.action !== 'pause' && a.action !== 'resume') throw new Error('action must be status, pause or resume')
+      return teamText((await api('POST', `/v1/team/${a.action}`, {})) as TeamPublic)
     }
   },
   {

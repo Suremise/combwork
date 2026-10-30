@@ -38,6 +38,8 @@ vi.mock('../src/main/deliveries', () => ({
   }
 }))
 vi.mock('../src/main/lanes', () => ({
+  // The team never paused here (HI-2081's refusal is teamPause.test's).
+  refuseWhileTeamPaused: () => undefined,
   startLane: async (_ws: unknown, s: unknown) => {
     state.recorded.push(s)
     state.calls.push('record')

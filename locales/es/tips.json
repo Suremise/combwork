@@ -342,6 +342,8 @@
   "tips.paneCells.title": "Pon un agente en cualquier panel",
   "tips.pasteScreenshot.text": "Presiona Ctrl+V en la terminal de un agente con una imagen en el portapapeles, o suelta una imagen en ella: el agente la ve, y Hive guarda una copia.",
   "tips.pasteScreenshot.title": "Pega una captura en una sesión",
+  "tips.pauseTeam.text": "Pausar el equipo, en Carriles del panel Progreso, evita que los carriles inicien tarjetas y que se despierte a los agentes, pide a cada agente que aparque y lista lo que sigue en marcha hasta que se pueda instalar: entonces, Instalar ahora.",
+  "tips.pauseTeam.title": "Pausa el equipo antes de una actualización",
   "tips.perfCompare.text": "Rendimiento → Comparar: guarda la vista actual antes de un cambio y otra vez después, y comprueba si el tráfico de Hive bajó mientras el trabajo se seguía haciendo.",
   "tips.perfCompare.title": "Antes y después de un cambio",
   "tips.performance.text": "Rendimiento, en la barra de actividad, muestra lo que cuestan la API, las herramientas y las instrucciones de Hive en el último día, semana o mes: todo el espacio de trabajo o un proyecto. Cada proyecto también tiene su pestaña Rendimiento.",

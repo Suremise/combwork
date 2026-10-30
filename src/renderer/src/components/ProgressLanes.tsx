@@ -24,6 +24,7 @@ import { usePanelFold } from './ProgressMerge'
 import { Icon, IconButton, Tooltip, useContextMenu } from './ui'
 import { durationText } from '@shared/tasks'
 import { LaneCostTip, useLaneCost } from './CardCost'
+import { TeamPauseBand, TeamPauseButton } from './TeamPause'
 
 /**
  * The bottom of the Progress panel (#484): the lanes (a builder and its reviewer working through cards in order), one
@@ -317,8 +318,11 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
           <button type="button" className="btn small subtle progress-lanes-start" onClick={() => openLaneStart(null)}>
             <Icon name="add" /> {tr(START_LANE)}
           </button>
+          <TeamPauseButton className="btn small subtle progress-lanes-team" />
         </div>
       )}
+      {/* The team paused (HI-2081): what still runs, or All parked with Install Now. */}
+      {!folded && <TeamPauseBand />}
       {/* The legend for screen readers: the bar's (or the tab's Legend button's) description. */}
       <span id={legendId} className="visually-hidden">
         {legendText(legend)}

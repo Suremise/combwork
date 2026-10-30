@@ -2915,6 +2915,14 @@
     "defaultMessage": "Its submission stays in the card's work.",
     "description": "What of a card's submission for review by the Assistant stays when it is undone."
   },
+  "assistant.undo.why.teamPaused": {
+    "defaultMessage": "A team it paused stays paused: resume it if it should go on.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2081): it paused its workspace's team before an update (Hive starts no card and wakes no agent until it resumes)."
+  },
+  "assistant.undo.why.teamResumed": {
+    "defaultMessage": "A team it resumed isn't paused again: pause it if it should wait.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2081): it resumed its workspace's team, which was paused before an update."
+  },
   "assistant.undo.why.templateCards": {
     "defaultMessage": "The cards and lanes of the agents a template replaced stay as the load left them (cards put back, lanes ended): undo doesn't give them back.",
     "description": "What of the Assistant loading a template into a project (it replaced the project's agents) stays when it is undone: the replaced agents' open cards were put back and their lanes ended (HI-1502)."

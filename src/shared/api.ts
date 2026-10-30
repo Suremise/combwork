@@ -220,6 +220,16 @@ export interface HiveRequests {
   /** Restart and Update: quits (asking if agents are working), installs and restarts. */
   'update:install': () => void
   'update:skip': (version: string) => void
+  /** Pausing the team before an update (HI-2081): every open workspace's pause and what still runs, scanned now. */
+  'team:state': () => import('./teamPause').TeamPauseState
+  /** Pause the Team: every open workspace (one id; a workspace opened meanwhile is held too); those it couldn't pause, named. */
+  'team:pause': () => { done: string[]; failed: { workspacePath: string; error: string }[] }
+  /** Resume the Team: every open workspace's pause lifted. */
+  'team:resume': () => { done: string[]; failed: { workspacePath: string; error: string }[] }
+  /** End It on a process the check names, after the window's question: it and what it started, by its recorded identity. */
+  'team:endProcess': (projectPath: string, agentId: string, pid: number, created: string) => 'ended' | 'notFound' | 'failed'
+  /** Install Now: scanned again here first; installed only when every open workspace is paused and parked. */
+  'team:install': () => { installed: boolean; state: import('./teamPause').TeamPauseState }
   /** Opens the Chromium/Electron licences that ship next to the app's executable. */
   'app:openChromiumLicenses': () => boolean
 

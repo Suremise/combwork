@@ -175,6 +175,7 @@
   "service.laneStarts.freshBlockedBody": "{why, select, timeout {Não ficou livre em {minutes, plural, one {# minuto} other {# minutos}}.} uncertain {O Hive fechou enquanto a iniciava, então ela pode não ter começado.} other {{reason}}} Tente de novo pela linha da raia no painel Progresso ou encerre a raia. Os cartões dela aguardam até lá.",
   "service.laneStarts.freshBlockedTitle": "A conversa nova de {agent} não começou",
   "service.lanes.noWorkspace": "Nenhum espaço de trabalho aberto",
+  "service.lanes.teamPaused": "A equipe está pausada (antes de uma atualização): retome a equipe primeiro e depois inicie a raia.",
   "service.lanes.unknown": "Raia desconhecida: {id}",
   "service.mcp.addedDropped": "Cada projeto e o Assistente do Hive listam os servidores que rodavam lá. {n, plural, one {# escolha guardada para um servidor que estava desativado no espaço de trabalho foi descartada} other {# escolhas guardadas para servidores que estavam desativados no espaço de trabalho foram descartadas}}: adicione um servidor na aba MCP de um projeto onde precisar dele.",
   "service.mcp.addedTitle": "Os servidores MCP agora são adicionados onde rodam",

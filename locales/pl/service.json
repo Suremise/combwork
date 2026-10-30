@@ -175,6 +175,7 @@
   "service.laneStarts.freshBlockedBody": "{why, select, timeout {Nie był wolny w ciągu {minutes, plural, one {# minuty} few {# minut} many {# minut} other {# minuty}}.} uncertain {Hive zamknął się podczas uruchamiania, więc mogła się nie rozpocząć.} other {{reason}}} Spróbuj ponownie z wiersza toru w panelu Postęp albo zakończ tor. Do tego czasu jego karty czekają.",
   "service.laneStarts.freshBlockedTitle": "Nowa rozmowa agenta {agent} się nie rozpoczęła",
   "service.lanes.noWorkspace": "Żaden obszar roboczy nie jest otwarty",
+  "service.lanes.teamPaused": "Zespół jest wstrzymany (przed aktualizacją): najpierw wznów zespół, a potem uruchom tor.",
   "service.lanes.unknown": "Nieznany tor {id}",
   "service.mcp.addedDropped": "Każdy projekt i Asystent Hive pokazują serwery, które tam działały. {n, plural, one {Odrzucono # wybór zapamiętany dla serwera wyłączonego w obszarze roboczym} few {Odrzucono # wybory zapamiętane dla serwerów wyłączonych w obszarze roboczym} many {Odrzucono # wyborów zapamiętanych dla serwerów wyłączonych w obszarze roboczym} other {Odrzucono # wyboru zapamiętanego dla serwerów wyłączonych w obszarze roboczym}}: dodaj serwer w zakładce MCP projektu, w którym go potrzebujesz.",
   "service.mcp.addedTitle": "Serwery MCP dodaje się teraz tam, gdzie działają",

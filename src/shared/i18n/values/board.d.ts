@@ -533,6 +533,7 @@ interface HiveMessageValues {
   'board.lanes.stalled': undefined
   'board.lanes.start': undefined
   'board.lanes.state': { state: string }
+  'board.lanes.teamPause': undefined
   'board.lanes.title': undefined
   'board.lanes.took': { time: string | number }
   'board.lanes.usualOrder': undefined
@@ -871,6 +872,26 @@ interface HiveMessageValues {
   'board.strip.count': { state: string; n: number }
   'board.strip.oneRun': { state: string }
   'board.strip.runs': { n: number; states: string | number }
+  'board.team.endDetail': undefined
+  'board.team.endFailed': { label: string | number }
+  'board.team.endIt': undefined
+  'board.team.endMessage': { agent: string | number; label: string | number; pid: string | number }
+  'board.team.endTitle': undefined
+  'board.team.hive': undefined
+  'board.team.install': undefined
+  'board.team.item': { kind: string; agent: string | number; label: string | number; pid: string | number }
+  'board.team.notParked': undefined
+  'board.team.otherNotPaused': { name: string | number }
+  'board.team.parked': undefined
+  'board.team.pause': undefined
+  'board.team.pauseFailed': { n: number; names: string | number }
+  'board.team.pauseFirst': undefined
+  'board.team.pausing': { n: number }
+  'board.team.resume': undefined
+  'board.team.stillPaused': undefined
+  'board.team.stillPausedBody': undefined
+  'board.team.stillPausedResume': undefined
+  'board.team.thisWorkspace': undefined
   'board.toolbar.archived': { n: number }
   'board.toolbar.forYou': { n: number }
   'board.toolbar.more': undefined

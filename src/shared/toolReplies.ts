@@ -919,6 +919,26 @@ export function queueResumedText(r: { resumed: boolean; queue: QueuePublic }): s
   return r.resumed ? queueText(r.queue) : `Still paused: its cause is still there. ${queueText(r.queue)}`
 }
 
+/** The team's pause as the Agent API gives it to the Assistant (HI-2081, GET /v1/team): its workspace's, other ones in a line. */
+export interface TeamPublic {
+  paused: boolean
+  pausedBy: string | null
+  since: string | null
+  parked: boolean
+  safeToInstall: boolean
+  running: { project: string; agent: string; state: string; what: string }[]
+  others: string[]
+}
+
+/** hive_team: paused or not, parked or not, safe to install or not, then what still runs, a short row each. */
+export function teamText(t: TeamPublic): string {
+  const head = !t.paused ? 'The team is not paused.' : t.parked ? `The team is paused (by ${t.pausedBy ?? 'the user'}) and parked.` : `The team is paused (by ${t.pausedBy ?? 'the user'}), not parked yet: ${t.running.length} still running or unchecked.`
+  const install = t.paused ? ` Safe to install: ${t.safeToInstall ? 'yes' : 'no'}.` : ''
+  const rows = t.running.slice(0, MAX_ROWS).map((r) => `- ${r.project ? `${r.project}/` : ''}${r.agent || 'Hive'}: ${r.what}${r.state === 'unknown' ? " (can't be checked)" : ''}`)
+  const more = t.running.length > MAX_ROWS ? [`…and ${t.running.length - MAX_ROWS} more.`] : []
+  return [head + install, ...rows, ...more, ...t.others].join('\n')
+}
+
 /** A project's slots to release as the Agent API lists them (#1561, GET /v1/projects/{name}/slots/releasable). */
 export interface ReleasablePublic {
   project: string

@@ -342,6 +342,8 @@
   "tips.paneCells.title": "Placer un agent dans n’importe quel volet",
   "tips.pasteScreenshot.text": "Appuie sur Ctrl+V dans le terminal d’un agent avec une image dans le presse-papiers, ou dépose une image dessus : l’agent la voit, et Hive en garde une copie.",
   "tips.pasteScreenshot.title": "Coller une capture d’écran dans une session",
+  "tips.pauseTeam.text": "Mettre l’équipe en pause, dans Couloirs du panneau Progression, empêche les couloirs de lancer des cartes et les agents d’être réveillés, demande à chaque agent de se garer et liste ce qui tourne encore jusqu’à ce que l’installation soit sans risque : alors, Installer maintenant.",
+  "tips.pauseTeam.title": "Mets l’équipe en pause avant une mise à jour",
   "tips.perfCompare.text": "Performances → Comparer : garde la vue actuelle avant un changement et de nouveau après, et vois si le trafic de Hive a baissé tout en faisant le même travail.",
   "tips.perfCompare.title": "Avant et après un changement",
   "tips.performance.text": "Performances, dans la barre d’activité, montre ce que coûtent l’API, les outils et les consignes de Hive sur le dernier jour, la dernière semaine ou le dernier mois : pour tout l’espace de travail ou un projet. Chaque projet a aussi son propre onglet Performances.",

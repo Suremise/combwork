@@ -618,6 +618,24 @@ From api.version 9 (#1561). The two releases an agent's ⋯ menu offers in Hive'
 - A held writer needs `confirm`, the slot and the run the user agreed to release, as the listing gave them (`400` without it). `end: true` ends the processes listed for its run first; if Windows doesn't let Hive end them, nothing is released (`409`). Refused (`409`) while its run is still live in this Hive (its session, or the processes it left still followed), while another Hive holding it still runs (or can't be told), and when its writer is no longer that run (a release or a start meanwhile: one of them wins, the other is refused).
 - Replies `{ "project", "kind", "slot", "agent", "ended"? }` (`ended`: the listed processes were ended first).
 
+### Pausing the team
+
+From api.version 11 (HI-2081, SPEC §16.10.9). Before an update, a workspace's **team** (every agent of its projects) can be paused: Hive starts no lane card and no new conversation by itself, sends no card events, watch wakes or reviews from the pool (a message or the user's answer still goes), starts no merge queue entry, and tells each running agent once to finish its turn, end its runs and commit. The user's Pause the Team (in Hive's window) pauses every open workspace; the Hive Assistant pauses and resumes its own workspace only, within Settings → Assistant → Control (Control agents). Project agents are refused (`403`). Each pause and resume the Assistant makes is in its actions (`team-pause`, `team-resume`), and undo can't take it back.
+
+`GET /v1/team` — the workspace's pause and, while it is paused, what still runs (a fresh scan; none is made for a workspace that isn't paused):
+
+```json
+{ "paused": true, "pausedBy": "assistant", "since": "2026-10-30T05:00:00.000Z", "parked": false, "safeToInstall": false,
+  "running": [{ "project": "alpha", "agent": "B1", "state": "busy", "what": "npm run e2e (Progress run, 4 min)" },
+              { "project": "alpha", "agent": "R1", "state": "unknown", "what": "its processes can't be read now" }],
+  "others": ["Another open workspace isn't paused: the user pauses it from its window, or with Pause the Team."] }
+```
+
+- `parked`: every agent stopped, or idle (ready, finished or watching) or at a question for the user, with nothing of Hive's records left: no start of it under way (before its session exists), no background task its CLI reports, no open Progress run, no held slot writer, and no process its launches left running (an earlier launch's too). Hive doesn't look into the CLI's own process tree: a server started from a shell, outside Hive's records, is the user's to end. `state` `unknown` (its status unknown, leftovers not all listed, the workspace's projects unreadable, its pause not saved) is never parked. Your own turn isn't counted when you ask about your own workspace; what you left running is.
+- `safeToInstall`: this workspace parked, and every other open one paused and parked. Another open workspace is only ever one line in `others`, with none of its agents.
+
+`POST /v1/team/pause` and `POST /v1/team/resume` — `{}`: reply as `GET /v1/team`. Resuming hands out what the pause held (each wake offered again if still due) and lets lanes start their cards again. A pause outlives a crash or a plain quit; only Hive's restart for the update it was paused for lifts it by itself.
+
 ### Templates
 
 From api.version 11 (HI-1502, SPEC §16.10.6). The Hive Assistant's alone: it lists a project's agent templates, plans a load and loads one, as **Load template** does in Hive's window. A script, the user's token or a project agent is refused (`403`) before any template is read. Listing and planning are reads; loading needs **Control agents** (Settings → Assistant → Control) and is undoable (`POST /v1/assistant/undo`).
@@ -839,6 +857,8 @@ Nothing private is added: no prompt or message text and no setting's value, the 
 | `lane-fresh-start` | Retried a lane agent's new conversation that Hive had stopped trying (HI-2034) | `{ "kind": "lane-fresh-start", "ok": true, "lane": "lane-0f89a0", "project": "hive" }` |
 | `queue-pause` | Paused a project's merge queue | `{ "kind": "queue-pause", "ok": true, "project": "alpha" }` |
 | `queue-resume` | Resumed a project's merge queue (`ok: true` also when it stayed paused for its cause) | `{ "kind": "queue-resume", "ok": true, "project": "alpha" }` |
+| `team-pause` | Paused its workspace's team before an update (HI-2081) | `{ "kind": "team-pause", "ok": true }` |
+| `team-resume` | Resumed its workspace's team | `{ "kind": "team-resume", "ok": true }` |
 | `release-slot` | Released a slot: a carried slot, or a held writer once the user agreed (`agent`: whose it was) | `{ "kind": "release-slot", "ok": true, "project": "alpha", "agent": { "id": "a-7b21e4aa", "name": "B1" } }` |
 | `load-template` | Loaded a template into a project, replacing its agents (and, unless told not to, set its workflow options) | `{ "kind": "load-template", "ok": true, "project": "alpha" }` |
 | `create-project` | Created a project | `{ "kind": "create-project", "ok": true, "project": "apiary" }` |

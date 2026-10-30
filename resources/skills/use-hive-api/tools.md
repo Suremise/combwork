@@ -2,7 +2,7 @@
 
 Each hive tool's description says what it does and the rule a caller can't guess. This file holds the rest: cases, defaults, event lists and mechanics. Read the section you need; don't read it all. Do routine work with the tools themselves, never by calling the HTTP API instead.
 
-**Sections:** [Inbox](#inbox) · [Card watches](#card-watches-hive_wait_for_tasks) · [Agent watches](#agent-watches-hive_wait_for_agents) · [Agent activity](#agent-activity-hive_agent_activity) · [Messages to agents](#messages-to-agents-hive_message_agent) · [Reading a card](#reading-a-card-hive_read_task) · [Changing cards](#changing-cards-hive_update_task) · [Adding cards](#adding-cards-hive_create_task) · [Submitting and reviewing](#submitting-and-reviewing) · [Card loop steps](#card-loop-steps-hive_loop_step) · [Lanes](#lanes-hive_lane) · [Merge slot](#merge-slot-hive_merge_slot) · [Merge queue](#merge-queue-hive_queue) · [Release Slot](#release-slot-hive_release_slot) · [Templates](#templates-hive_template) · [Agents' settings](#agents-settings) · [Documents](#documents-hive_doc_outline-and-hive_read_section) · [Undo](#undo-hive_undo) · [Journal](#journal) · [Developer console](#developer-console-hive_console)
+**Sections:** [Inbox](#inbox) · [Card watches](#card-watches-hive_wait_for_tasks) · [Agent watches](#agent-watches-hive_wait_for_agents) · [Agent activity](#agent-activity-hive_agent_activity) · [Messages to agents](#messages-to-agents-hive_message_agent) · [Reading a card](#reading-a-card-hive_read_task) · [Changing cards](#changing-cards-hive_update_task) · [Adding cards](#adding-cards-hive_create_task) · [Submitting and reviewing](#submitting-and-reviewing) · [Card loop steps](#card-loop-steps-hive_loop_step) · [Lanes](#lanes-hive_lane) · [Merge slot](#merge-slot-hive_merge_slot) · [Merge queue](#merge-queue-hive_queue) · [Release Slot](#release-slot-hive_release_slot) · [Pausing the team](#pausing-the-team-hive_team) · [Templates](#templates-hive_template) · [Agents' settings](#agents-settings) · [Documents](#documents-hive_doc_outline-and-hive_read_section) · [Undo](#undo-hive_undo) · [Journal](#journal) · [Developer console](#developer-console-hive_console)
 
 ## Inbox
 
@@ -119,6 +119,12 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 - `release` (`slot`, and `kind` when it is both): a carried slot stops being kept for its agent (its folder and branch stay).
 - A held writer needs the user's agreement first: show them the slot, run and processes, and once they agree pass `confirm` `{slot, run}` as `list` gave them. `end=true` ends the listed processes first (left running, they may still write in the slot).
 - Refused while that run is still live in this Hive, while another Hive holding it still runs, or when the slot changed since `list` (look again). Not undoable.
+
+## Pausing the team (`hive_team`)
+
+- `status`: whether your workspace's team is paused, whether it is parked (safe to install), and what still runs, a row each (an agent working, a run, a process beyond its CLI's own; "can't be checked" is never parked). Another open workspace is one line, with none of its agents.
+- The Assistant's `pause` (Control agents): no lane starts a card, no card events, watch wakes or pool reviews are sent, the merge queue takes no new card, and each running agent is told once to park. `resume` lifts it; what it held is offered again if still due.
+- Your own workspace only: the user's Pause the Team covers every open window. Tell the user when `status` says it is safe to install; installing is theirs (Install Now).
 
 ## Templates (`hive_template`)
 

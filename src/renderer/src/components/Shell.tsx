@@ -1,7 +1,9 @@
 import type { PlanLimit, PlanUsage, ProviderId, TaskCard, WorkspaceInfo } from '@shared/types'
 import { useNow } from '../usage'
 import { runCommand } from '../commands'
-import { setActivity, set, useProviderWarnings, useStore, type Activity } from '../store'
+import { setActivity, set, setProgressOpen, useProviderWarnings, useStore, type Activity } from '../store'
+import { useTeamPaused } from './TeamPause'
+import { useTeamPause } from '../teamPause'
 import { enabledProviders, installSourceText } from '@shared/providers'
 import { ProviderIcon } from './ProviderIcon'
 import { cx, formatKeybinding, resetsIn, timeAgo } from '../util'
@@ -202,6 +204,7 @@ export function StatusBar() {
         </div>
       </Tooltip>
       <InboxStatusItem />
+      <TeamPausedStatusItem />
       <div className="status-spacer" />
       <KeepAwakeStatusItem />
       {/* App-wide items only: each agent's model, effort, mode and context are in its pane's footer. */}
@@ -218,6 +221,27 @@ export function StatusBar() {
       <UpdateStatusItem />
     </div>
   )
+}
+
+/** While the team is paused (HI-2081): a quiet item that opens the Progress panel, where its Lanes say what still runs. */
+function TeamPausedStatusItem() {
+  const paused = useTeamPaused()
+  const parked = useTeamPause((s) => !!s.state?.allParked)
+  if (!paused) return null
+  const text = parked ? tr(TEAM_STATUS.parked) : tr(TEAM_STATUS.paused)
+  return (
+    <Tooltip content={tr(TEAM_STATUS.tip)}>
+      <div className="status-item team-paused" role="button" tabIndex={0} aria-label={text} onClick={() => setProgressOpen(true)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setProgressOpen(true)}>
+        <Icon name="debug-pause" /> {text}
+      </div>
+    </Tooltip>
+  )
+}
+
+const TEAM_STATUS = {
+  paused: msg({ id: 'shell.status.teamPaused', defaultMessage: 'Team paused', description: "A status bar item while the team is paused before an update (HI-2081): Hive starts no lane card and wakes no agent until it resumes. Click: opens the Progress panel." }),
+  parked: msg({ id: 'shell.status.teamParked', defaultMessage: 'Team parked', description: 'The status bar item (HI-2081) once the paused team has parked: nothing runs, so an update can be installed.' }),
+  tip: msg({ id: 'shell.status.teamPausedTip', defaultMessage: "The team is paused: no lane starts a card and no agent is woken until you resume it. The Progress panel's Lanes says what still runs.", description: 'Tooltip of the status bar item while the team is paused (HI-2081).' })
 }
 
 /** While working agents keep the PC from sleeping (Settings → General). */

@@ -175,6 +175,7 @@
   "service.laneStarts.freshBlockedBody": "{why, select, timeout {No estuvo libre en {minutes, plural, one {# minuto} many {# minutos} other {# minutos}}.} uncertain {Hive se cerró mientras lo iniciaba, así que puede que no se haya iniciado.} other {{reason}}} Reinténtalo desde la fila del carril en el panel Progreso, o termina el carril. Sus tarjetas esperan hasta entonces.",
   "service.laneStarts.freshBlockedTitle": "La conversación nueva de {agent} no se inició",
   "service.lanes.noWorkspace": "No hay ningún espacio de trabajo abierto",
+  "service.lanes.teamPaused": "El equipo está en pausa (antes de una actualización): reanuda primero el equipo y luego inicia el carril.",
   "service.lanes.unknown": "No existe el carril {id}",
   "service.mcp.addedDropped": "Cada proyecto y el Asistente de Hive muestran los servidores que se ejecutaban allí. {n, plural, one {Se descartó # elección guardada para un servidor que estaba desactivado en el espacio de trabajo} many {Se descartaron # elecciones guardadas para servidores que estaban desactivados en el espacio de trabajo} other {Se descartaron # elecciones guardadas para servidores que estaban desactivados en el espacio de trabajo}}: agrega un servidor en la pestaña MCP de un proyecto donde lo necesites.",
   "service.mcp.addedTitle": "Los servidores MCP ahora se agregan donde se ejecutan",

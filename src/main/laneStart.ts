@@ -9,7 +9,7 @@ import { legacyWorktree, slotsMigrated } from './agentFolders'
 import { lendLane } from './slotCards'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
 import { HiveError, hiveError } from './hiveError'
-import { changeFreshStart, freshStartsNow, holdLaneStart, listLanes, oweFreshStart, rawLanes, retryFreshStarts, setLaneSlotWait, startLane } from './lanes'
+import { changeFreshStart, freshStartsNow, holdLaneStart, listLanes, oweFreshStart, rawLanes, refuseWhileTeamPaused, retryFreshStarts, setLaneSlotWait, startLane } from './lanes'
 import { createLogger, userText } from './logger'
 import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
@@ -19,6 +19,7 @@ import { workflowEnforced } from './workflow/service'
 import type { WorkspaceService } from './workspace'
 import type { AgentDef, ProjectConfig } from '../shared/types'
 import { reviewerModeOf, type WorkflowOptions } from '../shared/workflow/options'
+import { teamPauseOf } from './teamPause'
 
 const log = createLogger('lanes')
 
@@ -50,6 +51,8 @@ const M = {
 const starting = new Set<string>()
 
 export async function startLaneFromWindow(ws: WorkspaceService, projectPath: string, req: LaneStartRequest): Promise<LaneStartResult> {
+  // The team paused (HI-2081): refused before anything else is asked of the lane.
+  refuseWhileTeamPaused(ws)
   const project = basename(projectPath)
   const cfg = await ws.projectConfig(projectPath)
   const agents = projectAgents(cfg)
@@ -477,6 +480,8 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
   const slot = (await listLanes(ws)).find((l) => l.id === laneId)?.slot ?? null
   // The note it was owed with (HR1 on HI-2034: the user's Start Lane note, kept through its wait, a restart and a retry).
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, where, slot, entry.note ?? lane.slotWait?.note ?? '')
+  // The team paused (HI-2081): not now; the pass after the resume launches it.
+  if (teamPauseOf(ws)) return 'notFree'
   // Claimed under the lock: still this obligation, unblocked and not being launched.
   let claimed = false
   await changeFreshStart(ws, laneId, entryId, (f) => {
@@ -485,9 +490,11 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
   })
   if (!claimed) return 'gone'
   await laneStartTestHooks.beforeFreshLaunch?.(laneId, entryId)
+  // Still this obligation, and the team not paused since (HI-2081, round 1 finding 6): asked before the old conversation
+  // is replaced and as the launch spawns; refused, the claim is given back and the next pass tries again.
   const still = (): void => {
     const f = freshStartsNow(ws, laneId).find((x) => x.id === entryId)
-    if (!f || f.blocked || !f.launching) throw new FreshGone()
+    if (!f || f.blocked || !f.launching || teamPauseOf(ws)) throw new FreshGone()
   }
   const [r] = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, undefined, undefined, { role: entry.role, still })
   if (r?.how === 'fresh' || r?.how === 'started') {

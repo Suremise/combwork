@@ -175,6 +175,7 @@
   "service.laneStarts.freshBlockedBody": "{why, select, timeout {未能在 {minutes, plural, other {# 分钟}}内空闲。} uncertain {启动时 Hive 已关闭，因此可能未能开始。} other {{reason}}} 请在进度面板中通道的行上重试，或结束通道。在此之前其卡片会等待。",
   "service.laneStarts.freshBlockedTitle": "{agent} 的新对话未能开始",
   "service.lanes.noWorkspace": "未打开工作区",
+  "service.lanes.teamPaused": "团队已暂停（更新前）：请先恢复团队，再启动通道。",
   "service.lanes.unknown": "未知的通道 {id}",
   "service.mcp.addedDropped": "每个项目和 Hive 助手都会列出曾在那里运行的服务器。{n, plural, other {为工作区中已关闭的服务器保存的 # 个选择已被丢弃}}：请在需要的项目的“MCP”标签页中添加服务器。",
   "service.mcp.addedTitle": "MCP 服务器现在添加到它运行的地方",

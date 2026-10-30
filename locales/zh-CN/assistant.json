@@ -728,6 +728,8 @@
   "assistant.undo.why.start": "开始卡片的记录保留在卡片的工作记录中：撤销会把卡片移回，但不会撤销这次开始。",
   "assistant.undo.why.startReview": "它开始的评审保留在卡片的工作记录中。",
   "assistant.undo.why.submit": "它提交评审的记录保留在卡片的工作记录中。",
+  "assistant.undo.why.teamPaused": "它暂停的团队会保持暂停：如需继续，请恢复它。",
+  "assistant.undo.why.teamResumed": "它恢复的团队不会再次暂停：如需等待，请暂停它。",
   "assistant.undo.why.templateCards": "模板替换掉的智能体的卡片和通道保持加载后的状态（卡片已退回，通道已结束）：撤销不会把它们还回去。",
   "assistant.undo.why.verdict": "它的结论连同其轮次保留在卡片的工作记录中。",
   "assistant.undo.why.withdrawn": "它撤回的消息不会再次发送。",

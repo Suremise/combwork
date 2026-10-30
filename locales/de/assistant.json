@@ -728,6 +728,8 @@
   "assistant.undo.why.start": "Der Start bleibt in der Arbeit der Karte: Rückgängig verschiebt die Karte zurück, macht den Start aber nicht ungeschehen.",
   "assistant.undo.why.startReview": "Das begonnene Review bleibt in der Arbeit der Karte.",
   "assistant.undo.why.submit": "Die Einreichung bleibt in der Arbeit der Karte.",
+  "assistant.undo.why.teamPaused": "Ein Team, das er pausiert hat, bleibt pausiert: Setze es fort, wenn es weitermachen soll.",
+  "assistant.undo.why.teamResumed": "Ein Team, das er fortgesetzt hat, wird nicht wieder pausiert: Pausiere es, wenn es warten soll.",
   "assistant.undo.why.templateCards": "Die Karten und Lanes der Agenten, die eine Vorlage ersetzt hat, bleiben, wie das Laden sie hinterlassen hat (Karten zurückgegeben, Lanes beendet): Rückgängig gibt sie ihnen nicht zurück.",
   "assistant.undo.why.verdict": "Das Urteil bleibt in der Arbeit der Karte, und mit ihm seine Runde.",
   "assistant.undo.why.withdrawn": "Zurückgezogene Nachrichten werden nicht erneut gesendet.",

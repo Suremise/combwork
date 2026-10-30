@@ -2127,6 +2127,10 @@
     "defaultMessage": "{state, select, paused {paused} ended {merged} other {abandoned}}",
     "description": "A lane's state in its header in the Progress panel, lower case (a lane: a builder and its reviewer working through cards in turn): paused, merged (it ended: its cards were merged) or abandoned."
   },
+  "board.lanes.teamPause": {
+    "defaultMessage": "paused: the team is pausing",
+    "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-2081): the user (or the Hive Assistant) paused the whole team before an update, so Hive starts none of the lane's cards and wakes none of its agents until the team resumes. 'The team' is every agent of the workspace."
+  },
   "board.lanes.title": {
     "defaultMessage": "Lanes",
     "description": "The Progress panel's section of lanes (a builder and its reviewer working through cards in turn): its bar's label and accessible name."
@@ -3478,6 +3482,86 @@
   "board.strip.runs": {
     "defaultMessage": "{n, plural, one {# run} other {# runs}}: {states}",
     "description": "The folded Progress strip's name: how many runs, then how many are in each state (\"8 runs: 5 running, 2 failed\"). {states} is that list."
+  },
+  "board.team.endDetail": {
+    "defaultMessage": "Only that process and what it started end, and only while they are still the ones listed. Work they had not saved is lost.",
+    "description": "Detail of the question before ending a process from the paused team's band (HI-2081)."
+  },
+  "board.team.endFailed": {
+    "defaultMessage": "{label} couldn't be ended",
+    "description": "A notice (HI-2081): ending a process from the paused team’s band failed, or it was no longer the one listed. {label} is what it runs."
+  },
+  "board.team.endIt": {
+    "defaultMessage": "End It…",
+    "description": "A button beside a process the paused team's band names (HI-2081): ends it and what it started, after a question (…)."
+  },
+  "board.team.endMessage": {
+    "defaultMessage": "End {agent}'s {label} (process {pid}) and everything it started?",
+    "description": "The question before ending a process (HI-2081). {agent} is the agent's name, {label} what the process runs, {pid} its id."
+  },
+  "board.team.endTitle": {
+    "defaultMessage": "End this process?",
+    "description": "Title of the question before ending a process the paused team's band names (HI-2081)."
+  },
+  "board.team.hive": {
+    "defaultMessage": "Hive",
+    "description": "Who runs something while the team is paused when no agent does (HI-2081): Hive itself (a slot's setup, a merge). Hive is the product's name."
+  },
+  "board.team.install": {
+    "defaultMessage": "Install Now",
+    "description": "A button on the paused team’s band (HI-2081), once all are parked and an update is ready: restarts Hive and installs the update (checked again first)."
+  },
+  "board.team.item": {
+    "defaultMessage": "{kind, select, working {{agent} is working} starting {{agent} is starting} background {{agent} has background tasks running} run {{agent}: {label} (a run)} merge {A merge: {label}} copy {A check in a copy: {label}} process {{agent}: {label} (process {pid})} writer {{agent}: its slot {label} is still held} status {{agent}: Hive can’t tell what it is doing} other {{agent}: can’t be checked now}}",
+    "description": "One thing that still runs while the team is paused (HI-2081), a line in its band. {agent} is an agent's name (or Assistant); {label} the user's own words for it (a run's title, a process's command, a slot's name); {pid} a process id. kind: working or starting; background tasks; a run (a test run through hive-progress); a merge of the merge queue; a check in a copy (a folder Hive keeps at one revision); a process (a test runner, a dev server, a test copy of Hive); its slot (a working folder Hive lends) still held by its processes; its state unknown; or (other) its processes can't be read now. Keep the select keys."
+  },
+  "board.team.notParked": {
+    "defaultMessage": "The team isn't parked any more, so the update wasn't installed.",
+    "description": "A notice (HI-2081): the user chose Install Now, and as Hive checked again something had started running (an agent, a run) in an open workspace."
+  },
+  "board.team.otherNotPaused": {
+    "defaultMessage": "{name} isn’t paused",
+    "description": "A line in the paused team's band (HI-2081): another open workspace ({name}, its folder's name) isn't paused, so the update can't be installed yet."
+  },
+  "board.team.parked": {
+    "defaultMessage": "All parked: safe to install",
+    "description": "The band in the Progress panel's Lanes (HI-2081): the team is paused and nothing runs in any open workspace, so an update can be installed."
+  },
+  "board.team.pause": {
+    "defaultMessage": "Pause the Team",
+    "description": "A button and command (the Progress panel's Lanes, the command palette, Help → Check for Updates) (HI-2081): before an update, Hive starts no lane card, wakes no agent with card events and gives no reviews out in every open workspace, and tells each running agent once to finish its turn, end its runs and commit. 'The team' is every agent of the workspace."
+  },
+  "board.team.pauseFailed": {
+    "defaultMessage": "{n, plural, one {# workspace couldn't be paused: {names}} other {# workspaces couldn't be paused: {names}}}",
+    "description": "A notice (HI-2081): Pause the Team could not save the pause of some open workspaces (their folder names in {names}); they are not held, and the app is never shown as parked while one is not."
+  },
+  "board.team.pauseFirst": {
+    "defaultMessage": "Pause the Team First",
+    "description": "A button in Help → Check for Updates, when an update is ready and agents are running (HI-2081): pauses the team (see Pause the Team) so it can be installed once every agent has parked."
+  },
+  "board.team.pausing": {
+    "defaultMessage": "{n, plural, one {Pausing the team: # still running} other {Pausing the team: # still running}}",
+    "description": "The band in the Progress panel's Lanes while the team is paused (HI-2081) and not every agent has parked yet: n things still run (agents working, runs, processes), listed below."
+  },
+  "board.team.resume": {
+    "defaultMessage": "Resume the Team",
+    "description": "A button and command (HI-2081): lifts the pause of every open workspace, so lanes start their cards and agents are woken again."
+  },
+  "board.team.stillPaused": {
+    "defaultMessage": "The team is still paused",
+    "description": "A notice as Hive's window opens (HI-2081): the team was paused before Hive last closed (not for an update that has now been installed), so Hive starts no lane card and wakes no agent until the user resumes it."
+  },
+  "board.team.stillPausedBody": {
+    "defaultMessage": "No lane starts a card and no agent is woken until you resume the team. The Progress panel's Lanes says what still runs.",
+    "description": "The notice that the team is still paused as the window opens (HI-2081)."
+  },
+  "board.team.stillPausedResume": {
+    "defaultMessage": "Resume the Team",
+    "description": "A button in the notice that the team is still paused (HI-2081): resumes it."
+  },
+  "board.team.thisWorkspace": {
+    "defaultMessage": "This workspace",
+    "description": "A heading in the paused team's band, over what still runs in the window's own workspace (HI-2081), when several are open."
   },
   "board.toolbar.archived": {
     "defaultMessage": "Archived ({n, number})",

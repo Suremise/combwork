@@ -12,6 +12,7 @@ import { clock, connectionDropped, OutageResume, reachable, type OutageAgent, ty
 import { progress, progressGate } from './progressService'
 import { sessions } from './sessions'
 import { workspaceOf } from './workspace'
+import { pausedFor } from './teamPause'
 
 /**
  * Resuming agents after a connection drops (HI-1612, SPEC §6.3). Off by default (Settings → Advanced, Hive's "Resume
@@ -133,7 +134,8 @@ const hiveHost: OutageHost = {
     }
   },
   async resume(a, note) {
-    const still = (): boolean => hiveHost.stillStopped(a)
+    // Not while its team is paused (HI-2081): a turn carried on is work, which waits for the team to resume.
+    const still = (): boolean => hiveHost.stillStopped(a) && !pausedFor(a.projectPath)
     if (!still()) return false
     return !!(await deliverNow(a.projectPath, { agentId: a.agentId, kind: 'control', from: HIVE, body: note, source: 'connection-back', ref: `${a.runId}@${a.turn}`, forRun: a.runId }, still).catch(() => null))
   },

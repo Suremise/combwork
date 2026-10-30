@@ -7,6 +7,8 @@ import { commandKeybinding } from '../commands'
 import { set, useStore } from '../store'
 import { cx, formatKeybinding, timeAgo } from '../util'
 import { Icon, Markdown, Modal, Tooltip } from './ui'
+import { M as TEAM, TeamPauseBand, pauseTheTeam, useTeamPaused } from './TeamPause'
+import { useTeamPause } from '../teamPause'
 import { msg, tr } from '@shared/i18n'
 
 const M = {
@@ -137,6 +139,9 @@ export function UpdateDialog() {
   const u = useStore((s) => s.update)
   const settings = useStore((s) => s.settings)
   const working = useStore((s) => s.workspace?.projects.some((p) => p.agents.some((a) => a.live?.status === 'working' || a.live?.status === 'waiting' || a.live?.status === 'background')) ?? false)
+  // The team paused for it (HI-2081): its band here, and Install Now (checked again in main) in place of Restart and Update.
+  const paused = useTeamPaused()
+  const allParked = useTeamPause((s) => !!s.state?.allParked)
   if (!open || !u) return null
   const close = (): void => set({ updateOpen: false })
   const auto = settings?.updates.install === 'auto'
@@ -276,7 +281,25 @@ export function UpdateDialog() {
               <Icon name="cloud-download" /> {tr(M.download)}
             </button>
           )}
-          {u.status === 'ready' && (
+          {u.status === 'ready' && !paused && working && (
+            <button className="btn" onClick={() => void pauseTheTeam()}>
+              <Icon name="debug-pause" /> {tr(TEAM.pauseFirst)}
+            </button>
+          )}
+          {u.status === 'ready' && paused && (
+            <button
+              className="btn primary"
+              disabled={!allParked}
+              onClick={() => {
+                void call('team:install').then((r) => {
+                  if (r.installed) close()
+                })
+              }}
+            >
+              <Icon name="debug-restart" /> {tr(TEAM.install)}
+            </button>
+          )}
+          {u.status === 'ready' && !paused && (
             <button
               className="btn primary"
               onClick={() => {
@@ -293,6 +316,7 @@ export function UpdateDialog() {
   }
   return (
     <Modal title={title} icon="cloud-download" onClose={close} footer={footer} wide={!!u.releaseNotes && ['available', 'downloading', 'ready'].includes(u.status)}>
+      {u.status === 'ready' && paused && <TeamPauseBand />}
       <div className="update-dialog">{body}</div>
     </Modal>
   )
