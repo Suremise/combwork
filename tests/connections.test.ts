@@ -764,7 +764,7 @@ describe('an agent’s own connection, checked with the write that saves it (HI-
   })
 })
 
-describe('templates’ connections (HI-1769; HI-2106: dropped as they are read)', () => {
+describe('templates’ connections (HI-1769; HI-2106: dropped as they are read; HI-2109: chosen when loaded)', () => {
   const gamma = join(wsPath, 'gamma')
   const tplDir = join(wsPath, '.hive', 'templates')
   /** A template from before HI-2106: T1 on Personal (its id), T2 on a connection this machine never had, T3 on none of its own. */
@@ -779,24 +779,23 @@ describe('templates’ connections (HI-1769; HI-2106: dropped as they are read)'
   const ids = async () => (await w.projectConfig(gamma)).agents.map((a) => a.id)
   const byName = async (n: string) => (await w.projectConfig(gamma)).agents.find((a) => a.name === n)
 
-  it('the plan flags none: every agent gets its CLI’s first usable connection here', async () => {
+  it('the plan offers the connections on here, in the order; with no answers every agent gets the first on the CLI it suggests', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
-    await signedInConnection('Work', 'work@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
     writeTemplate('flags.json', a.id)
     const plan = await here(() => templates.templatePlan(gamma, 'workspace', 'flags.json'))
-    expect(plan.connections).toEqual([])
+    expect(plan.options.map((o) => [o.id, o.accountName, o.cli])).toEqual([[baseOf(a.id), 'Personal', 'claude-code'], [baseOf(b.id), 'Work', 'claude-code']])
     expect(plan.create.some((x) => 'connection' in x || 'connectionName' in x)).toBe(false)
     const before = await ids()
     await here(() => templates.loadTemplate(gamma, 'workspace', 'flags.json', before))
     for (const n of ['T1', 'T2', 'T3']) expect((await byName(n))?.connection).toBe(baseOf(a.id))
   })
 
-  it('one agent added from a template: its CLI’s first usable connection, and no fallback to say', async () => {
+  it('one agent added from a template: its CLI’s first usable connection', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     writeTemplate('one.json', a.id)
     const t2 = await here(() => templates.addAgentFromTemplate(gamma, 'workspace', 'one.json', 1, undefined, 'One T2'))
     expect(t2.connection).toBe(baseOf(a.id))
-    expect(t2.connectionFallback).toBeUndefined()
   })
 
   it('saved: no connection, nor its name', async () => {

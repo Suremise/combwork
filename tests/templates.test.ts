@@ -57,7 +57,7 @@ describe('the template format', () => {
     { id: 'a1', name: 'Builder', role: 'UI work', workflowRole: 'builder', pairedWith: 'Reviewer', provider: 'claude-code', model: 'opus', effort: 'high', permissionMode: 'acceptEdits', use200kContext: true, lastSessionId: 's1', worktree: { path: 'C:/w/b', branch: 'hive/builder', base: 'main' }, needsSetup: true },
     { id: 'a2', name: 'Reviewer', mode: 'x' } as StoredAgent
   ]
-  it("saves each agent's role in the workflow, note, settings and provider, its pairs, the layout and the project's preset; never sessions, paths, setup state or modes", () => {
+  it("saves each agent's role in the workflow, note, MCP servers and suggested CLI, its pairs, the layout and the project's preset; never sessions, paths, setup state, modes or launch settings (HI-2109)", () => {
     const t = templateFrom('  Build and review ', agents, 'columns2', () => 'codex', new Date('2026-10-05T10:00:00Z'), 'pair')
     expect(t).toEqual({
       version: TEMPLATE_VERSION,
@@ -65,14 +65,15 @@ describe('the template format', () => {
       savedAt: '2026-10-05T10:00:00.000Z',
       layout: 'columns2',
       agents: [
-        { name: 'Builder', role: 'builder', note: 'UI work', provider: 'claude-code', model: 'opus', effort: 'high', permissionMode: 'acceptEdits', use200kContext: true },
+        // Its model, effort, mode and context aren't kept (decision G): its connection's, chosen when it is loaded.
+        { name: 'Builder', role: 'builder', note: 'UI work', provider: 'claude-code' },
         // An agent without its own provider: the one it runs now; without a role saved, the guess from its name (#1430).
         { name: 'Reviewer', role: 'reviewer', provider: 'codex' }
       ],
       suggestedPreset: 'pair',
       pairs: [{ builder: 'Builder', reviewer: 'Reviewer' }]
     })
-    expect(JSON.stringify(t)).not.toMatch(/s1|C:\/w\/b|hive\/builder|needsSetup|"mode"|"id"|worktree/)
+    expect(JSON.stringify(t)).not.toMatch(/s1|C:\/w\/b|hive\/builder|needsSetup|"mode"|"id"|worktree|opus|"effort"|permissionMode|200k|connection/)
     expect(readAny(JSON.parse(JSON.stringify(t)))).toEqual(t)
   })
 
@@ -107,13 +108,45 @@ describe('the template format', () => {
     expect([isAgentTemplate(readAny({ ...team, pairs: [{ builder: 'E1', reviewer: 'R1' }] })), isAgentTemplate(readAny({ ...team, pairs: [{ builder: 'B1', reviewer: 'E1' }] }))]).toEqual([true, true])
     const odd = readTemplate({ ...team, suggestedPreset: 'chaos', reviewerMode: 'mob' })
     expect(typeof odd !== 'string' && [odd.suggestedPreset, odd.reviewerMode]).toEqual([undefined, undefined])
-    // A provider this Hive doesn't know is kept (shown flagged; loading it is refused), if it looks like a provider's id.
+    // A CLI this Hive doesn't know is kept as the suggestion (shown flagged, never used), if it looks like a provider's id.
     const later = readTemplate({ ...ok, agents: [{ name: 'A', provider: 'gemini' }, { name: 'B', provider: 'claude-code' }] })
     expect(typeof later !== 'string' && later.agents.map((a) => a.provider)).toEqual(['gemini', 'claude-code'])
     expect(typeof later !== 'string' && unknownProviders(later.agents)).toEqual(['gemini'])
-    expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: '../x' }] })).toMatch(/coding agent isn't one Hive can use/)
-    expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: 'claude-code', model: 'rm -rf /' }] })).toMatch(/model isn't one/)
+    // Anything else is no suggestion, never a refusal (HI-2109).
+    expect(readTemplate({ ...ok, agents: [{ name: 'A', provider: '../x' }, { name: 'B' }] })).toMatchObject({ agents: [{ name: 'A', role: 'builder' }, { name: 'B', role: 'builder' }] })
+    expect(typeof later !== 'string' && unknownProviders([{ name: 'B', role: 'builder' }])).toEqual([])
     expect(readTemplate('nope')).toMatch(/isn't a Hive agent template/)
+  })
+
+  it('reads a template from before HI-2109: its model, effort, mode, context and connection dropped, whatever they hold, nothing else lost', () => {
+    const old = v2({
+      name: 'Old',
+      description: 'From rc.12',
+      layout: 'columns2',
+      suggestedPreset: 'pair',
+      pairs: [{ builder: 'B', reviewer: 'R' }],
+      agents: [
+        { name: 'B', note: 'UI', provider: 'claude-code', model: 'opus', effort: 'high', permissionMode: 'acceptEdits', use200kContext: true, connection: 'a-1234', connectionName: 'Personal', mcpServers: ['docs'] },
+        // Values no CLI takes, from a hand-edited file: dropped too, never a refusal.
+        { name: 'R', role: 'reviewer', provider: 'codex', model: 'rm -rf /', effort: 7, permissionMode: { x: 1 }, use200kContext: 'yes', connection: 42 }
+      ]
+    })
+    const t = readAny(old)
+    expect(t).toEqual({
+      version: TEMPLATE_VERSION,
+      name: 'Old',
+      savedAt: '',
+      layout: 'columns2',
+      description: 'From rc.12',
+      agents: [
+        { name: 'B', role: 'builder', note: 'UI', provider: 'claude-code', mcpServers: ['docs'] },
+        { name: 'R', role: 'reviewer', provider: 'codex' }
+      ],
+      suggestedPreset: 'pair',
+      pairs: [{ builder: 'B', reviewer: 'R' }]
+    })
+    // Written again, it holds none of them.
+    expect(JSON.stringify(exportable(t as AgentTemplate))).not.toMatch(/model|effort|permissionMode|use200k|connection/)
   })
 
   it("names from a pattern of the project's key, numbered among those of the pattern; pairs from the agents' pairing", () => {
@@ -208,8 +241,8 @@ describe('the template format', () => {
       const want = shape[h.file]
       expect([t.agents.filter((a) => a.role === 'builder').length, t.agents.filter((a) => a.role === 'reviewer').length, t.suggestedPreset, t.layout, t.pairs?.length ?? 0, t.reviewerMode], h.file).toEqual([want.builders, want.reviewers, want.preset, want.layout, want.pairs, want.mode])
       expect(t.agents.length).toBeLessThanOrEqual(AGENT_LIMIT_DEFAULT)
-      // Builders on Claude Code, reviewers on the template's provider; models left to the provider's default.
-      expect(t.agents.every((a) => (a.role === 'builder' ? a.provider === 'claude-code' : a.provider === want.reviewer) && a.model === undefined), h.file).toBe(true)
+      // Builders suggest Claude Code, reviewers the template's CLI; nothing else (HI-2109: no model, effort or connection).
+      expect(t.agents.every((a) => (a.role === 'builder' ? a.provider === 'claude-code' : a.provider === want.reviewer) && Object.keys(a).every((k) => ['name', 'role', 'provider'].includes(k))), h.file).toBe(true)
       // Names from the project's key (#1123 names), each reading as its role (#1430's guess): HI-B1 a builder, HI-R1 a reviewer.
       for (const key of ['HI', 'ABCD']) {
         const names = templateAgentNames(t.agents, key)
@@ -223,7 +256,7 @@ describe('the template format', () => {
         expect([buildsWork(b.role), reviewsWork(r.role), p.builder.replace('B', 'R')]).toEqual([true, true, p.reviewer])
       }
     }
-    expect(HIVE_TEMPLATES.find((h) => h.file === 'team-6x6.json')!.template.agents.filter((a) => a.role === 'builder').every((a) => a.effort === 'medium')).toBe(true)
+
     // Their names as the window shows them, in its language; any other template's as saved.
     expect(templateTitle({ scope: 'hive', file: 'team-3x3.json', name: 'whatever main said' })).toBe('Team 3×3')
     expect(templateTitle({ scope: 'workspace', file: 'team-3x3.json', name: 'Mine' })).toBe('Mine')
@@ -265,11 +298,26 @@ describe('claims on a worktree being removed (#289)', () => {
 const GIT_HEAVY = 60_000
 const gitIt = (name: string, fn: () => Promise<void>): void => void it(name, fn, GIT_HEAVY)
 
-/** Claude Code and Codex there and turned on, for loading templates without starting anything. */
+/**
+ * Claude Code and Codex there and turned on, for loading templates without starting anything, each with an account (HI-2109:
+ * its CLI's own home, on everywhere, so no sign-in is faked) and connections on it: Claude Code's base and a High one, and
+ * Codex's base.
+ */
 function providersOn(): void {
   config.settings.providers['claude-code'].enabled = true
   config.settings.providers.codex.enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true })) as never
+  config.update((c) => {
+    c.accounts = [
+      { id: 'acc-cc', provider: 'claude-code', name: 'Personal', createdAt: '', home: 'cli' },
+      { id: 'acc-cx', provider: 'codex', name: 'Work', createdAt: '', home: 'cli' }
+    ]
+    c.connections = [
+      { id: 'c-cc', account: 'acc-cc', name: 'Personal' },
+      { id: 'c-cc-high', account: 'acc-cc', name: 'Personal · High', effort: 'high' },
+      { id: 'c-cx', account: 'acc-cx', name: 'Work' }
+    ]
+  })
 }
 
 describe('saving and loading templates', () => {
@@ -379,25 +427,85 @@ describe('saving and loading templates', () => {
     expect([r.created, r.removed]).toEqual([B, ['Old']])
     const cfg = cfgOf(beta)
     expect(await layoutOf(beta)).toBe('columns2')
-    // Each with its role in the workflow and note (alpha's "builder" note), in the project folder (#1436); its model kept on
-    // it while its CLI has no account here (HI-2106), for the connection it gets once one is.
-    expect(cfg.agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.role, a.model, a.provider, a.worktree])).toEqual([['BBuilder', 'builder', 'builder', 'opus', 'claude-code', undefined], ['BReviewer', 'reviewer', undefined, undefined, 'claude-code', undefined]])
+    // Each with its role in the workflow and note (alpha's "builder" note), in the project folder (#1436), on its role's
+    // preselected connection (HI-2109: the first on the CLI it suggests); alpha's model isn't carried (decision G).
+    expect(cfg.agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.role, a.model, a.provider, a.connection, a.worktree])).toEqual([['BBuilder', 'builder', 'builder', undefined, 'claude-code', 'c-cc', undefined], ['BReviewer', 'reviewer', undefined, undefined, 'claude-code', 'c-cc', undefined]])
     expect(cfg.agents.some((a: StoredAgent) => a.id === 'b1')).toBe(false)
     const card = (await run(() => tasks.allTasks())).find((c) => c.title === 'Old work')!
     expect([card.agent, card.column]).toEqual([null, 'todo'])
   })
 
-  it('refuses while an agent runs, a worktree has uncommitted work, a provider is off, or the agents changed meanwhile', async () => {
+  it("loads each agent on the picker's answer (HI-2109): its own over its role's over all's, by its name or its name in the template; one that can't be used refuses it all", async () => {
+    const ids = () => cfgOf(beta).agents.map((a: StoredAgent) => a.id)
+    const connOf = () => cfgOf(beta).agents.map((a: StoredAgent) => [a.name, a.provider, a.connection])
+    // A role, then an agent by its name in the template (Reviewer, loaded as BReviewer): the reviewer on Codex.
+    await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ids(), undefined, B, { builder: 'Personal · High', Reviewer: 'c-cx' }))
+    expect(connOf()).toEqual([['BBuilder', 'claude-code', 'c-cc-high'], ['BReviewer', 'codex', 'c-cx']])
+    // All, under an agent's own by the name it gets.
+    await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ids(), undefined, B, { '*': 'work', BBuilder: 'c-cc' }))
+    expect(connOf()).toEqual([['BBuilder', 'claude-code', 'c-cc'], ['BReviewer', 'codex', 'c-cx']])
+    // Refused, nothing changed: a connection that isn't usable here, a name two have, a key that is no role or agent.
+    const before = ids()
+    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { builder: 'Gone' }))).rejects.toThrow(/No connection "Gone" can be used in this workspace now/)
+    config.update((c) => void (c.connections = [...c.connections!, { id: 'c-cx-2', account: 'acc-cx', name: 'Personal' }]))
+    try {
+      await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { builder: 'personal' }))).rejects.toThrow(/Several connections are called "personal": name one by its id \(c-cc and c-cx-2\)/)
+    } finally {
+      providersOn()
+    }
+    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { builders: 'c-cc' }))).rejects.toThrow(/builders is none of them/)
+    expect(ids()).toEqual(before)
+    // One agent added from a template: its role's preselected one, or the one named.
+    const one = await run(() => templates.addAgentFromTemplate(beta, 'workspace', 'pair-2.json', 1, undefined, 'BExtra', 'user'))
+    expect([one.provider, one.connection]).toEqual(['claude-code', 'c-cc'])
+    const two = await run(() => templates.addAgentFromTemplate(beta, 'workspace', 'pair-2.json', 1, undefined, 'BExtra2', 'user', 'Work'))
+    expect([two.provider, two.connection]).toEqual(['codex', 'c-cx'])
+    await w.mutateProjectConfig(beta, (c) => ({ agents: c.agents.filter((a: StoredAgent) => !a.name.startsWith('BExtra')) }))
+  })
+
+  it('Choose Connections… (HI-2109): only the existing agents\' connections change, by role or name; one unnamed keeps its own; a running one keeps its CLI', async () => {
+    const plan = await run(() => templates.connectionsPlan(beta))
+    expect(plan.agents.map((a) => [a.name, a.role, a.provider, a.connection, a.running])).toEqual([['BBuilder', 'builder', 'claude-code', 'c-cc', false], ['BReviewer', 'reviewer', 'codex', 'c-cx', false]])
+    expect(plan.options.map((o) => o.id)).toEqual(['c-cc', 'c-cc-high', 'c-cx'])
+    const before = cfgOf(beta).agents.map((a: StoredAgent) => a.id)
+    // "High effort for every builder here": the builders only; the ids (and so their conversations) stay.
+    const done = await run(() => templates.applyConnections(beta, { builder: 'Personal · High' }))
+    expect(done).toEqual({ changed: ['BBuilder'], restart: [], skipped: [] })
+    expect(cfgOf(beta).agents.map((a: StoredAgent) => [a.id, a.connection])).toEqual([[before[0], 'c-cc-high'], [before[1], 'c-cx']])
+    // Another CLI's connection for a stopped agent: its CLI follows; for a running one: skipped, said; nothing else changes.
+    live.add(before[1])
+    const running = await run(() => templates.applyConnections(beta, { '*': 'c-cc' }))
+    expect(running).toEqual({ changed: ['BBuilder'], restart: [], skipped: [{ name: 'BReviewer', why: 'running' }] })
+    live.clear()
+    const moved = await run(() => templates.applyConnections(beta, { BReviewer: 'c-cc' }))
+    expect(moved.changed).toEqual(['BReviewer'])
+    expect(cfgOf(beta).agents.map((a: StoredAgent) => [a.provider, a.connection])).toEqual([['claude-code', 'c-cc'], ['claude-code', 'c-cc']])
+    // On its own CLI while it runs: changed, to restart.
+    live.add(before[0])
+    expect(await run(() => templates.applyConnections(beta, { BBuilder: 'c-cc-high' }))).toEqual({ changed: ['BBuilder'], restart: [{ id: before[0], name: 'BBuilder' }], skipped: [] })
+    live.clear()
+    // Checked first: nothing changes for an unknown key or connection.
+    await expect(run(() => templates.applyConnections(beta, { nobody: 'c-cc', '*': 'c-cx' }))).rejects.toThrow(/nobody is none of them/)
+    await expect(run(() => templates.applyConnections(beta, { reviewer: 'Gone' }))).rejects.toThrow(/No connection "Gone"/)
+    expect(cfgOf(beta).agents.map((a: StoredAgent) => a.connection)).toEqual(['c-cc-high', 'c-cc'])
+  })
+
+  it('refuses while an agent runs, a worktree has uncommitted work, no connection is usable, or the agents changed meanwhile', async () => {
     const ids = () => cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     const first = ids()[0]
     live.add(first)
     expect((await run(() => templates.templatePlan(beta, 'workspace', 'pair.json'))).blocked).toEqual([expect.stringMatching(/Builder is running or starting: stop it first/)])
     await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair.json', ids()))).rejects.toThrow(/can't be loaded yet/)
     live.clear()
+    // A CLI turned off (HI-2109): its connections aren't offered, the agents suggesting it get another; none at all offers
+    // none and stops nothing (its agents get one once an account is, as Add Agent's), but a connection asked for refuses it.
     config.settings.providers['claude-code'].enabled = false
     const off = await run(() => templates.templatePlan(beta, 'workspace', 'pair.json'))
-    expect(off.missing).toEqual([{ provider: 'claude-code', reason: expect.stringMatching(/turned off/), agents: ['Builder', 'Reviewer'], problem: 'off' }])
-    config.settings.providers['claude-code'].enabled = true
+    expect([off.blocked, off.options.map((o) => o.id)]).toEqual([[], ['c-cx']])
+    config.settings.providers.codex.enabled = false
+    expect(await run(() => templates.templatePlan(beta, 'workspace', 'pair.json'))).toMatchObject({ blocked: [], options: [] })
+    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair.json', ids(), undefined, B, { '*': 'c-cc' }))).rejects.toThrow(/No connection "c-cc"/)
+    providersOn()
     await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair.json', ['someone-else']))).rejects.toThrow(/changed since you looked/)
     expect(ids()).toHaveLength(2)
     // A worktree agent with uncommitted work.
@@ -614,7 +722,7 @@ describe('saving and loading templates', () => {
     expect(readFileSync(twice, 'utf8')).toBe(text)
   })
 
-  it('an import is checked first and refused, saying why; nothing is written. An unknown coding agent is kept, flagged, and blocks loading', async () => {
+  it('an import is checked first and refused, saying why; nothing is written. An unknown coding agent is kept and flagged: only a suggestion', async () => {
     const dir = join(base, 'imports')
     mkdirSync(dir, { recursive: true })
     const f = (name: string, body: string): string => {
@@ -641,9 +749,10 @@ describe('saving and loading templates', () => {
     const t = 'imported' in imported ? imported.imported : null
     expect(t?.agents.map((a) => a.provider)).toEqual(['claude-code', 'gemini'])
     expect(readFileSync(join(wsPath, '.hive', 'templates', t!.file), 'utf8')).not.toMatch(/author|someone/)
+    expect(readFileSync(join(wsPath, '.hive', 'templates', t!.file), 'utf8')).not.toMatch(/g-1|model/)
+    // Only a suggestion (HI-2109): G gets the first connection usable here, never a refusal.
     const plan = await run(() => templates.templatePlan(beta, 'workspace', t!.file))
-    expect(plan.blocked).toEqual([expect.stringMatching(/doesn't know the coding agent "gemini".*needed by G/)])
-    await expect(run(() => templates.addAgentFromTemplate(beta, 'workspace', t!.file, 1))).rejects.toThrow(/doesn't know the coding agent "gemini"/)
+    expect([plan.blocked, plan.create.map((a) => a.provider)]).toEqual([[], ['claude-code', 'gemini']])
   })
 
   gitIt("a project's template loads into another project (from the Templates view), every agent in that project's folder (#268, #1436)", async () => {
@@ -667,7 +776,7 @@ describe('saving and loading templates', () => {
     expect(cfgOf(alpha).agents.find((a: StoredAgent) => a.id === source.id)?.worktree).toEqual(source.worktree)
   })
 
-  gitIt("Hive's Team 3×3 (#1436): six agents named from the project's key, paired both ways, in a grid, none in a worktree; a provider that can't run is swapped, said on its row", async () => {
+  gitIt("Hive's Team 3×3 (#1436): six agents named from the project's key, paired both ways, in a grid, none in a worktree; each role on the first connection of the CLI it suggests, else the first usable (HI-2109)", async () => {
     const ids = cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     // Names made from the key that can't be read (beta has none yet): refused, never a guessed key (#1440).
     await expect(run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))).rejects.toThrow(/couldn't read beta's key/)
@@ -686,30 +795,31 @@ describe('saving and loading templates', () => {
     // Once it has one, every agent's name as its plan makes them, by place; the template's own patterns kept as they are.
     expect(await listedNames()).toEqual(plan.templateNames)
     expect((await run(() => templates.listTemplates(beta))).find((t) => t.file === 'team-3x3.json')?.agents.map((a) => a.name)).toEqual(['{key}-B{n}', '{key}-B{n}', '{key}-B{n}', '{key}-R{n}', '{key}-R{n}', '{key}-R{n}'])
-    expect([plan.name, plan.blocked, plan.create.map((a) => a.name), plan.templateNames, plan.layout, plan.suggestedPreset, plan.swaps]).toEqual(['Team 3×3', [], want, want, 'grid6', 'team', []])
+    expect([plan.name, plan.blocked, plan.create.map((a) => a.name), plan.templateNames, plan.layout, plan.suggestedPreset, plan.options.map((o) => o.id)]).toEqual(['Team 3×3', [], want, want, 'grid6', 'team', ['c-cc', 'c-cc-high', 'c-cx']])
     expect(plan.pairs).toEqual([{ builder: 0, reviewer: 3 }, { builder: 1, reviewer: 4 }, { builder: 2, reviewer: 5 }])
     await run(() => templates.loadTemplate(beta, 'hive', 'team-3x3.json', ids))
     const made = cfgOf(beta)
     expect(await layoutOf(beta)).toBe('grid6')
-    expect(made.agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.provider, a.pairedWith, a.worktree])).toEqual([
-      [want[0], 'builder', 'claude-code', want[3], undefined],
-      [want[1], 'builder', 'claude-code', want[4], undefined],
-      [want[2], 'builder', 'claude-code', want[5], undefined],
-      [want[3], 'reviewer', 'codex', want[0], undefined],
-      [want[4], 'reviewer', 'codex', want[1], undefined],
-      [want[5], 'reviewer', 'codex', want[2], undefined]
+    expect(made.agents.map((a: StoredAgent) => [a.name, a.workflowRole, a.provider, a.connection, a.pairedWith, a.worktree])).toEqual([
+      [want[0], 'builder', 'claude-code', 'c-cc', want[3], undefined],
+      [want[1], 'builder', 'claude-code', 'c-cc', want[4], undefined],
+      [want[2], 'builder', 'claude-code', 'c-cc', want[5], undefined],
+      [want[3], 'reviewer', 'codex', 'c-cx', want[0], undefined],
+      [want[4], 'reviewer', 'codex', 'c-cx', want[1], undefined],
+      [want[5], 'reviewer', 'codex', 'c-cx', want[2], undefined]
     ])
     // The project's options started from Team: no suggestion to switch (#1436). Its key's want, chosen again: the same.
     await w.mutateProjectConfig(beta, () => ({ workflow: { platform: 'git', preset: 'team', options: {} } }) as never)
     expect((await run(() => templates.templatePlan(beta, 'hive', 'team-3x3.json'))).suggestedPreset).toBeNull()
-    // Codex not installed: Hive's own runs those agents on Claude Code, said on each row; a template the user made is refused.
+    // Codex not installed (HI-2109): its connections aren't offered; the reviewer suggesting it gets the first usable one,
+    // Hive's own templates and the user's alike (a suggestion, never a refusal).
     const info = providerService.info
     providerService.info = ((id: string) => ({ provider: id, found: id !== 'codex' })) as never
     try {
-      const swapped = await run(() => templates.templatePlan(beta, 'hive', 'pair.json'))
-      expect([swapped.blocked, swapped.create.map((a) => a.provider), swapped.swaps]).toEqual([[], ['claude-code', 'claude-code'], [{ index: 1, from: 'codex', to: 'claude-code', problem: 'notInstalled' }]])
+      const noCodex = await run(() => templates.templatePlan(beta, 'hive', 'pair.json'))
+      expect([noCodex.blocked, noCodex.create.map((a) => a.provider), noCodex.options.map((o) => o.id)]).toEqual([[], ['claude-code', 'codex'], ['c-cc', 'c-cc-high']])
       const mine = await run(() => templates.duplicateTemplate({ scope: 'hive', file: 'pair.json' }, { scope: 'workspace' }))
-      expect((await run(() => templates.templatePlan(beta, 'workspace', mine.file))).blocked).toEqual([expect.stringMatching(/Codex isn't installed \(Provider Setup\), needed by/)])
+      expect((await run(() => templates.templatePlan(beta, 'workspace', mine.file))).blocked).toEqual([])
       await run(() => templates.deleteTemplate({ scope: 'workspace', file: mine.file }))
     } finally {
       providerService.info = info
@@ -726,6 +836,7 @@ describe('saving and loading templates', () => {
       description: '  Builds, then reviews. ',
       layout: 'columns2' as const,
       agents: [
+        // A window from before HI-2109 may still send launch settings: dropped, never saved.
         { name: 'Two', provider: 'claude-code', role: 'reviewer' as const, model: 'opus', effort: 'high', permissionMode: 'acceptEdits' },
         { name: 'Builder', provider: 'claude-code', role: 'builder' as const, note: 'UI', use200kContext: true }
       ]
@@ -733,8 +844,8 @@ describe('saving and loading templates', () => {
     const saved = await run(() => templates.updateTemplate(ref, edited, '2026-10-06T10:00:00.000Z'))
     expect([saved.file, saved.name, saved.description, saved.layout]).toEqual(['edit-me.json', 'Edited pair', 'Builds, then reviews.', 'columns2'])
     expect(saved.agents).toEqual([
-      { name: 'Two', role: 'reviewer', provider: 'claude-code', model: 'opus', effort: 'high', permissionMode: 'acceptEdits' },
-      { name: 'Builder', role: 'builder', note: 'UI', provider: 'claude-code', use200kContext: true }
+      { name: 'Two', role: 'reviewer', provider: 'claude-code' },
+      { name: 'Builder', role: 'builder', note: 'UI', provider: 'claude-code' }
     ])
     // What the editor doesn't change stays (#1436): the suggestion; One's pair went with One.
     expect([saved.suggestedPreset, saved.pairs]).toEqual(['pair', undefined])
@@ -749,7 +860,7 @@ describe('saving and loading templates', () => {
     await expect(run(() => templates.updateTemplate(ref, { ...edited, agents: [] }, now))).rejects.toThrow(/no agents/)
     await expect(run(() => templates.updateTemplate(ref, { ...edited, agents: Array.from({ length: 25 }, (_, i) => ({ name: `A${i}`, provider: 'claude-code', role: 'builder' as const })) }, now))).rejects.toThrow(/up to 24/)
     await expect(run(() => templates.updateTemplate(ref, { ...edited, agents: [edited.agents[0], { ...edited.agents[1], name: 'two' }] }, now))).rejects.toThrow(/Two agents are called "two"/)
-    await expect(run(() => templates.updateTemplate(ref, { ...edited, agents: [{ ...edited.agents[0], provider: '../x' }] }, now))).rejects.toThrow(/coding agent isn't one/)
+
     await expect(run(() => templates.updateTemplate(ref, { ...edited, name: ' ' }, now))).rejects.toThrow(/Enter a name/)
     await expect(run(() => templates.updateTemplate({ ...ref, file: '../project.json' }, edited, now))).rejects.toThrow(/no longer there/)
     // A description too long (only a window that ignores the field's limit sends one) is left out; none removes it.
@@ -758,7 +869,7 @@ describe('saving and loading templates', () => {
     const after = await run(() => templates.listTemplates(alpha))
     const t = after.find((e) => e.file === 'edit-me.json')!
     const plan = await run(() => templates.templatePlan(beta, 'project', 'edit-me.json', alpha))
-    expect([plan.name, plan.layout, plan.create.map((a) => [a.name, a.role, a.model, a.note])]).toEqual([t.name, 'columns2', [['Two', 'reviewer', 'opus', undefined], ['Builder', 'builder', undefined, 'UI']]])
+    expect([plan.name, plan.layout, plan.create.map((a) => [a.name, a.role, a.provider, a.note])]).toEqual([t.name, 'columns2', [['Two', 'reviewer', 'claude-code', undefined], ['Builder', 'builder', 'claude-code', 'UI']]])
     // Its pairs kept through an edit while both agents are: Builder and Two paired, then Builder renamed.
     writeFileSync(join(dir, 'edit-me.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(dir, 'edit-me.json'), 'utf8')), pairs: [{ builder: 'Builder', reviewer: 'Two' }] }))
     const fresh = (await run(() => templates.listTemplates(alpha))).find((e) => e.file === 'edit-me.json')!

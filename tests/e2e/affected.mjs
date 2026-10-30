@@ -476,6 +476,8 @@ export const AREAS = [
   { paths: ['src/main/templates.ts', 'src/renderer/src/templateList.ts', 'src/shared/templates.ts', 'src/shared/templateLoad.ts', 'src/renderer/src/components/TemplatePlan.tsx', 'src/renderer/src/components/TemplateLoad.tsx', 'src/shared/templateDefaults.ts'], suites: ['templateapi', 'templatenames', 'templates', 'templateshare', 'templatesv2', 'templateworkflow'] },
   // The Assistant's template load (HI-1502): its routes, the shared replacement and undo of a load.
   { paths: ['src/main/templateApi.ts', 'tests/e2e/templateapi.cjs'], suites: ['templateapi', 'replysize'] },
+  // Choose Connections… and the template picker (HI-2109).
+  { paths: ['src/shared/templateConnections.ts', 'src/renderer/src/components/TemplateConnections.tsx', 'tests/e2e/chooseconnections.cjs'], suites: ['chooseconnections', 'templates', 'templateapi'] },
   { paths: ['src/shared/workflow/templateOptions.ts', 'src/renderer/src/components/TemplateLoadWorkflow.tsx', 'src/renderer/src/components/TemplateWorkflowView.tsx', 'tests/e2e/templateworkflow.cjs'], suites: ['templateworkflow'] },
   { paths: ['src/main/templateUpgrade.ts', 'tests/e2e/templatesv2.cjs'], suites: ['templatesv2'] },
   { paths: ['src/main/agentNames.ts', 'src/shared/agentNames.ts'], suites: ['agents', 'agents-ui', 'templatenames', 'templates'] },

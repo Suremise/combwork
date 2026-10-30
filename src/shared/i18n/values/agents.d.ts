@@ -353,7 +353,7 @@ interface HiveMessageValues {
   'agents.switch.title': { agent: string | number; cli: string | number }
   'agents.template.nameTaken': { name: string | number }
   'agents.template.new': undefined
-  'agents.template.note': { template: string | number; projects: string | number }
+  'agents.template.noteSuggest': { template: string | number }
   'agents.template.title': { agent: string | number }
   'agents.tested.newer': undefined
   'agents.tested.older': undefined

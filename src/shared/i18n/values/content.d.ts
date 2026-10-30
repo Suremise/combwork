@@ -76,7 +76,9 @@ interface HiveMessageValues {
   'content.templates.changedSince': undefined
   'content.templates.changedWhile': undefined
   'content.templates.checkFailed': { agent: string | number; folder: string | number; error: string | number }
-  'content.templates.connectionsChanged': undefined
+  'content.templates.connectionAmbiguous': { ref: string | number; ids: string | number }
+  'content.templates.connectionKeys': { keys: string | number; count: number }
+  'content.templates.connectionUnknown': { ref: string | number }
   'content.templates.editedMeanwhile': { name: string | number }
   'content.templates.enterName': undefined
   'content.templates.failed': { error: string | number }
@@ -91,8 +93,6 @@ interface HiveMessageValues {
   'content.templates.nameTaken': { name: string | number }
   'content.templates.nameTooLong': { max: string | number }
   'content.templates.namesChanged': undefined
-  'content.templates.neededBy': { problem: string; provider: string | number; agents: string | number }
-  'content.templates.needsIt': { problem: string; provider: string | number; agent: string | number }
   'content.templates.noAgents': undefined
   'content.templates.noFile': undefined
   'content.templates.noKey': { project: string | number }
@@ -100,7 +100,6 @@ interface HiveMessageValues {
   'content.templates.noWorkspace': undefined
   'content.templates.nothing': { problem: string | number }
   'content.templates.overMax': { count: number; max: number }
-  'content.templates.provider': { problem: string; provider: string | number }
   'content.templates.restoring': undefined
   'content.templates.running': { agent: string | number }
   'content.templates.scope': { scope: string | number }

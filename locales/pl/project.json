@@ -1,5 +1,6 @@
 {
   "project.agents.add": "Dodaj agenta",
+  "project.agents.chooseConnections": "Wybierz połączenia…",
   "project.agents.connectionSettings": "Domyślne ustawienia połączenia ({model})",
   "project.agents.merge": "Scal…",
   "project.agents.off": "{provider} (wyłączony)",

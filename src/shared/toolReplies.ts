@@ -1007,9 +1007,9 @@ export interface TemplatePlanPublic {
   project: string
   template: { scope: string; file: string; name: string }
   remove: string[]
-  create: { name: string; template: string; role: string; provider: string; pairedWith?: string }[]
+  create: { name: string; template: string; role: string; connection: string | null; pairedWith?: string }[]
   taken: { name: string; project: string; suggestion: string }[]
-  connections: string[]
+  options: { id: string; name: string; cli: string; account: string }[]
   blocked: string[]
   workflow: TemplateWorkflowPublic | null
 }
@@ -1021,8 +1021,16 @@ export interface TemplateLoadPublic {
   removed: string[]
   created: string[]
   renamed: { template: string; name: string }[]
-  connections: string[]
+  connections: { name: string; connection: string }[]
   workflow: TemplateWorkflowPublic | null
+}
+
+/** Choose Connections as the Agent API reports it (HI-2109, POST /v1/projects/{name}/templates/apply). */
+export interface ConnectionsAppliedPublic {
+  project: string
+  changed: { name: string; connection: string }[]
+  restart: string[]
+  skipped: { name: string; why: string }[]
 }
 
 const shownValue = (v: unknown): string => (typeof v === 'string' ? v : JSON.stringify(v ?? null))
@@ -1040,19 +1048,27 @@ function templateWorkflowText(w: TemplateWorkflowPublic | null, will: boolean): 
 
 /** hive_template plan (HI-1502): what loading would do, what stops it, names taken (with free ones) and its workflow. */
 export function templatePlanText(r: TemplatePlanPublic): string {
-  const made = r.create.map((a) => `${a.name}${a.name !== a.template ? ` (${a.template})` : ''} ${a.role}${a.pairedWith ? ` with ${a.pairedWith}` : ''}`).join(', ')
+  const made = r.create.map((a) => `${a.name}${a.name !== a.template ? ` (${a.template})` : ''} ${a.role}${a.pairedWith ? ` with ${a.pairedWith}` : ''} on ${a.connection ?? 'no connection'}`).join(', ')
   const head = `"${r.template.name}" into ${r.project}: removes ${r.remove.length ? r.remove.join(', ') : 'no agents'}; creates ${made}.`
   const taken = r.taken.length ? ` Taken: ${r.taken.map((t) => `${t.name} (${t.project}'s): try "${t.suggestion}"`).join('; ')}.` : ''
-  const conn = r.connections.length ? ` ${r.connections.join(', ')} get the workspace's default connection.` : ''
+  const options = r.options.length ? ` Connections here: ${r.options.map((o) => `${o.name} (${o.cli}, ${o.id})`).join(', ')}.` : ''
   const blocked = r.blocked.length ? ` Can't load yet: ${r.blocked.join(' ')}` : ''
-  return `${head}${taken}${conn}${templateWorkflowText(r.workflow, true)}${blocked}`
+  return `${head}${taken}${options}${templateWorkflowText(r.workflow, true)}${blocked}`
 }
 
 /** hive_template load (HI-1502): what was loaded, names given, and its workflow saved or why not. */
 export function templateLoadedText(r: TemplateLoadPublic): string {
   const renamed = r.renamed.length ? ` (${r.renamed.map((x) => `${x.template} named ${x.name}`).join(', ')})` : ''
-  const conn = r.connections.length ? ` ${r.connections.join(', ')} got the workspace's default connection.` : ''
+  const conn = r.connections.length ? ` On: ${r.connections.map((c) => `${c.name} ${c.connection}`).join(', ')}.` : ''
   return `Loaded "${r.template.name}" into ${r.project}: removed ${r.removed.length ? r.removed.join(', ') : 'no agents'}; created ${r.created.join(', ')}${renamed}.${conn}${templateWorkflowText(r.workflow, false)} hive_undo can put the agents and options back.`
+}
+
+/** hive_template apply (HI-2109): who got which connection, who to restart for it, who was skipped and why. */
+export function connectionsAppliedText(r: ConnectionsAppliedPublic): string {
+  const changed = r.changed.length ? `${r.changed.map((c) => `${c.name} → ${c.connection}`).join(', ')}` : 'no agent changed (each already on it)'
+  const restart = r.restart.length ? ` Running on the old one until restarted: ${r.restart.join(', ')}.` : ''
+  const skipped = r.skipped.length ? ` Skipped: ${r.skipped.map((s) => `${s.name} (${s.why})`).join('; ')}.` : ''
+  return `Connections in ${r.project}: ${changed}.${restart}${skipped}${r.changed.length ? ' hive_undo can put them back.' : ''}`
 }
 
 /** How Hive tells an agent of what waits for it, by the carrying-on switch that does it (#1432, shared/inboxSwitches.ts). */

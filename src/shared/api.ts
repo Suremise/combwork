@@ -50,7 +50,6 @@ import type {
   AgentApiInfo,
   AgentBranchStatus,
   AgentDef,
-  ConnectionProblem,
   TemplateLoadPlan,
   AgentPatch,
   CleanupItem,
@@ -147,6 +146,7 @@ import type { Fact } from './workflow/facts'
 import type { CommitMessage, WorkflowOptions } from './workflow/options'
 import type { Artifact, CompareScope, ImportResult, KeptEntry } from './benchmark'
 import type { AgentTemplate, TemplateDest, TemplateEntry, TemplateRef, TemplateScope } from './templates'
+import type { ConnectionAnswers, ConnectionsApplied, ConnectionsPlan } from './templateConnections'
 import type { TemplateWorkflow } from './workflow/templateOptions'
 import type { ProjectPref, ProjectPrefValue } from './uiPrefs'
 import type { TipsChange, TipsState } from './tips'
@@ -669,10 +669,17 @@ export interface HiveRequests {
   'templates:save': (projectPath: string, scope: TemplateScope, name: string, overwrite: boolean, usePatterns?: boolean, includeWorkflow?: boolean) => { saved: TemplateEntry; workflow: { saved: PlatformId | null; kept: PlatformId[] } } | { exists: string }
   /** What loading a template would do, and what stops it now. `from`: the project a project's template is kept in, if not this one. */
   'templates:plan': (projectPath: string, scope: TemplateScope, file: string, from?: string, names?: string[]) => TemplateLoadPlan
-  /** Replaces the project's agents and layout with a template's; `expected` is the agents' ids as the user saw them. */
-  'templates:load': (projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: Record<number, string | null>, applyWorkflow?: boolean) => { created: string[]; removed: string[]; workflow: TemplateWorkflow | null; maxAgents?: number }
-  /** Adds one agent of a template (the `index`-th), the others left alone. */
-  'templates:addAgent': (projectPath: string, scope: TemplateScope, file: string, index: number, from?: string, name?: string) => AgentDef & { connectionFallback?: { name: string; problem: ConnectionProblem } }
+  /**
+   * Replaces the project's agents and layout with a template's; `expected` is the agents' ids as the user saw them.
+   * `connections` (HI-2109): the picker's answers (`*`, a role, an agent's name → a connection's id).
+   */
+  'templates:load': (projectPath: string, scope: TemplateScope, file: string, expected: string[], from?: string, names?: string[], connections?: ConnectionAnswers, applyWorkflow?: boolean) => { created: string[]; removed: string[]; workflow: TemplateWorkflow | null; maxAgents?: number }
+  /** Adds one agent of a template (the `index`-th), the others left alone; on `connection` (HI-2109), else its role's preselected one. */
+  'templates:addAgent': (projectPath: string, scope: TemplateScope, file: string, index: number, from?: string, name?: string, connection?: string) => AgentDef
+  /** Choose Connections… (HI-2109): the project's agents by their roles, with their connections, and the connections usable here. */
+  'templates:connectionsPlan': (projectPath: string) => ConnectionsPlan
+  /** Choose Connections…: the project's agents given the connections answered, nothing else changed. */
+  'templates:applyConnections': (projectPath: string, connections: ConnectionAnswers) => ConnectionsApplied
   /** Every template of the workspace (#127, the Templates view): Hive's own (#1436), the workspace's, then each project's. */
   'templates:all': () => TemplateEntry[]
   /** Renames a template where it is kept (another of that name there refuses it). */

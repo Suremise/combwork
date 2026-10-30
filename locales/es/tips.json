@@ -135,6 +135,8 @@
   "tips.cardSummaries.title": "Los informes empiezan por lo esencial",
   "tips.cardWork.text": "Abre una tarjeta: su sección Trabajo muestra cada versión enviada a revisión, con su ronda, archivos, veredictos y comprobaciones, y cómo se fusionó. En el tablero, una tarjeta muestra su versión y su último veredicto.",
   "tips.cardWork.title": "Mira por lo que pasó el trabajo de una tarjeta",
+  "tips.chooseConnections.text": "Configuración del proyecto → Agentes → Elegir conexiones… elige una conexión para cada rol de los agentes del proyecto (o una para todos, o por agente), sin cambiar nada más. Cargar una plantilla ofrece la misma elección.",
+  "tips.chooseConnections.title": "Esfuerzo alto para todos los autores, de una vez",
   "tips.claudeStatusLine.text": "La línea de estado de Hive alimenta el pie de un agente y no muestra nada en el panel. Desactiva Configuración → Avanzado → La línea de estado de Hive en lugar de la tuya para volver a ver la de tu configuración de Claude Code: Hive sigue leyendo el estado.",
   "tips.claudeStatusLine.title": "Conserva tu propia línea de estado de Claude Code",
   "tips.cliOverrides.text": "Hive cambia un poco cómo se comporta cada CLI en sus sesiones, por ejemplo que Copilot no se actualice solo o el título de la terminal de Codex. Cada cambio se puede desactivar en Configuración → Avanzado, bajo su CLI, que explica lo que Hive ya no puede hacer sin él.",

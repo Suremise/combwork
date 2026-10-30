@@ -135,6 +135,8 @@
   "tips.cardSummaries.title": "Les rapports commencent par l’essentiel",
   "tips.cardWork.text": "Ouvre une carte : sa section Travail liste chaque révision soumise à relecture, avec son tour, ses fichiers, ses verdicts et ses vérifications, et la façon dont elle a été fusionnée. Sur le tableau, une carte affiche sa révision et son dernier verdict.",
   "tips.cardWork.title": "Voir le parcours du travail d’une carte",
+  "tips.chooseConnections.text": "Paramètres du projet → Agents → Choisir les connexions… choisit une connexion pour chaque rôle des agents du projet (ou une pour tous, ou par agent), sans rien changer d’autre. Charger un modèle propose le même choix.",
+  "tips.chooseConnections.title": "Un effort élevé pour tous les auteurs, d’un coup",
   "tips.claudeStatusLine.text": "La ligne d’état de Hive alimente le pied d’un agent et n’affiche rien dans le volet. Désactive Paramètres → Avancé → La ligne d’état de Hive à la place de la tienne pour revoir celle de tes paramètres Claude Code : Hive lit toujours l’état.",
   "tips.claudeStatusLine.title": "Garde ta propre ligne d’état Claude Code",
   "tips.cliOverrides.text": "Hive modifie un peu le comportement de chaque CLI dans ses sessions, comme Copilot qui ne se met pas à jour lui-même ou le titre du terminal de Codex. Chaque modification peut être désactivée dans Paramètres → Avancé, sous sa CLI, qui indique ce que Hive ne peut plus faire sans elle.",

@@ -2,6 +2,7 @@
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
   'project.agents.add': undefined
+  'project.agents.chooseConnections': undefined
   'project.agents.connectionSettings': { model: string | number }
   'project.agents.merge': undefined
   'project.agents.off': { provider: string | number }

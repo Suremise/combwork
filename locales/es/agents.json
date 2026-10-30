@@ -351,7 +351,7 @@
   "agents.switch.title": "¿Cambiar el agente {agent} a {cli}?",
   "agents.template.nameTaken": "Otro agente de la plantilla se llama “{name}”.",
   "agents.template.new": "Agente nuevo (plantilla)",
-  "agents.template.note": "Para la plantilla “{template}”: Guardar lo guarda en la plantilla. Los ajustes que se dejen en “{projects}” siguen al proyecto en el que se cargue.",
+  "agents.template.noteSuggest": "Para la plantilla “{template}”: Guardar lo guarda en la plantilla. Su agente de programación es solo una sugerencia: la conexión de cada agente se elige al cargar la plantilla.",
   "agents.template.title": "Configuración del agente {agent} (plantilla)",
   "agents.tested.newer": "Esta versión salió después de que se probara esta versión de Hive. La mayoría de las actualizaciones funcionan; si algo se comporta de forma extraña, infórmalo (Copiar diagnóstico).",
   "agents.tested.older": "Es anterior a la probada; considera actualizar.",

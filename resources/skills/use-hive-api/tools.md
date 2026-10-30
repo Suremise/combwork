@@ -128,10 +128,11 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 
 ## Templates (`hive_template`)
 
-- `list`: those the project can use (Hive's own, the workspace's, its own).
+- `list`: those the project can use.
 - `plan`: what loading one would do, changing nothing: who it removes and creates, names another project's agent has (each with a free one), what stops it, and the workflow options it would set.
 - `load`: replaces every agent of the project with the template's and sets its workflow options for the project's version control (`workflow: false` leaves them). Refused while an agent runs, and when its workflow needs Git the project hasn't (setting up Git is the user's). `hive_undo` puts the agents, layout and options back.
 - `names`: new names by place ("1") or name; names are unique across the workspace.
+- `connections`: `*`, a role or an agent → a connection (`plan` lists them). `apply`: existing agents' only.
 - Only when the user asked for it.
 
 ## Agents' settings

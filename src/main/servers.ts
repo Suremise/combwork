@@ -72,7 +72,7 @@ import { isResuming } from './restartResume'
 import { sessions, type HookObservation } from './sessions'
 import { agentPlace, folderFacts } from './agentFolders'
 import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from './slotRelease'
-import { findTemplate, loadForAssistant, planReply, templateRows } from './templateApi'
+import { applyForAssistant, findTemplate, loadForAssistant, planReply, templateRows } from './templateApi'
 import { slotAt } from '../shared/agentFolders'
 import { agentNowOf, cardStall, laneOrderView, stepWaitOf, type StallAgent } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
@@ -2245,7 +2245,7 @@ route('POST', '/v1/projects/:name/templates/plan', async ({ params, body }) => {
   assistantTemplates('plan loading a template')
   const p = projectByName(params[0])
   const e = await findTemplate(p, body ?? {})
-  return (await planReply(p, e, body?.names, workflowArg(body))).reply
+  return (await planReply(p, e, body?.names, workflowArg(body), body?.connections)).reply
 })
 
 // Loading a template (HI-1502): the window's load, its names given, its workflow saved unless workflow is false; undoable.
@@ -2256,9 +2256,19 @@ route('POST', '/v1/projects/:name/templates/load', async ({ params, body }) => {
   const named = typeof body?.template === 'string' ? clip(body.template, 60) : 'a template'
   return assistantChange('agents', `load the template "${named}" into ${basename(p)}`, { kind: 'load-template', project: basename(p) }, async (guard) => {
     const e = await findTemplate(p, body ?? {})
-    const r = await loadForAssistant(p, e, body?.names, applyWorkflow, guard)
+    const r = await loadForAssistant(p, e, body?.names, applyWorkflow, guard, body?.connections)
     const wf = r.workflow ? (r.workflow.saved ? `, and its workflow (${r.workflow.changes.length} options changed)` : '; its workflow was not saved') : ''
     return { done: `Loaded the template "${r.template.name}" into ${r.project}: ${r.created.length} agents${wf}`, stays: UNDO_FINAL.templateCards, result: r }
+  })
+})
+
+// Choose Connections… (HI-2109): the project's existing agents given connections by role or name, nothing loaded; undoable.
+route('POST', '/v1/projects/:name/templates/apply', async ({ params, body }) => {
+  assistantTemplates("choose a project's agents' connections")
+  const p = projectByName(params[0])
+  return assistantChange('agents', `choose connections for ${basename(p)}'s agents`, { kind: 'update-agent', project: basename(p) }, async (guard) => {
+    const r = await applyForAssistant(p, body?.connections, guard)
+    return { done: `Chose connections in ${r.project}: ${r.changed.length} agents changed${r.skipped.length ? `, ${r.skipped.length} skipped` : ''}`, result: r }
   })
 })
 

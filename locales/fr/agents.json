@@ -351,7 +351,7 @@
   "agents.switch.title": "Passer l’agent {agent} à {cli} ?",
   "agents.template.nameTaken": "Un autre agent du modèle s’appelle « {name} ».",
   "agents.template.new": "Nouvel agent (modèle)",
-  "agents.template.note": "Pour le modèle « {template} » : Enregistrer l’enregistre dans le modèle. Les paramètres laissés sur « {projects} » suivent le projet dans lequel il est chargé.",
+  "agents.template.noteSuggest": "Pour le modèle « {template} » : Enregistrer l’enregistre dans le modèle. Son agent de code n’est qu’une suggestion : la connexion de chaque agent est choisie au chargement du modèle.",
   "agents.template.title": "Paramètres de l’agent {agent} (modèle)",
   "agents.tested.newer": "Cette version est sortie après les tests de cette version de Hive. La plupart des mises à jour fonctionnent ; si quelque chose se comporte bizarrement, signale-le (Copier les diagnostics).",
   "agents.tested.older": "Plus ancienne que la version testée ; pense à la mettre à jour.",

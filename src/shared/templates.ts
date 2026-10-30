@@ -7,7 +7,7 @@
 import { AGENT_LIMIT_MAX, ROLE_MAX, SESSION_LAYOUTS, projectAgents } from './defaults'
 import { isKnownProvider } from './providers'
 import { cleanMcpServers } from './agentMcp'
-import type { AgentDef, EffortLevel, PageLayout, PermissionMode, ProviderId } from './types'
+import type { AgentDef, PageLayout, ProviderId } from './types'
 import { msg } from './i18n/msg'
 import { shownText, withValues, type Text } from './advanced'
 import { agentWorkflowRole, buildsWork, isWorkflowRole, reviewsWork, type ReviewerMode, type WorkflowRole } from './workflow/roles'
@@ -53,9 +53,10 @@ export interface TemplateRef extends TemplateDest {
 }
 
 /**
- * One agent of a template: its role in the workflow (#1430), its note and its settings; never where it works (#1436:
- * agents aren't pinned to folders). Its provider may be one this Hive doesn't know (a template from a newer Hive,
- * imported): it is kept and shown, and blocks loading it.
+ * One agent of a template: its role in the workflow (#1430), its note, its MCP servers and the CLI it suggests; never
+ * where it works (#1436: agents aren't pinned to folders) nor what it runs on (HI-2109, decision G: no connection, model,
+ * effort, mode or context; those are the connection's, chosen when it is loaded). Its provider may be one this Hive
+ * doesn't know (a template from a newer Hive, imported): kept and shown, never used.
  */
 export interface TemplateAgent {
   /** Its name, or a pattern of the project's key (`{key}-B1`: Hive's own templates, #1123 names). */
@@ -63,20 +64,10 @@ export interface TemplateAgent {
   role: WorkflowRole
   /** What it is for, in the user's words (the agent's note, `AgentDef.role`). */
   note?: string
-  provider: ProviderId
-  model?: string
-  effort?: EffortLevel
-  permissionMode?: PermissionMode
-  use200kContext?: boolean
+  /** The CLI it suggests (HI-2109): it only preselects a connection on that CLI in the picker. Absent: none. */
+  provider?: ProviderId
   /** Only these of the project's MCP servers (#537); absent: all of them. */
   mcpServers?: string[]
-  /**
-   * The connection it ran on (HI-1755), with `model`: what runs it. A connection's id is this machine's: where it isn't
-   * on, the load dialog asks (HI-1769), the same CLI's default preselected; absent, it uses the workspace's default.
-   */
-  connection?: string
-  /** That connection's name when saved (HI-1769): shown where its id isn't here, never used to find one. */
-  connectionName?: string
 }
 
 export interface AgentTemplate {
@@ -134,8 +125,8 @@ export interface TemplateEntry {
 }
 
 /**
- * A template of a project's agents and layout. `provider` gives each agent's provider as it runs now (stored on the
- * agent since 0.2, else the project's or the app's default), so a template is the same wherever it is loaded.
+ * A template of a project's agents and layout. `provider` gives each agent's CLI as it runs now (stored on the agent
+ * since 0.2), kept as the CLI it suggests (HI-2109); its connection, and so its model, effort and mode, never.
  */
 export function templateFrom(name: string, agents: AgentDef[], layout: PageLayout, provider: (a: AgentDef) => ProviderId, now = new Date(), suggestedPreset?: SuggestedPreset, patternKey?: string): AgentTemplate {
   const list = projectAgents({ agents })
@@ -156,11 +147,7 @@ export function templateFrom(name: string, agents: AgentDef[], layout: PageLayou
       role: agentWorkflowRole(a),
       ...(a.role ? { note: a.role } : {}),
       provider: a.provider || provider(a),
-      ...(a.model ? { model: a.model } : {}),
-      ...(a.effort ? { effort: a.effort } : {}),
-      ...(a.permissionMode ? { permissionMode: a.permissionMode } : {}),
-      ...(typeof a.use200kContext === 'boolean' ? { use200kContext: a.use200kContext } : {}),
-      // Never its connection (HI-2106): a setup of this machine's, chosen when it is loaded.
+      // Never its connection, model, effort, mode or context (HI-2109, decision G): chosen when it is loaded.
       ...(Array.isArray(a.mcpServers) ? { mcpServers: [...a.mcpServers] } : {})
     })),
     ...(suggestedPreset ? { suggestedPreset } : {}),
@@ -186,9 +173,6 @@ export function templatePairs(agents: readonly { name: string; role: WorkflowRol
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const text = (v: unknown, max: number): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= max
-/** A model, effort or mode as a CLI names it: short, no spaces or control characters. */
-const setting = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9._:/[\]-]{1,100}$/.test(v)
-
 // Why a template file can't be used: shown in the Templates view and the dialogs that read one (window text).
 const M = {
   notTemplate: msg({ id: 'assistant.template.notTemplate', defaultMessage: "It isn't a Hive agent template.", description: "Why a template file can't be used: it isn't one." }),
@@ -200,13 +184,10 @@ const M = {
   tooManyAny: msg({ id: 'assistant.template.tooMany', defaultMessage: 'It has {count} agents; a project can have up to {max}.', description: "Why a template file can't be used: more agents than any project can have." }),
   agentNoName: msg({ id: 'assistant.template.agentNoName', defaultMessage: 'Agent {n} has no name (or one over 60 characters).', description: "Why a template file can't be used: its agent number {n} (1, 2…) has no usable name." }),
   sameName: msg({ id: 'assistant.template.sameName', defaultMessage: 'Two agents are called "{name}".', description: "Why a template file can't be used: two agents share a name." }),
-  badProvider: msg({ id: 'assistant.template.badProvider', defaultMessage: "{name}'s coding agent isn't one Hive can use ({given, select, yes {{provider}} other {none}}).", description: "Why a template file can't be used: an agent's coding agent (Claude Code, Codex…) is no id Hive could know. {name} is the agent; {provider} what the file says; none when it says nothing." }),
   badRole: msg({ id: 'assistant.template.badRole', defaultMessage: "{name}'s role in the workflow isn't builder, reviewer, either or generalist.", description: "Why a template file can't be used: an agent's role in the workflow (glossary: builder, reviewer, either) is none of the three. Keep builder, reviewer and either as they are (the file's values)." }),
   longNote: msg({ id: 'assistant.template.longNote', defaultMessage: 'The note of agent {name} is over {max, number} characters.', description: "Why a template file can't be used: an agent's note (what it is for, in the user's words) is too long. {max} is the limit, a number. A noun before the name (glossary §1 rule 4)." }),
   badToken: msg({ id: 'assistant.template.badToken', defaultMessage: "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).", description: "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Hive doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are." }),
   badPairs: msg({ id: 'assistant.template.badPairs', defaultMessage: 'Its pairs of builders and reviewers name agents it doesn’t have, or an agent twice.', description: "Why a template file can't be used: its list of builders paired with reviewers (glossary: builder, reviewer) doesn't match its agents." }),
-  badSetting: msg({ id: 'assistant.template.badSetting', defaultMessage: "{name}'s {setting, select, model {model} effort {effort} other {permissionMode}} isn't one Hive can use.", description: "Why a template file can't be used: an agent's model, effort or permission mode is no value a coding agent takes. Keep permissionMode as it is (the file's field)." }),
-  badContext: msg({ id: 'assistant.template.badContext', defaultMessage: "{name}'s context setting isn't one Hive can use.", description: "Why a template file can't be used: an agent's 200K context setting isn't on or off." }),
   badMcp: msg({ id: 'assistant.template.badMcp', defaultMessage: "{name}'s MCP servers aren't a list Hive can use.", description: "Why a template file can't be used: an agent's list of MCP servers." })
 }
 
@@ -247,12 +228,11 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
     // a number's 2 digits).
     const token = /\{[^}]*\}/.exec(name.replace(NAME_TOKENS, ''))?.[0]
     if (token) return withValues(M.badToken, { name, token })
-    // One this Hive doesn't know is kept (flagged where it is shown; loading it is refused), as long as it looks like one.
-    if (!isProviderId(a.provider)) return withValues(M.badProvider, { name, given: typeof a.provider === 'string' ? 'yes' : 'no', provider: typeof a.provider === 'string' ? a.provider.slice(0, 40) : '' })
+    // The CLI it suggests (HI-2109): one this Hive doesn't know is kept (flagged where it is shown) as long as it looks
+    // like one; anything else is no suggestion, never a refusal.
+    const provider = isProviderId(a.provider) ? a.provider : undefined
     if (a.role !== undefined && !isWorkflowRole(a.role)) return withValues(M.badRole, { name })
     if (a.note !== undefined && (typeof a.note !== 'string' || a.note.length > ROLE_MAX)) return withValues(M.longNote, { name, max: ROLE_MAX })
-    for (const k of ['model', 'effort', 'permissionMode'] as const) if (a[k] !== undefined && !setting(a[k])) return withValues(M.badSetting, { name, setting: k })
-    if (a.use200kContext !== undefined && typeof a.use200kContext !== 'boolean') return withValues(M.badContext, { name })
     let mcpServers: string[] | undefined
     try {
       mcpServers = cleanMcpServers(a.mcpServers)
@@ -265,13 +245,9 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
       // None given: read as an agent of that name and note would be (#1430's guess).
       role: isWorkflowRole(a.role) ? a.role : agentWorkflowRole({ name, ...(note ? { role: note } : {}) }),
       ...(note ? { note } : {}),
-      provider: a.provider as ProviderId,
-      ...(a.model ? { model: a.model as string } : {}),
-      ...(a.effort ? { effort: a.effort as string } : {}),
-      ...(a.permissionMode ? { permissionMode: a.permissionMode as string } : {}),
-      ...(typeof a.use200kContext === 'boolean' ? { use200kContext: a.use200kContext } : {}),
-      // Its connection and its name (HI-1769) are dropped as it is read (HI-2106: connections are this machine's setups,
-      // chosen when it is loaded; HI-2109 builds that choice).
+      ...(provider ? { provider } : {}),
+      // Its model, effort, mode, context, connection and connection's name (from before HI-2109) are dropped as it is
+      // read, whatever they hold: never a refusal (decision G: connections are this machine's, chosen when it is loaded).
       ...(mcpServers ? { mcpServers } : {})
     })
   }
@@ -332,9 +308,9 @@ export const pairIndex = (agents: readonly Pick<TemplateAgent, 'name' | 'role'>[
 /** A provider's id as Hive writes one: known to this Hive or not. */
 const isProviderId = (v: unknown): v is string => typeof v === 'string' && /^[a-z][a-z0-9-]{0,39}$/.test(v)
 
-/** The providers of a template's agents that this Hive doesn't know (each once). */
+/** The CLIs a template's agents suggest that this Hive doesn't know (each once). */
 export function unknownProviders(agents: readonly TemplateAgent[]): string[] {
-  return [...new Set(agents.map((a) => a.provider).filter((p) => !isKnownProvider(p)))]
+  return [...new Set(agents.map((a) => a.provider).filter((p): p is string => !!p && !isKnownProvider(p)))]
 }
 
 /**

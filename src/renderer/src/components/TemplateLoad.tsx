@@ -7,7 +7,8 @@ import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { set, useStore } from '../store'
 import { TemplatePlan } from './TemplatePlan'
-import { useConnections } from './ConnectionChoice'
+import { ConnectionsSection } from './TemplateConnections'
+import { answerFor, initialPicker, loadFallback, pickerAnswers, type ConnectionAnswers, type PickerState } from '@shared/templateConnections'
 import { TemplateLoadWorkflowPart, workflowBlocks } from './TemplateLoadWorkflow'
 import { useAgentLimit } from '../advanced'
 import { OPEN_WORKFLOW_OPTIONS } from '@shared/defaults'
@@ -21,8 +22,10 @@ import { loadedMaxAgents } from '@shared/workflow/templateOptions'
  * edited to any free one. One another project's agent has, one used twice or an empty one is marked, saying what it
  * clashes with, and the dialog's button stays greyed out (`dialogBlocked`) until none is; this project's own agents
  * don't count, as the load replaces them. The plan (who replaces whom) is asked for again once typing pauses.
- * `onChange` hears the names the button loads. HI-1910: under it, the template's workflow (TemplateLoadWorkflow.tsx):
- * `onWorkflow` hears whether to apply it; a Git-only one, ticked in a project with no version control, holds the button.
+ * `onChange` hears the names the button loads. HI-2109: under the plan, the Connections section (TemplateConnections.tsx)
+ * choosing what each agent runs on, the table following it; `onConnections` hears its answers, by the names chosen.
+ * HI-1910: under it, the template's workflow (TemplateLoadWorkflow.tsx): `onWorkflow` hears whether to apply it; a
+ * Git-only one, ticked in a project with no version control, holds the button.
  */
 const M = {
   sameTwice: msg({ id: 'assistant.loadNames.sameTwice', defaultMessage: 'Another of its agents has this name.', description: "Load template, under a name box: another of the template's agents is given the same name." }),
@@ -33,11 +36,9 @@ const M = {
   takenNote: msg({ id: 'assistant.loadNames.filledNote', defaultMessage: 'Agent names are unique across the workspace, and {count, plural, one {this name is} other {these names are}} taken already: {names} (projects: {projects}). {count, plural, one {A free name is} other {Free names are}} filled in below. Change any name you like.', description: "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them. Each sentence whole, the verb never agreeing with a list (HI-1585: glossary §1 rules 3 and 4)." })
 }
 
-export function TemplateLoadNames({ path, scope, file, from, initial, onChange, onConnections, onWorkflow, onOpenWorkflow, onSetUpGit, onPlan }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void; onConnections?: (choices: Record<number, string | null>) => void; onWorkflow?: (apply: boolean) => void; onOpenWorkflow?: () => void; onSetUpGit?: () => void; onPlan?: (plan: TemplateLoadPlan) => void }) {
+export function TemplateLoadNames({ path, scope, file, from, initial, onChange, onConnections, onWorkflow, onOpenWorkflow, onSetUpGit, onPlan }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void; onConnections?: (answers: ConnectionAnswers) => void; onWorkflow?: (apply: boolean) => void; onOpenWorkflow?: () => void; onSetUpGit?: () => void; onPlan?: (plan: TemplateLoadPlan) => void }) {
   const project = useStore((s) => s.workspace?.projects.find((p) => p.path === path) ?? null)
   const projects = useStore((s) => s.workspace?.projects)
-  const settings = useStore((s) => s.settings)
-  const providers = useStore((s) => s.providers)
   const [plan, setPlan] = useState(initial)
   // The plan shown now (HR5's HI-1910 round 1): its workflow is the one the load is checked against.
   useEffect(() => onPlan?.(plan), [plan, onPlan])
@@ -55,10 +56,13 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange, 
     return chosen
   })
   const [planError, setPlanError] = useState<string | null>(null)
-  // The connection chosen for each agent the plan flags (HI-1769), by its index: the workspace's default to start with.
-  const connections = useConnections()
-  const [choices, setChoices] = useState<Record<number, string | null>>(() => Object.fromEntries(initial.connections.map((c) => [c.index, null])))
-  useEffect(() => onConnections?.(choices), [choices, onConnections])
+  // The connections (HI-2109): each role's preselected (the first on the CLI it suggests, else the first usable), changed
+  // in the Connections section; the load takes its answers by the names chosen now.
+  const [picker, setPicker] = useState<PickerState>(() => initialPicker(initial.create, initial.options))
+  const picked = names.map((n, i) => ({ name: n, role: initial.create[i]?.role ?? 'generalist', provider: initial.create[i]?.provider }))
+  const answers = pickerAnswers(picker, picked)
+  const answersKey = JSON.stringify(answers)
+  useEffect(() => onConnections?.(JSON.parse(answersKey) as ConnectionAnswers), [answersKey, onConnections])
   // This project's agents don't count: the load replaces them.
   const others = useMemo(() => workspaceAgentList(projects).filter((a) => a.project.toLowerCase() !== (project?.name ?? '').toLowerCase()), [projects, project])
   const problems = names.map((n, i) => {
@@ -101,7 +105,9 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange, 
     }
   }, [key, unusable, path, scope, file, from, initial])
   if (!project) return null
-  const shown = templateLoadView(plan, project.config, settings, (id) => providers[id])
+  // Each agent on the connection the section gives it now, as the load will.
+  const refs = answerFor(picked, answers, loadFallback(picked, plan.options))
+  const shown = templateLoadView(plan, (i) => plan.options.find((o) => o.id === refs[i]) ?? null)
   // Each agent's partner by the name in its box (#1440, the Assistant's screenshots): "with AP-R1" follows the edits,
   // as the load pairs them (by place) under the names chosen.
   const partnerOf = (i: number): number | undefined => {
@@ -116,12 +122,9 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange, 
           {tr(M.takenNote, { projects: fmt.list([...new Set(initial.taken.map((t) => t.project))], 'unit'), count: initial.taken.length, names: fmt.list(initial.taken.map((t) => t.name), 'unit') })}
         </p>
       )}
-      <TemplatePlan
-        view={view}
-        edit={{ from: initial.templateNames, names, problems, onName: (i, v) => setNames((x) => x.map((n, j) => (j === i ? v : n))) }}
-        connections={connections ? { view: connections, own: plan.create.map((a) => a.connection), flagged: plan.connections, choices, onChoice: (i, id) => setChoices((x) => ({ ...x, [i]: id })) } : undefined}
-      />
+      <TemplatePlan view={view} edit={{ from: initial.templateNames, names, problems, onName: (i, v) => setNames((x) => x.map((n, j) => (j === i ? v : n))) }} />
       {planError && <div className="field-error">{planError}</div>}
+      <ConnectionsSection agents={picked} options={plan.options} state={picker} onState={setPicker} />
       {plan.workflow && <TemplateLoadWorkflowPart workflow={plan.workflow} apply={apply} onApply={setApply} onSetUpGit={() => onSetUpGit?.()} />}
       {saves !== null && saves !== now && (
         <p className="template-plan-note" data-saves-max={saves}>

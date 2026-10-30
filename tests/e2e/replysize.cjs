@@ -594,6 +594,10 @@ const prose = (seed, n) => {
   check('…a plan: who comes, the name given beside its own', /^"Team 3×3" into gamma: removes no agents; creates Gamma lead \([A-Z]+-B1\) builder with [A-Z]+-R1/.test(templatePlan), templatePlan)
   const templateLoaded = measure('hive_template (load)', tool('hive_template', { action: 'load', project: 'gamma', template: 'team-3x3.json', names: { 1: 'Gamma lead' } }, 'assistant'), 1500)
   check('…a load: what it made, the name given, and that undo puts it back', /^Loaded "Team 3×3" into gamma: removed no agents; created Gamma lead, .*hive_undo can put the agents and options back\.$/.test(templateLoaded), templateLoaded)
+  // Choose Connections (HI-2109): the reviewers on the first connection the plan offered, in a line.
+  const offeredConnection = /Connections here: [^(]*\([^,]+, ([^)]+)\)/.exec(templatePlan)?.[1] ?? ''
+  const applied = measure('hive_template (apply)', tool('hive_template', { action: 'apply', project: 'gamma', connections: { reviewer: offeredConnection } }, 'assistant'), 500)
+  check('…apply: who got which connection, in a line', applied.startsWith('Connections in gamma: ') && !applied.includes('\n'), applied)
   check('…the tool is the Assistant\'s, not offered to project agents', toolDescription('hive_template') === '' && toolDescription('hive_template', 'assistant').length > 0)
 
   console.log('\n--- Agent API routes not behind a tool')

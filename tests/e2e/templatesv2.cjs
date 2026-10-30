@@ -6,7 +6,7 @@
 // Claude Code with a note on their rows, its workflow unticked; Pair loaded from + Add ▾ → Templates with "Also apply its
 // workflow" (HI-1910: Hive's own carry their preset's) ticked lands in Version Control → Workflow with Pair chosen and not
 // saved. Screenshots of the Hive templates, and of
-// the load dialog's suggestion and swap note, in both themes. Dev build (or HIVE_EXE), throwaway profile, workspace and
+// the load dialog's suggestion and connections (HI-2109), in both themes. Dev build (or HIVE_EXE), throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy. (0.9's templates copied at the board's real upgrade, and the upgrade waiting:
 // tests/upgradeTemplates.test.ts, on boards made 0.9's.)
 const lib = require('./lib.cjs')
@@ -43,7 +43,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
   fs.writeFileSync(path.join(ws, '.hive', 'templates', 'old-pair.json.bak'), v09('Old pair'))
   fs.writeFileSync(path.join(alpha, '.hive', 'templates', 'mine.json'), v09('Mine'))
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase()]))
-  // Claude Code only: Codex stays turned off, so Hive's templates' reviewers run on Claude Code (#1436's swap).
+  // Claude Code only: Codex stays turned off, so Hive's templates' reviewers start on Claude Code's connection (HI-2109: Codex is only their suggestion).
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -147,7 +147,9 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     const key = names[0].split('-')[0]
     const want = ['B1', 'B2', 'B3', 'R1', 'R2', 'R3'].map((n) => `${key}-${n}`)
     check("…its agents named from alpha's key (#1123 names)", /^[A-Z]{2,4}$/.test(key) && JSON.stringify(names) === JSON.stringify(want), JSON.stringify(names))
-    check('…its reviewers on Claude Code, Codex being off, said on their rows', (await teamLoad.locator('.template-plan-swapped').allInnerTexts()).map((t) => t.trim()).join('|') === Array(3).fill('Codex is turned off (Settings → Providers): Claude Code instead.').join('|'), JSON.stringify(await teamLoad.locator('.template-plan-swapped').allInnerTexts()))
+    // HI-2109: Codex off, its reviewers' role suggests Codex, so they start on the first connection there is (Claude Code's).
+    const conns = await teamLoad.locator('.template-plan-table tbody .template-plan-connection').evaluateAll((l) => l.map((x) => x.dataset.connection))
+    check('…every agent on the one connection there is (Codex being off), its reviewers too', conns.length === 6 && !!conns[0] && conns.every((c) => c === conns[0]) && (await teamLoad.locator('[data-connection-for="reviewer"] .template-connections-suggests').innerText()) === 'suggests Codex', JSON.stringify(conns))
     // Its preset as its workflow (HI-1910), ticked by default; unticked here, so only its agents load.
     const teamApply = teamLoad.locator('[data-template-workflow] [data-workflow-apply]')
     check('…and shows its workflow, ticked', (await teamApply.count()) === 1 && (await teamApply.isChecked()) && (await teamLoad.locator('.dialog-check').count()) === 0)
@@ -165,14 +167,14 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     await page.getByText('alpha', { exact: true }).first().click()
     check('…all six shown at once', !!(await until(async () => (await lib.agentCount(page)) === 6, HUNG_MS)))
 
-    // --- Pair from + Add ▾ → Templates: its workflow and its swap note; ticked, Version Control → Workflow with Pair
+    // --- Pair from + Add ▾ → Templates: its workflow and its connections; ticked, Version Control → Workflow with Pair
     // chosen, not saved (HI-1910: its workflow, as its suggestion was).
     await lib.addMenuRun(page, 'Templates')
     const item = (label) => page.locator('.menu .menu-item').filter({ has: page.getByText(label, { exact: true }) }).first()
     await until(async () => (await item('Pair').count()) === 1, HUNG_MS)
     await item('Pair').click()
     const pairLoad = page.locator('.dialog', { hasText: 'Load "Pair"?' })
-    check('Pair: the load dialog shows', !!(await until(async () => (await pairLoad.locator('.template-plan-swapped').count()) === 1, HUNG_MS)))
+    check('Pair: the load dialog shows', !!(await until(async () => (await pairLoad.locator('[data-template-connections] [data-connection-for="reviewer"]').count()) === 1, HUNG_MS)))
     const tick = pairLoad.locator('[data-template-workflow] [data-workflow-apply]')
     check('…its workflow, ticked', (await tick.count()) === 1 && (await tick.isChecked()) && (await pairLoad.locator('[data-template-workflow] li').count()) > 0, await pairLoad.locator('[data-template-workflow]').innerText().catch(() => ''))
     await shoot('load-suggestion', () => pairLoad)

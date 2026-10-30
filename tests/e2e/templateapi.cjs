@@ -149,6 +149,19 @@ const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.j
     const agentsOnly = await load('plain', { template: 'Git only', names: free, workflow: false }, assistant)
     check('with workflow: false its agents load alone', agentsOnly.status === 200 && agentsOnly.body?.created?.join() === 'P-Ann,P-Rob' && agentsOnly.body.workflow === null, JSON.stringify(agentsOnly.body))
     check('…plain still has no version control', (await inv('workflow:form', plain)).platform === 'none')
+
+    // --- 6. Connections (HI-2109): a plan names each agent's and what may be named; apply (Choose Connections) changes
+    // only existing agents' connections, checked first, the Assistant's alone.
+    check('a plan names each agent’s connection and the connections usable here', planned.body.create.every((a) => typeof a.connection === 'string' && a.connection) && planned.body.options?.length > 0, JSON.stringify([planned.body.create, planned.body.options]))
+    const apply = (p, body, token) => api('POST', `/v1/projects/${p}/templates/apply`, body, token)
+    const option = planned.body.options[0]
+    check("a script's apply is refused (403)", (await apply('plain', { connections: { '*': option.id } })).status === 403)
+    const typo = await apply('plain', { connections: { builders: option.id } }, assistant)
+    check('apply: a key that is no role or agent is refused (400), naming the agents', typo.status === 400 && /builders is not "\*", a role or one of its agents \(P-Ann, P-Rob\)/.test(typo.body?.error ?? ''), JSON.stringify(typo.body))
+    const gone = await apply('plain', { connections: { reviewer: 'Nowhere' } }, assistant)
+    check('…a connection not usable here is refused (409), nothing changed', gone.status === 409 && /no connection "Nowhere" can be used here/.test(gone.body?.error ?? ''), JSON.stringify(gone.body))
+    const applied = await apply('plain', { connections: { '*': option.name } }, assistant)
+    check('…by name: each agent on it, said (none moved: already there)', applied.status === 200 && applied.body?.project === 'plain' && Array.isArray(applied.body.changed) && applied.body.skipped?.length === 0 && cfgOf(plain).agents.every((a) => a.connection === option.id), JSON.stringify(applied.body))
   } finally {
     await app.close().catch(() => undefined)
   }
