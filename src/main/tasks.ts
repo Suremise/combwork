@@ -27,7 +27,7 @@ import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCar
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
-import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, STAGE_CATEGORY, type AskActionKind, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
+import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
@@ -1256,6 +1256,9 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
   return recording(actor, reads, () => boardLock(ws, () => createTaskLocked(...args)))
 }
 
+/** The Assistant's card made in Doing with nobody on it (HI-2062): refused, naming the user's three choices. */
+export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultMessage: 'A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then hive_start_task), or nobody on it (make it in Todo, then move it with override and their reason).', description: "An error said to the Hive Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and hive_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names." })
+
 async function createTaskLocked(
   input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string },
   actor: TaskActor
@@ -1274,6 +1277,8 @@ async function createTaskLocked(
   // An agent that puts a new card straight into Doing, naming no agent, is taking it.
   const own = column === 'doing' && input.agent === undefined ? selfIn(actor, project) : null
   const agent = input.agent ? await agentOf(project, input.agent) : own ? await agentOf(project, own) : null
+  // The Assistant's card made in Doing with nobody on it (HI-2062): which the user wants is theirs, as a move's is.
+  if (actor.kind === 'assistant' && column === 'doing' && project && !agent) throw new TaskConflictError(DOING_NOBODY_NEW)
   const ws = workspace
   const by = actorName(actor)
   const now = new Date().toISOString()
@@ -1400,7 +1405,11 @@ async function gateOf(ws: WorkspaceService, n: number, patch: TaskPatch, actor: 
   // A stage its ruleset lacks: refused by the runtime with why (the window's move, `anyStage`); the board's other moves
   // keep P3's recorded move until the window asks through tasks:move (#1275), so today's columns go on working.
   if (s.stage === to || (!o.anyStage && !hasStage(wf.rulesetOf(rec, s), to))) return null
-  const agent = patch.agent !== undefined ? await agentIdIn(ws, head.project, patch.agent) : typeof head.agent === 'string' && head.agent ? head.agent : null
+  // The agent it is started for: one named, else the card's, which a change of project takes off (HI-2062).
+  const leaves = patch.project !== undefined && patch.project !== head.project
+  const agent = patch.agent !== undefined ? await agentIdIn(ws, head.project, patch.agent) : !leaves && typeof head.agent === 'string' && head.agent ? head.agent : null
+  // An agent named that the project lacks is its own error (agentOf's), never a start for nobody (HI-2062).
+  if (!agent && typeof patch.agent === 'string' && patch.agent) await agentOf(head.project, patch.agent)
   return { wf, to, by: actor.kind, ...(agent ? { builder: agent } : {}) }
 }
 
@@ -1624,7 +1633,10 @@ async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: Tas
     (wf) => wf.move(n, g.to, g.by, { confirm, ...(reason ? { reason } : {}), ...(g.builder ? { builder: g.builder } : {}) }),
     (w, first) => {
       const placed = STAGE_CATEGORY[w.current] === target ? { ...(before !== undefined ? { before } : {}), ...(position !== undefined ? { position } : {}) } : {}
-      return { patch: { ...(first ? rest : {}), ...placed }, opts: first ? opts : {} }
+      // A write that takes the card into Active (a start, or back from Review: HI-2062): whether its Override lets the card
+      // be left with nobody on it, checked on the card as the write leaves it (updateTaskAs).
+      const entered = w.current === 'active' && w.was !== 'active' ? { entered: { nobodyOk: w.written.some((f) => f.kind === 'Override' && (f.data as FactData['Override']).rules.includes('move.doingNobody')) } } : {}
+      return { patch: { ...(first ? rest : {}), ...placed }, opts: { ...(first ? opts : {}), ...entered } }
     }
   )
   // A drag that went as far as it could (its start written, its submission refused for what no override makes true).
@@ -1641,12 +1653,40 @@ async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActo
   // which asks; one that would skip a rule here is refused with the rules it names. Hive's own calls for the user (a
   // card's Start) confirm as before.
   const { ask, ...rest } = opts
-  const r = await moveThroughRules(g, n, patch, actor, rest, !ask)
+  const r = await moveDecidedAgain(g, n, patch, actor, rest, !ask)
   if ('refused' in r) throw new WorkflowRefusedError(r.refused)
   // Stopped part way: the user sees where the card is; the Assistant is told why it stopped there (its start kept).
   if ('moved' in r && r.stopped && actor.kind !== 'user') throw new WorkflowRefusedError(r.stopped)
   if ('ask' in r) throw new WorkflowRefusedError(refusalOf('move.needsOverride', { card: cardRef(n), stage: g.to, rules: r.ask.join(', ') }, 'the user')) // i18n-ignore: who can override, agent-facing (§16.8.3)
   return r.moved
+}
+
+/**
+ * The card's agent changed under the Assistant's move into Active (HI-2062): its write left the card with nobody on it,
+ * though the move was decided for an agent. The write is undone; the move is decided again on the card as it is now.
+ */
+class NobodyChanged extends Error {
+  constructor(n: number) {
+    super(`#${n}'s agent changed under its move into Active`) // i18n-ignore: an internal signal, never shown
+  }
+}
+
+/**
+ * moveThroughRules, decided again when its write into Active found the card's agent gone (NobodyChanged): with the gate read
+ * again, the move is for nobody now, so it is refused without the user's reason, or its one Override names the rule. A
+ * card still changing under it after that is refused, as nobody on it.
+ */
+async function moveDecidedAgain(g: Gate, n: number, patch: TaskPatch, actor: TaskActor, opts: Parameters<typeof updateTaskLocked>[3], confirm: boolean): Promise<MoveResult> {
+  for (let tries = 0; ; tries++) {
+    try {
+      return await moveThroughRules(g, n, patch, actor, opts, confirm)
+    } catch (e) {
+      if (!(e instanceof NobodyChanged)) throw e
+      const again = tries < 2 ? await gateOf(workspace, n, patch, actor) : null
+      if (!again) throw new WorkflowRefusedError(refusalOf('move.doingNobody', { card: cardRef(n), stage: 'active' }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
+      g = again
+    }
+  }
 }
 
 /**
@@ -2089,7 +2129,7 @@ async function planned(ws: WorkspaceService, numbers: number[], patch: Pick<Task
 /** For tests: runs as a card's change begins, in its board change (to hold a batch at a card). */
 export const taskTestHooks: { beforeUpdate: ((n: number) => Promise<void>) | null } = { beforeUpdate: null }
 
-async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; ask?: boolean; note?: StoredText[] } = {}): Promise<TaskCard> {
+async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; ask?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean } } = {}): Promise<TaskCard> {
   // Its facts are this actor's (#1216), with the reads its caller made before the change, if any.
   return recordingAs(actor, () => updateTaskAs(n, patch, actor, opts))
 }
@@ -2105,7 +2145,7 @@ async function stageNamesOf(ws: WorkspaceService, project: string | null | undef
   return names && Object.keys(names).length ? names : null
 }
 
-async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[] }): Promise<TaskCard> {
+async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean } }): Promise<TaskCard> {
   await taskTestHooks.beforeUpdate?.(n)
   const ws = workspace
   const by = actorName(actor)
@@ -2202,6 +2242,15 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
         delete card.agentName
       }
     }
+    // The Assistant's move into Doing leaving nobody on the card (HI-2062), on the card as it is now, its agent as this
+    // change leaves it (a project change takes it off): nobody on it is the user's choice, passed as override with their
+    // reason (null: refused). A runtime move's write into Active (a start, or back from Review) is checked the same way:
+    // its Override names the rule when its move was for nobody; one decided for an agent that this change leaves off
+    // (taken off meanwhile) undoes the write, and the move is decided again on the card as it is now (moveThrough).
+    const leftEmpty = actor.kind === 'assistant' && patch.column === 'doing' && card.column !== 'doing' && !!card.project && !card.agent
+    if (leftEmpty && changeByRuntime() && opts.entered && !opts.entered.nobodyOk) throw new NobodyChanged(n)
+    const nobody = leftEmpty && !changeByRuntime() ? patch.override?.reason.trim() || null : undefined
+    if (nobody === null) throw new WorkflowRefusedError(refusalOf('move.doingNobody', { card: cardRef(n), stage: 'active' }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
     // A review renewed by its reviewer changes the card (when it started) without a line in its history: saved too.
     const reviewed = patch.review !== undefined && (await reviewChange(card, patch, actor, said))
     if (patch.column !== undefined || patch.before !== undefined || patch.position !== undefined) {
@@ -2288,6 +2337,8 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // see the card as it was before this change.
     opts.commit?.()
     await saveCard(ws, n, card, before)
+    // Nobody on it, by the user's reason: recorded as an override is (setKind's), with the rule it passes.
+    if (nobody) FactStore.forBoard(ws, { project: card.project, key: '' }).tx((tx) => tx.append(n, { kind: 'Override', actor: actorOf(actor), source: 'recorded', data: { rules: ['move.doingNobody'], move: `${CATEGORY_STAGE[before.column]}→active`, by: 'assistant', reason: nobody } })) // i18n-ignore: a fact's kind and codes, not text
     return card
   })()
   changed(ws)

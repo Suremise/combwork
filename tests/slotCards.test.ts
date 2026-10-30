@@ -586,7 +586,8 @@ describe("a Start's prompt goes to the slot's placement only while one is due (H
     expect(await placementDue(ws, e.project, n)).toBeNull()
     const card = e.store.card(n)
     await e.wf.write(card, null, 'hive', (w) => void w.move('review', 'intent'))
-    moved(await e.wf.move(n, 'active', 'assistant'))
+    // A Start names its agent (taskStart's move gives it): never a move into Active for nobody (HI-2062).
+    moved(await e.wf.move(n, 'active', 'assistant', { builder: 'B1' }))
     expect(e.wf.state(e.store.card(n)).stage).toBe('active')
     expect(e.kinds(n).filter((k) => k === 'Started')).toHaveLength(1)
     expect(await placementDue(ws, e.project, n)).toBeNull()

@@ -278,6 +278,8 @@ interface HiveMessageValues {
   'workflow.refused.merge.hiveMerges.nextReturned': undefined
   'workflow.refused.merge.hiveMerges.nextStale': { current: string | number }
   'workflow.refused.merge.hiveMerges.nextTesting': { target: string | number }
+  'workflow.refused.move.doingNobody.message': { card: string | number; stage: string | number; also: string; rules: string | number }
+  'workflow.refused.move.doingNobody.next': { reader: string }
   'workflow.refused.move.needsOverride.change': { reader: string }
   'workflow.refused.move.needsOverride.message': { card: string | number; stage: string | number; rules: string | number }
   'workflow.refused.move.needsOverride.next': { reader: string }
@@ -370,6 +372,7 @@ interface HiveMessageValues {
   'workflow.rule.integrate.approved': undefined
   'workflow.rule.integrate.checksPassed': undefined
   'workflow.rule.integrate.upToDate': undefined
+  'workflow.rule.move.doingNobody': undefined
   'workflow.rule.requeue.allowed': undefined
   'workflow.rule.review.decisionsReceived': undefined
   'workflow.rule.review.notAuthor': undefined

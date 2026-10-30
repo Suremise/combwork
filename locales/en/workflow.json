@@ -1107,6 +1107,14 @@
     "defaultMessage": "The merge queue is merging it into {target} now and moves it to Done once merged: wait for that, or for it to come back.",
     "description": "The next step after a refused merge of a card the merge queue is testing or merging now. {target} is a branch name."
   },
+  "workflow.refused.move.doingNobody.message": {
+    "defaultMessage": "{card} would be in {stage} with nobody on it{also, select, yes {, and the move skips: {rules}} other {}}.",
+    "description": "A refused move into the Active stage by the Hive Assistant (HI-2062): the card {card} (its key, like AM-12) would have no agent on it. {stage} is the stage's name. {also} (select): yes when the move also skips other rules, listed in {rules}; translate both branches."
+  },
+  "workflow.refused.move.doingNobody.next": {
+    "defaultMessage": "{reader, select, you {Choose nobody on it, an agent on it, or an agent started on it.} other {Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (hive_start_task).}}",
+    "description": "The next step after the Assistant's move into Active was refused for leaving nobody on the card: the user chooses nobody on it, an agent given the card, or an agent started on it. override, agent and hive_start_task are names of a call's fields and a tool: keep them as they are. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
   "workflow.refused.move.needsOverride.change": {
     "defaultMessage": "{reader, select, you {These rules are set in Version Control, where you can change them.} other {These rules are set in Version Control, where the user can change them.}}",
     "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it). {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
@@ -1474,6 +1482,10 @@
   "workflow.rule.integrate.upToDate": {
     "defaultMessage": "Work is up to date before it merges",
     "description": "A rule of the workflow, named where a move skips or can't check it (glossary 2.6: G8, without the branch name)."
+  },
+  "workflow.rule.move.doingNobody": {
+    "defaultMessage": "A card in Active has someone on it, unless you say otherwise",
+    "description": "A rule of the workflow, named where a move skips it (HI-2062): the Hive Assistant moves a card into Active with nobody on it only with the user's reason (glossary: override). Active is a stage's name."
   },
   "workflow.rule.requeue.allowed": {
     "defaultMessage": "Unchanged work is queued again only after a failure outside it",

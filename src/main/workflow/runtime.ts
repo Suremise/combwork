@@ -2056,6 +2056,20 @@ export class Workflow {
   }
 
   /**
+   * Whether the Assistant's move into Active leaves the card with nobody on it (HI-2062): no builder named, the card's
+   * agent as its caller read it (tasks.ts gateOf; the write checks the card again as it leaves it).
+   */
+  private leavesNobody(to: StageId, by: 'user' | 'assistant', opts: { builder?: string }): boolean {
+    return by === 'assistant' && to === 'active' && !opts.builder
+  }
+
+  /** That move refused without the user's reason: `move.doingNobody`, naming the other rules it skips too. Null: it may go. */
+  private async nobodyOn(card: CardRecord, to: StageId, by: 'user' | 'assistant', opts: { builder?: string; reason?: string }, others: string[]): Promise<Refusal | null> {
+    if (!this.leavesNobody(to, by, opts) || opts.reason) return null
+    return this.refuse(card, 'assistant', 'move', { rule: 'move.doingNobody', values: { card: card.key, stage: to, also: others.length ? 'yes' : 'no', rules: others.join(', ') } }, 'the user or the Assistant') // i18n-ignore: select keys and who can override, agent-facing (§16.8.3)
+  }
+
+  /**
    * The user's drag (or menu): never refused. A move that skips rules asks first, then records an `Override`; a move
    * that skips nothing just moves (§16.7.1). The Assistant passes `override: { reason }` or is refused.
    */
@@ -2096,9 +2110,12 @@ export class Workflow {
       if (forward) return this.dragForward(card, was, to, by, opts, was)
       if (to === was) {
         if (opts.dry) return this.ok(card, from, to)
+        const nobody = await this.nobodyOn(card, to, by, opts, [])
+        if (nobody) return nobody
         const out = await this.write(card, r, by, (w) => {
           const changed = this.stillAt(w, s, 'move')
           if (changed) return changed
+          if (this.leavesNobody(to, by, opts)) w.fact('Override', { rules: ['move.doingNobody'], move: `${from}→${to}`, by, reason: opts.reason ?? '' }) // i18n-ignore: a fact's kind and codes, not text
           // A card that was queued (Merging, or Approved under Hive merges) is queued again.
           const requeue = to === was && (was === 'merging' || (was === 'approved' && r.options.finish === 'hiveMerges' && !s.stale && !notApproved(s, r, card.labels)))
           w.move(requeue ? 'approved' : was, 'user')
@@ -2120,9 +2137,13 @@ export class Workflow {
     if (from !== 'hold' && ORDER.indexOf(to) > ORDER.indexOf(from) && to !== 'done') return this.dragForward(card, from, to, by, opts)
     // Out of On Hold, the rules a move skips count from where the card was, not from Todo.
     const heldFrom = from === 'hold' ? ([...this.store.facts(card.id)].reverse().find((f): f is Fact<'Moved'> => f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'hold')?.data.from ?? 'todo') : from
-    const skipped = this.skippedRules(card, r, heldFrom, to)
+    const others = this.skippedRules(card, r, heldFrom, to)
+    // Back into Active with nobody on it (HI-2062): the Assistant's, a rule as a start's is (dragForward).
+    const skipped = this.leavesNobody(to, by, opts) ? [...others, 'move.doingNobody'] : others
     if (skipped.length && by === 'user' && (!opts.confirm || opts.dry)) return { ask: true, card: card.key, rules: skipped }
     if (opts.dry) return this.ok(card, from, to)
+    const nobody = await this.nobodyOn(card, to, by, opts, others)
+    if (nobody) return nobody
     if (skipped.length && by === 'assistant' && !opts.reason) return this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
     const out = await this.write(card, r, by, (w) => {
       // The drag was made on the card as it was: if it moved on meanwhile, the user sees where it is now and drags again.
@@ -2181,9 +2202,15 @@ export class Workflow {
       if (gsub) for (const x of this.failingOf(gsub.card, gsub.s, gsub.r, 'submit', gsub.inputs, gsub.only)) rules.add(x)
       // Past Review (or the user's OK): the review and approvals are skipped, and the change counts as approved.
       if (pastReview && this.enforced()) rules.add('integrate.approved')
+      // The Assistant's start into Active naming nobody (HI-2062): nobody on it, an agent on it or one started is the
+      // user's choice, so it is a rule its reason overrides, recorded in the same Override as any other the move skips.
+      const others = [...rules]
+      const nobody = !!gs && this.leavesNobody(to, by, opts)
+      if (nobody) rules.add('move.doingNobody')
       const skipped = [...rules]
       const needs = (list: string[]): Ask | Refusal => (by === 'user' ? { ask: true, card: card.key, rules: list } : refusal('move.needsOverride', { card: card.key, stage: to, rules: list.join(', ') }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
       if (opts.dry && !skipped.length) return this.ok(card, from, s0.stage)
+      if (nobody && asking) return (await this.nobodyOn(card, to, by, opts, others))!
       if (skipped.length && asking) return by === 'user' ? needs(skipped) : this.refuse(card, 'assistant', 'move', { rule: 'move.needsOverride', values: { card: card.key, stage: to, rules: skipped.join(', ') } }, 'the user or the Assistant') // i18n-ignore: who can override, agent-facing (§16.8.3)
       await this.cfg.hooks?.beforeWrite?.('move')
       if (gs && (await this.revalidate(card, s, gs.o, gs.before))) return this.regather(card, () => this.dragForward(card, from, to, by, opts, fromHold))
