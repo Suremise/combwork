@@ -97,6 +97,7 @@
   "content.templates.noKeySave": "Hive no pudo leer la clave de {project}, así que los nombres no se pueden guardar con ella. Inténtalo de nuevo o guarda sin “Usar la clave del proyecto en los nombres”.",
   "content.templates.noWorkspace": "Abre primero un espacio de trabajo.",
   "content.templates.nothing": "{problem} No se cambió nada.",
+  "content.templates.overMax": "Tiene {count, number} agentes, y el flujo de trabajo de este proyecto permite {max, plural, one {# agente} many {# agentes} other {# agentes}}: sube primero el Máximo de agentes en Control de versiones → Flujo de trabajo, o cárgala con su flujo de trabajo. No se cambió nada.",
   "content.templates.provider": "{problem, select, unknown {Esta versión de Hive no conoce el agente de programación “{provider}” (actualiza Hive)} off {{provider} está desactivado (Configuración → Proveedores)} other {{provider} no está instalado (Configuración de proveedores)}}",
   "content.templates.restoring": "Deshacer está devolviendo los agentes de este proyecto a como estaban antes de cargar una plantilla",
   "content.templates.running": "El agente {agent} está en ejecución o iniciándose: detenlo primero.",

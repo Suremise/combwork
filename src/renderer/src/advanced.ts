@@ -1,7 +1,8 @@
 import { advancedDef, advancedRow, rightClickToCliId } from '@shared/advanced'
 import { AGENT_LIMIT_MAX } from '@shared/defaults'
 import { INBOX_SWITCH_ID, inboxSwitchOn, type InboxSwitch } from '@shared/inboxSwitches'
-import type { ProjectConfig } from '@shared/types'
+import type { ProjectConfig, ProjectInfo } from '@shared/types'
+import { projectInfoPreferences } from '@shared/workflow/preferences'
 import { call } from './api'
 import { setLoaded, useStore } from './store'
 
@@ -33,17 +34,23 @@ export function useRightClickToCli(provider: string | undefined): boolean {
 }
 
 /**
- * How many agents the user can give a project by hand (#562, HI-2001): the most any project can have, past its workflow's
- * Maximum agents, which binds the Assistant and the Agent API. The main process checks it again.
+ * How many agents the user can give a project (#562, HI-2001): its workflow's Maximum agents, which binds the user too
+ * (HI-2058), at most the most any project can have. No project (the Assistant's home): that most. Main checks it again.
  */
-export function useAgentLimit(): number {
-  return AGENT_LIMIT_MAX
+export function useAgentLimit(project: ProjectInfo | null | undefined): number {
+  const global = useStore((s) => s.settings?.workflow)
+  const workspace = useStore((s) => s.workspace?.config.workflow)
+  return limitOf(project, global, workspace)
 }
 
 /** The same, outside a component. */
-export function agentLimit(): number {
-  return AGENT_LIMIT_MAX
+export function agentLimit(project: ProjectInfo | null | undefined): number {
+  const st = useStore.getState()
+  return limitOf(project, st.settings?.workflow, st.workspace?.config.workflow)
 }
+
+const limitOf = (project: ProjectInfo | null | undefined, global: Parameters<typeof projectInfoPreferences>[1], workspace: Parameters<typeof projectInfoPreferences>[2]): number =>
+  project ? Math.min(AGENT_LIMIT_MAX, projectInfoPreferences(project, global, workspace).maxAgents) : AGENT_LIMIT_MAX
 
 /** Whether a carrying-on switch is on for a project's agents (#1432): its own over Settings → Advanced's; no project (the Assistant), Settings'. */
 export function useInboxSwitch(which: InboxSwitch, project: Partial<ProjectConfig> | null | undefined): boolean {

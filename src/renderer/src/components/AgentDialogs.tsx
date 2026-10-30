@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { DEFAULT_PROJECT_CONFIG, ROLE_MAX, agentLimitText, effectiveModelLabel, mergeBlocked, projectAgents, transcriptWarnLimit } from '@shared/defaults'
+import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, OPEN_WORKFLOW_OPTIONS, ROLE_MAX, agentLimitText, effectiveModelLabel, mergeBlocked, projectAgents, transcriptWarnLimit } from '@shared/defaults'
 import { handOverNow, onRunningLane } from '@shared/handOver'
 import { useAgentLimit } from '../advanced'
 import { agentProvider, chosenDefaultProvider, defaultProviderPending, isProviderEnabled, modeCaveat, modeOption, offeredModes, orderedProviders, projectDefaultProvider, projectProviderConfig, projectUse200k, providerDescriptor, providerName, providerSettings, shownText } from '@shared/providers'
@@ -15,7 +15,7 @@ import * as actions from '../actions'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { call, errorMessage } from '../api'
 import { projectMergeChoice } from '../mergeChoice'
-import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
+import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
 import { msg, tr, tRich } from '@shared/i18n'
 import { confirmDangerousMode } from './PermissionMode'
 import { ProviderIcon } from './ProviderIcon'
@@ -301,7 +301,7 @@ export function AddAgentDialog() {
     const p = useStore.getState().workspace?.projects.find((x) => x.path === path)
     if (p && followDefault && !defaultPending) setProvider(projectDefaultProvider(p.config, useStore.getState().settings))
   }, [path, followDefault, defaultPending])
-  const limit = useAgentLimit()
+  const limit = useAgentLimit(project)
 
   if (!path || !project || !settings) return null
   const close = (): void => set({ addAgentFor: null })
@@ -372,7 +372,18 @@ export function AddAgentDialog() {
         </>
       }
     >
-      {full && <div className="banner warn">{tr(msg({ id: 'agents.add.full', defaultMessage: '{limit} Remove one first.', description: "The Add Agent dialog when the project has as many agents as it may: why ({limit}, a sentence), then what to do." }), { limit: agentLimitText(tr) })}</div>}
+      {full &&
+        (limit < AGENT_LIMIT_MAX ? (
+          // At its Maximum agents (HI-2058): raised in Version Control → Workflow, which the link opens.
+          <div className="banner warn" data-limit="workflow">
+            <span>{agentLimitText(tr, limit)}</span>{' '}
+            <button className="btn small" onClick={() => (close(), openVersionControl(project.path, 'workflow'))}>
+              {tr(OPEN_WORKFLOW_OPTIONS)}
+            </button>
+          </div>
+        ) : (
+          <div className="banner warn">{tr(msg({ id: 'agents.add.full', defaultMessage: '{limit} Remove one first.', description: "The Add Agent dialog when the project has as many agents as it may: why ({limit}, a sentence), then what to do." }), { limit: agentLimitText(tr) })}</div>
+        ))}
       <div className="agent-form">
         <label>{tr(NAME)}</label>
         <input

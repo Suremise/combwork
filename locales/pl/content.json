@@ -97,6 +97,7 @@
   "content.templates.noKeySave": "Hive nie mógł odczytać klucza projektu {project}, więc nazw nie da się z nim zapisać. Spróbuj ponownie lub zapisz bez opcji „Używaj klucza projektu w nazwach”.",
   "content.templates.noWorkspace": "Najpierw otwórz obszar roboczy.",
   "content.templates.nothing": "{problem} Nic nie zmieniono.",
+  "content.templates.overMax": "Ma {count, number} agentów, a przepływ pracy tego projektu pozwala na {max, plural, one {# agenta} few {# agentów} many {# agentów} other {# agenta}}: najpierw zwiększ Maksymalną liczbę agentów w Kontrola wersji → Przepływ pracy albo wczytaj go z jego przepływem pracy. Nic nie zmieniono.",
   "content.templates.provider": "{problem, select, unknown {Ta wersja Hive nie zna agenta programistycznego „{provider}” (zaktualizuj Hive)} off {Dostawca {provider} jest wyłączony (Ustawienia → Dostawcy)} other {Dostawca {provider} nie jest zainstalowany (Konfiguracja dostawców)}}",
   "content.templates.restoring": "Cofanie przywraca agentów tego projektu do stanu sprzed wczytania szablonu",
   "content.templates.running": "Agent {agent} działa lub się uruchamia: najpierw go zatrzymaj.",

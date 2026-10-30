@@ -417,7 +417,7 @@ function editTemplateAgent(template: string, agent: TemplateAgent | null, others
 function TemplateEditor({ t, project, onDone }: { t: TemplateEntry; project?: ProjectInfo; onDone: () => void }) {
   const key = editKey(t)
   // As many as a project of this workspace can have: more couldn't be loaded here (#562).
-  const limit = useAgentLimit()
+  const limit = useAgentLimit(null)
   // The template as the editor opened it (or last saved it), kept whatever the list shows later: what the draft is
   // compared with, and the revision a save expects (a newer one there refuses it, so a save made meanwhile is never
   // overwritten).

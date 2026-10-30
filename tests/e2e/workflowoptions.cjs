@@ -229,6 +229,24 @@ async function theForm(page, app, inv) {
     check('saved: Pair (the agent merges), in project.json', !!(await lib.until(async () => projectJson().workflow?.preset === 'pairAgent' && saved().finish === 'agentMerges', HUNG_MS)), JSON.stringify(projectJson().workflow))
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
 
+    // --- Maximum agents (HI-2058): stepped with the arrow keys it is staged at once, before the box loses focus, so Save
+    // lights and the row is marked; Discard drops it; typed and saved, it is the project's own. Pair's 2 again after.
+    const maxBox = row('maxAgents').locator('input')
+    const maxBefore = saved().maxAgents
+    await maxBox.click()
+    await maxBox.press('ArrowUp')
+    check('Maximum agents stepped with ↑: Save lights and the row is marked while the box still has the focus', !!(await lib.until(async () => (await save.isEnabled()) && (await row('maxAgents').locator('.modified').count()) === 1, HUNG_MS)) && (await maxBox.evaluate((e) => e === document.activeElement)), await maxBox.inputValue())
+    await discard()
+    check('…Discard Changes drops it, nothing written', !!(await lib.until(async () => !(await save.isEnabled()) && (await maxBox.inputValue()) === String(maxBefore ?? ''), HUNG_MS)) && saved().maxAgents === maxBefore, JSON.stringify({ maxBefore, saved: saved().maxAgents }))
+    await maxBox.fill('14')
+    await lib.until(async () => save.isEnabled(), HUNG_MS)
+    await saveAll()
+    check('…typed and saved: the project’s own Maximum agents, in project.json', !!(await lib.until(async () => saved().maxAgents === 14, HUNG_MS)), JSON.stringify(saved()))
+    await maxBox.fill(String(maxBefore))
+    await lib.until(async () => save.isEnabled(), HUNG_MS)
+    await saveAll()
+    await lib.until(async () => saved().maxAgents === maxBefore, HUNG_MS)
+
     // --- Contradictions as you choose: the reason under both rows at once, Save off until it's resolved.
     const both = async (c, a, b) => JSON.stringify(await reasons(a)).includes(c) && JSON.stringify(await reasons(b)).includes(c)
     await row('finish').locator('select').selectOption('committed')

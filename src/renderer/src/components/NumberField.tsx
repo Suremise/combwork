@@ -5,7 +5,8 @@ import { parseNumberDraft } from '@shared/numberInput'
  * A number setting's box, saved on blur or Enter (once). A blank box keeps the saved value, or inherits where
  * `inherit` is given; text that isn't a number in range shows a message under the box and saves nothing. Where
  * 0 turns the feature off, `off` adds a checkbox for it: ticking saves 0, unticking brings back the last other
- * value (or `off.restore`).
+ * value (or `off.restore`). `live` (a form staging its draft, HI-2058): each value in range is passed on as it is typed
+ * or stepped, so the form sees the change before the box loses focus; a blank or invalid box still waits for blur.
  */
 export function NumberField({
   value,
@@ -16,6 +17,7 @@ export function NumberField({
   inherit,
   label,
   unit,
+  live,
   onCommit
 }: {
   value: number | null
@@ -28,6 +30,7 @@ export function NumberField({
   label?: string
   /** The number's unit, shown after the box ("s"). */
   unit?: string
+  live?: boolean
   onCommit: (value: number | null) => Promise<unknown> | void
 }) {
   const shown = (v: number | null): string => (v === null ? '' : String(v))
@@ -103,6 +106,10 @@ export function NumberField({
           onChange={(e) => {
             setDraft(e.target.value)
             setError(null)
+            if (!live) return
+            const r = parseNumberDraft(e.target.value, { min, max }, { badInput: e.target.validity.badInput, off: !!off })
+            // Passed on as it is, with no reset: the box keeps what is typed (the form's draft only stages it).
+            if (r.kind === 'value' && r.value !== current.current) void Promise.resolve(onCommit(r.value)).catch(() => undefined)
           }}
           onBlur={commit}
           onKeyDown={(e) => {

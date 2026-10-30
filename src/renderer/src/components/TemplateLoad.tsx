@@ -9,6 +9,9 @@ import { set, useStore } from '../store'
 import { TemplatePlan } from './TemplatePlan'
 import { useConnections } from './ConnectionChoice'
 import { TemplateLoadWorkflowPart, workflowBlocks } from './TemplateLoadWorkflow'
+import { useAgentLimit } from '../advanced'
+import { OPEN_WORKFLOW_OPTIONS } from '@shared/defaults'
+import { loadedMaxAgents } from '@shared/workflow/templateOptions'
 
 /**
  * The Load template dialog's plan with its agents' names to choose (#702, Darren's decision of 12 Oct; #1440): beside
@@ -25,11 +28,12 @@ const M = {
   sameTwice: msg({ id: 'assistant.loadNames.sameTwice', defaultMessage: 'Another of its agents has this name.', description: "Load template, under a name box: another of the template's agents is given the same name." }),
   taken: msg({ id: 'assistant.loadNames.taken', defaultMessage: '{project} has an agent called {name}.', description: 'Load template, under a name box: an agent of another project has that name.' }),
   blocked: msg({ id: 'assistant.loadNames.blocked', defaultMessage: 'Agent names are unique across the workspace: change the marked names first.', description: "Load template: why its button can't be used yet." }),
-  raise: msg({ id: 'assistant.loadNames.raiseMax', defaultMessage: 'Also raise Maximum agents from {now, number} to {needs, number} (opens Version Control → Workflow with it set, to save there)', description: "Load template (HI-2001), a tick box: the template has more agents ({needs}) than the project's workflow option Maximum agents ({now}); ticked, the project's Version Control tab opens at Workflow with Maximum agents set to {needs}, not saved. Version Control → Workflow: use the translated names." }),
+  savesMax: msg({ id: 'assistant.loadNames.savesMax', defaultMessage: 'Maximum agents goes from {now, number} to {next, number} for this project, saved with its agents.', description: "Load template (HI-2058), with its workflow applied: the template's own Maximum agents ({next}) is saved with its agents, in place of the project's ({now}). Maximum agents is a name in the window: as translated there." }),
+  overMax: msg({ id: 'assistant.loadNames.overMax', defaultMessage: 'It has {count, number} agents, and this project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents first, or load it with its workflow.', description: "Load template (HI-2058), why its button can't be used: the template's agents ({count}) are more than the project's Maximum agents ({max}), and its workflow, which would raise it, isn't applied. Maximum agents is a name in the window: as translated there." }),
   takenNote: msg({ id: 'assistant.loadNames.filledNote', defaultMessage: 'Agent names are unique across the workspace, and {count, plural, one {this name is} other {these names are}} taken already: {names} (projects: {projects}). {count, plural, one {A free name is} other {Free names are}} filled in below. Change any name you like.', description: "Load template, above the plan: some of the template's names are taken by other projects' agents ({projects} lists the projects, {names} the names; {count} how many), so free names were filled in for them. Each sentence whole, the verb never agreeing with a list (HI-1585: glossary §1 rules 3 and 4)." })
 }
 
-export function TemplateLoadNames({ path, scope, file, from, initial, onChange, onConnections, onWorkflow, onRaise, onSetUpGit, onPlan }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void; onConnections?: (choices: Record<number, string | null>) => void; onWorkflow?: (apply: boolean) => void; onRaise?: (raise: boolean) => void; onSetUpGit?: () => void; onPlan?: (plan: TemplateLoadPlan) => void }) {
+export function TemplateLoadNames({ path, scope, file, from, initial, onChange, onConnections, onWorkflow, onOpenWorkflow, onSetUpGit, onPlan }: { path: string; scope: TemplateScope; file: string; from?: string; initial: TemplateLoadPlan; onChange: (names: string[]) => void; onConnections?: (choices: Record<number, string | null>) => void; onWorkflow?: (apply: boolean) => void; onOpenWorkflow?: () => void; onSetUpGit?: () => void; onPlan?: (plan: TemplateLoadPlan) => void }) {
   const project = useStore((s) => s.workspace?.projects.find((p) => p.path === path) ?? null)
   const projects = useStore((s) => s.workspace?.projects)
   const settings = useStore((s) => s.settings)
@@ -69,14 +73,13 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange, 
   // Its workflow applied, unless unticked (HI-1910).
   const [apply, setApply] = useState(true)
   useEffect(() => onWorkflow?.(apply), [apply, onWorkflow])
-  // More agents than its Maximum agents (HI-2001): the load goes ahead, and raising it is offered, on unless unticked.
-  // Not where the workflow applied already raises it that far.
-  const [raise, setRaise] = useState(true)
-  const over = plan.maxAgents
-  const sectionMax = apply && plan.workflow?.section ? plan.workflow.section.options.maxAgents : undefined
-  const offerRaise = !!over && !(sectionMax !== undefined && sectionMax >= over.needs)
-  useEffect(() => onRaise?.(offerRaise && raise), [offerRaise, raise, onRaise])
-  const blocked = problems.some(Boolean) ? tr(M.blocked) : (planError ?? workflowBlocks(plan.workflow, apply))
+  // Maximum agents (HI-2058, Darren's decisions): its workflow applied, the template's own is saved with its agents (main
+  // works it out again under the project's lock); without it, more agents than the project's maximum can't be loaded.
+  const now = useAgentLimit(project)
+  const section = apply ? (plan.workflow?.section ?? null) : null
+  const saves = section ? loadedMaxAgents(section.options.maxAgents, plan.create.length, now) : null
+  const over = !section && plan.create.length > now ? tr(M.overMax, { count: plan.create.length, max: now }) : null
+  const blocked = problems.some(Boolean) ? tr(M.blocked) : (planError ?? workflowBlocks(plan.workflow, apply) ?? over)
   const key = names.join('\n')
   useEffect(() => onChange(key.split('\n')), [key, onChange])
   useEffect(() => set({ dialogBlocked: blocked }), [blocked])
@@ -120,10 +123,18 @@ export function TemplateLoadNames({ path, scope, file, from, initial, onChange, 
       />
       {planError && <div className="field-error">{planError}</div>}
       {plan.workflow && <TemplateLoadWorkflowPart workflow={plan.workflow} apply={apply} onApply={setApply} onSetUpGit={() => onSetUpGit?.()} />}
-      {offerRaise && (
-        <label className="flex template-workflow-apply">
-          <input type="checkbox" checked={raise} data-raise-max="" onChange={(e) => setRaise(e.target.checked)} /> {tr(M.raise, { now: over!.now, needs: over!.needs })}
-        </label>
+      {saves !== null && saves !== now && (
+        <p className="template-plan-note" data-saves-max={saves}>
+          {tr(M.savesMax, { now, next: saves })}
+        </p>
+      )}
+      {over && (
+        <div className="banner warn" data-over-max="">
+          <span>{over}</span>{' '}
+          <button className="btn small" onClick={() => onOpenWorkflow?.()}>
+            {tr(OPEN_WORKFLOW_OPTIONS)}
+          </button>
+        </div>
       )}
     </>
   )

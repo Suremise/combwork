@@ -176,17 +176,27 @@ export const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
 export const TRANSCRIPT_WINDOW = 200
 
 export { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX }
-/** Why the user can't add another agent by hand: the project has AGENT_LIMIT_MAX already. */
-export const agentLimitText = (tr?: Tr): string =>
-  tr
-    ? tr(msg({ id: 'agents.limit.most', defaultMessage: 'A project can have up to {most, number} agents.', description: "Why another agent can't be added to a project: it has as many as Hive allows ({most}, 24)." }), { most: AGENT_LIMIT_MAX })
-    : `A project can have up to ${AGENT_LIMIT_MAX} agents.` // i18n-ignore: English for main's error (the window passes tr)
+/**
+ * Why the user can't add another agent (HI-2058: Maximum agents binds the user too): the project's workflow allows `max`
+ * (its Maximum agents), and where to raise it; at AGENT_LIMIT_MAX, the most any project can have.
+ */
+export const agentLimitText = (tr?: Tr, max: number = AGENT_LIMIT_MAX): string => {
+  if (max >= AGENT_LIMIT_MAX)
+    return tr
+      ? tr(msg({ id: 'agents.limit.most', defaultMessage: 'A project can have up to {most, number} agents.', description: "Why another agent can't be added to a project: it has as many as Hive allows ({most}, 24)." }), { most: AGENT_LIMIT_MAX })
+      : `A project can have up to ${AGENT_LIMIT_MAX} agents.` // i18n-ignore: English for main's error (the window passes tr)
+  return tr
+    ? tr(msg({ id: 'agents.limit.workflow', defaultMessage: 'This project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents in Version Control → Workflow.', description: "Why another agent can't be added to a project (HI-2058): its workflow option Maximum agents allows {max} and it has that many. Maximum agents, Version Control and Workflow are names in the window: as translated there." }), { max })
+    : `This project's workflow sets Maximum agents to ${max}: raise it in Version Control → Workflow.` // i18n-ignore: English for main's error (the window passes tr)
+}
+/** The link beside agentLimitText at a project's Maximum agents (HI-2058): opens Version Control → Workflow. */
+export const OPEN_WORKFLOW_OPTIONS = msg({ id: 'agents.limit.openWorkflow', defaultMessage: 'Open Workflow Options', description: "A button or link beside why another agent can't be added (HI-2058: the project is at its Maximum agents): opens the project's Version Control tab at Workflow, where Maximum agents is set." })
 /**
  * Why the Assistant or the Agent API can't add another agent (HI-2001): the project's workflow allows `max` (Maximum
- * agents), and where the user raises it. Only agents read it (the user's own adds go past it), so it stays English.
+ * agents), and where the user raises it. Only agents read it, so it stays English.
  */
 export const agentMaxText = (max: number): string =>
-  `This project's workflow sets Maximum agents to ${max}, the user's team size, and the project has that many. Only the user goes past it: ask them to add the agent themselves, or to raise Maximum agents in Version Control → Workflow.` // i18n-ignore: English for the Assistant and the Agent API (agents read it)
+  `This project's workflow sets Maximum agents to ${max}, the user's team size, and the project has that many. Ask the user to raise Maximum agents in Version Control → Workflow.` // i18n-ignore: English for the Assistant and the Agent API (agents read it)
 /** Memory as the agents note says it: MB, or GB from 1 GB. */
 const memoryText = (n: number): string => (n >= 1024 ** 3 ? formatGigabytes(n) : formatSize(n))
 

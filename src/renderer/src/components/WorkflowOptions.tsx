@@ -80,7 +80,7 @@ const T = {
   stageNamesValue: msg({ id: 'workflow.form.stageNamesValue', defaultMessage: '{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}', description: 'A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage).' }),
   fileLocksNote: msg({ id: 'workflow.form.fileLocksNote', defaultMessage: 'Applies to agents working in the same folder, outside a slot.', description: 'Under the workflow option “File locks”: a slot is a folder Hive lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file.' }),
   loopsReadNote: msg({ id: 'workflow.form.loopsReadNote', defaultMessage: 'Read when a loop starts: a loop already running keeps its own, and one started with its own (“rounds: 5, wait: 2h”) keeps those.', description: 'Under the workflow options “Rounds” and “Wait (hours)” (Card loops), when a change applies. “rounds: 5, wait: 2h” is what the user types to an agent: keep it in English.' }),
-  overMax: msg({ id: 'workflow.form.overMax', defaultMessage: 'This project has {count, plural, one {# agent} other {# agents}}: none is removed, but the Assistant can’t add another until it has fewer than {max, number}.', description: 'Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max}).' }),
+  overMax: msg({ id: 'workflow.form.overMax', defaultMessage: 'This project has {count, plural, one {# agent} other {# agents}}: none is removed, but no agent can be added until it has fewer than {max, number}.', description: 'Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max}): nobody can add one (HI-2058), neither the user nor the Assistant.' }),
   stepWaitNote: msg({ id: 'workflow.form.stepWaitNote', defaultMessage: 'A design left unchecked longer shows its card as stalled; one already posted keeps its wait.', description: 'Under the workflow option “Design check wait (minutes)” (Card loops), when a change applies.' }),
   hoursValue: msg({ id: 'workflow.form.hoursValue', defaultMessage: '{n, plural, one {# hour} other {# hours}}', description: 'The value of the workflow option “Wait (hours)” (Card loops) in words, as in the Inherit box and a preset preview.' }),
   minutesValue: msg({ id: 'workflow.form.minutesValue', defaultMessage: '{n, plural, one {# minute} other {# minutes}}', description: 'The value of the workflow option “Design check wait (minutes)” (Card loops) in words, as in the Inherit box.' }),
@@ -312,11 +312,6 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   useEffect(() => {
     if (!prefill || source.level || prefill.path !== source.key || loaded?.for !== source.key) return
     setStore({ workflowPrefill: null })
-    // Maximum agents raised at least to a loaded template's agents (HI-2001), over whatever else is filled in.
-    const raised = (own: Partial<WorkflowOptions>, inherited: Partial<WorkflowOptions>): Partial<WorkflowOptions> => {
-      const needs = prefill.maxAgents
-      return needs && (own.maxAgents ?? inherited.maxAgents ?? AGENT_LIMIT_DEFAULT) < needs ? { ...own, maxAgents: needs } : own
-    }
     const t = prefill.template
     if (t) {
       const path = source.key
@@ -329,7 +324,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
           show(path, f)
           if (f.platform !== t.platform) return notify('warning', tr(T.templateOtherPlatform, { template: t.name, platform: tr(PLATFORM_NAME[t.platform]), project: project?.name ?? '' }))
           const o = overlayTemplateWorkflow(t.section, { platform: f.platform, options: f.options, own: f.own, identity: f.identity })
-          setDraft({ preset: o.preset, options: raised(o.own, f.options) })
+          setDraft({ preset: o.preset, options: o.own })
           setFromTemplate({ for: path, name: t.name, identityOff: o.identityOff })
         },
         (e) => notify('error', errorMessage(e))
@@ -337,8 +332,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       return
     }
     const p = prefill.preset ? loaded.form.presets.find((x) => x.id === prefill.preset)?.options : null
-    if (p) setDraft({ preset: prefill.preset, options: raised(withUnpreset(ownOptions(p), loaded.draft.options), loaded.form.inherited) })
-    else if (prefill.maxAgents) setDraft({ ...loaded.draft, options: raised(loaded.draft.options, loaded.form.inherited) })
+    if (p) setDraft({ preset: prefill.preset, options: withUnpreset(ownOptions(p), loaded.draft.options) })
   }, [prefill, loaded, source, show, project])
 
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
@@ -581,8 +575,9 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       case 'loopStepWaitMinutes':
       case 'maxAgents': {
         const max = key === 'loopRounds' ? LANE_MAX_ROUNDS : key === 'loopWaitHours' ? LOOP_WAIT_MAX_HOURS : key === 'maxAgents' ? AGENT_LIMIT_MAX : LOOP_STEP_WAIT_MAX_MINUTES
-        // Empty inherits: the box shows the inherited value as its placeholder.
-        return <NumberField value={draft.options[key] ?? null} min={1} max={max} step={key === 'loopStepWaitMinutes' ? 5 : 1} label={tr(optionTitle(key, platform)!)} inherit={valueText(key, form.inherited[key])} onCommit={(v) => (v === null ? inheritKey(key) : set(key, v))} />
+        // Empty inherits: the box shows the inherited value as its placeholder. Staged as typed or stepped (HI-2058), so
+        // Save lights at once, as the selects and switches do.
+        return <NumberField live value={draft.options[key] ?? null} min={1} max={max} step={key === 'loopStepWaitMinutes' ? 5 : 1} label={tr(optionTitle(key, platform)!)} inherit={valueText(key, form.inherited[key])} onCommit={(v) => (v === null ? inheritKey(key) : set(key, v))} />
       }
       case 'focusedTests': {
         // G20 (HI-1367): its picker and runner are commands of their own, kept in the same map as the checks'.
