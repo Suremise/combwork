@@ -45,7 +45,7 @@ import { e2eProgress, slotWaitProgress } from '../progressReport.mts'
 import { SUITES } from './suites.mjs'
 import { affectedSuites, changedFiles, mergeBase } from './affected.mjs'
 import { CLI_LOG, fingerprint, readCliLog, realCliHomes, realCliVersions, recordJson, recordMarkdown, selectionOf } from './record.mjs'
-import { LANG_SUITE, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, packagedPlan, resultLines, selectSuites, suiteOutcome } from './runner.mjs'
+import { LANG_SUITE, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, packagedPlan, resultLines, selectSuites, suiteLimitMs, suiteOutcome } from './runner.mjs'
 import { devBuild, ensureBuild } from './build.mjs'
 import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, omittedLine, pruneRunDirsReleasing } from './logs.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from './lanes.mjs'
@@ -319,11 +319,12 @@ const run = (name, port) =>
     child.stderr.on('data', add)
     // Out of time: the suite and everything it started. Killing only the suite's node leaves its test copy of Hive running,
     // holding the lane's port, and the lane's next suites can't start their Agent API.
+    const limitMs = suiteLimitMs(name, opts.lang)
     const timer = setTimeout(() => {
-      out += '\nFAIL timed out after 10 minutes: the suite and the processes it started were stopped\n'
+      out += `\nFAIL timed out after ${limitMs / 60_000} minutes: the suite and the processes it started were stopped\n`
       // Each as the process it is now, children first (#603): never taskkill /T, which follows parent ids that may be stale.
       if (process.platform !== 'win32' || !endChildTree(child)) child.kill()
-    }, 10 * 60_000)
+    }, limitMs)
     child.on('exit', (code) => {
       clearTimeout(timer)
       // The Windows codes its output names (#599: a child that failed to start or crashed), not its own exit code: its

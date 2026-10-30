@@ -14,7 +14,7 @@ import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, UNIT_ONLY, affectedSuites, und
 // @ts-expect-error: plain .mjs modules without types
 import { fingerprint } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { DEV_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keepLimits, needsDevBuild, packagedPlan, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteDevOnly, suiteFiles as filesOfSuite, suiteOutcome, suiteSource } from './e2e/runner.mjs'
+import { DEV_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keepLimits, needsDevBuild, packagedPlan, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, recordStatus, repeatStatus, resultLines, selectSuites, suiteDevOnly, suiteFiles as filesOfSuite, suiteLimitMs, suiteOutcome, suiteSource } from './e2e/runner.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { recordJson, recordMarkdown, selectionLine, selectionOf } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -932,6 +932,13 @@ describe("each run's own log folder (logs.mjs)", () => {
     expect(keepLimits('i18nshots', ['en-XA', 'pl', 'de', 'es', 'fr', 'ja', 'pt-BR', 'zh-CN'])).toEqual({ maxFiles: 3700, maxTotal: 500 * 1024 * 1024 })
     expect(keepLimits('i18nshots', [])).toEqual({})
     expect(keepLimits('board', ['pl'])).toEqual({})
+  })
+
+  it("a --lang run's time limit grows with its languages; every other suite keeps 10 minutes (HI-2159)", () => {
+    expect(suiteLimitMs('i18nshots', [])).toBe(10 * 60_000)
+    expect(suiteLimitMs('i18nshots', ['en-XA'])).toBe(10 * 60_000)
+    expect(suiteLimitMs('i18nshots', ['en-XA', 'pl', 'de', 'es', 'fr', 'ja', 'pt-BR'])).toBe(42 * 60_000)
+    expect(suiteLimitMs('board', ['pl', 'de', 'es'])).toBe(10 * 60_000)
   })
 
   it('a failed run survives ten newer passing runs for a day, with its failed suites’ screenshots, then goes (#223)', () => {

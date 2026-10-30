@@ -49,7 +49,7 @@ async function cancelDialog(ctx) {
 }
 
 /** Settings' sections, in their order (settingsCatalog.ts SETTINGS_SECTIONS), each photographed whole. */
-const SECTIONS = ['general', 'updates', 'appearance', 'providers', 'provider:claude-code', 'provider:codex', 'provider:copilot', 'notifications', 'sessions', 'assistant', 'workspace', 'board', 'agents', 'keybindings', 'agentApi', 'advanced']
+const SECTIONS = ['general', 'updates', 'appearance', 'providers', 'provider:claude-code', 'provider:codex', 'provider:copilot', 'accounts', 'notifications', 'sessions', 'assistant', 'workspace', 'board', 'workflow', 'agents', 'keybindings', 'mcpCatalogs', 'agentApi', 'advanced']
 const screenName = (id) => `section-${id.replace(/:/g, '-').replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`
 
 const sectionScreens = SECTIONS.map((id) => ({

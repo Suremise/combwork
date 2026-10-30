@@ -212,12 +212,12 @@ async function mcp(ctx) {
   return ctx.page.locator('.page-narrow').first()
 }
 
-/** Project Settings: a section, by its icon in the list of sections (a provider's: the first with a provider icon). */
+/** Project Settings: a section, by its icon in the list of sections (HI-2107: no provider pages; a CLI's settings are under Agents). */
 async function settingsSection(ctx, icon) {
   await ctx.command('project.tab.settings')
   await shown(ctx, ctx.page.locator('.settings-nav .row'), 'the sections of Project Settings')
-  const row = icon ? ctx.page.locator('.settings-nav .row', { has: ctx.page.locator(`.codicon-${icon}`) }) : ctx.page.locator('.settings-nav .row', { has: ctx.page.locator('.settings-sub') })
-  await (await shown(ctx, row, `the section (${icon ?? 'a provider'})`)).first().click()
+  const row = ctx.page.locator('.settings-nav .row', { has: ctx.page.locator(`.codicon-${icon}`) })
+  await (await shown(ctx, row, `the section (${icon})`)).first().click()
   await shown(ctx, ctx.page.locator('.settings-nav .row.selected'), 'the section, selected')
   await shown(ctx, ctx.page.locator('.settings-content .setting'), 'its settings')
   return ctx.page.locator('.settings').first()
@@ -252,7 +252,6 @@ module.exports = {
     { name: 'skills-refresh-failed', open: skillsRefreshFailed, close: retrySkills },
     { name: 'mcp', open: mcp },
     { name: 'settings-agents', open: (ctx) => settingsSection(ctx, 'organization') },
-    { name: 'settings-provider', open: (ctx) => settingsSection(ctx, null) },
     { name: 'settings-sessions', open: (ctx) => settingsSection(ctx, 'history') },
     { name: 'reset-dialog', open: resetDialog, close: closeLast }
   ]

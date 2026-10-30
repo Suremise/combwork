@@ -17,6 +17,11 @@ export const LANG_SUITE = 'i18nshots'
  * --lang run photographed (#899: about 370 screenshots and 35 MB each, with the reports beside them).
  */
 export const keepLimits = (name, lang = []) => (name === LANG_SUITE && lang.length ? { maxFiles: 100 + 450 * lang.length, maxTotal: (20 + 60 * lang.length) * 1024 * 1024 } : {})
+/**
+ * How long a suite may run before the runner stops it: 10 minutes, but 6 a language for a --lang run of more than one
+ * (HI-2159: a language takes about 3 minutes, so a seven-language run reached four in 10).
+ */
+export const suiteLimitMs = (name, lang = []) => Math.max(10, name === LANG_SUITE ? 6 * lang.length : 0) * 60_000
 /** A language tag as --lang takes it (pl, pt-BR, en-XA); whether Hive has the language, the suite checks by starting it. */
 const LANG_TAG = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i
 
