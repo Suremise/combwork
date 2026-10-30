@@ -42,7 +42,15 @@ import { buildNeedsCpuSlot, creditFor, preMerge, refusedLine, slotPool, waitForS
 import { waitForCodexHome } from '../e2e/codexHomeLock.mjs'
 import { autoClean } from '../e2e/clean.mjs'
 import { scenariosProgress, slotWaitProgress } from '../progressReport.mts'
+import { endRunTemp, startRunTemp } from '../runTemp.mts'
 
+// The run's own temp folder in hive-test\tmp (HI-2102): the test copies of Hive and the CLIs its scenarios start get it
+// as TEMP (e2e/runContext.cjs ALLOW), not %TEMP%. It goes as the runner exits.
+startRunTemp()
+process.on('exit', () => {
+  const failed = endRunTemp()
+  if (failed) console.warn(`The run's temp folder was left behind (the next run's start removes it after a day): ${failed}`)
+})
 const require = createRequire(import.meta.url)
 const lib = require('../e2e/lib.cjs')
 const runContext = require('../e2e/runContext.cjs')

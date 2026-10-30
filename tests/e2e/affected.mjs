@@ -97,6 +97,8 @@ export const EVERYTHING = [
   'tests/scenarios/harness.cjs',
   'tests/scenarios/run.mjs',
   'tests/progressReport.mts',
+  // The runs' temp folders (HI-2102): the unit tests' (through tests/tempDir.ts) and the e2e and scenario runners'.
+  'tests/runTemp.mts',
   'package.json',
   'package-lock.json',
   'electron.vite.config.ts',
@@ -558,7 +560,7 @@ const FAKE_FIXTURES = ['tests/fixtures/claude-initialize.json', 'tests/fixtures/
  * file from there, which tests/e2esuites.test.ts checks), and the sleeps checker (npm run test:waits: its unit test
  * and a scenario use it, no e2e suite). The i18n tooling too (#768): extracting, checking and counting translations and
  * the guard against new hard-coded text (npm test and CI run them; the app never reads them, nor the guard's allowlists
- * in i18n/allow/), and each area's i18n unit tests (tests/i18n/). tests/progressReport.mts is the runners' and in
+ * in i18n/allow/), and each area's i18n unit tests (tests/i18n/). tests/progressReport.mts and tests/runTemp.mts are the runners' and in
  * EVERYTHING. The 1.0 workflow core spike (#1118) too: nothing in the app loads it, and tests/workflow runs its
  * scenarios; the phase that wires it into the app (P3, P4) gives it an area (the 1.0 schema, src/main/schema, has the
  * board's since its cards step, #1209, as the fact store and the actions worker do since #1215).
