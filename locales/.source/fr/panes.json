@@ -49,6 +49,8 @@
   "panes.footer.connectionChanged": "Its login changed since it was added: see Settings → Accounts & Connections.",
   "panes.footer.connectionEmail": "Signed in as {email}.",
   "panes.footer.connectionOff": "The connection chosen for it is off in this workspace, so it runs on the workspace's default.",
+  "panes.footer.connectionOffHere": "The connection chosen for it is on an account that's off in this workspace, so it runs on its CLI's first usable connection.",
+  "panes.footer.connectionRemoved": "The connection chosen for it was removed, so it runs on its CLI's first usable connection. Choose another in its Agent Settings.",
   "panes.footer.connectionSwitching": "switches once its turn is over",
   "panes.footer.connectionSwitchingTip": "Once its turn is over, it ends and carries on, on the connection chosen for it now.",
   "panes.footer.connectionTip": "Runs on the connection {name}.",

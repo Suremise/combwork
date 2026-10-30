@@ -3,10 +3,6 @@
     "defaultMessage": "Add Agent",
     "description": "The Add Agent dialog's button: adds the agent."
   },
-  "agents.add.checking": {
-    "defaultMessage": "Checking which coding agents are installed, for the default provider (Automatic)…",
-    "description": "The Add Agent dialog while Hive looks for the installed CLIs, to pick the default provider. Automatic is that setting's name."
-  },
   "agents.add.failed": {
     "defaultMessage": "Could not add agent",
     "description": "An error's title: adding an agent to a project failed."
@@ -22,10 +18,6 @@
   "agents.add.nameTakenHere": {
     "defaultMessage": "{project} already has an agent called {agent}.",
     "description": "Under the name in the Add Agent dialog: an agent of this project ({project}) has that name ({agent})."
-  },
-  "agents.add.providerOff": {
-    "defaultMessage": "{cli} is turned off{whose, select, project {, and it is this project's default provider} yours {, and it is your default provider} other {}}. Turn it on in Settings → Providers, or choose another provider.",
-    "description": "The Add Agent dialog when the chosen provider ({cli}) is turned off; if it is the default provider, whose default it is: this project's (project) or the user's (yours); other: say nothing. Settings → Providers: use its translated names."
   },
   "agents.add.startNow": {
     "defaultMessage": "Start a session now",
@@ -478,10 +470,6 @@
   "agents.dialog.projectFolder": {
     "defaultMessage": "The project folder",
     "description": "Where an agent works: the project's own folder (not a worktree)."
-  },
-  "agents.dialog.settings": {
-    "defaultMessage": "Settings",
-    "description": "A heading in Add Agent and Agent Settings, above the agent's model, effort, mode and context."
   },
   "agents.dialog.worksIn": {
     "defaultMessage": "Works in",
@@ -1007,26 +995,6 @@
     "defaultMessage": "A name is at most {max} characters.",
     "description": "Why an agent name can't be used: it is longer than {max} characters."
   },
-  "agents.overrides.connectionDefault": {
-    "defaultMessage": "Connection default",
-    "description": "An agent's model, effort or context choice that follows its connection's default (HI-1770): the first choice of each, before that default in brackets (\"Connection default (Opus 5.5)\"). Keep it short."
-  },
-  "agents.overrides.context": {
-    "defaultMessage": "Use 200K context (instead of 1M)",
-    "description": "Label of an agent's choice to hold its sessions to a 200K-token context window instead of the model's 1M one."
-  },
-  "agents.overrides.effort": {
-    "defaultMessage": "Effort",
-    "description": "Label of an agent's effort (reasoning) choice (Add Agent, Agent Settings)."
-  },
-  "agents.overrides.inherited": {
-    "defaultMessage": "{whose} ({value})",
-    "description": "The first choice of an agent's model, effort, mode or context: whose setting it follows ({whose}: \"Project's\") and what that is now ({value}: \"Opus 5.5\")."
-  },
-  "agents.overrides.model": {
-    "defaultMessage": "Model",
-    "description": "Label of an agent's model choice (Add Agent, Agent Settings)."
-  },
   "agents.overrides.off": {
     "defaultMessage": "Off",
     "description": "A choice of an agent's Use 200K context setting. Keep it short."
@@ -1034,10 +1002,6 @@
   "agents.overrides.on": {
     "defaultMessage": "On",
     "description": "A choice of an agent's Use 200K context setting. Keep it short."
-  },
-  "agents.overrides.permission": {
-    "defaultMessage": "Permission mode",
-    "description": "Label of an agent's permission mode choice (Add Agent, Agent Settings)."
   },
   "agents.overrides.projects": {
     "defaultMessage": "Project's",
@@ -1359,6 +1323,10 @@
     "defaultMessage": "Optional: what it is for, in your words",
     "description": "Placeholder of an agent's empty note (Agent Settings)."
   },
+  "agents.settings.otherCliStopped": {
+    "defaultMessage": "Another CLI's connection can be chosen once {agent} is stopped: its conversations stay with {cli}.",
+    "description": "Under the connection in Agent Settings of a running agent ({agent}) (HI-2108): only its own CLI's ({cli}: \"Claude Code\") connections are offered while it runs."
+  },
   "agents.settings.save": {
     "defaultMessage": "Save",
     "description": "Agent Settings' button: saves the agent's settings."
@@ -1366,10 +1334,6 @@
   "agents.settings.saving": {
     "defaultMessage": "Saving…",
     "description": "Agent Settings' Save button while it saves."
-  },
-  "agents.settings.stopToChange": {
-    "defaultMessage": "— stop {agent} to change it",
-    "description": "After a running agent's provider in Agent Settings ({agent}: its name): the provider can only change while it is stopped."
   },
   "agents.settings.title": {
     "defaultMessage": "{agent} settings",

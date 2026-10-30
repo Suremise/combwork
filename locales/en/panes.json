@@ -187,9 +187,13 @@
     "defaultMessage": "Signed in as {email}.",
     "description": "Added to the hover of a pane footer's connection (HI-1756): the login the connection is signed in as ({email}: its email address)."
   },
-  "panes.footer.connectionOff": {
-    "defaultMessage": "The connection chosen for it is off in this workspace, so it runs on the workspace's default.",
-    "description": "Added to the hover of a pane footer's connection: the agent's own connection is off in this workspace, so the default runs it."
+  "panes.footer.connectionOffHere": {
+    "defaultMessage": "The connection chosen for it is on an account that's off in this workspace, so it runs on its CLI's first usable connection.",
+    "description": "Added to the hover of a pane footer's connection (HI-2108): the agent's own connection is on an account turned off in this workspace, so its CLI's first usable connection runs it."
+  },
+  "panes.footer.connectionRemoved": {
+    "defaultMessage": "The connection chosen for it was removed, so it runs on its CLI's first usable connection. Choose another in its Agent Settings.",
+    "description": "Added to the hover of a pane footer's connection (HI-2108): the agent's connection was removed, so its CLI's first usable connection runs it. Agent Settings names a dialog."
   },
   "panes.footer.connectionSwitching": {
     "defaultMessage": "switches once its turn is over",

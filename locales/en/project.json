@@ -3,10 +3,6 @@
     "defaultMessage": "Add Agent",
     "description": "Button: adds an agent to the project."
   },
-  "project.agents.connectionSettings": {
-    "defaultMessage": "Its connection's defaults ({model})",
-    "description": "Under an agent with no model, effort or context of its own, with Connections on (HI-1770): it runs with its connection's defaults. {model} is the model it runs."
-  },
   "project.agents.merge": {
     "defaultMessage": "Merge…",
     "description": "Tooltip on a worktree agent's merge button."
@@ -15,33 +11,13 @@
     "defaultMessage": "{provider} (off)",
     "description": "A provider's name when it is turned off in Settings → Providers (an agent's provider, and the Provider list)."
   },
-  "project.agents.own200k": {
-    "defaultMessage": "{on, select, yes {200K context on} other {200K context off}}",
-    "description": "One of an agent's own settings, in a list. Keep 200K."
-  },
-  "project.agents.ownEffort": {
-    "defaultMessage": "effort {effort}",
-    "description": "One of an agent's own settings, in a list."
-  },
   "project.agents.ownMcp": {
     "defaultMessage": "MCP servers {servers}",
     "description": "One of an agent's own settings, in a list: which MCP servers it gets."
   },
-  "project.agents.ownModel": {
-    "defaultMessage": "model {model}",
-    "description": "One of an agent's own settings, in a list."
-  },
-  "project.agents.ownSettings": {
-    "defaultMessage": "Own settings: {settings}",
-    "description": "Under an agent: the settings it sets for itself, as a list."
-  },
   "project.agents.projectFolder": {
     "defaultMessage": "project folder",
     "description": "Where an agent works when it has no worktree."
-  },
-  "project.agents.projectSettings": {
-    "defaultMessage": "Project settings ({model})",
-    "description": "Under an agent that uses the project's settings. {model} is the model it runs."
   },
   "project.agents.remove": {
     "defaultMessage": "Remove agent…",
@@ -64,12 +40,12 @@
     "description": "Button in that banner: opens Project Settings."
   },
   "project.banner.connectionSetup": {
-    "defaultMessage": "No {cli} connection is on in this workspace, so its agents can't start. Add one and sign it in.",
-    "description": "Banner in a project whose agents' CLI ({cli}: \"Claude Code\") has no connection on in the workspace (HI-1755)."
+    "defaultMessage": "No {cli} account is on in this workspace, so its agents can't start. Add one and sign it in.",
+    "description": "Banner in a project whose agents' CLI ({cli}: \"Claude Code\") has no account (a sign-in or server) on in the workspace (HI-1755; HI-2108)."
   },
   "project.banner.connectionSetupAdd": {
-    "defaultMessage": "Add a Connection",
-    "description": "Button on the banner asking for a connection: opens Settings → Connections."
+    "defaultMessage": "Add an Account",
+    "description": "Button on the banner asking for an account (HI-2108): opens Settings → Accounts & Connections."
   },
   "project.banner.copyToWorkspace": {
     "defaultMessage": "Copy to workspace",
@@ -718,6 +694,10 @@
   "project.empty.markWorking": {
     "defaultMessage": "Mark as working on",
     "description": "Button: marks the project as one you are working on."
+  },
+  "project.empty.noAccount": {
+    "defaultMessage": "No account is on in this workspace — Settings → Accounts & Connections",
+    "description": "Warning on the Session tab of a project with no agents (HI-2108): no account (a sign-in or server a coding agent CLI uses) is on in this workspace, so a new agent has no connection to run on. Settings → Accounts & Connections: name it as Settings does."
   },
   "project.empty.noAgents": {
     "defaultMessage": "No agents yet",

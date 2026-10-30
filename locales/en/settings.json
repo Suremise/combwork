@@ -2575,22 +2575,6 @@
     "defaultMessage": "Highlight Compact over",
     "description": "A setting's title (Settings → Assistant)."
   },
-  "settings.assistant.connection.desc": {
-    "defaultMessage": "Which connection the Assistant of the open workspace runs on. The workspace's default unless you choose one.",
-    "description": "What the setting \"Connection (this workspace)\" does, under its title (Settings → Assistant)."
-  },
-  "settings.assistant.connection.failed": {
-    "defaultMessage": "Couldn't change the Assistant's connection",
-    "description": "An error's title: saving the Assistant's connection (Settings → Assistant) failed."
-  },
-  "settings.assistant.connection.noWorkspace": {
-    "defaultMessage": "Open a workspace to choose its Assistant's connection.",
-    "description": "Settings → Assistant → Connection with no workspace open."
-  },
-  "settings.assistant.connection.title": {
-    "defaultMessage": "Connection (this workspace)",
-    "description": "A setting's title (Settings → Assistant): which connection the open workspace's Assistant runs on."
-  },
   "settings.assistant.control.desc": {
     "defaultMessage": "What the Assistant may do beyond looking and advising, in every workspace.",
     "description": "What the setting \"Control\" does, under its title (Settings → Assistant)."
@@ -2630,14 +2614,6 @@
   "settings.assistant.control.title": {
     "defaultMessage": "Control",
     "description": "A setting's title (Settings → Assistant)."
-  },
-  "settings.assistant.defaultIs": {
-    "defaultMessage": "Default ({value})",
-    "description": "The first choice of a list in Settings → Assistant → With <provider>: what applies when nothing is chosen. {value} says what that is."
-  },
-  "settings.assistant.defaultProvider": {
-    "defaultMessage": "Default provider ({provider})",
-    "description": "The first choice of Settings → Assistant → Provider: the default provider, and which one that is now."
   },
   "settings.assistant.enterEndsPause.desc": {
     "defaultMessage": "Once you press Enter in the terminal (you sent what you typed), the Assistant may type there at once.",
@@ -2707,18 +2683,6 @@
     "defaultMessage": "Panel side",
     "description": "A setting's title (Settings → Assistant)."
   },
-  "settings.assistant.provider.desc": {
-    "defaultMessage": "The coding agent the Assistant runs, unless a workspace chooses another.",
-    "description": "What the setting \"Provider\" does, under its title (Settings → Assistant)."
-  },
-  "settings.assistant.provider.tip": {
-    "defaultMessage": "The Assistant is independent of your project agents: a Codex Assistant can look after Claude Code agents, and the other way round.",
-    "description": "The info tip of the setting \"Provider\" (Settings → Assistant): more on what it does and when it applies."
-  },
-  "settings.assistant.provider.title": {
-    "defaultMessage": "Provider",
-    "description": "A setting's title (Settings → Assistant)."
-  },
   "settings.assistant.tellReplies.desc": {
     "defaultMessage": "The Assistant's watch on an agent or its card hears the first line of what you send that agent from its pane.",
     "description": "What the setting \"Tell the Assistant when I reply to an agent\" does, under its title (Settings → Assistant)."
@@ -2746,62 +2710,6 @@
   "settings.assistant.typingPause.title": {
     "defaultMessage": "Pause after you type",
     "description": "A setting's title (Settings → Assistant)."
-  },
-  "settings.assistant.withProvider.desc": {
-    "defaultMessage": "The model, effort, permission mode{context, select, yes {, context} other {}} and extra arguments when the Assistant runs {provider}. Default follows {provider}'s own settings, except the mode: {mode}, where {provider} approves safe actions itself and only asks about risky ones.",
-    "description": "What the setting \"With <provider>\" does (Settings → Assistant). {provider} is a coding agent's name, {mode} a permission mode's name; {context} is yes when the provider has a context-size choice."
-  },
-  "settings.assistant.withProvider.tip": {
-    "defaultMessage": "By default it uses the same model and effort as your agents. A lighter model or low effort saves tokens but makes it careless (for example, saying it will check on an agent later and never doing so). Its default mode is the one your agents default to, so it rarely asks. Hive's own tools never ask: what they may do is set by Control above.",
-    "description": "The info tip of the setting \"With <provider>\" (Settings → Assistant)."
-  },
-  "settings.assistant.withProvider.title": {
-    "defaultMessage": "With {provider}",
-    "description": "A setting's title (Settings → Assistant): the Assistant's model, effort and mode when it runs this provider. {provider} is a coding agent's name."
-  },
-  "settings.assistantDefaults.extraArgsPlaceholder": {
-    "defaultMessage": "e.g. --verbose",
-    "description": "The empty box's placeholder of the setting \"Extra arguments\". --verbose is an argument: keep it."
-  },
-  "settings.assistantProvider.effort.desc": {
-    "defaultMessage": "Its reasoning effort with {provider}. Empty follows Settings → {provider} → Default effort.",
-    "description": "A field of Settings → Assistant → With <provider>: what it is. {provider} is a coding agent's name."
-  },
-  "settings.assistantProvider.effort.title": {
-    "defaultMessage": "Effort",
-    "description": "A field's title in Settings → Assistant → With <provider>: the Assistant's reasoning effort."
-  },
-  "settings.assistantProvider.extraArgs.desc": {
-    "defaultMessage": "Additional {cli} command-line arguments when the Assistant runs {provider}.",
-    "description": "A field of Settings → Assistant → With <provider>: what it is. {provider} is a coding agent's name. {cli} is the CLI's command (claude, codex, copilot): keep it."
-  },
-  "settings.assistantProvider.extraArgs.title": {
-    "defaultMessage": "Extra arguments",
-    "description": "A field's title in Settings → Assistant → With <provider>: command-line arguments."
-  },
-  "settings.assistantProvider.model.desc": {
-    "defaultMessage": "The model when the Assistant runs {provider}. Empty follows Settings → {provider} → Default model.",
-    "description": "A field of Settings → Assistant → With <provider>: what it is. {provider} is a coding agent's name."
-  },
-  "settings.assistantProvider.model.title": {
-    "defaultMessage": "Model",
-    "description": "A field's title in Settings → Assistant → With <provider>: the Assistant's model."
-  },
-  "settings.assistantProvider.permissionMode.desc": {
-    "defaultMessage": "Its permission mode with {provider}. Empty is {mode}, where {provider} approves safe actions itself and only asks about risky ones.",
-    "description": "A field of Settings → Assistant → With <provider>: what it is. {provider} is a coding agent's name. {mode} is a permission mode's name."
-  },
-  "settings.assistantProvider.permissionMode.title": {
-    "defaultMessage": "Permission mode",
-    "description": "A field's title in Settings → Assistant → With <provider>: the Assistant's permission mode."
-  },
-  "settings.assistantProvider.use200kContext.desc": {
-    "defaultMessage": "A 200K-token context window for it with {provider}. Empty follows Settings → {provider}.",
-    "description": "A field of Settings → Assistant → With <provider>: what it is. {provider} is a coding agent's name."
-  },
-  "settings.assistantProvider.use200kContext.title": {
-    "defaultMessage": "Use 200K context (instead of 1M)",
-    "description": "A field's title in Settings → Assistant → With <provider>. 200K and 1M are numbers of tokens."
   },
   "settings.board.archiveDoneDays.desc": {
     "defaultMessage": "Days a card stays in Done before Hive archives it.",
@@ -4302,10 +4210,6 @@
   "settings.option.on": {
     "defaultMessage": "On",
     "description": "A choice of a setting that is on or off, beside Inherit or Default."
-  },
-  "settings.path.assistant": {
-    "defaultMessage": "Settings → {assistant} → With {provider} → {title}",
-    "description": "Where a field of the Assistant's settings with a provider is. {assistant} is the Assistant section's name, {provider} a coding agent's name."
   },
   "settings.path.level": {
     "defaultMessage": "Settings → {section} → {part} → {title}",

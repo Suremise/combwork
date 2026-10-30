@@ -1,10 +1,11 @@
-// The Agent API and connections (HI-1771, S4; the test seam off so
-// the real rule applies): GET /v1/connections as each caller may see it (the workspace token and the Assistant every
-// connection, a project agent only those on in its workspace, four fields; details=true widens nothing; never a folder
-// or defaults; another one asked after by id or name is 404 to an agent); the Assistant adds and changes agents by
-// connection name or id (two sharing a name: 409; unknown: 404; one off here: 409; another CLI than the provider: 409),
-// an unrelated change keeping it and null clearing it (HI-2106: to its CLI's first on here); the status shows the chosen
-// and the running connection. The fake Claude Code signs in, no browser.
+// The Agent API and connections (HI-1771, S4; HI-2108: connections are setups on accounts; the test seam off so the real
+// rule applies): GET /v1/connections as each caller may see it (the workspace token and the Assistant every connection
+// and account, a project agent only those usable in its workspace, without extra arguments; details=true widens nothing;
+// never a folder; another one asked after by id or name is 404 to an agent); the Assistant adds and changes agents by
+// connection name or id (two sharing a name: 409; unknown: 404; one whose account is off here: 409), provider, model,
+// effort, mode and context200k refused naming the connections to use (decision D), an unrelated change keeping it and
+// null giving its CLI's first usable one; hive_connection makes and changes a connection only with Change settings on;
+// the status shows the chosen connection and the account it runs on. The fake Claude Code signs in, no browser.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -67,17 +68,22 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const twinB = await connect('Twin', 'tb@example.com')
     const other = await connect('Other', 'other@example.com', false)
 
-    // --- The workspace token: every connection, with on, default and identity; nothing of where a login is kept.
+    // Each account's base connection (HI-2106: made with it, named after it): what an agent chooses.
+    const rows = (await inv('connections:list')).connectionRows
+    const base = (a) => rows.find((c) => c.account === a.id)?.id
+    const [c1, c2, cTa, cTb, cOther] = [max1, max2, twinA, twinB, other].map(base)
+
+    // --- The workspace token (HI-2108): every connection, with its account, CLI and values, and `usable: false` on one
+    // whose account is off here; every account, with on and identity; nothing of where a login is kept.
     const all = await api('GET', '/v1/connections')
     const byId = Object.fromEntries((all.body?.connections ?? []).map((c) => [c.id, c]))
-    check('the workspace token sees every connection, on or not', all.status === 200 && Object.keys(byId).length === 5 && byId[other.id]?.on === false && byId[max1.id]?.on === true && byId[max1.id]?.default === true && byId[max1.id]?.email === 'one@example.com', JSON.stringify(all.body))
-    const raw = JSON.stringify(all.body) + JSON.stringify((await api('GET', '/v1/connections?details=true')).body) + JSON.stringify((await api('GET', `/v1/connections/${max1.id}?details=true`)).body)
-    // (The reply's own `defaults` is each CLI's default connection id; no connection carries its model defaults.)
-    const items = (all.body?.connections ?? []).concat((await api('GET', '/v1/connections?details=true')).body?.connections ?? [])
-    check('…never a folder, a path, its defaults or raw login records, details or not', !/folder|accounts|\\\\|observed|accepted|orgId/.test(raw) && items.every((c) => !('defaults' in c) && !('defaultsFrom' in c)), raw.slice(0, 300))
-    check('…and the defaults per CLI', all.body?.defaults?.['claude-code'] === max1.id)
+    const accountsById = Object.fromEntries((all.body?.accounts ?? []).map((a) => [a.id, a]))
+    check('the workspace token sees every connection, its account named, usable or not', all.status === 200 && Object.keys(byId).length === 5 && byId[c1]?.account === 'Max 1' && byId[c1]?.cli === 'claude-code' && !('usable' in byId[c1]) && byId[cOther]?.usable === false, JSON.stringify(all.body?.connections))
+    check('…and every account, with on and who it is signed in as', Object.keys(accountsById).length === 5 && accountsById[other.id]?.on === false && accountsById[max1.id]?.on === true && accountsById[max1.id]?.email === 'one@example.com', JSON.stringify(all.body?.accounts))
+    const raw = JSON.stringify(all.body) + JSON.stringify((await api('GET', '/v1/connections?details=true')).body) + JSON.stringify((await api('GET', `/v1/connections/${c1}?details=true`)).body)
+    check('…never a folder, a path or raw login records, details or not; no default (decision A)', !/folder|accounts\\|\\\\|observed|accepted|orgId/.test(raw) && !('defaults' in (all.body ?? {})), raw.slice(0, 300))
 
-    // --- A project agent (One, running on Max 1): only those on in its workspace, four fields.
+    // --- A project agent (One, running on Max 1): only those usable in its workspace, without extra arguments.
     await inv('session:start', alpha, { agentId: 'a-one' })
     const sessionId = await lib.until(async () => (await live(alpha, 'a-one'))?.sessionId, HUNG_MS)
     const launch = await lib.until(() => lines(path.join(accountsRoot, max1.id, 'fake-launches.jsonl')).find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
@@ -86,17 +92,17 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check("One's own Agent API token found", !!agentToken)
     const mine = await api('GET', '/v1/connections?details=true', null, agentToken)
     const ids = (mine.body?.connections ?? []).map((c) => c.id).sort()
-    check('a project agent sees only those on in its workspace (Other left out), details or not', mine.status === 200 && ids.join() === [max1.id, max2.id, twinA.id, twinB.id].sort().join(), JSON.stringify(mine.body))
-    check('…with four fields alone', (mine.body?.connections ?? []).every((c) => Object.keys(c).sort().join() === 'cli,id,kind,name,signedIn'), JSON.stringify(mine.body?.connections?.[0]))
-    const hidden = [await api('GET', `/v1/connections/${other.id}`, null, agentToken), await api('GET', '/v1/connections/Other', null, agentToken)]
+    check('a project agent sees only the connections usable in its workspace (Other left out), details or not', mine.status === 200 && ids.join() === [c1, c2, cTa, cTb].sort().join(), JSON.stringify(mine.body))
+    check('…their id, name, account, CLI and values alone; accounts with four fields', (mine.body?.connections ?? []).every((c) => Object.keys(c).every((k) => ['id', 'name', 'account', 'cli', 'model', 'effort', 'context200k', 'mode'].includes(k))) && (mine.body?.accounts ?? []).every((a) => Object.keys(a).sort().join() === 'cli,id,kind,name,signedIn'), JSON.stringify(mine.body))
+    const hidden = [await api('GET', `/v1/connections/${cOther}`, null, agentToken), await api('GET', '/v1/connections/Other', null, agentToken)]
     check('…Other asked after by id or by name: 404, as if there were none', hidden.every((r) => r.status === 404), JSON.stringify(hidden.map((r) => r.status)))
-    check('…one on here, by name: its four fields', (await api('GET', '/v1/connections/max%202', null, agentToken)).body?.id === max2.id)
+    check('…one usable here, by name: it', (await api('GET', '/v1/connections/max%202', null, agentToken)).body?.id === c2)
 
-    // --- The status: One's connection (none of its own before HI-2106: pinned to the one it ran on) and its run's.
+    // --- The status: One's connection (none of its own before HI-2106: pinned to the one it ran on) and its run's account.
     const one = (await api('GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.id === 'a-one')
-    check('the status: One, which had none of its own, is pinned to Max 1 (HI-2106), and runs on it', one?.connection?.id === max1.id && one?.launchedConnection?.id === max1.id, JSON.stringify(one && { connection: one.connection, launchedConnection: one.launchedConnection }))
+    check("the status: One is on Max 1's base connection (HI-2106), its account named, and runs on Max 1", one?.connection?.id === c1 && one?.connection?.account === 'Max 1' && one?.launchedConnection?.id === max1.id, JSON.stringify(one && { connection: one.connection, launchedConnection: one.launchedConnection }))
 
-    // --- The Assistant: started on the workspace's default, its token, then agents by connection.
+    // --- The Assistant: started on the first usable, its token, then agents by connection.
     await inv('session:start', assistantHome, { agentId: 'assistant' })
     const ready = await lib.until(async () => {
       const st = await live(assistantHome, 'assistant')
@@ -111,24 +117,44 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const add = async (name, extra) => asAssistant('POST', '/v1/projects/alpha/agents', { name, ...extra })
     const byName = await add('Vianame', { connection: 'max 2' })
     const viaRow = byName.body?.project?.agents?.find((a) => a.name === 'Vianame')
-    check('the Assistant adds an agent by connection name: on Max 2, its CLI Claude Code', byName.status === 200 && viaRow?.connection?.id === max2.id && viaRow?.connection?.name === 'Max 2' && viaRow.provider === 'claude-code', JSON.stringify({ status: byName.status, body: byName.body?.error ?? viaRow }))
+    check('the Assistant adds an agent by connection name: on Max 2, its CLI Claude Code', byName.status === 200 && viaRow?.connection?.id === c2 && viaRow?.connection?.name === 'Max 2' && viaRow.provider === 'claude-code', JSON.stringify({ status: byName.status, body: byName.body?.error ?? viaRow }))
     const twin = await add('Twinned', { connection: 'Twin' })
-    check('…a name two share: 409, naming both ids', twin.status === 409 && twin.body?.error?.includes(twinA.id) && twin.body?.error?.includes(twinB.id), JSON.stringify(twin))
+    check('…a name two share: 409, naming both ids', twin.status === 409 && twin.body?.error?.includes(cTa) && twin.body?.error?.includes(cTb), JSON.stringify(twin))
     const nope = await add('Nowhere', { connection: 'Nope' })
     check('…an unknown one: 404', nope.status === 404, JSON.stringify(nope))
-    const viaId = await add('Viaid', { connection: twinA.id })
-    check('…by id: on that one', viaId.status === 200 && viaId.body?.project?.agents?.find((a) => a.name === 'Viaid')?.connection?.id === twinA.id, JSON.stringify(viaId.body?.error ?? ''))
-    const offHere = await add('Offhere', { connection: other.id })
-    check('…one not on here (by id): 409, nothing added', offHere.status === 409 && !(await api('GET', '/v1/projects/alpha')).body?.agents?.some((a) => a.name === 'Offhere'), JSON.stringify(offHere))
-    const mismatch = await add('Mismatch', { provider: 'codex', connection: 'Max 1' })
-    check('…a provider another than the connection’s CLI: 409', mismatch.status === 409 && /That connection is for Claude Code, not Codex/.test(mismatch.body?.error ?? ''), JSON.stringify(mismatch))
+    const viaId = await add('Viaid', { connection: cTa })
+    check('…by id: on that one', viaId.status === 200 && viaId.body?.project?.agents?.find((a) => a.name === 'Viaid')?.connection?.id === cTa, JSON.stringify(viaId.body?.error ?? ''))
+    const offHere = await add('Offhere', { connection: cOther })
+    check('…one whose account is off here (by id): 409, nothing added', offHere.status === 409 && !(await api('GET', '/v1/projects/alpha')).body?.agents?.some((a) => a.name === 'Offhere'), JSON.stringify(offHere))
+    // Decision D (HI-2108): the old settings are refused, naming the connections to use; nothing is added.
+    const old = await add('Oldway', { provider: 'claude-code', model: 'opus' })
+    check("…provider and model: 400, naming the first usable account's connections, nothing added", old.status === 400 && /provider, model/.test(old.body?.error ?? '') && /On Max 1: Max 1/.test(old.body?.error ?? '') && !(await api('GET', '/v1/projects/alpha')).body?.agents?.some((a) => a.name === 'Oldway'), JSON.stringify(old))
     const viaAgent = (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Vianame')
-    await asAssistant('PATCH', `/v1/projects/alpha/agents/${viaAgent.id}`, { model: 'opus' })
-    check('an unrelated change keeps its connection', (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Vianame')?.connection?.id === max2.id)
+    const oldPatch = await asAssistant('PATCH', `/v1/projects/alpha/agents/${viaAgent.id}`, { effort: 'high' })
+    check("a change of effort: 400, naming its account's connections; its connection kept", oldPatch.status === 400 && /On Max 2: Max 2/.test(oldPatch.body?.error ?? '') && (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Vianame')?.connection?.id === c2, JSON.stringify(oldPatch))
+    await asAssistant('PATCH', `/v1/projects/alpha/agents/${viaAgent.id}`, { workflowRole: 'reviewer' })
+    check('an unrelated change keeps its connection', (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Vianame')?.connection?.id === c2)
     await asAssistant('PATCH', `/v1/projects/alpha/agents/${viaAgent.id}`, { connection: null })
-    check('…null clears it: its CLI’s first on here (HI-2106, decision H)', (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Vianame')?.connection?.id === max1.id)
+    check('…null: its CLI’s first usable one (HI-2106, decision H)', (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Vianame')?.connection?.id === c1)
     const projectAgent = await api('POST', '/v1/projects/alpha/agents', { name: 'Sneaky', connection: 'Max 1' }, agentToken)
     check('a project agent may not add agents (403), connection or not', projectAgent.status === 403, JSON.stringify(projectAgent))
+
+    // --- hive_connection (HI-2108): the Assistant makes and changes a connection, only with Change settings on.
+    const before = (await inv('connections:list')).connectionRows.length
+    const shut = await asAssistant('POST', '/v1/connections', { account: 'Max 2', name: 'Max 2 · High', effort: 'high' })
+    check('making a connection with Change settings off: 403, nothing made', shut.status === 403 && /Change settings is off/.test(shut.body?.error ?? '') && (await inv('connections:list')).connectionRows.length === before, JSON.stringify(shut))
+    await inv('settings:update', { assistant: { changeSettings: true } })
+    const made = await asAssistant('POST', '/v1/connections', { account: 'Max 2', name: 'Max 2 · High', effort: 'high' })
+    check('…on: made on the account named, as listed', made.status === 200 && made.body?.name === 'Max 2 · High' && made.body?.account === 'Max 2' && made.body?.effort === 'high', JSON.stringify(made))
+    const noAccount = await asAssistant('POST', '/v1/connections', { account: 'Nobody', name: 'X' })
+    check('…on an account that isn’t there: 404 (accounts are the user’s)', noAccount.status === 404, JSON.stringify(noAccount))
+    const changed = await asAssistant('PATCH', `/v1/connections/${encodeURIComponent('Max 2 · High')}`, { mode: 'plan', effort: '' })
+    check('…changed by name: its mode set, its effort back to the CLI’s', changed.status === 200 && changed.body?.mode === 'plan' && !('effort' in (changed.body ?? {})), JSON.stringify(changed))
+    const onIt = await asAssistant('PATCH', `/v1/projects/alpha/agents/${viaAgent.id}`, { connection: 'Max 2 · High' })
+    check('…and an agent pointed at it', onIt.status === 200 && (await api('GET', '/v1/projects/alpha')).body.agents.find((a) => a.name === 'Vianame')?.connection?.id === made.body?.id, JSON.stringify(onIt.body?.error ?? ''))
+    const byAgent = await api('POST', '/v1/connections', { account: 'Max 1', name: 'Sneaky' }, agentToken)
+    check('a project agent may not make connections (403)', byAgent.status === 403, JSON.stringify(byAgent))
+    await inv('settings:update', { assistant: { changeSettings: false } })
 
     await inv('session:stop', alpha, 'a-one')
     await inv('session:stop', assistantHome, 'assistant')

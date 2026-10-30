@@ -705,7 +705,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 11
+export const API_VERSION = 12
 
 /** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -1254,12 +1254,12 @@ function connectionValuesArg(body: any): ConnectionPatch {
  * Change settings on, asked again at the change, and listed in its panel. Accounts (sign-ins, servers, keys) stay the
  * user's: a connection goes only on an account that exists.
  */
-async function connectionChange<T>(kind: 'add-connection' | 'update-connection', what: string, fn: () => Promise<{ done: string; act?: Partial<ActivityTarget>; result: T }>): Promise<T> {
+async function connectionChange<T>(act: ActivityTarget, what: string, fn: () => Promise<{ done: string; act?: Partial<ActivityTarget>; result: T }>): Promise<T> {
   const allowed = (): void => {
     if (config.settings.assistant?.changeSettings !== true) throw new HttpError(403, "The user's settings don't let you change connections (Settings → Assistant → Control → Change settings is off). Tell the user how to change it in Settings → Accounts & Connections, or that turning Change settings on lets you.")
   }
   allowed()
-  return assistantChange('look', what, { kind }, async () => {
+  return assistantChange('look', what, act, async () => {
     allowed()
     return fn()
   })
@@ -1276,7 +1276,7 @@ async function connectionsCall<T>(fn: () => T | Promise<T>): Promise<T> {
 }
 
 route('POST', '/v1/connections', async ({ body }) =>
-  connectionChange('add-connection', 'make a connection', async () => {
+  connectionChange({ kind: 'add-connection' }, 'make a connection', async () => {
     const ref = String(body?.account ?? '').trim()
     if (!ref) throw new HttpError(400, "Name the account it goes on (account: its id or name, from hive_connection list). Adding an account is the user's, in Settings → Accounts & Connections.")
     const accounts = allAccounts()
@@ -1291,7 +1291,7 @@ route('POST', '/v1/connections', async ({ body }) =>
 )
 
 route('PATCH', '/v1/connections/:ref', async ({ params, body }) =>
-  connectionChange('update-connection', 'change a connection', async () => {
+  connectionChange({ kind: 'update-connection' }, 'change a connection', async () => {
     const ref = decodeURIComponent(params[0] ?? '')
     const r = connectionRef(ref, allConnections(), allConnections().map((c) => c.id))
     if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, `Several connections are named "${ref}": use its id (${r.ids!.join(', ')}).`) : new HttpError(404, `No connection named "${ref}", and none has that id.`)

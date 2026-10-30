@@ -2,12 +2,10 @@
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
   'agents.add.add': undefined
-  'agents.add.checking': undefined
   'agents.add.failed': undefined
   'agents.add.full': { limit: string | number }
   'agents.add.nameTaken': { project: string | number; agent: string | number }
   'agents.add.nameTakenHere': { project: string | number; agent: string | number }
-  'agents.add.providerOff': { cli: string | number; whose: string }
   'agents.add.startNow': undefined
   'agents.add.title': { project: string | number }
   'agents.add.useSuggestion': { name: string | number }
@@ -121,7 +119,6 @@ interface HiveMessageValues {
   'agents.dialog.merge': undefined
   'agents.dialog.name': undefined
   'agents.dialog.projectFolder': undefined
-  'agents.dialog.settings': undefined
   'agents.dialog.worksIn': undefined
   'agents.effort.inherited': { effort: string | number }
   'agents.efforts.cliDefault': { provider: string | number }
@@ -253,14 +250,8 @@ interface HiveMessageValues {
   'agents.name.empty': undefined
   'agents.name.taken': { agent: string | number; project: string | number; suggestion: string | number }
   'agents.name.tooLong': { max: string | number }
-  'agents.overrides.connectionDefault': undefined
-  'agents.overrides.context': undefined
-  'agents.overrides.effort': undefined
-  'agents.overrides.inherited': { whose: string | number; value: string | number }
-  'agents.overrides.model': undefined
   'agents.overrides.off': undefined
   'agents.overrides.on': undefined
-  'agents.overrides.permission': undefined
   'agents.overrides.projects': undefined
   'agents.permission.agentNewSessions': { agent: string | number }
   'agents.permission.answerFirst': undefined
@@ -341,9 +332,9 @@ interface HiveMessageValues {
   'agents.settings.appliesNext': { agent: string | number }
   'agents.settings.note': undefined
   'agents.settings.noteNone': undefined
+  'agents.settings.otherCliStopped': { agent: string | number; cli: string | number }
   'agents.settings.save': undefined
   'agents.settings.saving': undefined
-  'agents.settings.stopToChange': { agent: string | number }
   'agents.settings.title': { agent: string | number }
   'agents.settings.worktreeOn': { branch: string | number; base: string | number }
   'agents.start.exited': { cli: string | number; code: string | number }

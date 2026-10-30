@@ -521,8 +521,10 @@ const prose = (seed, n) => {
   check('activating a project confirms it', measure('hive_activate_project', tool('hive_activate_project', { project: 'gamma' }, 'assistant'), 300) === 'gamma is on.')
   measure('hive_create_project', tool('hive_create_project', { name: 'epsilon' }, 'assistant'), 300)
   const added = measure('hive_add_agent', tool('hive_add_agent', { project: 'beta', name: 'Helper' }, 'assistant'), 400)
-  check('a new agent: its name, id and folder', /^Added Helper \(id a-\w+\) to beta: claude-code, in the project folder, stopped\.$/.test(added), added)
-  measure('hive_update_agent', tool('hive_update_agent', { project: 'beta', agent: 'Helper', effort: 'high' }, 'assistant'), 1000)
+  check('a new agent: its name, id, connection and folder', /^Added Helper \(id a-\w+\) to beta: claude-code( on [^,]+)?, in the project folder, stopped\.$/.test(added), added)
+  measure('hive_update_agent', tool('hive_update_agent', { project: 'beta', agent: 'Helper', workflowRole: 'builder' }, 'assistant'), 1000)
+  // Connections (HI-2108): a row each, short.
+  measure('hive_connection (list)', tool('hive_connection', { action: 'list' }, 'assistant'), 600)
   const started = measure('hive_start_agent', tool('hive_start_agent', { project: 'beta', agent: 'Helper' }, 'assistant'), 400)
   check('a start: its status and session', /^Started Helper in beta: \w+, session [\w-]+\. Follow it with hive_wait_for_agents\.$/.test(started), started)
   const helper = async () => live(path.join(ws, 'beta'), (await inv('workspace:refresh')).projects.find((p) => p.name === 'beta').agents.find((a) => a.name === 'Helper').id)

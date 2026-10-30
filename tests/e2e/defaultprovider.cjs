@@ -77,22 +77,15 @@ const check = (name, ok, extra = '') => {
   check('a chosen default that is turned off is named', /Claude Code is turned off/.test(named ?? ''), String(named))
   await shot('chosen-off')
 
-  // Add Agent keeps that choice, says why it can't add, and adds once another provider is chosen.
+  // Add Agent has no provider to choose (HI-2108, decision A): it offers connections, and Settings' old default doesn't
+  // keep Claude Code chosen there; adding stays possible.
   const dialog = page.locator('.dialog', { hasText: 'Add an agent to alpha' })
   const addButton = () => dialog.getByRole('button', { name: 'Add Agent', exact: true })
-  const addAgentDialog = async (label, whose) => {
-    await card.locator('button', { hasText: 'Add Agent' }).first().click()
-    const open = await lib.until(async () => (await dialog.count()) === 1, 10000)
-    const checked = await dialog.locator('.provider-choice .choice.selected strong').innerText().catch(() => '')
-    const note = await dialog.locator('[data-provider-off]').innerText().catch(() => '')
-    check(`${label}: Add Agent keeps Claude Code chosen`, !!open && checked === 'Claude Code', checked)
-    check(`${label}: …says it's turned off and is ${whose} default`, note.includes('Claude Code is turned off') && note.includes(`${whose} default provider`), note)
-    check(`${label}: …and can't add it`, await addButton().isDisabled(), 'Add Agent is enabled')
-    await shot(`add-${label.replace(/[^a-z]+/gi, '-').toLowerCase()}`)
-  }
-  await addAgentDialog('Settings default', 'your')
-  await dialog.locator('.provider-choice .choice', { hasText: 'Codex' }).click()
-  check('…choosing Codex instead allows Add', !(await addButton().isDisabled()) && (await dialog.locator('[data-provider-off]').count()) === 0)
+  await card.locator('button', { hasText: 'Add Agent' }).first().click()
+  check('Add Agent opens', !!(await lib.until(async () => (await dialog.count()) === 1, 10000)))
+  check('…with a connection to choose and no coding agent choice', (await dialog.locator('#add-agent-connection').count()) === 1 && (await dialog.locator('.provider-choice').count()) === 0 && (await dialog.locator('[data-provider-off]').count()) === 0)
+  check('…and can add', !(await addButton().isDisabled()))
+  await shot('add-agent')
   await page.keyboard.press('Escape')
   await lib.until(async () => (await dialog.count()) === 0, 5000)
   await inv('settings:update', { defaultProvider: 'auto' })

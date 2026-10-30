@@ -22,6 +22,8 @@ interface HiveMessageValues {
   'session.compact.stopped': undefined
   'session.compact.userTyped': undefined
   'session.compact.waiting': undefined
+  'session.connection.fallback': { why: string; wanted: string | number; name: string | number }
+  'session.connection.fallbackTitle': { agent: string | number }
   'session.error.agentGone': undefined
   'session.error.inUseElsewhere': undefined
   'session.error.noAgents': undefined

@@ -96,7 +96,6 @@ describe('the settings catalogue as Settings shows it', () => {
     expect(danger.confirmOn?.title).toBe('Enable the Bypass permissions option?')
     expect(shownText(danger.text.confirmOn!.title)).toBe('Enable the Bypass permissions option?')
     expect(shownSettingPath(settingEntry('sessions.transcriptWarnMB')!)).toBe('Settings → Sessions → Warn when a transcript is over')
-    expect(shownSettingPath(settingEntry('assistant.claude-code.model')!)).toBe('Settings → Assistant → With Claude Code → Model')
   })
 
   it("a dangerous mode's opt-in names its modes as one list, with the grammar of how many", () => {
@@ -116,7 +115,7 @@ describe('the settings catalogue as Settings shows it', () => {
       const s = shownSetting(e!)
       return [s.title, s.desc, s.tip, ...(e!.options ?? []).map((o) => shownText(o.text)), ...(e!.text.confirmOn ? [shownText(e!.text.confirmOn.title)] : [])]
     }
-    for (const id of ['workflow.git.fileLocks', 'workspace.workflow.none.fileLocks', 'project.workflow.fileLocks', 'claude-code.enableDangerousMode', 'codex.enableDangerousMode', 'copilot.enableDangerousMode', 'assistant.provider:codex'])
+    for (const id of ['workflow.git.fileLocks', 'workspace.workflow.none.fileLocks', 'project.workflow.fileLocks', 'claude-code.enableDangerousMode', 'codex.enableDangerousMode', 'copilot.enableDangerousMode'])
       for (const text of shown(id)) for (const name of english) expect(text, `${id}: ${name}`).not.toContain(name)
     expect(problems).toEqual([])
   })
