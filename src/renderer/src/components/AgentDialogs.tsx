@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AGENT_LIMIT_MAX, OPEN_WORKFLOW_OPTIONS, ROLE_MAX, agentLimitText, mergeBlocked, projectAgents, transcriptWarnLimit } from '@shared/defaults'
 import { handOverNow, onRunningLane } from '@shared/handOver'
 import { useAgentLimit } from '../advanced'
-import { agentProvider, autoProvider, isProviderEnabled, modeCaveat, orderedProviders, providerDescriptor } from '@shared/providers'
+import { PROVIDERS, agentProvider, autoProvider, isProviderEnabled, modeCaveat, providerDescriptor } from '@shared/providers'
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import type { MergeBranch } from '@shared/types'
 import type { AgentBranchStatus, MergeResult, PermissionMode, ProviderId } from '@shared/types'
@@ -49,8 +49,8 @@ export function ProviderChoice({ value, current, onChange }: { value: ProviderId
   useLanguage()
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
-  // In the user's order (HI-1965: Settings → Providers), the one Automatic picks first among them.
-  const shown = orderedProviders(settings).filter((p) => isProviderEnabled(settings, p.id) || p.id === value || p.id === current)
+  // In Hive's order (HI-2139), the one Automatic picks first among them.
+  const shown = PROVIDERS.filter((p) => isProviderEnabled(settings, p.id) || p.id === value || p.id === current)
   if (!shown.length) {
     return (
       <div className="muted">

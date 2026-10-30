@@ -172,10 +172,11 @@ class ConfigStore {
         if (problem) throw new Error(problem)
       }
     }
-    // The provider order (HI-1965): provider ids, each once. No screen sets it since decision A (HI-2113: a 0.9 order is
-    // still read), but settings:update still takes the key, so a malformed one is never saved.
-    const order: unknown = patch.providerOrder
-    if (order !== undefined && (!Array.isArray(order) || order.some((x) => typeof x !== 'string' || !x || x.length > 64) || new Set(order).size !== order.length)) throw new Error('providerOrder must list provider ids, each once.') // i18n-ignore: a programming error's message
+    // The providers' order went with decision A (HI-2139): one sent (an older script's settings:update) isn't kept.
+    if ('providerOrder' in patch) {
+      const { providerOrder: _o, ...rest } = patch as SettingsPatch & { providerOrder?: unknown }
+      patch = rest
+    }
     const prev = structuredClone(this.data.settings)
     // Refused whole, nothing changed, by a check (HI-2106: a model and effort that don't go together, decision E).
     if (this.checks.size) {

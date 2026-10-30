@@ -9,7 +9,7 @@ import { PRICES_CHECKED, SHIPPED_PRICES, listedPriceModels, priceRows } from '@s
 import { APP_SETTINGS_CATALOG, SETTINGS_SECTIONS, providerSection, settingDefault, settingPatch, settingValue, shownSetting, type SettingEntry, type SettingsSection, type SettingsSectionInfo } from '@shared/settingsCatalog'
 import { fallbackEfforts, fallbackModels, modelSource, modelSourceText } from '@shared/models'
 import type { SettingsPatch } from '@shared/api'
-import { isProviderEnabled, installSourceText, inProviderOrder, orderedProviders, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
+import { PROVIDERS, isProviderEnabled, installSourceText, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
 import { modeName, useModes } from '../components/Assistant'
 import { NumberField } from '../components/NumberField'
 import { ProviderIcon } from '../components/ProviderIcon'
@@ -510,7 +510,7 @@ function ProvidersList() {
   const providers = useStore((s) => s.providers)
   return (
     <div className="provider-list">
-      {orderedProviders(settings).map((p) => {
+      {PROVIDERS.map((p) => {
         const info = providers[p.id]
         const on = isProviderEnabled(settings, p.id)
         const state = !info || info.checking ? tr(msg({ id: 'settings.provider.checking', defaultMessage: 'Checking…', description: "While Hive looks for a provider's CLI (Settings → <provider> → Installation)." })) : !info.found ? tr(msg({ id: 'settings.provider.notInstalledShort', defaultMessage: 'Not installed', description: "Under a provider in Settings → Providers: Hive didn't find its CLI." })) : (info.readiness?.find((r) => r.level === 'error')?.message ?? tr(msg({ id: 'settings.provider.installed', defaultMessage: 'Installed · {version}', description: 'Under a provider in Settings → Providers: its CLI is installed. {version} is its number.' }), { version: info.version ?? '' }))
@@ -1029,8 +1029,7 @@ export function SettingsView() {
   }, [query, section, settings, modifiedOnly, advanced, shownLanguage, workspaceName])
 
   if (!settings) return null
-  // Each provider's page in the user's order (HI-1965: Settings → Providers), the other sections where they are.
-  const sections = inProviderOrder(SECTIONS, (s) => s.provider, settings)
+  const sections = SECTIONS
   const grouped = sections.map((s) => ({ ...s, items: visible.filter((d) => d.section === s.id) })).filter((g) => g.items.length)
   // Shown in the user's language: a provider's page is its name.
   const sectionText = (s: (typeof SECTIONS)[number]): { label: string; desc: string } => ({ label: shownText(s.text.label), desc: shownText(s.text.desc) })

@@ -1,6 +1,6 @@
-// The providers' order (HI-1965): no screen sets it since decision A (HI-2113: the one order is the accounts'), but one
-// saved by 0.9 is still read. config.updateSettings takes a list of provider ids, each once, and refuses anything else
-// with nothing changed; what Automatic picks follows the saved order; the Assistant's settings tools don't offer it.
+// The providers' order (HI-1965) went with decision A (HI-2113, HI-2139): every provider list is in Hive's order. One
+// sent to config.updateSettings (an older script's settings:update) isn't kept, Automatic picks in Hive's order, and the
+// Assistant's settings tools don't offer it. A 0.9 one saved in config.json is dropped on load (defaultProvider.test.ts).
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -13,34 +13,16 @@ const { config } = await import('../src/main/config')
 const { autoProvider, setInstalledCheck } = await import('../src/shared/providers')
 const { SETTINGS_CATALOG } = await import('../src/shared/settingsCatalog')
 
-describe("the providers' saved order (HI-1965, read only since HI-2113)", () => {
-  afterEach(() => {
-    config.updateSettings({ providerOrder: [] })
-    setInstalledCheck(() => false)
-  })
+describe("the providers' order is gone (HI-2139)", () => {
+  afterEach(() => setInstalledCheck(() => false))
 
-  it('a saved list of provider ids is kept, and Automatic follows it', () => {
+  it("one sent isn't kept, and the rest of the patch is; Automatic picks in Hive's order", () => {
     config.updateSettings({ providers: { 'claude-code': { enabled: true }, codex: { enabled: true } } as never })
     setInstalledCheck(() => true)
+    config.updateSettings({ providerOrder: ['codex', 'claude-code', 'copilot'], sessions: { transcriptWarnMB: 77 } } as never)
+    expect('providerOrder' in config.settings).toBe(false)
+    expect(config.settings.sessions.transcriptWarnMB).toBe(77)
     expect(autoProvider(config.settings)).toBe('claude-code')
-    config.updateSettings({ providerOrder: ['codex', 'claude-code', 'copilot'] })
-    expect(config.settings.providerOrder).toEqual(['codex', 'claude-code', 'copilot'])
-    expect(autoProvider(config.settings)).toBe('codex')
-  })
-
-  it('refuses one that is not a list of ids, each once, and changes nothing', () => {
-    config.updateSettings({ providerOrder: ['copilot'] })
-    for (const bad of ['codex', ['codex', 'codex'], ['codex', 7], [''], null]) {
-      expect(() => config.updateSettings({ providerOrder: bad as never }), JSON.stringify(bad)).toThrow('providerOrder must list provider ids, each once.')
-    }
-    expect(config.settings.providerOrder).toEqual(['copilot'])
-  })
-
-  it("a reset gives Hive's order back, and no revision is kept beside it", () => {
-    config.updateSettings({ providerOrder: ['copilot', 'codex'] })
-    config.resetSettings('providerOrder')
-    expect(config.settings.providerOrder).toEqual([])
-    expect('providerOrderRevision' in config.settings).toBe(false)
   })
 
   it("isn't among the settings the Assistant's tools list or change", () => {

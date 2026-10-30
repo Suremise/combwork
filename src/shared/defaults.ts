@@ -69,7 +69,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Automatic (#474): the first provider turned on and installed, in the order below.
   defaultProvider: AUTO_PROVIDER,
   // Hive's own order: no screen sets it since decision A (HI-2113); a 0.9 order is still read.
-  providerOrder: [],
   notifications: {
     chimeEnabled: true,
     chimeSound: 'chime',
@@ -654,12 +653,9 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
   cfg.version = 8
   // Settings for providers this version doesn't know are kept (a newer Hive wrote them), but never used.
   if (!isDefaultProviderValue(cfg.settings.defaultProvider)) cfg.settings.defaultProvider = AUTO_PROVIDER
-  // The provider order (HI-1965; a 0.9 one, read only since HI-2113): a list of ids, each once; ids this Hive doesn't
-  // know are kept (a newer Hive's).
-  const order: unknown = cfg.settings.providerOrder
-  cfg.settings.providerOrder = Array.isArray(order) ? [...new Set(order.filter((x): x is ProviderId => typeof x === 'string' && x.length > 0 && x.length <= 64))] : []
-  // Its revision went with the window's moves (HI-2113).
-  delete (cfg.settings as unknown as Record<string, unknown>).providerOrderRevision
+  // The providers' order (HI-1965) and its revision went with decision A (HI-2113, HI-2139): every list is in Hive's
+  // order, so a 0.9 one is dropped.
+  for (const k of ['providerOrder', 'providerOrderRevision']) delete (cfg.settings as unknown as Record<string, unknown>)[k]
   return cfg
 }
 
