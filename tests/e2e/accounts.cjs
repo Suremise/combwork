@@ -186,6 +186,14 @@ const check = (name, ok, extra = '') => {
     // so Set Up asks once, in the workspace's folder; the fake records the trust answered there.
     const ws1Real = fs.realpathSync.native(ws1)
     const trustOf = async (invoke, id) => (await invoke('connections:list')).connections.find((a) => a.id === id)?.trust ?? null
+    // Its agent on Personal's connection, as Agent Settings sets it (HI-2162): a test copy's project migration pins an agent
+    // to the CLI test home's account (the seam), always usable, so Personal is used there only when chosen. Counted by
+    // its connection's account (HI-2108: an agent names a connection, not an account).
+    const onPersonal = async (invoke, project) => {
+      const base = (await invoke('connections:list')).connectionRows.find((c) => c.account === personal.id)
+      return (await invoke('agents:update', project, 'a-one', { connection: base.id })).connection === base.id
+    }
+    check('its project’s agent put on it (Agent Settings → Connection)', await onPersonal(inv, path.join(ws1, 'alpha')))
     check('on in a workspace whose project it doesn’t trust, it needs set up again, naming the project', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1 && /Not trusted yet in this workspace: alpha/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)) && (await row('Personal').locator('[data-set-up].primary').count()) === 1)
     await shots('not-trusted')
     const launchesBefore = fs.readFileSync(launches, 'utf8').split('\n').filter(Boolean).length
@@ -210,6 +218,7 @@ const check = (name, ok, extra = '') => {
     fs.rmSync(trustGo)
     projectWithAgent(path.join(ws1, 'gamma'))
     await inv('workspace:refresh')
+    check('…its agent put on it too', await onPersonal(inv, path.join(ws1, 'gamma')))
     check('while its trust of a new project is read, the row says Checking…, not Set up', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="checking"]').count()) === 1, HUNG_MS)) && (await row('Personal').locator('[data-set-up-state="done"]').count()) === 0)
     await shots('checking')
     fs.writeFileSync(trustGo, '')
@@ -286,6 +295,7 @@ const check = (name, ok, extra = '') => {
     check('a new workspace starts with the top of the order on (HI-1875), the one used there', JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), JSON.stringify(wsJson(ws2)))
     // One connection, two workspaces (HI-1870): set up for the first one's folders, not yet for this one's.
     const alpha2 = fs.realpathSync.native(path.join(ws2, 'alpha'))
+    check('its alpha’s agent put on it there too', await onPersonal(invOn(p2), path.join(ws2, 'alpha')))
     check('one connection in two workspaces: each window says its own (here alpha untrusted, set up in the first)', !!(await lib.until(async () => !!(await trustOf(invOn(p2), personal.id))?.pending.some((p) => p.project === 'alpha' && p.folder === alpha2), HUNG_MS)) && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }), JSON.stringify([await trustOf(invOn(p2), personal.id), await trustOf(inv, personal.id), alpha2]))
     await invOn(p2)('connections:setOn', personal.id, false)
     check('…off there, its trust there no longer counts', !!(await lib.until(async () => (await trustOf(invOn(p2), personal.id)) === null, HUNG_MS)))
