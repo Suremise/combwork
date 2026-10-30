@@ -27,7 +27,7 @@ import { removePath, samePlace } from '../fsutil'
 import { access } from 'original-fs/promises'
 import { git, GIT_PREFIX, withoutGitRoute } from '../git'
 import { onOutputSettled, withLauncherEnv, type GitOutcome, type GitRequest } from '../gitWorker'
-import { gitExe, gitExeGone } from '../gitTool'
+import { gitExe, gitExeGone, PATH_GIT, type GitExe } from '../gitTool'
 import { createLogger, userText } from '../logger'
 import { endTree } from '../progressReporters/wrapper'
 import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
@@ -473,11 +473,18 @@ export class QueueRunner {
    * git host (no Node start of its own); a bounded one through `run`'s launcher, whose bound ends its tree. HI-2137: the
    * git Hive starts (gitExe), once more with PATH's when that one couldn't start.
    */
-  async git(cwd: string, args: string[], what: Launched = 'testMerge', opts: { env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}): Promise<RunResult> {
-    const use = gitExe()
+  git(cwd: string, args: string[], what: Launched = 'testMerge', opts: { env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}): Promise<RunResult> {
+    return this.gitAs(gitExe(), cwd, args, what, opts)
+  }
+
+  private async gitAs(use: GitExe, cwd: string, args: string[], what: Launched, opts: { env?: NodeJS.ProcessEnv; timeoutMs?: number }): Promise<RunResult> {
     const env = use.launcherEnv ? withLauncherEnv(opts.env ?? process.env, use.launcherEnv) : opts.env
     const r = opts.timeoutMs ? await this.run(what, use.exe, [...GIT_PREFIX, ...args], { cwd, ...opts, env }) : await this.hostGit(cwd, [...GIT_PREFIX, ...args], env ?? process.env, use.exe)
-    if (r.notRun === 'ENOENT' && existsSync(cwd) && gitExeGone(use.exe)) return this.git(cwd, args, what, opts)
+    // As git() does: the real git gone, this command once more with PATH's, whichever command found it gone first.
+    if (r.notRun === 'ENOENT' && use.exe !== PATH_GIT.exe && existsSync(cwd)) {
+      gitExeGone(use.exe)
+      return this.gitAs(PATH_GIT, cwd, args, what, opts)
+    }
     return r
   }
 

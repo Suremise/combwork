@@ -3,7 +3,7 @@ import { join, resolve, sep } from 'path'
 import { SHARE_ENV, Worker } from 'worker_threads'
 import { lstat, readFile, readlink } from 'original-fs/promises'
 import { insideReal } from './fsutil'
-import { gitExe, gitExeGone, gitProblem, gitTool, noteGitMissing, noteGitRan } from './gitTool'
+import { gitExe, gitExeGone, gitProblem, gitTool, noteGitMissing, noteGitRan, PATH_GIT, type GitExe } from './gitTool'
 import type { GitDiff, GitStatus } from '../shared/types'
 import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
@@ -90,9 +90,13 @@ export function withoutGitRoute<T>(fn: () => T): T {
   return routes.run(null, fn)
 }
 
-export async function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
+export function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
   // HI-2137: the git Hive starts (Git for Windows' real git rather than its launcher, where it found one).
-  const use = opts.exe !== undefined ? { exe: opts.exe } : gitExe()
+  return gitAs(opts.exe !== undefined ? { exe: opts.exe } : gitExe(), cwd, args, maxBuffer, input, opts)
+}
+
+/** git() with the git it starts (`use`). */
+async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number, input: string | undefined, opts: GitRunOptions): Promise<GitResult> {
   const m = { cwd, args: [...GIT_PREFIX, ...args], maxBuffer, ...(use.exe !== 'git' ? { exe: use.exe } : {}), ...(use.launcherEnv ? { launcherEnv: use.launcherEnv } : {}), ...(input !== undefined ? { input } : {}), ...(opts.env ? { env: opts.env } : {}), ...(opts.timeout ? { timeout: opts.timeout } : {}) }
   const scope = routes.getStore()
   // HI-2078: a route's scope runs it there; else it starts off main's thread (HI-1783): gitWorker.ts runs it as this
@@ -111,8 +115,12 @@ export async function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1
   const notRun = !ranToExit && !missing ? String(errCode ?? err?.signal ?? 'error') : undefined
   const code = err ? (typeof errCode === 'number' ? errCode : -1) : 0
   if (opts.exe === undefined) {
-    // HI-2137: the real git Hive found couldn't start (uninstalled, moved): it never ran, so once more with PATH's.
-    if (missing && gitExeGone(m.exe)) return git(cwd, args, maxBuffer, input, opts)
+    // HI-2137: the real git Hive found couldn't start (uninstalled, moved): it never ran, so once more with PATH's,
+    // whether or not another command found it gone first.
+    if (missing && use.exe !== PATH_GIT.exe) {
+      gitExeGone(use.exe)
+      return gitAs(PATH_GIT, cwd, args, maxBuffer, input, opts)
+    }
     if (missing) noteGitMissing()
     // Git ran (whatever it answered): not one that didn't start for another reason (no working folder, output too big).
     else if (ranToExit) noteGitRan()

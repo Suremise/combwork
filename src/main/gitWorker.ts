@@ -1,5 +1,5 @@
 import { execFile, type ChildProcess } from 'child_process'
-import { existsSync } from 'original-fs'
+import { existsSync, statSync } from 'original-fs'
 import { delimiter, join } from 'path'
 import { parentPort } from 'worker_threads'
 import { readRepoRefs, type RepoRefs } from './platform/repoRefs'
@@ -31,9 +31,9 @@ export interface GitRequest {
 
 /**
  * HI-2137: what Git for Windows' launcher (`<root>\cmd\git.exe`) gives the real git it starts, which Hive gives it when
- * it starts that git itself: MSYSTEM when it isn't set, and its folders before PATH (`pathFirst`: `<root>\mingw64\bin`
- * and `<root>\usr\bin`), then the user's `~\bin`. The real git, given MSYSTEM, leaves PATH as it is; without it, it
- * would put `~\bin` first itself.
+ * it starts that git itself (withLauncherEnv): its MSYSTEM (`msystem`: MINGW64, CLANGARM64 or MINGW32, as its folder),
+ * and its folders before PATH (`pathFirst`: `<root>\<mingw>\bin` and `<root>\usr\bin`). The real git, given MSYSTEM,
+ * leaves PATH as it is; without it, it would put `~\bin` first itself.
  */
 export interface LauncherEnv {
   pathFirst: string
@@ -114,14 +114,44 @@ export function runGit(m: Omit<GitRequest, 'id'>, quietMs = EXITED_QUIET_MS): Pr
 }
 
 /**
- * HI-2137: `env` as Git for Windows' launcher gives it to the git it starts (LauncherEnv): a copy, its PATH found
- * whatever its case (a spread environment's key is as Windows spelled it), its home as the launcher finds it.
+ * HI-2137: `env` as Git for Windows' launcher gives it to the git it starts (git-wrapper.c's setup_environment), a copy,
+ * each variable found whatever its case (a spread environment's keys are as Windows spelled them): MSYSTEM its own,
+ * whatever was set; PLINK_PROTOCOL `ssh` unless set; HOME, unless set, `%HOMEDRIVE%%HOMEPATH%` when that is a folder
+ * other than the system folder, else `%USERPROFILE%`; and PATH after its folders and `%HOME%\bin`.
  */
 export function withLauncherEnv(env: NodeJS.ProcessEnv, l: LauncherEnv): NodeJS.ProcessEnv {
-  const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
-  const home = env.HOME || env.USERPROFILE
+  const out: NodeJS.ProcessEnv = { ...env }
+  const keyOf = (name: string): string => Object.keys(out).find((k) => k.toUpperCase() === name) ?? name
+  const get = (name: string): string | undefined => out[keyOf(name)] || undefined
+  const set = (name: string, value: string): void => {
+    delete out[keyOf(name)]
+    out[name] = value
+  }
+  set('MSYSTEM', l.msystem)
+  if (!get('PLINK_PROTOCOL')) set('PLINK_PROTOCOL', 'ssh')
+  let home = get('HOME')
+  if (!home) {
+    home = launcherHome(get) ?? get('USERPROFILE')
+    if (home) set('HOME', home)
+  }
+  const path = get('PATH')
   const first = home ? `${l.pathFirst}${delimiter}${join(home, 'bin')}` : l.pathFirst
-  return { ...env, [key]: env[key] ? `${first}${delimiter}${env[key]}` : first, ...(env.MSYSTEM ? {} : { MSYSTEM: l.msystem }) }
+  out[keyOf('PATH')] = path ? `${first}${delimiter}${path}` : first
+  return out
+}
+
+/** The launcher's home from HOMEDRIVE and HOMEPATH (a roaming profile's), when that is a folder and not the system's. */
+function launcherHome(get: (name: string) => string | undefined): string | undefined {
+  const homePath = get('HOMEPATH')
+  if (!homePath) return undefined
+  const home = `${get('HOMEDRIVE') ?? ''}${homePath}`
+  const root = get('SYSTEMROOT') ?? get('WINDIR')
+  if (root && home.toLowerCase() === join(root, 'System32').toLowerCase()) return undefined
+  try {
+    return statSync(home).isDirectory() ? home : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**

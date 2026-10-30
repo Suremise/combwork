@@ -28,7 +28,8 @@ export interface GitExe {
   exe: string
   launcherEnv?: LauncherEnv
 }
-const PATH_GIT: GitExe = { exe: 'git' }
+/** Git from PATH, as Windows finds it. */
+export const PATH_GIT: GitExe = { exe: 'git' }
 let started: GitExe = PATH_GIT
 
 /** The git Hive starts (HI-2137). */
@@ -139,15 +140,15 @@ export async function realGit(said: string, onPath: string | null, run: CheckRun
 }
 
 /**
- * HI-2137: from a git that couldn't start `tried` (git() and the merge queue, before trying PATH's git once): when that
- * was the real git Hive found (uninstalled, moved), Hive starts PATH's from now on, checks git again, and says true.
+ * HI-2137: from a command that couldn't start the real git it was given, `tried` (git() and the merge queue, each of
+ * which then runs that command once more with PATH's git): when Hive still starts that one (uninstalled, moved), it
+ * starts PATH's from now on and checks git again. A command that found it gone after another did changes nothing here.
  */
-export function gitExeGone(tried: string | undefined): boolean {
-  if (!tried || tried === PATH_GIT.exe || tried !== started.exe) return false
+export function gitExeGone(tried: string): void {
+  if (tried === PATH_GIT.exe || tried !== started.exe) return
   log.warn(`Git: ${userText(tried)} couldn't be started: starting git from PATH, and checking it again`)
   started = PATH_GIT
   void checkGit()
-  return true
 }
 
 /** From git(): it couldn't start git at all. */

@@ -186,12 +186,24 @@ describe('the git Hive starts', () => {
     expect(realGitBehind(arm.launcher, arm.execPath)?.launcherEnv).toEqual({ pathFirst: [join(arm.root, 'clangarm64', 'bin'), join(arm.root, 'usr', 'bin')].join(delimiter), msystem: 'CLANGARM64' })
   })
 
-  it("the real git's environment is the launcher's: MSYSTEM unless set, its folders and then ~\\bin before PATH", () => {
+  it("the real git's environment is the launcher's (git-wrapper.c): its MSYSTEM, PLINK_PROTOCOL, HOME, and its folders and ~\\bin before PATH", () => {
     const l = { pathFirst: 'C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin', msystem: 'MINGW64' }
-    // A spread environment keeps Windows' spelling of PATH: that key, not a second one.
-    expect(withLauncherEnv({ Path: 'C:\\Windows', USERPROFILE: 'C:\\Users\\u' }, l)).toEqual({ Path: 'C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin;C:\\Users\\u\\bin;C:\\Windows', USERPROFILE: 'C:\\Users\\u', MSYSTEM: 'MINGW64' })
-    // HOME first, as the launcher takes it; an MSYSTEM already set stays.
-    expect(withLauncherEnv({ PATH: 'C:\\Windows', HOME: 'D:\\home', USERPROFILE: 'C:\\Users\\u', MSYSTEM: 'MSYS' }, l)).toMatchObject({ PATH: 'C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin;D:\\home\\bin;C:\\Windows', MSYSTEM: 'MSYS' })
+    const top = tempDir('hive-gitenv-')
+    layouts.push(top)
+    const roaming = join(top, 'roaming')
+    const local = join(top, 'local')
+    for (const d of [roaming, local]) mkdirSync(d)
+    const drive = (p: string): { HOMEDRIVE: string; HOMEPATH: string } => ({ HOMEDRIVE: p.slice(0, 2), HOMEPATH: p.slice(2) })
+    // Keys as Windows spelled them (a spread environment's): those keys, never a second one. An inherited MSYSTEM is
+    // replaced by the launcher's own; HOME, unset, is HOMEDRIVE and HOMEPATH's folder (a roaming profile's), not USERPROFILE.
+    expect(withLauncherEnv({ Path: 'C:\\Windows', Msystem: 'MSYS', ...drive(roaming), USERPROFILE: local }, l)).toEqual({ Path: `C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin;${roaming}\\bin;C:\\Windows`, MSYSTEM: 'MINGW64', PLINK_PROTOCOL: 'ssh', HOME: roaming, ...drive(roaming), USERPROFILE: local })
+    // HOMEDRIVE and HOMEPATH that aren't a folder, or are the system folder: USERPROFILE.
+    expect(withLauncherEnv({ PATH: 'C:\\Windows', ...drive(join(top, 'gone')), USERPROFILE: local }, l)).toMatchObject({ HOME: local, PATH: `C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin;${local}\\bin;C:\\Windows` })
+    const system = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
+    expect(withLauncherEnv({ PATH: 'C:\\Windows', SystemRoot: process.env.SystemRoot, ...drive(system), USERPROFILE: local }, l)).toMatchObject({ HOME: local })
+    // HOME and PLINK_PROTOCOL already set stay; no home at all: no ~\bin.
+    expect(withLauncherEnv({ PATH: 'C:\\Windows', HOME: 'D:\\home', USERPROFILE: local, PLINK_PROTOCOL: 'plink' }, l)).toMatchObject({ PATH: 'C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin;D:\\home\\bin;C:\\Windows', HOME: 'D:\\home', PLINK_PROTOCOL: 'plink' })
+    expect(withLauncherEnv({}, l)).toEqual({ PATH: 'C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin', MSYSTEM: 'MINGW64', PLINK_PROTOCOL: 'ssh' })
   })
 
   it('a different version from the real git (a mismatch, or it failed): PATH git', async () => {
@@ -233,6 +245,25 @@ describe('the git Hive starts', () => {
     expect(await git(p, ['rev-parse', '--abbrev-ref', 'HEAD'])).toMatchObject({ ok: true, out: 'main\n' })
   })
 
+  it('this machine: an alias through sh sees the same environment from the real git as through the launcher', async () => {
+    const execPath = win32.normalize(run(process.cwd(), '--exec-path').trim())
+    const launcher = join(dirname(dirname(dirname(execPath))), 'cmd', 'git.exe')
+    const real = realGitBehind(launcher, execPath)
+    if (!real?.launcherEnv) return // Not Git for Windows: nothing of this applies.
+    const { p } = await project()
+    const roaming = join(root, 'roaming')
+    const local = join(root, 'local')
+    for (const d of [roaming, local]) mkdirSync(d)
+    // No Git folder on PATH, an inherited MSYSTEM that isn't the launcher's, a roaming home apart from USERPROFILE.
+    const env: NodeJS.ProcessEnv = { ...process.env }
+    for (const k of Object.keys(env)) if (['PATH', 'HOME', 'HOMEDRIVE', 'HOMEPATH', 'USERPROFILE', 'MSYSTEM', 'PLINK_PROTOCOL'].includes(k.toUpperCase())) delete env[k]
+    Object.assign(env, { PATH: `${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`, MSYSTEM: 'MSYS', HOMEDRIVE: roaming.slice(0, 2), HOMEPATH: roaming.slice(2), USERPROFILE: local })
+    const said = (exe: string, e: NodeJS.ProcessEnv): string => execFileSync(exe, ['-c', 'alias.hiveenv=!echo "$MSYSTEM|$HOME|$PLINK_PROTOCOL|$PATH"', 'hiveenv'], { cwd: p, env: e, encoding: 'utf8' })
+    const through = said(launcher, env)
+    expect(through).toMatch(/^MINGW64\|/)
+    expect(said(real.exe, withLauncherEnv(env, real.launcherEnv))).toBe(through)
+  })
+
   it("a real git that can't start any more (uninstalled, moved): that git once more from PATH, and git checked again", async () => {
     const { p } = await project()
     const gone = join(root, 'gone', 'mingw64', 'libexec', 'git-core', 'git.exe')
@@ -241,6 +272,17 @@ describe('the git Hive starts', () => {
     expect(gitExe().exe).not.toBe(gone)
     expect(gitTool().state).not.toBe('missing')
     expect((await checkGit()).state).not.toBe('missing')
+    expect(gitExe().exe).not.toBe(gone)
+  })
+
+  it('several commands at once that find the real git gone: each runs once more from PATH, none says git is missing', async () => {
+    const { p } = await project()
+    const gone = join(root, 'gone', 'mingw64', 'libexec', 'git-core', 'git.exe')
+    setGitToolForTests({ state: 'ok', version: '2.51.0' }, { exe: gone, launcherEnv: { pathFirst: join(root, 'gone', 'usr', 'bin'), msystem: 'MINGW64' } })
+    const rs = await Promise.all(Array.from({ length: 4 }, () => git(p, ['rev-parse', '--abbrev-ref', 'HEAD'])))
+    for (const r of rs) expect(r).toMatchObject({ ok: true, out: 'main\n' })
+    expect(gitTool().state).not.toBe('missing')
+    await checkGit()
     expect(gitExe().exe).not.toBe(gone)
   })
 })
