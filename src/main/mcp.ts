@@ -259,9 +259,10 @@ async function allProjectPaths(): Promise<string[]> {
 }
 
 /**
- * A project's MCP lists as its file has them, or null when it has no project.json. One that can't be read is an error,
- * never "no servers" (HI-2059 round 1): with no master switch, a membership left behind would add a new definition
- * under the old name.
+ * A project's MCP lists as its file has them now, or null when it has no project.json. One that can't be read or
+ * parsed is an error, never "no servers" (HI-2059 rounds 1 and 2): with no master switch, a membership left behind
+ * would add a new definition under the old name. So it is read strictly, from the current file's own text: never the
+ * kept-file reader's last good copy or default, which stands in for a file still being saved.
  */
 async function membershipOf(projectPath: string, name: string): Promise<ProjectConfig['mcp'] | null> {
   const file = join(projectPath, '.hive', 'project.json')
@@ -274,13 +275,24 @@ async function membershipOf(projectPath: string, name: string): Promise<ProjectC
     }
   )
   if (!exists) return null
-  // Read as it is (not a default for a file briefly locked), then as Hive reads it; either failing stops the change.
-  await readFile(file, 'utf8').catch((e) => {
+  // The current text decides, read before anything that might put a kept copy in its place: a file that doesn't parse
+  // as an object (one partway through a save) is uncertainty. Then Hive's own read must succeed too.
+  const text = await readFile(file, 'utf8').catch((e) => {
     throw unreadable(e)
   })
-  return (await workspace.projectConfig(projectPath).catch((e) => {
+  let now: unknown
+  try {
+    now = JSON.parse(text)
+  } catch (e) {
     throw unreadable(e)
-  })).mcp
+  }
+  if (!now || typeof now !== 'object' || Array.isArray(now)) throw unreadable(new Error('project.json is not an object'))
+  await workspace.projectConfig(projectPath).catch((e) => {
+    throw unreadable(e)
+  })
+  const mcp = (now as { mcp?: unknown }).mcp
+  const lists = mcp && typeof mcp === 'object' && !Array.isArray(mcp) ? (mcp as Record<string, unknown>) : {}
+  return { enabled: listed(lists.enabled), disabled: listed(lists.disabled), ...(lists.model === MCP_ADDED_MODEL ? { model: MCP_ADDED_MODEL } : {}) }
 }
 
 /**

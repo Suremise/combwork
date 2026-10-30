@@ -348,6 +348,22 @@ describe('MCP servers per project (HI-2059)', () => {
     expect(await listed('godot')).toBeUndefined()
   })
 
+  it("refuses to replace a server while a project's file is partway through a save, never reading its last good copy (HI-2059 round 2)", async () => {
+    await open()
+    await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
+    await add(amber, 'godot')
+    const settings = join(amber, '.hive', 'project.json')
+    const saved = readFileSync(settings, 'utf8')
+    // Another writer is partway through saving amberlight's settings: the file doesn't parse yet.
+    writeFileSync(settings, '{')
+    await expect(run(() => mcp.addMcpFromFile(file('godot.json', { ...godot, args: ['unseen-new-server.js'] }), 'godot', true))).rejects.toThrow("Couldn't read the settings of amberlight, so godot wasn't changed")
+    await expect(run(() => mcp.deleteMcp('godot'))).rejects.toThrow("Couldn't read the settings of amberlight")
+    // The writer finishes: the old definition is the only one amberlight's launch can get.
+    writeFileSync(settings, saved)
+    expect((await listed('godot')).def?.args).toEqual(['godot.js'])
+    expect(await run(async () => (await sessions.effective(amber, { id: 'a1', name: 'Builder', provider: 'claude-code' } as never)).mcpServers.godot?.args)).toEqual(['godot.js'])
+  })
+
   it('creates a new server from the template added nowhere', async () => {
     await open()
     await add(amber, 'docs')
