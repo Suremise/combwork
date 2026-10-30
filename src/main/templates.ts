@@ -33,7 +33,7 @@ import {
 } from '../shared/templates'
 import { HIVE_TEMPLATES, hiveTemplate, type HiveTemplate } from '../shared/templateDefaults'
 import type { AgentBranchStatus, AgentDef, PageLayout, ProjectConfig, ProviderId, TemplateLoadPlan, TemplateLoadWorkflow } from '../shared/types'
-import { answerFor, loadFallback, optionNamed, optionOf, unknownKeys, type ConnectionAnswers, type ConnectionOption, type ConnectionsApplied, type ConnectionsPlan, type PickedAgent } from '../shared/templateConnections'
+import { answerFor, badAnswers, loadFallback, optionNamed, optionOf, type ConnectionAnswers, type ConnectionOption, type ConnectionsApplied, type ConnectionsPlan, type PickedAgent } from '../shared/templateConnections'
 import { accountOnIn, connectionsOn } from '../shared/accounts'
 import { agentWorkflowRole } from '../shared/workflow/roles'
 import { hasWorkflow, loadedMaxAgents, overlayTemplateWorkflow, readTemplateWorkflow, templateWorkflowOf, TEMPLATE_PLATFORMS, type TemplateWorkflow, type TemplateWorkflows } from '../shared/workflow/templateOptions'
@@ -89,7 +89,7 @@ const M = {
   nameTaken: msg({ id: 'content.templates.nameTaken', defaultMessage: 'There is already a template called "{name}" there.', description: 'An error renaming or editing a template: another template where it is kept (the workspace or a project) is called {name}.' }),
   connectionUnknown: msg({ id: 'content.templates.connectionUnknown', defaultMessage: 'No connection "{ref}" can be used in this workspace now: choose another.', description: "An error loading a template or choosing connections (HI-2109): the connection chosen ({ref}, its name or id) was removed, or its account turned off here, since it was offered." }),
   connectionAmbiguous: msg({ id: 'content.templates.connectionAmbiguous', defaultMessage: 'Several connections are called "{ref}": name one by its id ({ids}).', description: "An error loading a template or choosing connections (HI-2109): the name given ({ref}) is several connections' names; {ids} lists their ids." }),
-  connectionKeys: msg({ id: 'content.templates.connectionKeys', defaultMessage: 'Connections are chosen for *, builder, reviewer, either, generalist or an agent by its name: {keys} {count, plural, one {is none of them} other {are none of them}}.', description: "An error loading a template or choosing connections (HI-2109): keys given that are neither all (*), a role (keep builder, reviewer, either and generalist in English: they are the values) nor one of the agents' names. {keys} lists them." }),
+  connectionKeys: msg({ id: 'content.templates.connectionChoices', defaultMessage: "These connection choices don't fit its agents: {keys}. Open it again.", description: "An error loading a template or choosing connections (HI-2109): choices sent for a role it doesn't know or an agent it doesn't have (another window's, or the template changed meanwhile). {keys} lists them as given ('role boss', 'agent 7'): keep role and agent in English." }),
   taken: msg({ id: 'content.templates.taken', defaultMessage: '{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}.', description: "Why a template can't be loaded: agents of other projects ({projects}) have its agents' names {names} ({count} of them). {names} and {projects} are lists, in the language's way (\"B1 and R1\")." }),
   takenNothing: msg({ id: 'content.templates.takenNothing', defaultMessage: '{names} {count, plural, one {is already an agent} other {are already agents}} in {projects}: agent names are unique across the workspace, so rename {count, plural, one {it} other {them}}. Nothing was changed.', description: "An error loading a template: agents of other projects ({projects}) took its agents' names {names} ({count} of them) while it loaded, so nothing changed. {names} and {projects} are lists, in the language's way (\"B1 and R1\")." }),
   overMax: msg({ id: 'content.templates.overMax', defaultMessage: 'It has {count, number} agents, and this project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents in Version Control → Workflow first, or load it with its workflow. Nothing was changed.', description: "An error loading a template (HI-2058): its agents ({count}) are more than the project's workflow option Maximum agents ({max}), and its workflow, which would raise it, isn't applied. Maximum agents, Version Control and Workflow are names in the window: as translated there." }),
@@ -846,14 +846,8 @@ export async function restoreProjectAgents(projectPath: string, back: { agents: 
  * again as the agent is prepared and with the write.
  */
 function connectionsFor(plan: TemplateLoadPlan, answers: ConnectionAnswers | undefined): string[] {
-  // An agent named by its name in the template (the Agent API's), as by the name it gets.
   const agents: PickedAgent[] = plan.create.map((a) => ({ name: a.name, role: a.role, provider: a.provider }))
-  const given: ConnectionAnswers = {}
-  for (const [k, v] of Object.entries(answers ?? {})) {
-    const i = plan.templateNames.findIndex((n) => n.toLowerCase() === k.trim().toLowerCase())
-    given[i >= 0 && !agents.some((a) => a.name.toLowerCase() === k.trim().toLowerCase()) ? agents[i].name : k] = v
-  }
-  return resolveAnswers(agents, plan.options, given, loadFallback(agents, plan.options)).map((id) => id ?? '')
+  return resolveAnswers(agents, plan.options, answers, loadFallback(agents, plan.options)).map((id) => id ?? '')
 }
 
 /**
@@ -864,9 +858,9 @@ const onConnection = (a: TemplateAgent, connection: string | undefined): { conne
 
 /** Each agent's connection id from answers (`answerFor`), the refs checked against `options`; none answered: undefined. */
 function resolveAnswers(agents: readonly PickedAgent[], options: readonly ConnectionOption[], answers: ConnectionAnswers | undefined, fallback: (a: PickedAgent) => string | undefined): (string | undefined)[] {
-  if (answers !== undefined && (typeof answers !== 'object' || answers === null || Array.isArray(answers) || Object.values(answers).some((v) => typeof v !== 'string'))) throw refusal(M.connectionKeys, { keys: listOf([String(answers)]), count: 1 }, 'invalid')
-  const bad = unknownKeys(agents, answers)
-  if (bad.length) throw refusal(M.connectionKeys, { keys: listOf(bad), count: bad.length }, 'invalid')
+  // Untrusted (a window's, the Agent API's once read): a role or an agent's place it doesn't have is refused, said.
+  const bad = badAnswers(agents.length, answers)
+  if (bad.length) throw refusal(M.connectionKeys, { keys: listOf(bad) }, 'invalid')
   return answerFor(agents, answers, fallback).map((ref) => {
     if (ref === undefined) return undefined
     const found = optionNamed(options, ref)
@@ -945,6 +939,6 @@ export async function addAgentFromTemplate(projectPath: string, scope: TemplateS
   const name = typeof chosen === 'string' && chosen.trim() ? withNames([{ ...a, name: own }], [chosen])[0].name : uniqueName(own, (await workspaceAgents(projectPath)).map((x) => x.name))
   const options = connectionOptions(projectPath)
   const picked = { name, role: a.role, provider: a.provider }
-  const [id] = resolveAnswers([picked], options, typeof connection === 'string' && connection.trim() ? { [name]: connection } : undefined, loadFallback([picked], options))
+  const [id] = resolveAnswers([picked], options, typeof connection === 'string' && connection.trim() ? { agents: { 0: connection } } : undefined, loadFallback([picked], options))
   return addAgent(projectPath, { name, role: a.note, workflowRole: a.role, mcpServers: a.mcpServers, ...onConnection(a, id), location: 'project' }, by)
 }

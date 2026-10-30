@@ -50,7 +50,7 @@ const GERMAN: Record<string, string> = {
   'mcp.error.invalidName': 'Ungültiger Servername',
   'content.templates.noFile': 'Diese Datei ist nicht da.',
   'content.templates.connectionUnknown': 'Keine Verbindung „{ref}“ kann jetzt in diesem Arbeitsbereich verwendet werden: wähle eine andere.',
-  'content.templates.connectionKeys': 'Verbindungen werden für *, builder, reviewer, either, generalist oder einen Agenten nach Namen gewählt: {keys} {count, plural, one {ist keins davon} other {sind keins davon}}.',
+  'content.templates.connectionChoices': 'Diese Verbindungswahl passt nicht zu ihren Agenten: {keys}. Öffne sie erneut.',
   'content.templates.cantLoad': 'Die Vorlage kann noch nicht geladen werden:',
   'content.templates.nameEach': 'Gib jedem ihrer Agenten einen Namen.',
   'content.templates.cantUse': '„{name}“ kann nicht verwendet werden: {problem}',
@@ -189,7 +189,7 @@ describe("a template's load plan is the window's", () => {
     setLanguage('de', GERMAN)
     const plan = await run(() => templates.templatePlan(proj, 'workspace', 'pair.json'))
     expect([plan.options, plan.blocked]).toEqual([[], []])
-    const e = await caught(() => templates.loadTemplate(proj, 'workspace', 'pair.json', plan.remove.map((a) => a.id), undefined, undefined, { builder: 'Claude · High' }))
+    const e = await caught(() => templates.loadTemplate(proj, 'workspace', 'pair.json', plan.remove.map((a) => a.id), undefined, undefined, { roles: { builder: 'Claude · High' } }))
     expect(e.message).toBe('No connection "Claude · High" can be used in this workspace now: choose another.')
     expect(shownError(e)).toBe('Keine Verbindung „Claude · High“ kann jetzt in diesem Arbeitsbereich verwendet werden: wähle eine andere.')
     setLanguage('en', {})
@@ -225,14 +225,14 @@ describe("lists in the language's way, never joined with English commas", () => 
   it("lists the connections' keys it doesn't know in the window's language, and English in the refusal's message (HI-2109)", async () => {
     writeFileSync(join(wsPath, '.hive', 'templates', 'crew.json'), JSON.stringify({ version: 2, name: 'Crew', savedAt: '', layout: 'auto', agents: ['Builder', 'Reviewer', 'Tester'].map((name) => ({ name, role: 'builder', provider: 'claude-code' })) }))
     const plan = await run(() => templates.templatePlan(proj, 'workspace', 'crew.json'))
-    const load = () => caught(() => templates.loadTemplate(proj, 'workspace', 'crew.json', plan.remove.map((a) => a.id), undefined, undefined, { builders: 'x', testers: 'x', all: 'x' }))
+    const load = () => caught(() => templates.loadTemplate(proj, 'workspace', 'crew.json', plan.remove.map((a) => a.id), undefined, undefined, { roles: { builders: 'x', testers: 'x' }, agents: { 9: 'x' } } as never))
     setLanguage('de', GERMAN)
     const e = await load()
-    expect(e.message).toBe('Connections are chosen for *, builder, reviewer, either, generalist or an agent by its name: builders, testers and all are none of them.')
-    expect(shownError(e)).toBe('Verbindungen werden für *, builder, reviewer, either, generalist oder einen Agenten nach Namen gewählt: builders, testers und all sind keins davon.')
+    expect(e.message).toBe("These connection choices don't fit its agents: role builders, role testers and agent 9. Open it again.")
+    expect(shownError(e)).toBe('Diese Verbindungswahl passt nicht zu ihren Agenten: role builders, role testers und agent 9. Öffne sie erneut.')
     // A language with no translation yet still lists in its own way.
     setLanguage('ja', {})
-    expect(shownError(await load())).toContain('builders、testers、all are none of them')
+    expect(shownError(await load())).toContain('role builders、role testers、agent 9')
   })
 
   it("lists an MCP server's variables and headers in the window's language", () => {

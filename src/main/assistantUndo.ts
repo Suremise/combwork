@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import type { AgentDef, AgentPatch, AssistantUndoResult, LaneInfo, PageLayout, ProjectConfig, TaskCard, TaskPatch, WorkflowForm } from '../shared/types'
-import { AGENT_FIELDS, CARD_FIELDS, cardValue, markUndone, notRecording, PROVIDER_DEPENDENTS, recordedChanges, REVIEW, reviewOf, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
+import { AGENT_FIELDS, CARD_FIELDS, CONNECTION_ID, cardValue, markUndone, notRecording, PROVIDER_DEPENDENTS, recordedChanges, REVIEW, reviewOf, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
 import * as assistant from './assistantControl'
 import { boardWrite } from './boardStore'
 import { config } from './config'
@@ -429,6 +429,37 @@ async function undoLoadedWorkflow(ws: WorkspaceService, projectPath: string, wf:
  * one write of the agent as it was (an absent one absent again: a provider it inherited is inherited again), and never
  * while the agent runs; one of them changed since keeps them all. Its other settings go through updateAgent.
  */
+/**
+ * An agent's connection set back (HI-2109's Choose Connections…, recorded by its id as `connectionId`, with `provider`
+ * and `lastSessionId` when its CLI changed with it): all of them or none, only while each is still as the change left
+ * it (read under the project's lock, in updateAgent's check), and its CLI only while it is stopped.
+ */
+async function undoConnection(projectPath: string, agentId: string, def: AgentDef, values: readonly FieldChange[], guard: Guard): Promise<Outcome> {
+  const fields = values.map((v) => v.field)
+  const raw = (d: AgentDef, f: string): unknown => (f === CONNECTION_ID ? (d.connection ?? null) : ((d as unknown as Record<string, unknown>)[f] ?? null))
+  if (values.every((v) => sameValue(raw(def, v.field), v.old))) return { undone: fields, skipped: [] }
+  const connection = values.find((v) => v.field === CONNECTION_ID)!
+  const provider = values.find((v) => v.field === 'provider')
+  try {
+    if (provider && sessions.liveFor(projectPath, agentId)) throw new Error(AGENT_RUNNING)
+    let saved = await updateAgent(projectPath, agentId, { connection: (connection.old ?? null) as string | null, ...(provider ? { provider: provider.old as AgentDef['provider'] } : {}) }, {
+      check: (cur) => {
+        if (provider && sessions.liveFor(projectPath, agentId)) throw new Error(AGENT_RUNNING)
+        // Its last conversation is the agent's own write, after: the rest must be as the change left them.
+        if (values.some((v) => v.field !== 'lastSessionId' && !sameValue(raw(cur, v.field), v.new))) throw new ChangedSince(fields)
+        guard?.()
+      }
+    })
+    const session = values.find((v) => v.field === 'lastSessionId')
+    if (session) saved = await workspaceOf(projectPath).updateAgent(projectPath, agentId, { lastSessionId: (session.old ?? undefined) as string | undefined })
+    await workspaceOf(projectPath).refresh()
+    return readBack(values, (f) => raw(saved, f))
+  } catch (e) {
+    if (e instanceof ChangedSince) return { undone: [], skipped: changed(fields) }
+    return failedOr(fields, e)
+  }
+}
+
 async function undoAgent(ws: WorkspaceService, c: RecordedChange, guard: Guard): Promise<Outcome> {
   if (!ws.path || !c.project || !c.target) return goneAll(c.fields)
   const projectPath = join(ws.path, c.project)
@@ -436,6 +467,8 @@ async function undoAgent(ws: WorkspaceService, c: RecordedChange, guard: Guard):
   const cfg = await ws.projectConfig(projectPath).catch(() => null)
   const def = cfg ? projectAgents(cfg).find((a) => a.id === agentId) : undefined
   if (!def) return goneAll(c.fields)
+  // Choose Connections… (HI-2109): its connection by id, with its CLI and last conversation when they changed with it.
+  if (c.values.some((v) => v.field === CONNECTION_ID)) return undoConnection(projectPath, agentId, def, c.values, guard)
   // As today's screens read it (HI-2106): its model, effort, mode and context are its connection's.
   const current = (d: AgentDef, f: string): unknown => agentViewOf(d)[f as keyof AgentDef] ?? null
   const withProvider = c.values.some((v) => v.field === 'provider')

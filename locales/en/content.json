@@ -303,9 +303,9 @@
     "defaultMessage": "Several connections are called \"{ref}\": name one by its id ({ids}).",
     "description": "An error loading a template or choosing connections (HI-2109): the name given ({ref}) is several connections' names; {ids} lists their ids."
   },
-  "content.templates.connectionKeys": {
-    "defaultMessage": "Connections are chosen for *, builder, reviewer, either, generalist or an agent by its name: {keys} {count, plural, one {is none of them} other {are none of them}}.",
-    "description": "An error loading a template or choosing connections (HI-2109): keys given that are neither all (*), a role (keep builder, reviewer, either and generalist in English: they are the values) nor one of the agents' names. {keys} lists them."
+  "content.templates.connectionChoices": {
+    "defaultMessage": "These connection choices don't fit its agents: {keys}. Open it again.",
+    "description": "An error loading a template or choosing connections (HI-2109): choices sent for a role it doesn't know or an agent it doesn't have (another window's, or the template changed meanwhile). {keys} lists them as given ('role boss', 'agent 7'): keep role and agent in English."
   },
   "content.templates.connectionUnknown": {
     "defaultMessage": "No connection \"{ref}\" can be used in this workspace now: choose another.",

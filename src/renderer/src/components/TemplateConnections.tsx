@@ -178,7 +178,7 @@ const CHOOSE = {
 export function ChooseConnectionsBody({ plan, onAnswers }: { plan: ConnectionsPlan; onAnswers: (a: ConnectionAnswers) => void }) {
   const agents = plan.agents.map((a) => ({ name: a.name, role: a.role, provider: a.provider, current: a.connection }))
   const [state, setState] = useState<PickerState>(() => initialPicker(agents, plan.options, () => ''))
-  const answers = pickerAnswers(state, agents)
+  const answers = pickerAnswers(state)
   const key = JSON.stringify(answers)
   useEffect(() => onAnswers(JSON.parse(key) as ConnectionAnswers), [key, onAnswers])
   const after = answerFor(agents, answers, (a) => (a as (typeof agents)[number]).current)

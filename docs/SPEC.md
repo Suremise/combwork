@@ -4451,18 +4451,19 @@ repeating them (#533) [note §8].
     connection of each account usable in the project's workspace (on there, or the CLI's own home) whose CLI is on and
     installed, in the order (accounts', then within each); a test copy's CLI test home gets its account as an agent's
     start would. **Same for all** (`*`), else a choice per role the agents have (builder, reviewer, either, generalist),
-    and **Per agent** over its role's (`PickerState`, `pickerAnswers`). An answer (`ConnectionAnswers`: `*`, a role or an
-    agent's name → a connection's id or name) resolves agent > role > `*` > fallback (`answerFor`); a name two
-    connections share is refused naming their ids, one not usable here now is refused, and a key that is no role or agent
-    is refused, each before anything changes. A role's **preselected** connection is the first on the CLI its agents
+    and **Per agent** over its role's (`PickerState`, `pickerAnswers`). An answer (`ConnectionAnswers`: `all`, `roles`
+    and `agents` by place, **kept apart** so an agent called Builder never stands for the builders: HR3's round 1; each a
+    connection's id or name) resolves agent > role > all > fallback (`answerFor`); a name two connections share is
+    refused naming their ids, one not usable here now is refused, and a role or place it hasn't is refused (`badAnswers`),
+    each before anything changes. A role's **preselected** connection is the first on the CLI its agents
     suggest (the first agent of the role naming one), else the first option (`preselected`, `loadFallback`).
   - **Loading** (`TemplateLoadPlan.options` replaces `missing`, `swaps` and HI-1769's `connections`): the dialog's table
     is Agent · Change · Role · Connection (its values under it); under it the Connections section. A CLI a template
     suggests that's off or not installed no longer blocks a load. The load (`loadTemplateWith`'s `connections`; IPC
     `templates:load`) gives each agent its connection (its CLI follows: `prepareAgent`); with no option at all, the
     agents are made on the CLI they suggest without one (HI-2106's unplaced agents), as Add Agent makes one.
-    `templates:addAgent` takes an optional `connection` (else its role's preselected one). An agent may be named by its
-    name in the template as by the one it gets.
+    `templates:addAgent` takes an optional `connection` (else its role's preselected one). The window sends each agent's
+    choice by its place, so a name changed in the dialog keeps it.
   - **Choose Connections…** (Project Settings → Agents; `templates:connectionsPlan`, `templates:applyConnections`,
     `applyConnections`): the picker over the project's existing agents by their roles, every choice starting at "keep"
     (an agent no answer names keeps its own); each change through `updateAgent` (its CLI with it, under the project's
@@ -4473,8 +4474,14 @@ repeating them (#533) [note §8].
   - **The Agent API:** `hive_template` `plan` and `load` take `connections` (the plan reports each agent's `connection`
     by name and `options`, a connection usable here each: id, name, CLI, account); a new **`apply`**
     (`POST /v1/projects/{name}/templates/apply`, the Assistant's alone, Control agents, kind `update-agent`) is Choose
-    Connections: `connections` required, every answer checked first, each agent's change recorded for undo as Agent
-    Settings' are (`noteAgent`), the guard checked in each write.
+    Connections: `connections` required, every answer checked first, the guard checked in each write. The API's flat
+    `connections` (`templateApi.ts` `answersOf`) reads a key as `*`, a role exactly as written (`builder`), an agent's
+    place (`"1"`, as `names` takes it), else an agent's name, any case, as made for the project or in the template (with
+    the key or as a pattern); a name several agents share, two keys for one agent, a place out of range or an unknown key
+    is said (a plan's `blocked`, `400` for apply). **Undo** (`noteConnection`, `assistantUndo.ts` `undoConnection`):
+    each agent's connection by its id (`connectionId`, never the adapter's account id, so connections alike in every
+    value are told apart), with its CLI and last conversation when they changed with it, set back together through
+    `updateAgent`, only while each is as the change left it.
 - **Names: patterns and the names table** [#1440] **Built [#1440]**: an agent's name in a template may hold `{key}` (the
   project's key, `projectKeyOf`; never guessed: a plan, load or added agent whose names hold `{key}` is refused when the
   key can't be read, `content.templates.noKey`, and the window shows `{key}` unexpanded) and `{n}` (its number among the template's agents with the same

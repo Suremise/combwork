@@ -719,7 +719,7 @@ const tools: Tool[] = [
         scope: { type: 'string', enum: ['hive', 'workspace', 'project'], description: 'When a name is in several.' },
         from: { type: 'string', description: "A project's template kept in another project: that project." },
         names: { type: 'object', additionalProperties: { type: 'string' }, description: 'New names for its agents: place ("1") or name → the name.' },
-        connections: { type: 'object', additionalProperties: { type: 'string' }, description: '"*", a role or an agent\'s name → a connection\'s id or name (agent over role over "*").' },
+        connections: { type: 'object', additionalProperties: { type: 'string' }, description: '"*", a role, or an agent\'s place ("1") or name → a connection\'s id or name (agent over role over "*").' },
         workflow: { type: 'boolean', description: 'Set its workflow options (default true).' }
       },
       required: ['action', 'project']

@@ -75,7 +75,7 @@
   "content.templates.changedWhile": "加载模板期间项目的智能体发生了更改：未做任何更改。请重新打开模板。",
   "content.templates.checkFailed": "Hive 无法检查 {agent} 的工作树（{folder}）：{error}",
   "content.templates.connectionAmbiguous": "有多个连接名为“{ref}”：请用 ID 指定其中一个（{ids}）。",
-  "content.templates.connectionKeys": "连接按 *、builder、reviewer、either、generalist 或智能体名称选择：{count, plural, other {{keys} 都不属于其中。}}",
+  "content.templates.connectionChoices": "这些连接选择与其智能体不符：{keys}。请重新打开。",
   "content.templates.connectionUnknown": "连接“{ref}”现在无法在此工作区中使用：请选择另一个。",
   "content.templates.editedMeanwhile": "你开始编辑后，“{name}”已更改（期间又被保存过）：未保存任何内容。关闭编辑器即可查看它现在的样子。",
   "content.templates.enterName": "请输入模板名称。",

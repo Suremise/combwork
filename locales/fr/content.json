@@ -75,7 +75,7 @@
   "content.templates.changedWhile": "Les agents du projet ont changé pendant le chargement du modèle : rien n’a été modifié. Rouvre le modèle.",
   "content.templates.checkFailed": "Hive n’a pas pu vérifier le worktree de l’agent {agent} ({folder}) : {error}",
   "content.templates.connectionAmbiguous": "Plusieurs connexions s’appellent « {ref} » : désigne-en une par son id ({ids}).",
-  "content.templates.connectionKeys": "Les connexions se choisissent pour *, builder, reviewer, either, generalist ou un agent par son nom : {keys} {count, plural, one {n’en fait pas partie} many {n’en font pas partie} other {n’en font pas partie}}.",
+  "content.templates.connectionChoices": "Ces choix de connexion ne correspondent pas à ses agents : {keys}. Rouvre-le.",
   "content.templates.connectionUnknown": "Aucune connexion « {ref} » n’est utilisable dans cet espace de travail maintenant : choisis-en une autre.",
   "content.templates.editedMeanwhile": "Le modèle « {name} » a changé depuis que tu as commencé à le modifier (il a été réenregistré entre-temps) : rien n’a été enregistré. Ferme l’éditeur pour le voir tel qu’il est maintenant.",
   "content.templates.enterName": "Saisis un nom pour le modèle.",

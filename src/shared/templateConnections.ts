@@ -56,10 +56,15 @@ export const optionOf = (c: Connection, account: { name: string; provider: Provi
 })
 
 /**
- * What a picker answers (`hive_template` `connections`, the dialogs'): `*` for every agent, a role for its agents, an
- * agent's name for it alone (over its role's, over `*`). Each value a connection's id or name.
+ * What a picker answers (the dialogs', and `hive_template` `connections` once read: templateApi.ts): one connection for
+ * every agent (`all`), one per role, and one per agent by its place among them (over its role's, over all's). Kept apart,
+ * so an agent called Builder never stands for the builders (HR3's HI-2109 round 1). Each value a connection's id or name.
  */
-export type ConnectionAnswers = Record<string, string>
+export interface ConnectionAnswers {
+  all?: string
+  roles?: Partial<Record<WorkflowRole, string>>
+  agents?: Record<number, string>
+}
 
 /** The answer's keys for all and the roles, in the order the picker shows them. */
 export const ALL_KEY = '*'
@@ -81,26 +86,35 @@ export const suggestedCli = (agents: readonly PickedAgent[], role: WorkflowRole 
 export const preselected = (options: readonly ConnectionOption[], cli: string | undefined): string | undefined => (options.find((o) => o.cli === cli) ?? options[0])?.id
 
 /**
- * Each agent's answer, by the agents' order: its name's (any case), else its role's, else all's, else `fallback(agent)`
+ * Each agent's answer, by the agents' order: its own (by its place), else its role's, else all's, else `fallback(agent)`
  * (a load: its role's preselected connection; Choose Connections…: none, it keeps its own). Values as answered (an id or a
  * name: the caller finds the connection).
  */
 export function answerFor(agents: readonly PickedAgent[], answers: ConnectionAnswers | undefined, fallback: (a: PickedAgent) => string | undefined): (string | undefined)[] {
-  const byName = new Map(Object.entries(answers ?? {}).map(([k, v]) => [k.trim().toLowerCase(), v]))
-  const given = (k: string): string | undefined => {
-    const v = byName.get(k.toLowerCase())
-    return typeof v === 'string' && v.trim() ? v.trim() : undefined
-  }
-  return agents.map((a) => given(a.name) ?? given(a.role) ?? given(ALL_KEY) ?? fallback(a))
+  const given = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
+  return agents.map((a, i) => given(answers?.agents?.[i]) ?? given(answers?.roles?.[a.role]) ?? given(answers?.all) ?? fallback(a))
 }
 
 /** A load's fallback: the connection its role's picker preselects (the first on the CLI its role's agents suggest). */
 export const loadFallback = (agents: readonly PickedAgent[], options: readonly ConnectionOption[]) => (a: PickedAgent): string | undefined => preselected(options, suggestedCli(agents, a.role))
 
-/** The answer's keys that are neither all, a role nor one of the agents' names: refused, so a typo never goes unseen. */
-export function unknownKeys(agents: readonly Pick<PickedAgent, 'name'>[], answers: ConnectionAnswers | undefined): string[] {
-  const names = new Set(agents.map((a) => a.name.toLowerCase()))
-  return Object.keys(answers ?? {}).filter((k) => k !== ALL_KEY && !(WORKFLOW_ROLES as readonly string[]).includes(k) && !names.has(k.trim().toLowerCase()))
+/**
+ * What of answers (untrusted: a window's or main's caller's) isn't one: a role that isn't one, an agent's place that isn't
+ * one of `count`'s, a value that isn't text. Each named as it was given ("role boss", "agent 7"); none: [].
+ */
+export function badAnswers(count: number, answers: unknown): string[] {
+  if (answers === undefined || answers === null) return []
+  if (typeof answers !== 'object' || Array.isArray(answers)) return [String(answers)]
+  const a = answers as Record<string, unknown>
+  const bad = Object.keys(a).filter((k) => k !== 'all' && k !== 'roles' && k !== 'agents')
+  const text = (v: unknown): boolean => v === undefined || typeof v === 'string'
+  if (!text(a.all)) bad.push('all')
+  const map = (k: 'roles' | 'agents'): Record<string, unknown> => (a[k] && typeof a[k] === 'object' && !Array.isArray(a[k]) ? (a[k] as Record<string, unknown>) : {})
+  if (a.roles !== undefined && (typeof a.roles !== 'object' || Array.isArray(a.roles))) bad.push('roles')
+  if (a.agents !== undefined && (typeof a.agents !== 'object' || Array.isArray(a.agents))) bad.push('agents')
+  for (const [k, v] of Object.entries(map('roles'))) if (!(WORKFLOW_ROLES as readonly string[]).includes(k) || !text(v)) bad.push(`role ${k}`) // i18n-ignore: what was given, named as it was (role or agent and its key), not prose
+  for (const [k, v] of Object.entries(map('agents'))) if (!/^\d+$/.test(k) || Number(k) >= count || !text(v)) bad.push(`agent ${k}`) // i18n-ignore: what was given, named as it was (role or agent and its key), not prose
+  return bad
 }
 
 /**
@@ -132,12 +146,10 @@ export function initialPicker(agents: readonly PickedAgent[], options: readonly 
   return { same: false, all: pre(ALL_KEY), roles: Object.fromEntries(rolesOf(agents).map((r) => [r, pre(r)])), agents: {} }
 }
 
-/** A picker's state as answers, by the agents' names now (the names chosen in the dialog): only what is chosen, '' left out. */
-export function pickerAnswers(state: PickerState, agents: readonly PickedAgent[]): ConnectionAnswers {
-  const out: ConnectionAnswers = {}
-  if (state.same) {
-    if (state.all) out[ALL_KEY] = state.all
-  } else for (const [r, id] of Object.entries(state.roles)) if (id) out[r] = id
-  if (!state.same) for (const [i, id] of Object.entries(state.agents)) if (id && agents[Number(i)]) out[agents[Number(i)].name] = id
-  return out
+/** A picker's state as answers: all's alone when Same for all is ticked, else each role's and each agent's own (by its place); '' left out. */
+export function pickerAnswers(state: PickerState): ConnectionAnswers {
+  if (state.same) return state.all ? { all: state.all } : {}
+  const roles = Object.fromEntries(Object.entries(state.roles).filter(([, id]) => !!id)) as ConnectionAnswers['roles']
+  const agents = Object.fromEntries(Object.entries(state.agents).filter(([, id]) => !!id))
+  return { ...(Object.keys(roles ?? {}).length ? { roles } : {}), ...(Object.keys(agents).length ? { agents } : {}) }
 }

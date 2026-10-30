@@ -75,7 +75,7 @@
   "content.templates.changedWhile": "Los agentes del proyecto cambiaron mientras se cargaba la plantilla: no se cambió nada. Vuelve a abrir la plantilla.",
   "content.templates.checkFailed": "Hive no pudo comprobar el worktree del agente {agent} ({folder}): {error}",
   "content.templates.connectionAmbiguous": "Varias conexiones se llaman “{ref}”: indica una por su id ({ids}).",
-  "content.templates.connectionKeys": "Las conexiones se eligen para *, builder, reviewer, either, generalist o un agente por su nombre: {keys} {count, plural, one {no es ninguno de ellos} many {no son ninguno de ellos} other {no son ninguno de ellos}}.",
+  "content.templates.connectionChoices": "Estas conexiones elegidas no corresponden a sus agentes: {keys}. Ábrela de nuevo.",
   "content.templates.connectionUnknown": "Ninguna conexión “{ref}” se puede usar ahora en este espacio de trabajo: elige otra.",
   "content.templates.editedMeanwhile": "“{name}” cambió desde que empezaste a editarla (se volvió a guardar mientras tanto): no se guardó nada. Cierra el editor para verla como está ahora.",
   "content.templates.enterName": "Escribe un nombre para la plantilla.",

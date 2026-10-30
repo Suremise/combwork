@@ -435,25 +435,25 @@ describe('saving and loading templates', () => {
     expect([card.agent, card.column]).toEqual([null, 'todo'])
   })
 
-  it("loads each agent on the picker's answer (HI-2109): its own over its role's over all's, by its name or its name in the template; one that can't be used refuses it all", async () => {
+  it("loads each agent on the picker's answer (HI-2109): its own (by its place) over its role's over all's; one that can't be used refuses it all", async () => {
     const ids = () => cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     const connOf = () => cfgOf(beta).agents.map((a: StoredAgent) => [a.name, a.provider, a.connection])
-    // A role, then an agent by its name in the template (Reviewer, loaded as BReviewer): the reviewer on Codex.
-    await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ids(), undefined, B, { builder: 'Personal · High', Reviewer: 'c-cx' }))
+    // A role, then the second agent's own: the reviewer on Codex.
+    await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ids(), undefined, B, { roles: { builder: 'Personal · High' }, agents: { 1: 'c-cx' } }))
     expect(connOf()).toEqual([['BBuilder', 'claude-code', 'c-cc-high'], ['BReviewer', 'codex', 'c-cx']])
-    // All, under an agent's own by the name it gets.
-    await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ids(), undefined, B, { '*': 'work', BBuilder: 'c-cc' }))
+    // All (a name, any case), under the first agent's own.
+    await run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', ids(), undefined, B, { all: 'work', agents: { 0: 'c-cc' } }))
     expect(connOf()).toEqual([['BBuilder', 'claude-code', 'c-cc'], ['BReviewer', 'codex', 'c-cx']])
-    // Refused, nothing changed: a connection that isn't usable here, a name two have, a key that is no role or agent.
+    // Refused, nothing changed: a connection that isn't usable here, a name two have, a role or a place it hasn't.
     const before = ids()
-    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { builder: 'Gone' }))).rejects.toThrow(/No connection "Gone" can be used in this workspace now/)
+    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { roles: { builder: 'Gone' } }))).rejects.toThrow(/No connection "Gone" can be used in this workspace now/)
     config.update((c) => void (c.connections = [...c.connections!, { id: 'c-cx-2', account: 'acc-cx', name: 'Personal' }]))
     try {
-      await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { builder: 'personal' }))).rejects.toThrow(/Several connections are called "personal": name one by its id \(c-cc and c-cx-2\)/)
+      await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { roles: { builder: 'personal' } }))).rejects.toThrow(/Several connections are called "personal": name one by its id \(c-cc and c-cx-2\)/)
     } finally {
       providersOn()
     }
-    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { builders: 'c-cc' }))).rejects.toThrow(/builders is none of them/)
+    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair-2.json', before, undefined, B, { roles: { builders: 'c-cc' }, agents: { 2: 'c-cc' } } as never))).rejects.toThrow(/don't fit its agents: role builders and agent 2/)
     expect(ids()).toEqual(before)
     // One agent added from a template: its role's preselected one, or the one named.
     const one = await run(() => templates.addAgentFromTemplate(beta, 'workspace', 'pair-2.json', 1, undefined, 'BExtra', 'user'))
@@ -463,30 +463,30 @@ describe('saving and loading templates', () => {
     await w.mutateProjectConfig(beta, (c) => ({ agents: c.agents.filter((a: StoredAgent) => !a.name.startsWith('BExtra')) }))
   })
 
-  it('Choose Connections… (HI-2109): only the existing agents\' connections change, by role or name; one unnamed keeps its own; a running one keeps its CLI', async () => {
+  it('Choose Connections… (HI-2109): only the existing agents\' connections change, by role or agent; one unnamed keeps its own; a running one keeps its CLI', async () => {
     const plan = await run(() => templates.connectionsPlan(beta))
     expect(plan.agents.map((a) => [a.name, a.role, a.provider, a.connection, a.running])).toEqual([['BBuilder', 'builder', 'claude-code', 'c-cc', false], ['BReviewer', 'reviewer', 'codex', 'c-cx', false]])
     expect(plan.options.map((o) => o.id)).toEqual(['c-cc', 'c-cc-high', 'c-cx'])
     const before = cfgOf(beta).agents.map((a: StoredAgent) => a.id)
     // "High effort for every builder here": the builders only; the ids (and so their conversations) stay.
-    const done = await run(() => templates.applyConnections(beta, { builder: 'Personal · High' }))
+    const done = await run(() => templates.applyConnections(beta, { roles: { builder: 'Personal · High' } }))
     expect(done).toEqual({ changed: ['BBuilder'], restart: [], skipped: [] })
     expect(cfgOf(beta).agents.map((a: StoredAgent) => [a.id, a.connection])).toEqual([[before[0], 'c-cc-high'], [before[1], 'c-cx']])
     // Another CLI's connection for a stopped agent: its CLI follows; for a running one: skipped, said; nothing else changes.
     live.add(before[1])
-    const running = await run(() => templates.applyConnections(beta, { '*': 'c-cc' }))
+    const running = await run(() => templates.applyConnections(beta, { all: 'c-cc' }))
     expect(running).toEqual({ changed: ['BBuilder'], restart: [], skipped: [{ name: 'BReviewer', why: 'running' }] })
     live.clear()
-    const moved = await run(() => templates.applyConnections(beta, { BReviewer: 'c-cc' }))
+    const moved = await run(() => templates.applyConnections(beta, { agents: { 1: 'c-cc' } }))
     expect(moved.changed).toEqual(['BReviewer'])
     expect(cfgOf(beta).agents.map((a: StoredAgent) => [a.provider, a.connection])).toEqual([['claude-code', 'c-cc'], ['claude-code', 'c-cc']])
     // On its own CLI while it runs: changed, to restart.
     live.add(before[0])
-    expect(await run(() => templates.applyConnections(beta, { BBuilder: 'c-cc-high' }))).toEqual({ changed: ['BBuilder'], restart: [{ id: before[0], name: 'BBuilder' }], skipped: [] })
+    expect(await run(() => templates.applyConnections(beta, { agents: { 0: 'c-cc-high' } }))).toEqual({ changed: ['BBuilder'], restart: [{ id: before[0], name: 'BBuilder' }], skipped: [] })
     live.clear()
-    // Checked first: nothing changes for an unknown key or connection.
-    await expect(run(() => templates.applyConnections(beta, { nobody: 'c-cc', '*': 'c-cx' }))).rejects.toThrow(/nobody is none of them/)
-    await expect(run(() => templates.applyConnections(beta, { reviewer: 'Gone' }))).rejects.toThrow(/No connection "Gone"/)
+    // Checked first: nothing changes for an unknown role or connection.
+    await expect(run(() => templates.applyConnections(beta, { roles: { nobody: 'c-cc' }, all: 'c-cx' } as never))).rejects.toThrow(/don't fit its agents: role nobody/)
+    await expect(run(() => templates.applyConnections(beta, { roles: { reviewer: 'Gone' } }))).rejects.toThrow(/No connection "Gone"/)
     expect(cfgOf(beta).agents.map((a: StoredAgent) => a.connection)).toEqual(['c-cc-high', 'c-cc'])
   })
 
@@ -504,7 +504,7 @@ describe('saving and loading templates', () => {
     expect([off.blocked, off.options.map((o) => o.id)]).toEqual([[], ['c-cx']])
     config.settings.providers.codex.enabled = false
     expect(await run(() => templates.templatePlan(beta, 'workspace', 'pair.json'))).toMatchObject({ blocked: [], options: [] })
-    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair.json', ids(), undefined, B, { '*': 'c-cc' }))).rejects.toThrow(/No connection "c-cc"/)
+    await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair.json', ids(), undefined, B, { all: 'c-cc' }))).rejects.toThrow(/No connection "c-cc"/)
     providersOn()
     await expect(run(() => templates.loadTemplate(beta, 'workspace', 'pair.json', ['someone-else']))).rejects.toThrow(/changed since you looked/)
     expect(ids()).toHaveLength(2)

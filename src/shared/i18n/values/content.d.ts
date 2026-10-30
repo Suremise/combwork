@@ -77,7 +77,7 @@ interface HiveMessageValues {
   'content.templates.changedWhile': undefined
   'content.templates.checkFailed': { agent: string | number; folder: string | number; error: string | number }
   'content.templates.connectionAmbiguous': { ref: string | number; ids: string | number }
-  'content.templates.connectionKeys': { keys: string | number; count: number }
+  'content.templates.connectionChoices': { keys: string | number }
   'content.templates.connectionUnknown': { ref: string | number }
   'content.templates.editedMeanwhile': { name: string | number }
   'content.templates.enterName': undefined

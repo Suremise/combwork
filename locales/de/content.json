@@ -75,7 +75,7 @@
   "content.templates.changedWhile": "Die Agenten des Projekts haben sich geändert, während die Vorlage geladen wurde: Es wurde nichts geändert. Öffne die Vorlage erneut.",
   "content.templates.checkFailed": "Hive konnte den Worktree von Agent {agent} ({folder}) nicht prüfen: {error}",
   "content.templates.connectionAmbiguous": "Mehrere Verbindungen heißen „{ref}“: Nenne eine über ihre ID ({ids}).",
-  "content.templates.connectionKeys": "Verbindungen werden für *, builder, reviewer, either, generalist oder einen Agenten nach Namen gewählt: {keys} {count, plural, one {ist keins davon} other {sind keins davon}}.",
+  "content.templates.connectionChoices": "Diese Verbindungswahl passt nicht zu ihren Agenten: {keys}. Öffne sie erneut.",
   "content.templates.connectionUnknown": "Keine Verbindung „{ref}“ kann jetzt in diesem Arbeitsbereich verwendet werden: Wähle eine andere.",
   "content.templates.editedMeanwhile": "„{name}“ wurde geändert, seit du mit dem Bearbeiten begonnen hast (inzwischen erneut gespeichert): Es wurde nichts gespeichert. Schließe den Editor, um den aktuellen Stand zu sehen.",
   "content.templates.enterName": "Gib einen Namen für die Vorlage ein.",

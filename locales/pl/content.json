@@ -75,7 +75,7 @@
   "content.templates.changedWhile": "Agenci projektu zmienili się podczas wczytywania szablonu: nic nie zmieniono. Otwórz szablon ponownie.",
   "content.templates.checkFailed": "Nie udało się sprawdzić worktree agenta {agent} ({folder}): {error}",
   "content.templates.connectionAmbiguous": "Kilka połączeń nazywa się „{ref}”: wskaż jedno po identyfikatorze ({ids}).",
-  "content.templates.connectionKeys": "Połączenia wybiera się dla *, builder, reviewer, either, generalist albo agenta po nazwie: {keys} {count, plural, one {nie jest żadnym z nich} few {nie są żadnym z nich} many {nie są żadnym z nich} other {nie są żadnym z nich}}.",
+  "content.templates.connectionChoices": "Te wybory połączeń nie pasują do jego agentów: {keys}. Otwórz go ponownie.",
   "content.templates.connectionUnknown": "Połączenia „{ref}” nie można teraz użyć w tym obszarze roboczym: wybierz inne.",
   "content.templates.editedMeanwhile": "Szablon „{name}” zmienił się, odkąd zaczęto go edytować (w międzyczasie zapisano go ponownie): nic nie zapisano. Zamknij edytor, aby zobaczyć jego obecną wersję.",
   "content.templates.enterName": "Wpisz nazwę szablonu.",
