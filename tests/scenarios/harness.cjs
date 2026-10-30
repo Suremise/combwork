@@ -644,14 +644,17 @@ async function runScenario(sc, providerKey, opts = {}) {
     ctx.subjectStatus = async () => (await live())?.status ?? 'stopped'
     // Every status the session under test reports, in order, as Hive emits it (HI-2022): a state the loop below would
     // look at between its looks (each a few calls and a second apart; a short watch ends in between) is still seen.
+    // Each with the watch it had then (HI-2086): the watch a turn ended with, even once a wake has ended it since.
     await page.evaluate((who) => {
       window.__subjectStatuses = []
       window.hive.onEvent((e) => {
-        if (e.type === 'session-status' && e.state?.agentId === who.agentId && String(e.state.projectPath).toLowerCase() === who.host.toLowerCase()) window.__subjectStatuses.push(e.state.status)
+        if (e.type === 'session-status' && e.state?.agentId === who.agentId && String(e.state.projectPath).toLowerCase() === who.host.toLowerCase()) window.__subjectStatuses.push({ status: e.state.status, watch: e.state.watch ?? null })
       })
     }, { host, agentId })
     /** The statuses the session under test has reported since its prompt was sent, in order (`watching` included). */
-    ctx.statusesSeen = () => page.evaluate(() => [...(window.__subjectStatuses ?? [])])
+    ctx.statusesSeen = () => page.evaluate(() => (window.__subjectStatuses ?? []).map((x) => x.status))
+    /** The same from the `from`th on, each with its watch. */
+    ctx.statesSeen = (from = 0) => page.evaluate((n) => (window.__subjectStatuses ?? []).slice(n), from)
     if (sc.beforePrompt && !endedAtLaunch) await sc.beforePrompt(ctx)
     const prompt = typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
     const fakePrompt = typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake
@@ -676,6 +679,9 @@ async function runScenario(sc, providerKey, opts = {}) {
       return items.some((x) => x.kind === 'user' && x.text.includes(text.slice(0, 40)))
     }
     let notTaken = null
+    // Where the prompt's states begin (HI-2086): a watch a turn before it left (a setup wake's, beforePrompt) isn't the
+    // prompt's. A model started by Hive's line has no prompt typed: its turn is the line's, all of them.
+    const statesFrom = hiveLine && !p.fake ? 0 : ((await page.evaluate(() => (window.__subjectStatuses ?? []).length).catch(() => 0)) ?? 0)
     if (!endedAtLaunch && !(hiveLine && !p.fake)) {
       turnBefore.set(text, (await live())?.turn?.id ?? null)
       const mark = String((await inv('pty:buffer', key).catch(() => '')) ?? '').length
@@ -768,6 +774,11 @@ async function runScenario(sc, providerKey, opts = {}) {
     observed.statuses = await ctx.statusesSeen().catch(() => [])
     // The watch it ended its turn with (#402): the live one, not every watch it started (a new one replaces the last).
     observed.watch = s?.watch ?? null
+    // The watch of the last turn it ended watching since its prompt (HI-2086), as it reported it then: a wake may have
+    // ended that watch before the run looked (the snapshot above), and the turn the wake started, a fake's inbox read,
+    // ended with none. Null if it never ended a turn watching. With no states seen, the snapshot's.
+    const states = await ctx.statesSeen(statesFrom).catch(() => [])
+    observed.turnWatch = states.length ? (states.findLast((x) => x.status === 'watching')?.watch ?? null) : observed.status === 'watching' ? observed.watch : null
     // What Hive woke it with (#402), in order: a line it typed in, or (#650: its doorbell) what the session's next
     // hive_inbox call read, the inbox's own items after the doorbell. Codex calls hive tools from its code tool (Script),
     // so its read is the script that calls hive_inbox (#1537).
