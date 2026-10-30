@@ -125,6 +125,7 @@ interface HiveMessageValues {
   'performance.compare.measure.exportResponseBytes': undefined
   'performance.compare.measure.exportToolCalls': undefined
   'performance.compare.measure.exportToolChars': undefined
+  'performance.compare.measure.exportToolListPerLaunch': undefined
   'performance.compare.measure.guidanceBytes': undefined
   'performance.compare.measure.guidanceChars': undefined
   'performance.compare.measure.hiveCallErrors': undefined
@@ -148,6 +149,7 @@ interface HiveMessageValues {
   'performance.compare.measure.toolDetailCalls': undefined
   'performance.compare.measure.toolErrors': undefined
   'performance.compare.measure.toolListBytes': undefined
+  'performance.compare.measure.toolListChars': undefined
   'performance.compare.measureTip.apiCancelled': undefined
   'performance.compare.measureTip.apiFailed': undefined
   'performance.compare.measureTip.apiMs': undefined
@@ -160,6 +162,7 @@ interface HiveMessageValues {
   'performance.compare.measureTip.exportGuidancePerLaunch': undefined
   'performance.compare.measureTip.exportRequests': undefined
   'performance.compare.measureTip.exportToolChars': undefined
+  'performance.compare.measureTip.exportToolListPerLaunch': undefined
   'performance.compare.measureTip.guidanceBytes': undefined
   'performance.compare.measureTip.guidanceChars': undefined
   'performance.compare.measureTip.hiveCallErrors': undefined
@@ -183,6 +186,7 @@ interface HiveMessageValues {
   'performance.compare.measureTip.toolDetailCalls': undefined
   'performance.compare.measureTip.toolErrors': undefined
   'performance.compare.measureTip.toolListBytes': undefined
+  'performance.compare.measureTip.toolListChars': undefined
   'performance.compare.noScenarios': undefined
   'performance.compare.notComparable': { reasons: string | number }
   'performance.compare.note.cliVersions': { base: string | number; run: string | number }
@@ -237,6 +241,7 @@ interface HiveMessageValues {
   'performance.compare.sample.tooManyChecks': undefined
   'performance.compare.samples': { title: string | number; base: number; run: number }
   'performance.compare.scopeName': { kind: string; project: string | number }
+  'performance.compare.sideMeasure': { measure: string | number; side: string }
   'performance.compare.sizesHint': undefined
   'performance.compare.status.better': undefined
   'performance.compare.status.betterTip': undefined
@@ -297,6 +302,8 @@ interface HiveMessageValues {
   'performance.guidance.skills': undefined
   'performance.guidance.tip': undefined
   'performance.guidance.unmeasured': undefined
+  'performance.guidance.workflow': undefined
+  'performance.guidance.workflowSide': { side: string }
   'performance.heading': undefined
   'performance.intro.project': undefined
   'performance.intro.workspace': undefined

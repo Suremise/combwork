@@ -3512,7 +3512,9 @@ route('POST', '/v1/metrics/mcp', async ({ body }) => {
   if (calls.length > MCP_REPORT_LIMITS.events) throw new HttpError(400, `At most ${MCP_REPORT_LIMITS.events} calls in one report`)
   let accepted = 0
   for (const c of calls) if (c && typeof c === 'object' && recordMcp(h, project, role, c as Record<string, unknown> as never)) accepted++
-  if (body?.catalog && typeof body.catalog === 'object' && recordCatalog(h, project, role, body.catalog)) accepted++
+  // On the side of the launch its token is for (HI-2049), never the agent's next one; the Assistant's is none.
+  const side = agent ? sessions.launchSide(agent.projectPath, agent.agentId, agentCallerRun()) : 'none'
+  if (body?.catalog && typeof body.catalog === 'object' && recordCatalog(h, project, role, side, body.catalog)) accepted++
   return { accepted, refused: calls.length + (body?.catalog ? 1 : 0) - accepted }
 })
 

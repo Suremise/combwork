@@ -9,7 +9,7 @@ import { createRequire } from 'module'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
-import { BENCHMARK_LIMITS, EXPORT_MEASURES, SCENARIO_MEASURES, USAGE_MEASURES, aboutOf, compareArtifacts, compareScopeOf, factsOf, keptAbout, keptLabel, parseArtifact, readEntry, readKept, summaryOf, type Artifact, type CompareScope, type KeptEntry, type ParseResult } from '../src/shared/benchmark'
+import { BENCHMARK_LIMITS, EXPORT_MEASURES, SCENARIO_MEASURES, USAGE_MEASURES, aboutOf, compareArtifacts, compareScopeOf, exportMeasure, factsOf, keptAbout, keptLabel, parseArtifact, readEntry, readKept, sideMeasureLabel, summaryOf, type Artifact, type CompareScope, type KeptEntry, type ParseResult } from '../src/shared/benchmark'
 import { englishText, shownText } from '../src/shared/advanced'
 import { setLanguage } from '../src/shared/i18n'
 import { tempDir } from './tempDir'
@@ -369,6 +369,63 @@ describe('Performance exports', () => {
   })
 })
 
+describe('HI-2049: Performance exports by workflow role', () => {
+  const guidance = (workflow: string | undefined, launches: number, bytes: number) => ({ provider: 'claude-code', role: 'agent', ...(workflow ? { workflow } : {}), launches, guidanceBytes: bytes, customBytes: 0, roleBytes: 0, modeBytes: 0, skillCatalogBytes: 0 })
+  /** An export whose only project has these launches and tool lists (the rest of its parts as exportFile makes them). */
+  const withLaunches = (g: object[], catalog: object[]): Artifact => {
+    const f = JSON.parse(exportFile({ requests: { alpha: 10 } }))
+    f.report.projects.alpha.guidance = g
+    f.report.projects.alpha.catalog = catalog
+    f.report.workspace.guidance = []
+    return art(parseArtifact(JSON.stringify(f), WS))
+  }
+  const row = (c: ReturnType<typeof compareArtifacts>, key: string) => c.rows!.find((r) => r.key === key)
+
+  it("a summary keeps each role's launches, guidance and tool lists; launches recorded before it are the role not recorded", () => {
+    const a = withLaunches([guidance('builder', 4, 4000), guidance('reviewer', 2, 3000), guidance(undefined, 1, 900)], [{ role: 'agent', workflow: 'builder', starts: 4, tools: 160, toolsBytes: 40400, toolsChars: 40000, charStarts: 4 }, { role: 'agent', workflow: 'reviewer', starts: 2, tools: 80, toolsBytes: 20000, toolsChars: 19800, charStarts: 2 }])
+    expect(a.summary!.totals).toMatchObject({ launches: 7, 'launches.builder': 4, 'launches.reviewer': 2, 'launches.unknown': 1, 'guidanceBytes.builder': 4000, 'guidanceBytes.reviewer': 3000, toolListStarts: 6, toolListChars: 59800, 'toolListChars.builder': 40000, 'toolListStarts.reviewer': 2 })
+  })
+
+  it('Compare shows each role’s launches, guidance a launch and tool list a launch, only for roles either side has', () => {
+    const a = withLaunches([guidance('builder', 4, 4000), guidance('reviewer', 2, 3000)], [{ role: 'agent', workflow: 'builder', starts: 4, tools: 160, toolsBytes: 40400, toolsChars: 40000, charStarts: 4 }, { role: 'agent', workflow: 'reviewer', starts: 2, tools: 80, toolsBytes: 20000, toolsChars: 20000, charStarts: 2 }])
+    const b = withLaunches([guidance('builder', 4, 3600), guidance('reviewer', 2, 3000)], [{ role: 'agent', workflow: 'builder', starts: 4, tools: 160, toolsBytes: 36400, toolsChars: 36000, charStarts: 4 }, { role: 'agent', workflow: 'reviewer', starts: 2, tools: 80, toolsBytes: 20000, toolsChars: 20000, charStarts: 2 }])
+    const c = compareArtifacts(a, b)
+    expect(c.comparable).toBe(true)
+    expect(row(c, 'guidancePerLaunch.builder')).toMatchObject({ base: { mean: 1000 }, run: { mean: 900 }, delta: -100 })
+    expect(row(c, 'toolListPerLaunch.builder')).toMatchObject({ base: { mean: 10000 }, run: { mean: 9000 } })
+    expect(row(c, 'toolListPerLaunch.reviewer')).toMatchObject({ base: { mean: 10000 }, run: { mean: 10000 }, delta: 0 })
+    expect(row(c, 'toolListPerLaunch')).toMatchObject({ base: { mean: 60000 / 6 }, run: { mean: 56000 / 6 } })
+    expect(row(c, 'launches.reviewer')).toMatchObject({ delta: 0 })
+    expect(c.rows!.some((r) => r.key.endsWith('.either') || r.key.endsWith('.none') || r.key.endsWith('.unknown'))).toBe(false)
+    // Each row's measure, and the role it is for, for the window.
+    expect(exportMeasure('toolListPerLaunch.reviewer')).toMatchObject({ def: { key: 'toolListPerLaunch', unit: 'chars' }, side: 'reviewer' })
+    expect(exportMeasure('requests.reviewer')).toBeUndefined()
+    expect(englishText(sideMeasureLabel('Guidance a launch', 'none'))).toBe('Guidance a launch · no workflow role')
+  })
+
+  it("a tool list's characters average over the starts that had them: one from before, bytes only, isn't a zero", () => {
+    const mixed = withLaunches([guidance('builder', 3, 3000)], [{ role: 'agent', workflow: 'builder', starts: 3, tools: 120, toolsBytes: 30300, toolsChars: 10000, charStarts: 1 }, { role: 'agent', starts: 5, tools: 200, toolsBytes: 50000 }])
+    expect(mixed.summary!.totals).toMatchObject({ toolListStarts: 1, toolListChars: 10000, 'toolListStarts.builder': 1 })
+    expect(mixed.summary!.totals['toolListStarts.unknown']).toBe(0)
+    const c = compareArtifacts(mixed, mixed)
+    expect(row(c, 'toolListPerLaunch')).toMatchObject({ base: { mean: 10000 } })
+    expect(row(c, 'toolListPerLaunch.builder')).toMatchObject({ base: { mean: 10000 } })
+    // Only bytes on both sides: no value, not zero.
+    const old = withLaunches([guidance(undefined, 2, 2000)], [{ role: 'agent', starts: 2, tools: 80, toolsBytes: 20000 }])
+    expect(row(compareArtifacts(old, old), 'toolListPerLaunch')).toMatchObject({ base: null, run: null, delta: null })
+  })
+
+  it('a summary kept before it has none of these: its rows are unknown, never zero', () => {
+    const now = withLaunches([guidance('builder', 4, 4000)], [{ role: 'agent', workflow: 'builder', starts: 4, tools: 160, toolsBytes: 40400, toolsChars: 40000, charStarts: 4 }])
+    const kept = JSON.parse(JSON.stringify(now))
+    kept.summary.totals = Object.fromEntries(Object.entries(kept.summary.totals).filter(([k]) => !k.includes('.') && !k.startsWith('toolList')))
+    const before = readKept(kept)!
+    const c = compareArtifacts(before, now)
+    for (const k of ['toolListPerLaunch', 'launches.builder', 'guidancePerLaunch.builder', 'toolListPerLaunch.builder']) expect(row(c, k), k).toMatchObject({ incomplete: true, delta: null })
+    expect(row(c, 'guidancePerLaunch')).toMatchObject({ incomplete: false, delta: 0 })
+  })
+})
+
 describe('the scenario harness writes what the app reads (tests/scenarios/benchmark.cjs)', () => {
   const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, measuresOf, LIMITS } = require_('./scenarios/benchmark.cjs')
   const meta = { fixturesVersion: 5, provider: 'fake-codex', model: '(default)', effort: '(default)', mode: 'full-access', repeats: 2, source: { head: 'abc1234', dirty: null }, guidance: 'g1', when: '2026-10-03T12:00:00.000Z', spentUsd: 0, budgetUsd: 2 }
@@ -391,6 +448,16 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
     guidance: { atStart: { revision: 'g1' }, delivered: { guidance: 'g1', skills: { 'work-on-card': 'rev-a' } } },
     metricsOverheadMs: 12,
     ...extra
+  })
+
+  it("the tool list's characters only when every start in the scenario had them (HI-2049): else unknown", () => {
+    const withLists = (n: number, catalog: object[]) => ({ ...report(n), projects: { alpha: { ...report(n).projects.alpha, catalog } } })
+    const all = measuresOf(withLists(0, []), withLists(1, [{ starts: 2, toolsBytes: 200, toolsChars: 190, charStarts: 2 }]), {}, null)
+    expect(all).toMatchObject({ toolListBytes: 200, toolListChars: 190 })
+    expect(all).not.toHaveProperty('toolListCharStarts')
+    const some = measuresOf(withLists(0, []), withLists(1, [{ starts: 2, toolsBytes: 200, toolsChars: 95, charStarts: 1 }]), {}, null)
+    expect(some.toolListBytes).toBe(200)
+    expect(some).not.toHaveProperty('toolListChars')
   })
 
   it('the measures leave out the harness’s own requests; its artifact parses, with checks, coverage, revisions and Unicode intact', () => {

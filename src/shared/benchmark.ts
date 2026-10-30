@@ -118,6 +118,7 @@ const M = {
   roleAgent: msg({ id: 'performance.compare.filters.role.agent', defaultMessage: 'project agents', description: "A Performance export's Who filter (as Performance's Who menu names it: Project agents), in a list of filters. Lower case." }),
   roleAssistant: msg({ id: 'performance.compare.filters.role.assistant', defaultMessage: 'the Assistant', description: "A Performance export's Who filter (as Performance's Who menu names it: The Assistant), in a list of filters." }),
   roleApi: msg({ id: 'performance.compare.filters.role.api', defaultMessage: 'scripts', description: "A Performance export's Who filter (as Performance's Who menu names it: Scripts), in a list of filters. Lower case." }),
+  sideMeasure: msg({ id: 'performance.compare.sideMeasure', defaultMessage: '{measure} · {side, select, builder {builders} reviewer {reviewers} either {either role} none {no workflow role} other {role not recorded}}', description: "A measure of Performance → Compare of exports for one workflow role's launches (HI-2049): {measure} is the measure's name (\"Guidance a launch\"); then whose launches: builders', reviewers', agents that take either role, those with no workflow role (generalists, the Assistant), or launches recorded before Hive recorded the role. Glossary: builder, reviewer, either, workflow role." }),
   roleViewer: msg({ id: 'performance.compare.filters.role.viewer', defaultMessage: 'viewer apps', description: "A Performance export's Who filter (as Performance's Who menu names it: Viewer apps), in a list of filters. Lower case." })
 }
 
@@ -151,6 +152,7 @@ export const SCENARIO_MEASURES: MeasureDef[] = [
   { key: 'guidanceBytes', label: msg({ id: 'performance.compare.measure.guidanceBytes', defaultMessage: 'Launch guidance', description: 'A measure in Performance → Compare: the size of the guidance Hive gave a session at launch.' }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.guidanceBytes', defaultMessage: 'Core contract, project additions, the Assistant’s role and mode, and the skills’ catalog, at launch.', description: 'Tooltip of the Launch guidance measure in Performance → Compare: its parts.' }) },
   { key: 'guidanceChars', label: msg({ id: 'performance.compare.measure.guidanceChars', defaultMessage: 'Launch guidance (characters)', description: 'A measure in Performance → Compare: the launch guidance counted in characters.' }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.guidanceChars', defaultMessage: 'The same parts in characters (UTF-16 code units); the catalog has bytes only.', description: 'Tooltip of the Launch guidance (characters) measure in Performance → Compare.' }) },
   { key: 'toolListBytes', label: msg({ id: 'performance.compare.measure.toolListBytes', defaultMessage: 'Tool list', description: "A measure in Performance → Compare: the size of the list of Hive's tools a session was given." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolListBytes', defaultMessage: 'The hive tools’ names, descriptions and schemas as the CLI got them.', description: 'Tooltip of the Tool list measure in Performance → Compare. Keep hive (the tools\' name).' }) },
+  { key: 'toolListChars', label: msg({ id: 'performance.compare.measure.toolListChars', defaultMessage: 'Tool list (characters)', description: "A measure in Performance → Compare: the size of the list of Hive's tools a session was given, in characters." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolListChars', defaultMessage: 'The same list in characters (UTF-16 code units). Unknown for a run from before Hive counted them.', description: 'Tooltip of the Tool list (characters) measure in Performance → Compare.' }) },
   { key: 'toolChars', label: msg({ id: 'performance.compare.measure.toolChars', defaultMessage: 'Tool replies', description: "A measure in Performance → Compare: the size of the replies of Hive's tools." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolChars', defaultMessage: 'Characters of the hive tools’ replies, as the model got them.', description: 'Tooltip of the Tool replies measure in Performance → Compare. Keep hive (the tools\' name).' }) },
   { key: 'toolBytes', label: msg({ id: 'performance.compare.measure.toolBytes', defaultMessage: 'Tool replies (bytes)', description: "A measure in Performance → Compare: the size of the replies of Hive's tools, in bytes." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolBytes', defaultMessage: 'UTF-8 bytes of the same replies.', description: 'Tooltip of the Tool replies (bytes) measure in Performance → Compare.' }) },
   { key: 'toolCalls', label: msg({ id: 'performance.compare.measure.toolCalls', defaultMessage: 'Tool calls', description: "A measure in Performance → Compare: how many times agents called Hive's tools." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.toolCalls', defaultMessage: 'hive tool calls measured by the bridge.', description: "Tooltip of the Tool calls measure in Performance → Compare. Keep hive (the tools' name); the bridge is Hive's MCP server between the CLI and Hive." }) },
@@ -195,8 +197,34 @@ export const EXPORT_MEASURES: MeasureDef[] = [
   { key: 'toolChars', label: msg({ id: 'performance.compare.measure.exportToolChars', defaultMessage: 'Tool replies', description: "A measure in Performance → Compare of exports: the size of the replies of Hive's tools." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportToolChars', defaultMessage: 'Characters, per hour recorded.', description: 'Tooltip of the Tool replies measure in Performance → Compare of exports.' }) },
   { key: 'detailCalls', label: msg({ id: 'performance.compare.measure.exportDetailCalls', defaultMessage: 'Detail calls', description: "A measure in Performance → Compare of exports: calls of Hive's tools that asked for the full reply." }), unit: 'count', group: 'work', tip: PER_HOUR },
   { key: 'launches', label: msg({ id: 'performance.compare.measure.exportLaunches', defaultMessage: 'Launches', description: 'A measure in Performance → Compare of exports: agent sessions started.' }), unit: 'count', group: 'work', tip: PER_HOUR },
-  { key: 'guidancePerLaunch', label: msg({ id: 'performance.compare.measure.exportGuidancePerLaunch', defaultMessage: 'Guidance a launch', description: "A measure in Performance → Compare of exports: the size of Hive's guidance for each session started." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportGuidancePerLaunch', defaultMessage: 'Core, project, the Assistant’s role and mode, and catalog, on average (not per hour).', description: 'Tooltip of the Guidance a launch measure in Performance → Compare of exports: its parts.' }) }
+  { key: 'guidancePerLaunch', label: msg({ id: 'performance.compare.measure.exportGuidancePerLaunch', defaultMessage: 'Guidance a launch', description: "A measure in Performance → Compare of exports: the size of Hive's guidance for each session started." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportGuidancePerLaunch', defaultMessage: 'Core, project, the Assistant’s role and mode, and catalog, on average (not per hour).', description: 'Tooltip of the Guidance a launch measure in Performance → Compare of exports: its parts.' }) },
+  { key: 'toolListPerLaunch', label: msg({ id: 'performance.compare.measure.exportToolListPerLaunch', defaultMessage: 'Tool list a launch', description: "A measure in Performance → Compare of exports (HI-2049): the size of the list of Hive's tools each session was given." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportToolListPerLaunch', defaultMessage: 'The hive tools’ names, descriptions and schemas as each session’s CLI got them, in characters, on average (not per hour). Sessions from before Hive counted characters are left out.', description: "Tooltip of the Tool list a launch measure in Performance → Compare of exports. Keep hive (the tools' name)." }) }
 ]
+
+/**
+ * The workflow roles an export's launches are split by (HI-2049): GuidanceSeries and CatalogSeries `workflow`, with
+ * `unknown` for what was recorded before. Each has the per-launch measures below, keyed `<measure>.<role>`.
+ */
+export const WORKFLOW_SIDES = ['builder', 'reviewer', 'either', 'none', 'unknown'] as const
+export type WorkflowSide = (typeof WORKFLOW_SIDES)[number]
+const SIDE_MEASURES = ['launches', 'guidancePerLaunch', 'toolListPerLaunch']
+/** The totals each role keeps, `<total>.<role>`: what its measures are made from. */
+const SIDE_TOTALS = ['launches', 'guidanceBytes', 'toolListStarts', 'toolListChars']
+const sided = (key: string): string[] => WORKFLOW_SIDES.map((side) => `${key}.${side}`)
+const sideOf = (v: unknown): WorkflowSide => (typeof v === 'string' && (WORKFLOW_SIDES as readonly string[]).includes(v) && v !== 'unknown' ? (v as WorkflowSide) : 'unknown')
+
+/** An export comparison row's measure: its own, or one of a workflow role's (`<measure>.<role>`) with that role. */
+export function exportMeasure(key: string): { def: MeasureDef; side?: WorkflowSide } | undefined {
+  const own = EXPORT_MEASURES.find((m) => m.key === key)
+  if (own) return { def: own }
+  const at = key.lastIndexOf('.')
+  const base = EXPORT_MEASURES.find((m) => m.key === key.slice(0, at))
+  const side = key.slice(at + 1)
+  return at > 0 && base && SIDE_MEASURES.includes(base.key) && (WORKFLOW_SIDES as readonly string[]).includes(side) ? { def: base, side: side as WorkflowSide } : undefined
+}
+
+/** A workflow role's measure's name: the measure's, and whose launches. */
+export const sideMeasureLabel = (label: string, side: WorkflowSide): Text => said(M.sideMeasure, { measure: label, side })
 
 // ---------------------------------------------------------------------------
 // Artifacts, as kept (validated and normalised).
@@ -316,11 +344,11 @@ export interface Artifact {
   summary?: ExportSummary
 }
 
-const COMPONENT_KEYS = ['coreBytes', 'customBytes', 'roleBytes', 'modeBytes', 'catalogBytes', 'coreChars', 'customChars', 'roleChars', 'modeChars', 'toolBytes', 'toolListBytes']
+const COMPONENT_KEYS = ['coreBytes', 'customBytes', 'roleBytes', 'modeBytes', 'catalogBytes', 'coreChars', 'customChars', 'roleChars', 'modeChars', 'toolBytes', 'toolListBytes', 'toolListChars']
 const DERIVED = new Set(['contextBytes', 'guidanceBytes', 'guidanceChars', 'seconds'])
 const MEASURE_KEYS = new Set([...SCENARIO_MEASURES.map((m) => m.key).filter((k) => !DERIVED.has(k)), ...COMPONENT_KEYS, 'toolMs', 'launches', 'skillsDelivered', 'skillsUnmeasured', 'toolListStarts', 'skillTooLarge', 'dropped', 'skillsRead', 'skillRefsRead'])
 const USAGE_KEYS = new Set([...USAGE_MEASURES.map((m) => m.key), 'contextTokens'])
-const EXPORT_KEYS = new Set(['requests', 'failed', 'responseBytes', 'requestBytes', 'toolCalls', 'toolChars', 'detailCalls', 'launches', 'guidanceBytes'])
+const EXPORT_KEYS = new Set(['requests', 'failed', 'responseBytes', 'requestBytes', 'toolCalls', 'toolChars', 'detailCalls', 'launches', 'guidanceBytes', 'toolListStarts', 'toolListChars', ...SIDE_TOTALS.flatMap(sided)])
 
 const text = (v: unknown, max = BENCHMARK_LIMITS.text): string =>
   String(typeof v === 'string' || typeof v === 'number' ? v : '')
@@ -481,7 +509,12 @@ function readScenarios(v: unknown): ScenarioResult[] {
 }
 
 /** Which totals each kind of series adds to (an unreadable series leaves exactly these unknown). */
-const SERIES_TOTALS: Record<'api' | 'mcp' | 'guidance', string[]> = { api: ['requests', 'failed', 'responseBytes', 'requestBytes'], mcp: ['toolCalls', 'toolChars', 'detailCalls'], guidance: ['launches', 'guidanceBytes'] }
+const SERIES_TOTALS: Record<'api' | 'mcp' | 'guidance' | 'catalog', string[]> = {
+  api: ['requests', 'failed', 'responseBytes', 'requestBytes'],
+  mcp: ['toolCalls', 'toolChars', 'detailCalls'],
+  guidance: ['launches', 'guidanceBytes', ...sided('launches'), ...sided('guidanceBytes')],
+  catalog: ['toolListStarts', 'toolListChars', ...sided('toolListStarts'), ...sided('toolListChars')]
+}
 
 /**
  * A report part's totals added into `t`. A series that is missing, isn't a list, is longer than can be read, or has an
@@ -494,8 +527,10 @@ function partTotals(p: unknown, t: Measures, unknown: Set<string>): void {
     for (const keys of Object.values(SERIES_TOTALS)) for (const k of keys) unknown.add(k)
     return
   }
-  for (const kind of ['api', 'mcp', 'guidance'] as const) {
+  for (const kind of ['api', 'mcp', 'guidance', 'catalog'] as const) {
     const v = o[kind]
+    // A report with no tool lists at all (one written by hand, or by a Hive from before they were counted) has none.
+    if (kind === 'catalog' && v === undefined) continue
     const mark = (...keys: string[]): void => keys.forEach((k) => unknown.add(k))
     if (!Array.isArray(v) || v.length > BENCHMARK_LIMITS.series) {
       mark(...SERIES_TOTALS[kind])
@@ -529,17 +564,33 @@ function partTotals(p: unknown, t: Measures, unknown: Set<string>): void {
           if (x.mode === 'detail') t.detailCalls += n
         }
         add('toolChars', x.chars)
-      } else {
+      } else if (kind === 'guidance') {
+        // Recorded before HI-2049: its role is unknown, never a guess.
+        const side = sideOf(x.workflow)
         add('launches', x.launches)
+        add(`launches.${side}`, x.launches)
         const parts = [x.guidanceBytes, x.customBytes ?? 0, x.roleBytes ?? 0, x.modeBytes ?? x.personaBytes ?? 0, x.skillCatalogBytes].map(num)
-        if (parts.some((n) => n === null)) unknown.add('guidanceBytes')
-        else t.guidanceBytes += (parts as number[]).reduce((a, b) => a + b, 0)
+        if (parts.some((n) => n === null)) mark('guidanceBytes', `guidanceBytes.${side}`)
+        else {
+          const n = (parts as number[]).reduce((a, b) => a + b, 0)
+          t.guidanceBytes += n
+          t[`guidanceBytes.${side}`] += n
+        }
+      } else {
+        // The starts whose characters were counted (`charStarts`): a bridge from before HI-2049 sent bytes only, and
+        // its starts count in neither the characters nor the starts they are averaged over.
+        if (x.toolsChars === undefined && x.charStarts === undefined) continue
+        const side = sideOf(x.workflow)
+        for (const [key, value] of [['toolListStarts', x.charStarts], ['toolListChars', x.toolsChars]] as const) {
+          add(key, value)
+          add(`${key}.${side}`, value)
+        }
       }
     }
   }
 }
 
-const emptyTotals = (): Measures => ({ requests: 0, failed: 0, responseBytes: 0, requestBytes: 0, toolCalls: 0, toolChars: 0, detailCalls: 0, launches: 0, guidanceBytes: 0 })
+const emptyTotals = (): Measures => ({ requests: 0, failed: 0, responseBytes: 0, requestBytes: 0, toolCalls: 0, toolChars: 0, detailCalls: 0, launches: 0, guidanceBytes: 0, toolListStarts: 0, toolListChars: 0, ...Object.fromEntries(SIDE_TOTALS.flatMap(sided).map((k) => [k, 0])) })
 
 /** Whether a report part has any measurement in it (a part that can't be read counts as having some: it isn't empty). */
 const hasData = (p: unknown): boolean => {
@@ -1048,14 +1099,23 @@ export function compareArtifacts(base: Artifact, run: Artifact): Comparison {
     if (Math.abs(a.rangeMs - b.rangeMs) > 3_600_000) notes.push(M.rangesDiffer)
     const known = (s: ExportSummary, ...keys: string[]): boolean => keys.every((k) => typeof s.totals[k] === 'number')
     const perHour = (s: ExportSummary, k: string): number[] => (s.observedMs ? [s.totals[k] / (s.observedMs / 3_600_000)] : [])
-    const rows = EXPORT_MEASURES.map((m) => {
-      const keys = m.key === 'guidancePerLaunch' ? ['launches', 'guidanceBytes'] : [m.key]
-      // Unknown on a side (a damaged measurement in its file): shown as unknown, never compared.
-      if (!known(a, ...keys) || !known(b, ...keys)) return { key: m.key, base: null, run: null, delta: null, pct: null, withinSpread: false, incomplete: true }
-      return m.key === 'guidancePerLaunch'
-        ? deltaOf(m.key, a.totals.launches ? [a.totals.guidanceBytes / a.totals.launches] : [], b.totals.launches ? [b.totals.guidanceBytes / b.totals.launches] : [])
-        : deltaOf(m.key, perHour(a, m.key), perHour(b, m.key))
-    })
+    // An average a launch: what it adds up over what it is averaged over (none: no value, not zero).
+    const PER_LAUNCH: Record<string, [string, string]> = { guidancePerLaunch: ['guidanceBytes', 'launches'], toolListPerLaunch: ['toolListChars', 'toolListStarts'] }
+    const row = (key: string, measure: string, suffix = ''): MeasureDelta => {
+      const per = PER_LAUNCH[measure]
+      const keys = (per ?? [measure]).map((k) => k + suffix)
+      // Unknown on a side (a damaged measurement in its file, or a summary kept before it was measured): shown as
+      // unknown, never compared.
+      if (!known(a, ...keys) || !known(b, ...keys)) return { key, base: null, run: null, delta: null, pct: null, withinSpread: false, incomplete: true }
+      const average = (s: ExportSummary): number[] => (s.totals[keys[1]] ? [s.totals[keys[0]] / s.totals[keys[1]]] : [])
+      return per ? deltaOf(key, average(a), average(b)) : deltaOf(key, perHour(a, keys[0]), perHour(b, keys[0]))
+    }
+    const rows = EXPORT_MEASURES.map((m) => row(m.key, m.key))
+    // Each workflow role either side has launches or tool lists of (HI-2049), its own measures.
+    for (const side of WORKFLOW_SIDES) {
+      const has = (s: ExportSummary): boolean => (s.totals[`launches.${side}`] ?? 0) > 0 || (s.totals[`toolListStarts.${side}`] ?? 0) > 0
+      if (has(a) || has(b)) for (const m of SIDE_MEASURES) rows.push(row(`${m}.${side}`, m, `.${side}`))
+    }
     notes.push(M.realUse)
     return { kind: 'export', comparable: reasons.length === 0, ...why(reasons, notes), rows, summary: {} }
   }

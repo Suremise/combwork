@@ -1,5 +1,5 @@
 import { Children, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { BENCHMARK_LIMITS, EXPORT_MEASURES, SCENARIO_MEASURES, USAGE_MEASURES, compareArtifacts, compareScopeKey, keptAbout, keptLabel, type CompareScope, type Comparison, type KeptEntry, type MeasureDef, type MeasureDelta, type ScenarioComparison, type ScenarioStatus } from '@shared/benchmark'
+import { BENCHMARK_LIMITS, SCENARIO_MEASURES, USAGE_MEASURES, compareArtifacts, exportMeasure, sideMeasureLabel, compareScopeKey, keptAbout, keptLabel, type CompareScope, type Comparison, type KeptEntry, type MeasureDef, type MeasureDelta, type ScenarioComparison, type ScenarioStatus } from '@shared/benchmark'
 import type { MetricsQuery } from '@shared/metrics'
 import { shownText, type Text } from '@shared/advanced'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
@@ -115,9 +115,10 @@ const STATUS: Record<ScenarioStatus, { label: Msg; tone: string; tip: Msg; key: 
 const STATUS_ORDER: ScenarioStatus[] = ['smaller-but-failing', 'worse', 'failing', 'incomplete', 'better', 'same', 'only-in-base', 'only-in-run']
 
 /** Each kind's measures by key: a scenario's (with provider usage) and an export's share keys but not labels or tips. */
-type Defs = Map<string, MeasureDef>
+type Defs = Pick<Map<string, MeasureDef>, 'get'>
 const SCENARIO_DEFS: Defs = new Map([...SCENARIO_MEASURES, ...USAGE_MEASURES].map((m) => [m.key, m]))
-const EXPORT_DEFS: Defs = new Map(EXPORT_MEASURES.map((m) => [m.key, m]))
+/** An export's measures, a workflow role's (`<measure>.<role>`, HI-2049) as its measure. */
+const EXPORT_DEFS: Defs = { get: (key) => exportMeasure(key)?.def }
 
 /** Markup in messages, as React children (keyed by Children.toArray where they are shown). */
 const strong = (c: ReactNode[]): ReactNode => <strong>{c}</strong>
@@ -464,14 +465,18 @@ function scenarioColumns(open: string | null): DataColumn<ScenarioComparison>[] 
 
 /** An export comparison's measures: baseline, run and the change (sortable, the biggest change first). */
 function measureColumns(): DataColumn<MeasureDelta>[] {
-  const def = (d: MeasureDelta): MeasureDef | undefined => EXPORT_DEFS.get(d.key)
+  const label = (d: MeasureDelta): string => {
+    const m = exportMeasure(d.key)
+    if (!m) return d.key
+    return m.side ? shownText(sideMeasureLabel(tr(m.def.label), m.side)) : tr(m.def.label)
+  }
   return [
     {
       key: 'measure',
       header: tr(M.measure),
       cell: (d) => (
         <>
-          {def(d) ? tr(def(d)!.label) : d.key} <InfoTip text={def(d) ? tr(def(d)!.tip) : ''} />
+          {label(d)} <InfoTip text={EXPORT_DEFS.get(d.key) ? tr(EXPORT_DEFS.get(d.key)!.tip) : ''} />
         </>
       )
     },

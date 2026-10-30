@@ -116,6 +116,7 @@ import { startMergeSlots } from './mergeSlotHost'
 import { startLanes } from './lanes'
 import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
+import { startLaunchSides } from './launchSides'
 import { checkInstallDir } from './installDir'
 import { exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
 import { checkLastRun, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
@@ -1094,6 +1095,8 @@ app.whenReady().then(async () => {
 
   // Hook auth files of an earlier run of Hive: their tokens died with it (#345).
   await clearHookAuth()
+  // A launch's side of the workflow for its metrics (HI-2049): before the Agent API or a window can start an agent.
+  startLaunchSides()
   await startHookServer()
   await startApiServer()
   wireSettingsEffects()

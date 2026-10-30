@@ -34,6 +34,7 @@ import {
   type Timed,
   type TrendPoint
 } from '../shared/metrics'
+import type { LaunchWorkflow } from '../shared/workflow/roles'
 
 /**
  * Hive's performance metrics, one store per open workspace (shared/metrics.ts has the contract). Recording is a few
@@ -127,9 +128,10 @@ function drop(b: Bucket, owner: string, n = 1): void {
 const SKILL_COUNTS = ['sharedScans', 'hits', 'misses', 'invalidations', 'tooLarge', 'files', 'bytes', 'headerBytes', 'entries'] as const
 const emptySkills = (): SkillServiceSeries => ({ scans: emptyTimed(), sharedScans: 0, hits: 0, misses: 0, invalidations: 0, tooLarge: 0, files: 0, bytes: 0, headerBytes: 0, entries: 0 })
 const GUIDANCE_COUNTS = ['launches', 'guidanceBytes', 'guidanceChars', 'customBytes', 'customChars', 'roleBytes', 'roleChars', 'modeBytes', 'modeChars', 'skills', 'skillCatalogBytes', 'skillBytes', 'skillsNotDelivered', 'skillsUnmeasured'] as const
-const CATALOG_COUNTS = ['starts', 'tools', 'toolsBytes'] as const
+const CATALOG_COUNTS = ['starts', 'tools', 'toolsBytes', 'toolsChars', 'charStarts'] as const
 const newBucket = (start: number, span: Bucket['span']): Bucket => ({ start, span, projects: dict(), workspace: emptyPart(), skills: emptySkills(), dropped: 0, droppedBy: dict(), series: 0 })
-const emptyGuidance = (provider: string, role: GuidanceSeries['role']): GuidanceSeries => ({ provider, role, launches: 0, guidanceBytes: 0, guidanceChars: 0, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 })
+const emptyCatalog = (role: CatalogSeries['role'], workflow: CatalogSeries['workflow']): CatalogSeries => ({ role, workflow, starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0 })
+const emptyGuidance = (provider: string, role: GuidanceSeries['role'], workflow: GuidanceSeries['workflow']): GuidanceSeries => ({ provider, role, workflow, launches: 0, guidanceBytes: 0, guidanceChars: 0, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 })
 
 // ---------------------------------------------------------------------------
 // Labels: each from a fixed set. Anything else is "(other)", so a label never grows or carries what it shouldn't.
@@ -146,6 +148,9 @@ const TOOLS = new Set<string>([...HIVE_TOOLS, START_VIEW_METRIC])
 const PROVIDER_IDS = new Set<string>(PROVIDERS.map((p) => p.id))
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 const ROLES = new Set(['agent', 'assistant', 'api', 'viewer', 'unknown'])
+const WORKFLOWS = new Set<string>(['builder', 'reviewer', 'either', 'none'])
+/** A series' workflow side as saved: one Hive records, else `unknown` (saved before HI-2049, or not one it knows). */
+const workflowOf = (v: unknown): GuidanceSeries['workflow'] => (typeof v === 'string' && WORKFLOWS.has(v) ? (v as LaunchWorkflow) : 'unknown')
 const OUTCOMES = new Set(['ok', 'client-error', 'denied', 'server-error', 'cancelled', 'waiting'])
 const OTHER = '(other)'
 const inSet = (set: Set<string>, v: unknown): string => (typeof v === 'string' && set.has(v) ? v : OTHER)
@@ -243,14 +248,18 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
     const c = readCounts(s, GUIDANCE_COUNTS, ['skillsNotDelivered', 'skillsUnmeasured', 'customBytes', 'customChars', 'roleBytes', 'roleChars', 'modeBytes', 'modeChars'])
     if (!c || (s.role !== 'agent' && s.role !== 'assistant')) return
     const provider = inSet(PROVIDER_IDS, s.provider)
-    const key = `${provider} ${s.role}`
-    const g = part.guidance[key] ?? (room() ? (part.guidance[key] = emptyGuidance(provider, s.role)) : null)
+    const workflow = workflowOf(s.workflow)
+    const key = `${provider} ${s.role} ${workflow}`
+    const g = part.guidance[key] ?? (room() ? (part.guidance[key] = emptyGuidance(provider, s.role, workflow)) : null)
     if (g) for (const k of GUIDANCE_COUNTS) g[k] += c[k]
   })
   each(o.catalog, (s) => {
-    const c = readCounts(s, CATALOG_COUNTS)
-    if (!c || (s.role !== 'agent' && s.role !== 'assistant')) return
-    const g = part.catalog[s.role] ?? (room() ? (part.catalog[s.role] = { role: s.role, starts: 0, tools: 0, toolsBytes: 0 }) : null)
+    // Saved before HI-2049: bytes only, so none of its starts has its characters.
+    const c = readCounts(s, CATALOG_COUNTS, ['toolsChars', 'charStarts'])
+    if (!c || (s.role !== 'agent' && s.role !== 'assistant') || c.charStarts > c.starts) return
+    const workflow = workflowOf(s.workflow)
+    const key = `${s.role} ${workflow}`
+    const g = part.catalog[key] ?? (room() ? (part.catalog[key] = emptyCatalog(s.role, workflow)) : null)
     if (g) for (const k of CATALOG_COUNTS) g[k] += c[k]
   })
   return part
@@ -693,12 +702,12 @@ function mergePart(bucket: Bucket, a: PartData, b: PartData, capped: boolean, ow
     t.bytes += v.bytes
   }
   for (const [k, v] of Object.entries(b.guidance)) {
-    const t = a.guidance[k] ?? (room() ? (a.guidance[k] = emptyGuidance(v.provider, v.role)) : null)
+    const t = a.guidance[k] ?? (room() ? (a.guidance[k] = emptyGuidance(v.provider, v.role, v.workflow)) : null)
     if (!t) continue
     for (const f of GUIDANCE_COUNTS) t[f] += v[f] ?? 0
   }
   for (const [k, v] of Object.entries(b.catalog)) {
-    const t = a.catalog[k] ?? (room() ? (a.catalog[k] = { role: v.role, starts: 0, tools: 0, toolsBytes: 0 }) : null)
+    const t = a.catalog[k] ?? (room() ? (a.catalog[k] = emptyCatalog(v.role, v.workflow)) : null)
     if (!t) continue
     for (const f of CATALOG_COUNTS) t[f] += v[f]
   }
@@ -942,11 +951,16 @@ export function recordMcp(h: MetricsHandle | null, project: string | null, role:
   return true
 }
 
-/** The bridge's tool list as one session start sent it to its CLI. */
-export function recordCatalog(h: MetricsHandle | null, project: string | null, role: CatalogSeries['role'], c: { tools: unknown; toolsBytes: unknown }): boolean {
+/**
+ * The bridge's tool list as one session start sent it to its CLI, on the workflow side of the launch it reported for
+ * (HI-2049: that launch's own, `unknown` when Hive doesn't know it). A bridge from before HI-2049 sends no `toolsChars`:
+ * its start counts in `starts`, not `charStarts`.
+ */
+export function recordCatalog(h: MetricsHandle | null, project: string | null, role: CatalogSeries['role'], workflow: CatalogSeries['workflow'], c: { tools: unknown; toolsBytes: unknown; toolsChars?: unknown }): boolean {
   const tools = count(c.tools, MCP_REPORT_LIMITS.tools)
   const toolsBytes = count(c.toolsBytes, 10_000_000)
-  if (tools === null || toolsBytes === null || !Number.isInteger(tools) || !Number.isInteger(toolsBytes)) return false
+  const toolsChars = c.toolsChars === undefined ? undefined : count(c.toolsChars, 10_000_000)
+  if (tools === null || toolsBytes === null || toolsChars === null || !Number.isInteger(tools) || !Number.isInteger(toolsBytes) || (toolsChars !== undefined && !Number.isInteger(toolsChars))) return false
   try {
     const at = bucketOf(h)
     if (!at) return true
@@ -956,11 +970,16 @@ export function recordCatalog(h: MetricsHandle | null, project: string | null, r
       at.store.changed()
       return true
     }
-    const s = series(at.b, ownerOf(project), part.catalog, role, () => ({ role, starts: 0, tools: 0, toolsBytes: 0 }))
+    const side = workflowOf(workflow)
+    const s = series(at.b, ownerOf(project), part.catalog, `${role} ${side}`, () => emptyCatalog(role, side))
     if (s) {
       s.starts++
       s.tools += tools
       s.toolsBytes += toolsBytes
+      if (toolsChars !== undefined) {
+        s.toolsChars += toolsChars
+        s.charStarts++
+      }
     }
     at.store.changed()
   } catch (err) {
@@ -977,7 +996,8 @@ export function recordLaunch(h: MetricsHandle | null, project: string | null, g:
     const part = partOf(at.b, project)
     if (!part) return at.store.changed()
     const provider = inSet(PROVIDER_IDS, g.provider)
-    const s = series(at.b, ownerOf(project), part.guidance, `${provider} ${g.role}`, () => emptyGuidance(provider, g.role))
+    const workflow = workflowOf(g.workflow)
+    const s = series(at.b, ownerOf(project), part.guidance, `${provider} ${g.role} ${workflow}`, () => emptyGuidance(provider, g.role, workflow))
     if (s) {
       s.launches++
       for (const f of GUIDANCE_COUNTS) if (f !== 'launches') s[f] += Math.max(0, Math.floor(g[f]))

@@ -495,6 +495,10 @@
     "defaultMessage": "Tool replies",
     "description": "A measure in Performance → Compare of exports: the size of the replies of Hive's tools."
   },
+  "performance.compare.measure.exportToolListPerLaunch": {
+    "defaultMessage": "Tool list a launch",
+    "description": "A measure in Performance → Compare of exports (HI-2049): the size of the list of Hive's tools each session was given."
+  },
   "performance.compare.measure.guidanceBytes": {
     "defaultMessage": "Launch guidance",
     "description": "A measure in Performance → Compare: the size of the guidance Hive gave a session at launch."
@@ -587,6 +591,10 @@
     "defaultMessage": "Tool list",
     "description": "A measure in Performance → Compare: the size of the list of Hive's tools a session was given."
   },
+  "performance.compare.measure.toolListChars": {
+    "defaultMessage": "Tool list (characters)",
+    "description": "A measure in Performance → Compare: the size of the list of Hive's tools a session was given, in characters."
+  },
   "performance.compare.measureTip.apiCancelled": {
     "defaultMessage": "Requests the client gave up on.",
     "description": "Tooltip of the API cancelled measure in Performance → Compare."
@@ -634,6 +642,10 @@
   "performance.compare.measureTip.exportToolChars": {
     "defaultMessage": "Characters, per hour recorded.",
     "description": "Tooltip of the Tool replies measure in Performance → Compare of exports."
+  },
+  "performance.compare.measureTip.exportToolListPerLaunch": {
+    "defaultMessage": "The hive tools’ names, descriptions and schemas as each session’s CLI got them, in characters, on average (not per hour). Sessions from before Hive counted characters are left out.",
+    "description": "Tooltip of the Tool list a launch measure in Performance → Compare of exports. Keep hive (the tools' name)."
   },
   "performance.compare.measureTip.guidanceBytes": {
     "defaultMessage": "Core contract, project additions, the Assistant’s role and mode, and the skills’ catalog, at launch.",
@@ -726,6 +738,10 @@
   "performance.compare.measureTip.toolListBytes": {
     "defaultMessage": "The hive tools’ names, descriptions and schemas as the CLI got them.",
     "description": "Tooltip of the Tool list measure in Performance → Compare. Keep hive (the tools' name)."
+  },
+  "performance.compare.measureTip.toolListChars": {
+    "defaultMessage": "The same list in characters (UTF-16 code units). Unknown for a run from before Hive counted them.",
+    "description": "Tooltip of the Tool list (characters) measure in Performance → Compare."
   },
   "performance.compare.noScenarios": {
     "defaultMessage": "No scenarios.",
@@ -942,6 +958,10 @@
   "performance.compare.scopeName": {
     "defaultMessage": "{kind, select, project {project {project}} own {the workspace’s own work} other {the whole workspace}}",
     "description": "A scope of Performance → Compare, inside \"Different scopes: {base} and {run}.\": a project (its name), the workspace’s own work (no project’s: the Assistant, scripts), or the whole workspace."
+  },
+  "performance.compare.sideMeasure": {
+    "defaultMessage": "{measure} · {side, select, builder {builders} reviewer {reviewers} either {either role} none {no workflow role} other {role not recorded}}",
+    "description": "A measure of Performance → Compare of exports for one workflow role's launches (HI-2049): {measure} is the measure's name (\"Guidance a launch\"); then whose launches: builders', reviewers', agents that take either role, those with no workflow role (generalists, the Assistant), or launches recorded before Hive recorded the role. Glossary: builder, reviewer, either, workflow role."
   },
   "performance.compare.sizesHint": {
     "defaultMessage": "Sizes are exact bytes and characters of what Hive gave the sessions; tokens are only what a provider reported. Skills on disk are what was available, not what a model read. A ~ marks a change within the samples’ spread.",
@@ -1182,6 +1202,14 @@
   "performance.guidance.unmeasured": {
     "defaultMessage": "Skills marked ? couldn’t be measured.",
     "description": "Under the Guidance at launch table. Keep the ?: it is how those skills are marked in it."
+  },
+  "performance.guidance.workflow": {
+    "defaultMessage": "Workflow role",
+    "description": "Column header of the Guidance at launch table (HI-2049): the side of the workflow the launched agents took. Glossary: workflow role."
+  },
+  "performance.guidance.workflowSide": {
+    "defaultMessage": "{side, select, builder {Builder} reviewer {Reviewer} either {Either} none {None} other {Not recorded}}",
+    "description": "A cell of the Guidance at launch table's Workflow role column (HI-2049): builder, reviewer, either (builds or reviews), none (a generalist, the Assistant), or not recorded (launches from before Hive recorded it). Glossary: builder, reviewer, either."
   },
   "performance.heading": {
     "defaultMessage": "Performance",
