@@ -26,9 +26,10 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const AGENT_ONLY = ['work-on-card', 'review-agent-work', 'merge-ready', 'use-hive-api']
+const AGENT_ONLY = ['work-on-card', 'review-agent-work', 'merge-ready']
 const ASSISTANT_ONLY = ['coordinate-agents']
-const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note']
+// HI-2012 (022a921c8) made use-hive-api's audience all.
+const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-hive-api']
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome, codexHome]) fs.rmSync(d, { recursive: true, force: true })
@@ -98,7 +99,7 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note']
   check("a folder of the user's with a copy's name is left as it is", fs.readFileSync(path.join(codexDir, 'hive-handover', 'SKILL.md'), 'utf8').includes('MY OWN') && !fs.existsSync(path.join(codexDir, 'hive-handover', '.hive-copy')))
   check("Hive's copies are kept out of git", fs.readFileSync(path.join(proj, '.git', 'info', 'exclude'), 'utf8').includes('/.agents/skills/hive-*/'))
   const told = developer(codexLaunch(proj))
-  check('Codex is told the session contract: the board skills and their boundaries', /work-on-card skill/.test(told) && /review-agent-work/.test(told) && /Board rules\b.*\bhive_report_merge\b.*On hold is the user's/.test(told) && !/coordinate-agents/.test(told), told.slice(0, 300))
+  check('Codex is told the session contract: the board skills and their boundaries', /work-on-card skill/.test(told) && /review-agent-work/.test(told) && /Board rules\b.*\bhive_report_merge\b.*Never take a card out of On Hold unasked/.test(told) && !/coordinate-agents/.test(told), told.slice(0, 300))
   const status = await inv('workspace:refresh').then((w) => w.projects.find((p) => p.name === 'alpha').agents.find((a) => a.id === codex.id).live)
   check('the agent records what it launched with', /^[0-9a-f]{16}$/.test(status?.launched?.guidance ?? '') && !!status.launched.skills['work-on-card'], JSON.stringify(status?.launched))
   // What was delivered, not what was asked for: the user's own hive-handover kept Hive's handover out.

@@ -168,7 +168,7 @@ function mcp(config, msgs) {
     { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }
   ]).then((r) => [r.find((x) => x.id === 1), r.find((x) => x.id === 2)])
   const instructions = init?.result?.instructions ?? ''
-  check("the agents' instructions tell reviewing from working on a card, and name the skill", /asked to review or check one, use review-agent-work/.test(instructions) && /hive_start_review\b.*\breview (?:isn't|is not) working on it/.test(instructions), instructions.slice(0, 400))
+  check("the agents' instructions tell reviewing from working on a card, and name the skill", /asked to review or check one, use review-agent-work/.test(instructions) && /\bhive_start_review then hive_verdict\b/.test(instructions), instructions.slice(0, 400))
   const update = list?.result?.tools?.find((t) => t.name === 'hive_update_task')
   check('hive_update_task describes reviewing, and takes review', /reviewing isn't working on it/.test(update?.inputSchema?.properties?.review?.description ?? '') && JSON.stringify(update?.inputSchema?.properties?.review?.enum) === '["start","passed","failed"]', JSON.stringify(update?.inputSchema?.properties?.review))
   // The reviewer's launch carries the review skill (its own copy, in its launch plugin).
