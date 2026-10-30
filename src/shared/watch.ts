@@ -760,7 +760,7 @@ export const RELEASE_REASONS: readonly Released['why'][] = ['reassigned', 'revie
 const over = (r: Released): boolean => r.why === 'done' || r.why === 'laneEnded'
 
 /** What happened to a released card, for a wake line: "#354 was reassigned to B4", "#356 is blocked: "…"". */
-function releasedPart(r: Released, full: boolean): string {
+export function releasedPart(r: Released, full: boolean): string {
   const head =
     r.why === 'blocked'
       ? `${cardRef(r.number)} is blocked${full && r.detail ? `: "${[...r.detail].length > 120 ? `${[...r.detail].slice(0, 119).join('')}…` : r.detail}"` : ''}`

@@ -1,7 +1,7 @@
 import type { LaneState, LaneStatus, SessionStatus, TaskCard, TaskColumn } from './types'
 import { laneStatusText } from './lanes'
 import { columnLabel } from './tasks'
-import { brief, cardPart, WAKE_MAX_BYTES, WATCH_CHANGES, WATCH_MAX_CARDS, type CardChange, type WatchChange } from './watch'
+import { brief, cardPart, releasedPart, WAKE_MAX_BYTES, WATCH_CHANGES, WATCH_MAX_CARDS, type CardChange, type Released, type WatchChange } from './watch'
 import { cardRef } from './projectKeys'
 import { HISTORY } from './taskHistory'
 // Types only: agentWatch loads the translations, which hive-mcp (toolReplies imports this) never does.
@@ -277,8 +277,10 @@ export interface LaneAgentHit {
  * what an agent asks) give way first, then labels shorten to the lane's id, then each lane is only counted, the cards
  * named in a few words and the waiting agents by name.
  */
-export function laneWakeLine(hits: readonly LaneHit[], more: { cards?: readonly CardChange[]; waits?: readonly WaitHit[]; watching?: boolean; agents?: readonly LaneAgentHit[]; following?: boolean } = {}): string {
+export function laneWakeLine(hits: readonly LaneHit[], more: { cards?: readonly CardChange[]; released?: readonly Released[]; waits?: readonly WaitHit[]; watching?: boolean; agents?: readonly LaneAgentHit[]; following?: boolean } = {}): string {
   const cards = more.cards ?? []
+  // Cards beside the lanes that left the watch (HI-2153: in Done), first: "#12 is in Done (your watch on it ended)".
+  const released = more.released ?? []
   const waits = more.waits ?? []
   const agents = more.agents ?? []
   const asks = waits.length > 0 || hits.some((h) => h.parts.some((p) => p.event === 'paused-user'))
@@ -287,14 +289,14 @@ export function laneWakeLine(hits: readonly LaneHit[], more: { cards?: readonly 
   const join = (lanes: string[], cs: string[], ws: string[], as: string[]): string => [...lanes, cs.join('; '), ws.join('; '), as.join('; ')].filter(Boolean).join(' | ')
   for (const detail of [120, 50, 0]) {
     for (const short of [false, true]) {
-      const line = `[Hive] ${join(hits.map((h) => `Lane ${short ? h.id : h.label}: ${h.parts.map((p) => part(p, detail)).join('; ')}`), cards.map((c) => cardPart(c, detail)), waits.map((w) => waitPart(w, detail)), agents.map((a) => a.text(detail)))}.${TAIL}`
+      const line = `[Hive] ${join(hits.map((h) => `Lane ${short ? h.id : h.label}: ${h.parts.map((p) => part(p, detail)).join('; ')}`), [...released.map((r) => releasedPart(r, detail > 0)), ...cards.map((c) => cardPart(c, detail))], waits.map((w) => waitPart(w, detail)), agents.map((a) => a.text(detail)))}.${TAIL}`
       if (jsonBytes(line) <= WAKE_MAX_BYTES) return line
     }
   }
   const lanes = hits.length ? [`${hits.length} lane${hits.length === 1 ? '' : 's'} changed: ${hits.map((h) => `${h.id} (${h.parts.map((p) => (p.n ? `${cardRef(p.n)} ${p.event}` : p.event)).join(', ')})`).join(', ')}`] : []
-  const counts = `[Hive] ${join(lanes, cards.map(brief), waits.length ? [`waiting for the user: ${waits.map((w) => `${w.name} (${w.project})`).join(', ')}`] : [], agents.length ? [`agents changed: ${agents.map((a) => `${a.agent.name} (${a.agent.project}) ${a.event}`).join(', ')}`] : [])}`
+  const counts = `[Hive] ${join(lanes, [...released.map((r) => releasedPart(r, false)), ...cards.map(brief)], waits.length ? [`waiting for the user: ${waits.map((w) => `${w.name} (${w.project})`).join(', ')}`] : [], agents.length ? [`agents changed: ${agents.map((a) => `${a.agent.name} (${a.agent.project}) ${a.event}`).join(', ')}`] : [])}`
   if (jsonBytes(counts + `.${TAIL}`) <= WAKE_MAX_BYTES) return `${counts}.${TAIL}`
-  const what = [hits.length ? `${hits.length} lane${hits.length === 1 ? '' : 's'} changed` : '', cards.length ? `${cards.length} of your cards changed` : '', waits.length ? `${waits.length} agent${waits.length === 1 ? ' is' : 's are'} waiting for the user` : '', agents.length ? `${agents.length} of your agents changed` : ''].filter(Boolean).join(', ')
+  const what = [hits.length ? `${hits.length} lane${hits.length === 1 ? '' : 's'} changed` : '', cards.length + released.length ? `${cards.length + released.length} of your cards changed` : '', waits.length ? `${waits.length} agent${waits.length === 1 ? ' is' : 's are'} waiting for the user` : '', agents.length ? `${agents.length} of your agents changed` : ''].filter(Boolean).join(', ')
   return `[Hive] ${what}: list them (hive_lane list, hive_list_projects, hive_agent_activity) and read their cards.${TAIL}`
 }
 
@@ -305,10 +307,12 @@ export const laneWatchLabel = (cond: LaneWatchCondition, cards: readonly number[
   `${cond.ids === 'all' ? 'Waiting on all running lanes' : `Waiting on ${cond.ids.length === 1 ? `lane ${cond.ids[0]}` : `${cond.ids.length} lanes`}`}${cards.length || agents.length ? ` and ${[...(cards.length ? [cardList(cards)] : []), ...agents.map((a) => a.name)].join(', ')}` : ''}`
 
 /** The line typed when a lane watch's limit passes with nothing to tell. */
-export function laneLimitLine(cond: LaneWatchCondition, minutes: number, cards: readonly number[] = [], agents: readonly Pick<WatchedAgent, 'name'>[] = []): string {
+export function laneLimitLine(cond: LaneWatchCondition, minutes: number, cards: readonly number[] = [], agents: readonly Pick<WatchedAgent, 'name'>[] = [], released: readonly Released[] = []): string {
   const dur = minutes >= 60 ? `${Math.round((minutes / 60) * 10) / 10} h` : `${minutes} min`
   const also = [...(cards.length ? [cardList(cards)] : []), ...agents.map((a) => a.name)]
-  return `[Hive] Nothing to tell on ${cond.ids === 'all' ? 'the running lanes' : cond.ids.length === 1 ? `lane ${cond.ids[0]}` : `${cond.ids.length} lanes`}${also.length ? ` or ${also.join(', ')}` : ''} in ${dur}: your lane watch has ended. Check them (hive_lane list${agents.length ? ', hive_agent_activity' : ''}), then watch again, or tell the user (hive_notify) if one seems stuck.`
+  // Cards beside the lanes that left the watch meanwhile (HI-2153: in Done), told first.
+  const left = released.length ? ` ${released.map((r) => releasedPart(r, false)).join('; ')}. Else nothing` : ' Nothing'
+  return `[Hive]${left} to tell on ${cond.ids === 'all' ? 'the running lanes' : cond.ids.length === 1 ? `lane ${cond.ids[0]}` : `${cond.ids.length} lanes`}${also.length ? ` or ${also.join(', ')}` : ''} in ${dur}: your lane watch has ended. Check them (hive_lane list${agents.length ? ', hive_agent_activity' : ''}), then watch again, or tell the user (hive_notify) if one seems stuck.`
 }
 
 /** What became of a lane watch's cards beside its lanes (#726): those it has now, kept from the last lane watch, the ones they replace, and kept ones left out (done or gone). */
