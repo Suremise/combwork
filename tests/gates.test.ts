@@ -716,6 +716,54 @@ describe('the Assistant puts a card in Doing with someone on it, or nobody by th
     })
   }
 
+  // HR1's round 1: through the rules, the card as the start's write leaves it decides, not the agent read before it.
+  for (const reason of [undefined, 'The user takes it']) {
+    it(`its agent taken off as the start is written: decided again on the card as it is, ${reason ? "the user's reason recorded in one Override" : 'refused, nothing moved'}`, async () => {
+      advanced.set(ENFORCE, true)
+      const { w, repo } = await workspace(PAIR)
+      const card = await create(w)
+      await update(w, card, { agent: 'a1' })
+      const { workspace: facade } = await import('../src/main/workspace')
+      const wf = (await inWorkspace(w, () => workflowFor(facade, repo)))!
+      let once = true
+      // The runtime's own hook, just before its write: the user takes a1 off then.
+      wf.cfg.hooks = {
+        beforeWrite: async (intent: string) => {
+          if (intent !== 'move' || !once) return
+          once = false
+          await update(w, card, { agent: '' })
+        }
+      }
+      try {
+        const result = await update(w, card, { column: 'doing', ...(reason ? { override: { reason } } : {}) }, assistant).catch((e) => e)
+        expect(once).toBe(false)
+        const now = await inWorkspace(w, () => tasks.getTask(card, w))
+        if (reason) {
+          expect(result).toMatchObject({ column: 'doing', agent: null })
+          expect(overrides(w, card)).toEqual([expect.objectContaining({ rules: ['move.doingNobody'], reason })])
+          expect(facts(w, card).find((f) => f.kind === 'Started')).toMatchObject({ data: { builder: 'user' } })
+        } else {
+          expect(result.refusal).toMatchObject({ rule: 'move.doingNobody' })
+          expect([now.column, now.agent]).toEqual(['todo', null])
+          expect(kinds(w, card)).not.toContain('Started')
+        }
+      } finally {
+        wf.cfg.hooks = undefined
+      }
+    })
+  }
+
+  it('a move into Doing that also changes its project leaves nobody on it: refused, through the rules too', async () => {
+    advanced.set(ENFORCE, true)
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { agent: 'a1' })
+    const err = await update(w, card, { column: 'doing', project: 'p-card' }, assistant).catch((e) => e)
+    expect(err.refusal).toMatchObject({ rule: 'move.doingNobody' })
+    const now = await inWorkspace(w, () => tasks.getTask(card, w))
+    expect([now.column, now.project, now.agent]).toEqual(['todo', 'p', 'a1'])
+  })
+
   it('a start that also skips another rule names both, and one reason records both in one Override', async () => {
     advanced.set(ENFORCE, true)
     const { w } = await workspace(PAIR)
