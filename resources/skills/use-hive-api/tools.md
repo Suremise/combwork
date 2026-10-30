@@ -137,18 +137,18 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 
 ## Agents' settings
 
-`hive_add_agent`, `hive_update_agent`: an agent's model, effort, context and mode are its connection's; its CLI follows. `provider`, `model`, `effort`, `mode`, `context200k` are refused.
+`hive_add_agent`, `hive_update_agent`: model, effort, context and mode are its connection's, and its CLI; `provider`, `model`, `effort`, `mode`, `context200k` are refused.
 - `connection`: id or name (`hive_connection`). Default or empty: the first usable here.
 - `workflowRole`: builder, reviewer, either (never its own cards) or generalist (no lanes or reviews). Default: from its name.
-- `mcpServers`: `[]` none, `["*"]` all (default); hive is always given.
-- A running agent takes a change when restarted; another CLI's connection only while stopped. One whose connection is gone or off here runs on its CLI's first usable one, saying so.
+- `mcpServers`: `[]` none, `["*"]` all (default); hive always.
+- A running agent takes a change when restarted; another CLI's connection only while stopped. A connection gone or off here: its CLI's first usable one runs it.
 - `hive_start_agent`: a folder new to its CLI asks the user to trust it.
 
 ## Connections (`hive_connection`)
 
 - A named setup (model, effort, context, mode, arguments) on an account (the user's alone).
-- `list`: id, account, CLI and values each.
-- `add` on an existing `account`; `update` a `connection`: each value given set, `""` the CLI's own. Need Change settings and the user's OK; `hive_undo` doesn't undo them.
+- `list`: id, account, CLI, values.
+- `add` on an existing `account`; `update` a `connection` (`""`: the CLI's own). Need Change settings and the user's OK; not undoable.
 
 ## Documents (`hive_doc_outline` and `hive_read_section`)
 
