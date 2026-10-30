@@ -20,6 +20,8 @@
   "session.compact.stopped": "智能体在“压缩”发出前已停止。",
   "session.compact.userTyped": "Hive 发送 Compact 时你在代理的终端中输入了内容，因此未发送：你输入的内容会保留。",
   "session.compact.waiting": "智能体正在等你回答。请在它完成后再压缩。",
+  "session.connection.fallback": "{why, select, missing {为它选择的连接已被移除} other {它的连接 {wanted} 在此工作区中已停用}}，因此它已使用 {name}（其 CLI 在此处的第一个可用连接）启动。请在它的“智能体设置”中另选一个。",
+  "session.connection.fallbackTitle": "{agent} 正在使用另一个连接运行",
   "session.error.agentGone": "该智能体已不存在。",
   "session.error.inUseElsewhere": "另一个程序打开了它的会话记录。请关闭后重试。",
   "session.error.noAgents": "此项目还没有智能体。请先添加一个。",

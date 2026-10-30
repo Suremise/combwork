@@ -1,6 +1,7 @@
 {
   "agents.add.add": "Add Agent",
   "agents.add.checking": "Checking which coding agents are installed, for the default provider (Automatic)…",
+  "agents.add.checkingConnection": "Finding out which coding agents are installed, to choose the first connection that can run…",
   "agents.add.failed": "Could not add agent",
   "agents.add.full": "{limit} Remove one first.",
   "agents.add.nameTaken": "{project} already has an agent called {agent}: agent names are unique across the workspace.",
@@ -340,6 +341,7 @@
   "agents.settings.appliesNext": "Changes apply the next time {agent} starts; the running session keeps its settings until then.",
   "agents.settings.note": "Note",
   "agents.settings.noteNone": "Optional: what it is for, in your words",
+  "agents.settings.otherCliStopped": "Another CLI's connection can be chosen once {agent} is stopped: its conversations stay with {cli}.",
   "agents.settings.save": "Save",
   "agents.settings.saving": "Saving…",
   "agents.settings.stopToChange": "— stop {agent} to change it",

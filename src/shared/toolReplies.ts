@@ -980,6 +980,35 @@ export interface TemplateRowPublic {
   problem?: string
 }
 
+/** A connection as the Agent API gives it (HI-2108): the setup agents choose, on an account. */
+export interface ConnectionPublic {
+  id: string
+  name: string
+  account: string
+  cli: string | null
+  model?: string
+  effort?: string
+  context200k?: boolean
+  mode?: string
+  extraArgs?: string
+  usable?: false
+}
+
+/** A connection's values, short: "opus · high · 200K · plan", or "the CLI's defaults". */
+const connectionValuesText = (c: ConnectionPublic): string => [c.model, c.effort, c.context200k ? '200K' : '', c.mode, c.extraArgs ? `args ${c.extraArgs}` : ''].filter(Boolean).join(' · ') || "the CLI's defaults"
+
+/** hive_connection list (HI-2108): one row per connection, by account, those not usable here marked; then the accounts with none. */
+export function connectionListText(r: { connections: ConnectionPublic[]; accounts: { id: string; name: string; cli: string; on?: boolean }[] }): string {
+  const rows = r.connections.map((c) => `${c.name} (id ${c.id}) on ${c.account}, ${c.cli ?? 'unknown CLI'}: ${connectionValuesText(c)}${c.usable === false ? '. Not usable here: its account is off' : ''}`)
+  const bare = r.accounts.filter((a) => !r.connections.some((c) => c.account === a.name)).map((a) => `Account ${a.name} (id ${a.id}), ${a.cli}: no connections${a.on === false ? ', off here' : ''}`)
+  return [...rows, ...bare].join('\n') || 'No connections: the user adds an account in Settings → Accounts & Connections.'
+}
+
+/** hive_connection add or update (HI-2108): what it is now. */
+export function connectionChangedText(verb: 'Made' | 'Changed', c: ConnectionPublic): string {
+  return `${verb} ${c.name} (id ${c.id}) on ${c.account}: ${connectionValuesText(c)}.${verb === 'Changed' ? ' Running agents on it take it when restarted.' : ''}`
+}
+
 /** hive_template list (HI-1502): a line per template, with what load needs to name it (scope and file, from). */
 export function templateListText(r: { project: string; templates: TemplateRowPublic[] }): string {
   if (!r.templates.length) return `No templates for ${r.project}.`

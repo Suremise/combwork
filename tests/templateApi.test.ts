@@ -199,7 +199,8 @@ describe('loading a template for the Assistant, and undoing it', () => {
     const { group } = await load(alpha, 'team-3x3.json')
     // An agent the load made, edited since: the agents stay; the options go back.
     const made = cfgOf(alpha).agents[0]
-    await run(() => updateAgent(alpha, made.id, { model: 'sonnet' }))
+    // (Its role: HI-2108's undo compares an agent's own settings, its connection among them, never a model of its own.)
+    await run(() => updateAgent(alpha, made.id, { workflowRole: 'generalist' }))
     const edited = await undo(group)
     expect(edited.map((x) => [x.undone, x.skipped.map((s) => s.why)])).toEqual([
       [['workflow'], []],

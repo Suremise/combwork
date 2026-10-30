@@ -17,7 +17,6 @@ import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from
 import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES, SLOT_COPY_DEFAULT } from './defaults'
 import { SLOT_COPY_TEXT } from './slotDefaults'
 import { PRICES_CHECKED } from './prices'
-import { isCliOwnMode } from './cliOwnMode'
 import { ADVANCED_DEFS, advancedDef, advancedTakesText, advancedText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
 import { language, msg } from './i18n'
 import { FORM_GROUPS, takesOption, type OptionKey } from './workflow/options'
@@ -25,7 +24,7 @@ import { OPTION_TEXT, optionTitle, VALUE_TEXT } from './workflow/optionTexts'
 import { writeWorkflow } from './workflow/projectWorkflow'
 import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
-import { PROVIDERS, dangerModes, defaultProviderSettings, modeOption, permissionLabel, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
+import { PROVIDERS, dangerModes, defaultProviderSettings, permissionLabel, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
 import { LEGACY_CONSUMED, ownOrLegacy } from './workflow/preferences'
 import { EMPTY_HIVE, EMPTY_WORKSPACE, resolvePoint } from './commands'
 
@@ -75,9 +74,7 @@ interface Row {
   confirmOn?: { title: Text; message: Text; detail?: Text }
   /** Why it can't be changed now (another setting it depends on is off), shown under it; null when it can. */
   disabledBy?: (s: AppSettings) => Text | null
-  /** One field of the Assistant's settings with a provider (settings.assistant.providers[<id>]). */
-  assistantProvider?: ProviderId
-  /** Not a row of its own in Settings: drawn as part of another (the Assistant's "With <provider>", Advanced's list). */
+  /** Not a row of its own in Settings: drawn as part of another (Advanced's list). */
   hidden?: boolean
   /** An advanced value (#367, shared/advanced.ts): its id there, and whether this entry is advanced.json's or the workspace's own. */
   advanced?: { id: string; scope: 'app' | 'workspace' }
@@ -92,11 +89,6 @@ interface Row {
 /** A permission mode's name, as text: the window's words where the descriptor has them (#885). */
 function modeLabel(m: Pick<ModeOption, 'label' | 'text'>): TextPart {
   return m.text?.label ?? m.label
-}
-/** The name of a provider's mode by its id (the id itself when the provider has no such mode). */
-function modeLabelOf(provider: ProviderId, mode: string): TextPart {
-  const m = modeOption(provider, mode)
-  return m ? modeLabel(m) : mode
 }
 
 /** Advanced's values (#367) as catalog rows, drawn by Settings → Advanced's list: one each, and a workspace's own where it takes one. */
@@ -127,35 +119,6 @@ function advancedRows(): Row[] {
       }
     ]
   })
-}
-
-/** The Assistant's model, effort, mode, context and arguments with one provider, a field each (Settings → Assistant → With <provider>). */
-function assistantProviderRows(p: ProviderDescriptor): Row[] {
-  const row = (key: string, title: Text, desc: Text): Row => ({ section: 'assistant', assistantProvider: p.id, hidden: true, key: `${p.id}.${key}`, title, desc, type: 'custom' })
-  const provider = p.name
-  return [
-    row('model', msg({ id: 'settings.assistantProvider.model.title', defaultMessage: 'Model', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's model." }), withValues(msg({ id: 'settings.assistantProvider.model.desc', defaultMessage: 'The model when the Assistant runs {provider}. Empty follows Settings → {provider} → Default model.', description: "A field of Settings → Assistant → With <provider>: what it is. {provider} is a coding agent's name." }), { provider })),
-    row('effort', msg({ id: 'settings.assistantProvider.effort.title', defaultMessage: 'Effort', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's reasoning effort." }), withValues(msg({ id: 'settings.assistantProvider.effort.desc', defaultMessage: 'Its reasoning effort with {provider}. Empty follows Settings → {provider} → Default effort.', description: "A field of Settings → Assistant → With <provider>: what it is. {provider} is a coding agent's name." }), { provider })),
-    row(
-      'permissionMode',
-      msg({ id: 'settings.assistantProvider.permissionMode.title', defaultMessage: 'Permission mode', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's permission mode." }),
-      withValues(msg({ id: 'settings.assistantProvider.permissionMode.desc', defaultMessage: 'Its permission mode with {provider}. Empty is {mode}, where {provider} approves safe actions itself and only asks about risky ones.', description: "A field of Settings → Assistant → With <provider>: what it is. {provider} is a coding agent's name. {mode} is a permission mode's name." }), { provider, mode: modeLabelOf(p.id, p.assistantMode) })
-    ),
-    ...(p.capabilities.contextLimit
-      ? [
-          row(
-            'use200kContext',
-            msg({ id: 'settings.assistantProvider.use200kContext.title', defaultMessage: 'Use 200K context (instead of 1M)', description: "A field's title in Settings → Assistant → With <provider>. 200K and 1M are numbers of tokens." }),
-            withValues(msg({ id: 'settings.assistantProvider.use200kContext.desc', defaultMessage: 'A 200K-token context window for it with {provider}. Empty follows Settings → {provider}.', description: "A field of Settings → Assistant → With <provider>: what it is. {provider} is a coding agent's name." }), { provider })
-          )
-        ]
-      : []),
-    row(
-      'extraArgs',
-      msg({ id: 'settings.assistantProvider.extraArgs.title', defaultMessage: 'Extra arguments', description: "A field's title in Settings → Assistant → With <provider>: command-line arguments." }),
-      withValues(msg({ id: 'settings.assistantProvider.extraArgs.desc', defaultMessage: 'Additional {cli} command-line arguments when the Assistant runs {provider}.', description: "A field of Settings → Assistant → With <provider>: what it is. {provider} is a coding agent's name. {cli} is the CLI's command (claude, codex, copilot): keep it." }), { provider, cli: p.cliName })
-    )
-  ]
 }
 
 /** A select setting's choice: its value, its label in English (the tools) and as Settings shows it. */
@@ -462,19 +425,11 @@ const APP_ROWS: Row[] = [
   // Assistant
   {
     section: 'assistant',
-    key: 'connection',
-    title: msg({ id: 'settings.assistant.connection.title', defaultMessage: 'Connection (this workspace)', description: "A setting's title (Settings → Assistant): which connection the open workspace's Assistant runs on." }),
-    desc: msg({ id: 'settings.assistant.connection.desc', defaultMessage: "Which connection the Assistant of the open workspace runs on. The workspace's default unless you choose one.", description: 'What the setting "Connection (this workspace)" does, under its title (Settings → Assistant).' }),
-    type: 'custom'
-  },
-  {
-    section: 'assistant',
     key: 'mcp',
     title: msg({ id: 'settings.assistant.mcp.title', defaultMessage: 'MCP servers (this workspace)', description: "A setting's title (Settings → Assistant): which of the open workspace's MCP servers the Assistant gets. MCP is a protocol's name: keep it." }),
     desc: msg({ id: 'settings.assistant.mcp.descAdded', defaultMessage: "The workspace's MCP servers added for the Assistant are chosen in its own view (the Hive Assistant on the activity bar), as a project's are in its MCP tab.", description: 'What the setting "MCP servers (this workspace)" says, under its title (Settings → Assistant, HI-2059): the servers are added in the Hive Assistant’s view now. "MCP tab" is a place in Hive: keep it as Hive shows it.' }),
     type: 'custom'
   },
-  { section: 'assistant', key: 'provider', title: msg({ id: 'settings.assistant.provider.title', defaultMessage: 'Provider', description: "A setting's title (Settings → Assistant)." }), desc: msg({ id: 'settings.assistant.provider.desc', defaultMessage: 'The coding agent the Assistant runs, unless a workspace chooses another.', description: 'What the setting "Provider" does, under its title (Settings → Assistant).' }), tip: msg({ id: 'settings.assistant.provider.tip', defaultMessage: 'The Assistant is independent of your project agents: a Codex Assistant can look after Claude Code agents, and the other way round.', description: 'The info tip of the setting "Provider" (Settings → Assistant): more on what it does and when it applies.' }), type: 'custom' },
   {
     section: 'assistant',
     key: 'control',
@@ -519,30 +474,6 @@ const APP_ROWS: Row[] = [
   { section: 'assistant', key: 'compactSuggestTokens', title: msg({ id: 'settings.assistant.compactSuggestTokens.title', defaultMessage: 'Highlight Compact over', description: "A setting's title (Settings → Assistant)." }), desc: msg({ id: 'settings.assistant.compactSuggestTokens.desc', defaultMessage: "Context size, in tokens, at which the Assistant's Compact button and the context count in its footer turn orange. Never: they never do.", description: 'What the setting "Highlight Compact over" does, under its title (Settings → Assistant).' }), tip: msg({ id: 'settings.assistant.compactSuggestTokens.tip', defaultMessage: "The Assistant usually runs a bigger context than your agents, so it has its own threshold (your agents' is Settings → Sessions → Suggest compacting above). Compacting summarises the conversation so every later message is cheaper; the full history stays in the transcript.", description: 'The info tip of the setting "Highlight Compact over" (Settings → Assistant): more on what it does and when it applies.' }), type: 'number', min: 1000, max: 2000000, step: 10000, off: msg({ id: 'settings.assistant.compactSuggestTokens.off', defaultMessage: 'Never', description: 'The Off box of the number setting "Highlight Compact over" (Settings → Assistant): ticked, the setting is off (0).' }) },
   { section: 'assistant', key: 'mode', title: msg({ id: 'settings.assistant.mode.title', defaultMessage: 'Default mode', description: "A setting's title (Settings → Assistant)." }), desc: msg({ id: 'settings.assistant.mode.desc', defaultMessage: 'How the Assistant works in a new conversation (Coordinator, Planner, QA triager, Release manager, or your own), unless a workspace chooses another.', description: 'What the setting "Default mode" does, under its title (Settings → Assistant).' }), tip: msg({ id: 'settings.assistant.mode.tip', defaultMessage: 'Modes are Markdown files in each workspace (.hive/modes): edit them, or add your own, in the Hive Assistant view (the crown on the left). The panel switches mode at once, keeping the conversation.', description: 'The info tip of the setting "Default mode" (Settings → Assistant): more on what it does and when it applies.' }), type: 'custom' },
   { section: 'assistant', key: 'journal', title: msg({ id: 'settings.assistant.journal.title', defaultMessage: 'Journal', description: "A setting's title (Settings → Assistant): the Assistant's journal, its memory across sessions." }), desc: msg({ id: 'settings.assistant.journal.desc', defaultMessage: "The Assistant keeps a journal in this workspace: decisions, plans, events and what it learned, recalled a few lines at a time instead of reading a long handover. Hive adds facts: lanes, merges, unexpected closes.", description: 'What the setting "Journal" does, under its title (Settings → Assistant).' }), tip: msg({ id: 'settings.assistant.journal.tip', defaultMessage: "For this workspace. Turning it off keeps the entries; Delete Journal… removes them. The Assistant's journal tools follow a change at its next start; it is told at once.", description: 'The info tip of the setting "Journal" (Settings → Assistant): more on what it does and when it applies.' }), type: 'custom', wide: true },
-  ...PROVIDERS.map(
-    (p): Row => ({
-      section: 'assistant',
-      key: `provider:${p.id}`,
-      title: withValues(msg({ id: 'settings.assistant.withProvider.title', defaultMessage: 'With {provider}', description: "A setting's title (Settings → Assistant): the Assistant's model, effort and mode when it runs this provider. {provider} is a coding agent's name." }), { provider: p.name }),
-      desc: withValues(
-        msg({
-          id: 'settings.assistant.withProvider.desc',
-          defaultMessage: "The model, effort, permission mode{context, select, yes {, context} other {}} and extra arguments when the Assistant runs {provider}. Default follows {provider}'s own settings, except the mode: {mode}, where {provider} approves safe actions itself and only asks about risky ones.",
-          description: 'What the setting "With <provider>" does (Settings → Assistant). {provider} is a coding agent\'s name, {mode} a permission mode\'s name; {context} is yes when the provider has a context-size choice.'
-        }),
-        { provider: p.name, mode: modeLabelOf(p.id, p.assistantMode), context: p.capabilities.contextLimit ? 'yes' : 'no' }
-      ),
-      tip: msg({
-        id: 'settings.assistant.withProvider.tip',
-        defaultMessage: "By default it uses the same model and effort as your agents. A lighter model or low effort saves tokens but makes it careless (for example, saying it will check on an agent later and never doing so). Its default mode is the one your agents default to, so it rarely asks. Hive's own tools never ask: what they may do is set by Control above.",
-        description: 'The info tip of the setting "With <provider>" (Settings → Assistant).'
-      }),
-      type: 'custom',
-      wide: true
-    })
-  ),
-  // Each field of those rows, for the tools (the row above draws them together).
-  ...PROVIDERS.flatMap(assistantProviderRows),
   // Agent API
   { section: 'mcpCatalogs', key: 'sources', title: msg({ id: 'settings.mcpCatalogs.sources.title', defaultMessage: 'Catalogues', description: "A setting's title (Settings → MCP Catalogues, HI-545): the catalogues listed, each on or off." }), desc: msg({ id: 'settings.mcpCatalogs.sources.desc', defaultMessage: "Each catalogue is a catalog.json at an https:// or file:// address. Turned off, its servers aren't listed (those installed stay). Hive reads them only when the Catalogue opens or you refresh it, and checks every download against its catalogue.", description: 'What the setting "Catalogues" does, under its title (Settings → MCP Catalogues, HI-545). Keep catalog.json, https:// and file:// as they are.' }), type: 'custom', wide: true },
   { section: 'agentApi', key: 'status', title: msg({ id: 'settings.agentApi.status.title', defaultMessage: 'Status', description: "A setting's title (Settings → Agent API)." }), tip: msg({ id: 'settings.agentApi.status.tip', defaultMessage: 'Whether the Agent API is listening.', description: 'The info tip of the setting "Status" (Settings → Agent API): more on what it does and when it applies.' }), type: 'custom' },
@@ -919,16 +850,13 @@ const ACTIONS = new Set([
   'project.agents',
   'project.metadata',
   'project.reset',
-  ...PROVIDERS.map((p) => `${p.id}.status`),
-  // The Assistant's "With <provider>" rows: their fields are entries of their own (assistant.<provider>.<key>).
-  ...PROVIDERS.map((p) => `assistant.provider:${p.id}`)
+  ...PROVIDERS.map((p) => `${p.id}.status`)
 ])
 
 /** Custom controls whose value the tools can set (checked by checkSettingValue). */
 const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
   'notifications.chimeSound': 'select',
   'general.language': 'select',
-  'assistant.provider': 'select',
   'assistant.mode': 'text',
   ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
   'board.colors': 'table',
@@ -1055,7 +983,7 @@ const DOCS_BY_ID: Record<string, string> = {
 }
 
 /** Where a setting is, in English (the tools name it so) or as the user sees it: "Settings → Sessions → Suggest compacting above". */
-function settingPathOf(e: Pick<SettingEntry, 'section' | 'assistantProvider' | 'text' | 'workflowLevel' | 'slotLevel'>, scope: SettingScope, say: (t: TextPart) => string): string {
+function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel' | 'slotLevel'>, scope: SettingScope, say: (t: TextPart) => string): string {
   const where = (list: SettingsSectionInfo[]): string => {
     const found = list.find((x) => x.id === e.section)
     return found ? say(found.text.label) : e.section
@@ -1067,7 +995,6 @@ function settingPathOf(e: Pick<SettingEntry, 'section' | 'assistantProvider' | '
   const level = e.workflowLevel?.level ?? (e.slotLevel === 'global' || e.slotLevel === 'workspace' ? e.slotLevel : null)
   if (level) return say(withValues(PATHS.level, { section: say(SETTINGS_SECTIONS.find((x) => x.id === 'workflow')!.text.label), part: say(level === 'global' ? LEVEL_PART.global : LEVEL_PART.workspace), title }))
   if (scope === 'project') return say(withValues(PATHS.project, { section: where(PROJECT_SETTINGS_SECTIONS), title }))
-  if (e.assistantProvider) return say(withValues(PATHS.assistant, { assistant: where(SETTINGS_SECTIONS.filter((x) => x.id === 'assistant')), provider: providerDescriptor(e.assistantProvider).name, title }))
   return say(withValues(PATHS.settings, { section: where(SETTINGS_SECTIONS), title }))
 }
 
@@ -1083,7 +1010,6 @@ const PATHS = {
   project: msg({ id: 'settings.path.project', defaultMessage: 'Project Settings → {section} → {title}', description: "Where a project's setting is: Project Settings, its section and its title." }),
   level: msg({ id: 'settings.path.level', defaultMessage: 'Settings → {section} → {part} → {title}', description: 'Where a workflow default is: Settings, its section (Version Control), its part (Hive defaults or Workspace defaults) and its title.' }),
   versionControl: msg({ id: 'settings.path.versionControl', defaultMessage: 'Version Control → Workflow → {title}', description: "Where a project's workflow option is: the project's Version Control tab, its Workflow section, and the option's title (glossary 2.1)." }),
-  assistant: msg({ id: 'settings.path.assistant', defaultMessage: 'Settings → {assistant} → With {provider} → {title}', description: "Where a field of the Assistant's settings with a provider is. {assistant} is the Assistant section's name, {provider} a coding agent's name." })
 }
 
 const toOption = (o: RowOption): SettingOption => ({ value: o.value, label: englishText(o.label), text: o.label })
@@ -1097,7 +1023,7 @@ function entry(row: Row, id: string, scope: SettingScope, docs: string): Setting
   const restart = row.advanced ? (applies === 'sessions' ? 'sessions' : applies === 'restart' ? 'hive' : undefined) : RESTART.find(([re]) => re.test(id))?.[1]
   const { title, desc, tip, options, off, confirmOn, englishTitle, ...rest } = row
   const text: SettingEntry['text'] = { title, desc: desc ?? null, tip: tip ?? null, ...(off ? { off } : {}), ...(confirmOn ? { confirmOn } : {}), ...(englishTitle ? { englishTitle } : {}) }
-  const path = settingPathOf({ section: row.section, assistantProvider: row.assistantProvider, text }, scope, englishText)
+  const path = settingPathOf({ section: row.section, text }, scope, englishText)
   return {
     ...rest,
     id,
@@ -1169,7 +1095,6 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
     if (e.key === PLATFORM_SETTING_KEY) return project.platform ?? project.workflow?.platform ?? null
     return (project as unknown as Record<string, unknown>)[e.key]
   }
-  if (e.assistantProvider) return (settings.assistant?.providers?.[e.assistantProvider] as unknown as Record<string, unknown> | undefined)?.[fieldKey(e)] ?? ''
   if (e.provider) {
     const v = (providerSettings(settings, e.provider) as unknown as Record<string, unknown>)[e.key]
     // A fallback list nobody edited is Hive's own (an empty list).
@@ -1198,7 +1123,6 @@ export function settingDefault(e: SettingEntry): unknown {
   if (e.advanced) return e.advanced.scope === 'workspace' ? null : advancedDef(e.advanced.id)?.default
   if (e.workflowLevel || e.slotLevel) return 'inherit'
   if (e.scope === 'project') return e.workflow ? 'inherit' : (DEFAULT_PROJECT_CONFIG as unknown as Record<string, unknown>)[e.key]
-  if (e.assistantProvider) return ''
   if (e.provider) {
     if (e.key === 'modelFallback' || e.key === 'effortFallback') return []
     if (e.key === 'prices') return {}
@@ -1207,21 +1131,14 @@ export function settingDefault(e: SettingEntry): unknown {
   return (DEFAULT_SETTINGS[e.section as keyof AppSettings] as unknown as Record<string, unknown> | undefined)?.[e.key]
 }
 
-/** An Assistant provider field's key in its settings ("model" of assistant.claude-code.model). */
-const fieldKey = (e: SettingEntry): string => e.key.slice(e.key.indexOf('.') + 1)
 
 /** The values a select setting (or a custom one the tools set as a select) takes. */
 export function settingOptions(e: SettingEntry): { value: string; label: string }[] | null {
   // The tools' choices, in English: the Assistant sets a value by it or by its label as the tools name it.
   if (e.options) return e.options
-  const providers = PROVIDERS.map((p) => ({ value: p.id, label: p.name }))
   if (e.id === 'notifications.chimeSound') return ['chime', 'bell', 'soft', 'pop'].map((v) => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }))
   // The Assistant's tools name languages in English (Polish, or pl); Settings shows each by its own name.
   if (e.id === 'general.language') return [{ value: 'auto', label: 'Automatic' }, ...LANGUAGES.map((l) => ({ value: l.code, label: l.english }))] // i18n-ignore: the Assistant's tools (English)
-  if (e.id === 'assistant.provider') return [{ value: '', label: 'Default provider' }, ...providers] // i18n-ignore: the Assistant's tools (English)
-  const modes = (p: ProviderId) => providerDescriptor(p).permissionModes.map((m) => ({ value: m.value, label: englishText(m.label) }))
-  if (e.assistantProvider && fieldKey(e) === 'permissionMode') return [{ value: '', label: 'Default' }, ...modes(e.assistantProvider).filter((m) => !isCliOwnMode(m.value))] // i18n-ignore: the Assistant's tools (English)
-  if (e.assistantProvider && fieldKey(e) === 'use200kContext') return [{ value: '', label: 'Default' }, { value: 'on', label: 'On' }, { value: 'off', label: 'Off' }] // i18n-ignore: the Assistant's tools (English)
   return null
 }
 
@@ -1425,7 +1342,6 @@ export function settingPatch(
   if (e.scope === 'project') {
     return { project: () => ({ [e.key]: value }) as Partial<ProjectConfig> }
   }
-  if (e.assistantProvider) return { settings: { assistant: { providers: { [e.assistantProvider]: { [fieldKey(e)]: value } } } } }
   if (e.provider && e.key === 'prices') return { prices: { provider: e.provider, value: value as Record<string, unknown> } }
   if (e.provider && (e.key === 'modelFallback' || e.key === 'effortFallback')) return { fallback: { provider: e.provider, kind: e.key === 'modelFallback' ? 'models' : 'efforts', list: Array.isArray(value) && value.length ? value : null } }
   if (e.provider) return { settings: { providers: { [e.provider]: { [e.key]: value } } } }

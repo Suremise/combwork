@@ -104,6 +104,7 @@ export const SUITES = [
   { name: 'compact', needs: ['claude'], claudeHome: 'own' },
   { name: 'connectionapi' },
   { name: 'connectiondefaults' },
+  { name: 'connectionfirst' },
   { name: 'connectionrows' },
   { name: 'connections' },
   { name: 'connections-codex' },

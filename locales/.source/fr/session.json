@@ -20,6 +20,8 @@
   "session.compact.stopped": "The agent stopped before Compact was sent.",
   "session.compact.userTyped": "You typed in the agent's terminal while Hive was sending Compact, so it wasn't sent: what you typed stays.",
   "session.compact.waiting": "The agent is waiting for your answer. Compact after it has finished.",
+  "session.connection.fallback": "{why, select, missing {The connection chosen for it was removed} other {Its connection {wanted} is off in this workspace}}, so it started on {name}, its CLI's first usable one here. Choose another in its Agent Settings.",
+  "session.connection.fallbackTitle": "{agent} runs on another connection",
   "session.error.agentGone": "That agent no longer exists.",
   "session.error.inUseElsewhere": "Another program has its transcript open. Close it, then try again.",
   "session.error.noAgents": "This project has no agents yet. Add one first.",

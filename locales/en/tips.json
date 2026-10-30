@@ -151,6 +151,14 @@
     "defaultMessage": "When the Assistant suggests compacting",
     "description": "A tip's title."
   },
+  "tips.assistantConnection.text": {
+    "defaultMessage": "Assistant Settings → Connection picks the setup it runs on, for this workspace: keep it on your agents' model and effort, since a lighter one makes it careless. A server account such as DeepSeek works too, with caveats the guide lists.",
+    "description": "A tip (HI-2108). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. DeepSeek is a product's name."
+  },
+  "tips.assistantConnection.title": {
+    "defaultMessage": "Choose what the Assistant runs on",
+    "description": "A tip's title (HI-2108): the Assistant's connection (the setup of model, effort and mode it runs on)."
+  },
   "tips.assistantControl.text": {
     "defaultMessage": "Settings → Assistant → Control decides what it may do: only advise, or also add, start and brief agents and start cards when you ask.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

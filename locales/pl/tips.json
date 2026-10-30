@@ -37,6 +37,8 @@
   "tips.assistantBatch.title": "Wiele kart w jednym kroku",
   "tips.assistantCompact.text": "Asystent zwykle pracuje z większym kontekstem niż Twoi agenci, więc jego przycisk Kompaktuj zmienia kolor na pomarańczowy później: domyślnie powyżej {tokens, plural, one {# tokena} few {# tokenów} many {# tokenów} other {# tokena}}. Zmienisz to w Ustawienia → Asystent → Wyróżnij Kompaktuj powyżej, a Nigdy wyłącza wyróżnianie.",
   "tips.assistantCompact.title": "Kiedy Asystent sugeruje kompaktowanie",
+  "tips.assistantConnection.text": "Ustawienia Asystenta → Połączenie wybiera, na czym działa on w tym obszarze roboczym: zostaw model i wysiłek Twoich agentów, bo lżejszy model czyni go niedbałym. Konto serwerowe, takie jak DeepSeek, też działa, z zastrzeżeniami opisanymi w Podręczniku użytkownika.",
+  "tips.assistantConnection.title": "Wybierz, na czym działa Asystent",
   "tips.assistantControl.text": "Ustawienia → Asystent → Kontrola decyduje, co Asystent może robić: tylko doradzać, czy też, gdy poprosisz, dodawać, uruchamiać i instruować agentów oraz rozpoczynać karty.",
   "tips.assistantControl.title": "Pozwól Asystentowi kierować agentami",
   "tips.assistantImages.text": "Załączniki w widoku Asystenta pokazują każdy zrzut ekranu i plik wklejony lub upuszczony do jego rozmów, pogrupowane według rozmów. Kliknij nazwę rozmowy, żeby przeczytać ją ponownie.",

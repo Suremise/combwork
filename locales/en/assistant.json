@@ -1,7 +1,7 @@
 {
   "assistant.banner.connectionSetup": {
-    "defaultMessage": "No {cli} connection is on in this workspace, so the Assistant can't start. Add one and sign it in.",
-    "description": "Banner in the Assistant panel when its coding agent CLI ({cli}: \"Claude Code\") has no connection on in the workspace (HI-1774): it can't start until one is."
+    "defaultMessage": "No {cli} account is on in this workspace, so the Assistant can't start. Add one and sign it in.",
+    "description": "Banner in the Assistant panel when its coding agent CLI ({cli}: \"Claude Code\") has no account (a sign-in or server) on in the workspace (HI-1774; HI-2108): it can't start until one is."
   },
   "assistant.chooseConnections.agent": {
     "defaultMessage": "Agent",
@@ -675,6 +675,10 @@
     "defaultMessage": "Choose a mode",
     "description": "Tooltip on the Assistant's mode button when it has none."
   },
+  "assistant.panel.cliOwnConnection": {
+    "defaultMessage": "its mode is the CLI's own setting, and the Assistant needs to know its mode",
+    "description": "Why a connection is greyed out in Assistant Settings' choice of connection (HI-2108): its permission mode is \"The CLI's own setting\" (Hive passes none), and the Assistant's Control relies on knowing its mode. A clause, lower case."
+  },
   "assistant.panel.codingAgent": {
     "defaultMessage": "Coding agent",
     "description": "Assistant Settings: a heading (Claude Code, Codex…)."
@@ -694,6 +698,10 @@
   "assistant.panel.compacting": {
     "defaultMessage": "Compacting the conversation…",
     "description": "Tooltip on Compact while the conversation is compacted."
+  },
+  "assistant.panel.connectionRestart": {
+    "defaultMessage": "The Assistant restarts on the connection chosen and resumes this conversation.",
+    "description": "Confirmation before a running Assistant moves to another connection of the same coding agent CLI (HI-2108): it restarts in it and carries on the conversation."
   },
   "assistant.panel.conversations": {
     "defaultMessage": "Conversations",
@@ -736,8 +744,8 @@
     "description": "Tooltip of the button in the Assistant panel's header that folds it to a strip at the window's edge, with its shortcut ({key}: \"Ctrl+Alt+I\")."
   },
   "assistant.panel.forWorkspace": {
-    "defaultMessage": "For this workspace. Anything left at <i>Default</i> follows <link>Settings → Assistant</link>.",
-    "description": "Assistant Settings, at the top. <i> is italic (the choice Default); <link> opens Settings → Assistant."
+    "defaultMessage": "For this workspace. Its connection holds its model, effort and permission mode; a mode left at <i>Default</i> follows <link>Settings → Assistant</link>.",
+    "description": "Assistant Settings, at the top (HI-2108). <i> is italic (the choice Default of the Mode list); <link> opens Settings → Assistant."
   },
   "assistant.panel.inactive": {
     "defaultMessage": "{count, plural, one {# inactive project} other {# inactive projects}}",
@@ -2724,7 +2732,7 @@
     "description": "An error notice: undoing a change the Assistant made failed; the reason follows."
   },
   "assistant.undo.field": {
-    "defaultMessage": "{field, select, title {title} description {description} labels {labels} blocked {blocked} blockedBy {blocked by} links {links} agent {agent} column {column} project {project} created {the card} cards {cards} reviewer {reviewer} rounds {rounds} waitMinutes {wait} name {name} provider {provider} model {model} effort {effort} permissionMode {permission mode} use200kContext {context size} mcpServers {MCP servers} lastSessionId {conversation} value {value} removed {removed models} run {the run} agents {agents} layout {layout} workflow {workflow options} other {{field}}}",
+    "defaultMessage": "{field, select, title {title} description {description} labels {labels} blocked {blocked} blockedBy {blocked by} links {links} agent {agent} column {column} project {project} created {the card} cards {cards} reviewer {reviewer} rounds {rounds} waitMinutes {wait} name {name} provider {provider} connection {connection} model {model} effort {effort} permissionMode {permission mode} use200kContext {context size} mcpServers {MCP servers} lastSessionId {conversation} value {value} removed {removed models} run {the run} agents {agents} layout {layout} workflow {workflow options} other {{field}}}",
     "description": "What part of something the Assistant changed (lower case, listed after a card or in why undo kept it): a card's title, labels, column…; a lane's cards, reviewer, rounds, wait; an agent's provider, model, effort…; a setting's value; run: an agent it started; agents, layout, workflow: a project's agents, page layout and workflow options a template's load replaced (HI-1502). Select keys: the field."
   },
   "assistant.undo.final": {
@@ -2818,6 +2826,14 @@
   "assistant.undo.why.comment": {
     "defaultMessage": "A comment stays: undo doesn't take back what was said.",
     "description": "Why part of a change of the Assistant's can't be undone: a comment on a card."
+  },
+  "assistant.undo.why.connectionChanged": {
+    "defaultMessage": "A connection it changed isn't changed back: edit it in Settings → Accounts & Connections.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2108): it changed a connection's name, model, effort, context or mode. Settings → Accounts & Connections names a section."
+  },
+  "assistant.undo.why.connectionMade": {
+    "defaultMessage": "A connection it made stays: remove it in Settings → Accounts & Connections if it isn't wanted.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2108): it made a connection (a named setup of model, effort and mode on an account that agents choose). Settings → Accounts & Connections names a section."
   },
   "assistant.undo.why.context": {
     "defaultMessage": "The doc sections to read first stay as set.",

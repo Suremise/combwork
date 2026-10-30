@@ -2380,7 +2380,7 @@ export interface LiveSessionState {
   launchedConnection?: {
     id: string
     name: string
-    note?: 'offFallback' | 'unknownLogin' | 'loginChanged'
+    note?: 'offFallback' | 'missing' | 'unknownLogin' | 'loginChanged'
     /** Who it launched as (HI-1756: its plan usage is that login's), as plan usage keeps a login (a hash); absent: unknown. */
     login?: string
     /** A server connection's (HI-1772): its models as launched, so the footer shows the real model and what it stands in for, and whether it runs only on this PC (its server is, and none of its models runs elsewhere: HI-1773). */

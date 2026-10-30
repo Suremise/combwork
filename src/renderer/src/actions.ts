@@ -1,6 +1,7 @@
 import { basename } from './util'
 import { call, errorMessage } from './api'
 import { agentLimit } from './advanced'
+import { cliReadyOf, firstReadyConnection, offeredConnections } from '@shared/connectionLabel'
 import { agentOf, cancelDialog, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
 import { AGENT_LIMIT_MAX, MANY_AGENTS, OPEN_WORKFLOW_OPTIONS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
@@ -318,6 +319,29 @@ async function ensureAgent(path: string, agentId: string, resumes?: ProviderId):
  * `auto` says it is used) and whether a CLI is installed aren't known yet, and deciding then would pick the wrong
  * provider or open Provider Setup. Null, said to the user, when Hive is still looking after that: nothing is decided from a guess.
  */
+/**
+ * The connection a new agent gets (firstReadyConnection), once Hive knows whether the CLIs before it are installed: null
+ * (and said) when it still doesn't after 20 s.
+ */
+async function readyConnection(view: Parameters<typeof firstReadyConnection>[0], cli?: ProviderId): Promise<{ id?: string } | null> {
+  const now = (): ReturnType<typeof firstReadyConnection> => firstReadyConnection(view, get().settings, cliReadyOf(get().providers), cli)
+  if (!now().checking) return now()
+  const ok = await new Promise<boolean>((done) => {
+    const stop = (v: boolean): void => {
+      clearTimeout(timer)
+      unsubscribe()
+      done(v)
+    }
+    const timer = setTimeout(() => stop(false), 20_000)
+    const unsubscribe = useStore.subscribe(() => {
+      if (!now().checking) stop(true)
+    })
+  })
+  if (ok) return now()
+  notify('warning', tr(LOOKING.title), tr(LOOKING.message))
+  return null
+}
+
 async function detectedProvider(resolve: () => ProviderId, auto: () => boolean): Promise<ProviderId | null> {
   const settled = (): boolean => {
     const i = get().providers[resolve()]
@@ -336,12 +360,14 @@ async function detectedProvider(resolve: () => ProviderId, auto: () => boolean):
     })
   })
   if (ok) return resolve()
-  notify(
-    'warning',
-    tr(msg({ id: 'actions.provider.lookingTitle', defaultMessage: 'Still looking for the coding agents', description: "A warning's title: Hive hasn't finished finding which coding agent CLIs are installed." })),
-    tr(msg({ id: 'actions.provider.lookingMessage', defaultMessage: 'Hive is still finding out which coding agent CLIs are installed. Try again in a moment.', description: 'Under the warning that Hive is still looking for the coding agent CLIs.' }))
-  )
+  notify('warning', tr(LOOKING.title), tr(LOOKING.message))
   return null
+}
+
+/** Said when Hive hasn't finished finding which CLIs are installed. */
+const LOOKING = {
+  title: msg({ id: 'actions.provider.lookingTitle', defaultMessage: 'Still looking for the coding agents', description: "A warning's title: Hive hasn't finished finding which coding agent CLIs are installed." }),
+  message: msg({ id: 'actions.provider.lookingMessage', defaultMessage: 'Hive is still finding out which coding agent CLIs are installed. Try again in a moment.', description: 'Under the warning that Hive is still looking for the coding agent CLIs.' })
 }
 
 /**
@@ -422,16 +448,30 @@ export async function quickAddAgent(path: string | null = get().selectedProject,
     notify('warning', tr(msg({ id: 'actions.agent.noRoom', defaultMessage: 'No room for another agent', description: "A warning's title: the project has as many agents as it may have." })), raise ? agentLimitText(tr, limit) : tr(msg({ id: 'actions.agent.noRoomMessage', defaultMessage: '{why} Remove one first.', description: 'Under the warning that a project has no room for another agent: {why} says the limit and where it is set.' }), { why: agentLimitText(tr) }), raise)
     return null
   }
-  const provider = await detectedProvider(
-    () => forProvider ?? projectDefaultProvider(project(path)?.config, get().settings),
-    () => !forProvider && defaultProviderPending(project(path)?.config, get().settings)
-  )
-  if (!provider) return null
-  if (!isProviderEnabled(get().settings, provider) || !get().providers[provider]?.found) {
+  // Decision A (HI-2108): the first usable connection in the order of accounts (a session's CLI's, when resuming one),
+  // its CLI on and installed, as main's firstUsableAccount: waited for while Hive still looks for a CLI before it. Its CLI
+  // follows from it. Connections here but none on an installed CLI: the dialog, which says why. None usable here (no
+  // account on, or a test copy on its CLI test home): as before accounts.
+  const view = await call('connections:list').catch(() => null)
+  const first = await readyConnection(view, forProvider)
+  if (!first) return null
+  if (!first.id && offeredConnections(view, get().settings, forProvider).length) {
     set({ addAgentFor: path })
     return null
   }
-  const def = await attempt(tr(msg({ id: 'actions.agent.addFailed', defaultMessage: 'Could not add an agent', description: "An error's title: adding an agent failed." })), () => call('agents:add', path, { provider }))
+  const connection = first.id
+  const provider = connection
+    ? undefined
+    : await detectedProvider(
+        () => forProvider ?? projectDefaultProvider(project(path)?.config, get().settings),
+        () => !forProvider && defaultProviderPending(project(path)?.config, get().settings)
+      )
+  if (!connection && !provider) return null
+  if (provider && (!isProviderEnabled(get().settings, provider) || !get().providers[provider]?.found)) {
+    set({ addAgentFor: path })
+    return null
+  }
+  const def = await attempt(tr(msg({ id: 'actions.agent.addFailed', defaultMessage: 'Could not add an agent', description: "An error's title: adding an agent failed." })), () => call('agents:add', path, connection ? { connection } : { provider: provider ?? undefined }))
   if (!def) return null
   await refreshWorkspace()
   noteManyAgents(path)

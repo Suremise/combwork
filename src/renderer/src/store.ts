@@ -871,12 +871,6 @@ export function useProviderWarnings(): ReturnType<typeof providerWarnings> {
 }
 
 /** The provider an agent runs (its own, else the project's default, else the global default). */
-/** The Assistant's account for a CLI (HI-2106, the adapter until HI-2108): its agent's when it runs that CLI, else its workspace's choice from before. */
-export function assistantAccountOf(ws: WorkspaceInfo | null | undefined, provider: ProviderId): string | undefined {
-  const a = ws?.assistant?.agents[0]
-  return (a && a.provider === provider ? a.connection : undefined) ?? ws?.config.assistantConnection?.[provider] ?? undefined
-}
-
 export function agentProviderOf(p: ProjectInfo | null | undefined, a: Pick<AgentInfo, 'provider' | 'live'> | null | undefined): ProviderId {
   return a?.live?.provider || agentProvider(a, p?.config, get().settings)
 }

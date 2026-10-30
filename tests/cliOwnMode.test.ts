@@ -11,7 +11,7 @@ import { assistantProjectConfig } from '../src/shared/assistant'
 import { DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { legacyLaunchSettings as agentLaunchSettings } from '../src/shared/connectionDefaults'
 import { PROVIDERS, canSwitchModeLive, modeAllowed, modeBadgeLabel, offeredModes, permissionLabel } from '../src/shared/providers'
-import { settingEntry, settingOptions } from '../src/shared/settingsCatalog'
+import { settingEntry } from '../src/shared/settingsCatalog'
 import type { AppSettings, ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -72,10 +72,9 @@ describe('the choice', () => {
     const cfg = assistantProjectConfig({ ...structuredClone(DEFAULT_PROJECT_CONFIG), agents: [{ id: 'assistant', name: 'Assistant', permissionMode: CLI_OWN_MODE }] } as unknown as ProjectConfig, s)
     expect(cfg.providers['claude-code'].permissionMode).toBe(PROVIDERS.find((p) => p.id === 'claude-code')!.assistantMode)
     expect(cfg.agents[0].permissionMode).toBeUndefined()
-    // Nor among the options the Assistant's settings take through the Agent API.
-    const options = settingOptions(settingEntry('assistant.claude-code.permissionMode')!)!.map((o) => o.value)
-    expect(options).toContain('plan')
-    expect(options).not.toContain(CLI_OWN_MODE)
+    // Settings → Assistant has no per-provider mode any more (HI-2108): its connection holds it, and its launch never
+    // takes the CLI's own (sessions' effective()).
+    expect(settingEntry('assistant.claude-code.permissionMode')).toBeUndefined()
   })
 })
 

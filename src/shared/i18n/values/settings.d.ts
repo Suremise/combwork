@@ -645,10 +645,6 @@ interface HiveMessageValues {
   'settings.assistant.compactSuggestTokens.off': undefined
   'settings.assistant.compactSuggestTokens.tip': undefined
   'settings.assistant.compactSuggestTokens.title': undefined
-  'settings.assistant.connection.desc': undefined
-  'settings.assistant.connection.failed': undefined
-  'settings.assistant.connection.noWorkspace': undefined
-  'settings.assistant.connection.title': undefined
   'settings.assistant.control.desc': undefined
   'settings.assistant.control.option.agents': undefined
   'settings.assistant.control.option.look': undefined
@@ -659,8 +655,6 @@ interface HiveMessageValues {
   'settings.assistant.control.tip.look': undefined
   'settings.assistant.control.tip.projects': undefined
   'settings.assistant.control.title': undefined
-  'settings.assistant.defaultIs': { value: string | number }
-  'settings.assistant.defaultProvider': { provider: string | number }
   'settings.assistant.enterEndsPause.desc': undefined
   'settings.assistant.enterEndsPause.tip': undefined
   'settings.assistant.enterEndsPause.title': undefined
@@ -678,9 +672,6 @@ interface HiveMessageValues {
   'settings.assistant.panelSide.option.right': undefined
   'settings.assistant.panelSide.tip': undefined
   'settings.assistant.panelSide.title': undefined
-  'settings.assistant.provider.desc': undefined
-  'settings.assistant.provider.tip': undefined
-  'settings.assistant.provider.title': undefined
   'settings.assistant.tellReplies.desc': undefined
   'settings.assistant.tellReplies.tip': undefined
   'settings.assistant.tellReplies.title': undefined
@@ -688,20 +679,6 @@ interface HiveMessageValues {
   'settings.assistant.typingPause.off': undefined
   'settings.assistant.typingPause.tip': undefined
   'settings.assistant.typingPause.title': undefined
-  'settings.assistant.withProvider.desc': { context: string; provider: string | number; mode: string | number }
-  'settings.assistant.withProvider.tip': undefined
-  'settings.assistant.withProvider.title': { provider: string | number }
-  'settings.assistantDefaults.extraArgsPlaceholder': undefined
-  'settings.assistantProvider.effort.desc': { provider: string | number }
-  'settings.assistantProvider.effort.title': undefined
-  'settings.assistantProvider.extraArgs.desc': { cli: string | number; provider: string | number }
-  'settings.assistantProvider.extraArgs.title': undefined
-  'settings.assistantProvider.model.desc': { provider: string | number }
-  'settings.assistantProvider.model.title': undefined
-  'settings.assistantProvider.permissionMode.desc': { provider: string | number; mode: string | number }
-  'settings.assistantProvider.permissionMode.title': undefined
-  'settings.assistantProvider.use200kContext.desc': { provider: string | number }
-  'settings.assistantProvider.use200kContext.title': undefined
   'settings.board.archiveDoneDays.desc': undefined
   'settings.board.archiveDoneDays.off': undefined
   'settings.board.archiveDoneDays.tip': undefined
@@ -1077,7 +1054,6 @@ interface HiveMessageValues {
   'settings.option.inherit': undefined
   'settings.option.off': undefined
   'settings.option.on': undefined
-  'settings.path.assistant': { assistant: string | number; provider: string | number; title: string | number }
   'settings.path.level': { section: string | number; part: string | number; title: string | number }
   'settings.path.project': { section: string | number; title: string | number }
   'settings.path.settings': { section: string | number; title: string | number }

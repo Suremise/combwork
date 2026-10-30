@@ -37,6 +37,8 @@
   "tips.assistantBatch.title": "Muchas tarjetas en un paso",
   "tips.assistantCompact.text": "El Asistente suele trabajar con un contexto más grande que tus agentes, así que su botón Compactar se pone naranja más tarde: a partir de {tokens, plural, one {# token} many {# tokens} other {# tokens}} de forma predeterminada. Configuración → Asistente → Destacar Compactar por encima de lo cambia, o Nunca lo desactiva.",
   "tips.assistantCompact.title": "Cuándo sugiere compactar el Asistente",
+  "tips.assistantConnection.text": "Configuración del Asistente → Conexión elige con qué se ejecuta, en este espacio de trabajo: mantén el modelo y el esfuerzo de tus agentes, porque uno más ligero lo vuelve descuidado. Una cuenta de servidor como DeepSeek también sirve, con las salvedades que indica la Guía del usuario.",
+  "tips.assistantConnection.title": "Elige con qué se ejecuta el Asistente",
   "tips.assistantControl.text": "Configuración → Asistente → Control decide qué puede hacer: solo aconsejar, o también agregar, iniciar e instruir agentes e iniciar tarjetas cuando se lo pidas.",
   "tips.assistantControl.title": "Deja que el Asistente dirija agentes",
   "tips.assistantImages.text": "Adjuntos, en la vista del Asistente, muestra cada captura y archivo que pegaste o soltaste en sus conversaciones, por conversación. Haz clic en el nombre de una conversación para volver a leerla.",

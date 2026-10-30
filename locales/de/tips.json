@@ -37,6 +37,8 @@
   "tips.assistantBatch.title": "Viele Karten in einem Schritt",
   "tips.assistantCompact.text": "Der Assistent arbeitet meist mit einem größeren Kontext als deine Agenten, daher wird seine Schaltfläche „Komprimieren“ später orange: standardmäßig ab {tokens, plural, one {# Token} other {# Tokens}}. Einstellungen → Assistent → „Komprimieren“ hervorheben ab ändert das, „Nie“ schaltet es aus.",
   "tips.assistantCompact.title": "Wann der Assistent zum Komprimieren rät",
+  "tips.assistantConnection.text": "Assistenten-Einstellungen → Verbindung wählt, womit er in diesem Arbeitsbereich läuft: Bleib beim Modell und Aufwand deiner Agenten, denn ein leichteres Modell macht ihn nachlässig. Ein Server-Konto wie DeepSeek geht auch, mit Einschränkungen, die das Benutzerhandbuch nennt.",
+  "tips.assistantConnection.title": "Wählen, womit der Assistent läuft",
   "tips.assistantControl.text": "Einstellungen → Assistent → Steuerung legt fest, was er darf: nur beraten oder auch Agenten hinzufügen, starten und einweisen und Karten starten, wenn du darum bittest.",
   "tips.assistantControl.title": "Den Assistenten Agenten steuern lassen",
   "tips.assistantImages.text": "Unter „Anhänge“ in der Ansicht des Assistenten findest du jeden Screenshot und jede Datei, die du in seine Unterhaltungen eingefügt oder gezogen hast, nach Unterhaltung sortiert. Klicke auf den Namen einer Unterhaltung, um sie noch einmal zu lesen.",

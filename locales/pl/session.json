@@ -20,6 +20,8 @@
   "session.compact.stopped": "Agent zatrzymał się, zanim wysłano polecenie kompaktowania.",
   "session.compact.userTyped": "Pisałeś w terminalu agenta, gdy Hive wysyłał Compact, więc nie został wysłany: to, co wpisałeś, zostaje.",
   "session.compact.waiting": "Agent czeka na Twoją odpowiedź. Kompaktuj, gdy skończy.",
+  "session.connection.fallback": "{why, select, missing {Wybrane dla niego połączenie zostało usunięte} other {Jego połączenie {wanted} jest wyłączone w tym obszarze roboczym}}, więc uruchomił się na {name}, pierwszym dostępnym tu połączeniu swojego CLI. Wybierz inne w jego oknie Ustawienia agenta.",
+  "session.connection.fallbackTitle": "Agent {agent} działa na innym połączeniu",
   "session.error.agentGone": "Ten agent już nie istnieje.",
   "session.error.inUseElsewhere": "Inny program ma otwartą transkrypcję tej sesji. Zamknij go i spróbuj ponownie.",
   "session.error.noAgents": "Ten projekt nie ma jeszcze agentów. Najpierw dodaj agenta.",

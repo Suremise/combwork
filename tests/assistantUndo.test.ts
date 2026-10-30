@@ -21,6 +21,7 @@ const changes = await import('../src/main/assistantChanges')
 const { undoChanges, userUndo, UndoNotFound } = await import('../src/main/assistantUndo')
 const { assistantBatch } = await import('../src/main/taskBatch')
 const { updateAgent } = await import('../src/main/projectAgents')
+const accountsMod = await import('../src/main/accounts')
 const { applySetting, entryOf } = await import('../src/main/settingsTools')
 const { projectAgents } = await import('../src/shared/defaults')
 const { agentProvider } = await import('../src/shared/providers')
@@ -51,8 +52,15 @@ beforeAll(async () => {
   // No version control chosen: the board's moves are plain (the rules' own undo, an override, is the runtime's to test).
   await advanced.set(ENFORCE, false)
   config.settings.assistant = { ...config.settings.assistant, control: 'projects' } as typeof config.settings.assistant
+  // An account for each CLI with its base connection (HI-2108: an agent's model and effort are its connection's), on in
+  // the workspace.
+  config.update((c) => {
+    c.accounts = (['claude-code', 'codex'] as const).map((p) => ({ id: `acc-${p}`, provider: p, kind: 'signIn' as const, name: p, createdAt: '' }))
+    c.connections = (['claude-code', 'codex'] as const).map((p) => ({ id: `c-${p}`, account: `acc-${p}`, name: p }))
+  })
   w = createWorkspaceService()
   await w.open(wsPath)
+  for (const p of ['claude-code', 'codex']) await inWorkspace(w, () => accountsMod.setAccountOn(`acc-${p}`, true))
   await control.newAssistantToken(wsPath)
   token = (await import('fs')).readFileSync(control.assistantTokenFile(wsPath), 'utf8').match(/"token":\s*"([0-9a-f]+)"/)![1]
 })
@@ -168,18 +176,22 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
   })
 
   it("an agent's settings: those still as it set them go back", async () => {
+    // Its connection to start from (HI-2108: an agent's model and effort are its connection's).
+    await updateAgent(alpha, 'a1', { connection: null })
+    const before = projectAgents(await w.projectConfig(alpha)).find((x) => x.id === 'a1')!
     const group = newMessage()
     await asAssistant("change A1's settings in alpha", async () => {
       const was = projectAgents(await w.projectConfig(alpha)).find((x) => x.id === 'a1')!
-      const def = await updateAgent(alpha, 'a1', { model: 'claude-opus-5-5', effort: 'high' })
+      const def = await updateAgent(alpha, 'a1', { name: 'A1 Assistant', model: 'claude-opus-5-5', effort: 'high' })
       await changes.noteAgent(w, 'alpha', was, def)
     }, 'update-agent')
-    // The user changes its effort since.
-    await updateAgent(alpha, 'a1', { effort: 'low' })
+    // The user renames it since.
+    await updateAgent(alpha, 'a1', { name: 'A1 User' })
     const [r] = await userUndo(w, { group })
-    expect(r).toMatchObject({ undone: ['model'], skipped: [{ field: 'effort', why: 'changed' }] })
+    expect(r).toMatchObject({ undone: ['connection'], skipped: [{ field: 'name', why: 'changed' }] })
     const now = projectAgents(await w.projectConfig(alpha)).find((x) => x.id === 'a1')!
-    expect([now.model, now.effort]).toEqual([undefined, 'low'])
+    expect([now.name, now.connection]).toEqual(['A1 User', before.connection])
+    await updateAgent(alpha, 'a1', { name: before.name })
   })
 
   it('a Hive setting: set back while still as it set it; changed since, left', async () => {
@@ -353,11 +365,12 @@ describe('undo checks at the write (#1282 round 1)', async () => {
     })
     try {
       const [r] = await userUndo(w, { group })
-      expect(r.skipped).toEqual([{ field: 'model', why: 'changed' }])
+      // Its connection (HI-2108: the model is its connection's) changed by the user just before.
+      expect(r.skipped).toEqual([{ field: 'connection', why: 'changed' }])
     } finally {
       spy.mockRestore()
     }
-    expect((await a1()).model).toBe('user-model')
+    expect(accountsMod.getConnection((await a1()).connection)?.model).toBe('user-model')
     await updateAgent(alpha, 'a1', { model: '' })
   })
 
@@ -507,13 +520,16 @@ describe('undo, round 3: implicit effects, permission at the write, retention (#
   const removeAgent = (id: string) => w.mutateProjectConfig(alpha, (cfg) => ({ agents: projectAgents(cfg).filter((a) => a.id !== id) as never }))
 
   it('a provider goes back with everything it reset, its last conversation too; an inherited one is inherited again', async () => {
-    await addAgent('p1', { provider: 'claude-code', model: 'claude-opus-5-5', effort: 'high', lastSessionId: 'conv-1' })
+    await addAgent('p1', { provider: 'claude-code', lastSessionId: 'conv-1' })
+    // Its connection (HI-2108), which its CLI follows: what goes back with it.
+    await updateAgent(alpha, 'p1', { connection: null })
+    const before = await agent('p1')
     const group = newMessage()
     await changeAgent('p1', { provider: 'codex' })
-    expect(groupOf(group)!.changes[0].fields.sort()).toEqual(['effort', 'lastSessionId', 'model', 'permissionMode', 'provider', 'use200kContext'])
+    expect(groupOf(group)!.changes[0].fields.sort()).toEqual(['connection', 'lastSessionId', 'provider'])
     const [r] = await userUndo(w, { group })
     expect(r.skipped).toEqual([])
-    expect(await agent('p1')).toMatchObject({ provider: 'claude-code', model: 'claude-opus-5-5', effort: 'high', lastSessionId: 'conv-1' })
+    expect(await agent('p1')).toMatchObject({ provider: 'claude-code', connection: before.connection, lastSessionId: 'conv-1' })
     // None of its own (from before 0.2): back on the CLI it ran, pinned (HI-2106, decision A: none is inherited).
     await addAgent('p2')
     const ran = agentProvider(await agent('p2'), null, config.settings)
@@ -532,8 +548,9 @@ describe('undo, round 3: implicit effects, permission at the write, retention (#
     await updateAgent(alpha, 'p3', { model: 'user-model' })
     const [r] = await userUndo(w, { group })
     expect(r.undone).toEqual([])
-    expect(r.skipped.map((s) => s.field).sort()).toEqual(['effort', 'lastSessionId', 'model', 'permissionMode', 'provider', 'use200kContext'])
-    expect(await agent('p3')).toMatchObject({ provider: 'codex', model: 'user-model' })
+    expect(r.skipped.map((s) => s.field).sort()).toEqual(['connection', 'lastSessionId', 'provider'])
+    expect(await agent('p3')).toMatchObject({ provider: 'codex' })
+    expect(accountsMod.getConnection((await agent('p3')).connection)?.model).toBe('user-model')
     // Running: its provider isn't changed under it (failed, said why), and the change stays to try again.
     await addAgent('p4', { provider: 'claude-code' })
     const second = newMessage()

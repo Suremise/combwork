@@ -37,6 +37,8 @@
   "tips.assistantBatch.title": "Beaucoup de cartes en une étape",
   "tips.assistantCompact.text": "L’Assistant travaille d’habitude avec un contexte plus grand que tes agents, donc son bouton Compacter devient orange plus tard : au-delà de {tokens, plural, one {# jeton} many {# jetons} other {# jetons}} par défaut. Paramètres → Assistant → Mettre en avant Compacter dès le modifie, ou Jamais le désactive.",
   "tips.assistantCompact.title": "Quand l’Assistant suggère de compacter",
+  "tips.assistantConnection.text": "Paramètres de l’Assistant → Connexion choisit ce sur quoi il fonctionne, pour cet espace de travail : garde le modèle et l’effort de tes agents, car un plus léger le rend négligent. Un compte serveur comme DeepSeek fonctionne aussi, avec des réserves que le Guide de l’utilisateur énumère.",
+  "tips.assistantConnection.title": "Choisir sur quoi fonctionne l’Assistant",
   "tips.assistantControl.text": "Paramètres → Assistant → Contrôle décide de ce qu’il peut faire : seulement conseiller, ou aussi ajouter des agents, les démarrer et leur donner leurs consignes, et démarrer des cartes quand tu le demandes.",
   "tips.assistantControl.title": "Laisser l’Assistant piloter les agents",
   "tips.assistantImages.text": "Dans la vue de l’Assistant, Pièces jointes montre chaque capture d’écran et chaque fichier que tu as collés ou déposés dans ses conversations, classés par conversation. Clique sur le nom d’une conversation pour la relire.",

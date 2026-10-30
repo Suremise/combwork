@@ -73,7 +73,7 @@ const check = (name, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${
   await page.keyboard.press('Enter')
   await lib.until(async () => (await page.locator('.dialog', { hasText: 'Add an agent' }).count()) === 1, 10000)
   const add = page.locator('.dialog', { hasText: 'Add an agent' })
-  check('Add Agent has a coding agent choice', (await add.locator('.provider-choice .choice').count()) >= 1)
+  check('Add Agent has a connection choice, no coding agent choice (HI-2108)', (await add.locator('#add-agent-connection').count()) === 1 && (await add.locator('.provider-choice').count()) === 0)
   await page.screenshot({ path: path.join(scratch, 'pv-5-add-agent.png') })
   await page.keyboard.press('Escape')
   const cfg = JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8'))
