@@ -250,6 +250,18 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
       expect(r.note).toMatch(/is already Done: left out\./)
     })
 
+    it('a start with its own name carries only the brief, and says only that (HI-2104)', async () => {
+      const [a, b] = [await make('Renamed a'), await make('Renamed b')]
+      const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], name: 'Old', brief: 'The kept brief.', by: 'the Assistant' })).lane
+      await move(a, 'done')
+      await ended(l.id)
+      const r = await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [b], name: 'New', by: 'the Assistant' })
+      expect([r.did, r.lane.id === l.id, r.lane.name]).toEqual(['started', false, 'New'])
+      expect(await briefOf(r.lane.id)).toMatchObject({ text: 'The kept brief.', rev: 1 })
+      expect(r.note).toContain(`B1's lane ${l.id} had just ended (all merged): started a new lane with its brief;`)
+      expect(r.note).not.toContain('brief and name')
+    })
+
     it('a start with its own brief uses that', async () => {
       const [a, b] = [await make('Own a'), await make('Own b')]
       const l = (await named([a], 'The old brief.')).lane
