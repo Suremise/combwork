@@ -17,6 +17,7 @@ import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
 import { startTask } from './taskStart'
 import { HIVE_LANE_START } from './tasks'
+import { teamPauseOf } from './teamPause'
 import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 
 /**
@@ -126,6 +127,9 @@ export async function checkLaneStarts(ws: WorkspaceService): Promise<void> {
   const before = JSON.stringify([...waits].filter(([k]) => k.startsWith(`${path.toLowerCase()}#`)))
   for (const k of [...waits.keys()]) if (k.startsWith(`${path.toLowerCase()}#`)) waits.delete(k)
   try {
+    // The team paused (HI-2081): no card started, no new conversation launched; its lanes show it as their pause. The
+    // pause's end changes the lanes (team-pause-changed), which looks again.
+    if (teamPauseOf(ws)) return
     // An agent owed its new conversation is launched with the rules off too (HR1 on HI-2034: Start Lane owes it either
     // way); only Hive's own card starts need them.
     await freshPass(ws, path)

@@ -45,6 +45,7 @@ import type { Workflow } from './runtime'
 import { openEntry, type FactData } from '../../shared/workflow/facts'
 import { FOCUSED_PICK_SECONDS, QUEUE_CHECKED_OUT_TARGET, QUEUE_FOCUSED_JOBS, QUEUE_SIGN_SECONDS } from '../../shared/advanced'
 import { childEnv } from '../ptyHost'
+import { pausedFor } from '../teamPause'
 
 const log = createLogger('queue')
 
@@ -329,6 +330,7 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     signTimeoutMs: Math.max(1, Number(advanced.get(QUEUE_SIGN_SECONDS)) || 60) * 1000,
     lock: (fn) => withRepoLock(h.projectPath, fn, { quiet: true, project: h.projectPath }),
     enforced: () => workflowEnforced(),
+    teamPaused: () => !!pausedFor(h.projectPath),
     // A target checked out in a folder (#1351, §16.9.2): advanced there with that folder fenced, unless an agent builds
     // in it; asked first while Merge into a checked-out branch says so (OP-40).
     // i18n-ignore: what changes the folder, for the log and an agent's reply (agent-facing, English)
@@ -497,6 +499,12 @@ export function startQueueHosts(): void {
   })
   const seen = new WeakSet<AbortSignal>()
   const off = onHiveEvent((e) => {
+    // The team resuming (HI-2081): its queues go on with what waited, as when the rules are turned on again.
+    if (e.type === 'team-pause-changed') {
+      const ws = e.pause ? null : openWorkspaces().find((w) => w.path?.toLowerCase() === e.workspacePath.toLowerCase())
+      if (ws) void startOpen(ws, true).catch((x) => log.warn('resuming the merge queues after the team resumed', x))
+      return
+    }
     if (e.type !== 'workspace-changed') return
     for (const ws of openWorkspaces()) {
       if (!ws.path || seen.has(ws.lifetime)) continue

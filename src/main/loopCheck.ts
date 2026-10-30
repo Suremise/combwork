@@ -13,6 +13,7 @@ import { allTasks, liveCardHeads } from './tasks'
 import { forYouOfCards } from './workflow/cardWork'
 import { workspaceOf } from './workspace'
 import { projectPreferences } from './workflow/preferences'
+import { pausedFor } from './teamPause'
 
 const log = createLogger('loops')
 
@@ -206,6 +207,11 @@ export const loopChecksOf = (projectPath: string, agentId: string): number => lo
  */
 async function recheck(loop: Loop): Promise<void> {
   try {
+    // Its team paused (HI-2081): parking isn't a stall; a mark made before is cleared, and none is made until it resumes.
+    if (pausedFor(loop.projectPath)) {
+      if (sessions.liveFor(loop.projectPath, loop.agentId)?.notWatching) sessions.setNotWatching(loop.projectPath, loop.agentId, null)
+      return
+    }
     const st = sessions.liveFor(loop.projectPath, loop.agentId)
     if (!(st?.notWatching || unwatched(st)) || loops.get(keyOf(loop.projectPath, loop.agentId)) !== loop) return
     const owed = await owedNow(loop)
@@ -230,6 +236,7 @@ async function check(loop: Loop): Promise<void> {
 }
 
 async function checkNow(loop: Loop): Promise<void> {
+  if (pausedFor(loop.projectPath)) return
   const st = sessions.liveFor(loop.projectPath, loop.agentId)
   if (!unwatched(st) || loops.get(keyOf(loop.projectPath, loop.agentId)) !== loop) return
   const inPlay = await owedNow(loop)
@@ -267,7 +274,7 @@ export function initLoopCheck(): void {
   }
   onHiveEvent((e) => {
     if (e.type === 'session-status') statusChanged(e.state)
-    else if (e.type === 'tasks-changed' || e.type === 'lanes-changed') recheckAll(e.workspacePath)
+    else if (e.type === 'tasks-changed' || e.type === 'lanes-changed' || e.type === 'team-pause-changed') recheckAll(e.workspacePath)
     // What reaches it may have changed (HI-1693): its hive tools (the Agent API, the built-in hive server), or its
     // project's loop wakes and agents (a project's settings written refresh the workspace).
     else if (e.type === 'settings-changed') recheckAll(null)

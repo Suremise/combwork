@@ -3492,6 +3492,8 @@ export interface OpenProgress {
 /** Events pushed from main to renderer. */
 export type HiveEvent =
   | { type: 'workspace-changed'; workspace: WorkspaceInfo | null }
+  /** A workspace's team paused or resumed (HI-2081): its pause now, or null. */
+  | { type: 'team-pause-changed'; workspacePath: string; pause: import('./teamPause').TeamPause | null; was?: import('./teamPause').TeamPause | null }
   /** The window's workspace opening (HI-1694): its step now, or null once it is done. */
   | { type: 'workspace-progress'; progress: OpenProgress | null }
   /** The recent workspaces changed (opened, removed, cleared): each window asks for its own view of them (#144). */
@@ -3682,8 +3684,10 @@ export interface LaneInfo {
  * `checkCopy` (#1435): its card's review or isolated check waits for a review or check copy to be free. `slot` (#1438):
  * the lane has no slot yet (every one is lent), so its builder can't start; it pauses the lane until one is free.
  * `preparing` (#1446): its slot is being prepared (G15's warming: its setup or an install), which doesn't pause it.
+ * `teamPause` (HI-2081): its workspace's team is paused (before an update): nothing of it starts or is woken until it
+ * resumes; it pauses the lane.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait' | 'teamPause'
 
 /**
  * A running lane's slot as its row shows it (#1446): its name, whether the lane works in its builder's carried slot (a

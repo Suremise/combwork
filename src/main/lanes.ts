@@ -34,6 +34,7 @@ import { laneValues, noteLaneIn, sameValue, type FieldChange } from './assistant
 import type { workspaceDb } from './boardStore'
 import { lineWaiting, onLineWaitChanged } from './workflow/lineUpdates'
 import { hooksMissingFor, onHooksHealthChanged } from './hooksHealth'
+import { teamPauseOf } from './teamPause'
 
 const log = createLogger('lanes')
 
@@ -71,7 +72,8 @@ export class LaneError extends HiveError {
 /** Refusals the window can meet (ending a lane from Progress → Lanes), in its language. */
 const M = {
   noWorkspace: msg({ id: 'service.lanes.noWorkspace', defaultMessage: 'No workspace is open', description: "An error changing a workspace's lanes (card loops) while no workspace is open in the window." }),
-  unknown: msg({ id: 'service.lanes.unknown', defaultMessage: 'Unknown lane {id}', description: 'An error: there is no lane (a card loop) with the id {id}, perhaps removed meanwhile.' })
+  unknown: msg({ id: 'service.lanes.unknown', defaultMessage: 'Unknown lane {id}', description: 'An error: there is no lane (a card loop) with the id {id}, perhaps removed meanwhile.' }),
+  teamPaused: msg({ id: 'service.lanes.teamPaused', defaultMessage: 'The team is paused (before an update): resume the team first, then start the lane.', description: "An error starting a lane (a card loop) while the user or the Hive Assistant has paused the whole team before an update (HI-2081): nothing of a lane starts until the team resumes (Resume the Team, in the Progress panel's Lanes)." })
 }
 
 /** Each lane's project id as it was read, so a lane whose project the workspace doesn't have now keeps it. */
@@ -442,7 +444,7 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   // Each running lane's cards' owner lanes (HI-1821): a card given to no agent is the lane's that owns it.
   const owned = ws.path ? cardOwnersNow(ws, [...new Set(lanes.filter(running).flatMap((l) => l.cards))]) : new Map<number, { lane: string | null }>()
   const owners = new Map([...owned].map(([n, o]) => [n, o.lane]))
-  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null)))
+  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws))))
 }
 
 /**
@@ -861,6 +863,8 @@ async function tellReordered(ws: WorkspaceService, l: LaneRecord, put: { putBack
 }
 
 export async function startLane(ws: WorkspaceService, s: StartLane): Promise<LaneChange> {
+  // The team paused (HI-2081, HR1's s8 check): no lane starts or changes its list until it resumes.
+  if (teamPauseOf(ws)) throw new LaneError(409, M.teamPaused)
   const builder = await agentIn(ws, s.project, s.builder)
   if (!builder) throw new LaneError(404, 'Unknown agent: the builder must be an agent of the project') // i18n-ignore: hive_lane's refusal, which only agents get
   const reviewer = s.reviewer ? await agentIn(ws, s.project, s.reviewer) : s.reviewer === undefined ? undefined : null
@@ -1187,7 +1191,7 @@ export function laneNow(ws: WorkspaceService, by: { lane: string } | { card: num
   const atLimit = on ? roundLimitCards(ws, l.cards) : new Set<number>()
   const deaf = new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && hooksMissingFor(join(ws.path!, l.project), a.id)).map((a) => a.id))
   const owners = new Map([...cardOwnersNow(ws, l.cards)].map(([n, o]) => [n, o.lane]))
-  return laneView(l, cards, undefined, facts, atLimit, on ? lineWaiting(ws, l.id) : null, deaf, undefined, null, slotView(ws, l), owners)
+  return laneView(l, cards, undefined, facts, atLimit, on ? lineWaiting(ws, l.id) : null, deaf, undefined, null, slotView(ws, l), owners, null, !!teamPauseOf(ws))
 }
 
 /** The running lane of a project agent (as builder, else as reviewer), or null. */
@@ -1401,8 +1405,9 @@ export function startLanes(): void {
       if (ws) changed(ws)
       return
     }
-    // A project's workflow written (#1421): its lanes' old rules marks may have come or gone.
-    if (e.type !== 'tasks-changed' && e.type !== 'workflow-changed') return
+    // A project's workflow written (#1421): its lanes' old rules marks may have come or gone. Its team paused or resumed
+    // (HI-2081): every running lane is paused or goes on.
+    if (e.type !== 'tasks-changed' && e.type !== 'workflow-changed' && e.type !== 'team-pause-changed') return
     const ws = openWorkspaces().find((w) => w.path && same(w.path, e.workspacePath))
     if (ws) changed(ws)
   })

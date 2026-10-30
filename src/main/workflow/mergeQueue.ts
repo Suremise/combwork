@@ -154,6 +154,11 @@ export interface QueueConfig {
    */
   enforced?: () => boolean
   /**
+   * Whether the project's team is paused now (HI-2081, read at each use): no entry is taken, and one about to advance
+   * stops just before it (`held`, nothing written: it is taken as it is once the team resumes). An advance begun finishes.
+   */
+  teamPaused?: () => boolean
+  /**
    * Told each step of an entry's way as it begins (#1353: the queue's model shows what is testing now), and null once the
    * entry has its outcome.
    */
@@ -675,7 +680,7 @@ export class MergeQueue {
     // G20 (HI-1367): lifted once its skipped focused tests are decided (the reviewer's answer or the user's); the entry is
     // tested again from its test merge and takes that decision (`skipDecided`).
     if (p?.reason === 'focusedSkip' && !this.skipAsking(p.card) && (await this.wf.locked(() => this.wf.store.clearQueuePause(target, 'focusedSkip')))) return this.runOnce(target)
-    if (p) return null
+    if (p || this.cfg.teamPaused?.()) return null
     return this.fenced(target, async () => {
       // A push owed by an earlier merge goes first (G18: after a restart or a Resume), and the next entry waits for it.
       const owed = await this.settlePush(target)
@@ -884,7 +889,7 @@ export class MergeQueue {
       const approved = r.options.review === 'none' ? !s.stale : !notApproved(s, r, card.labels)
       if (!open || s.stage !== 'merging' || !approved) return 'denied' as const
       if (this.cfg.enforced && !this.cfg.enforced()) return 'rulesOff' as const
-      if (this.wf.store.queuePause(entry.target)) return 'held' as const
+      if (this.wf.store.queuePause(entry.target) || this.cfg.teamPaused?.()) return 'held' as const
       // A checked-out target under Ask each time (OP-40): only with the user's Approve of this entry and test merge, as
       // the setting and the answers are now, here in the lock (HR4's #1351 round 1: a check before it is an early-out).
       if (data.checkedOut && this.cfg.checkedOutTarget?.() === 'ask' && !advanceApprovedIn(s, entry.id, data.expected, data.result)) return 'ask' as const

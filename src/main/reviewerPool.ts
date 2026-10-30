@@ -43,6 +43,7 @@ import { agentBusy } from './workflow/lineUpdates'
 import type { Workflow } from './workflow/runtime'
 import { agentRunsGoing, ENFORCE, workflowEnforced, workflowFor } from './workflow/service'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
+import { teamPauseOf } from './teamPause'
 
 const log = createLogger('reviewerPool')
 
@@ -122,7 +123,8 @@ export function settleReviewerPool(ws: WorkspaceService, projectPath: string): P
 }
 
 async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<void> {
-  if (!ws.path || ws.lifetime.aborted || !workflowEnforced()) return
+  // The team paused (HI-2081): nothing given out or told until it resumes (its end, a board change, passes again).
+  if (!ws.path || ws.lifetime.aborted || !workflowEnforced() || teamPauseOf(ws)) return
   const project = basename(projectPath)
   const lanes = (await rawLanes(ws)).filter((l) => running(l) && same(l.project, project))
   const wf = await workflowFor(ws, projectPath).catch(() => null)
@@ -222,6 +224,7 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
   // Asked before either launch (a first one, or a retry for a delivery still on its way: HR1's round 1), as the line is
   // typed, and as a stopped one's launch spawns (sessions.start's `allowed`, after its awaits).
   const still = (): boolean => {
+    if (teamPauseOf(ws)) return false
     const rec = cardOf(wf, c.card)
     if (!rec || !stillGivenOut(rec, c.loose)) return false
     const s = wf.state(rec)
@@ -325,7 +328,7 @@ export function startReviewerPool(): void {
     soon.unref?.()
   }
   const offEvents = onHiveEvent((e) => {
-    if (e.type === 'tasks-changed' || e.type === 'workspace-changed') later()
+    if (e.type === 'tasks-changed' || e.type === 'workspace-changed' || e.type === 'team-pause-changed') later()
     else if (e.type === 'session-status' && freed(e.state)) {
       const ws = workspaceFor(e.state.projectPath)
       if (ws && !ws.isAssistantHome(e.state.projectPath)) void settleReviewerPool(ws, e.state.projectPath)

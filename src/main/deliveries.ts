@@ -46,6 +46,8 @@ import { sessions } from './sessions'
 import { folderChanging, folderSteady, inFolder, onFolderSteady } from './folderFence'
 import { cardsNow } from './tasks'
 import { workspaceFor, WorkspaceService } from './workspace'
+import { pausedFor } from './teamPause'
+import { pauseHolds } from '../shared/teamPause'
 import { isAdmitted, refusedOpen } from './openingFence'
 import { cardRef } from '../shared/projectKeys'
 import { scopeOfHost, withCardNames } from './projectKeys'
@@ -779,7 +781,8 @@ function whyNot(store: Store, r: DeliveryRecord): { to: 'refused' | 'expired'; w
   if (why) return { to: 'refused', why }
   // Its agent can't read an inbox (the Agent API turned off since it was made): refused, never typed instead.
   if (!readsInbox(store.host, r.agentId)) return { to: 'refused', why: noInbox(r.agentName ?? r.agentId) }
-  if (Date.parse(r.expires) <= clock()) return { to: 'expired', why: 'not received in time' }
+  // Held by its team's pause (HI-2081): its time stands still while it is held, and is moved on at the resume.
+  if (Date.parse(r.expires) <= clock() && !pauseHeld(store, r)) return { to: 'expired', why: 'not received in time' }
   const live = sessions.liveFor(store.host, r.agentId)
   if (r.forRun && live?.runId !== r.forRun) return { to: 'expired', why: 'the session it was for has ended' }
   if (r.conversation && live?.sessionId && live.sessionId !== r.conversation) return { to: 'expired', why: 'its agent is in another conversation now' }
@@ -1234,7 +1237,20 @@ function applyFresh(store: Store, d: Draft, fresh: Map<string, Fresh>, by: HandO
  * expired, it is for the agent's conversation (and launch), and its source and producer still hold it. The one check
  * the gate (mayGive) and the writer before each key (offerHolds) both ask.
  */
-const eligible = (store: Store, r: DeliveryRecord, by: HandOut = 'offer'): boolean => !whyNot(store, r) && sourceHolds(store, r, by) && producerHolds(store, r)
+const eligible = (store: Store, r: DeliveryRecord, by: HandOut = 'offer'): boolean => !whyNot(store, r) && sourceHolds(store, r, by) && producerHolds(store, r) && !pauseHeld(store, r)
+
+/**
+ * The team's pause admission (HI-2081, HR1's s10 check): one of Hive's own wakes or hand-outs (`pauseHolds`: a loop or
+ * watch wake, a pool review; never the user's answer) for a project agent whose workspace is paused. Apart from its
+ * validity (whyNot, its source's refresh and holds, which still end what is stale): held, it stays as it is, unread, and
+ * isn't offered, typed (each key and Enter: whyOfferFails), read, counted for a notice or acked until the team resumes.
+ * The Assistant's own wakes aren't held (it follows the pause).
+ */
+function pauseHeld(store: Store, r: DeliveryRecord): boolean {
+  if (!pauseHolds(r)) return false
+  const ws = workspaceFor(store.host)
+  return !!ws && !ws.isAssistantHome(store.host) && !!pausedFor(store.host)
+}
 
 /** Whether a delivery's source still holds it (its `holds`), for this way of giving it out; one with no source does. */
 const sourceHolds = (store: Store, r: DeliveryRecord, by: HandOut): boolean => (r.source ? sources.get(r.source)?.holds?.(r, store.host, by) : undefined) !== false
@@ -1473,6 +1489,7 @@ function whyOfferFails(store: Store, o: Offer): string | null {
     if (not) return `${id} may no longer be given out (${not})`
     if (!sourceHolds(store, r, 'offer')) return `${id} is no longer wanted by its source (${r.source})`
     if (!producerHolds(store, r)) return `${id} is no longer wanted by its producer`
+    if (pauseHeld(store, r)) return `${id} is held while the team is paused`
   }
   return null
 }
@@ -1889,6 +1906,11 @@ export function initDeliveries(): void {
       })
       .catch((err) => log.warn('loading deliveries', err))
   })
+  // A team resuming (HI-2081): what its pause held has its time moved on by how long it was held (never expired for the
+  // pause: a weekend's still resumes), then each source's refresh decides from things as they are now, and it is offered.
+  onHiveEvent((e) => {
+    if (e.type === 'team-pause-changed' && !e.pause && e.was) void rebaseHeld(e.workspacePath, e.was.since).catch((err) => log.warn('offering what the team pause held', err))
+  })
   // The user's pause after typing, a line taken, overdue: nothing tells of those, so they are looked at now and then.
   const timer = setInterval(tick, 5000)
   timer.unref?.()
@@ -1896,6 +1918,27 @@ export function initDeliveries(): void {
   onFolderSteady((folder) => {
     for (const st of sessions.liveStates()) if (st.cwd && inFolder(st.cwd, folder) && !folderChanging(st.cwd)) void offerNow(st.projectPath, st.agentId).catch((err) => log.warn('offering deliveries', err))
   })
+}
+
+/**
+ * The deliveries a team's pause held in a workspace (HI-2081): unread, and of a held kind, each with its expiry moved on
+ * by how long the pause lasted, then offered (made again from its source first, so what is no longer due is cancelled).
+ */
+async function rebaseHeld(workspacePath: string, since: string): Promise<void> {
+  const held = Math.max(0, Date.now() - (Date.parse(since) || Date.now()))
+  for (const store of [...stores.values()]) {
+    if (!inFolder(store.host, workspacePath) || workspaceFor(store.host)?.isAssistantHome(store.host)) continue
+    const agents = new Set<string>()
+    await transact(store, (d) => {
+      for (const r of [...d.records]) {
+        if (!isUnread(r) || !pauseHolds(r)) continue
+        put(d, r, { ...r, expires: new Date(Date.parse(r.expires) + held).toISOString() })
+        agents.add(r.agentId)
+      }
+    })
+    showAll(store)
+    for (const a of agents) void offerNow(store.host, a).catch((err) => log.warn('offering deliveries', err))
+  }
 }
 
 // The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its hosts' deliveries, read from the

@@ -64,6 +64,7 @@ import type { SlotForStart, Workflow } from './workflow/runtime'
 import { agentRunsGoing, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
 import { listWorktreesOrNull } from './worktrees'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
+import { teamPauseOf } from './teamPause'
 import { cardAttachments } from './cardAttachments'
 import { briefOf } from './laneBriefs'
 
@@ -1158,6 +1159,10 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
   })
   if (!took) return 'done'
   await crashAt('inPlacement')
+  // The team paused (HI-2081): a lane's card (Hive's start, or its builder's) isn't given to its builder until it resumes;
+  // a card the user started by hand still is. Asked again just before the launch or the line (below).
+  const pausedLane = (): boolean => l.kind === 'lane' && !!teamPauseOf(ws)
+  if (pausedLane()) return 'wait'
   const agent = projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === agentId)
   const card = await getTask(n, ws).catch(() => null)
   if (!agent || !card) return 'done'
@@ -1187,12 +1192,18 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
   let how: FactData['BuilderPlaced']['how'] = there ? 'typed' : st ? 'newConversation' : resumeId ? 'resumed' : 'started'
   /** The builder's launch here: its lease's conversation resumed, else a new one; a failed resume counted. */
   const launch = async (line?: string): Promise<LiveSessionState> => {
-    if (!resumeId) return sessions.start(projectPath, line ? { agentId, prompt: line } : { agentId })
+    // The team paused meanwhile (HI-2081): checked as the launch spawns, after its own awaits.
+    const allowed = (): void => {
+      if (pausedLane()) throw new Waits()
+    }
+    if (!resumeId) return sessions.start(projectPath, line ? { agentId, prompt: line, allowed } : { agentId, allowed })
     try {
-      const run = await sessions.start(projectPath, { agentId, resumeId, auto: true, ...(conv?.is === 'resume' && conv.name ? { name: conv.name } : {}), ...(line ? { prompt: line } : {}) })
+      const run = await sessions.start(projectPath, { agentId, resumeId, auto: true, allowed, ...(conv?.is === 'resume' && conv.name ? { name: conv.name } : {}), ...(line ? { prompt: line } : {}) })
       track.failures = 0
       return run
     } catch (e) {
+      // Held by the team's pause (HI-2081): a wait, not this resume's failure.
+      if (e instanceof Waits) throw e
       // Another start of it won (the restart queue, Resume All): not this resume's failure; the next look finds it running.
       if (sessions.liveFor(projectPath, agentId) || sessions.pendingStart(projectPath, agentId)) throw e
       // Its slot not ready for it yet (a crashed run's processes not known ended, a setup under way): a wait, not a try.
@@ -1238,8 +1249,9 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref } // i18n-ignore: who a delivery is from, as agents read it
       log.info(`Giving ${userText(agent.name)} #${n} in ${userText(cycle.started.slot)} (${how})`)
       // A refusal (NotGiven: its agent got busy) or a launch that couldn't start throws: nothing recorded, tried again.
+      if (pausedLane()) throw new Waits()
       const r = there
-        ? await deliverNow(projectPath, { ...nd, need: 'free', conversation: st!.sessionId || null })
+        ? await deliverNow(projectPath, { ...nd, need: 'free', conversation: st!.sessionId || null }, () => !pausedLane())
         : (await launchWith(projectPath, nd, (line) => (st ? sessions.newConversation(projectPath, agentId, line) : launch(line)))).record
       if (!r || NOT_GIVEN.has(r.state)) throw new Error(`#${n}'s delivery to ${agent.name} wasn't given (${r?.state ?? 'none made'})`) // i18n-ignore: an error for the log (the pass tries again)
       delivery = r.id
@@ -1477,10 +1489,12 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
       // Its carried lease kept for a card it has left ends now that the lane holds its own (HI-1731).
       await endLeftCarriedNow(ws, projectPath, pool, lane.builder.id, { lane: lane.id }, r.lease.id)
     }
-    // Hive quitting once a slot is lent (#1628): the lane keeps it and keeps waiting; the next start's pass starts it.
-    if (stopped()) return
+    // Hive quitting once a slot is lent (#1628): the lane keeps it and keeps waiting; the next start's pass starts it. The
+    // team paused (HI-2081): the same, until it resumes (its end is a board change, which passes again).
+    const held = (): boolean => stopped() || !!teamPauseOf(ws)
+    if (held()) return
     const { startWaitingLane } = await import('./laneStart')
-    const started = await startWaitingLane(ws, projectPath, lane.id, lease.slot, stopped).catch((e) => (failedStep(`starting lane ${lane.id} in ${userText(lease!.slot)}`, e), false)) // i18n-ignore: a log line (failedStep logs it)
+    const started = await startWaitingLane(ws, projectPath, lane.id, lease.slot, held).catch((e) => (failedStep(`starting lane ${lane.id} in ${userText(lease!.slot)}`, e), false)) // i18n-ignore: a log line (failedStep logs it)
     if (started && !stopped()) await setLaneSlotWait(ws, lane.id, null)
   }
 }
@@ -1600,7 +1614,8 @@ export function startSlotCards(): void {
   // a second per workspace.
   let boardSoon: NodeJS.Timeout | null = null
   const offBoard = onHiveEvent((e) => {
-    if (e.type !== 'tasks-changed' || boardSoon) return
+    // The team resuming (HI-2081) is one too: what waited for it is placed.
+    if ((e.type !== 'tasks-changed' && e.type !== 'team-pause-changed') || boardSoon) return
     boardSoon = setTimeout(() => {
       boardSoon = null
       void settleAll().catch((x) => log.warn('settling the slots after a board change', x))

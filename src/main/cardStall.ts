@@ -1,7 +1,7 @@
 import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
-import { backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, type LaneOrderView, type StallAgent } from '../shared/tasks'
+import { REVIEW_WAIT_STALL_MS, backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, type LaneOrderView, type StallAgent } from '../shared/tasks'
 import type { AgentInfo, AgentStart, LaneStatus, ProgressRun, TaskCard } from '../shared/types'
 import { LOOP_STEP_WAIT_MINUTES, laneStatusText } from '../shared/lanes'
 import { forYouOfCards } from './workflow/cardWork'
@@ -12,6 +12,7 @@ import { startNow, startSeq } from './agentStarts'
 import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
 import { config } from './config'
+import { pausedFor, resumedAt } from './teamPause'
 
 /**
  * Why a card is stalled, in one place (the Agent API's `stalled`, and lane watches, #531): a Doing card nobody works on
@@ -172,20 +173,27 @@ function ownQuestionOpen(wsPath: string, c: TaskCard, agentId: string): boolean 
  * check (stepWaitMs: its project's workflow option Design check wait, HI-1766).
  */
 export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null): string | null {
+  // Its team paused (HI-2081): its agents parking (idle, stopped, not watching) is what was asked of them, never a stall.
+  // Once it resumes the usual checks apply again, each timed one counted from the resume too (HR1's s12 check): it needs
+  // its own wait since then as well as since what it times.
+  const at = wsPath && c.project ? join(wsPath, c.project) : null
+  if (at && pausedFor(at)) return null
+  const resumed = at ? resumedAt(at) : 0
+  const waited = (ms: number): boolean => Date.now() - resumed >= ms
   const live = wsPath ? liveOf(wsPath) : []
   const watchers = live.filter((a) => a.cards.length)
   const builder = (returned || stale) && c.agent && c.project ? live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project!.toLowerCase()) : undefined
   const now = builder ? { name: builder.name, status: builder.status, watching: builder.cards.length > 0 } : null
-  const back = now ? (returnedWaitReason(c, returned, now) ?? staleWaitReason(c, stale, now)) : null
+  const back = now ? ((waited(RETURN_STALL_MS) ? returnedWaitReason(c, returned, now) : null) ?? (waited(STALE_STALL_MS) ? staleWaitReason(c, stale, now) : null)) : null
   // A started review's builder's job for the card (HI-1993): only read for a card it could stall.
   const job = c.column === 'review' && c.review && c.agent && wsPath ? builderJobOf(c, runsOf?.(wsPath) ?? [], live.find((a) => a.agentId === c.agent && a.project.toLowerCase() === c.project.toLowerCase()) ?? null, backgroundTaskMinutes(config.settings.agents.backgroundTaskMinutes) * 60_000) : null
   // HI-2080: a reviewer waiting on its own question to the user (For you) isn't stalled for only watching the card; the
   // board is read only for a card that would be.
   const verdictWait = (): string | null => {
-    const why = reviewVerdictWaitReason(c, watchers, Date.now(), undefined, job)
+    const why = waited(REVIEW_WAIT_STALL_MS) ? reviewVerdictWaitReason(c, watchers, Date.now(), undefined, job) : null
     return why && wsPath && c.review && ownQuestionOpen(wsPath, c, c.review.agent) ? null : why
   }
-  return startFailedReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? reviewWaitReason(c, watchers) ?? verdictWait() ?? laneOrderWaitReason(c, lane, watchers) ?? loopStepWaitReason(c, watchers, stepWaitMs) ?? laneNext(c, lane, live, agentNow) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
+  return startFailedReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? (waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers) : null) ?? verdictWait() ?? (waited(REVIEW_WAIT_STALL_MS) ? laneOrderWaitReason(c, lane, watchers) : null) ?? (waited(REVIEW_WAIT_STALL_MS) ? loopStepWaitReason(c, watchers, stepWaitMs) : null) ?? (waited(LANE_NEXT_STALL_MS) ? laneNext(c, lane, live, agentNow) : null) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
 }
 
 /**
