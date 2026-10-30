@@ -331,6 +331,9 @@ const prose = (seed, n) => {
   check('a card made on a lane: its key, then the lane updated with it', !!placedKey && placed.split('\n').length === 2 && placed.split('\n')[1].startsWith('Lane updated: Coder / Tester (alpha) measured lane: ') && placed.split('\n')[1].includes(placedKey), placed)
   const elsewhere = tool('hive_create_task', { title: 'Not placed', lane: 'Tester' }, 'own')
   check("…another builder's lane: refused, no card made", elsewhere.isError && /its own lane only/.test(elsewhere.text) && !(await inv('tasks:list')).some((c) => c.title === 'Not placed'), elsewhere.text)
+  // The placed card goes again, so the board's counts below stay.
+  const placedCard = (await inv('tasks:list')).find((c) => c.title === 'Placed card')
+  if (placedCard) await inv('tasks:delete', placedCard.number)
   check('a lane ended', measure('hive_lane (end)', tool('hive_lane', { action: 'end', lane: laneId, abandoned: true }), 400).startsWith('Lane abandoned: '), texts['hive_lane (end)'])
   tool('hive_wait_for_tasks', { cancel: true }, 'own')
   check('…and no longer waits once it has ended', !!(await until(async () => ['ready', 'finished'].includes((await live(alpha, coder.id))?.status), HUNG_MS)), (await live(alpha, coder.id))?.status)

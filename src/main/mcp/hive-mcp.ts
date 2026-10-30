@@ -633,8 +633,8 @@ const tools: Tool[] = [
   {
     name: 'hive_lane',
     description: ASSISTANT
-      ? `Lanes: a builder and reviewer taking a project's cards in order (card-loop). start (builder, reviewer or pool, cards; brief, given with each card: never prompt it separately), end (abandoned=true: unfinished), list. A card you create goes on a lane with hive_create_task's lane, never by a guessed key. (detail: use-hive-api, tools.md)${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works.'}`
-      : "Your card loop's lane. start (the builder: cards in order and reviewer; again to change the list; a card you create goes on it with hive_create_task's lane), join (the reviewer: builder), next (your next card, or why it waits), list. It ends by itself when every card is Done; abandoning it is the user's. (detail: use-hive-api, tools.md)",
+      ? `Lanes: a builder and reviewer taking a project's cards in order (card-loop). start (builder, reviewer or pool, cards; brief, given with each card: never prompt it separately), end (abandoned=true: unfinished), list. (detail: use-hive-api, tools.md)${controlAllows(CONTROL, 'agents') ? '' : ' At Look and advise only list works.'}`
+      : "Your card loop's lane. start (the builder: cards in order and reviewer; again to change the list), join (the reviewer: builder), next (your next card, or why it waits), list. It ends by itself when every card is Done; abandoning it is the user's. (detail: use-hive-api, tools.md)",
     inputSchema: {
       type: 'object',
       properties: {
@@ -827,9 +827,9 @@ const tools: Tool[] = [
         lane: {
           type: ['string', 'object'],
           description: ASSISTANT
-            ? "Put it on a lane as it is made, never by a guessed key: a builder's name (last on its running lane), or { builder, reviewer, brief, name, position } (starts one if it has none)."
-            : 'Put it on your own lane as it is made, never by a guessed key: your name (last on it), or { builder: you, reviewer, position } (starts one if you have none).',
-          properties: { builder: { type: 'string' }, reviewer: { type: 'string' }, brief: { type: 'string' }, name: { type: 'string' }, position: { type: 'string', enum: ['last', 'next'], description: 'next: before its first card still in Todo.' } }
+            ? "Put it on a lane as it is made, never by a guessed key: a builder's name, or { builder, reviewer, brief, position }."
+            : 'Onto your lane: your name, or { builder, reviewer, position }.',
+          properties: { builder: { type: 'string' }, reviewer: { type: 'string' }, brief: { type: 'string' }, name: { type: 'string' }, position: { type: 'string', enum: ['last', 'next'], ...(ASSISTANT ? { description: 'next: before its first card still in Todo.' } : {}) } }
         }
       },
       required: ['title']
