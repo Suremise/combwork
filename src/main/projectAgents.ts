@@ -7,7 +7,7 @@ import { forgetPtys } from './ptyHost'
 import { agentProvider, isKnownProvider } from '../shared/providers'
 import { cleanMcpServers } from '../shared/agentMcp'
 import { isWorkflowRole, type WorkflowRole } from '../shared/workflow/roles'
-import type { AddAgentOptions, AddedAgent, AgentBranchStatus, AgentDef, AgentPatch, Connection, LaunchValues, MergeResult, ProjectConfig, ProjectGitInfo, ProjectProviderConfig, ProviderId, RemovedAgent, SessionLayout, WorktreeCheck, WorktreeMatch } from '../shared/types'
+import type { AddAgentOptions, AddedAgent, AgentBranchStatus, AgentDef, AgentPatch, Connection, MergeResult, ProjectConfig, ProjectGitInfo, ProviderId, RemovedAgent, SessionLayout, WorktreeCheck, WorktreeMatch } from '../shared/types'
 import { config } from './config'
 import { slotLevelsOf } from './slots'
 import { slotCopyOf } from '../shared/slotDefaults'
@@ -27,9 +27,9 @@ import { listOf, shownText, withValues, type Text } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { capturedText, HiveError, hiveError, shownError } from './hiveError'
 import { providerService } from './providerService'
-import { accountById, allConnections, assertEffortTaken, firstUsableAccount, assertConnectionHere, connectionProblem, connectionWith, firstAccountHere, getConnection } from './accounts'
+import { accountById, allConnections, firstUsableAccount, assertConnectionHere, connectionProblem, firstAccountHere, getConnection } from './accounts'
 import { ensureMigrated, saveConnections } from './connectionMoves'
-import { baseConnection, valuesOf } from '../shared/accounts'
+import { baseConnection } from '../shared/accounts'
 import { assertNameFree, withAgentNames, workspaceAgents } from './agentNames'
 import { sameAgentName } from '../shared/agentNames'
 import { chooseSpace, hiveBranch, reusableBranches, type BranchHome } from '../shared/hiveBranches'
@@ -55,39 +55,25 @@ const M = {
   notChecked: msg({ id: 'worktrees.reuse.notChecked', defaultMessage: 'not checked', description: "Why an unused worktree isn't reused for a new agent: it wasn't checked. A clause, lower case." })
 }
 
-/** The launch fields today's screens and the Agent API still send for an agent (the adapter until HI-2108). */
-type LaunchPatch = Partial<Record<'model' | 'effort' | 'permissionMode' | 'extraArgs', string | null>> & { use200kContext?: boolean | null }
-
 /**
- * The connection an agent gets from what today's screens and the Agent API send (HI-2106, the adapter until HI-2108): a
- * connection's id as it is; else on the account named (an account's id), else on its current connection's account, else
- * its CLI's first usable here, the connection with its current connection's values (or the account's base connection's)
- * and the patch's over them (a value emptied: the base connection's), made if none is. Undefined: its CLI has no account
- * here (it launches on none). An effort its model doesn't take is refused (decision E).
+ * The connection an agent gets (HI-2122: an agent has no model, effort, mode or context of its own, so nothing makes one
+ * for it): the connection named, on in this workspace for its CLI (else refused, saying why: HI-1769); none named, the
+ * one it has when it stays on its CLI, else its CLI's first usable here (decision A). Undefined: its CLI has no account
+ * here (it launches on none).
  */
-function connectionFrom(projectPath: string, cli: ProviderId, named: string | null | undefined, current: Connection | undefined, patch: LaunchPatch, agent: string): string | undefined {
-  const given = (['model', 'effort', 'permissionMode', 'use200kContext', 'extraArgs'] as const).filter((k) => k in patch)
+function connectionFor(projectPath: string, cli: ProviderId, named: string | null | undefined, current: Connection | undefined, agent: string): string | undefined {
   const asConnection = getConnection(named)
-  // The one it has, named again with nothing changed: kept, even off here (checked with the write: HI-1769).
-  if (current && !given.length && (named === current.id || named === current.account)) return current.id
-  if (asConnection && !given.length) {
+  // The one it has, named again (or its account): kept, even off here (checked with the write: HI-1769).
+  if (current && (named === current.id || named === current.account)) return current.id
+  if (asConnection) {
     assertConnectionHere(asConnection.account, cli, projectPath, agent)
     return asConnection.id
   }
-  if (named && !asConnection) assertConnectionHere(named, cli, projectPath, agent)
-  const sameAccount = current && accountById(current.account)?.provider === cli ? current : undefined
-  const account = accountById(asConnection?.account ?? named ?? sameAccount?.account) ?? firstAccountHere(cli, workspaceOf(projectPath).path ? workspaceOf(projectPath).config : null)
-  if (!account) return undefined
-  const base = baseConnection(account.id, allConnections())
-  const from = asConnection ?? (sameAccount?.account === account.id ? sameAccount : base)
-  if (!given.length && from) return from.id
-  const values: LaunchValues = { ...valuesOf(from ?? {}) }
-  for (const k of given) {
-    const v = patch[k]
-    ;(values as Record<string, unknown>)[k] = v === null || v === '' || v === undefined ? base?.[k] : v
-  }
-  if (values.effort && (given.includes('effort') || given.includes('model'))) assertEffortTaken(cli, values.model ?? null, account, values.effort)
-  return connectionWith(account.id, values).id
+  // An account named: its base connection.
+  if (named) assertConnectionHere(named, cli, projectPath, agent)
+  else if (current && accountById(current.account)?.provider === cli) return current.id
+  const account = accountById(named) ?? firstAccountHere(cli, workspaceOf(projectPath).path ? workspaceOf(projectPath).config : null)
+  return account ? baseConnection(account.id, allConnections())?.id : undefined
 }
 
 /**
@@ -386,15 +372,12 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
   if (opts.workflowRole !== undefined) def.workflowRole = cleanWorkflowRole(opts.workflowRole)
   const mcpServers = cleanMcpServers(opts.mcpServers)
   if (mcpServers) def.mcpServers = mcpServers
-  // Its connection (HI-2106): the one named, or the one with the model, effort, mode and context given on the account named
-  // (on in this workspace, else refused, saying why: HI-1769) or its CLI's first usable here; checked again with the write.
+  // Its connection (HI-2106): the one named (on in this workspace, else refused, saying why: HI-1769), else its CLI's first
+  // usable here; checked again with the write. None when its CLI has no account here yet (it gets one once one is).
   await ensureMigrated(projectPath)
-  const launch: LaunchPatch = { ...(opts.model ? { model: opts.model } : {}), ...(opts.effort ? { effort: opts.effort } : {}), ...(opts.permissionMode ? { permissionMode: opts.permissionMode } : {}), ...(typeof opts.use200kContext === 'boolean' ? { use200kContext: opts.use200kContext } : {}) }
-  const connection = connectionFrom(projectPath, provider, opts.connection, undefined, launch, name)
+  const connection = connectionFor(projectPath, provider, opts.connection, undefined, name)
   if (connection) def.connection = connection
-  // Its CLI has no account here yet: what it was given waits on it, for the connection it gets once one is (placeUnplaced).
-  else Object.assign(def, launch)
-  // A connection made for it is saved before the agent naming it is.
+  // A test home's account made for it is saved before the agent naming it is.
   await saveConnections()
 
   return { def, discard: async () => undefined }
@@ -430,8 +413,9 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   // Its CLI follows the connection named (HI-2108): another CLI's is a change of CLI, made only while it is stopped.
   const namedCli = accountById(getConnection(patch.connection)?.account)?.provider
   if (namedCli && patch.provider === undefined) patch.provider = namedCli
-  // Empty values clear an override so the agent follows the project again (and an empty role: its name is its role).
-  const { use200kContext, mcpServers, workflowRole, connection, model, effort, permissionMode, ...rest } = patch
+  // An empty role: its name is its role. A model, effort, mode or context sent (from before HI-2122) is no agent's: dropped.
+  const { mcpServers, workflowRole, connection, ...withLaunch } = patch
+  const { model: _m, effort: _e, permissionMode: _p, use200kContext: _c, ...rest } = withLaunch as typeof withLaunch & { model?: unknown; effort?: unknown; permissionMode?: unknown; use200kContext?: unknown }
   const clean: Partial<AgentDef> = { ...rest }
   if ('role' in clean) clean.role = cleanRole(clean.role) || undefined
   // null clears it (an undo of the Assistant's change, #1282): the guess again. Absent, it stays as it is.
@@ -440,10 +424,8 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   // null: all of the project's servers again (#537).
   if (mcpServers !== undefined) clean.mcpServers = cleanMcpServers(mcpServers)
   if ('mode' in clean && !clean.mode) clean.mode = undefined
-  // Its model, effort, mode, context, connection or CLI (HI-2106, the adapter until HI-2108): the connection with them,
-  // on its account or the one named (connectionFrom), made before the write and checked again with it.
-  const launch: LaunchPatch = { ...('model' in patch ? { model } : {}), ...('effort' in patch ? { effort } : {}), ...('permissionMode' in patch ? { permissionMode } : {}), ...(use200kContext !== undefined ? { use200kContext } : {}) }
-  const touches = connection !== undefined || patch.provider !== undefined || Object.keys(launch).length > 0
+  // Its connection or CLI (connectionFor), worked out before the write and checked again with it.
+  const touches = connection !== undefined || patch.provider !== undefined
   let cfgNow = cfg
   if (touches) {
     await ensureMigrated(projectPath)
@@ -463,19 +445,12 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   if (touches && before) {
     const cli = patch.provider ?? agentProvider(before, cfgNow, config.settings)
     const changedCli = cli !== agentProvider(before, cfgNow, config.settings)
-    // Another CLI's model, effort, mode and context aren't carried over: only what the patch gives.
     // Cleared (null): its CLI's first usable here, as none chosen ran on before (decision H: it always names one).
     const cleared = connection === null || connection === ''
-    clean.connection = connectionFrom(projectPath, cli, connection || undefined, changedCli || cleared ? undefined : getConnection(before.connection), launch, before.name)
-    Object.assign(clean, { model: undefined, effort: undefined, permissionMode: undefined, use200kContext: undefined })
-    // Its CLI has no account here yet: what it was given waits on it (placeUnplaced), an emptied value gone, the rest kept
-    // (another CLI's not carried over).
-    if (!clean.connection) {
-      const kept = changedCli ? {} : { model: before.model, effort: before.effort, permissionMode: before.permissionMode, use200kContext: before.use200kContext }
-      const given = Object.fromEntries(Object.entries(launch).map(([k, v]) => [k, v === '' || v === null ? undefined : v]))
-      Object.assign(clean, kept, given)
-    }
-    // A connection made for it is saved before the agent naming it is.
+    clean.connection = connectionFor(projectPath, cli, connection || undefined, changedCli || cleared ? undefined : getConnection(before.connection), before.name)
+    // Another CLI's: what it kept from before HI-2106 while it had no account (placeUnplaced's) isn't carried over.
+    if (changedCli) Object.assign(clean, { model: undefined, effort: undefined, permissionMode: undefined, use200kContext: undefined })
+    // A test home's account made for it is saved before the agent naming it is.
     await saveConnections()
   }
   // A name: free across the workspace (#702), checked holding the names lock against the agent as saved then, just
@@ -515,49 +490,6 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   await workspaceOf(projectPath).refresh()
   return def
 }
-
-/**
- * A project's provider settings changed through today's Project Settings (HI-2106, the adapter until HI-2107): each of its
- * agents of that CLI goes on the connection with them over its own (Inherit, or empty arguments: its account's base
- * connection's; the project's extra arguments after its base connection's, as they were added to the CLI's), made if
- * none is. Nothing is kept in project.json: launches read the connections.
- */
-export async function applyProjectLaunch(projectPath: string, providers: Partial<Record<ProviderId, Partial<ProjectProviderConfig>>>): Promise<void> {
-  await ensureMigrated(projectPath)
-  for (const { id } of projectAgents(await workspace.projectConfig(projectPath))) {
-    // Worked out from its connection as saved, and written only if it is still that one (another change came between:
-    // worked out again from it, so neither is lost).
-    for (let tries = 0; ; tries++) {
-      const a = projectAgents(await workspace.projectConfig(projectPath)).find((x) => x.id === id)
-      const pc = a?.provider ? providers[a.provider] : undefined
-      if (!a || !pc) break
-      const patch: LaunchPatch = {}
-      for (const k of ['model', 'effort', 'permissionMode'] as const) if (k in pc) patch[k] = pc[k] === 'inherit' ? null : (pc[k] as string)
-      if ('use200kContext' in pc) patch.use200kContext = pc.use200kContext === 'on' ? true : pc.use200kContext === 'off' ? false : null
-      if ('extraArgs' in pc) {
-        const base = baseConnection(getConnection(a.connection)?.account ?? '', allConnections())?.extraArgs ?? ''
-        patch.extraArgs = [base, pc.extraArgs ?? ''].filter((x) => x.trim()).join(' ') || null
-      }
-      const next = connectionFrom(projectPath, a.provider!, undefined, getConnection(a.connection), patch, a.name)
-      if (!next || next === a.connection) break
-      await saveConnections()
-      let stale = false
-      await workspace.updateAgent(projectPath, id, { connection: next }, (cur) => {
-        if (cur.connection === a.connection) return
-        stale = true
-        throw new ChangedMeanwhile()
-      }).catch((e) => {
-        if (!(e instanceof ChangedMeanwhile)) throw e
-      })
-      if (!stale) break
-      if (tries >= 2) throw hiveError(msg({ id: 'worktrees.agent.providerChangedMeanwhile', defaultMessage: "{agent}'s provider was changed meanwhile: nothing was changed. Try again.", description: "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name." }), { agent: a.name }, { kind: 'conflict' })
-    }
-  }
-  await workspaceOf(projectPath).refresh()
-}
-
-/** An agent's connection changed by something else between applyProjectLaunch's read and its write. */
-class ChangedMeanwhile extends Error {}
 
 /**
  * Removes an agent (stopped). `releaseCards` takes its open cards from it too (Doing ones back to Todo). `deleteWorktree`

@@ -3843,7 +3843,8 @@ module.exports.SCENARIOS.push({
 async function team(c) {
   const like = c.agents.coder
   for (const [k, name] of [['builder2', 'Builder2'], ['reviewer2', 'Reviewer2']]) {
-    c.agents[k] = await c.inv('agents:add', c.alpha, { location: 'project', name, provider: like.provider, model: like.model ?? '', effort: like.effort ?? '', permissionMode: like.permissionMode })
+    // On Coder's connection (HI-2122: an agent's model, effort and mode are its connection's).
+    c.agents[k] = await c.inv('agents:add', c.alpha, { location: 'project', name, provider: like.provider, connection: like.connection })
   }
 }
 /**

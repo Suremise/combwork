@@ -32,7 +32,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const { sessions } = await import('../src/main/sessions')
 const { providerService } = await import('../src/main/providerService')
 const { config } = await import('../src/main/config')
-const { updateAgent } = await import('../src/main/projectAgents')
+const accounts = await import('../src/main/accounts')
 
 const wsPath = join(base, 'ws')
 const p = join(wsPath, 'amberlight')
@@ -42,8 +42,8 @@ let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 /** A refresh of the project's agents, as the window's after a session starts or stops. */
 const refresh = () => run(async () => sessions.liveInfo(p, await w.projectConfig(p)))
-// Its mode is its connection's (HI-2106): changed as Agent Settings changes it.
-const setMode = (mode: string) => run(() => updateAgent(p, 'amb1', { permissionMode: mode as never }))
+// Its mode is its connection's (HI-2106): changed as the connection dialog changes it (HI-2122).
+const setMode = (mode: string) => run(async () => accounts.updateConnection((await w.projectConfig(p)).agents.find((a) => a.id === 'amb1')!.connection!, { permissionMode: mode as never }))
 /** Bounds a hung run only: the offer is sent 400 ms after the refresh that makes it. */
 const HUNG_MS = 10000
 const offered = () => s.modeOffers.size > 0 || s.modeOfferTimer !== null

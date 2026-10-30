@@ -977,9 +977,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       // Its version control switches only with its checks and its options kept per platform (#1419): workflow:setPlatform.
       if (patch.platform !== undefined) throw new HiveError({ lines: ["A project's version control changes through workflow:setPlatform"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
       const projectPath = workspace.assertProject(p)
-      // Its provider pages (HI-2106, the adapter until HI-2107): its agents' connections take them; project.json keeps none.
-      const { providers, defaultProvider: _d, ...rest } = patch
-      if (providers) return projectAgents.applyProjectLaunch(projectPath, providers).then(() => workspace.updateProjectConfig(projectPath, rest))
+      // A project has no provider pages or default provider since HI-2106/HI-2107: its agents' connections hold what they
+      // set (HI-2122: nothing is made from them), and project.json keeps none.
+      const { providers: _p, defaultProvider: _d, ...rest } = patch
       return workspace.updateProjectConfig(projectPath, rest)
     },
     'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
@@ -1038,12 +1038,6 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       p = workspace.assertProject(p)
       await untrackHive(p, confirmed)
       return workspace.refresh()
-    },
-    'project:updateProvider': (p, provider, patch) => {
-      const id = knownProvider(provider)
-      assertExtraArgs(patch.extraArgs)
-      // Its agents' connections take it (HI-2106, the adapter until HI-2107); project.json keeps none.
-      return projectAgents.applyProjectLaunch(workspace.assertProject(p), { [id]: patch }).then(() => workspace.projectConfig(workspace.assertProject(p)))
     },
     'project:openInExplorer': (p) => void shell.openPath(workspace.assertProject(p)),
     'project:openTerminal': async (p) => {

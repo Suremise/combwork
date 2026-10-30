@@ -344,17 +344,18 @@ function agentPatch(back: readonly FieldChange[]): AgentPatch {
   const p: AgentPatch = {}
   for (const v of back) {
     const old = v.old as Value
-    if (v.field === 'use200kContext') p.use200kContext = typeof old === 'boolean' ? old : null
-    else if (v.field === 'mcpServers') p.mcpServers = Array.isArray(old) ? (old as string[]) : null
+    if (v.field === 'mcpServers') p.mcpServers = Array.isArray(old) ? (old as string[]) : null
     else if (v.field === 'workflowRole') p.workflowRole = isWorkflowRole(old) ? old : null
     else if (v.field === 'connection') p.connection = typeof old === 'string' ? old : null
-    // A change recorded before HI-2108 (its connection's values as the agent's): the connection on its account with them.
-    else if (v.field === 'name' || v.field === 'model' || v.field === 'effort' || v.field === 'permissionMode') (p as Record<string, unknown>)[v.field] = old ?? ''
+    else if (v.field === 'name') p.name = typeof old === 'string' ? old : ''
   }
   return p
 }
 
 const PROVIDER_SET: readonly string[] = ['provider', ...PROVIDER_DEPENDENTS]
+/** An agent's own launch settings as changes before HI-2108 recorded them: none can be put back since HI-2122. */
+const OWN_LAUNCH = ['model', 'effort', 'permissionMode', 'use200kContext'] as const
+const OWN_LAUNCH_GONE = "An agent has no model, effort, mode or context of its own any more: its connection holds them, which the user changes." // i18n-ignore: an Agent API reply (English)
 const AGENT_RUNNING = 'Stop the agent before its provider goes back.' // i18n-ignore: an Agent API reply (English)
 
 /** What of an agent a template's load made undo compares (HI-1502): who it is and its settings, never its conversation. */
@@ -472,10 +473,14 @@ async function undoAgent(ws: WorkspaceService, c: RecordedChange, guard: Guard):
   // Choose Connections… (HI-2109): its connection by id, with its CLI and last conversation when they changed with it.
   if (c.values.some((v) => v.field === CONNECTION_ID)) return undoConnection(projectPath, agentId, def, c.values, guard)
   const current = (d: AgentDef, f: string): unknown => d[f as keyof AgentDef] ?? null
-  const withProvider = c.values.some((v) => v.field === 'provider')
-  const set = withProvider ? c.values.filter((v) => PROVIDER_SET.includes(v.field)) : []
-  const others = c.values.filter((v) => !set.includes(v))
-  const out: Outcome = { undone: [], skipped: [] }
+  // A model, effort, mode or context recorded as the agent's before HI-2108: an agent has none of its own since HI-2122,
+  // so it can't be put back (its connection holds them: the user changes that connection).
+  const ownLaunch = c.values.filter((v) => (OWN_LAUNCH as readonly string[]).includes(v.field))
+  const values = c.values.filter((v) => !ownLaunch.includes(v))
+  const withProvider = values.some((v) => v.field === 'provider')
+  const set = withProvider ? values.filter((v) => PROVIDER_SET.includes(v.field)) : []
+  const others = values.filter((v) => !set.includes(v))
+  const out: Outcome = { undone: [], skipped: ownLaunch.map((v) => ({ field: v.field, why: 'failed' as const, error: OWN_LAUNCH_GONE })) } // i18n-ignore: an Agent API reply (English)
   // Its other settings: each as any undo of a field, through updateAgent and its check.
   const { back, undone, skipped } = plan(others, (f) => current(def, f))
   out.undone.push(...undone)

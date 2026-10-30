@@ -97,7 +97,6 @@ import type {
   NoteFile,
   PlanUsage,
   ProjectConfig,
-  ProjectProviderConfig,
   ProviderId,
   ProviderTask,
   ProjectGitInfo,
@@ -451,8 +450,6 @@ export interface HiveRequests {
   'project:hiveTracked': (projectPath: string) => string[]
   /** `git rm --cached` of exactly the files confirmed (#364), refused if git tracks others now: their removal staged, the files left on disk. */
   'project:untrackHive': (projectPath: string, files: string[]) => WorkspaceInfo
-  /** Changes one provider's overrides for a project, merged under the file lock. */
-  'project:updateProvider': (projectPath: string, provider: ProviderId, patch: Partial<ProjectProviderConfig>) => ProjectConfig
   'project:openInExplorer': (projectPath: string) => void
   'project:openTerminal': (projectPath: string) => void
   /** What hiding, removing or deleting the project would touch (Project → Remove Project…). */

@@ -95,7 +95,6 @@
   "actions.project.newMessage": "Im Arbeitsbereich wird ein neuer Ordner erstellt. Hive legt seinen Metadatenordner .hive automatisch an.",
   "actions.project.newTitle": "Neues Projekt",
   "actions.project.noWorkspace": "Öffne zuerst einen Arbeitsbereich",
-  "actions.project.saveFailed": "Projekteinstellungen konnten nicht gespeichert werden",
   "actions.project.stopAndDeactivate": "Stoppen und deaktivieren",
   "actions.provider.lookingMessage": "Hive ermittelt noch, welche Coding-Agent-CLIs installiert sind. Versuch es gleich noch einmal.",
   "actions.provider.lookingTitle": "Suche nach Coding-Agents läuft noch",

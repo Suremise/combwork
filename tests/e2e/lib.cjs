@@ -329,14 +329,62 @@ async function waitForProvider(inv, provider = 'claude-code', timeoutMs = 60000)
   throw new Error(`${provider}: still looking for it after ${timeoutMs / 1000} s`)
 }
 
-/** Adds an agent (Claude Code in the project folder unless told otherwise); returns its definition. */
+/** What a connection sets, by the name an agent's own settings had before HI-2122 (the launch values). */
+const LAUNCH_KEYS = ['model', 'effort', 'permissionMode', 'use200kContext', 'extraArgs']
+
 /**
- * Adds an agent. One in a worktree of its own (`location`: new-worktree or existing-worktree) is a 0.9 agent, as an
- * upgraded project has one: 1.0 adds none (#1451), so the test copies' channel makes it (`agents:testLegacy`).
+ * Adds an agent (Claude Code in the project folder unless told otherwise); returns its definition. One in a worktree of
+ * its own (`location`: new-worktree or existing-worktree) is a 0.9 agent, as an upgraded project has one: 1.0 adds none
+ * (#1451), so the test copies' channel makes it (`agents:testLegacy`). A model, effort, permission mode, 200K context or
+ * extra arguments given are its connection's since HI-2122 (an agent has none of its own): it gets the connection on its
+ * account with them (setLaunch).
  */
-function addAgent(inv, proj, opts = {}) {
+async function addAgent(inv, proj, opts = {}) {
   const legacy = opts.location === 'new-worktree' || opts.location === 'existing-worktree'
-  return inv(legacy ? 'agents:testLegacy' : 'agents:add', proj, { location: 'project', provider: 'claude-code', ...opts })
+  const values = Object.fromEntries(LAUNCH_KEYS.filter((k) => opts[k] !== undefined).map((k) => [k, opts[k]]))
+  const rest = Object.fromEntries(Object.entries(opts).filter(([k]) => !LAUNCH_KEYS.includes(k)))
+  const def = await inv(legacy ? 'agents:testLegacy' : 'agents:add', proj, { location: 'project', provider: 'claude-code', ...rest })
+  return Object.values(values).some((v) => v !== '' && v !== null && v !== false) ? setLaunch(inv, proj, def.id, values) : def
+}
+
+/**
+ * Gives an agent a model, effort, permission mode, 200K context or extra arguments (HI-2122: they are its connection's):
+ * the connection on its account with its current connection's values and these over them ('' or null: the CLI's own),
+ * one already there if any, else one made (connection:add, as the connection dialog makes it); then the agent is
+ * pointed at it. Returns the agent as saved. Its CLI must have an account here (a test home's counts).
+ */
+async function setLaunch(inv, proj, agentId, values) {
+  const rows = (await inv('connections:list')).connectionRows
+  const ws = await inv('workspace:refresh')
+  const host = [...ws.projects, ...(ws.assistant ? [ws.assistant] : [])].find((p) => p.path.toLowerCase() === proj.toLowerCase())
+  const agent = host?.agents.find((a) => a.id === agentId)
+  const current = rows.find((c) => c.id === agent?.connection)
+  if (!current) throw new Error(`setLaunch: ${agentId} has no connection to start from`)
+  const next = Object.fromEntries(LAUNCH_KEYS.filter((k) => current[k] !== undefined).map((k) => [k, current[k]]))
+  for (const [k, v] of Object.entries(values)) {
+    if (v === '' || v === null || v === undefined || v === false || v === 'inherit') delete next[k]
+    else next[k] = v
+  }
+  const same = (c) => LAUNCH_KEYS.every((k) => (c[k] ?? null) === (next[k] ?? null))
+  let target = rows.find((c) => c.account === current.account && same(c))
+  if (!target) {
+    const taken = new Set(rows.filter((c) => c.account === current.account).map((c) => c.name.toLowerCase()))
+    const label = LAUNCH_KEYS.filter((k) => next[k] !== undefined).map((k) => (next[k] === true ? '200K' : String(next[k]))).join(' · ') || 'CLI defaults'
+    let name = `Test · ${label}`
+    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `Test · ${label} (${n})`
+    target = await inv('connection:add', current.account, { name, ...Object.fromEntries(LAUNCH_KEYS.map((k) => [k, next[k] ?? null])) })
+  }
+  return inv('agents:update', proj, agentId, { connection: target.id })
+}
+
+/**
+ * setLaunch for each of a project's agents on one CLI, as Project Settings' provider page did before HI-2122: there are
+ * no project-wide launch values, only each agent's connection.
+ */
+async function setProjectLaunch(inv, proj, provider, values) {
+  const ws = await inv('workspace:refresh')
+  const host = ws.projects.find((p) => p.path.toLowerCase() === proj.toLowerCase())
+  for (const a of host?.agents ?? []) if (a.provider === provider) await setLaunch(inv, proj, a.id, values)
 }
 
 /** Makes a project's only agent (removing any others first): for suites that reuse a workspace. */
@@ -1650,4 +1698,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { projectConfig, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, inboxPending, agentQuiet, typeLine, fakePrompts, skip }
+module.exports = { projectConfig, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, inboxPending, agentQuiet, typeLine, fakePrompts, skip }

@@ -75,17 +75,15 @@ describe('detection before Automatic decides (#506)', () => {
     await expect(providerService.settle('codex')).rejects.toThrow(/still looking for Codex/)
   })
 
-  it("doesn't wait for a provider turned off, or when a default was chosen", async () => {
+  it("doesn't wait for a provider turned off, or when a CLI is named", async () => {
     config.update((c) => {
       c.settings.providers.copilot = { ...c.settings.providers.copilot, enabled: false }
     })
     hear('claude-code', false)
     hear('codex', true)
     expect(await providerService.detected()).toBe(true)
-    config.update((c) => {
-      c.settings.defaultProvider = 'codex'
-    })
+    // No default provider since HI-2106 (decision A): an agent naming its CLI doesn't wait on the others.
     hear('claude-code', null)
-    expect((await prepareAgent(join(base, 'p'), DEFAULT_PROJECT_CONFIG, { location: 'project' }, 'Codex', [])).def.provider).toBe('codex')
+    expect((await prepareAgent(join(base, 'p'), DEFAULT_PROJECT_CONFIG, { location: 'project', provider: 'codex' }, 'Codex', [])).def.provider).toBe('codex')
   })
 })

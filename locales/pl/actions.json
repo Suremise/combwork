@@ -95,7 +95,6 @@
   "actions.project.newMessage": "W obszarze roboczym powstanie nowy folder. Hive sam doda do niego folder metadanych .hive.",
   "actions.project.newTitle": "Nowy projekt",
   "actions.project.noWorkspace": "Najpierw otwórz obszar roboczy",
-  "actions.project.saveFailed": "Nie udało się zapisać ustawień projektu",
   "actions.project.stopAndDeactivate": "Zatrzymaj i dezaktywuj",
   "actions.provider.lookingMessage": "Hive wciąż sprawdza, które CLI agentów programistycznych są zainstalowane. Spróbuj ponownie za chwilę.",
   "actions.provider.lookingTitle": "Wciąż szukam agentów programistycznych",

@@ -1780,7 +1780,7 @@ export interface AgentDef {
 }
 
 /** A change to an agent's settings: empty values (null for use200kContext and mcpServers) clear an override so it follows the project. */
-export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'model' | 'effort' | 'permissionMode' | 'mode' | 'role'>> & { use200kContext?: boolean | null; mcpServers?: string[] | null; workflowRole?: WorkflowRole | null; connection?: string | null }
+export type AgentPatch = Partial<Pick<AgentDef, 'name' | 'provider' | 'mode' | 'role'>> & { mcpServers?: string[] | null; workflowRole?: WorkflowRole | null; connection?: string | null }
 
 /** Why a connection can't be an agent's own choice here (HI-1769): removed, another CLI's, or off in its workspace. */
 export type ConnectionProblem = 'missing' | 'otherCli' | 'off'
@@ -1893,17 +1893,14 @@ export interface AddAgentOptions {
   base?: string
   /** existing-worktree: its folder. */
   worktreePath?: string
+  /** Its CLI when no connection is named (HI-2122): that CLI's first usable connection here. */
   provider?: ProviderId
-  model?: string
-  effort?: EffortLevel
-  permissionMode?: PermissionMode
-  use200kContext?: boolean
   role?: string
   /** Which side of the workflow it takes (#1430); absent, the guess from its note or name. */
   workflowRole?: WorkflowRole
   /** Only these of the project's MCP servers (#537); absent: all of them. */
   mcpServers?: string[]
-  /** The connection it runs on (HI-1755), when it is on in the workspace; absent (or not on): the workspace's default. */
+  /** The connection it runs on (HI-2108: its id), on in the workspace; absent: the first usable here (decision A). */
   connection?: string
   /**
    * #456: new-worktree, work in the project's unused worktree on that branch instead when it is merged into the base and

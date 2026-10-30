@@ -95,7 +95,6 @@
   "actions.project.newMessage": "ワークスペースに新しいフォルダーを作成します。Hiveがメタデータ用の.hiveフォルダーを自動で追加します。",
   "actions.project.newTitle": "新しいプロジェクト",
   "actions.project.noWorkspace": "先にワークスペースを開いてください",
-  "actions.project.saveFailed": "プロジェクトの設定を保存できませんでした",
   "actions.project.stopAndDeactivate": "停止して非アクティブにする",
   "actions.provider.lookingMessage": "インストール済みのコーディングエージェントのCLIをHiveがまだ確認しています。しばらくしてからもう一度お試しください。",
   "actions.provider.lookingTitle": "コーディングエージェントを確認中",

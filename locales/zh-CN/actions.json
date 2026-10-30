@@ -95,7 +95,6 @@
   "actions.project.newMessage": "将在工作区中新建一个文件夹。Hive 会自动添加它的 .hive 元数据文件夹。",
   "actions.project.newTitle": "新建项目",
   "actions.project.noWorkspace": "请先打开工作区",
-  "actions.project.saveFailed": "无法保存项目设置",
   "actions.project.stopAndDeactivate": "停止并停用",
   "actions.provider.lookingMessage": "Hive 仍在检测已安装了哪些编程智能体 CLI。请稍后再试。",
   "actions.provider.lookingTitle": "仍在查找编程智能体",

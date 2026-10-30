@@ -214,13 +214,14 @@ const check = (name, ok, extra = '') => {
   const launched = await until(async () => (await footText('Claude')) || null, HUNG_MS)
   const claudeLaunch = (await live(claude))?.launchedWith
   check('the launch kept the model and effort it gave its CLI', !!claudeLaunch && claudeLaunch.model === null && claudeLaunch.effort === null, JSON.stringify(claudeLaunch))
-  await inv('agents:update', proj, claude.id, { model: 'haiku', effort: 'low' })
-  await inv('agents:update', proj, idle.id, { model: 'haiku', effort: 'low' })
-  const idleChanged = await until(async () => /Haiku/.test(await footText('Idle')) && /Low/.test(await footText('Idle')), HUNG_MS)
+  // Sonnet at Low (Haiku takes no effort: decision E refuses the pair).
+  await lib.setLaunch(inv, proj, claude.id, { model: 'sonnet', effort: 'low' })
+  await lib.setLaunch(inv, proj, idle.id, { model: 'sonnet', effort: 'low' })
+  const idleChanged = await until(async () => /Sonnet/.test(await footText('Idle')) && /Low/.test(await footText('Idle')), HUNG_MS)
   check("a stopped agent's footer shows its new settings (for new sessions)", !!idleChanged, await footText('Idle'))
-  check("the running agent's footer still shows what it launched with, not Haiku at Low", (await footText('Claude')) === launched && !/Haiku|Low/.test(launched ?? ''), JSON.stringify({ launched, now: await footText('Claude') }))
+  check("the running agent's footer still shows what it launched with, not Sonnet at Low", (await footText('Claude')) === launched && !/Sonnet|Low/.test(launched ?? ''), JSON.stringify({ launched, now: await footText('Claude') }))
   await page.screenshot({ path: path.join(lib.WORK, 'turnledger-footer-launch.png') })
-  await inv('agents:update', proj, claude.id, { model: '', effort: '' })
+  await lib.setLaunch(inv, proj, claude.id, { model: '', effort: '' })
 
   // Codex 0.164 compacting by itself, then running its turn under that compaction's id (HI-1916: HR5's "no hooks" on 27
   // Oct): heard as a turn, and finished at its Stop, with nothing of it stale.

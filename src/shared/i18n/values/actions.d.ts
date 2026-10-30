@@ -97,7 +97,6 @@ interface HiveMessageValues {
   'actions.project.newMessage': undefined
   'actions.project.newTitle': undefined
   'actions.project.noWorkspace': undefined
-  'actions.project.saveFailed': undefined
   'actions.project.stopAndDeactivate': undefined
   'actions.provider.lookingMessage': undefined
   'actions.provider.lookingTitle': undefined

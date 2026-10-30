@@ -91,7 +91,7 @@ module.exports = async function run(provider) {
       const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: r.status, body: await r.json().catch(() => null) }
     }
-    const def = await inv('agents:add', proj, { name: 'Tester', provider, location: 'project', ...(provider === 'codex' ? { model: 'gpt-6-luna', effort: 'low' } : {}) })
+    const def = await lib.addAgent(inv, proj, { name: 'Tester', provider, location: 'project', ...(provider === 'codex' ? { model: 'gpt-6-luna', effort: 'low' } : {}) })
     const id = def.id
     const live = async () => (await inv('session:live')).find((s) => s.agentId === id)
     const idle = async () => ['ready', 'finished'].includes((await live())?.status)

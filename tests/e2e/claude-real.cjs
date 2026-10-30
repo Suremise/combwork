@@ -77,7 +77,7 @@ const check = (name, ok, extra = '') => {
     check('Claude Code starts in the project', !!(await ready(proj, agent.id)), (await live(proj, agent.id))?.status)
   })
   // The agent's own effort (a project's isn't read for a CLI with connections, HI-1774).
-  await inv('agents:update', proj, agent.id, { effort: 'low' })
+  await lib.setLaunch(inv, proj, agent.id, { effort: 'low' })
   await inv('workspace:refresh')
   const restart = page.getByRole('button', { name: 'Restart session' })
   check('a new effort offers Restart session', !!(await lib.until(async () => (await restart.count()) > 0, 10000)))

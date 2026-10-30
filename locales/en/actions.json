@@ -383,10 +383,6 @@
     "defaultMessage": "Open a workspace first",
     "description": "A warning: a project can't be created without an open workspace."
   },
-  "actions.project.saveFailed": {
-    "defaultMessage": "Could not save project settings",
-    "description": "An error's title: saving a project's settings failed."
-  },
   "actions.project.stopAndDeactivate": {
     "defaultMessage": "Stop and deactivate",
     "description": "Button: stops the project's agents and marks it inactive."

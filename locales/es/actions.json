@@ -95,7 +95,6 @@
   "actions.project.newMessage": "Se crea una carpeta nueva en el espacio de trabajo. Hive le agrega automáticamente su carpeta de metadatos .hive.",
   "actions.project.newTitle": "Nuevo proyecto",
   "actions.project.noWorkspace": "Abre primero un espacio de trabajo",
-  "actions.project.saveFailed": "No se pudo guardar la configuración del proyecto",
   "actions.project.stopAndDeactivate": "Detener y desactivar",
   "actions.provider.lookingMessage": "Hive todavía está averiguando qué CLI de agentes de programación están instaladas. Vuelve a intentarlo en un momento.",
   "actions.provider.lookingTitle": "Todavía buscando los agentes de programación",
