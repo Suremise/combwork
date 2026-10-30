@@ -899,8 +899,8 @@ export async function applyConnections(projectPath: string, answers: ConnectionA
   await testHooks.applying?.()
   const plan = await connectionsPlan(projectPath)
   projectPath = workspace.assertProject(projectPath)
-  const now = plan.agents.map((a) => a.id)
-  if (o.expected && (o.expected.length !== now.length || o.expected.some((id, i) => id !== now[i]))) throw refusal(M.agentsChanged, undefined, 'conflict')
+  const shownNow = plan.agents.map((a) => a.id)
+  if (o.expected && (o.expected.length !== shownNow.length || o.expected.some((id, i) => id !== shownNow[i]))) throw refusal(M.agentsChanged, undefined, 'conflict')
   const ids = resolveAnswers(plan.agents.map((a) => ({ ...a, key: a.id })), plan.options, answers, () => undefined)
   const out: ConnectionsApplied = { changed: [], restart: [], skipped: [] }
   for (const [i, a] of plan.agents.entries()) {
