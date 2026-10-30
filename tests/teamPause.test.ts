@@ -1,12 +1,10 @@
 // Pausing the team before an update (HI-2081, SPEC §16.10.9): a workspace's pause saved before it holds anything (a
 // failed save holds and tells nothing), each running agent told once a pause, the user's pause holding a workspace opened
 // while it lasts, the update's restart lifting only the pause its close named (HR1's s10 check: a crash, a plain quit or
-// an older record keeps it); the CLI's own processes told by their recorded identity, never what they started (s12); and
-// a paused workspace's running lanes paused, so none is due a start.
+// an older record keeps it); and a paused workspace's running lanes paused, so none is due a start.
 import { existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ActivityProcess } from '../src/shared/activity'
 import { laneStartDue, laneView, type LaneRecord } from '../src/shared/lanes'
 import { TEAM_PAUSE_LINE } from '../src/shared/teamPause'
 import type { TaskCard } from '../src/shared/types'
@@ -34,7 +32,6 @@ vi.mock('../src/main/deliveries', async (orig) => ({ ...(await orig<object>()), 
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => state.profile
 
 const tp = await import('../src/main/teamPause')
-const { beyondCli } = await import('../src/main/teamParked')
 
 const base = tempDir('hive-teampause-')
 let n = 0
@@ -166,26 +163,6 @@ describe("the update's restart lifts only the pause its close named (HR1's s10 c
     tp.resetTeamPauseForTests()
     tp.loadPauseClosing()
     expect(tp.teamPauseOf(ws(w))).not.toBeNull()
-  })
-})
-
-describe("a CLI's own processes, by the launch's recorded servers (round 1, finding 1)", () => {
-  // FILETIMEs: 100 ns since 1601.
-  const ft = (ms: number): string => String(BigInt(ms) * 10000n + 116444736000000000n)
-  const t = Date.parse('2026-10-30T05:00:00.000Z')
-  const p = (pid: number, parent: number, at: number, command = '', name = 'node.exe'): ActivityProcess => ({ pid, parent, name, label: command || name, created: ft(at), command })
-  const gate = 100
-  const hive = { command: 'C:/Hive/Hive.exe', args: ['C:/Hive/out/main/hive-mcp.js'] }
-
-  it('the gate, the CLI, and the servers it was given are its own; what any of them started is not, however soon', () => {
-    const procs = [p(200, gate, t, 'claude.exe', 'claude.exe'), p(301, 200, t + 90_000, '"C:/Hive/Hive.exe" "C:/Hive/out/main/hive-mcp.js"', 'Hive.exe'), p(400, 200, t + 5_000, 'node vitest run'), p(500, 301, t + 700_000, 'electron .')]
-    expect(beyondCli(gate, procs, [hive])!.map((x) => x.pid)).toEqual([400, 500])
-  })
-
-  it('the same command line under another parent is not exempt; with no CLI to tell, nothing is verified', () => {
-    const procs = [p(200, gate, t, 'claude.exe', 'claude.exe'), p(300, 999, t + 5_000, '"C:/Hive/Hive.exe" "C:/Hive/out/main/hive-mcp.js"', 'Hive.exe')]
-    expect(beyondCli(gate, procs, [hive])!.map((x) => x.pid)).toEqual([300])
-    expect(beyondCli(gate, [p(300, 999, t, 'node')], [hive])).toBeNull()
   })
 })
 

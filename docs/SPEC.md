@@ -4595,22 +4595,22 @@ checked every agent and process by hand.
   *The team is pausing for an update. Finish this turn, end the runs you started (tests, builds, dev servers, test copies of
   Hive), commit your work, then end your turn. Until the team resumes Hive starts no card and sends you no card events or
   watch wakes; a message or an answer can still reach you.*
-- **Parked** (`teamParked.ts`, a fresh scan of every open workspace each time): every agent stopped, or idle (ready, finished,
-  watching) or at a question for the user (a permission prompt, a sign-in) with nothing of its own left: no background task,
-  no open Progress run (a test run, a check in a copy, a merge, a slot's warming), no held slot writer, no process in its job
-  beyond its CLI's own. The CLI's own, positively identified (HR1's round 1): the launch's gate, the CLI the gate started,
-  and the CLI's direct children that run one of the MCP servers this launch was given (its recorded config: the server's
-  executable and every argument; a shell wrapping one, with the one server it started); each alone, never what it started,
-  and never a child guessed by when it started. A status Hive can't read, an unknown turn, a job that can't be listed (or
-  listed cut short), projects that can't be read, a pause not saved (one taken from the user's pause and still pending, or
-  whose save failed), a workspace that closed during the scan, or a scan that fails is *can't be checked*, never parked.
-  Only the Assistant asking about its own workspace has its own turn left out; any other Assistant's, and the user's
-  install check, count it; what it started always counts. A stopped agent's leftovers count. Install Now scans again until
-  a scan ends with nothing changed while it was made (an agent's status or launch, a run, a pause, the open workspaces;
-  five tries), then reads every agent's status once more with nothing awaited before the install.
+- **Parked** (`teamParked.ts`, a fresh scan of every paused open workspace each time, from what Hive itself records; the
+  Assistant's call after HR1's round 2, the card's own scope): every agent stopped, or idle (ready, finished, watching) or
+  at a question for the user (a permission prompt, a sign-in), with nothing of Hive's records left: no background task its
+  CLI reports, no open Progress run (a test run, a check in a copy, a merge, a slot's warming), no held slot writer, and no
+  process its launches left running (HI-2055's leftovers), an earlier launch's included once it has a new session (round
+  2, finding 2). Hive doesn't read the CLI's own process tree to guess what else it runs: a server the user or an agent
+  started from a shell, outside Hive's records, is the user's to end (the user guide says so). A status Hive can't read,
+  an unknown turn, leftovers it can't list in full, projects or slots that can't be read, a pause not saved (one taken
+  from the user's pause and still pending, or whose save failed), a workspace that closed during the scan, or a scan that
+  fails is *can't be checked*, never parked. Only the Assistant asking about its own workspace has its own turn left out;
+  any other Assistant's, and the user's install check, count it; what it left running always counts. Install Now scans
+  again until a scan ends with nothing changed while it was made (an agent's status or launch, a run, a pause, the open
+  workspaces; five tries), then reads every agent's status once more with nothing awaited before the install.
 - **The window:** the Lanes section's band, *Pausing the team: 3 still running* with each named (*B1: npm run e2e (a run)*,
-  *R1: node (process 4120)*, *its slot slot-b is still held*), **End It…** on a process (after a question: it and what it
-  started, found again by pid and start time, never the CLI's own), or *All parked: safe to install* with **Install Now**
+  *R1: node dev-server.js (process 4120)*, a leftover; *its slot slot-b is still held*), **End It…** on a leftover process
+  (after a question: it and what it started, found again by pid and start time), or *All parked: safe to install* with **Install Now**
   once an update is ready. Install Now scans every open workspace again in main, under their locks, and installs only if
   each is paused and parked. The Updates dialog shows the same band. The status bar says *Team paused* (or *Team parked*).
 - **Resume** lifts the pause (the user's resumes every open workspace and the profile's): lanes look again, the pool and the

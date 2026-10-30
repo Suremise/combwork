@@ -463,21 +463,6 @@ export async function projectLaunches(projectPath: string): Promise<LaunchNow[]>
   return out
 }
 
-/**
- * An agent's running launch's job for the team pause's parked check (HI-2081): its gate (the terminal process tracked
- * at its start) and every process in its job, with their command lines. `none`: no launch of it runs here. `unknown`:
- * it can't be read now (not Windows, the tracker not working, its gate not tracked yet, its listing cut short), never
- * taken as nothing running.
- */
-export async function launchJob(projectPath: string, agentId: string): Promise<{ gate: number; processes: ActivityProcess[] } | 'none' | 'unknown'> {
-  const l = [...running.values()].findLast((x) => agentKey(x.projectPath, x.agentId) === agentKey(projectPath, agentId))
-  if (!l) return 'none'
-  if (process.platform !== 'win32' || !host.pid || !host.usable || !l.gate) return 'unknown'
-  const list = await listJob(l.runId, true).catch(() => null)
-  if (!list || list.more > 0) return 'unknown'
-  return { gate: l.gate, processes: list.processes }
-}
-
 /** A launch's own CLI among its processes: its gate and what the gate started. */
 function cliOf(l: Launch, processes: readonly AgentProcess[]): number[] {
   return l.gate ? [l.gate, ...processes.filter((p) => p.parent === l.gate).map((p) => p.pid)] : []

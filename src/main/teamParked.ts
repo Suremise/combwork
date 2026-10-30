@@ -1,11 +1,10 @@
 import { basename } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
-import type { ActivityProcess } from '../shared/activity'
 import type { ParkedItem, TeamPauseState, TeamPauseView } from '../shared/teamPause'
-import type { LiveSessionState, McpServerDef } from '../shared/types'
+import type { LiveSessionState } from '../shared/types'
 import { heldSlots } from './agentFolders'
-import { endTreesExactly, launchJob, leftoversOf } from './agentProcesses'
+import { endTreesExactly, leftoversOf } from './agentProcesses'
 import { onHiveEvent } from './events'
 import { progress } from './progressService'
 import { sessions } from './sessions'
@@ -15,76 +14,39 @@ import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { openWorkspaces, type WorkspaceService } from './workspace'
 
 /**
- * Whether a paused team is parked (HI-2081; HR1's design checks s10 and s12, and round 1's findings): a fresh scan each
- * time it is asked, never a kept list, of every open workspace's agents and its Assistant. An agent is parked when it is
- * stopped, or idle (ready, finished or watching) or at a question for the user, with nothing below; busy, and named, when
- * it works or starts, has background tasks, a Progress run (a test run, a check in a copy, a merge), a held slot writer,
- * or a process in its job beyond its CLI's own; and can't be checked, and named, when its state is unknown, its job or
- * its workspace's projects can't be read, its workspace's pause isn't saved, or the workspace closed during the scan.
- * Only "parked" is parked: what can't be read is never taken for nothing running.
+ * Whether a paused team is parked (HI-2081; HR1's design checks s10 and s12, its round 1 and 2 findings, and the
+ * Assistant's call after round 2, the card's own scope): a fresh scan each time it is asked, never a kept list, of every
+ * open workspace's agents and its Assistant, from what Hive itself records. An agent is parked when it is stopped, or
+ * idle (ready, finished or watching) or at a question for the user, with nothing of Hive's records left: busy, and named,
+ * when it works or starts, when its CLI reports background tasks, when a Progress run of it is open (a test run, a check
+ * in a copy, a merge), when it holds a slot writer, or when its launches, an earlier one's included, left processes
+ * running (HI-2055's leftovers); and can't be checked, and named, when its state is unknown, the workspace's projects or
+ * slots can't be read, its pause isn't saved, or the workspace closed during the scan. Only "parked" is parked.
  *
- * Its CLI's own processes are positively identified, never guessed by age (round 1, finding 1): the launch's gate (its
- * terminal, tracked at the spawn), the CLI the gate started, and the CLI's direct children that are the MCP servers this
- * launch was given (its recorded config: executable and arguments), a shell wrapping one included with that server
- * under it. Each is exempt alone: anything else, and anything any of them started, counts. The asking Assistant's own
- * turn isn't counted (no self-wait); any other Assistant's is, and what it started always is.
+ * Hive doesn't read the CLI's own process tree to guess what else it runs (its MCP servers, a server started from a
+ * shell): what Hive doesn't record is the user's to end, as the user guide's Updates section says. The asking Assistant's
+ * own turn isn't counted (no self-wait); any other Assistant's is, and what it left running always is.
  */
 
-/** A Windows FILETIME (100 ns since 1601), as the job records keep it, in Unix ms. */
-const msOf = (created: string | undefined): number => (created ? Number((BigInt(created) - 116444736000000000n) / 10000n) : NaN)
-
-const exe = (s: string): string => basename(s.replace(/^["']|["']$/g, '')).toLowerCase().replace(/\.(exe|cmd|bat)$/, '')
-const norm = (s: string): string => s.toLowerCase().replace(/\\+/g, '/')
-
-/** Whether a process runs one of the launch's MCP servers: its executable named by the server's command, its arguments all there. */
-function runsServer(p: ActivityProcess, servers: readonly McpServerDef[]): boolean {
-  const cmd = norm(p.command ?? '')
-  if (!cmd) return false
-  return servers.some((d) => !!d.command && (exe(p.name) === exe(d.command) || cmd.includes(norm(d.command))) && (d.args ?? []).every((a) => cmd.includes(norm(a))))
-}
-
-/** A shell a CLI may start a server through (cmd /c npx …): it, and the one process it started for the server. */
-const SHELLS = new Set(['cmd', 'powershell', 'pwsh', 'sh', 'bash'])
-
-/**
- * The processes of a launch's job beyond its CLI's own (round 1, finding 1), from its records: the gate, the CLI the gate
- * started, and the CLI's direct children that run one of `servers` (the launch's recorded MCP servers), with a shell
- * wrapping one and the server it started. Null when the CLI can't be told (no process started by the gate): nothing of
- * the job can be verified then.
- */
-export function beyondCli(gate: number, processes: readonly ActivityProcess[], servers: readonly McpServerDef[]): ActivityProcess[] | null {
-  const clis = processes.filter((p) => p.parent === gate)
-  if (!clis.length) return null
-  const infra = new Set<number>([gate, ...clis.map((c) => c.pid)])
-  for (const cli of clis)
-    for (const p of processes) {
-      if (p.parent !== cli.pid || !runsServer(p, servers)) continue
-      infra.add(p.pid)
-      // A shell running the server's command: its one child running the same server is the server itself.
-      if (SHELLS.has(exe(p.name))) {
-        const under = processes.filter((c) => c.parent === p.pid)
-        if (under.length === 1 && runsServer({ ...under[0], name: under[0].name }, servers.map((d) => ({ ...d, command: under[0].name })))) infra.add(under[0].pid)
-      }
-    }
-  return processes.filter((p) => !infra.has(p.pid))
-}
+/** A Windows FILETIME (100 ns since 1601), as the job records keep it, as an ISO time. */
+const isoOf = (created: string | undefined): string | undefined => (created ? new Date(Number((BigInt(created) - 116444736000000000n) / 10000n)).toISOString() : undefined)
 
 const KNOWN_IDLE = new Set(['ready', 'finished', 'watching'])
 /** At a question for the user (a permission prompt, a sign-in): parked, with nothing else of it left (HR1's Q2). */
 const AT_QUESTION = new Set(['waiting', 'signin'])
 
-/** One agent's blockers, from its session, its job, its runs and its slots as they are now. */
+/**
+ * One agent's blockers, from its session, its slot and its leftovers as they are now: what its launches left running is
+ * always counted, an earlier launch's too once it has a new session (round 2, finding 2).
+ */
 async function agentItems(project: string, projectPath: string, agentId: string, agent: string, st: LiveSessionState | null, writer: string | undefined, self: boolean): Promise<ParkedItem[]> {
   const out: ParkedItem[] = []
   const add = (i: Omit<ParkedItem, 'project' | 'agent' | 'agentId'>): void => void out.push({ project, agent, agentId, ...i })
   if (writer) add({ state: 'busy', kind: 'writer', label: writer, what: `holds ${writer}, whose processes still run` })
-  if (!st) {
-    // Stopped: what its launches left running still counts.
-    const left = leftoversOf(projectPath, agentId)
-    for (const p of left.processes) add({ state: 'busy', kind: 'process', label: p.label, what: `left running: ${p.label} (pid ${p.pid})`, ...(p.created ? { process: { pid: p.pid, created: p.created, name: p.name } } : {}), since: left.since })
-    if (left.more) add({ state: 'busy', kind: 'process', what: `${left.more} more processes left running` })
-    return out
-  }
+  const left = leftoversOf(projectPath, agentId)
+  for (const p of left.processes) add({ state: 'busy', kind: 'process', label: p.label, what: `left running: ${p.label} (pid ${p.pid})`, ...(p.created ? { process: { pid: p.pid, created: p.created, name: p.name }, since: isoOf(p.created) } : {}) })
+  if (left.more) add({ state: 'unknown', kind: 'process', what: `${left.more} more processes left running, not listed` })
+  if (!st) return out
   const status = st.status
   // Only the asking Assistant's own turn isn't counted (no self-wait, round 1 finding 4).
   if (!self) {
@@ -92,15 +54,8 @@ async function agentItems(project: string, projectPath: string, agentId: string,
     else if (!KNOWN_IDLE.has(status) && !AT_QUESTION.has(status) && status !== 'background') add({ state: 'unknown', kind: 'status', what: `its state is ${status}` })
     else if (agentRuntime(st).silentMinutes !== undefined) add({ state: 'unknown', kind: 'status', what: `silent ${agentRuntime(st).silentMinutes} min, its state unknown` })
   }
+  // Its CLI's own count of the tasks it runs in the background (a shell command, a subagent): relayed as it says.
   if ((st.backgroundTasks ?? 0) > 0 || status === 'background') add({ state: 'busy', kind: 'background', what: `${st.backgroundTasks ?? 1} background task(s)` })
-  const job = await launchJob(projectPath, agentId)
-  if (job === 'unknown') add({ state: 'unknown', kind: 'scan', what: "its processes can't be read now" })
-  else if (job !== 'none') {
-    const servers = sessions.launchedMcp(projectPath, agentId)
-    const rest = beyondCli(job.gate, job.processes, Object.values(servers ?? {}))
-    if (!rest) add({ state: 'unknown', kind: 'scan', what: "its CLI can't be told among its processes" })
-    else for (const p of rest) add({ state: 'busy', kind: 'process', label: p.run ?? p.label, what: `${p.run ? `${p.run} (` : ''}${p.label}${p.run ? ')' : ''} (pid ${p.pid})`, ...(p.created ? { process: { pid: p.pid, created: p.created, name: p.name }, since: new Date(msOf(p.created)).toISOString() } : {}) })
-  }
   return out
 }
 
@@ -153,19 +108,11 @@ export async function teamPauseState(): Promise<TeamPauseState> {
 }
 
 /**
- * Ends a process the parked check names (End it, after the window's question), with all it started: found again in its
- * agent's job or among what its launches left, by its pid and recorded start (never a pid alone), and never its CLI's own.
+ * Ends a process the parked check names (End it, after the window's question), with all it started: one an agent's
+ * launches left running (its leftovers, an earlier launch's included), found again by its pid and recorded start, never
+ * by a pid alone.
  */
-export async function endParkedProcess(projectPath: string, agentId: string, pid: number, created: string): Promise<'ended' | 'notFound' | 'cli' | 'failed'> {
-  const job = await launchJob(projectPath, agentId)
-  if (job !== 'none' && job !== 'unknown') {
-    const p = job.processes.find((x) => x.pid === pid && x.created === created)
-    if (p) {
-      if (!beyondCli(job.gate, job.processes, Object.values(sessions.launchedMcp(projectPath, agentId) ?? {}))?.some((x) => x.pid === pid)) return 'cli'
-      const r = await endTreesExactly([p])
-      return r && !r.failed.length && !r.unverified.length ? 'ended' : 'failed'
-    }
-  }
+export async function endParkedProcess(projectPath: string, agentId: string, pid: number, created: string): Promise<'ended' | 'notFound' | 'failed'> {
   const left = leftoversOf(projectPath, agentId).processes.find((x) => x.pid === pid && x.created === created)
   if (!left) return 'notFound'
   const r = await endTreesExactly([left])
