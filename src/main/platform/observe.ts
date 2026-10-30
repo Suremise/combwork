@@ -21,7 +21,7 @@ import { dirname, isAbsolute, join, resolve, sep } from 'path'
 import { git, readRefsOffMain } from '../git'
 import { createLogger, userText } from '../logger'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import { isMainGitDir, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
+import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { unknown, type Maybe } from './types'
 
@@ -277,6 +277,11 @@ class RepoWatch {
   /** Callers of `current()`, each until the reads owed when it asked are in. */
   private owed: { want: number; done: () => void }[] = []
   private closed = false
+  /**
+   * HI-2115: how many reads found something moved (a line, a folder's HEAD, a HEAD reflog entry: a switch to the same
+   * commit too, a worktree added or removed). The same number: nothing of these moved in between.
+   */
+  changes = 0
 
   constructor(
     readonly common: string,
@@ -356,6 +361,20 @@ class RepoWatch {
    * Once the reads asked for so far are in: never waiting for those asked for after it (HR1's round 1: a busy
    * repository's refreshes kept every check waiting), nor for any once the watch has closed.
    */
+  /** Whether a working folder's HEAD is among those read (at most MAX_FOLDERS of them). */
+  watches(folder: string): boolean {
+    const k = resolve(folder).toLowerCase()
+    for (const f of this.heads.keys()) if (resolve(f).toLowerCase() === k) return true
+    return false
+  }
+
+  /** A working folder's own git dir, as the last read found it; null when it isn't one of the folders read. */
+  gitDirOf(folder: string): string | null {
+    const k = resolve(folder).toLowerCase()
+    for (const [g, f] of this.reflogFolder) if (resolve(f).toLowerCase() === k) return g
+    return null
+  }
+
   current(): Promise<void> {
     if (this.closed || this.covered >= this.asked) return Promise.resolve()
     const want = this.asked
@@ -384,6 +403,7 @@ class RepoWatch {
 
   /** Takes in what a read found: the moves since the last are said (but for the first), the write logs kept in step. */
   private apply({ lines, folders, heads, sizes }: RepoRefs): void {
+    if (!sameMap(this.lines, lines) || !sameMap(this.heads, heads) || !sameMap(this.reflogSize, sizes)) this.changes++
     this.reflogFolder.clear()
     for (const f of folders) {
       const g = f.gitDir.toLowerCase()
@@ -588,6 +608,44 @@ export class Observer {
   }
 
   /**
+   * HI-2115: where a project's refs stand now, as a token: the same token, and no line, folder HEAD or HEAD reflog of
+   * its repository moved in between, so what git said about a folder's checkout then holds. The refs are read again
+   * first (in git's worker, no git process), so a move just made counts though its event hasn't come yet. Null when
+   * that can't be told: the project's repository isn't watched (not followed, or held), or `folder` isn't among the
+   * folders it reads.
+   */
+  async refsNow(project: string, folder: string): Promise<string | null> {
+    const p = this.projects.get(resolve(project).toLowerCase())
+    const r = p?.repo ? this.repos.get(p.repo.toLowerCase()) : undefined
+    if (!r) return null
+    // The folder's own HEAD as it is written (the branch it names, or its commit): a switch between two branches at the
+    // same commit with no reflog moves nothing the reads compare (HR3's round 1, finding 1).
+    const gitDir = r.gitDirOf(folder)
+    let head: string
+    try {
+      head = gitDir ? readFileSync(join(gitDir, 'HEAD'), 'utf8').trim() : ''
+    } catch {
+      return null
+    }
+    // Only a plain repository (plainRepo, the one rule of Hive's git caches): a reftable's refs, say, aren't in the files
+    // these reads walk, so nothing of them can be seen to move (HR3's HI-2115 rounds 1 and 2).
+    if (!head || !plainRepo(r.common, gitDir!)) return null
+    r.read()
+    await r.current()
+    if (this.repos.get(p!.repo!.toLowerCase()) !== r || !r.watches(folder) || r.gitDirOf(folder) !== gitDir) return null
+    return `${this.serial(r)}:${r.changes}:${head}`
+  }
+
+  /** Each repository watch's own number: a watch started again (after a hold) is another, whose moves start afresh. */
+  private serials = new WeakMap<RepoWatch, number>()
+  private serialNext = 0
+  private serial(r: RepoWatch): number {
+    let n = this.serials.get(r)
+    if (n === undefined) this.serials.set(r, (n = ++this.serialNext))
+    return n
+  }
+
+  /**
    * Once the events of what was written in a folder so far have come in (it is quiet a moment; at most
    * WRITES_SETTLE_MAX_MS): an event is timed when it arrives, so a check's start waits for this, or a commit just before
    * it would count as a change during it (#1222).
@@ -703,6 +761,13 @@ async function writtenAt(p: string): Promise<number | 'gone' | 'unreadable'> {
 }
 
 /** A folder's identity (its file id), or null when it isn't there. */
+/** Whether two maps hold the same keys with the same values. */
+function sameMap<K, V>(a: Map<K, V>, b: Map<K, V>): boolean {
+  if (a.size !== b.size) return false
+  for (const [k, v] of a) if (!b.has(k) || b.get(k) !== v) return false
+  return true
+}
+
 function identity(path: string): bigint | null {
   try {
     return statSync(path, { bigint: true }).ino

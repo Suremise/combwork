@@ -9,7 +9,7 @@ import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync
 import { access } from 'original-fs/promises'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
 import { git } from '../git'
-import { refSync } from './repoRefs'
+import { plainRepo, refSync } from './repoRefs'
 import type { FileChange } from '../../shared/workflow/facts'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 import { isUnknown, unknown, withDetail, type Change, type Containment, type Maybe } from './types'
@@ -70,6 +70,49 @@ function onceInStep<T>(repo: string, what: string, ids: string[], ask: () => Pro
   })
   step.answers.set(key, p)
   return p
+}
+
+/** How many answers about fixed commits are kept between steps (HI-2115); the oldest go first. */
+const KEPT_MAX = 20_000
+const kept = new Map<string, unknown>()
+
+/**
+ * HI-2115: an answer about fixed commits (full ids) that can't change, kept for as long as Hive runs, not only for a
+ * step: whether one is another's ancestor, their merge base, a range's first parents. The reconciler asked them again
+ * at every ref change for every card under way (a git each, several a second while lanes build). Unknown answers are
+ * asked again. Kept only for a plain repository (`plainRepo`, the one rule of Hive's git caches): otherwise (replace
+ * refs, grafts or shallow history can give the same ids other answers; a reftable can hold replacements unseen) nothing
+ * is kept or answered from what was, checked before each answer kept is given and again before one is kept (it may
+ * have changed while git ran). An answer kept for a plain repository holds whenever it is plain again: its commits are
+ * the same objects. Keyed by the common git dir, so a
+ * project and its linked worktrees share the answers about the same commits, and a slot reused for another repository
+ * never sees the other's.
+ */
+function onceForever<T>(repo: string, what: string, ids: string[], ask: () => Promise<Maybe<T>>): Promise<Maybe<T>> {
+  if (!ids.every((id) => SHA.test(id))) return onceInStep(repo, what, ids, ask)
+  const common = commonDirSync(repo)
+  // The folder's own git dir: a linked worktree's `config.worktree` is its own (HR3's round 3, finding 2).
+  const own = gitDirSync(repo)
+  if (!common || !own || !plainRepo(common, own)) return onceInStep(repo, what, ids, ask)
+  const key = [common.toLowerCase(), what, ...ids].join('\0')
+  if (kept.has(key)) {
+    const v = kept.get(key) as Maybe<T>
+    // The newest last: the oldest are the first dropped.
+    kept.delete(key)
+    kept.set(key, v)
+    return Promise.resolve(v)
+  }
+  return onceInStep(repo, what, ids, ask).then((v) => {
+    if (isUnknown(v) || !plainRepo(common, own)) return v
+    kept.set(key, v)
+    if (kept.size > KEPT_MAX) kept.delete(kept.keys().next().value!)
+    return v
+  })
+}
+
+/** Tests: forgets the answers kept between steps. */
+export function forgetKeptAnswers(): void {
+  kept.clear()
 }
 
 /** An answer read with another git (lineHeadAndTree), kept as the step's own for those commits. */
@@ -254,7 +297,7 @@ export async function defaultBranch(repo: string): Promise<Maybe<string>> {
 }
 
 export function isAncestor(repo: string, a: string, b: string): Promise<Maybe<boolean>> {
-  return onceInStep(repo, 'is-ancestor', [a, b], async () => {
+  return onceForever(repo, 'is-ancestor', [a, b], async () => {
     const r = await git(repo, ['merge-base', '--is-ancestor', a, b])
     if (r.ok) return true
     if (r.code === 1) return false
@@ -263,7 +306,7 @@ export function isAncestor(repo: string, a: string, b: string): Promise<Maybe<bo
 }
 
 export function mergeBase(repo: string, a: string, b: string): Promise<Maybe<string | null>> {
-  return onceInStep(repo, 'merge-base', [a, b], async () => {
+  return onceForever(repo, 'merge-base', [a, b], async () => {
     const r = await git(repo, ['merge-base', a, b])
     if (r.ok) return r.out.trim()
     if (r.code === 1 && !r.err) return null
@@ -479,9 +522,11 @@ async function containsAt(repo: string, target: string, c: { base: string; revis
 }
 
 /** A line's own commits since a base, newest first: its first-parent history (a merge brings others' in beside it). */
-export async function firstParents(repo: string, base: string, headRev: string): Promise<Maybe<string[]>> {
-  const r = await git(repo, ['rev-list', '--first-parent', `${base}..${headRev}`])
-  return r.ok ? lines(r.out) : unknown(U.commitsSince, { revision: headRev.slice(0, 7), base: base.slice(0, 7) })
+export function firstParents(repo: string, base: string, headRev: string): Promise<Maybe<readonly string[]>> {
+  return onceForever(repo, 'first-parents', [base, headRev], async () => {
+    const r = await git(repo, ['rev-list', '--first-parent', `${base}..${headRev}`])
+    return r.ok ? lines(r.out) : unknown(U.commitsSince, { revision: headRev.slice(0, 7), base: base.slice(0, 7) })
+  })
 }
 
 /** The commits of a range, oldest first, with their author emails and `Hive-Card` trailers. */
