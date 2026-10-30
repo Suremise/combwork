@@ -753,6 +753,38 @@ describe('the Assistant puts a card in Doing with someone on it, or nobody by th
     })
   }
 
+  // HR1's round 2: back into Active from Review is a move into Doing too; its Started builder doesn't put anyone on it.
+  it("back from Review with nobody on it, through a batch: refused, left in Review; with the user's reason, one Override", async () => {
+    advanced.set(ENFORCE, true)
+    const { w, wt } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    writeFileSync(join(wt, 'b.txt'), 'b\n')
+    git(wt, 'add', '-A')
+    git(wt, 'commit', '-qm', 'b')
+    await update(w, card, { column: 'review' })
+    await update(w, card, { agent: '' })
+    const refused = await inWorkspace(w, () => tasks.updateTasks([card], { column: 'doing' }, assistant))
+    expect(refused[0].error).toMatch(/nobody on it/)
+    expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('review')
+    const moved = await inWorkspace(w, () => tasks.updateTasks([card], { column: 'doing', override: { reason: 'The user fixes it' } }, assistant))
+    expect(moved[0]).toMatchObject({ error: null, card: { column: 'doing', agent: null } })
+    expect(overrides(w, card)).toEqual([expect.objectContaining({ rules: ['move.doingNobody'], move: 'review→active', reason: 'The user fixes it' })])
+  })
+
+  it('back out of On Hold into Active with nobody on it: refused, left On Hold; with the reason, recorded', async () => {
+    advanced.set(ENFORCE, true)
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    await update(w, card, { column: 'hold' })
+    await update(w, card, { agent: '' })
+    await expect(update(w, card, { column: 'doing' }, assistant)).rejects.toMatchObject({ refusal: { rule: 'move.doingNobody' } })
+    expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('hold')
+    expect(await update(w, card, { column: 'doing', override: { reason: 'The user resumes it' } }, assistant)).toMatchObject({ column: 'doing', agent: null })
+    expect(overrides(w, card)).toEqual([expect.objectContaining({ rules: ['move.doingNobody'], move: 'hold→active', reason: 'The user resumes it' })])
+  })
+
   it('a move into Doing that also changes its project leaves nobody on it: refused, through the rules too', async () => {
     advanced.set(ENFORCE, true)
     const { w } = await workspace(PAIR)

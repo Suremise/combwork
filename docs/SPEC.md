@@ -2807,9 +2807,11 @@ The `review` parameter of `hive_update_task` maps onto the intents for one relea
   agent on it already, none named, or `agent` empty) is refused, `move.doingNobody`, naming the user's three choices:
   nobody on it, an agent on it (`agent`), or an agent started on it (`hive_start_task`). Nobody on it passes with the
   user's reason as `override`, recorded as an `Override` naming `move.doingNobody` (with any other rule the move skips:
-  the refusal names those too, and one reason covers them all). Through the rules it is a rule of the start (no builder
-  named); with the rules off, P3's move checks it on the card as it is in its change and records the `Override` with
-  it. A card the Assistant makes in Doing with no agent is refused the same way (made in Todo, then moved). The Agent
+  the refusal names those too, and one reason covers them all). Through the rules it is a rule of every move into
+  Active (a start, or back from Review or On Hold) that names no builder, and the move's write checks the card again
+  as it leaves it: an agent taken off meanwhile, or by the same change (a change of project), undoes the write and the
+  move is decided again on the card as it is. With the rules off, P3's move checks it on the card as it is in its
+  change and records the `Override` with it. A card the Assistant makes in Doing with no agent is refused the same way (made in Todo, then moved). The Agent
   API checks it before asking the user to approve the change, and the change checks it again; the user's moves (the
   Move to Doing dialog asks) and project agents' (into Doing gives it to them) aren't asked.
 - **In the window (#1275):** every move the user makes on the board (a drag, Move to, Review (next round), the Move to

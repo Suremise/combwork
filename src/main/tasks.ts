@@ -1633,10 +1633,10 @@ async function moveThroughRules(g: Gate, n: number, patch: TaskPatch, actor: Tas
     (wf) => wf.move(n, g.to, g.by, { confirm, ...(reason ? { reason } : {}), ...(g.builder ? { builder: g.builder } : {}) }),
     (w, first) => {
       const placed = STAGE_CATEGORY[w.current] === target ? { ...(before !== undefined ? { before } : {}), ...(position !== undefined ? { position } : {}) } : {}
-      // A start in this write (HI-2062): whether its Override lets the card be left with nobody on it, checked on the card
-      // as the write leaves it (updateTaskAs).
-      const started = w.written.some((f) => f.kind === 'Started') ? { started: { nobodyOk: w.written.some((f) => f.kind === 'Override' && (f.data as FactData['Override']).rules.includes('move.doingNobody')) } } : {}
-      return { patch: { ...(first ? rest : {}), ...placed }, opts: { ...(first ? opts : {}), ...started } }
+      // A write that takes the card into Active (a start, or back from Review: HI-2062): whether its Override lets the card
+      // be left with nobody on it, checked on the card as the write leaves it (updateTaskAs).
+      const entered = w.current === 'active' && w.was !== 'active' ? { entered: { nobodyOk: w.written.some((f) => f.kind === 'Override' && (f.data as FactData['Override']).rules.includes('move.doingNobody')) } } : {}
+      return { patch: { ...(first ? rest : {}), ...placed }, opts: { ...(first ? opts : {}), ...entered } }
     }
   )
   // A drag that went as far as it could (its start written, its submission refused for what no override makes true).
@@ -1662,17 +1662,17 @@ async function moveThrough(g: Gate, n: number, patch: TaskPatch, actor: TaskActo
 }
 
 /**
- * The card's agent changed under the Assistant's start (HI-2062): its write left the card with nobody on it, though the
- * move was decided for an agent. The write is undone; the move is decided again on the card as it is now.
+ * The card's agent changed under the Assistant's move into Active (HI-2062): its write left the card with nobody on it,
+ * though the move was decided for an agent. The write is undone; the move is decided again on the card as it is now.
  */
 class NobodyChanged extends Error {
   constructor(n: number) {
-    super(`#${n}'s agent changed under its start`) // i18n-ignore: an internal signal, never shown
+    super(`#${n}'s agent changed under its move into Active`) // i18n-ignore: an internal signal, never shown
   }
 }
 
 /**
- * moveThroughRules, decided again when its start's write found the card's agent gone (NobodyChanged): with the gate read
+ * moveThroughRules, decided again when its write into Active found the card's agent gone (NobodyChanged): with the gate read
  * again, the move is for nobody now, so it is refused without the user's reason, or its one Override names the rule. A
  * card still changing under it after that is refused, as nobody on it.
  */
@@ -2129,7 +2129,7 @@ async function planned(ws: WorkspaceService, numbers: number[], patch: Pick<Task
 /** For tests: runs as a card's change begins, in its board change (to hold a batch at a card). */
 export const taskTestHooks: { beforeUpdate: ((n: number) => Promise<void>) | null } = { beforeUpdate: null }
 
-async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; ask?: boolean; note?: StoredText[]; started?: { nobodyOk: boolean } } = {}): Promise<TaskCard> {
+async function updateTaskLocked(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; ask?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean } } = {}): Promise<TaskCard> {
   // Its facts are this actor's (#1216), with the reads its caller made before the change, if any.
   return recordingAs(actor, () => updateTaskAs(n, patch, actor, opts))
 }
@@ -2145,7 +2145,7 @@ async function stageNamesOf(ws: WorkspaceService, project: string | null | undef
   return names && Object.keys(names).length ? names : null
 }
 
-async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[]; started?: { nobodyOk: boolean } }): Promise<TaskCard> {
+async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts: { check?: (card: TaskCard) => void; said?: string[]; comment?: string; commit?: () => void; was?: TaskColumn; keepAgent?: boolean; note?: StoredText[]; entered?: { nobodyOk: boolean } }): Promise<TaskCard> {
   await taskTestHooks.beforeUpdate?.(n)
   const ws = workspace
   const by = actorName(actor)
@@ -2244,11 +2244,11 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     }
     // The Assistant's move into Doing leaving nobody on the card (HI-2062), on the card as it is now, its agent as this
     // change leaves it (a project change takes it off): nobody on it is the user's choice, passed as override with their
-    // reason (null: refused). A runtime start's write is checked the same way: its Override names the rule when its move
-    // started it for nobody; one started for an agent that this change leaves off (taken off meanwhile) undoes the write,
-    // and the move is decided again on the card as it is now (moveThrough).
+    // reason (null: refused). A runtime move's write into Active (a start, or back from Review) is checked the same way:
+    // its Override names the rule when its move was for nobody; one decided for an agent that this change leaves off
+    // (taken off meanwhile) undoes the write, and the move is decided again on the card as it is now (moveThrough).
     const leftEmpty = actor.kind === 'assistant' && patch.column === 'doing' && card.column !== 'doing' && !!card.project && !card.agent
-    if (leftEmpty && changeByRuntime() && opts.started && !opts.started.nobodyOk) throw new NobodyChanged(n)
+    if (leftEmpty && changeByRuntime() && opts.entered && !opts.entered.nobodyOk) throw new NobodyChanged(n)
     const nobody = leftEmpty && !changeByRuntime() ? patch.override?.reason.trim() || null : undefined
     if (nobody === null) throw new WorkflowRefusedError(refusalOf('move.doingNobody', { card: cardRef(n), stage: 'active' }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
     // A review renewed by its reviewer changes the card (when it started) without a line in its history: saved too.
