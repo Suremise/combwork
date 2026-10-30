@@ -252,6 +252,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     check("…saved: Hive merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity", projectJson(alpha).workflow?.preset === 'pair' && projectJson(alpha).workflow?.presetAsked === 'chosen' && options.finish === 'hiveMerges' && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email, JSON.stringify(projectJson(alpha).workflow))
     const identity = options.identity ?? fx.identity
     const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, '-c', `user.email=${identity.email}`, ...args]).trim()
+    // Pair, its Maximum agents raised to 3 as a user would (HI-2131, as HI-2091): G14's builder B2 below is alpha's third.
+    await inv('workflow:setOptions', alpha, { preset: 'pair', options: { ...options, maxAgents: 3 } })
 
     // The board: alpha's stages.
     const laneA = []
