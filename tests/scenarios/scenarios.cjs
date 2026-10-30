@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 100
+const FIXTURES_VERSION = 101
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -2465,6 +2465,8 @@ module.exports.SCENARIOS = [
       if (!c.doneAt || Date.now() - c.doneAt > 60000) return false
       const pane = await c.inv('pty:buffer', require('../e2e/lib.cjs').ptyKey(c.alpha, c.agents.coder.id)).catch(() => '')
       c.given ||= String(pane).includes('New in your inbox: 1 task')
+      // Its start's text (HI-2047), as the agent's deliveries show it.
+      if (c.given) c.start = (await c.deliveries('coder')).find((d) => d.kind === 'task' && d.card === c.cards.b)?.text ?? null
       return !c.given
     },
     prompt: (c) =>
@@ -2476,6 +2478,8 @@ module.exports.SCENARIOS = [
       return [
         [`#${c.cards.b} is started on Coder (in Doing, its agent)`, b?.column === 'doing' && (b?.agent?.id ?? b?.agent) === c.agents.coder.id, `${b?.column} / ${JSON.stringify(b?.agent)}`],
         [`Coder is given #${c.cards.b} (its task's doorbell in its pane)`, !!c.given, String(c.given)],
+        // HI-2047: a running lane's builder is pointed at card-loop alone.
+        ["its start names card-loop as the lane's builder, not work-on-card", /card-loop skill as this lane's builder/.test(c.start ?? '') && !/work-on-card/.test(c.start ?? ''), String(c.start)],
         ['started by Hive or by Coder itself, nobody else', !!started && /^(Hive|Coder)/.test(started.by), JSON.stringify(started ?? null)],
         ["didn't ask the user (no hive_notify, no question)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
       ]

@@ -1,4 +1,4 @@
-import { join } from 'path'
+import { basename, join } from 'path'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import type { DeliverySender } from '../shared/deliveries'
 import { projectAgents } from '../shared/defaults'
@@ -21,6 +21,8 @@ import { expectStartPrompt, placementDue, startedOutsideSlots } from './slotCard
 import { startBegun, startEnded } from './agentStarts'
 import type { ContextLine } from '../shared/tasks'
 import { cardRef } from '../shared/projectKeys'
+import { laneBuilds } from '../shared/lanes'
+import { rawLanes } from './lanes'
 
 const log = createLogger('tasks')
 
@@ -237,7 +239,8 @@ async function giveCard(
     // folder; the user's Start across the rules (with its reason) starts where the agent is, as they chose.
     // Already Active with no slot (HR2's round 1: a start from before this fix, given again) is refused the same way.
     if (!(reason && actor.kind === 'user') && (await startedOutsideSlots(workspaceOf(p), p, n))) throw hiveError(NO_SLOT, { card: cardRef(n), active: before.column === 'doing' ? 'yes' : 'no' }, { kind: 'conflict' })
-    const prompt = advanced.get<boolean>(RAW_CARD_START) ? rawTaskPrompt(card, note) : taskPrompt(card, !!sessions.hiveMcp(p), { from: before.column, note, context, attachments: await cardAttachments(workspace, n) })
+    const inLane = laneBuilds(await rawLanes(workspaceOf(p)), basename(p), agentId, n)
+    const prompt = advanced.get<boolean>(RAW_CARD_START) ? rawTaskPrompt(card, note) : taskPrompt(card, !!sessions.hiveMcp(p), { from: before.column, note, context, attachments: await cardAttachments(workspace, n), inLane })
     // Started in a slot (#1438): Hive gives it to the agent there once the slot is ready (a new conversation where the
     // agent isn't running there), so nothing is typed where it is now. Only while that placement is still to come: a card
     // back from Review for more work keeps its placed cycle, so it is given here like any other (HI-1953).

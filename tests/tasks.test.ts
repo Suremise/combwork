@@ -2070,6 +2070,26 @@ describe('task prompt', () => {
     const long = { ...back, comments: [{ at: '2026-10-02T10:00:00Z', by: 'You', text: 'x'.repeat(5000) }] }
     expect(taskPrompt(long, false, { from: 'done' })).toMatch(/x{4000}… \(cut short: hive_read_task has it all\)$/)
   })
+
+  // HI-2047 (HI-2009's K10): a running lane's builder is pointed at card-loop, not at work-on-card as well.
+  it("names card-loop for a running lane's builder, work-on-card elsewhere", async () => {
+    const { taskPrompt } = await import('../src/shared/tasks')
+    expect(taskPrompt(card, true, { inLane: true })).toBe("Work on task #7 from the Hive task board: Fix it\n\nThe details.\n\nUse the card-loop skill as this lane's builder.")
+    expect(taskPrompt(card, true, { inLane: true })).not.toContain('work-on-card')
+    expect(taskPrompt(card, true, { inLane: false })).toMatch(/Use the work-on-card skill\.$/)
+    expect(taskPrompt(card, false, { inLane: true })).not.toMatch(/card-loop|work-on-card/)
+  })
+
+  it("knows a card is in a running lane only for that lane's builder, in its project", async () => {
+    const { laneBuilds } = await import('../src/shared/lanes')
+    const lane = { state: 'active' as const, project: 'Alpha', builder: { id: 'a-1', name: 'B1' }, cards: [7, 8] }
+    expect(laneBuilds([lane], 'alpha', 'a-1', 7)).toBe(true)
+    expect(laneBuilds([lane], 'alpha', 'a-1', 9)).toBe(false) // not one of its cards
+    expect(laneBuilds([lane], 'alpha', 'a-2', 7)).toBe(false) // another agent (its reviewer, say)
+    expect(laneBuilds([lane], 'beta', 'a-1', 7)).toBe(false) // another project's
+    expect(laneBuilds([{ ...lane, state: 'ended' }], 'alpha', 'a-1', 7)).toBe(false) // ended
+    expect(laneBuilds([], 'alpha', 'a-1', 7)).toBe(false)
+  })
 })
 
 describe('column colours', () => {

@@ -707,9 +707,9 @@ const PROMPT_COMMENT_MAX = 4000
 /**
  * What an agent is given when a card is started: the card's own words (title, description, what it depends on), and
  * for more work on a card from Review or Done the feedback it came back with (the latest comment) and the user's note.
- * How to carry a card through is the work-on-card skill's (and, briefly, Hive's session contract), so with Hive's
- * tools the prompt only points there; without them the card is all the agent has. from: the column it was started
- * from; note: what to do now.
+ * How to carry a card through is the work-on-card skill's (card-loop's for a running lane's builder; and, briefly,
+ * Hive's session contract), so with Hive's tools the prompt only points there; without them the card is all the agent
+ * has. from: the column it was started from; note: what to do now; inLane: the agent builds it in a running lane.
  */
 /**
  * A card's start in its own words (#1292, #966 row 30; Settings → Advanced, "A card's start in its own words"): its
@@ -723,7 +723,7 @@ export function rawTaskPrompt(card: Pick<TaskCard, 'title' | 'description'>, not
 /** At most this many of a card's attachments named in its start prompt (HI-1700); hive_read_task lists them all. */
 const PROMPT_ATTACHMENTS_MAX = 10
 
-export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: TaskColumn; note?: string; context?: ContextLine[]; attachments?: Pick<CardAttachment, 'id' | 'path'>[] } = {}): string {
+export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: TaskColumn; note?: string; context?: ContextLine[]; attachments?: Pick<CardAttachment, 'id' | 'path'>[]; inLane?: boolean } = {}): string {
   // Its attachments (HI-1700): the text's links to them as their paths, and their paths listed.
   const files = opts.attachments ?? []
   const paths = (t: string): string => (files.length ? withAttachmentPaths(t, files) : t)
@@ -741,6 +741,8 @@ export function taskPrompt(card: TaskCard, withTools: boolean, opts: { from?: Ta
     const text = paths(latest.text.trim())
     parts.push(`Its latest comment (${latest.by}, ${latest.at.slice(0, 10)}):\n\n${text.length > PROMPT_COMMENT_MAX ? `${text.slice(0, PROMPT_COMMENT_MAX)}… (cut short: hive_read_task has it all)` : text}`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
   }
-  if (withTools) parts.push(`Use the work-on-card skill.${card.comments.length ? ` The card has ${card.comments.length} comment${card.comments.length === 1 ? '' : 's'}: read ${again ? 'the rest' : 'them'} with hive_read_task.` : ''}`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  // A running lane's builder (HI-2047) works its cards in turn with card-loop, which does each with work-on-card.
+  const skill = opts.inLane ? "Use the card-loop skill as this lane's builder." : 'Use the work-on-card skill.' // i18n-ignore: agent-facing: the prompt an agent starts a card with
+  if (withTools) parts.push(`${skill}${card.comments.length ? ` The card has ${card.comments.length} comment${card.comments.length === 1 ? '' : 's'}: read ${again ? 'the rest' : 'them'} with hive_read_task.` : ''}`) // i18n-ignore: agent-facing: the prompt an agent starts a card with
   return parts.join('\n\n')
 }

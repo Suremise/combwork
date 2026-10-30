@@ -24,7 +24,8 @@ export const GUIDANCE_REVISION = hashText(
     controlRules('agents'),
     controlRules('projects'),
     journalRule(['{scope}']),
-    taskPrompt({ number: 0, title: '{title}', description: '', blockedBy: [], comments: [] } as never, true)
+    taskPrompt({ number: 0, title: '{title}', description: '', blockedBy: [], comments: [] } as never, true),
+    taskPrompt({ number: 0, title: '{title}', description: '', blockedBy: [], comments: [] } as never, true, { inLane: true })
   ].join('\n')
 )
 
