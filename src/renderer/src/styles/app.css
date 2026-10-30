@@ -4910,9 +4910,11 @@ h2.section#unused-worktrees {
   gap: 2px;
   padding: 4px 10px 6px 38px;
 }
+/* Each row is its own grid: a users column sized apart from its text keeps the split the same in every row, so the
+   columns line up (HI-2158). It fills to 150px before the fr columns grow, and gives way to 80px in a narrow pane. */
 .connection-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1.2fr) minmax(160px, 2fr) minmax(80px, auto) auto;
+  grid-template-columns: minmax(120px, 1.2fr) minmax(160px, 2fr) minmax(80px, 150px) auto;
   gap: 10px;
   align-items: center;
   min-height: 26px;

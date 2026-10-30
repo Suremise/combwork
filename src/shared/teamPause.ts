@@ -4,7 +4,7 @@
  * next entry), and what still runs before it is safe to install. No imports: hive-mcp.js and the window read it too.
  */
 
-/** A workspace's pause as saved (`.hive/team-pause.json`): its epoch, since when, and who paused it. */
+/** A workspace's pause, held in memory by the running Hive (HI-2156): its epoch, since when, and who paused it. */
 export interface TeamPause {
   pauseId: string
   since: string

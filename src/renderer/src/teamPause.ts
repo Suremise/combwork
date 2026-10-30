@@ -1,14 +1,6 @@
 import { create } from 'zustand'
 import type { TeamPauseState } from '@shared/teamPause'
-import { msg, tr } from '@shared/i18n'
 import { call } from './api'
-import { notify } from './store'
-
-const STILL = {
-  title: msg({ id: 'board.team.stillPaused', defaultMessage: 'The team is still paused', description: "A notice as Hive's window opens (HI-2081): the team was paused before Hive last closed (not for an update that has now been installed), so Hive starts no lane card and wakes no agent until the user resumes it." }),
-  body: msg({ id: 'board.team.stillPausedBody', defaultMessage: "No lane starts a card and no agent is woken until you resume the team. The Progress panel's Lanes says what still runs.", description: 'The notice that the team is still paused as the window opens (HI-2081).' }),
-  resume: msg({ id: 'board.team.stillPausedResume', defaultMessage: 'Resume the Team', description: 'A button in the notice that the team is still paused (HI-2081): resumes it.' })
-}
 
 /**
  * The team's pause as the window shows it (HI-2081): every open workspace's pause and what still runs, read from main
@@ -62,12 +54,7 @@ let started = false
 export function initTeamPause(): void {
   if (started) return
   started = true
-  // Still paused as the window opens (a crash or a plain quit while it was; an update's restart lifts it): said once, with
-  // Resume the Team, as nothing restarts on its own until then.
-  void refreshTeamPause().then(() => {
-    if (!anyPaused()) return
-    notify('warning', tr(STILL.title), tr(STILL.body), [{ label: tr(STILL.resume), command: 'team.resume' }])
-  })
+  void refreshTeamPause()
   // Each read scans every agent's job in main: what changes often (statuses, runs) is read at most once a second.
   let soon: ReturnType<typeof setTimeout> | null = null
   const later = (): void => {

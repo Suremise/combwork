@@ -103,30 +103,6 @@ describe('what a paused team counts (round 1, findings 2, 4, 5)', () => {
     expect((await parked.scanWorkspace(ws(w), { assistantOf: ws(w) })).parked).toBe(true)
   })
 
-  it('a first pause of every workspace whose save fails: named, never parked', async () => {
-    const w = space()
-    h.open = [w]
-    mkdirSync(join(w.path, '.hive', 'team-pause.json'))
-    const r = await tp.pauseApp()
-    expect(r.failed.map((f) => f.workspacePath)).toEqual([w.path])
-    await tp.withLock(ws(w), () => undefined)
-    const s = await parked.teamPauseState()
-    expect(s.allParked).toBe(false)
-    expect(s.workspaces[0].items.map((i) => i.what)).toEqual([expect.stringMatching(/^its pause couldn't be saved/)])
-  })
-
-  it('a workspace opened during the user’s pause whose save fails: held, named, never parked', async () => {
-    const a = space()
-    h.open = [a]
-    await tp.pauseApp()
-    const b = space()
-    mkdirSync(join(b.path, '.hive', 'team-pause.json'))
-    h.open = [a, b]
-    expect(tp.teamPauseOf(ws(b))).not.toBeNull()
-    await vi.waitFor(async () => expect(tp.pauseSaveState(ws(b))).toMatchObject({ failed: expect.any(String) }), { timeout: 10_000 })
-    expect((await parked.scanWorkspace(ws(b))).parked).toBe(false)
-  })
-
   it('projects that can’t be read: can’t be checked, never parked', async () => {
     const w = space()
     h.open = [w]

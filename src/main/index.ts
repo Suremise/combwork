@@ -127,7 +127,7 @@ import { startOutageResume } from './outageResume'
 import { startRetryNotice } from './retryNotice'
 import { chooseStartLanguage, languageInfo, startI18n, switchLanguage } from './i18n'
 import { fmt, msg, tr } from '../shared/i18n'
-import { loadPauseClosing, recordPauseClosing } from './teamPause'
+import { clearSavedPauses } from './teamPause'
 
 const log = createLogger('main')
 let quitting = false
@@ -651,8 +651,6 @@ async function quitNow(tellUser: boolean): Promise<void> {
   stopWatchingRestartRequests()
   const reason: RestartReason = quitReason ?? (installOnQuit || installsOnQuit() ? 'update' : relaunchOnQuit ? 'restart' : 'quit')
   await recordClosing(reason).catch((e) => log.warn('recording the agents as Hive closes', e))
-  // The team's pauses with this close (HI-2081): an install's or an update's restart lifts these, and only these.
-  await recordPauseClosing(reason).catch((e) => log.warn('recording the team pauses as Hive closes', e))
   await sessions.stopAllAndWait(3000)
   await quitLeftovers()
   // The stopped runs' slot writers released before the workspaces close (HI-1801): their outcomes are known by now.
@@ -924,7 +922,8 @@ app.whenReady().then(async () => {
   // The last run's marker (#984): still there, it ended without quitting; then this run's own.
   // The agents a restart or quit recorded (HI-1707), read first: the unexpected-close notice leaves those to it.
   loadRestartRecord()
-  loadPauseClosing()
+  // A team pause is this run's only (HI-2156): what an earlier build saved of one goes, and Hive starts unpaused.
+  clearSavedPauses()
   checkLastRun()
   startRunMarker()
   initRestartRecovery()
