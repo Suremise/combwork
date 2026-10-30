@@ -351,7 +351,7 @@
   "agents.switch.title": "将 {agent} 切换到 {cli}？",
   "agents.template.nameTaken": "模板中已有另一个名为“{name}”的智能体。",
   "agents.template.new": "新智能体（模板）",
-  "agents.template.note": "用于模板“{template}”：“保存”会将其保存到模板中。保持为“{projects}”的设置将跟随载入模板的项目。",
+  "agents.template.noteSuggest": "用于模板“{template}”：“保存”会将其保存到模板中。它的编码智能体只是建议：每个智能体的连接在载入模板时选择。",
   "agents.template.title": "{agent} 的设置（模板）",
   "agents.tested.newer": "此版本发布于此 Hive 版本测试之后。大多数更新都能正常工作；如果出现异常，请报告（复制诊断信息）。",
   "agents.tested.older": "低于测试所用版本，建议更新。",

@@ -351,7 +351,7 @@
   "agents.switch.title": "Przełączyć agenta {agent} na {cli}?",
   "agents.template.nameTaken": "Inny agent szablonu nazywa się „{name}”.",
   "agents.template.new": "Nowy agent (szablon)",
-  "agents.template.note": "Dla szablonu „{template}”: Zapisz zapisuje go w szablonie. Ustawienia pozostawione jako „{projects}” biorą wartość z projektu, do którego szablon zostanie wczytany.",
+  "agents.template.noteSuggest": "Dla szablonu „{template}”: Zapisz zapisuje go w szablonie. Jego agent kodujący jest tylko sugestią: połączenie każdego agenta wybiera się przy wczytywaniu szablonu.",
   "agents.template.title": "Ustawienia agenta {agent} (szablon)",
   "agents.tested.newer": "Ta wersja ukazała się po przetestowaniu tego wydania Hive. Większość aktualizacji działa; jeśli coś zachowuje się dziwnie, zgłoś to (Kopiuj diagnostykę).",
   "agents.tested.older": "Starsza niż testowana; rozważ aktualizację.",

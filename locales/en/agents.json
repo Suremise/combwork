@@ -1407,9 +1407,9 @@
     "defaultMessage": "New agent (template)",
     "description": "Title of Agent Settings for a new agent of a template, from the template editor."
   },
-  "agents.template.note": {
-    "defaultMessage": "For the template \"{template}\": Save saves it in the template. Settings left as \"{projects}\" follow the project it is loaded into.",
-    "description": "Under Agent Settings for a template's agent: Save (a button) saves it in the template ({template}); {projects} is the first choice of each setting (\"Project's\")."
+  "agents.template.noteSuggest": {
+    "defaultMessage": "For the template \"{template}\": Save saves it in the template. Its coding agent is only a suggestion: the connection each agent runs on is chosen when the template is loaded.",
+    "description": "Under Agent Settings for a template's agent (HI-2109): Save (a button) saves it in the template ({template}). A template keeps no connection, model or effort: its coding agent CLI only preselects a connection in the Load template dialog."
   },
   "agents.template.title": {
     "defaultMessage": "{agent} settings (template)",

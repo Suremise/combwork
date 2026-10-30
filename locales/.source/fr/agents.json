@@ -353,6 +353,7 @@
   "agents.template.nameTaken": "Another agent of the template is called \"{name}\".",
   "agents.template.new": "New agent (template)",
   "agents.template.note": "For the template \"{template}\": Save saves it in the template. Settings left as \"{projects}\" follow the project it is loaded into.",
+  "agents.template.noteSuggest": "For the template \"{template}\": Save saves it in the template. Its coding agent is only a suggestion: the connection each agent runs on is chosen when the template is loaded.",
   "agents.template.title": "{agent} settings (template)",
   "agents.tested.newer": "This version came out after this Hive release was tested. Most updates work; if something behaves oddly, report it (Copy Diagnostics).",
   "agents.tested.older": "Older than tested; consider updating.",

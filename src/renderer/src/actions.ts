@@ -4,7 +4,7 @@ import { agentLimit } from './advanced'
 import { agentOf, cancelDialog, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
 import { AGENT_LIMIT_MAX, MANY_AGENTS, OPEN_WORKFLOW_OPTIONS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
-import { defaultProviderPending, isProviderEnabled, projectDefaultProvider, providerName } from '@shared/providers'
+import { defaultProviderPending, isKnownProvider, isProviderEnabled, projectDefaultProvider, providerName } from '@shared/providers'
 import { agentsToResume, resumeAll, stalledOnSignIn, type ResumeAllResult } from '@shared/resumeAll'
 import { holdShort, holdText } from '@shared/sessionResume'
 import type { FreshRow } from '@shared/freshStarts'
@@ -29,6 +29,8 @@ import { formatTokens, type SessionAction } from './util'
 import { movesShown } from './pendingMoves'
 import { createElement } from 'react'
 import { TemplateLoadNames } from './components/TemplateLoad'
+import { ChooseConnectionsBody } from './components/TemplateConnections'
+import { loadFallback, type ConnectionAnswers, type ConnectionsApplied } from '@shared/templateConnections'
 import { McpProjectPicker } from './components/McpProjectPicker'
 import { McpServerPicker } from './components/McpServerPicker'
 import { AgentsDetail, batchAgentsData, projectAgentsData, tableText } from './components/AgentsTable'
@@ -1496,18 +1498,13 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   const plan = await attempt(tr(msg({ id: 'actions.template.readFailed', defaultMessage: 'Could not read the template', description: "An error's title: reading a template failed." })), () => call('templates:plan', path, entry.scope, entry.file, from))
   if (!plan) return
   if (plan.blocked.length) {
-    // What each missing provider's problem is (#849), never its reason's words, which are in the window's language.
-    const fix = plan.missing.find((m) => m.problem === 'notInstalled')?.provider ?? null
-    const off = plan.missing.some((m) => m.problem === 'off')
     const where = project(path)?.name
-    const choice = await choose({
+    await choose({
       title: tr(msg({ id: 'actions.template.blockedTitle', defaultMessage: 'Can\'t load "{name}" yet', description: "Title of the message when a template ({name}) can't be loaded now (an agent runs, a provider is off…)." }), { name: plan.name }),
       message: tr(msg({ id: 'actions.template.blockedMessage', defaultMessage: "It can't be loaded into {project, select, none {this project} other {{project}}} yet:", description: "Above the reasons a template can't be loaded into a project ({project}; none when unknown)." }), { project: where ?? 'none' }),
       detail: plan.blocked.map((b) => `• ${b}`).join('\n'),
-      choices: [...(fix ? [{ label: tr(msg({ id: 'actions.template.openSetup', defaultMessage: 'Open Provider Setup', description: 'Button: opens Provider Setup (a Help window) to install a missing CLI.' })), value: 'setup' }] : []), { label: tr(msg({ id: 'actions.template.ok', defaultMessage: 'OK', description: "Button: closes the message that a template can't be loaded yet." })), value: 'ok' }]
+      choices: [{ label: tr(msg({ id: 'actions.template.ok', defaultMessage: 'OK', description: "Button: closes the message that a template can't be loaded yet." })), value: 'ok' }]
     })
-    if (choice === 'setup' && fix) set({ setupOpen: fix })
-    else if (off) notify('warning', tr(msg({ id: 'actions.template.providerOff', defaultMessage: 'A provider it needs is turned off', description: "A warning's title: a template needs a CLI that is turned off." })), tr(msg({ id: 'actions.template.providerOffMessage', defaultMessage: 'Turn it on in Settings → Providers, then load the template again.', description: 'Under the warning that a template needs a CLI that is turned off. Settings → Providers is where: use its translated names.' })), [{ label: openSettingsLabel(), command: 'settings.providers' }])
     return
   }
   const p = project(path)
@@ -1515,8 +1512,8 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   const expected = p.agents.map((a) => a.id)
   // The names its agents get (#702): chosen in the dialog, which greys out its button while one clashes.
   let names = plan.create.map((a) => a.name)
-  // The connection chosen for each agent whose own can't be used here (HI-1769), by its index in the plan.
-  let connections: Record<number, string | null> = Object.fromEntries(plan.connections.map((c) => [c.index, null]))
+  // The Connections section's answers (HI-2109), by the names chosen: none for an agent, its role's preselected one.
+  let connections: ConnectionAnswers = {}
   // Its workflow (HI-1910) replaces the suggestion: shown and applied where it has a section for this project's version
   // control, waiting for Git where it has only Git's, said where one can't be used (never replaced by the suggestion).
   const wf = plan.workflow
@@ -1534,9 +1531,9 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
     message: plan.remove.length
       ? tr(msg({ id: 'actions.template.loadReplaces', defaultMessage: 'It replaces every agent of {project}.', description: 'The question before loading a template: its agents replace every agent of the project ({project}).' }), { project: p.name })
       : tr(msg({ id: 'actions.template.loadAdds', defaultMessage: 'It adds its agents to {project}.', description: 'The question before loading a template into a project ({project}) with no agents.' }), { project: p.name }),
-    // Who goes and who comes: each new agent's settings, and its new worktree's branch and folder in this project (#268),
-    // as a table (#511), with their names to choose (#702).
-    detail: templateLoadDetail(plan, p.config, get().settings, (id) => get().providers[id]),
+    // Who goes and who comes, each on the connection its role starts on (HI-2109), as a table (#511), with their names to
+    // choose (#702) and the Connections section.
+    detail: templateLoadDetail(plan, (i) => plan.options.find((o) => o.id === loadFallback(plan.create, plan.options)(plan.create[i])) ?? null, get().settings),
     content: createElement(TemplateLoadNames, {
       path,
       scope: entry.scope,
@@ -1544,7 +1541,7 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
       from,
       initial: plan,
       onChange: (now: string[]) => void (names = now),
-      onConnections: (now: Record<number, string | null>) => void (connections = now),
+      onConnections: (now: ConnectionAnswers) => void (connections = now),
       onWorkflow: (v: boolean) => void (applyWorkflow = v),
       onOpenWorkflow: () => {
         openWorkflow = true
@@ -1599,11 +1596,11 @@ export async function loadTemplate(path: string, entry: Pick<TemplateEntry, 'sco
   }
 }
 
-/** Adds one agent of a template, the project's others left alone (a name already taken gets a number). */
 /**
- * Adds one agent of a template (#1440): a dialog with what it is (role, coding agent, model) and its name to choose,
- * starting as the template's (made with this project's key), or a free one when another agent of the workspace has it;
- * a name taken is refused there, with a free one to use.
+ * Adds one agent of a template (#1440): a dialog with what it is (its role, and the CLI it suggests) and its name to
+ * choose, starting as the template's (made with this project's key), or a free one when another agent of the workspace
+ * has it; a name taken is refused there, with a free one to use. It runs on its role's preselected connection (HI-2109:
+ * the first on the CLI it suggests), changed afterwards in Agent Settings or with Choose Connections….
  */
 export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEntry, 'scope' | 'file' | 'agents'>, index: number): Promise<void> {
   const p = project(path)
@@ -1621,7 +1618,7 @@ export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEnt
   const initial = nameTaken(own, everyone) ? suggestTemplateAgentName(own, p.name, key, everyone.map((x) => x.name)) : own
   const name = await prompt({
     title: tr(msg({ id: 'actions.template.addTitle', defaultMessage: 'Add an agent from a template', description: 'Title of the dialog that adds one agent of a template to the project (#1440).' })),
-    message: tr(msg({ id: 'actions.template.addMessage', defaultMessage: '{role} · {provider} · {model}', description: "The dialog adding one agent of a template: what it is: its role in the workflow ({role}: Builder, Reviewer, Either), coding agent ({provider}) and model ({model}, or the provider's default)." }), { role: tr(WORKFLOW_ROLE_TEXT[a.role].name), provider: providerName(a.provider), model: a.model ?? tr(msg({ id: 'actions.template.addDefaultModel', defaultMessage: "the provider's default model", description: "The dialog adding one agent of a template: its model when the template leaves it to the coding agent's default." })) }),
+    message: tr(msg({ id: 'actions.template.addSuggests', defaultMessage: '{role}{hasCli, select, yes { · suggests {cli}} other {}}', description: "The dialog adding one agent of a template (HI-2109): what it is: its role in the workflow ({role}: Builder, Reviewer, Either) and the coding agent CLI the template suggests ({cli}), which picks the connection it starts on. Lower case after the dot." }), { role: tr(WORKFLOW_ROLE_TEXT[a.role].name), hasCli: a.provider && isKnownProvider(a.provider) ? 'yes' : 'no', cli: a.provider && isKnownProvider(a.provider) ? providerName(a.provider) : '' }),
     fieldLabel: tr(msg({ id: 'actions.template.addName', defaultMessage: 'Its name', description: 'The dialog adding one agent of a template: the label of its name box.' })),
     initial,
     confirmLabel: tr(msg({ id: 'actions.template.addConfirm', defaultMessage: 'Add Agent', description: "The dialog adding one agent of a template: its button." })),
@@ -1636,10 +1633,50 @@ export async function addAgentFromTemplate(path: string, entry: Pick<TemplateEnt
   const def = await attempt(failed, () => call('templates:addAgent', path, entry.scope, entry.file, index, undefined, name.trim()))
   if (!def) return
   await refreshWorkspace()
-  // Its own connection can't be used here (HI-1769): it follows the workspace's default, and is told so.
-  if (def.connectionFallback) notify('info', tr(msg({ id: 'actions.template.connectionFallback', defaultMessage: "{agent} uses the workspace's default connection", description: "A notice's title after adding an agent from a template (HI-1769): its own connection can't be used here, so it follows the workspace's default connection for its CLI." }), { agent: def.name }), tr(msg({ id: 'actions.template.connectionFallbackWhy', defaultMessage: "{name} {problem, select, missing {isn't on this machine} otherCli {is another CLI's} other {is off in this workspace}}: choose another in its Agent Settings if you like.", description: "Under the notice that an agent added from a template uses the workspace's default connection (HI-1769): why its own ({name}) can't be used. Agent Settings names a dialog." }), { name: def.connectionFallback.name, problem: def.connectionFallback.problem }))
   const now = project(path)
   if (now) showAgent(now, def.id, 'select')
+}
+
+/**
+ * Choose Connections… (HI-2109, on the project's Agents page): the Load template dialog's picker over the project's
+ * existing agents, by their roles; it changes only their connections, nothing loaded or replaced ("high effort for every
+ * builder here"). Each choice starts at "keep each one's". Running agents keep their old connection until they restart:
+ * offered once it's done, as a change of connection is in Settings (each switches once its turn is over).
+ */
+export async function chooseConnections(path: string): Promise<void> {
+  const failed = tr(msg({ id: 'actions.chooseConnections.failed', defaultMessage: 'Could not change the connections', description: "An error's title (HI-2109): Choose Connections failed to read or change the agents' connections." }))
+  const plan = await attempt(failed, () => call('templates:connectionsPlan', path))
+  if (!plan) return
+  const p = project(path)
+  if (!p || !plan.agents.length) return
+  let answers: ConnectionAnswers = {}
+  let done: ConnectionsApplied | null = null
+  const ok = await confirm({
+    title: tr(msg({ id: 'actions.chooseConnections.title', defaultMessage: 'Choose connections for {project}', description: "Title of the Choose Connections dialog (HI-2109): chooses the connections (named setups on accounts: model, effort, mode) of a project's ({project}) agents, by role or one by one." }), { project: p.name }),
+    message: tr(msg({ id: 'actions.chooseConnections.message', defaultMessage: 'Only their connections change: no agent is replaced, and their conversations stay.', description: 'The Choose Connections dialog (HI-2109), under its title: it changes nothing but the agents\' connections.' })),
+    content: createElement(ChooseConnectionsBody, { plan, onAnswers: (now: ConnectionAnswers) => void (answers = now) }),
+    wide: true,
+    confirmLabel: tr(msg({ id: 'actions.chooseConnections.confirm', defaultMessage: 'Apply', description: 'The Choose Connections dialog\'s button (HI-2109): gives the agents the connections chosen.' })),
+    busyLabel: tr(msg({ id: 'actions.chooseConnections.busy', defaultMessage: 'Applying…', description: "The Choose Connections dialog's button while it works (HI-2109)." })),
+    run: async () => {
+      // Bound to the agents the dialog showed (HR3's round 2): changed since, it is refused, nothing changed.
+      done = await call('templates:applyConnections', path, answers, plan.agents.map((a) => a.id))
+    }
+  })
+  if (!ok || !done) return
+  await refreshWorkspace()
+  const r: ConnectionsApplied = done
+  if (r.skipped.length) notify('warning', tr(msg({ id: 'actions.chooseConnections.skipped', defaultMessage: '{count, plural, one {# agent kept its connection} other {# agents kept their connections}}', description: "A warning's title after Choose Connections (HI-2109): some agents ({count}) couldn't be changed." }), { count: r.skipped.length }), r.skipped.map((s) => tr(msg({ id: 'actions.chooseConnections.skippedWhy', defaultMessage: '{agent}: {why, select, running {it runs, and that connection is another coding agent’s: stop it first} other {it was removed meanwhile}}.', description: "Under that warning (HI-2109), one line per agent ({agent}): why its connection didn't change." }), { agent: s.name, why: s.why })).join('\n'))
+  if (!r.restart.length) return
+  const choice = await choose({
+    title: tr(msg({ id: 'actions.chooseConnections.restartTitle', defaultMessage: 'Switch the running agents?', description: 'Title of the question after Choose Connections (HI-2109) changed the connection of agents that are running.' })),
+    message: tr(msg({ id: 'actions.chooseConnections.restartMessage', defaultMessage: '{agents} {count, plural, one {runs on its old connection until it restarts.} other {run on their old connections until they restart.}}', description: 'That question (HI-2109): the running agents ({agents}, a list; {count} of them) keep their old connection until they restart.' }), { agents: fmt.list(r.restart.map((a) => a.name)), count: r.restart.length }),
+    choices: [
+      { label: tr(msg({ id: 'actions.chooseConnections.switch', defaultMessage: 'Switch Them When Their Turn Is Over', description: 'Button (HI-2109): each running agent ends once its turn is over and carries on, on the connection chosen now.' })), value: 'switch' },
+      { label: tr(msg({ id: 'actions.chooseConnections.later', defaultMessage: 'Later', description: 'Button (HI-2109): leaves the running agents on their old connections until they restart.' })), value: 'later' }
+    ]
+  })
+  if (choice === 'switch') await attempt(failed, () => call('connections:switchAffected'))
 }
 
 /** Removes an agent; for a worktree agent, asks whether to keep its worktree and branch. */

@@ -3433,14 +3433,49 @@ p.hint {
   color: var(--fg-strong);
   margin-right: 6px;
 }
-/* An agent's connection (HI-1769): its own one that can't be used here says why above the box choosing another. */
-.template-plan-connection select {
-  max-width: 16em;
+/* An agent's connection in the plan (HI-2109): its CLI's icon and name, what it runs under it. */
+.template-connection-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
-.template-plan-connection-problem {
+.template-plan-values {
   font-size: 11.5px;
-  color: var(--warning);
-  margin-bottom: 2px;
+}
+/* The Connections section (HI-2109): Same for all, then a row per role (or per agent, unfolded), each a choice and the
+   CLI its role suggests. */
+.template-connections {
+  margin-top: 10px;
+}
+.template-connections-form .template-connections-same {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.template-connections-same input {
+  margin: 0;
+}
+.template-connections-row {
+  gap: 8px;
+  min-width: 0;
+}
+.template-connections-row .template-connection-choice {
+  flex: 1;
+  min-width: 0;
+  max-width: 28em;
+}
+.template-connections-suggests {
+  white-space: nowrap;
+}
+.template-connections-agents {
+  margin-top: 8px;
+}
+.template-connections-agents > summary {
+  cursor: pointer;
+  margin-bottom: 6px;
 }
 /* The notice of moved settings above Settings → Accounts & Connections' list (HI-1770). */
 .connections-notice {

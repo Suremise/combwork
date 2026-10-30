@@ -2,6 +2,12 @@
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface HiveMessageValues {
   'assistant.banner.connectionSetup': { cli: string | number }
+  'assistant.chooseConnections.agent': undefined
+  'assistant.chooseConnections.next': undefined
+  'assistant.chooseConnections.now': undefined
+  'assistant.chooseConnections.otherCli': { agent: string | number }
+  'assistant.chooseConnections.role': undefined
+  'assistant.chooseConnections.running': undefined
   'assistant.hiveTemplates.pair': undefined
   'assistant.hiveTemplates.pairOne': undefined
   'assistant.hiveTemplates.pairOneText': undefined
@@ -468,13 +474,10 @@ interface HiveMessageValues {
   'assistant.status.watch': { watch: string | number; until: string }
   'assistant.status.working': undefined
   'assistant.template.agentNoName': { n: string | number }
-  'assistant.template.badContext': { name: string | number }
   'assistant.template.badMcp': { name: string | number }
   'assistant.template.badName': { max: string | number }
   'assistant.template.badPairs': undefined
-  'assistant.template.badProvider': { name: string | number; given: string; provider: string | number }
   'assistant.template.badRole': { name: string | number }
-  'assistant.template.badSetting': { name: string | number; setting: string }
   'assistant.template.badToken': { name: string | number; token: string | number }
   'assistant.template.from09': undefined
   'assistant.template.longNote': { name: string | number; max: number }
@@ -484,31 +487,32 @@ interface HiveMessageValues {
   'assistant.template.notTemplate': undefined
   'assistant.template.sameName': { name: string | number }
   'assistant.template.tooMany': { count: string | number; max: string | number }
+  'assistant.templateConnections.all': undefined
+  'assistant.templateConnections.gone': undefined
+  'assistant.templateConnections.heading': undefined
+  'assistant.templateConnections.keep': undefined
+  'assistant.templateConnections.keepOwn': { name: string | number }
+  'assistant.templateConnections.label': { who: string | number }
+  'assistant.templateConnections.none': undefined
+  'assistant.templateConnections.perAgent': undefined
+  'assistant.templateConnections.roleChoice': undefined
+  'assistant.templateConnections.roleRow': { role: string }
+  'assistant.templateConnections.same': undefined
+  'assistant.templateConnections.suggests': { cli: string | number }
   'assistant.templateLoad.afterLoad': { removed: string }
+  'assistant.templateLoad.cliDefaults': { cli: string | number }
+  'assistant.templateLoad.connectionLine': { name: string | number; values: string | number }
   'assistant.templateLoad.createdHeading': undefined
-  'assistant.templateLoad.createdLine': { name: string | number; hasRole: string; role: string | number; replaces: string; provider: string | number; settings: string | number }
-  'assistant.templateLoad.isDefault': { setting: string | number }
+  'assistant.templateLoad.createdOn': { name: string | number; hasRole: string; role: string | number; replaces: string; connection: string | number }
+  'assistant.templateLoad.noConnection': undefined
   'assistant.templateLoad.oldKept': { branch: string | number; hasWhy: string; why: string | number }
   'assistant.templateLoad.pairedWith': { name: string | number }
   'assistant.templateLoad.removedHeading': undefined
   'assistant.templateLoad.removedLine': { name: string | number; hasNote: string; note: string | number; replaced: string }
   'assistant.templateLoad.roleLine': { role: string | number; paired: string; name: string | number }
-  'assistant.templateLoad.swapped': { problem: string; from: string | number; to: string | number }
   'assistant.templatePlan.agent': undefined
-  'assistant.templatePlan.codingAgent': undefined
   'assistant.templatePlan.connection': undefined
-  'assistant.templatePlan.connectionDefault': { name: string | number }
-  'assistant.templatePlan.connectionLabel': { agent: string | number }
-  'assistant.templatePlan.connectionMissing': { name: string | number }
-  'assistant.templatePlan.connectionNone': undefined
-  'assistant.templatePlan.connectionOff': { name: string | number }
-  'assistant.templatePlan.connectionOtherCli': { name: string | number }
-  'assistant.templatePlan.connectionUnnamed': undefined
-  'assistant.templatePlan.default': undefined
-  'assistant.templatePlan.effort': undefined
   'assistant.templatePlan.fromTip': undefined
-  'assistant.templatePlan.mode': undefined
-  'assistant.templatePlan.model': undefined
   'assistant.templatePlan.nameLabel': { n: string | number }
   'assistant.templatePlan.noteSentence': { note: string | number }
   'assistant.templatePlan.role': undefined
@@ -519,7 +523,6 @@ interface HiveMessageValues {
   'assistant.templatePlan.stateRemovedTip': undefined
   'assistant.templatePlan.stateReplaced': undefined
   'assistant.templatePlan.stateReplacedTip': undefined
-  'assistant.templatePlan.withNote': { thing: string | number; note: string | number }
   'assistant.templateWorkflow.alsoGit': undefined
   'assistant.templateWorkflow.apply': undefined
   'assistant.templateWorkflow.change': { option: string | number; now: string | number; next: string | number }
@@ -551,15 +554,10 @@ interface HiveMessageValues {
   'assistant.templates.close': undefined
   'assistant.templates.colActions': undefined
   'assistant.templates.colAgent': undefined
-  'assistant.templates.colCodingAgent': undefined
-  'assistant.templates.colEffort': undefined
-  'assistant.templates.colMode': undefined
-  'assistant.templates.colModel': undefined
   'assistant.templates.colRole': undefined
-  'assistant.templates.context200k': undefined
+  'assistant.templates.colSuggests': undefined
   'assistant.templates.continue': undefined
   'assistant.templates.copyAgent': { name: string | number }
-  'assistant.templates.default': undefined
   'assistant.templates.delete': undefined
   'assistant.templates.deleteMessage': { scope: string; project: string | number }
   'assistant.templates.deleteTip': undefined
@@ -623,6 +621,7 @@ interface HiveMessageValues {
   'assistant.templates.newAgentName': undefined
   'assistant.templates.noLongerEdited': undefined
   'assistant.templates.noProjects': undefined
+  'assistant.templates.noSuggestion': undefined
   'assistant.templates.noWorkspace': undefined
   'assistant.templates.noWorkspaceTemplates': undefined
   'assistant.templates.noneHive': undefined
@@ -651,6 +650,7 @@ interface HiveMessageValues {
   'assistant.templates.showOf': undefined
   'assistant.templates.stale': { name: string | number }
   'assistant.templates.suggests': { preset: string | number; pool: string }
+  'assistant.templates.suggestsTip': undefined
   'assistant.templates.summary': { count: number; layout: string | number; hasSaved: string; when: string | number; scope: string; project: string | number }
   'assistant.templates.tabHint': undefined
   'assistant.templates.thisProject': undefined

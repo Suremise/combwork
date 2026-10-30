@@ -638,7 +638,7 @@ From api.version 11 (HI-2081, SPEC §16.10.9). Before an update, a workspace's *
 
 ### Templates
 
-From api.version 11 (HI-1502, SPEC §16.10.6). The Hive Assistant's alone: it lists a project's agent templates, plans a load and loads one, as **Load template** does in Hive's window. A script, the user's token or a project agent is refused (`403`) before any template is read. Listing and planning are reads; loading needs **Control agents** (Settings → Assistant → Control) and is undoable (`POST /v1/assistant/undo`).
+From api.version 11 (HI-1502, SPEC §16.10.6). The Hive Assistant's alone: it lists a project's agent templates, plans a load and loads one, as **Load template** does in Hive's window, and (HI-2109) chooses the connections of a project's existing agents, as **Choose Connections…** does. A script, the user's token or a project agent is refused (`403`) before any template is read. Listing and planning are reads; loading and choosing connections need **Control agents** (Settings → Assistant → Control) and are undoable (`POST /v1/assistant/undo`). A template keeps no connection, model or effort (HI-2109): each agent's `provider` is only the CLI it suggests, and the connections are chosen as it loads.
 
 `GET /v1/projects/{name}/templates` — the templates the project can use: Hive's own, the workspace's and its own.
 
@@ -651,22 +651,23 @@ From api.version 11 (HI-1502, SPEC §16.10.6). The Hive Assistant's alone: it li
 `POST /v1/projects/{name}/templates/plan` — what loading one would do; nothing is changed. The body names it and what to load with it:
 - `template` (required): its file, else its name (any case). `scope` (`hive`, `workspace`, `project`) narrows it; `from` is the project a project's template is kept in, when it isn't this one. None is `404`; several of one name are `409`, naming each one's scope and file: name one by them.
 - `names`: new names for some of its agents, `{ "<key>": "<name>" }`. A key is the agent's place (`"1"` for the first), its name as made for this project (`AL-B2`), or its name in the template (`{key}-B2`) when only one agent has it. A key that names no agent or several, two keys for one agent, a place out of range and a name that isn't text are `400`, listing the keys there are. The names are checked as the window checks them (none empty, none too long, none twice).
+- `connections` (HI-2109): which connection each agent gets, `{ "<key>": "<connection>" }`. A key is `"*"` (every agent), a role exactly as written here (`builder`, `reviewer`, `either`, `generalist`), an agent's place (`"1"`, as in `names`), or an agent's name, any case (as made for this project, or in the template); an agent's over its role's over `"*"`. An agent whose name is a role's word (`reviewer`) is named by its place. A value is a connection's id or name among those usable here (`options` in the reply). An agent none names gets the first connection on the CLI its role suggests, else the first usable, as the window's dialog starts with. A key that is no role, place or agent, a name several of its agents share, two keys for one agent, a place out of range, a connection not usable here and a name two connections share are said in `blocked` (and refused by the load).
 - `workflow` (default `true`): whether its workflow options would be set.
 
 ```json
 { "project": "alpha",
   "template": { "scope": "hive", "file": "team-3x3.json", "name": "Team 3×3" },
   "remove": ["Ann", "Rob"],
-  "create": [{ "name": "Coder", "template": "AL-B1", "role": "builder", "provider": "claude-code", "pairedWith": "AL-R1" }],
+  "create": [{ "name": "Coder", "template": "AL-B1", "role": "builder", "connection": "Claude · High", "pairedWith": "AL-R1" }],
   "taken": [{ "name": "Bea", "project": "beta", "suggestion": "Bea 2" }],
-  "connections": [],
+  "options": [{ "id": "c-3f9c2e1b", "name": "Claude · High", "cli": "claude-code", "account": "Personal" }],
   "blocked": [],
   "workflow": { "platform": "git", "applies": true, "needsGit": false, "dropped": [],
                 "changes": [{ "key": "review", "now": "none", "next": "agent" }],
                 "missingCommands": ["unit"], "identityOff": false, "problems": [] } }
 ```
 
-`taken` is each name another project's agent has, with a free one to give in `names` (agent names are unique across the workspace). `connections` names the agents whose own connection can't be used here: they get the workspace's default. `blocked` is why it can't be loaded now: an agent running or starting, a provider off or not installed, more agents than the project may have, and, with `workflow` on, a workflow for Git only in a project with no version control (`needsGit`: setting up Git is the user's, in the window) or options that can't be saved here (`problems`). `workflow` is null when the template has none for this project; `changes` is each option it sets that isn't so now, `missingCommands` the checks it names that the project has no command for (kept, for the user to set), `identityOff` that it turns the commit identity on and the project's git config has none.
+`taken` is each name another project's agent has, with a free one to give in `names` (agent names are unique across the workspace). Each `create` entry's `connection` is the name of the connection it would get (null with none usable here: it is made without one, on the CLI it suggests, and gets one once an account is); `options` lists the connections usable here, in the order. `blocked` is why it can't be loaded now: an agent running or starting, a `connections` answer that can't be used, more agents than the project may have, and, with `workflow` on, a workflow for Git only in a project with no version control (`needsGit`: setting up Git is the user's, in the window) or options that can't be saved here (`problems`). `workflow` is null when the template has none for this project; `changes` is each option it sets that isn't so now, `missingCommands` the checks it names that the project has no command for (kept, for the user to set), `identityOff` that it turns the commit identity on and the project's git config has none.
 
 `POST /v1/projects/{name}/templates/load` — the same body: **replaces every agent of the project** with the template's, and its layout. Refused (`409`) with a free name for each one taken, and for whatever `blocked` would list. It is the window's load: the project's agents can't start while it runs, and it publishes only if they are still those the plan read and none runs. With `workflow` on, the template's options for the project's version control are saved as the project's (Version Control → Workflow), from the same read of the template as its agents, once they are published; lanes and cards already under way keep their rules. Options changed meanwhile aren't saved, and the reply says so.
 
@@ -676,11 +677,20 @@ From api.version 11 (HI-1502, SPEC §16.10.6). The Hive Assistant's alone: it li
   "removed": ["Ann", "Rob"],
   "created": ["Coder", "AL-B2", "AL-B3", "AL-R1", "AL-R2", "AL-R3"],
   "renamed": [{ "template": "AL-B1", "name": "Coder" }],
-  "connections": [],
+  "connections": [{ "name": "Coder", "connection": "Claude · High" }],
   "workflow": { "platform": "git", "applies": true, "saved": true, "changes": [{ "key": "review", "now": "none", "next": "agent" }], "missingCommands": ["unit"], "identityOff": false, "needsGit": false, "dropped": [], "problems": [] } }
 ```
 
 The removed agents' conversations stay in Sessions, their open cards go back and their lanes end, as when an agent is removed. **Undo** puts back the project's agents (with their ids, so their conversations are theirs again) and layout, and its workflow options: two changes, each undone only while it is still as the load left it, and while none of the agents runs. An old name another project's agent has now is never renamed: that change stays, said, to try again. The removed agents' cards and lanes stay as the load left them.
+
+`POST /v1/projects/{name}/templates/apply` — **Choose Connections** (HI-2109): the project's existing agents given connections, nothing else changed (no agent replaced or loaded). The body: `connections` (required), as for a load; an agent none names keeps its own. Every answer is checked first: a key that is no role or agent is `400`, a connection not usable here or a name two share `409`, nothing changed. Each agent then changes through Agent Settings' save (its CLI with it), each change recorded for undo (its connection by id, with its CLI and last conversation when they changed: undo puts them back together, only while none changed since). The project's agents changing between the call's reading of them and its changes (one added, removed or moved) refuse it (`409`), nothing changed. A running agent keeps running on its old connection until it restarts (`restart`); one asked for another CLI's connection while it runs isn't changed (`skipped`, saying why).
+
+```json
+{ "project": "alpha",
+  "changed": [{ "name": "AL-B1", "connection": "Claude · High" }],
+  "restart": ["AL-B1"],
+  "skipped": [{ "name": "AL-R1", "why": "it runs, and that connection is another CLI's: stop it first" }] }
+```
 
 ### Skills and MCP
 

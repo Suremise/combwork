@@ -956,7 +956,7 @@ The design across every surface is HI-1755's design note and addendum. The decis
   - **HI-1770's move** of a project's own model, effort and context onto its agents is made first where a launch would have made it, and its record (`connections1`) is kept: its notice of values a connection can't use is kept (it reads the agent's connection now).
   - **The Assistant** gets a connection for each CLI it has a setup for in the workspace (`assistantConnection[cli]` set, or `settings.assistant.providers[cli]` with any value), its launch on that CLI as it would run it now; only the active one (the one it runs) is its agent's. The others are kept in its home's record (`migrations.accounts1.assistant`), which a change of its CLI picks.
   - **Copilot's** Settings → GitHub Copilot values become its account's base connection; its agents follow the rule.
-  - **Templates'** `connection` and `connectionName` are dropped as a template is read, and never written (HI-2109 builds the rest).
+  - **Templates'** `connection` and `connectionName` are dropped as a template is read, and never written; HI-2109 drops their model, effort, mode and context too, and chooses connections when one is loaded (§16.10.6).
   - **The default provider goes** (decision A): the project's is removed; Settings' stays read-only. A new agent naming nothing goes on the first account in the order that's usable here (its CLI on and installed).
 - **How it runs:** `config.json` once at start, before anything reads it (`config.ts`, `migrations.accounts1`, with the old connections kept read-only in it as `legacy`, the input for workspaces not opened yet; the order's one-time move, HI-1875, moves them too). Each project's and the Assistant's home's files when the workspace opens, and before anything launches there (`ensureMigrated`, `connectionMoves.ts`), under their locks: `config.json` is saved first, and a write that needs a connection not made yet writes nothing; the connection is made, saved, and the write runs again (`withConnections`), so a project never names a connection `config.json` lost (a save that fails publishes nothing and is tried again). Then the file's own old fields (`providers`, `defaultProvider`, 0.1's flat fields, agents' model, effort, mode and context) are removed in the same write that records `migrations.accounts1`, so an interrupted run repeats and a second changes nothing. `workspace.json`'s own (`assistantConnection`, each CLI's stored `default`) go in one write recording its `migrations.accounts1`, after its Assistant's home. A failure is said once (the project's move notice) and tried again at the next open or launch; a launch it fails is refused, saying so. Global sources (`settings.assistant.provider` and `.providers`, `settings.providers[cli]`'s default model, effort, mode, extra arguments and 200K, `settings.defaultProvider`) stay in `config.json`, read-only, for workspaces not yet opened: 1.0 never deletes them. One-way, as §16.17 allows: an older Hive can't read `accounts` and `connections`.
 - **Today's screens and the Agent API** (the adapter, until HI-2107 and HI-2108):
@@ -4359,8 +4359,9 @@ repeating them (#533) [note §8].
 [#1123 tpl, names] Template format v2 (`TEMPLATE_VERSION` 2, `src/shared/templates.ts:13`):
 - `worktree` removed; `role` becomes the **workflow role** `builder | reviewer | either`, used by lanes, the reviewer
   pool and no-self-review; a new optional `note` keeps today's free text [#1123 c].
-- Kept: name, provider, model, effort, permission mode, 200k context, MCP servers, layout, description. New optional:
-  `suggestedPreset` (loading offers it, never applies it silently) and `pairs`.
+- Kept: name, provider (since HI-2109 a suggestion only), MCP servers, layout, description; model, effort, permission
+  mode, 200K context and connections no longer (HI-2109, below). New optional: `suggestedPreset` (loading offers it,
+  never applies it silently) and `pairs`.
 - v1 templates are wiped at upgrade and refused on import with a clear message; release notes say so [#1123 tpl].
 - **Names** use patterns `{key}-B{n}`, `{key}-R{n}`, `{key}-A{n}` [#704, #1123 names]; the load dialog lists the names
   it will create, every one editable to any name unique in the workspace, with a free name pre-filled on a clash.
@@ -4409,12 +4410,11 @@ repeating them (#533) [note §8].
   (`workflowPrefill`, #1423's), never applied by the load. **Hive's own** (`shared/templateDefaults.ts`, the Hive scope:
   listed first, read-only, `hiveOnly` refusing save, rename, edit, delete and import into it; Duplicate… copies one with
   the window's name for it and the time): Solo (1 builder, Claude Code, single), Pair (builder Claude Code + reviewer
-  Codex, columns2), Pair: one provider (both Claude Code), Team 3×3 (3 + 3, paired, grid6), Team 6×6 (6 builders on medium
-  effort + 6 reviewers, paired, grid6 on two pages), Team 6 + pool (6 + 2, `reviewerMode: pool`, grid6 and a page of two);
-  models the provider's default; names `{key}-B{n}` / `{key}-R{n}` (expanded with the project's key, `templateAgentNames`; #1440 builds the names table on it); names and descriptions in 7 locales. A
-  provider of Hive's own that is off or not installed is swapped for the first one that runs here (Claude Code first) with
-  its model, effort and mode left to that one's defaults, said on the row (`swaps`), so Pair loads as Pair: one provider;
-  a template the user made stays refused instead. **0.9's at the upgrade** (`templateUpgrade.ts`; the Assistant's 23 Oct scope call: copy
+  Codex, columns2), Pair: one provider (both Claude Code), Team 3×3 (3 + 3, paired, grid6), Team 6×6 (6 builders + 6
+  reviewers, paired, grid6 on two pages), Team 6 + pool (6 + 2, `reviewerMode: pool`, grid6 and a page of two); the CLIs
+  are suggestions (HI-2109: no connection, model or effort); names `{key}-B{n}` / `{key}-R{n}` (expanded with the project's key, `templateAgentNames`; #1440 builds the names table on it); names and descriptions in 7 locales. A
+  CLI one of them suggests that is off or not installed only changes the connection its role preselects (HI-2109's
+  picker; before it, #1436's `swaps`), so Pair loads both on Claude Code where Codex has no account. **0.9's at the upgrade** (`templateUpgrade.ts`; the Assistant's 23 Oct scope call: copy
   only, the upgrade being one-way): 1.0 doesn't use a version-1 file (the lists skip it; a load, an added agent or a
   delete naming one says it is no longer there; a save of its name makes a new file beside it; an import is refused).
   Once the board is upgraded, at each open until done (board_meta `templates.v09`), each version-1 template of the
@@ -4448,6 +4448,55 @@ repeating them (#533) [note §8].
   template with a workflow drops the suggested preset's tick box. **The Templates view**: a Workflow section under None |
   Git tabs; the editor fills a section from a preset (its check names kept) or removes it; options one by one are set in a
   project and saved as the template. Not built: "Custom (from template X)" naming.
+- **Connections in templates and Choose Connections…** [HI-2109, HI-2105's design: decision G] **Built [HI-2109]**:
+  - **What a template keeps:** each agent's name, workflow role, note, `mcpServers` and `provider` **as a suggestion**
+    (`TemplateAgent.provider`, optional); never a connection, model, effort, mode or context (the connection's,
+    HI-2106). `templateFrom` writes none; `readTemplate` drops `model`, `effort`, `permissionMode`, `use200kContext`,
+    `connection` and `connectionName` whatever they hold (never a refusal), and a `provider` that isn't a provider's id is
+    no suggestion (before: refused). An unknown but well-formed one (a newer Hive's) is kept and flagged, never used.
+    Hive's own suggest Claude Code for builders and Codex for reviewers; Team 6×6's builders lost their medium effort.
+  - **The picker** (`shared/templateConnections.ts`; the window's `TemplateConnections.tsx`, a stand-in with HI-2108's
+    `ConnectionChoice` props until that one lists connections): the options are `connectionOptions(project)`, every
+    connection of each account usable in the project's workspace (on there, or the CLI's own home) whose CLI is on and
+    installed, in the order (accounts', then within each); a test copy's CLI test home gets its account as an agent's
+    start would. **Same for all** (`*`), else a choice per role the agents have (builder, reviewer, either, generalist),
+    and **Per agent** over its role's (`PickerState`, `pickerAnswers`). An answer (`ConnectionAnswers`: `all`, `roles`
+    and `agents` by key, **kept apart** so an agent called Builder never stands for the builders (HR3's round 1), and
+    each agent's choice **bound to that agent**, never to a place another can take when the list changes (round 2): an
+    existing agent's id, a template's agent's name in the template as made for the project; each value a connection's
+    id or name) resolves agent > role > all > fallback (`answerFor`); a name two connections share is
+    refused naming their ids, one not usable here now is refused, and a role or place it hasn't is refused (`badAnswers`),
+    each before anything changes. A role's **preselected** connection is the first on the CLI its agents
+    suggest (the first agent of the role naming one), else the first option (`preselected`, `loadFallback`).
+  - **Loading** (`TemplateLoadPlan.options` replaces `missing`, `swaps` and HI-1769's `connections`): the dialog's table
+    is Agent · Change · Role · Connection (its values under it); under it the Connections section. A CLI a template
+    suggests that's off or not installed no longer blocks a load. The load (`loadTemplateWith`'s `connections`; IPC
+    `templates:load`) gives each agent its connection (its CLI follows: `prepareAgent`); with no option at all, the
+    agents are made on the CLI they suggest without one (HI-2106's unplaced agents), as Add Agent makes one.
+    `templates:addAgent` takes an optional `connection` (else its role's preselected one). Each agent's own choice is
+    keyed by its name in the template, so a name changed in the dialog keeps it, and a template edited meanwhile (that
+    agent renamed or removed) refuses it rather than give it to another.
+  - **Choose Connections…** (Project Settings → Agents; `templates:connectionsPlan`, `templates:applyConnections`,
+    `applyConnections`): the picker over the project's existing agents by their roles, every choice starting at "keep"
+    (an agent no answer names keeps its own); bound to the agents shown (`expected`, their ids in order: one added,
+    removed or moved since refuses it all, `content.templates.agentsChangedChoose`; the Assistant's `apply` binds its own
+    plan the same way); each change through `updateAgent` (its CLI with it, under the project's
+    lock), nothing loaded or replaced, ids and conversations kept. A running agent can't take another CLI's connection
+    (greyed out; skipped, said: `skipped`, `running`); one on its own CLI is changed and listed in `restart`, and the
+    window offers **Switch Them When Their Turn Is Over** (`connections:switchAffected`) or Later. An agent removed
+    meanwhile is skipped (`gone`).
+  - **The Agent API:** `hive_template` `plan` and `load` take `connections` (the plan reports each agent's `connection`
+    by name and `options`, a connection usable here each: id, name, CLI, account); a new **`apply`**
+    (`POST /v1/projects/{name}/templates/apply`, the Assistant's alone, Control agents, kind `update-agent`) is Choose
+    Connections: `connections` required, every answer checked first, the guard checked in each write. The API's flat
+    `connections` (`templateApi.ts` `answersOf`) reads a key as `*`, a role exactly as written (`builder`), an agent's
+    place (`"1"`, as `names` takes it), else an agent's name, any case, as made for the project or in the template (with
+    the key or as a pattern); a name several agents share, two keys for one agent, a place out of range or an unknown key
+    is said (a plan's `blocked`, `400` for apply). **Undo** (`noteConnection`, `assistantUndo.ts` `undoConnection`):
+    each agent's connection by its id (`connectionId`, never the adapter's account id, so connections alike in every
+    value are told apart), with its CLI and last conversation when they changed with it, set back together in one
+    `updateAgent` write (its `session` option), only while every one of them, the conversation too, is as the change
+    left it under the project's lock: a newer conversation since keeps the whole group, said.
 - **Names: patterns and the names table** [#1440] **Built [#1440]**: an agent's name in a template may hold `{key}` (the
   project's key, `projectKeyOf`; never guessed: a plan, load or added agent whose names hold `{key}` is refused when the
   key can't be read, `content.templates.noKey`, and the window shows `{key}` unexpanded) and `{n}` (its number among the template's agents with the same
@@ -4475,7 +4524,7 @@ repeating them (#533) [note §8].
   one agent has it; a key naming several agents, two keys for one, a place out of range or a name that isn't text is
   refused, listing the keys. A name another project's agent has is refused (409) with a free one
   (`suggestTemplateAgentName`), never filled in. It loads through the window's load (`loadTemplateWith`: the same plan,
-  fence, lock, staging and checks), the flagged connections taking the workspace's default. `workflow` (default true):
+  fence, lock, staging and checks), its agents on the connections `connections` names, else their roles' preselected ones (HI-2109, above). `workflow` (default true):
   the plan's section laid over the project's options and checked (`checkWorkflowChange`) inside the load's guard on the
   plan it stages (`check`), so the agents and the options saved are one read of the template; refused when it needs Git
   (a Git-only template in a None project: setting up Git is the user's) or its options can't be saved; saved through

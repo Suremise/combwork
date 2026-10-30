@@ -351,7 +351,7 @@
   "agents.switch.title": "Agent {agent} auf {cli} umstellen?",
   "agents.template.nameTaken": "Ein anderer Agent der Vorlage heißt „{name}“.",
   "agents.template.new": "Neuer Agent (Vorlage)",
-  "agents.template.note": "Für die Vorlage „{template}“: „Speichern“ speichert in der Vorlage. Einstellungen, die auf „{projects}“ stehen, folgen dem Projekt, in das die Vorlage geladen wird.",
+  "agents.template.noteSuggest": "Für die Vorlage „{template}“: „Speichern“ speichert in der Vorlage. Ihr Coding-Agent ist nur ein Vorschlag: Die Verbindung jedes Agenten wird gewählt, wenn die Vorlage geladen wird.",
   "agents.template.title": "Einstellungen von {agent} (Vorlage)",
   "agents.tested.newer": "Diese Version erschien, nachdem dieses Hive-Release getestet wurde. Die meisten Updates funktionieren; wenn sich etwas seltsam verhält, melde es (Diagnosedaten kopieren).",
   "agents.tested.older": "Älter als getestet; ein Update ist ratsam.",

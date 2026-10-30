@@ -543,6 +543,14 @@
     "defaultMessage": "See what a card’s work went through",
     "description": "A tip's title. Glossary: work (a card's Work section)."
   },
+  "tips.chooseConnections.text": {
+    "defaultMessage": "Project Settings → Agents → Choose Connections… picks a connection for each role of the project's agents (or one for all, or per agent), changing nothing else. Loading a template offers the same choice.",
+    "description": "A tip (HI-2109). A connection is a named setup on an account (model, effort, mode). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.chooseConnections.title": {
+    "defaultMessage": "High effort for every builder, in one go",
+    "description": "A tip's title (HI-2109). Glossary: builder, effort."
+  },
   "tips.claudeStatusLine.text": {
     "defaultMessage": "Hive's status line feeds an agent's footer and shows nothing in the pane. Turn off Settings → Advanced → Hive's status line in place of yours to see the one in your Claude Code settings again: Hive still reads the status.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

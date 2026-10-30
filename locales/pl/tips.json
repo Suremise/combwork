@@ -135,6 +135,8 @@
   "tips.cardSummaries.title": "Raporty zaczynają się od sedna",
   "tips.cardWork.text": "Otwórz kartę: jej sekcja Praca pokazuje każdą rewizję przesłaną do recenzji, z rundą, plikami, werdyktami i sprawdzeniami, oraz to, jak ją scalono. Na tablicy karta pokazuje swoją rewizję i ostatni werdykt.",
   "tips.cardWork.title": "Zobacz, przez co przeszła praca karty",
+  "tips.chooseConnections.text": "Ustawienia projektu → Agenci → Wybierz połączenia… wybiera połączenie dla każdej roli agentów projektu (albo jedno dla wszystkich, albo dla każdego agenta), nie zmieniając nic więcej. Wczytanie szablonu daje ten sam wybór.",
+  "tips.chooseConnections.title": "Wysoki wysiłek dla wszystkich wykonawców naraz",
   "tips.claudeStatusLine.text": "Pasek stanu Hive zasila stopkę agenta i niczego nie pokazuje w panelu. Wyłącz Ustawienia → Zaawansowane → Pasek stanu Hive zamiast Twojego, by znów zobaczyć ten z Twoich ustawień Claude Code: Hive nadal odczytuje stan.",
   "tips.claudeStatusLine.title": "Zachowaj własny pasek stanu Claude Code",
   "tips.cliOverrides.text": "Hive trochę zmienia zachowanie każdego CLI w swoich sesjach, na przykład to, że Copilot nie aktualizuje się sam, albo tytuł terminala Codex. Każdą zmianę można wyłączyć w Ustawienia → Zaawansowane, pod jej CLI, gdzie opisano, czego Hive bez niej już nie zrobi.",

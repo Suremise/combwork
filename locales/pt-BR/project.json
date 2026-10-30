@@ -1,5 +1,6 @@
 {
   "project.agents.add": "Adicionar agente",
+  "project.agents.chooseConnections": "Escolher conexões…",
   "project.agents.connectionSettings": "Padrões da conexão ({model})",
   "project.agents.merge": "Fazer merge…",
   "project.agents.off": "{provider} (desativado)",

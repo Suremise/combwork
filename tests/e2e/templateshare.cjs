@@ -97,7 +97,8 @@ const check = (name, ok, extra = '') => {
   await userRow(sidebar, 'Pair').click()
   await detail.waitFor({ timeout: 5000 })
   const table = (await detail.locator('table tbody tr').allInnerTexts()).map((r) => r.split('\t').map((c) => c.trim()))
-  check('selecting one shows its agents (role in the workflow with its note, coding agent, model) and layout; nothing of worktrees', table.length === 2 && table[0][0] === 'Builder' && /^Builder\s+builder$/.test(table[0][1]) && table[1][1] === 'Reviewer' && table[0][3] === 'opus' && table[0].length === 6 && !/worktree|project folder/i.test((await detail.innerText()).replace(await detail.locator('[data-template-workflow-view]').innerText().catch(() => ''), '')) && /2 agents, two columns layout/i.test(await detail.innerText()), JSON.stringify(table))
+  // HI-2109: the CLI each suggests; no model, effort or mode (a template keeps none).
+  check('selecting one shows its agents (role in the workflow with its note, the CLI it suggests) and layout; nothing of worktrees or models', table.length === 2 && table[0][0] === 'Builder' && /^Builder\s+builder$/.test(table[0][1]) && table[1][1] === 'Reviewer' && table[0][2] === 'Claude Code' && table[0].length === 3 && !/opus/i.test(table.flat().join()) && !/worktree|project folder/i.test((await detail.innerText()).replace(await detail.locator('[data-template-workflow-view]').innerText().catch(() => ''), '')) && /2 agents, two columns layout/i.test(await detail.innerText()), JSON.stringify(table))
   await shot('1-view')
 
   // Rename: in place, the file kept.

@@ -549,6 +549,7 @@ function AgentSettingsModal({
   mcpProject,
   mcpWhere,
   providerLocked,
+  suggestOnly,
   note,
   nameProblem,
   confirmSave,
@@ -564,6 +565,8 @@ function AgentSettingsModal({
   mcpProject: string | null
   mcpWhere: 'project' | 'workspace'
   providerLocked?: ReactNode
+  /** A template's agent (HI-2109): its CLI is only a suggestion, with no connection, model, effort, mode or context. */
+  suggestOnly?: boolean
   note?: ReactNode
   nameProblem?: (name: string) => string | null
   confirmSave?: (f: AgentFields) => Promise<boolean>
@@ -632,6 +635,8 @@ function AgentSettingsModal({
       <WorkflowRoleChoice value={f.workflowRole} onChange={(workflowRole) => put({ workflowRole })} />
       <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
       {providerLocked ?? <ProviderChoice value={f.provider} current={initial.provider} onChange={chooseProvider} />}
+      {!suggestOnly && (
+        <>
       <div className="agent-form">
         {/* Another CLI's connection changes its CLI (HI-1769): its model and the rest start again, and saving asks first, as a change of CLI does; not while it runs. */}
         <ConnectionChoice id="agent-connection" provider={f.provider} value={f.connection} onChange={(connection) => put({ connection })} onOtherCli={providerLocked ? undefined : (provider, connection) => put({ provider, model: '', effort: '', permission: '', context: '', connection })} />
@@ -650,6 +655,8 @@ function AgentSettingsModal({
         onContext={(context) => put({ context })}
         connection={launchConnection}
       />
+        </>
+      )}
       <h3 className="agent-dialog-h">{tr(MCP_SERVERS)}</h3>
       <McpChoice value={f.mcp} offered={mcpOffered} where={mcpWhere} onChange={(mcp) => put({ mcp })} />
       {note && <div className="detail">{note}</div>}
@@ -763,7 +770,8 @@ export function TemplateAgentDialog() {
     result.current = null
   }
   const provider = a?.provider ?? projectDefaultProvider(project?.config ?? DEFAULT_PROJECT_CONFIG, settings)
-  const initial: AgentFields = { name: a?.name ?? req.suggestedName, role: a?.note ?? '', workflowRole: a?.role ?? agentWorkflowRole({ name: req.suggestedName }), provider, model: a?.model ?? '', effort: a?.effort ?? '', permission: a?.permissionMode ?? '', context: contextChoice(a?.use200kContext), mcp: a?.mcpServers ? [...a.mcpServers] : null, connection: a?.connection ?? '' }
+  // Its CLI as a suggestion only (HI-2109): no connection, model, effort, mode or context in a template.
+  const initial: AgentFields = { name: a?.name ?? req.suggestedName, role: a?.note ?? '', workflowRole: a?.role ?? agentWorkflowRole({ name: req.suggestedName }), provider, model: '', effort: '', permission: '', context: '', mcp: a?.mcpServers ? [...a.mcpServers] : null, connection: '' }
   return (
     <AgentSettingsModal
       title={a ? tr(msg({ id: 'agents.template.title', defaultMessage: '{agent} settings (template)', description: "Title of Agent Settings for an agent of a template ({agent}), from the template editor." }), { agent: a.name }) : tr(msg({ id: 'agents.template.new', defaultMessage: 'New agent (template)', description: 'Title of Agent Settings for a new agent of a template, from the template editor.' }))}
@@ -773,23 +781,17 @@ export function TemplateAgentDialog() {
       roles={roleSuggestions(req.others.map((o) => ({ role: o.note })))}
       mcpProject={null}
       mcpWhere="workspace"
-      note={tr(msg({ id: 'agents.template.note', defaultMessage: 'For the template "{template}": Save saves it in the template. Settings left as "{projects}" follow the project it is loaded into.', description: "Under Agent Settings for a template's agent: Save (a button) saves it in the template ({template}); {projects} is the first choice of each setting (\"Project's\")." }), { template: req.template, projects: tr(PROJECTS) })}
+      suggestOnly
+      note={tr(msg({ id: 'agents.template.noteSuggest', defaultMessage: 'For the template "{template}": Save saves it in the template. Its coding agent is only a suggestion: the connection each agent runs on is chosen when the template is loaded.', description: "Under Agent Settings for a template's agent (HI-2109): Save (a button) saves it in the template ({template}). A template keeps no connection, model or effort: its coding agent CLI only preselects a connection in the Load template dialog." }), { template: req.template })}
       nameProblem={(n) => (!n.includes('{n}') && req.others.some((o) => o.name.toLowerCase() === n.toLowerCase()) ? tr(msg({ id: 'agents.template.nameTaken', defaultMessage: 'Another agent of the template is called "{name}".', description: "Why a template's agent can't take a name ({name}): another agent of the template has it." }), { name: n }) : null)}
-      confirmSave={async (f) => !(f.permission && f.permission !== a?.permissionMode && !(await confirmDangerousMode(f.provider, f.permission, f.name.trim())))}
       save={async (f) => {
         const note = f.role.replace(/\s+/g, ' ').trim()
-        const ctx = contextValue(f.context)
         result.current = {
           name: f.name.replace(/\s+/g, ' ').trim(),
           role: f.workflowRole,
           ...(note ? { note } : {}),
           provider: f.provider,
-          ...(f.model ? { model: f.model } : {}),
-          ...(f.effort ? { effort: f.effort as EffortLevel } : {}),
-          ...(f.permission ? { permissionMode: f.permission as PermissionMode } : {}),
-          ...(ctx !== null ? { use200kContext: ctx } : {}),
-          ...(f.mcp ? { mcpServers: f.mcp } : {}),
-          ...(f.connection ? { connection: f.connection } : {})
+          ...(f.mcp ? { mcpServers: f.mcp } : {})
         }
       }}
       onClose={() => close(result.current)}
