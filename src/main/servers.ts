@@ -1969,10 +1969,13 @@ route('POST', '/v1/lanes', async ({ body }) =>
       }
     }
     const started = async () => {
-      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: args.brief !== undefined ? (sessions.liveFor(p, builder)?.sessionId ?? null) : null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}) })
+      const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}) })
       // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
-      const told = args.brief !== undefined ? await briefNote(ws, (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id) ?? { project: basename(p) }) : null
-      if (args.brief !== undefined) await settleLaneBriefs(ws)
+      // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
+      const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
+      const briefed = args.brief !== undefined || (r.did === 'started' && !!rec?.brief)
+      const told = briefed ? await briefNote(ws, rec ?? { project: basename(p) }) : null
+      if (briefed) await settleLaneBriefs(ws)
       // Started for its builder by the Assistant or a script (HI-1900: a lane over stopped agents sat active, nothing lent,
       // nobody working it): its stopped agents started as Start Lane… starts them, its slot lent for a stopped builder; a
       // running one is left as it is, and the reply says to tell it (HI-1934). A builder registering its own loop is

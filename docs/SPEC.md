@@ -4021,6 +4021,10 @@ Whether a conversation may resume there is its **hold** (none: it may):
     current one. It is never offered into the builder's conversation running as its lane began (`notIn`: the one a
     new lane's start replaces), only to its next one, or to any while it wasn't running; an edit keeps that exclusion and
     takes no other, so an edited brief reaches the lane's working conversation.
+    **A start racing its lane's end** (HI-2097: a changed list sent as the lane's last card merged): with no running lane
+    the start makes a new one; given no `brief`, it carries the brief and name of the builder's lane that ended (all
+    merged, never abandoned) in the last 10 minutes, as a new rev 1, and its reply says so. A new lane leaves out a card
+    already Done, its reply naming it; a list of only Done cards starts nothing (`409`).
     **Its builder starting a lane card itself** (HI-2092: `hive_start_card` rather than ending its turn for Hive's start,
     as Codex did): where no placement follows (outside slots), the start's reply ends with what Hive's start would have
     given it, "Use the card-loop skill as this lane's builder." and the lane's brief as it is now, so the lane's
