@@ -15,6 +15,8 @@ const h = vi.hoisted(() => ({
   installed: 0,
   left: { processes: [], more: 0, since: '' } as { processes: { pid: number; name: string; label: string; created: string }[]; more: number; since: string },
   ended: [] as number[],
+  /** Starts reserved (sessions.start's), their sessions not made yet. */
+  pending: new Set<string>(),
   profile: ''
 }))
 
@@ -24,7 +26,7 @@ vi.mock('../src/main/workspace', async (orig) => ({
   workspaceFor: (p: string) => h.open.find((w) => p.toLowerCase().startsWith(w.path.toLowerCase())) ?? null,
   inWorkspace: (_w: unknown, f: () => unknown) => f()
 }))
-vi.mock('../src/main/sessions', async (orig) => ({ ...(await orig<object>()), sessions: { liveFor: (p: string, a: string) => h.lives.get(`${p}#${a}`) ?? null } }))
+vi.mock('../src/main/sessions', async (orig) => ({ ...(await orig<object>()), sessions: { liveFor: (p: string, a: string) => h.lives.get(`${p}#${a}`) ?? null, pendingStart: (p: string, a: string) => (h.pending.has(`${p}#${a}`) ? { resumeId: null, outcome: new Promise(() => undefined) } : null) } }))
 vi.mock('../src/main/events', async (orig) => ({ ...(await orig<object>()), emit: () => undefined }))
 vi.mock('../src/main/deliveries', async (orig) => ({ ...(await orig<object>()), createDelivery: async () => null }))
 // A read that takes a while (its slots): a test's step lands then.
@@ -55,7 +57,7 @@ const ws = (w: (typeof h.open)[number]) => w as never
 
 beforeEach(() => {
   tp.resetTeamPauseForTests()
-  Object.assign(h, { open: [], lives: new Map(), job: null, installed: 0, left: { processes: [], more: 0, since: '' }, ended: [], profile: join(base, `profile${++n}`) })
+  Object.assign(h, { open: [], lives: new Map(), job: null, installed: 0, left: { processes: [], more: 0, since: '' }, ended: [], pending: new Set(), profile: join(base, `profile${++n}`) })
   mkdirSync(h.profile, { recursive: true })
 })
 
@@ -147,6 +149,33 @@ describe('Install Now (round 1, finding 3)', () => {
       h.lives.set(`${alpha}#b1`, { status: 'working' })
       return null
     }
+    expect((await parked.installIfParked()).installed).toBe(false)
+    expect(h.installed).toBe(0)
+  })
+
+  // Round 3: a start reserved before its session exists (sessions.start's own window) is work, in the scan and at the install.
+  it("a start reserved, its session not made yet: starting, not parked; one reserved as Install Now's last check is made: not installed", async () => {
+    const w = space(true)
+    h.open = [w]
+    await tp.pauseTeam(ws(w), 'user')
+    const alpha = join(w.path, 'alpha')
+    h.pending.add(`${alpha}#b1`)
+    const v = await parked.scanWorkspace(ws(w))
+    expect(v.parked).toBe(false)
+    expect(v.items).toEqual([expect.objectContaining({ agent: 'B1', kind: 'starting' })])
+    expect((await parked.installIfParked()).installed).toBe(false)
+    // Reserved while the last scan is made (as its slots are read): the check with nothing awaited after it sees it.
+    h.pending.clear()
+    h.job = async () => {
+      h.pending.add(`${alpha}#b1`)
+      return null
+    }
+    expect((await parked.installIfParked()).installed).toBe(false)
+    // The Assistant's start too.
+    h.job = null
+    h.pending.clear()
+    h.pending.add(`${w.assistantHome}#assistant`)
+    expect((await parked.scanWorkspace(ws(w))).parked).toBe(false)
     expect((await parked.installIfParked()).installed).toBe(false)
     expect(h.installed).toBe(0)
   })

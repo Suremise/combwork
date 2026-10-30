@@ -4597,8 +4597,9 @@ checked every agent and process by hand.
   watch wakes; a message or an answer can still reach you.*
 - **Parked** (`teamParked.ts`, a fresh scan of every paused open workspace each time, from what Hive itself records; the
   Assistant's call after HR1's round 2, the card's own scope): every agent stopped, or idle (ready, finished, watching) or
-  at a question for the user (a permission prompt, a sign-in), with nothing of Hive's records left: no background task its
-  CLI reports, no open Progress run (a test run, a check in a copy, a merge, a slot's warming), no held slot writer, and no
+  at a question for the user (a permission prompt, a sign-in), with nothing of Hive's records left: no start of it under
+  way (HR1's round 3: reserved by `sessions.start`, or its slot being prepared, before its session exists), no background
+  task its CLI reports, no open Progress run (a test run, a check in a copy, a merge, a slot's warming), no held slot writer, and no
   process its launches left running (HI-2055's leftovers), an earlier launch's included once it has a new session (round
   2, finding 2). Hive doesn't read the CLI's own process tree to guess what else it runs: a server the user or an agent
   started from a shell, outside Hive's records, is the user's to end (the user guide says so). A status Hive can't read,

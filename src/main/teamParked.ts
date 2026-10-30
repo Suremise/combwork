@@ -5,6 +5,7 @@ import type { ParkedItem, TeamPauseState, TeamPauseView } from '../shared/teamPa
 import type { LiveSessionState } from '../shared/types'
 import { heldSlots } from './agentFolders'
 import { endTreesExactly, leftoversOf } from './agentProcesses'
+import { startNow } from './agentStarts'
 import { onHiveEvent } from './events'
 import { progress } from './progressService'
 import { sessions } from './sessions'
@@ -46,7 +47,12 @@ async function agentItems(project: string, projectPath: string, agentId: string,
   const left = leftoversOf(projectPath, agentId)
   for (const p of left.processes) add({ state: 'busy', kind: 'process', label: p.label, what: `left running: ${p.label} (pid ${p.pid})`, ...(p.created ? { process: { pid: p.pid, created: p.created, name: p.name }, since: isoOf(p.created) } : {}) })
   if (left.more) add({ state: 'unknown', kind: 'process', what: `${left.more} more processes left running, not listed` })
-  if (!st) return out
+  // A start of it under way, its session not made yet (round 3: reserved by sessions.start, or its slot being prepared):
+  // starting, never stopped.
+  if (!st) {
+    if (startingNow(projectPath, agentId)) add({ state: 'busy', kind: 'starting', what: 'starting' })
+    return out
+  }
   const status = st.status
   // Only the asking Assistant's own turn isn't counted (no self-wait, round 1 finding 4).
   if (!self) {
@@ -58,6 +64,9 @@ async function agentItems(project: string, projectPath: string, agentId: string,
   if ((st.backgroundTasks ?? 0) > 0 || status === 'background') add({ state: 'busy', kind: 'background', what: `${st.backgroundTasks ?? 1} background task(s)` })
   return out
 }
+
+/** A start of the agent under way before its session exists (sessions.start's reservation, or Hive's start preparing it). */
+const startingNow = (projectPath: string, agentId: string): boolean => !!sessions.pendingStart(projectPath, agentId) || startNow(projectPath, agentId).starting
 
 /** Who asks for a scan: the Assistant of `self` asking of its own workspace (its own turn isn't counted then). */
 export interface ScanAsker {
@@ -125,7 +134,7 @@ export async function endParkedProcess(projectPath: string, agentId: string, pid
  */
 let changes = 0
 onHiveEvent((e) => {
-  if (e.type === 'session-status' || e.type === 'session-exit' || e.type === 'progress-changed' || e.type === 'team-pause-changed' || e.type === 'workspace-changed') changes++
+  if (e.type === 'session-status' || e.type === 'session-exit' || e.type === 'agent-start' || e.type === 'progress-changed' || e.type === 'team-pause-changed' || e.type === 'workspace-changed') changes++
 })
 
 /** The most scans Install Now makes while things keep changing under it, before it says it isn't parked. */
@@ -140,6 +149,8 @@ function quietNow(): boolean {
       for (const id of h.ids) {
         const st = sessions.liveFor(h.path, id)
         if (st && !KNOWN_IDLE.has(st.status) && !AT_QUESTION.has(st.status)) return false
+        // A start reserved, its session not made yet (round 3).
+        if (!st && startingNow(h.path, id)) return false
       }
   }
   return true
