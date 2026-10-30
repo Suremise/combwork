@@ -68,6 +68,14 @@ describe('the Assistant ending a turn with lanes running and no watch (HI-2069)'
     expect(await noticeFor(assistant, 'drain')).toBeNull()
   })
 
+  // HR1's round 1: agent names aren't limited to what the line keeps of them.
+  it('a builder whose name has nothing the line keeps (an emoji) still gets the line: counted, never dropped', async () => {
+    state.lanes = [lane('l1', '🤖')]
+    expect(await noticeFor(assistant, 'drain')).toBe('[Hive] Lanes are running (1 lane) and nothing will wake you about them: watch the lanes (hive_wait_for_tasks with lanes ["all"], wake) before you finish.')
+    state.lanes = [lane('l1', '🤖'), lane('l2', 'HB2'), lane('l3', '✨')]
+    expect(await noticeFor(assistant, 'drain')).toContain('Lanes are running (HB2 and 2 more) and nothing')
+  })
+
   it('after its unread inbox, in the same drain', async () => {
     state.lanes = [lane('l1', 'HB1'), lane('l2', 'HB2')]
     state.unread = [{ id: 'm7', kind: 'rebrief', state: 'offered', expires: new Date(Date.now() + 3600_000).toISOString() }]
@@ -82,5 +90,7 @@ describe("the line's wording", () => {
     const many = unwatchedLanesNotice(Array.from({ length: 12 }, (_, i) => `B${i + 1}`))
     expect(many).toContain('B10 and 2 more)')
     expect(many).not.toMatch(/[\r\n]/)
+    expect(unwatchedLanesNotice(['🤖', '🤖'])).toContain('(2 lanes)')
+    expect(unwatchedLanesNotice([...Array.from({ length: 11 }, (_, i) => `B${i + 1}`), '🤖'])).toContain('B10 and 2 more)')
   })
 })
