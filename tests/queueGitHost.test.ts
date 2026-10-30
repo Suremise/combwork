@@ -8,12 +8,13 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { PassThrough } from 'stream'
+import { runInNewContext } from 'vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { FactStore } from '../src/main/workflow/factStore'
-import { FRAME_MAX, FrameDecoder, GitHost, OUT_CHUNK, REQUEST_MAX, startGitHost, type Frame, type FrameKind, type HostResult } from '../src/main/workflow/gitHost'
+import { FRAME_MAX, FrameDecoder, GitHost, HOST, OUT_CHUNK, REQUEST_MAX, startGitHost, type Frame, type FrameKind, type HostResult } from '../src/main/workflow/gitHost'
 import { endLeaseJob, queueHost } from '../src/main/workflow/queueJobs'
 import { LeaseLost, QueueRunner } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed } from '../src/main/workflow/queueProcs'
@@ -142,11 +143,15 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
   it('output a descendant keeps open after the command exited: told after the quiet, and what it writes later never framed', async () => {
     const { host, lost } = own()
     const dir = tempDir('gh-')
+    const go = join(dir, 'go')
     const mark = join(dir, 'wrote')
-    // The command exits at once; its detached child holds the output, writes once the command's end was told, and exits.
-    const later = `setTimeout(() => { process.stdout.write('late'); require('fs').writeFileSync(${JSON.stringify(mark)}, String(process.pid)) }, 3000)`
-    const code = `const k = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(later)}], { stdio: ['ignore', 'inherit', 'inherit'], detached: true }); k.unref(); process.stdout.write('p')`
+    // The command exits at once; its detached child holds the output and writes only once the test says (after the
+    // command's end was told), then exits. A bound of its own: it ends after a minute whatever happens.
+    const later = `const fs = require('fs'); process.stdout.on('error', () => {}); setTimeout(() => process.exit(0), 60000); const t = setInterval(() => { if (!fs.existsSync(${JSON.stringify(go)})) return; clearInterval(t); process.stdout.write('late', () => { fs.writeFileSync(${JSON.stringify(mark)}, String(process.pid)); process.exit(0) }) }, 50)`
+    // Hidden, in the test's own environment (the command's, from baseEnv).
+    const code = `const k = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(later)}], { stdio: ['ignore', 'inherit', 'inherit'], detached: true, windowsHide: true, env: process.env }); k.unref(); process.stdout.write('p')`
     expect(await host.request(node(dir, code))).toEqual({ out: 'p', err: '', code: 0 })
+    writeFileSync(go, '')
     await vi.waitFor(() => expect(existsSync(mark)).toBe(true), { timeout: 30_000, interval: 100 })
     // Written to a pipe the host no longer reads: nothing framed, nothing lost, and the host goes on.
     expect(await host.request(node(dir, `process.stdout.write('next')`))).toEqual({ out: 'next', err: '', code: 0 })
@@ -176,6 +181,104 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
     expect(lost).toHaveLength(1)
     expect(host.usable).toBe(false)
     expect(await host.request(node(dir, ''))).toMatchObject({ code: null, lost: lost[0] })
+  })
+})
+
+/**
+ * The host's own script (HOST) run in a VM, no process started: its input, its output (whether it takes more: `full`),
+ * its timers (run when the test says), and the children it starts (fake ones, their pipes the test's).
+ */
+function vmHost(): { send: (b: Buffer | string) => void; frames: () => string[]; setFull: (full: boolean) => void; kids: Fake[]; spawned: { command: string; args: string[]; opts: { cwd: string; env: NodeJS.ProcessEnv } }[]; runTimers: () => void; timers: () => number } {
+  const timers = new Map<number, () => void>()
+  let next = 0
+  let full = false
+  const written: Buffer[] = []
+  const stdout = Object.assign(new EventEmitter(), { write: (b: Buffer) => (written.push(b), !full) })
+  const stdin = new EventEmitter()
+  const kids: Fake[] = []
+  const spawned: { command: string; args: string[]; opts: { cwd: string; env: NodeJS.ProcessEnv } }[] = []
+  const cp = {
+    spawn: (command: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv }) => {
+      spawned.push({ command, args, opts })
+      const c = new EventEmitter() as unknown as Fake
+      Object.assign(c, { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), pid: 42 })
+      kids.push(c)
+      return c
+    }
+  }
+  const proc = { stdout, stdin, exit: () => undefined }
+  runInNewContext(HOST, {
+    process: proc,
+    require: (m: string) => (m === 'child_process' ? cp : req(m)),
+    Buffer,
+    setTimeout: (f: () => void) => (timers.set(++next, f), next),
+    clearTimeout: (i: number) => timers.delete(i)
+  })
+  return {
+    send: (b) => stdin.emit('data', Buffer.isBuffer(b) ? b : Buffer.from(b)),
+    frames: () => new FrameDecoder().push(Buffer.concat(written)).map((f) => `${f.kind}${f.id}:${f.payload.toString('utf8')}`),
+    setFull: (f) => {
+      full = f
+      if (!f) stdout.emit('drain')
+    },
+    kids,
+    spawned,
+    runTimers: () => {
+      const due = [...timers.values()]
+      timers.clear()
+      for (const f of due) f()
+    },
+    timers: () => timers.size
+  }
+}
+
+/** Lets the fake pipes' events through. */
+const turn = (): Promise<void> => new Promise((res) => setImmediate(res))
+
+describe("the git host's script, its streams the test's (HR3's round 1 findings 1 and 2)", () => {
+  it('held back by the runner: no quiet counted, nothing cut off; once read, all of it framed before its end', async () => {
+    const h = vmHost()
+    h.send('go\n' + JSON.stringify({ id: 1, command: 'git', args: [], cwd: '.', env: {} }) + '\n')
+    const [c] = h.kids
+    c.stdout.write('first')
+    await turn()
+    // The runner stops reading: the next frame isn't taken, and every output is held back.
+    h.setFull(true)
+    c.stderr.write('warn')
+    await turn()
+    c.stdout.write('tail')
+    c.stderr.write('more')
+    c.emit('exit', 0, null)
+    await turn()
+    // No quiet counts while it is held back: however long, it isn't ended and its tail isn't lost.
+    expect(h.timers()).toBe(0)
+    h.runTimers()
+    expect(h.frames()).toEqual(['S1:42', 'O1:first', 'E1:warn'])
+    // Read again: what waited is framed, then the quiet after the exit, then its end, and nothing after.
+    h.setFull(false)
+    await turn()
+    expect(h.frames()).toEqual(['S1:42', 'O1:first', 'E1:warn', 'O1:tail', 'E1:more'])
+    h.runTimers()
+    // Its output closed by the host: a later write goes nowhere.
+    c.stdout.on('error', () => undefined)
+    c.stdout.write('later')
+    await turn()
+    expect(h.frames()).toEqual(['S1:42', 'O1:first', 'E1:warn', 'O1:tail', 'E1:more', 'X1:0'])
+  })
+
+  it('a request split at any byte, characters too: its folder, arguments, environment and input as sent', () => {
+    const spec = { command: 'git', args: ['commit', '-m', 'héllo wörld ✓ 𝄞'], cwd: 'C:\\Users\\Zoë\\projet é', env: { HI2079: 'ünïcode ✓' }, input: 'naïve 🐝' }
+    const bytes = Buffer.from(JSON.stringify({ id: 1, ...spec }) + '\n')
+    for (let at = 1; at < bytes.length; at++) {
+      const h = vmHost()
+      h.send('go\n')
+      h.send(bytes.subarray(0, at))
+      h.send(bytes.subarray(at))
+      expect(h.spawned).toHaveLength(1)
+      const s = h.spawned[0]
+      expect({ command: s.command, args: s.args, cwd: s.opts.cwd, env: s.opts.env }).toEqual({ command: spec.command, args: spec.args, cwd: spec.cwd, env: spec.env })
+      expect(String(h.kids[0].stdin.read())).toBe(spec.input)
+    }
   })
 })
 
@@ -328,11 +431,12 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
     const runner = await acquire(w)
     try {
       // A check that starts a detached server and exits (as tests/queueRunner.test.ts's): its server runs on in the job.
-      const check = `const k = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true }); k.unref(); console.log(k.pid)`
+      // Hidden, in the check's own environment (baseEnv's).
+      const check = `const k = require('child_process').spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: process.env }); k.unref(); console.log(k.pid)`
       const c = await runner.spawn('check', process.execPath, ['-e', check], { env: baseEnv() })
       const server = await identify(Number(await new Promise<string>((res) => c.stdout!.once('data', (d) => res(String(d).trim())))))
       // A process outside the job that the supervisor follows (as a packaged app's escaped one).
-      const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true })
+      const k = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true, windowsHide: true, env: baseEnv() })
       k.unref()
       const escaped = await identify(k.pid!)
       expect(await runner.followForTests(k.pid!)).toBe(true)

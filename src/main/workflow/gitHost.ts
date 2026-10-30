@@ -32,6 +32,8 @@ export const HOST = `
 // A process of its own, not Hive's: its exit isn't one of Hive's ways out (exitBy).
 const end = process.exit.bind(process)
 const cp = require('child_process')
+// Its input decoded whole: a character split between two reads is kept for the next (HR3's round 1 finding 2).
+const input = new (require('string_decoder').StringDecoder)('utf8')
 const QUIET = ${EXITED_QUIET_MS}, CHUNK = ${OUT_CHUNK}
 const live = new Map()
 let got = '', gated = false, closing = false, blocked = false
@@ -40,10 +42,14 @@ const frame = (kind, id, payload) => {
   const head = Buffer.alloc(${HEAD})
   head.write(kind, 0, 'latin1'); head.writeUInt32BE(id, 1); head.writeUInt32BE(body.length, 5)
   if (!process.stdout.write(Buffer.concat([head, body])) && !blocked) {
-    // Backpressure: every command's output waits until the runner has read what was written.
+    // Backpressure: every command's output waits until the runner has read what was written, and no command's quiet
+    // after its exit counts meanwhile (HR3's round 1 finding 1: what waits in its paused output is never cut off).
     blocked = true
-    for (const r of live.values()) { r.c.stdout.pause(); r.c.stderr.pause() }
-    process.stdout.once('drain', () => { blocked = false; for (const r of live.values()) { r.c.stdout.resume(); r.c.stderr.resume() } })
+    for (const r of live.values()) { r.c.stdout.pause(); r.c.stderr.pause(); clearTimeout(r.quiet) }
+    process.stdout.once('drain', () => {
+      blocked = false
+      for (const r of live.values()) { r.c.stdout.resume(); r.c.stderr.resume(); r.wait() }
+    })
   }
 }
 const data = (kind, id) => (d) => { for (let i = 0; i < d.length; i += CHUNK) frame(kind, id, d.subarray(i, i + CHUNK)) }
@@ -60,7 +66,7 @@ function run(s) {
     c.once('error', (e) => { frame('E', s.id, String(e && e.message)); frame('N', s.id, String((e && e.code) || 'error')) })
     return
   }
-  const r = { c, exited: null, quiet: null, over: false }
+  const r = { c, exited: null, quiet: null, over: false, wait: () => {} }
   live.set(s.id, r)
   c.on('error', () => {})
   c.stdin.on('error', () => {})
@@ -68,27 +74,32 @@ function run(s) {
   frame('S', s.id, String(c.pid))
   if (blocked) { c.stdout.pause(); c.stderr.pause() }
   // HI-2043, as onOutputSettled: told once the output has closed, all of it read; once the command has exited, an
-  // output kept open (a descendant that got away) is closed after QUIET ms with nothing more. Nothing is framed after.
+  // output kept open (a descendant that got away) is closed after QUIET ms with nothing more, the quiet counted only
+  // while its output flows (never while the runner holds it back), and what is already buffered framed first. Nothing
+  // is framed after.
+  const out = data('O', s.id), err = data('E', s.id)
   const settle = () => {
     if (r.over) return
     r.over = true
     clearTimeout(r.quiet)
     live.delete(s.id)
     c.stdout.removeAllListeners('data'); c.stderr.removeAllListeners('data')
+    for (let b; (b = c.stdout.read()) !== null; ) out(b)
+    for (let b; (b = c.stderr.read()) !== null; ) err(b)
     c.stdout.destroy(); c.stderr.destroy()
     const [code, signal] = r.exited
     if (code !== null) frame('X', s.id, String(code))
     else frame('K', s.id, String(signal || 'unknown'))
     done()
   }
-  const quiet = () => { if (!r.exited || r.over) return; clearTimeout(r.quiet); r.quiet = setTimeout(settle, QUIET) }
-  c.stdout.on('data', data('O', s.id)); c.stderr.on('data', data('E', s.id))
-  c.stdout.on('data', quiet); c.stderr.on('data', quiet)
-  c.once('exit', (code, signal) => { r.exited = [code, signal]; quiet() })
+  r.wait = () => { if (!r.exited || r.over || blocked) return; clearTimeout(r.quiet); r.quiet = setTimeout(settle, QUIET) }
+  c.stdout.on('data', out); c.stderr.on('data', err)
+  c.stdout.on('data', r.wait); c.stderr.on('data', r.wait)
+  c.once('exit', (code, signal) => { r.exited = [code, signal]; r.wait() })
   c.once('close', (code, signal) => { if (!r.exited) r.exited = [code, signal]; settle() })
 }
 process.stdin.on('data', (d) => {
-  got += d
+  got += input.write(d)
   for (let i; (i = got.indexOf('\\n')) >= 0; ) {
     const line = got.slice(0, i)
     got = got.slice(i + 1)
