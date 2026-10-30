@@ -102,7 +102,7 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
   // Real session: the status line reaches Hive and prints nothing.
   const agent = await lib.soloAgent(inv, proj)
   // Its own effort (Claude Code has no default effort of its own since HI-1774).
-  await inv('agents:update', proj, agent.id, { effort: 'high' })
+  await lib.setLaunch(inv, proj, agent.id, { effort: 'high' })
   await inv('workspace:refresh')
   await page.locator('.tab', { hasText: 'Session' }).first().click(); await sleep(800)
   // The model's name: Claude Code's default model, by its name once Claude Code has said which it is (#125).

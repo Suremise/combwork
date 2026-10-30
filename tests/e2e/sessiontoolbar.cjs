@@ -207,7 +207,7 @@ const check = (name, ok, extra = '') => {
     check("…its list: F second (after W), a square, Stalled · failed to start: <why>", order === 'W,F,X,Y,Z' && fEntry.mark.includes('stalled') && fEntry.detail.startsWith("Stalled · failed to start: error: option '--model <model>' argument 'fail-start' is invalid"), `${order} ${JSON.stringify(fEntry)}`)
     await page.keyboard.press('Escape')
     await lib.until(async () => (await page.locator('.menu').count()) === 0, HUNG_MS)
-    await inv('agents:update', alpha, f.id, { model: '' })
+    await lib.setLaunch(inv, alpha, f.id, { model: '' })
     await inv('session:start', alpha, { agentId: f.id })
     await lib.until(async () => ['ready', 'waiting'].includes((await live(f.id))?.status), HUNG_MS)
     check('fixed and started: no longer stalled', !!(await lib.until(async () => !/stalled/.test(await chipText()) && !/stalled/.test(await headerLine()), HUNG_MS)), `${await chipText()} / ${await headerLine()}`)

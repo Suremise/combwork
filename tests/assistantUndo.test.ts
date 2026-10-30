@@ -41,6 +41,11 @@ const wsPath = join(base, 'ws')
 const alpha = join(wsPath, 'alpha')
 let w: WS
 let token = ''
+/** A connection on the agent's account with this model, made once (HI-2122: an agent's model is its connection's). */
+const onModel = async (id: string, model: string): Promise<string> => {
+  const cur = accountsMod.getConnection(projectAgents(await w.projectConfig(alpha)).find((x) => x.id === id)!.connection)!
+  return (accountsMod.allConnections().find((c) => c.account === cur.account && c.model === model) ?? accountsMod.addConnection(cur.account, { name: `Model ${model}`, model })).id
+}
 
 beforeAll(async () => {
   mkdirSync(join(alpha, '.hive'), { recursive: true })
@@ -182,7 +187,7 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     const group = newMessage()
     await asAssistant("change A1's settings in alpha", async () => {
       const was = projectAgents(await w.projectConfig(alpha)).find((x) => x.id === 'a1')!
-      const def = await updateAgent(alpha, 'a1', { name: 'A1 Assistant', model: 'claude-opus-5-5', effort: 'high' })
+      const def = await updateAgent(alpha, 'a1', { name: 'A1 Assistant', connection: await onModel('a1', 'claude-opus-5-5') })
       await changes.noteAgent(w, 'alpha', was, def)
     }, 'update-agent')
     // The user renames it since.
@@ -192,6 +197,17 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     const now = projectAgents(await w.projectConfig(alpha)).find((x) => x.id === 'a1')!
     expect([now.name, now.connection]).toEqual(['A1 User', before.connection])
     await updateAgent(alpha, 'a1', { name: before.name })
+  })
+
+  it("an agent's model recorded before HI-2122 can't go back, saying why; the rest goes back", async () => {
+    const group = newMessage()
+    await asAssistant('rename A1 (a change recorded with its own model, as before HI-2122)', async () => {
+      await updateAgent(alpha, 'a1', { name: 'A1 Old' })
+      await changes.noteChange(w, { kind: 'agent', project: 'alpha', target: 'a1', fields: [{ field: 'name', old: 'A1', new: 'A1 Old' }, { field: 'model', old: null, new: 'old-model' }] })
+    }, 'update-agent')
+    const [r] = await userUndo(w, { group })
+    expect(r).toMatchObject({ undone: ['name'], skipped: [{ field: 'model', why: 'failed', error: expect.stringMatching(/no model, effort, mode or context of its own/) }] })
+    expect(projectAgents(await w.projectConfig(alpha)).find((x) => x.id === 'a1')!.name).toBe('A1')
   })
 
   it('a Hive setting: set back while still as it set it; changed since, left', async () => {
@@ -353,14 +369,16 @@ describe('undo checks at the write (#1282 round 1)', async () => {
       'its model',
       async () => {
         let was: Awaited<ReturnType<typeof a1>> | undefined
-        const def = await updateAgent(alpha, 'a1', { model: 'assistant-model' }, { check: (cur) => void (was = structuredClone(cur)) })
+        const connection = await onModel('a1', 'assistant-model')
+        const def = await updateAgent(alpha, 'a1', { connection }, { check: (cur) => void (was = structuredClone(cur)) })
         await changes.noteAgent(w, 'alpha', was!, def)
       },
       'update-agent'
     )
     const real = projectAgentsMod.updateAgent
+    const userModel = await onModel('a1', 'user-model')
     const spy = vi.spyOn(projectAgentsMod, 'updateAgent').mockImplementationOnce(async (...args) => {
-      await real(alpha, 'a1', { model: 'user-model' })
+      await real(alpha, 'a1', { connection: userModel })
       return real(...args)
     })
     try {
@@ -371,7 +389,7 @@ describe('undo checks at the write (#1282 round 1)', async () => {
       spy.mockRestore()
     }
     expect(accountsMod.getConnection((await a1()).connection)?.model).toBe('user-model')
-    await updateAgent(alpha, 'a1', { model: '' })
+    await updateAgent(alpha, 'a1', { connection: null })
   })
 
   it("a lane's setting changed just before the write is kept; one it started, changed since, isn't abandoned", async () => {
@@ -544,8 +562,8 @@ describe('undo, round 3: implicit effects, permission at the write, retention (#
   it("a provider whose dependent setting the user changed since stays, with all it reset; one that runs isn't changed", async () => {
     await addAgent('p3', { provider: 'claude-code' })
     const group = newMessage()
-    await changeAgent('p3', { provider: 'codex', model: 'assistant-model' })
-    await updateAgent(alpha, 'p3', { model: 'user-model' })
+    await changeAgent('p3', { provider: 'codex' })
+    await updateAgent(alpha, 'p3', { connection: await onModel('p3', 'user-model') })
     const [r] = await userUndo(w, { group })
     expect(r.undone).toEqual([])
     expect(r.skipped.map((s) => s.field).sort()).toEqual(['connection', 'lastSessionId', 'provider'])

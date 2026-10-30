@@ -18,7 +18,7 @@ import { shownText } from '@shared/advanced'
 import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
 import { HAND_OVER_TEXT } from '@shared/handOver'
-import type { McpCatalogRow, McpServerInfo, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
+import type { McpCatalogRow, McpServerInfo, ProjectInfo, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
 import type { TemplateWorkflow } from '@shared/workflow/templateOptions'
 import { TEMPLATE_NAME_MAX, namesFollowKey, templateAgentNames, usesKey, type TemplateEntry, type TemplateScope } from '@shared/templates'
 import { PLATFORM_NAME } from '@shared/platform/switching'
@@ -485,14 +485,6 @@ export async function quickAddAgent(path: string | null = get().selectedProject,
 export function noteManyAgents(path: string): void {
   const n = project(path)?.agents.length ?? 0
   if (n === MANY_AGENTS) notify('info', tr(msg({ id: 'actions.agent.manyTitle', defaultMessage: '{n} agents in this project', description: "A notification's title when a project gets its seventh agent ({n})." }), { n }), tr(msg({ id: 'actions.agent.manyMessage', defaultMessage: "Each agent runs its own copy of its CLI (roughly 200–500 MB of memory each), and they all share your plan's usage limits.", description: 'Under the notification that a project has many agents: what each costs.' })))
-}
-
-/** Changes a project's settings for one provider. */
-export async function updateProjectProvider(path: string, provider: ProviderId, patch: Partial<ProjectProviderConfig>): Promise<void> {
-  const p = project(path)
-  if (!p) return
-  await attempt(tr(msg({ id: 'actions.project.saveFailed', defaultMessage: 'Could not save project settings', description: "An error's title: saving a project's settings failed." })), () => call('project:updateProvider', path, provider, patch))
-  await refreshWorkspace()
 }
 
 /** " (Agent 2)" in projects with several agents, else nothing — for dialog wording. */

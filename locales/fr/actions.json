@@ -95,7 +95,6 @@
   "actions.project.newMessage": "Un nouveau dossier est créé dans l’espace de travail. Hive y ajoute automatiquement son dossier de métadonnées .hive.",
   "actions.project.newTitle": "Nouveau projet",
   "actions.project.noWorkspace": "Ouvre d’abord un espace de travail",
-  "actions.project.saveFailed": "Impossible d’enregistrer les paramètres du projet",
   "actions.project.stopAndDeactivate": "Arrêter et désactiver",
   "actions.provider.lookingMessage": "Hive cherche encore quelles CLI d’agents de code sont installées. Réessaie dans un instant.",
   "actions.provider.lookingTitle": "Recherche des agents de code en cours",

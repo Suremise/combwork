@@ -29,7 +29,7 @@ const PROVIDERS = {
   fake: { provider: 'claude-code', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-claude', 'fake-claude.cmd'), mode: 'bypassPermissions' },
   // The fake Codex, in a throwaway home of its own (never the signed-in test home).
   'fake-codex': { provider: 'codex', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-codex', 'fake-codex.cmd'), mode: 'full-access' },
-  // Accept edits, with the hive tools, commands and skills allowed on the command line (the project's extra arguments):
+  // Accept edits, with the hive tools, commands and skills allowed on the command line (its connection's extra arguments):
   // it never asks, and needs no bypass mode (which Claude Code asks to accept once). One value after `=`: the option
   // takes a list, and as separate words it also took the first task Hive passes last, so an agent started on a card sat
   // idle (#498).
@@ -401,10 +401,11 @@ async function runScenario(sc, providerKey, opts = {}) {
     if (first.status === 401) throw new Error(`the Agent API on port ${port} refused this test Hive's token: another Hive is listening on that port`)
     result.guidance = { atStart: first.body?.guidance ?? null, delivered: null }
 
-    if (p.extraArgs) await inv('project:updateConfig', alpha, { providers: { [p.provider]: { extraArgs: p.extraArgs } } })
-    // The project's agents: the one under test (Coder), and another that did earlier work (Implementer, never started).
-    const coder = await lib.addAgent(inv, alpha, { name: 'Coder', provider: p.provider, model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode })
-    const implementer = await lib.addAgent(inv, alpha, { name: 'Implementer', provider: p.provider, model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode })
+    // The project's agents: the one under test (Coder), and another that did earlier work (Implementer, never started),
+    // on a connection with the scenario's extra arguments (HI-2122: a connection's, not the project's).
+    const launch = { provider: p.provider, model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode, extraArgs: p.extraArgs ?? '' }
+    const coder = await lib.addAgent(inv, alpha, { name: 'Coder', ...launch })
+    const implementer = await lib.addAgent(inv, alpha, { name: 'Implementer', ...launch })
     const ctx = {
       api,
       inv,

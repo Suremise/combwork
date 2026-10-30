@@ -47,7 +47,7 @@ function prepare() {
   check('no readiness problems (sandbox set up in the test home)', !(info?.readiness ?? []).some((r) => r.level !== 'info'), JSON.stringify(info?.readiness))
 
   await lib.openWorkspace(inv, page, ws)
-  const def = await inv('agents:add', proj, { name: 'Codex', provider: 'codex', location: 'project', model: 'gpt-6-luna', effort: 'low' })
+  const def = await lib.addAgent(inv, proj, { name: 'Codex', provider: 'codex', location: 'project', model: 'gpt-6-luna', effort: 'low' })
   check('agent added with provider codex', def.provider === 'codex')
   await page.getByText('demo', { exact: true }).first().click()
   await sleep(500)

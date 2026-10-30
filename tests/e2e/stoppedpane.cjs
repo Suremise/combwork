@@ -134,11 +134,11 @@ const check = (name, ok, extra = '') => {
     await app.evaluate(() => { delete process.env.HIVE_TEST_FAIL_IPC })
 
     // --- A launch that fails (the fake's --model fail-start): its failed bar, never Stopped, not dimmed.
-    await inv('agents:update', proj, agent.id, { model: 'fail-start' })
+    await lib.setLaunch(inv, proj, agent.id, { model: 'fail-start' })
     await bar.getByRole('button', { name: 'New Session' }).click()
     const failedBar = page.locator('.agent-pane .session-ended.start-failed')
     check('a failed start: its failed bar, not the stopped one, its terminal not dimmed', !!(await lib.until(async () => (await failedBar.count()) === 1 && (await page.locator('.agent-pane .session-ended.stopped').count()) === 0 && (await host.evaluate((h) => h.classList.contains('dimmed'))) === false && !/Stopped/.test(await text(status)), HUNG_MS)), JSON.stringify([await text(bar), await text(status)]))
-    await inv('agents:update', proj, agent.id, { model: '' })
+    await lib.setLaunch(inv, proj, agent.id, { model: '' })
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
   } finally {

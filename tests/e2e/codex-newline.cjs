@@ -59,7 +59,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').
     await lib.appReady(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
-    const def = await inv('agents:add', proj, { name: 'Tester', provider: 'codex', location: 'project', model: 'gpt-6-luna', effort: 'low' })
+    const def = await lib.addAgent(inv, proj, { name: 'Tester', provider: 'codex', location: 'project', model: 'gpt-6-luna', effort: 'low' })
     const key = lib.ptyKey(proj, def.id)
     const live = async () => (await inv('session:live')).find((s) => s.agentId === def.id)
     const idle = async () => ['ready', 'finished'].includes((await live())?.status)

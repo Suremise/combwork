@@ -97,7 +97,7 @@ async function closeStray(ctx) {
 async function launchRefused(ctx) {
   const { inv, page } = ctx
   await closeToasts(ctx)
-  await inv('project:updateProvider', ctx.project, 'claude-code', { extraArgs: '--settings' })
+  await ctx.lib.setProjectLaunch(inv, ctx.project, 'claude-code', { extraArgs: '--settings' })
   await ctx.command('project.focus', ctx.project)
   await ctx.command('project.tab.session')
   await ctx.command('session.new')
@@ -107,7 +107,7 @@ async function launchRefused(ctx) {
 /** Its notice closed and the extra arguments taken off again. */
 async function closeLaunchRefused(ctx) {
   await closeToasts(ctx)
-  await ctx.inv('project:updateProvider', ctx.project, 'claude-code', { extraArgs: '' })
+  await ctx.lib.setProjectLaunch(ctx.inv, ctx.project, 'claude-code', { extraArgs: '' })
 }
 
 module.exports = {

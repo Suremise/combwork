@@ -1011,10 +1011,6 @@
     "defaultMessage": "On",
     "description": "A choice of an agent's Use 200K context setting. Keep it short."
   },
-  "agents.permission.agentNewSessions": {
-    "defaultMessage": "{agent}: mode for new sessions",
-    "description": "The heading of a stopped agent's permission mode menu, when the agent has its own mode ({agent}: its name)."
-  },
   "agents.permission.answerFirst": {
     "defaultMessage": "The agent is asking you something: answer it first",
     "description": "In the permission mode menu, while the agent waits for an answer: its mode can be switched once it is answered."
@@ -1030,6 +1026,10 @@
   "agents.permission.cliOwnNoSwitchTitle": {
     "defaultMessage": "Hive can't switch this session's mode",
     "description": "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Hive passed no mode): a short line saying no mode switches live. Keep it short."
+  },
+  "agents.permission.connectionNewSessions": {
+    "defaultMessage": "{agent}: connection for new sessions",
+    "description": "The heading of a stopped agent's permission mode menu (HI-2122): its mode is its connection's, so the menu lists its account's connections, each with its mode ({agent}: its name)."
   },
   "agents.permission.current": {
     "defaultMessage": "Current mode",
@@ -1051,9 +1051,9 @@
     "defaultMessage": "Use {mode}?",
     "description": "Title of the confirmation before choosing a provider's no-guardrails permission mode ({mode}: its name, Bypass permissions, Full access…)."
   },
-  "agents.permission.inherit": {
-    "defaultMessage": "Inherit (Settings: {mode})",
-    "description": "In a stopped agent's permission mode menu: new sessions follow the mode set in Settings ({mode}: its name)."
+  "agents.permission.editConnection": {
+    "defaultMessage": "Edit \"{connection}\"…",
+    "description": "The last item of a stopped agent's permission mode menu (HI-2122): opens the connection dialog for its connection ({connection}: its name), where its mode is changed for every agent on it. The … says a dialog opens: keep it."
   },
   "agents.permission.menu": {
     "defaultMessage": "Permission mode",
@@ -1063,9 +1063,9 @@
     "defaultMessage": "Permission mode — {agent}",
     "description": "The permission mode menu's heading, for one of several agents ({agent}: its name)."
   },
-  "agents.permission.newSessionsOf": {
-    "defaultMessage": "New sessions of {name} will run every command, edit and network call without asking.",
-    "description": "The confirmation before choosing a no-guardrails permission mode for an agent's or a project's new sessions ({name}: the agent's or the project's name)."
+  "agents.permission.noConnection": {
+    "defaultMessage": "No connection yet: choose one in Agent Settings",
+    "description": "In a stopped agent's permission mode menu (HI-2122) when it has no connection (its CLI has no account on here yet). Agent Settings names a dialog."
   },
   "agents.permission.notSwitched": {
     "defaultMessage": "Permission mode not switched",
@@ -1086,10 +1086,6 @@
   "agents.permission.planOn": {
     "defaultMessage": "On: the agent plans and asks before changing anything. Click to turn off.",
     "description": "Under Plan mode in the permission mode menu, while it is on."
-  },
-  "agents.permission.projectNewSessions": {
-    "defaultMessage": "{project}: {provider} mode for new sessions",
-    "description": "The heading of a stopped agent's permission mode menu: the project's mode ({project}: its name) for its CLI ({provider})."
   },
   "agents.permission.restart": {
     "defaultMessage": "Restart",
@@ -1134,10 +1130,6 @@
   "agents.permission.switching": {
     "defaultMessage": "Switching to {mode}…",
     "description": "The permission mode badge while Hive switches the running session to another mode ({mode}: its name)."
-  },
-  "agents.permission.useProjects": {
-    "defaultMessage": "Use the project's ({mode})",
-    "description": "In a stopped agent's permission mode menu: use its project's mode for new sessions ({mode}: that mode's name)."
   },
   "agents.permission.withPlan": {
     "defaultMessage": "{mode} · Plan",

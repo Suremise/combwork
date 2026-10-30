@@ -48,7 +48,7 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
   await page.screenshot({ path: path.join(shots, '1-started.png') })
 
   // The agent's own effort (a project's isn't read for a CLI with connections, HI-1774).
-  await inv('agents:update', proj, agent.id, { effort: 'low' })
+  await lib.setLaunch(inv, proj, agent.id, { effort: 'low' })
   await inv('workspace:refresh')
   check('a changed effort offers Restart session', !!(await lib.until(async () => (await page.getByRole('button', { name: 'Restart session' }).count()) > 0, 10000)))
   await page.screenshot({ path: path.join(shots, '2-banner.png') })
@@ -80,7 +80,7 @@ const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.json
   // transaction by another process for a few seconds (less than its busy timeout) while it restarts, so its save waits:
   // the relaunch must still come, with no question.
   // The agent's own effort (a project's isn't read for a CLI with connections, HI-1774).
-  await inv('agents:update', proj, agent.id, { effort: 'high' })
+  await lib.setLaunch(inv, proj, agent.id, { effort: 'high' })
   await inv('workspace:refresh')
   check('another changed effort offers Restart session', !!(await lib.until(async () => (await page.getByRole('button', { name: 'Restart session' }).count()) > 0, 10000)))
   const dbFile = path.join(ws, '.hive', 'hive.db')

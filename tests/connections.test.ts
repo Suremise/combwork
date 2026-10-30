@@ -1063,8 +1063,6 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     const save = vi.spyOn(config, 'saveNow').mockResolvedValue(false)
     try {
       expect(await outcome(here(() => moves.ensureMigrated(p)))).toMatch(/config\.json couldn't be saved/)
-      // An agent's change that would make a connection: refused the same, the agent as it was.
-      expect(await outcome(here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { effort: 'max' })))).toMatch(/config\.json couldn't be saved/)
     } finally {
       save.mockRestore()
     }
@@ -1084,12 +1082,6 @@ describe('model, effort and context from the connection (HI-1770)', () => {
       const baseBefore = structuredClone(accounts.allConnections().find((c) => c.account === a.id))
       expect(() => accounts.updateConnection(baseOf(a.id), { model: 'haiku' })).toThrow(/haiku doesn't take high effort/)
       expect(accounts.allConnections().find((c) => c.account === a.id)).toEqual(baseBefore)
-      // An agent: its model switched with its effort kept.
-      const alpha = join(wsPath, 'alpha')
-      await here(() => updateAgent(alpha, 'a-one', { connection: a.id, model: 'opus', effort: 'high' }))
-      const was = (await w.projectConfig(alpha)).agents.find((x) => x.id === 'a-one')!.connection
-      expect(await outcome(here(() => updateAgent(alpha, 'a-one', { model: 'haiku' })))).toMatch(/haiku doesn't take high effort/)
-      expect((await w.projectConfig(alpha)).agents.find((x) => x.id === 'a-one')!.connection).toBe(was)
     } finally {
       providerService.info = info
       await here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { connection: null }))
@@ -1266,7 +1258,7 @@ describe('the Agent API and connections (HI-1771)', () => {
     const file = join(p, '.hive', 'project.json')
     let release!: () => void
     const held = withFileLock(file, () => new Promise<void>((r) => (release = r)))
-    const saving = here(() => updateAgent(p, 'k', { provider: 'codex', model: 'gpt-5' }))
+    const saving = here(() => updateAgent(p, 'k', { provider: 'codex' }))
     await vi.waitFor(() => expect(fileLockDepth(file)).toBe(2), { timeout: HUNG_MS })
     // Meanwhile something else moves it to Codex (written while the change waits on the lock).
     const raw = JSON.parse(readFileSync(file, 'utf8'))

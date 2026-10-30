@@ -64,7 +64,7 @@ const check = (name, ok, extra = '') => {
     check('Copilot found', !!info?.found, JSON.stringify(info && { found: info.found, path: info.path }))
     console.log(`Copilot CLI ${info?.version ?? '?'} (${info?.source ?? '?'}), offline against the stand-in at ${api.url}`)
     await lib.openWorkspace(inv, page, ws)
-    const a = await inv('agents:add', proj, { name: 'Cop A', provider: 'copilot', location: 'project', permissionMode: 'ask' })
+    const a = await lib.addAgent(inv, proj, { name: 'Cop A', provider: 'copilot', location: 'project', permissionMode: 'ask' })
     const b = await inv('agents:add', proj, { name: 'Cop B', provider: 'copilot', location: 'project' })
     check('agents added with provider copilot', a.provider === 'copilot' && b.provider === 'copilot')
     const live = async (id) => (await inv('session:live')).find((l) => l.agentId === id)
@@ -250,17 +250,17 @@ const check = (name, ok, extra = '') => {
     check('p.txt not edited again', !fs.readFileSync(path.join(proj2, 'p.txt'), 'utf8').includes('again'))
 
     // Copilot's danger opt-in unlocks Autopilot alone (#490: entering Autopilot approves everything for the session);
-    // Allow all needs no opt-in. Since HI-2106 a mode is its agent's connection's (Project Settings' page sets its
-    // agents'); turned off, the opt-in changes no connection: one in Autopilot launches in Copilot's default meanwhile.
+    // Allow all needs no opt-in. Since HI-2106 a mode is its agent's connection's; turned off, the opt-in changes no
+    // connection: one in Autopilot launches in Copilot's default meanwhile.
     const modeOfC = () => {
       const saved = JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8'))
       const conn = JSON.parse(fs.readFileSync(path.join(proj2, '.hive', 'project.json'), 'utf8')).agents?.find((x) => x.id === c.id)?.connection
       return saved.connections?.find((x) => x.id === conn)?.permissionMode ?? 'default'
     }
     await inv('settings:update', { providers: { copilot: { enableDangerousMode: true } } })
-    await inv('project:updateProvider', proj2, 'copilot', { permissionMode: 'autopilot' })
+    await lib.setProjectLaunch(inv, proj2, 'copilot', { permissionMode: 'autopilot' })
     check("paren(1)'s Autopilot, once allowed, is C's connection's", modeOfC() === 'autopilot', modeOfC())
-    await inv('agents:update', proj2, c.id, { permissionMode: 'allow-all' })
+    await lib.setLaunch(inv, proj2, c.id, { permissionMode: 'allow-all' })
     check('…then C in Allow all', modeOfC() === 'allow-all', modeOfC())
     await inv('settings:update', { providers: { copilot: { enableDangerousMode: false } } })
     check('turning the opt-in off leaves C in Allow all, which needs no opt-in', modeOfC() === 'allow-all', modeOfC())

@@ -64,9 +64,27 @@ const check = (name, ok, extra = '') => {
     check("the stopped agent's badge says CLI's own", !!(await lib.until(async () => (await badge.count()) === 1 && /CLI's own/.test(await badge.innerText()), HUNG_MS)), await badge.innerText().catch(() => 'no badge'))
     await badge.click()
     const items = page.locator('.menu .menu-item')
-    check("its menu offers the CLI's own setting, ticked, with what it does", !!(await lib.until(async () => (await items.allInnerTexts()).some((t) => /The CLI's own setting\s*Hive passes no permission mode/.test(t)), HUNG_MS)), JSON.stringify(await items.allInnerTexts()))
+    // Its mode is its connection's (HI-2122): the menu lists its account's connections with their modes, its own ticked,
+    // and edits that connection last.
+    check("its menu lists its account's connections, its own with the CLI's own setting", !!(await lib.until(async () => (await items.allInnerTexts()).some((t) => /Test · cli-own[\s\S]*CLI's own/.test(t)), HUNG_MS)), JSON.stringify(await items.allInnerTexts()))
+    check('…and edits its connection last', ((await items.allInnerTexts()).at(-1) ?? '').startsWith('Edit "Test · cli-own"…'), JSON.stringify(await items.allInnerTexts()))
     await shots('stopped-menu')
+    // Its last item opens that connection's dialog, its mode the CLI's own.
+    await items.last().click()
+    const modeSelect = page.locator('.dialog select[data-mode]')
+    check('Edit opens its connection\'s dialog, with its mode', !!(await lib.until(async () => (await modeSelect.count()) === 1 && (await modeSelect.inputValue()) === 'cli-own', HUNG_MS)), String(await modeSelect.inputValue().catch(() => 'no dialog')))
     await page.keyboard.press('Escape')
+    await lib.until(async () => (await modeSelect.count()) === 0, HUNG_MS)
+    // Picking another connection moves the agent onto it; nothing is made for it.
+    const connectionOf = async () => (await inv('workspace:refresh')).projects.find((p) => p.path.toLowerCase() === alpha.toLowerCase()).agents.find((a) => a.id === def.id).connection
+    const own = await connectionOf()
+    const count = (await inv('connections:list')).connectionRows.length
+    await badge.click()
+    await items.filter({ hasText: 'Claude Code' }).first().click()
+    const moved = await lib.until(async () => ((await connectionOf()) !== own ? await connectionOf() : null), HUNG_MS)
+    check('picking another connection moves the agent onto it, making none', !!moved && (await inv('connections:list')).connectionRows.length === count && /Auto/.test(await badge.innerText()), JSON.stringify({ moved, badge: await badge.innerText() }))
+    await inv('agents:update', alpha, def.id, { connection: own })
+    await lib.until(async () => /CLI's own/.test(await badge.innerText()), HUNG_MS)
 
     const launches = () => {
       const f = path.join(claudeHome, 'fake-launches.jsonl')

@@ -88,7 +88,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   if (l2?.status !== 'ready') console.log(`(its terminal: …${lib.plainText(await inv('pty:buffer', lib.ptyKey(proj, agent.id)).catch(() => '')).slice(-1500)})`)
 
   // Settings change: offered, not forced
-  await inv('project:updateConfig', proj, { providers: { 'claude-code': { model: 'inherit', effort: 'inherit', permissionMode: 'plan', extraArgs: '' } } }); await inv('workspace:refresh'); await sleep(1200) // A fixed wait on purpose: this checks the mode does NOT change until asked.
+  await lib.setProjectLaunch(inv, proj, 'claude-code', { permissionMode: 'plan' }); await inv('workspace:refresh'); await sleep(1200) // A fixed wait on purpose: this checks the mode does NOT change until asked.
   check('mode unchanged until asked', (await live())?.permissionMode === 'dontAsk')
   const toast = page.locator('.toast', { hasText: 'Permission mode changed to Plan' })
   check('offer to switch running agents', (await toast.count()) === 1)

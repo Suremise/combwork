@@ -81,29 +81,27 @@ const legacyBytes = () => Object.fromEntries(stored().map((a) => [a.id, JSON.str
     check('B1 works from its carried slot', same(s1?.cwd, hb1) && s1?.slot === 'hb1', JSON.stringify(s1))
     check('…its pane says "carried: hb1"', !!(await until(async () => (await lib.paneHeader(page, 'B1').locator('.agent-place').innerText().catch(() => '')) === 'carried: hb1', HUNG_MS)), JSON.stringify((await agentInfo('b1'))?.place))
 
-    // --- 2. Agent Settings: B1 renamed and its model changed, saved.
+    // --- 2. Agent Settings: B1 renamed, saved (its model is its connection's since HI-2108: none of its own).
     await lib.agentMenu(page, 'B1')
     await page.locator('.menu-item', { hasText: 'Agent Settings…' }).click()
     const dialog = page.locator('.dialog', { hasText: 'B1 settings' })
     check('Agent Settings opens', !!(await until(async () => (await dialog.count()) === 1, HUNG_MS)))
     await dialog.locator('input.input').first().fill('B1 renamed')
-    const model = dialog.locator('select').first()
-    const options = await model.locator('option').evaluateAll((os) => os.map((o) => o.value))
-    const chosen = options.find((v) => v && v !== 'inherit')
-    await model.selectOption(chosen)
     await dialog.locator('button.primary', { hasText: 'Save' }).click()
     const b1 = await until(async () => {
       const a = stored().find((x) => x.id === 'b1')
-      return a.name === 'B1 renamed' && a.model === chosen ? a : null
+      return a.name === 'B1 renamed' ? a : null
     }, HUNG_MS)
-    check('Agent Settings saved B1\'s new name and model', !!b1, JSON.stringify(stored().find((x) => x.id === 'b1')))
+    check('Agent Settings saved B1\'s new name', !!b1, JSON.stringify(stored().find((x) => x.id === 'b1')))
     check("…and its stored worktree is byte-identical", legacyBytes().b1 === before.b1, legacyBytes().b1)
 
     // The agents reordered (a whole list written), and B2's settings saved with nothing changed.
     await inv('agents:move', alpha, 'r1', 0)
     check('…reordered', !!(await until(() => stored()[0].id === 'r1', HUNG_MS)), JSON.stringify(stored().map((a) => a.id)))
-    await inv('agents:update', alpha, 'b2', { model: chosen })
-    check("…B2's model saved", !!(await until(() => stored().find((a) => a.id === 'b2').model === chosen, HUNG_MS)))
+    // B2 moved to a connection with another model (HI-2122: the model is its connection's).
+    await lib.setLaunch(inv, alpha, 'b2', { model: 'opus' })
+    const modelOfB2 = () => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).connections?.find((c) => c.id === stored().find((a) => a.id === 'b2').connection)?.model
+    check("…B2's model saved, on its connection", !!(await until(() => modelOfB2() === 'opus', HUNG_MS)), String(modelOfB2()))
     check("after every save, both agents' 0.9.3 fields are byte-identical (B2's needsSetup too)", sameLegacy(), `${JSON.stringify(before)} → ${JSON.stringify(legacyBytes())}`)
   } catch (e) {
     check('no exception', false, e.stack)

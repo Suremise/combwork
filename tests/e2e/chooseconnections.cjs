@@ -47,7 +47,7 @@ const connectionOf = (id) => project().agents.find((a) => a.id === id)?.connecti
     }, HUNG_MS)
     check('the agents and the connections usable here are planned', !!first && first.agents.map((a) => a.role).join() === 'builder,builder,reviewer', JSON.stringify(first))
     const base = first.options[0].id
-    await inv('agents:update', alpha, 'a-r1', { effort: 'high' })
+    await lib.setLaunch(inv, alpha, 'a-r1', { effort: 'high' })
     const plan = await inv('templates:connectionsPlan', alpha)
     const high = plan.options.find((o) => o.id !== base)?.id
     check('…a second connection, on the same account, now the reviewer’s', !!high && connectionOf('a-r1') === high && connectionOf('a-b1') === base, JSON.stringify(plan.options))

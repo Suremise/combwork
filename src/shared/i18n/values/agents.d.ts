@@ -254,26 +254,25 @@ interface HiveMessageValues {
   'agents.name.tooLong': { max: string | number }
   'agents.overrides.off': undefined
   'agents.overrides.on': undefined
-  'agents.permission.agentNewSessions': { agent: string | number }
   'agents.permission.answerFirst': undefined
   'agents.permission.badgeTip': { live: string; mode: string | number; note: string; key: string; cycles: string; plan: string }
   'agents.permission.cliOwnNoSwitch': undefined
   'agents.permission.cliOwnNoSwitchTitle': undefined
+  'agents.permission.connectionNewSessions': { agent: string | number }
   'agents.permission.current': undefined
   'agents.permission.dangerConfirm': { mode: string | number }
   'agents.permission.dangerDetail': { provider: string | number }
   'agents.permission.dangerMessage': { where: string | number }
   'agents.permission.dangerTitle': { mode: string | number }
-  'agents.permission.inherit': { mode: string | number }
+  'agents.permission.editConnection': { connection: string | number }
   'agents.permission.menu': undefined
   'agents.permission.menuAgent': { agent: string | number }
-  'agents.permission.newSessionsOf': { name: string | number }
+  'agents.permission.noConnection': undefined
   'agents.permission.notSwitched': undefined
   'agents.permission.planFailed': undefined
   'agents.permission.planMode': undefined
   'agents.permission.planOff': undefined
   'agents.permission.planOn': undefined
-  'agents.permission.projectNewSessions': { project: string | number; provider: string | number }
   'agents.permission.restart': undefined
   'agents.permission.restartAgent': { mode: string | number; agent: string | number }
   'agents.permission.restartFailed': undefined
@@ -285,7 +284,6 @@ interface HiveMessageValues {
   'agents.permission.sessionOnly': undefined
   'agents.permission.switchFailed': undefined
   'agents.permission.switching': { mode: string | number }
-  'agents.permission.useProjects': { mode: string | number }
   'agents.permission.withPlan': { mode: string | number }
   'agents.picker.customModel': undefined
   'agents.picker.defaultModel': { provider: string | number }
