@@ -1100,7 +1100,7 @@ describe('agent watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it("a watch that can never fire ends: its card merged (Done), or its lane ended or abandoned; not when it counts the move, not a dependency, not with the project's loop wakes off (#1475)", async () => {
+  it("a watch that can never fire ends: its card merged (Done), or its lane ended or abandoned; not when it counts the move; Done also ends a dependency's, and with the project's loop wakes off (#1475, HI-2153)", async () => {
     const { w, alpha } = await open()
     const st = fake(alpha)
     const user = { kind: 'user' } as const
@@ -1141,27 +1141,25 @@ describe('agent watches (main/watches.ts)', async () => {
     await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
     expect(st.told[2]).toMatch(new RegExp(`^\\[Hive\\] #${c3} \\(Reviewer's card\\) is in Done`))
     expect(st.told[2]).not.toContain('your watch on it ended')
-    // Another agent's card it depends on (no part in it: a watch for Passed) stays, Done or not.
+    // HI-2153: another agent's card it depends on (no part in it: a watch for Passed) ends in Done too, as does a
+    // reviewer's with the project's loop wakes off (both kept before): nothing more comes of a merged card.
     st.status = 'watching'
     const c4 = await card('Dependency')
     await watches.registerWatch(w, alpha, 'a1', { cards: [c4], changes: ['column'], column: 'passed' })
     await inWorkspace(w, () => tasks.updateTask(c4, { column: 'done' }, user))
     await watches.evaluateWatches(w)
-    await watches.tick()
-    await watches.settled()
-    expect(st.told).toHaveLength(3)
-    expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([c4])
-    // With the project's loop wakes off, a reviewer's watch on a merged card is kept, as before.
+    await vi.waitFor(() => expect(st.told).toHaveLength(4), { timeout: HUNG_MS })
+    expect(st.told[3]).toBe(`[Hive] #${c4} is in Done (your watch on it ended). ${done}`)
+    await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
+    st.status = 'watching'
     await w.mutateProjectConfig(alpha, () => ({ loopWakes: false }))
     const c5 = await card('Wakes off')
     await watches.registerWatch(w, alpha, 'a1', { cards: [c5], changes: ['column'], column: 'review' })
     await inWorkspace(w, () => tasks.updateTask(c5, { column: 'done' }, user))
     await watches.evaluateWatches(w)
-    await watches.tick()
-    await watches.settled()
-    expect(st.told).toHaveLength(3)
-    expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([c5])
-    await watches.cancelWatch(w, alpha, 'a1')
+    await vi.waitFor(() => expect(st.told).toHaveLength(5), { timeout: HUNG_MS })
+    expect(st.told[4]).toBe(`[Hive] #${c5} is in Done (your watch on it ended). ${done}`)
+    await vi.waitFor(() => expect(watches.watchFor(alpha, 'a1')).toBeNull(), { timeout: HUNG_MS })
     await disposeWorkspaceService(w)
   })
 

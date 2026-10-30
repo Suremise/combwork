@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { projectAgents } from '../shared/defaults'
-import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
+import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
 import { agentBusy, agentEvent, agentLimitLine, agentMarkOf, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, readSavedAgentMark, replyFirstLine, replyPart, REPLY_CHARS, type AgentEvent, type AgentMark, type AgentNow, type AgentWatchCondition, type WatchedAgent } from '../shared/agentWatch'
 import { isProjectId, type ProjectIdIndex } from '../shared/projectIds'
 import { rebase } from '../shared/movePaths'
@@ -854,12 +854,14 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
       const role = scope === null ? null : card.agent === agentId ? 'agent' : card.review?.agent === agentId ? 'reviewer' : cond.column === 'review' ? 'awaiting' : null
       if (role) on[n] = { role }
       const mark = markOf(card)
-      if (alreadyThere(mark, cond)) {
-        already = cardChange(n, card, ['column'])
-        break
-      }
       const was = told?.get(String(n))
       const base = start?.card.number === n ? start.card : card
+      // HI-2153: a card in Done or archived never changes again: its state is the answer, never a watch. Unless the watch
+      // starts from before it got there (a wake that told it elsewhere, an intent's card): that move fires it.
+      if (alreadyThere(mark, cond) || (cardOver(mark) && cardOver(was ? was.mark : markOf(base)))) {
+        already = cardChange(n, card, mark.archived ? 'gone' : ['column'])
+        break
+      }
       marks[n] = was ? carriedOver(card, was, self!) : markOf(base)
       seen[n] = was ? was.seen : seenOf(base)
       now[n] = mark
@@ -2223,6 +2225,11 @@ async function check(store: Store, rec: WatchRecord, cards?: CardReads, ctx: Rel
       kinds = changesBetween(rec.marks[n], after, rec.cond, into)
       if (kinds !== 'gone') kinds.push(...handoffsSince(card, rec.since, rec.cond, rec.watcherName))
     }
+    // HI-2153: in Done with nothing new to tell (a watch saved on it there, or the watcher's own move): it ends all the same.
+    if (kinds !== 'gone' && !kinds.length && card?.column === 'done') {
+      released.push({ number: n, why: 'done', detail: null })
+      continue
+    }
     if (kinds === 'gone' || kinds.length) {
       const about = wakeAbout(card, kinds, rec.agentId)
       // HI-2087: moved back to work because the merge queue returned it: the line leads with the return and its reason.
@@ -2258,6 +2265,9 @@ async function check(store: Store, rec: WatchRecord, cards?: CardReads, ctx: Rel
  * it is paused, not gone, and its loop waits for it (a reviewer that moved on deadlocked with its builder).
  */
 function releaseOf(rec: WatchRecord, n: number, card: TaskCard | null, ctx: ReleaseContext = NO_CONTEXT): Released | null {
+  // HI-2153 (#1475 before, for a loop's watches only): in Done, nothing more comes of it, whoever watches it and for
+  // what. A watch that counts the move there is told it as that change (check: unless it saw nothing new).
+  if (card && !card.archived && card.column === 'done' && !countsDone(rec.cond)) return { number: n, why: 'done', detail: null }
   const on = rec.on?.[n]
   if (!on || !card || card.archived) return null
   const me = rec.agentId
@@ -2274,8 +2284,6 @@ function releaseOf(rec: WatchRecord, n: number, card: TaskCard | null, ctx: Rele
   if (on.role === 'awaiting' && was && card.agent !== was && card.agent !== me) return { number: n, why: 'reassigned', detail: card.agentName ?? card.agent ?? null }
   // #1475: nothing more can come of it (the project's card-loop wakes off: kept, as before).
   if (!ctx.loopWakes) return null
-  // Merged (Done) since the watch began, which the watch doesn't count: a reviewer waiting for it in Review, a builder for its verdict.
-  if (card.column === 'done' && rec.marks[n]?.column !== 'done' && !countsDone(rec.cond)) return { number: n, why: 'done', detail: null }
   // A watch for the card's Done that sees it there has what it waited for (HR4's #1475 round 1): told as that change,
   // never as its lane's end. Anything else waited for on a lane that has ended is obsolete, also a change that fired the
   // watch before the lane ended but wasn't handed over yet (an arrival in Review of an abandoned lane's card).

@@ -52,7 +52,7 @@ import { msg, tr } from '../shared/i18n'
 import { cancelWatch, encodeSince, registerAgentWatch, registerLaneWatch, registerWatch, scopedCard } from './watches'
 import { readLaneCards, readLaneCondition } from '../shared/laneWatch'
 import { agentBusy, AGENT_WATCH_MAX_AGENTS, type AgentNow, type WatchedAgent } from '../shared/agentWatch'
-import { alreadyThere, cardChange, changesBetween, decodeSince, handoffsSince, markOf, movedIntoSince, readCondition, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_LIMIT_MINUTES, type CardChange, type CardMark } from '../shared/watch'
+import { alreadyThere, cardChange, cardOver, changesBetween, decodeSince, handoffsSince, markOf, movedIntoSince, readCondition, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_LIMIT_MINUTES, type CardChange, type CardMark } from '../shared/watch'
 import { advanced, waitMaxSeconds } from './advanced'
 import { titleNudge } from './titleNudge'
 import { insideReal, placeMatcher, placeRelative, readCapped, readJson, samePlace, writeJsonAtomic } from './fsutil'
@@ -3255,9 +3255,9 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   try {
     const start = await marksOf()
     const from = new Map(cond.cards.map((n) => [n, base?.get(n) ?? start.get(n)!]))
-    // A column condition already met when the wait begins answers at once.
-    const met = cond.column && !base ? cond.cards.filter((n) => alreadyThere(start.get(n)!, cond)) : []
-    if (met.length) return { changes: await Promise.all(met.map(async (n) => cardChange(n, await read(n), ['column']))), timedOut: false, since: encodeSince(start), ...withNames(met) }
+    // A column condition already met when the wait begins answers at once, as does a card in Done or archived (HI-2153).
+    const met = !base ? cond.cards.filter((n) => alreadyThere(start.get(n)!, cond) || cardOver(start.get(n)!)) : []
+    if (met.length) return { changes: await Promise.all(met.map(async (n) => cardChange(n, await read(n), start.get(n)!.archived ? 'gone' : ['column']))), timedOut: false, since: encodeSince(start), ...withNames(met) }
     const check = async (): Promise<{ changes: CardChange[]; now: Map<number, CardMark> }> => {
       const now = await marksOf()
       const changes: CardChange[] = []

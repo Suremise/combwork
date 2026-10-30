@@ -202,6 +202,8 @@ function cardBusy(c: TaskCard, projects: ProjectInfo[], assistant: ProjectInfo |
     if (agent?.live) return tr(BUSY.working, { agent: agent.name })
   }
   if (c.review) return tr(BUSY.reviewing, { agent: c.review.agentName })
+  // HI-2153: a watch on a card in Done waits for nothing more (Hive ends it): nobody is on it for that.
+  if (c.column === 'done') return null
   for (const p of assistant ? [...projects, assistant] : projects) {
     const a = p.agents.find((x) => x.live?.watch?.cards.includes(c.number))
     if (a && p === assistant) return tr(BUSY.assistantWatching)
