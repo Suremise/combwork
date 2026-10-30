@@ -97,10 +97,10 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('the header shows it', !!(await lib.until(async () => (await page.locator('.assistant-mode').innerText()).includes('Planner'), 10000)))
 
   // Assistant Settings (HI-2108): this workspace's connection and mode, nothing else. Two connections on its account (the
-  // connection dialog's saves): Haiku with Medium effort, and one in the CLI's own mode, which the Assistant can't take.
+  // connection dialog's saves): Sonnet with Medium effort, and one in the CLI's own mode, which the Assistant can't take.
   const saved = async () => (await inv('connections:list')).connectionRows
   const account = await lib.until(async () => (await saved()).find((c) => c.id === agentFile().connection)?.account ?? (await saved())[0]?.account, HUNG_MS)
-  const light = await inv('connection:add', account, { name: 'Light', model: 'haiku', effort: 'medium' })
+  const light = await inv('connection:add', account, { name: 'Light', model: 'sonnet', effort: 'medium' })
   const cliOwn = await inv('connection:add', account, { name: 'Its own mode', permissionMode: 'cli-own' })
   await page.locator('.assistant-header button[aria-label="More"]').click()
   await page.locator('.menu-item', { hasText: 'Assistant Settings…' }).click()
@@ -109,7 +109,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('Assistant Settings has a connection and a mode, no coding agent, model or effort', await becomes(async () => (await choice.count()) === 1) && (await settingsDialog.locator('.provider-choice').count()) === 0 && (await settingsDialog.getByText('Effort', { exact: true }).count()) === 0)
   check("…a connection in the CLI's own mode greyed out, saying why", await becomes(async () => (await choice.locator(`option[value="${cliOwn.id}"]`).count()) === 1) && (await choice.locator(`option[value="${cliOwn.id}"]`).isDisabled()) && /the Assistant needs to know its mode/.test(await choice.locator(`option[value="${cliOwn.id}"]`).innerText()))
   await choice.selectOption(light.id)
-  check('…the one chosen summed up under it', await becomes(async () => /Haiku.*Medium/.test(await settingsDialog.locator('[data-connection-summary]').innerText().catch(() => ''))), await settingsDialog.locator('[data-connection-summary]').innerText().catch(() => ''))
+  check('…the one chosen summed up under it', await becomes(async () => /Sonnet.*Medium/.test(await settingsDialog.locator('[data-connection-summary]').innerText().catch(() => ''))), await settingsDialog.locator('[data-connection-summary]').innerText().catch(() => ''))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
     await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
@@ -160,7 +160,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   // The key is marked as the user's own text in the log (userText), so the line is found by its parts.
   const launch = log.split('\n').filter((l) => / spawn \W?session:/.test(l) && l.toLowerCase().includes('assistant#assistant')).pop() ?? ''
   check('it launches in Auto', launch.includes('"--permission-mode","auto"'))
-  check('…with the model its connection sets', launch.includes('"--model","haiku"'))
+  check('…with the model its connection sets', launch.includes('"--model","sonnet"'))
   check("its mode is appended to Claude Code's system prompt", launch.includes('--append-system-prompt-file'))
   check("Hive's reading tools are allowed", launch.includes('mcp__hive__hive_list_projects') && !launch.includes('mcp__hive__hive_write_shared_note'))
   check('Planner\'s instructions are in the launch', fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8').includes('# Your mode: Planner'))

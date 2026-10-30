@@ -1159,7 +1159,7 @@ function connectionNamesOn(accountId: string | undefined): string {
  * agent's, or the one a new agent would go on), so an old script fails once and says what to do.
  */
 const OLD_AGENT_FIELDS = ['provider', 'model', 'effort', 'mode', 'context200k'] as const
-function refuseOldFields(body: any, account: string | undefined): void {
+export function refuseOldFields(body: any, account: string | undefined): void {
   const old = OLD_AGENT_FIELDS.filter((k) => body && typeof body === 'object' && k in body)
   if (!old.length) return
   throw new HttpError(400, `An agent no longer takes ${old.join(', ')}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). ${connectionNamesOn(account)} hive_connection lists every one, and makes one when the user agrees.`)
@@ -1181,17 +1181,17 @@ function connectionArg(body: any, projectPath: string): { connection: string | n
 }
 
 /**
- * An agent row's connection fields (HI-2108): `connection`, the one chosen as saved (its id, its name, its account's
- * name, and `problem` when it can't be used here: removed, or its account off here, so it runs on its CLI's first usable
- * one), or null for none; `launchedConnection`, the account its run is on; `switchPending`. A project agent is never told
- * the name of one that can't be used in its workspace.
+ * An agent row's connection fields (HI-2108): `connection`, the one chosen as saved (its id, its name, and `problem`
+ * when it can't be used here: removed, or its account off here, so it runs on its CLI's first usable one), or null for
+ * none; `launchedConnection`, the account its run is on; `switchPending`. A project agent is never told the name of one
+ * that can't be used in its workspace.
  */
 function agentConnectionFields(p: string, a: AgentInfo, cli: ProviderId): Record<string, unknown> {
   const c = getConnection(a.connection)
   const problem = a.connection ? (c ? connectionProblem(c.account, cli, p) : 'missing') : null
   const shown = !!c && (!problem || !agentCaller())
   return {
-    connection: a.connection ? { id: a.connection, name: shown ? c!.name : null, ...(shown ? { account: accountById(c!.account)?.name ?? null } : {}), ...(problem ? { problem } : {}) } : null,
+    connection: a.connection ? { id: a.connection, name: shown ? c!.name : null, ...(problem ? { problem } : {}) } : null,
     launchedConnection: a.live?.launchedConnection ? { id: a.live.launchedConnection.id, name: a.live.launchedConnection.name, ...(a.live.launchedConnection.note ? { note: a.live.launchedConnection.note } : {}) } : null,
     ...(a.live?.switchPending ? { switchPending: true } : {})
   }
@@ -1228,7 +1228,7 @@ route('GET', '/v1/connections/:ref', async ({ params }) => {
  * context200k and extraArgs, each "" or null for the CLI's own (on an update: cleared). Saving checks them as the
  * connection dialog's save does (a mode the CLI has, an effort the model takes: decision E).
  */
-function connectionValuesArg(body: any): ConnectionPatch {
+export function connectionValuesArg(body: any): ConnectionPatch {
   const out: ConnectionPatch = {}
   const text = (v: unknown): string | null => (v === null || v === undefined ? null : String(v).trim() || null)
   if (body?.name !== undefined) {

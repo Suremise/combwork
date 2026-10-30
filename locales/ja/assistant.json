@@ -179,7 +179,7 @@
   "assistant.panel.ended": "会話は終了しました。",
   "assistant.panel.fold": "アシスタントパネルを折りたたむ",
   "assistant.panel.foldTip": "{hasKey, select, yes {アシスタントパネルを折りたたむ（{key}）} other {アシスタントパネルを折りたたむ}}",
-  "assistant.panel.forWorkspace": "このワークスペース用の設定です。<i>既定</i>のままの項目は<link>「設定」→「アシスタント」</link>に従います。",
+  "assistant.panel.forWorkspace": "このワークスペース用の設定です。モデル、エフォート、権限モードは接続が保持します。<i>既定</i>のままのモードは<link>「設定」→「アシスタント」</link>に従います。",
   "assistant.panel.inactive": "{count, plural, other {非アクティブなプロジェクト#件}}",
   "assistant.panel.inboxLine": "{id} · {from}：{text}",
   "assistant.panel.inboxTip": "アシスタントの受信箱に、まだ取得・確認されていない項目が{n, plural, other {#件}}あります。アイドルになると次の行として提示されます。hive_inboxでも読めます。",

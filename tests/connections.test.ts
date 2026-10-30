@@ -38,6 +38,7 @@ const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWork
 const { runSwitch } = await import('../src/main/connectionSwitch')
 const { authScope, sessions } = await import('../src/main/sessions')
 const moves = await import('../src/main/connectionMoves')
+const { connectionValuesArg, refuseOldFields } = await import('../src/main/servers')
 const { assistantOwn, cliDefaults, legacyLaunchSettings: agentLaunchSettings, moveProjectOverrides } = await import('../src/shared/connectionDefaults')
 const { addAgent, updateAgent } = await import('../src/main/projectAgents')
 const templates = await import('../src/main/templates')
@@ -109,6 +110,33 @@ async function signedInConnection(name: string, email: string): Promise<Account>
 const launch = (wanted?: string | null) => accounts.connectionForLaunch({ provider: 'claude-code', workspaceConfig: w.config, wanted, agentName: 'Builder' })
 /** An account's base connection's id (HI-2106): what an agent on it with nothing of its own chooses. */
 const baseOf = (account: string): string => accounts.allConnections().find((c) => c.account === account)!.id
+
+describe("the Agent API's connection arguments (HI-2108)", () => {
+  it('refuses provider, model, effort, mode and context200k on an agent, naming the connections on the account concerned', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    accounts.addConnection(a.id, { name: 'Personal · High', effort: 'high' })
+    expect(() => refuseOldFields({ name: 'X', connection: 'Personal', mcpServers: [] }, a.id)).not.toThrow()
+    for (const body of [{ provider: 'codex' }, { model: '' }, { effort: 'high' }, { mode: 'plan' }, { context200k: 'on' }, { model: 'opus', effort: 'high' }]) {
+      let message = ''
+      try {
+        refuseOldFields(body, a.id)
+      } catch (e) {
+        message = `${(e as { status?: number }).status} ${(e as Error).message}`
+      }
+      expect(message, JSON.stringify(body)).toMatch(new RegExp(`^400 An agent no longer takes ${Object.keys(body).join(', ')}: it runs on a connection`))
+      expect(message).toContain('On Personal: Personal, Personal · High.')
+    }
+    // No account here to name: says where the user adds one.
+    expect(() => refuseOldFields({ model: 'opus' }, undefined)).toThrow(/No account is on in this workspace: the user adds one in Settings → Accounts & Connections/)
+  })
+  it("reads hive_connection's values: each '' or null back to the CLI's, a name never empty, context200k on or off", () => {
+    expect(connectionValuesArg({ name: ' Fast ', model: 'haiku', effort: 'low', mode: 'plan', context200k: 'on', extraArgs: ' --verbose ' })).toEqual({ name: 'Fast', model: 'haiku', effort: 'low', permissionMode: 'plan', use200kContext: true, extraArgs: '--verbose' })
+    expect(connectionValuesArg({ model: '', effort: null, context200k: 'off', extraArgs: '' })).toEqual({ model: null, effort: null, use200kContext: null, extraArgs: null })
+    expect(connectionValuesArg({})).toEqual({})
+    expect(() => connectionValuesArg({ name: '  ' })).toThrow(/A connection needs a name/)
+    expect(() => connectionValuesArg({ context200k: 'maybe' })).toThrow(/context200k is "on"/)
+  })
+})
 
 describe('which connection a launch uses (resolveConnection)', () => {
   const c = (id: string, p: Account['provider'] = 'claude-code'): Account => ({ id, provider: p, name: id, createdAt: '' })

@@ -1629,16 +1629,15 @@ export function newWorkspaceAccounts(): WorkspaceConfig['connections'] | undefin
 }
 
 /**
- * An agent as the window reads it (HI-2108), once its project is migrated: `connection` is its connection's id, as saved;
- * `permissionMode` is its connection's, for the mode badge's menu of a stopped agent (which offers the connection on its
- * account with another mode). Its model, effort and context are its connection's, which the window reads from the
- * connections themselves.
+ * An agent as the window reads it (HI-2108), once its project is migrated: `connection` is its connection's id, as saved,
+ * and its model, effort, context and mode are its connection's values, which its footer shows before it starts and its
+ * mode badge's menu reads. They are never sent back: a change is a change of its connection.
  */
 export function agentLaunchView(a: AgentDef, cfg: Pick<ProjectConfig, 'migrations'>): Partial<AgentInfo> {
   // Not migrated yet, or no connection yet (its CLI has no account: its own, as kept): as it is.
   if (!cfg.migrations?.accounts1 || !a.connection) return {}
   const c = getConnection(a.connection)
-  return { model: undefined, effort: undefined, use200kContext: undefined, permissionMode: c?.permissionMode }
+  return { model: c?.model, effort: c?.effort, use200kContext: c?.use200kContext, permissionMode: c?.permissionMode }
 }
 
 // ---------------------------------------------------------------------------

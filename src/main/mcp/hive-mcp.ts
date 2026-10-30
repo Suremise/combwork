@@ -128,7 +128,7 @@ const agentArg = { type: 'string', description: 'Its name or id; optional when t
 // follows from it).
 const settingsArgs = {
   mcpServers: { type: 'array', items: { type: 'string' }, description: "The project's MCP servers it gets: [] none, [\"*\"] all (default). hive is always given." },
-  connection: { type: 'string', description: 'Its connection (model, effort, mode; its CLI follows), by id or name, from hive_connection. Default: the first usable here.' }
+  connection: { type: 'string', description: 'Its connection, by id or name (hive_connection): its model, effort, mode and CLI. Default: the first usable here.' }
 }
 const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist'], description: 'Builds cards, reviews them, either (never its own), or generalist (never in a lane). Default: from its name.' }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`

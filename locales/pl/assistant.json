@@ -179,7 +179,7 @@
   "assistant.panel.ended": "Rozmowa się zakończyła.",
   "assistant.panel.fold": "Zwiń panel Asystenta",
   "assistant.panel.foldTip": "{hasKey, select, yes {Zwiń panel Asystenta ({key})} other {Zwiń panel Asystenta}}",
-  "assistant.panel.forWorkspace": "Dla tego obszaru roboczego. Wszystko, co zostawisz jako <i>Domyślny</i>, idzie za <link>Ustawienia → Asystent</link>.",
+  "assistant.panel.forWorkspace": "Dla tego obszaru roboczego. Jego połączenie określa model, wysiłek i tryb uprawnień; tryb pozostawiony jako <i>Domyślny</i> idzie za <link>Ustawienia → Asystent</link>.",
   "assistant.panel.inactive": "{count, plural, one {# nieaktywny projekt} few {# nieaktywne projekty} many {# nieaktywnych projektów} other {# nieaktywnego projektu}}",
   "assistant.panel.inboxLine": "{id} · {from}: {text}",
   "assistant.panel.inboxTip": "{n, plural, one {Element w skrzynce odbiorczej Asystenta, którego} few {# elementy w skrzynce odbiorczej Asystenta, których} many {# elementów w skrzynce odbiorczej Asystenta, których} other {# elementu w skrzynce odbiorczej Asystenta, których}} jeszcze nie pobrał ani nie potwierdził. Dostanie je jako następny wiersz, gdy będzie bezczynny, albo odczyta przez hive_inbox.",

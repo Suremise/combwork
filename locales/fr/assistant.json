@@ -179,7 +179,7 @@
   "assistant.panel.ended": "La conversation est terminée.",
   "assistant.panel.fold": "Replier le panneau de l’Assistant",
   "assistant.panel.foldTip": "{hasKey, select, yes {Replier le panneau de l’Assistant ({key})} other {Replier le panneau de l’Assistant}}",
-  "assistant.panel.forWorkspace": "Pour cet espace de travail. Ce qui reste sur <i>Par défaut</i> suit <link>Paramètres → Assistant</link>.",
+  "assistant.panel.forWorkspace": "Pour cet espace de travail. Sa connexion contient son modèle, son effort et son mode d’autorisation ; un mode laissé sur <i>Par défaut</i> suit <link>Paramètres → Assistant</link>.",
   "assistant.panel.inactive": "{count, plural, one {# projet inactif} many {# projets inactifs} other {# projets inactifs}}",
   "assistant.panel.inboxLine": "{id} · {from} : {text}",
   "assistant.panel.inboxTip": "{n, plural, one {Un élément dans la boîte de réception de l’Assistant, pas encore récupéré ni accusé de réception : proposé comme sa prochaine ligne dès qu’il est inactif, ou lu avec hive_inbox.} many {# éléments dans la boîte de réception de l’Assistant, pas encore récupérés ni accusés de réception : proposés comme sa prochaine ligne dès qu’il est inactif, ou lus avec hive_inbox.} other {# éléments dans la boîte de réception de l’Assistant, pas encore récupérés ni accusés de réception : proposés comme sa prochaine ligne dès qu’il est inactif, ou lus avec hive_inbox.}}",

@@ -117,7 +117,8 @@ export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew,
             {connectionLine(view, chosen, settings)}
           </div>
         )}
-        {!offered.length && <div className="hint">{cli ? tr(M.noneCli, { cli: providerName(cli) }) : tr(M.none)}</div>}
+        {/* None usable (not for a test copy on its CLI test home, whose account is made as its first agent needs it). */}
+        {!offered.length && !view.testHome.length && <div className="hint">{cli ? tr(M.noneCli, { cli: providerName(cli) }) : tr(M.none)}</div>}
       </div>
     </>
   )

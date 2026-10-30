@@ -720,8 +720,8 @@
     "description": "Tooltip of the button in the Assistant panel's header that folds it to a strip at the window's edge, with its shortcut ({key}: \"Ctrl+Alt+I\")."
   },
   "assistant.panel.forWorkspace": {
-    "defaultMessage": "For this workspace. Anything left at <i>Default</i> follows <link>Settings → Assistant</link>.",
-    "description": "Assistant Settings, at the top. <i> is italic (the choice Default); <link> opens Settings → Assistant."
+    "defaultMessage": "For this workspace. Its connection holds its model, effort and permission mode; a mode left at <i>Default</i> follows <link>Settings → Assistant</link>.",
+    "description": "Assistant Settings, at the top (HI-2108). <i> is italic (the choice Default of the Mode list); <link> opens Settings → Assistant."
   },
   "assistant.panel.inactive": {
     "defaultMessage": "{count, plural, one {# inactive project} other {# inactive projects}}",

@@ -179,7 +179,7 @@
   "assistant.panel.ended": "Die Unterhaltung ist beendet.",
   "assistant.panel.fold": "Assistentenpanel einklappen",
   "assistant.panel.foldTip": "{hasKey, select, yes {Assistentenpanel einklappen ({key})} other {Assistentenpanel einklappen}}",
-  "assistant.panel.forWorkspace": "Für diesen Arbeitsbereich. Alles, was auf <i>Standard</i> steht, folgt <link>Einstellungen → Assistent</link>.",
+  "assistant.panel.forWorkspace": "Für diesen Arbeitsbereich. Seine Verbindung enthält Modell, Aufwand und Berechtigungsmodus; ein Modus, der auf <i>Standard</i> steht, folgt <link>Einstellungen → Assistent</link>.",
   "assistant.panel.inactive": "{count, plural, one {# inaktives Projekt} other {# inaktive Projekte}}",
   "assistant.panel.inboxLine": "{id} · {from}: {text}",
   "assistant.panel.inboxTip": "{n, plural, one {Ein Eintrag} other {# Einträge}} im Posteingang des Assistenten, noch nicht abgerufen oder bestätigt: als nächste Zeile angeboten, sobald der Assistent untätig ist, oder mit hive_inbox gelesen.",

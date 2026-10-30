@@ -184,7 +184,7 @@
   "assistant.panel.fold": "Fold the Assistant panel",
   "assistant.panel.foldLabel": "{folded, select, yes {Show {project}'s agents} other {Fold {project}'s agents}}",
   "assistant.panel.foldTip": "{hasKey, select, yes {Fold the Assistant panel ({key})} other {Fold the Assistant panel}}",
-  "assistant.panel.forWorkspace": "For this workspace. Anything left at <i>Default</i> follows <link>Settings → Assistant</link>.",
+  "assistant.panel.forWorkspace": "For this workspace. Its connection holds its model, effort and permission mode; a mode left at <i>Default</i> follows <link>Settings → Assistant</link>.",
   "assistant.panel.hideTip": "{hasKey, select, yes {Hide the Assistant (it keeps running) ({key})} other {Hide the Assistant (it keeps running)}}",
   "assistant.panel.inactive": "{count, plural, one {# inactive project} other {# inactive projects}}",
   "assistant.panel.inboxLine": "{id} · {from}: {text}",

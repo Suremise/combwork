@@ -179,7 +179,7 @@
   "assistant.panel.ended": "La conversación terminó.",
   "assistant.panel.fold": "Plegar el panel del Asistente",
   "assistant.panel.foldTip": "{hasKey, select, yes {Plegar el panel del Asistente ({key})} other {Plegar el panel del Asistente}}",
-  "assistant.panel.forWorkspace": "Para este espacio de trabajo. Lo que quede en <i>Predeterminado</i> sigue <link>Configuración → Asistente</link>.",
+  "assistant.panel.forWorkspace": "Para este espacio de trabajo. Su conexión contiene su modelo, esfuerzo y modo de permisos; un modo que quede en <i>Predeterminado</i> sigue <link>Configuración → Asistente</link>.",
   "assistant.panel.inactive": "{count, plural, one {# proyecto inactivo} many {# proyectos inactivos} other {# proyectos inactivos}}",
   "assistant.panel.inboxLine": "{id} · {from}: {text}",
   "assistant.panel.inboxTip": "{n, plural, one {Un elemento} many {# elementos} other {# elementos}} en la bandeja de entrada del Asistente que todavía no ha obtenido ni confirmado: se le ofrece como su siguiente línea cuando esté inactivo, o puede leerse con hive_inbox.",

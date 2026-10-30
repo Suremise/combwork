@@ -179,7 +179,7 @@
   "assistant.panel.ended": "对话已结束。",
   "assistant.panel.fold": "收起助手面板",
   "assistant.panel.foldTip": "{hasKey, select, yes {收起助手面板（{key}）} other {收起助手面板}}",
-  "assistant.panel.forWorkspace": "仅用于此工作区。保持为<i>默认</i>的选项沿用<link>“设置”→“助手”</link>。",
+  "assistant.panel.forWorkspace": "仅用于此工作区。其模型、推理强度和权限模式由其连接保存；保持为<i>默认</i>的模式沿用<link>“设置”→“助手”</link>。",
   "assistant.panel.inactive": "{count, plural, other {# 个非活跃项目}}",
   "assistant.panel.inboxLine": "{id} · {from}：{text}",
   "assistant.panel.inboxTip": "助手的收件箱中尚有{n, plural, other { # 项}}未获取或确认：它空闲后会作为下一行输入给它，也可以用 hive_inbox 读取。",

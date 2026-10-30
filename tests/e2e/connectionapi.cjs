@@ -75,8 +75,10 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
 
     // --- The workspace token (HI-2108): every connection, with its account, CLI and values, and `usable: false` on one
     // whose account is off here; every account, with on and identity; nothing of where a login is kept.
+    // Claude Code's (GitHub Copilot's sign-in is an account with its connection too, decision C: left out here).
+    const claude = (list) => (list ?? []).filter((c) => c.cli === 'claude-code')
     const all = await api('GET', '/v1/connections')
-    const byId = Object.fromEntries((all.body?.connections ?? []).map((c) => [c.id, c]))
+    const byId = Object.fromEntries(claude(all.body?.connections).map((c) => [c.id, c]))
     const accountsById = Object.fromEntries((all.body?.accounts ?? []).map((a) => [a.id, a]))
     check('the workspace token sees every connection, its account named, usable or not', all.status === 200 && Object.keys(byId).length === 5 && byId[c1]?.account === 'Max 1' && byId[c1]?.cli === 'claude-code' && !('usable' in byId[c1]) && byId[cOther]?.usable === false, JSON.stringify(all.body?.connections))
     check('…and every account, with on and who it is signed in as', Object.keys(accountsById).length === 5 && accountsById[other.id]?.on === false && accountsById[max1.id]?.on === true && accountsById[max1.id]?.email === 'one@example.com', JSON.stringify(all.body?.accounts))
@@ -91,7 +93,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const agentToken = hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
     check("One's own Agent API token found", !!agentToken)
     const mine = await api('GET', '/v1/connections?details=true', null, agentToken)
-    const ids = (mine.body?.connections ?? []).map((c) => c.id).sort()
+    const ids = claude(mine.body?.connections).map((c) => c.id).sort()
     check('a project agent sees only the connections usable in its workspace (Other left out), details or not', mine.status === 200 && ids.join() === [c1, c2, cTa, cTb].sort().join(), JSON.stringify(mine.body))
     check('…their id, name, account, CLI and values alone; accounts with four fields', (mine.body?.connections ?? []).every((c) => Object.keys(c).every((k) => ['id', 'name', 'account', 'cli', 'model', 'effort', 'context200k', 'mode'].includes(k))) && (mine.body?.accounts ?? []).every((a) => Object.keys(a).sort().join() === 'cli,id,kind,name,signedIn'), JSON.stringify(mine.body))
     const hidden = [await api('GET', `/v1/connections/${cOther}`, null, agentToken), await api('GET', '/v1/connections/Other', null, agentToken)]
@@ -100,7 +102,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
 
     // --- The status: One's connection (none of its own before HI-2106: pinned to the one it ran on) and its run's account.
     const one = (await api('GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.id === 'a-one')
-    check("the status: One is on Max 1's base connection (HI-2106), its account named, and runs on Max 1", one?.connection?.id === c1 && one?.connection?.account === 'Max 1' && one?.launchedConnection?.id === max1.id, JSON.stringify(one && { connection: one.connection, launchedConnection: one.launchedConnection }))
+    check("the status: One is on Max 1's base connection (HI-2106), named, and runs on Max 1", one?.connection?.id === c1 && one?.connection?.name === 'Max 1' && one?.launchedConnection?.id === max1.id, JSON.stringify(one && { connection: one.connection, launchedConnection: one.launchedConnection }))
 
     // --- The Assistant: started on the first usable, its token, then agents by connection.
     await inv('session:start', assistantHome, { agentId: 'assistant' })
@@ -113,7 +115,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const tokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
     const assistantToken = JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token
     const asAssistant = (method, route, body) => api(method, route, body, assistantToken)
-    check('the Assistant sees every connection', ((await asAssistant('GET', '/v1/connections')).body?.connections ?? []).length === 5)
+    check('the Assistant sees every connection', claude((await asAssistant('GET', '/v1/connections')).body?.connections).length === 5)
     const add = async (name, extra) => asAssistant('POST', '/v1/projects/alpha/agents', { name, ...extra })
     const byName = await add('Vianame', { connection: 'max 2' })
     const viaRow = byName.body?.project?.agents?.find((a) => a.name === 'Vianame')
