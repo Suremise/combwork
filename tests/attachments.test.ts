@@ -211,7 +211,12 @@ describe.runIf(process.platform === 'win32')('attachments on disk', () => {
       const away = linkAway(at)
       running()
       await expect(run(() => sessions.attach(proj, [write(join(outside, `ext-${n}.log`))], 'a1'))).rejects.toThrow(/link or not a folder/)
-      expect(readdirSync(away, { recursive: true })).toEqual([])
+      // HI-2085: through a linked .hive folder, Hive's own setup of the new project (its sessions and archive folders, its
+      // project.json) can land there too: the refresh the folder's making scheduled may run after the link, at any point
+      // in the case. Only that is let be; an attachment, or anything else, fails it.
+      const setup = /^(sessions|archive)$|^project\.json(\.bak|\.[\w-]+\.tmp)?$/
+      const left = readdirSync(away, { recursive: true }).map(String)
+      expect(where === '.hive folder' ? left.filter((p) => !setup.test(p)) : left).toEqual([])
     })
   }
 
