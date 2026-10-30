@@ -67,7 +67,7 @@ const check = (name, ok, extra = '') => {
     // Its mode is its connection's (HI-2122): the menu lists its account's connections with their modes, its own ticked,
     // and edits that connection last.
     check("its menu lists its account's connections, its own with the CLI's own setting", !!(await lib.until(async () => (await items.allInnerTexts()).some((t) => /Test · cli-own[\s\S]*CLI's own/.test(t)), HUNG_MS)), JSON.stringify(await items.allInnerTexts()))
-    check('…and edits its connection last', /^Edit "Test · cli-own"…/.test((await items.allInnerTexts()).at(-1) ?? ''), JSON.stringify(await items.allInnerTexts()))
+    check('…and edits its connection last', ((await items.allInnerTexts()).at(-1) ?? '').startsWith('Edit "Test · cli-own"…'), JSON.stringify(await items.allInnerTexts()))
     await shots('stopped-menu')
     // Its last item opens that connection's dialog, its mode the CLI's own.
     await items.last().click()
