@@ -171,7 +171,10 @@ export async function repoSummary(root: string): Promise<GitRepoSummary> {
   const had = summaries.get(k)
   const basis: KeyBasis = { upstream: had?.summary.upstream ?? null, configs: had?.configs ?? [] }
   const before = await summaryKey(root, basis)
-  if (had && before !== null && before === had.key) return { ...had.summary, ...(await fileParts(had.gitDir)) }
+  if (had && before !== null && before === had.key) {
+    keep(k, had)
+    return { ...had.summary, ...(await fileParts(had.gitDir)) }
+  }
   const read = await readSummary(root)
   if (!read.gitDir || !read.configs || before === null) summaries.delete(k)
   else {
@@ -179,18 +182,40 @@ export async function repoSummary(root: string): Promise<GitRepoSummary> {
     // the config files it read).
     const still = (await summaryKey(root, basis)) === before
     const key = still ? await summaryKey(root, { upstream: read.summary.upstream, configs: read.configs }) : null
-    if (key !== null) summaries.set(k, { key, gitDir: read.gitDir, configs: read.configs, summary: read.summary })
+    if (key !== null) keep(k, { key, gitDir: read.gitDir, configs: read.configs, summary: read.summary })
     else summaries.delete(k)
   }
   return read.summary
 }
 
 /** HI-2115: each folder's last summary (lower-cased path), its git dir, the config files git read, and its key (summaryKey). */
-const summaries = new Map<string, { key: string; gitDir: string; configs: string[]; summary: GitRepoSummary }>()
+type KeptSummary = { key: string; gitDir: string; configs: string[]; summary: GitRepoSummary }
+const summaries = new Map<string, KeptSummary>()
+
+/**
+ * HI-2135: how many folders' summaries are kept: the most recently read, the oldest dropped first, so the folders of a
+ * long session (projects removed, slots and review copies gone, other workspaces) aren't kept for as long as Hive runs.
+ * A folder dropped is read with git again the next time, as one never read is.
+ */
+const SUMMARIES_MAX = 200
+let summariesMax = SUMMARIES_MAX
+
+/** A folder's summary kept as the most recently read (a Map's order is its insertion's), dropping the oldest past the bound. */
+function keep(k: string, kept: KeptSummary): void {
+  summaries.delete(k)
+  summaries.set(k, kept)
+  while (summaries.size > summariesMax) summaries.delete(summaries.keys().next().value!)
+}
 
 /** Tests: forgets the summaries read. */
 export function forgetSummaries(): void {
   summaries.clear()
+}
+
+/** Tests: how many folders' summaries are kept at most (null: as Hive keeps them), and how many are kept now. */
+export function summariesForTests(max?: number | null): number {
+  if (max !== undefined) summariesMax = max ?? SUMMARIES_MAX
+  return summaries.size
 }
 
 /** What a summary's key is read with: the upstream and the config files of the last read (none before the first). */

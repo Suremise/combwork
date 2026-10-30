@@ -300,6 +300,48 @@ describe("the summary read again only when what it's read from changed (HI-2115)
     expect((await counted()).n).toBeGreaterThan(0)
   })
 
+  it('HI-2135: only the most recently read folders are kept; one dropped is read with git again, as it is now', async () => {
+    mkdirSync(outer, { recursive: true })
+    const repoAt = (name: string): string => {
+      const d = join(outer, name)
+      execFileSync('git', ['init', '-q', '-b', 'main', d])
+      commit(d, 'a.txt')
+      return d
+    }
+    const [a, b] = [repoAt('a'), repoAt('b')]
+    const gitsFor = async (root: string): Promise<number> => {
+      let n = 0
+      gitHooks.started = () => void n++
+      try {
+        await repo.repoSummary(root)
+        return n
+      } finally {
+        gitHooks.started = undefined
+      }
+    }
+    repo.summariesForTests(2)
+    try {
+      await same()
+      expect(await gitsFor(a)).toBeGreaterThan(0)
+      expect(repo.summariesForTests()).toBe(2)
+      // proj read again (no git): the most recent, so b drops a, the oldest.
+      expect((await counted()).n).toBe(0)
+      expect(await gitsFor(b)).toBeGreaterThan(0)
+      expect(repo.summariesForTests()).toBe(2)
+      // proj again (no git), then a, read with git again: it drops b.
+      expect((await counted()).n).toBe(0)
+      expect(await gitsFor(a)).toBeGreaterThan(0)
+      // b read with git again drops proj, now the oldest; a stays. proj, changed meanwhile, is read with git, as it is now.
+      expect(await gitsFor(b)).toBeGreaterThan(0)
+      commit(proj, 'b.txt')
+      expect(await gitsFor(a)).toBe(0)
+      expect(repo.summariesForTests()).toBe(2)
+      expect(await reread()).toMatchObject({ head: git(proj, 'rev-parse', '--short', 'HEAD'), upstream: { ahead: 1 } })
+    } finally {
+      repo.summariesForTests(null)
+    }
+  })
+
   it('config given in the environment is never kept', async () => {
     process.env.GIT_CONFIG_COUNT = '0'
     try {
