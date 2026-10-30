@@ -2447,6 +2447,8 @@ module.exports.SCENARIOS = [
   {
     id: 'card-loop-lane-next',
     title: "A card loop builder whose lane's first card goes Done while it reads the wake (HI-1990): once its turn ends, Hive starts the lane's next card on it, with no prompt from the user or the Assistant",
+    // The first card's work as merged (HI-2047): without it the next card can't be built, and a model asks the user why.
+    files: { 'src/greet.js': "module.exports = (name) => 'Hi, ' + name\n" },
     async setup(c) {
       await reviewedPair(c)
       const a = await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', agent: 'coder', column: 'doing' })
