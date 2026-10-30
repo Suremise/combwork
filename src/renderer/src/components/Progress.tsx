@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ALL_PROJECTS, PASSED_SHOWN_MS, SHOW_ALL, activeFilter, onPulse, agentChoices, ProgressSync, barLook, shortRevision, filterChoices, filterMergeSlots, filterRuns, fractionDone, inStrip, isOpenRun, runDetails, runAgentName, runDetailsText, runStateWord, runStatusLine, stripRuns, stripSummary, unseenTrouble } from '@shared/progress'
 import { durationText } from '@shared/tasks'
 import type { MergeSlotInfo, ProgressRun, ProgressTelling } from '@shared/types'
@@ -21,7 +21,7 @@ import { MergeCards } from './ProgressMerge'
 import { MergesList, QueueAnnouncer, QueueLines } from './ProgressQueue'
 import { useLanes } from '../laneSource'
 import { keepShown, useQueuesKept } from '../queueSource'
-import { justMerged, onPulseLine, queuedCount, shownQueues, shownReturns, unseenReturns } from '@shared/progressQueue'
+import { allProjectsQueues, justMerged, onPulseLine, queuedCount, shownQueues, shownReturns, unseenReturns } from '@shared/progressQueue'
 import { cardLook, cardRunsSummary, groupLook, NO_RUNS_FILTER, PROGRESS_TABS, queueChecksLabel, runAgentKey, runDayLabel, runDays, runGroupLabel, runMatches, runsByCard, tabAt, tabBadges, unresolvedFailures, runTitleIn, type CardRuns, type ProgressTab, type RunDay, type RunGroup, type RunsFilter, type RunsLook } from '@shared/progressTabs'
 import { formatDateTime, formatTime } from '@shared/dates'
 import { RUNS_KEEP_PX } from '@shared/laneBar'
@@ -130,6 +130,9 @@ export function ProgressPanel() {
   // Its path and its projects' names (HI-1806): the workspace's every change (an agent's state) would render the panel again.
   const wsPath = useStore((s) => s.workspace?.path ?? null)
   const names = useStore(useShallow((s) => projectNames(s.workspace?.projects)))
+  // The projects being worked on (the sidebar's Working on), as one string so it changes only when they do.
+  const activeKey = useStore((s) => (s.workspace?.projects ?? []).filter((p) => p.active).map((p) => p.path.toLowerCase()).join('\n'))
+  const activePaths = useMemo(() => new Set(activeKey ? activeKey.split('\n') : []), [activeKey])
   const focused = useStore((s) => s.windowFocused)
   // The tab shown (#1309), kept per workspace; Pulse unless the user chose another.
   const tabKey = wsPath ? `progress-tab:${wsPath.toLowerCase()}` : null
@@ -175,7 +178,12 @@ export function ProgressPanel() {
   const allQueues = shownQueues(queues, now)
   const queueProjects = allQueues.map((v) => v.projectPath)
   const filter = activeFilter(runs, chosen, queueProjects)
-  const shownQueue = filter.project === ALL_PROJECTS ? allQueues : allQueues.filter((v) => v.projectPath.toLowerCase() === filter.project)
+  // The filter (#251): one project's runs (and one agent's), or all; offered when the runs span more than one project.
+  const nameOf = (p: string): string => names[p.toLowerCase()] ?? p.split(/[\\/]/).pop() ?? p
+  const choices = filterChoices(runs, nameOf, tr, queueProjects)
+  // All projects leaves out an inactive project's idle queue (HI-2165) while the filter is offered: chosen there, it
+  // shows. With no filter to choose it from (one project), every queue shows.
+  const shownQueue = filter.project !== ALL_PROJECTS ? allQueues.filter((v) => v.projectPath.toLowerCase() === filter.project) : choices.length > 1 ? allProjectsQueues(allQueues, activePaths, now) : allQueues
   // Looking at the Merges tab counts as seeing the returns it shows (#1356; HR3's round 1 finding 1): the filtered
   // project's only, and not while a dialog covers the panel. Each leaves its queue's card a few seconds later.
   const covered = useStore((s) => s.dialog !== null || s.taskOpen !== null)
@@ -195,9 +203,6 @@ export function ProgressPanel() {
   }, [seeKey])
   if (!on) return null
   const announcer = <QueueAnnouncer views={queues} runs={runs} />
-  // The filter (#251): one project's runs (and one agent's), or all; offered when the runs span more than one project.
-  const nameOf = (p: string): string => names[p.toLowerCase()] ?? p.split(/[\\/]/).pop() ?? p
-  const choices = filterChoices(runs, nameOf, tr, queueProjects)
   const shown = filterRuns(runs, filter)
   const filterName = filter === SHOW_ALL ? null : `${choices.find((c) => c.value === filter.project)?.label ?? ''}${filter.agent ? ` · ${(shown[0] ? runAgentName(shown[0], tr) : '')}` : ''}`
   if (!open)

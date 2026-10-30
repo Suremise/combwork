@@ -122,6 +122,23 @@ export function shownQueues(views: readonly QueueView[], now: number): QueueView
   return views.filter((v) => queueShown(v, now)).sort((a, b) => a.project.localeCompare(b.project) || a.target.localeCompare(b.target))
 }
 
+/** A merge this recent keeps an inactive project's queue under All projects (HI-2165). */
+export const BUSY_MERGE_MS = 60 * 60_000
+
+/**
+ * Whether a queue is doing something now (HI-2165): an entry testing or queued, a pause, a return not seen yet (or seen
+ * just now), or a merge in the last hour. An idle queue that only shows because Hive merges into it (or runs it) isn't.
+ */
+export function queueBusy(v: QueueView, now: number): boolean {
+  return !!v.testing || v.queued.length > 0 || !!v.paused || shownReturns(v, now).length > 0 || v.recent.some((r) => r.outcome === 'merged' && now - at(r.at) < BUSY_MERGE_MS)
+}
+
+/**
+ * The queues All projects shows (HI-2165): those of the projects being worked on (`active`: their folders, lower case),
+ * and any other project's while it is busy. Choosing a project in the filter still shows all of its own.
+ */
+export const allProjectsQueues = (views: readonly QueueView[], active: ReadonlySet<string>, now: number): QueueView[] => views.filter((v) => active.has(v.projectPath.toLowerCase()) || queueBusy(v, now))
+
 /** A queue's line on Pulse (#1356 item 4): only while it tests or is paused. */
 export const onPulseLine = (v: QueueView): boolean => !!v.testing || !!v.paused
 

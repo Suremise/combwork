@@ -86,7 +86,9 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       await inv('settings:update', { appearance: { theme: 'dark' } })
     }
 
-    // --- Hive merges, nothing queued: the queue's card shows, empty.
+    // --- Hive merges, nothing queued: the queue's card shows, empty, for the project being worked on (HI-2165: beta,
+    // not worked on, is left out under All projects while its queue is idle).
+    await inv('project:setActive', fx.alpha, true)
     await inv('workflow:setOptions', beta, { preset: null, options: q.queueOptions(fx) })
     await showTab('merges')
     check("the Merges tab shows the queue's card, empty, while the options have Hive merge", !!(await until(async () => /Merge queue · integration/.test(await cardText()) && /Nothing queued\./.test(await cardText()), HUNG_MS)), JSON.stringify({ panel: await panel.innerText().catch(() => ''), alpha: await inv('queue:list', fx.alpha).catch((e) => String(e)), beta: await inv('queue:list', beta).catch((e) => String(e)), projects: (await inv('workspace:refresh')).projects.map((p) => p.path) }))
@@ -101,7 +103,9 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // the panel (HR3's round 1 finding 1); then Show log and Open card.
     const projectFilter = panel.getByRole('combobox', { name: 'Show the runs of' })
     const betaCard = panel.locator(`.progress-queue-card[data-queue="beta#${TARGET}"]`)
-    check('the project filter offers both projects (each has a queue shown)', !!(await until(async () => (await projectFilter.count()) === 1 && (await betaCard.count()) === 1, HUNG_MS)))
+    check('the project filter offers both projects (each has a queue)', !!(await until(async () => (await projectFilter.count()) === 1 && (await projectFilter.locator('option', { hasText: 'beta' }).count()) === 1, HUNG_MS)))
+    check("…under All projects, beta's idle queue isn't shown: it isn't being worked on (HI-2165)", (await betaCard.count()) === 0 && (await card.count()) === 1, await panel.innerText().catch(() => ''))
+    await shoot('all-projects-inactive-hidden')
     await projectFilter.selectOption({ label: 'beta' })
     check('…filtered to beta, alpha\'s queue card is not shown', !!(await until(async () => (await card.count()) === 0 && (await betaCard.count()) === 1, HUNG_MS)))
     q.steer(fx, 'fail', 'unit broke')

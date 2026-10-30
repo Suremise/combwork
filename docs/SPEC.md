@@ -5182,7 +5182,14 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   queued.*), while the project's current options have Hive merge into it (`queue:list` gives the window those targets
   too, with `hiveMerges` and `inFlight`; the Agent API's listing is unchanged). So after a switch to "The agent merges",
   or Git → None with an old Git ruleset's cards in flight, the old queue stays controllable until its cards are merged,
-  out of flight, and their outcomes seen. Pulse has a line per queue testing or paused (*main: testing HI-61 · 2
+  out of flight, and their outcomes seen. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
+  from inactive projects") a queue shows only for a project being worked on (the sidebar's Working on) or while it is
+  busy (`queueBusy`: an entry testing or queued, a pause, a return not seen, or a merge in the last hour), so an
+  inactive project's idle *Nothing queued.* card is left out; chosen in the filter, its queue shows as above. The rule
+  holds only while the filter is offered (more than one choice): with nothing to choose a project from, every queue
+  shows. Pulse's
+  queue lines, the merge cards, Runs and Lanes need no such rule: each lists only what is going on or just happened (a
+  queue testing or paused, a slot taken, a run reported, a lane running or ended in the last hour). Pulse has a line per queue testing or paused (*main: testing HI-61 · 2
   queued*), which opens Merges; the Merges badge counts queued entries plus agents waiting for a slot; the project
   filter offers the projects with a queue shown. A polite live region (`role="status"`) says each change once: a card
   merged or returned (with why), a queue paused or resumed. The Runs tab's Agent filter has **Hive (merge queue)** for
