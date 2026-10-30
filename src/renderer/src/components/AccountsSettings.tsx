@@ -256,7 +256,7 @@ export function AccountsSettings() {
             </div>
           )
         })}
-        <button className="btn subtle small connection-add" data-add-connection={a.id} disabled={!!(a as AccountView).leftover} onClick={() => setDialog({ account: a.id })}>
+        <button className="btn subtle small connection-add" data-new-connection={a.id} disabled={!!(a as AccountView).leftover} onClick={() => setDialog({ account: a.id })}>
           <Icon name="add" /> {tr(M.addConnection)}
         </button>
       </div>

@@ -176,10 +176,10 @@ const check = (name, ok, extra = '') => {
     check('…and, its screens answered, its row says it is set up, Set Up no longer primary', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)) && (await row('Personal').locator('[data-set-up].primary').count()) === 0 && (await row('Personal').locator('[data-set-up-note]').count()) === 0)
     await shots('set-up-done')
 
-    // --- On in this workspace: its default.
+    // --- On in this workspace.
     await row('Personal').getByRole('switch').click()
     check('turned on here, it is on in this workspace (workspace.json; HI-2106: no default kept, the order says which)', !!(await lib.until(async () => JSON.stringify(wsJson(ws1)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), HUNG_MS)), JSON.stringify(wsJson(ws1)))
-    check('…and its row says so', !!(await lib.until(async () => (await row('Personal').locator('.account-default').count()) === 1, HUNG_MS)))
+    check('…and its row says so: On here', !!(await lib.until(async () => (await row('Personal').locator('[data-on-here] [role="switch"]').getAttribute('aria-checked')) === 'true', HUNG_MS)))
 
     // --- Set up for this workspace (HI-1870): on here, its CLI must trust the folders it would be used in too, read
     // from its .claude.json (never written by Hive). Claude Code's trust of a folder covers those inside it (HI-1871),
@@ -257,7 +257,7 @@ const check = (name, ok, extra = '') => {
     const claudeOrder = async () => (await list()).connections.filter((c) => c.provider === 'claude-code').map((c) => c.id)
     const onHere = async () => (await list()).workspace['claude-code']?.on ?? []
     check('no Default, Make Default or Used here on any row', (await page.locator('[data-default-hint], [data-make-default], [data-used-here]').count()) === 0)
-    check('each account lists its first connection under it, named after it', !!(await lib.until(async () => /Two/.test(await page.locator(`[data-connections-of="${personal.id}"] [data-connection]`).first().innerText().catch(() => '')) && (await page.locator(`[data-connections-of="${work.id}"] [data-connection]`).count()) === 1, HUNG_MS)))
+    check('each account lists its first connection under it, named after it as it was added (a rename leaves it)', !!(await lib.until(async () => /Personal/.test(await page.locator(`[data-connections-of="${personal.id}"] [data-connection]`).first().innerText().catch(() => '')) && (await page.locator(`[data-connections-of="${work.id}"] [data-connection]`).count()) === 1, HUNG_MS)))
     check('…and On here on every row, on or off', (await row('Two').locator('[data-on-here]').count()) === 1 && (await row('Work').locator('[data-on-here]').count()) === 1)
     await shots('order')
     const onBefore = JSON.stringify(await onHere())
@@ -306,7 +306,7 @@ const check = (name, ok, extra = '') => {
     await addVia('codex', 'ChatGPT')
     const gpt = await lib.until(async () => (await list()).connections.find((a) => a.name === 'ChatGPT' && a.observed?.loggedIn) ?? null, HUNG_MS)
     check('a Codex connection signs in', !!gpt, JSON.stringify((await list()).connections.map((a) => [a.name, a.observed])))
-    check('…in the same list, grouped after Claude Code’s, with its own CLI and icon', !!(await lib.until(async () => JSON.stringify(await page.locator('.account-row').evaluateAll((rs) => rs.map((r) => r.getAttribute('data-cli')))) === JSON.stringify(['claude-code', 'claude-code', 'codex']), HUNG_MS)) && (await row('ChatGPT').locator('.account-cli .provider-icon').count()) === 1)
+    check('…in the same list, last in the one order (HI-2107), with its own CLI and icon', !!(await lib.until(async () => JSON.stringify(await page.locator('.account-block').evaluateAll((rs) => rs.map((r) => r.getAttribute('data-cli')))) === JSON.stringify(['claude-code', 'claude-code', 'codex']), HUNG_MS)) && (await row('ChatGPT').locator('.account-cli .provider-icon').count()) === 1)
     check('…needing set up, said as for Claude Code, naming the sandbox', !!(await lib.until(async () => (await row('ChatGPT').locator('[data-set-up-state="needed"]').count()) === 1, HUNG_MS)) && (await row('ChatGPT').locator('[data-set-up].primary').count()) === 1 && /Windows sandbox/.test(await row('ChatGPT').locator('[data-set-up-note]').innerText().catch(() => '')))
     await closeEnded()
     await shots('codex-needs-set-up')

@@ -66,7 +66,7 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
 
     // --- No Codex connection on: refused, never launched from Codex's own home.
     const refused = await failure(inv('session:start', alpha, { agentId: 'a-one' }))
-    check('with no Codex connection on, a Codex agent is refused, saying why', /No Codex connection is on in this workspace/.test(refused ?? ''), refused ?? 'started')
+    check('with no Codex connection on, a Codex agent is refused, saying why', /No Codex account is on in this workspace/.test(refused ?? ''), refused ?? 'started')
     check("…nothing launched on Codex's own home", lines(path.join(codexHome, 'fake-launches.jsonl')).filter((l) => l.agent).length === 0)
 
     // --- Two connections, each signed in with Codex's own login in its folder (the fake opens no browser).

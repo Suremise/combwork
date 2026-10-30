@@ -59,7 +59,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
 
     // --- No connection on: refused, and the project asks for one. Nothing launched from the CLI's own home.
     const refused = await failure(inv('session:start', alpha, { agentId: 'a-one' }))
-    check('with no connection on, an agent is refused, saying why', /No Claude Code connection is on in this workspace/.test(refused ?? ''), refused ?? 'started')
+    check('with no connection on, an agent is refused, saying why', /No Claude Code account is on in this workspace/.test(refused ?? ''), refused ?? 'started')
     check('…nothing launched on the CLI home', lines(path.join(home, 'fake-launches.jsonl')).length === 0)
     await page.locator('.sidebar .tree-item', { hasText: 'alpha' }).first().click().catch(() => undefined)
     check('…and the project asks for a connection', !!(await lib.until(async () => (await page.locator('[data-connection-setup="project"]').count()) >= 1, HUNG_MS)))
