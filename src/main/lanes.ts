@@ -862,6 +862,24 @@ async function tellReordered(ws: WorkspaceService, l: LaneRecord, put: { putBack
   }
 }
 
+/** How recently a builder's lane ended for a new start to carry its brief and name (HI-2097). */
+export const LANE_CARRY_MS = 10 * 60_000
+
+/** The builder's lane that ended (all its cards merged) within LANE_CARRY_MS, the latest; never one abandoned. */
+function justEnded(lanes: readonly LaneRecord[], project: string, builder: string): LaneRecord | undefined {
+  const since = Date.now() - LANE_CARRY_MS
+  return lanes
+    .filter((l) => l.state === 'ended' && same(l.project, project) && l.builder.id === builder && !!l.endedAt && Date.parse(l.endedAt) >= since)
+    .sort((a, b) => Date.parse(b.endedAt!) - Date.parse(a.endedAt!))[0]
+}
+
+/** What a start that carried a just-ended lane's brief and name says (HI-2097), or null when it carried neither. */
+function carriedNote(builder: string, from: LaneRecord | null): string | null {
+  const what = [from?.brief?.text ? 'brief' : '', from?.name ? 'name' : ''].filter(Boolean)
+  if (!from || !what.length) return null
+  return `${builder}'s lane ${from.id} had just ended (all merged): started a new lane with its ${what.join(' and ')}; pass brief to change it.` // i18n-ignore: hive_lane's reply (agents)
+}
+
 /** The team paused (HI-2081, HR1's s8 check): no lane starts or changes its list until it resumes (Start Lane, the API). */
 export function refuseWhileTeamPaused(ws: WorkspaceService): void {
   if (teamPauseOf(ws)) throw new LaneError(409, M.teamPaused)
@@ -890,11 +908,15 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const ended: EndedLane[] = []
   let queuedAfter: number | null = null
   let shared: string | null = null
+  let carried: LaneRecord | null = null
+  let leftOut: number[] = []
   // One decision a save (HR6's #1270 round 2): a change applied at once is saved only while none of the lane's cards is
   // in flight, checked under the board's lock; a card started meanwhile makes it decide again, and queue it.
   const decide = () => mutate(ws, async (lanes, checks, also) => {
     queuedAfter = null
     ended.length = 0
+    carried = null
+    leftOut = []
     // After a put back for a reorder applied now (HI-1995), only the lane it was for, as it was then: ended or changed in
     // between, refused with why, nothing resumed or recreated (Darren's decision).
     const bound = put ? lanes.find((l) => l.id === put.lane) : undefined
@@ -945,13 +967,21 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       else close(was, v.current === null ? 'ended' : 'abandoned', v.cards)
       replaced = was
     }
+    // A list change that raced its lane's end (HI-2097): the builder's lane ended just now, so this start is a new lane.
+    // Given no brief, it carries that lane's brief and name; a card already Done is left out of the new list.
+    const just = was ? undefined : justEnded(lanes, s.project, builder.id)
+    carried = just && s.brief === undefined ? just : null
+    const board = await cardsNow(ws, s.cards)
+    const done = s.cards.filter((n) => board.get(n)?.column === 'done')
+    if (done.length && done.length === s.cards.length) throw new LaneError(409, withCardNames(ws, () => `${done.map(cardRef).join(', ')} ${done.length > 1 ? 'are' : 'is'} already Done: no lane started.`)) // i18n-ignore: hive_lane's refusal (agents)
+    leftOut = done
     const rec: LaneRecord = {
       id: newId(),
       project: s.project,
-      name: s.name ?? null,
+      name: s.name ?? carried?.name ?? null,
       builder,
       reviewer: reviewer ?? null,
-      cards: s.cards,
+      cards: s.cards.filter((n) => !done.includes(n)),
       rounds: s.rounds ?? defaults.rounds,
       waitMinutes: s.waitMinutes ?? defaults.waitHours * 60,
       state: 'active',
@@ -963,7 +993,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
       ...(ruleset ? { ruleset } : {}),
       ...(pool ? { pool: true as const } : {})
     }
-    const brief = nextBrief(undefined, s.brief, s.briefNotIn)
+    const brief = nextBrief(undefined, carried?.brief?.text ?? s.brief, s.briefNotIn)
     if (brief) rec.brief = brief
     lanes.push(rec)
     also.push((db) => noteLaneIn(db, ws.path!, null, rec))
@@ -989,7 +1019,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   // The builder told of a reorder applied now, once its list is saved (HI-1995).
   if (put) await tellReordered(ws, r.rec, put, s.by)
   const applied = put ? `Applied now: ${put.putBack} is back in Todo (its work stays on ${put.line ?? 'its branch'}); the lane's cards are now in this order, and ${builder.name} is told.` : null // i18n-ignore: hive_lane's reply (agents)
-  const note = [applied, queued, shared].filter(Boolean).join(' ') || undefined
+  const kept = carriedNote(builder.name, carried)
+  const gone = leftOut.length ? withCardNames(ws, () => `${leftOut.map(cardRef).join(', ')} ${leftOut.length > 1 ? 'are' : 'is'} already Done: left out.`) : null // i18n-ignore: hive_lane's reply (agents)
+  const note = [applied, kept, gone, queued, shared].filter(Boolean).join(' ') || undefined
   return { lane, did: r.did, replaced: replaced ?? null, ...(note ? { note } : {}) }
 }
 

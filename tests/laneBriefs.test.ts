@@ -228,4 +228,58 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
     expect(await briefs(l.id)).toEqual(['1:queued'])
     expect(await briefOf(l.id)).toMatchObject({ rev: 1, out: 1 })
   })
+
+  describe("a list change that raced its lane's end (HI-2097)", () => {
+    /** The lane ended as all its cards merged, `ago` ms before now. */
+    const ended = (id: string, ago = 0) =>
+      lanes.mutateLanes(w, (all) => {
+        const x = all.find((y) => y.id === id)!
+        Object.assign(x, { state: 'ended', endedAt: new Date(Date.now() - ago).toISOString() })
+      })
+    const named = (cards: number[], brief: string) => lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards, name: 'Race lane', brief, by: 'the Assistant' })
+
+    it('a start just after it ended carries its brief and name, and leaves out a card already Done, saying both', async () => {
+      const [a, b] = [await make('Raced a'), await make('Raced b')]
+      const l = (await named([a], 'Test slots: two heavy.')).lane
+      await move(a, 'done')
+      await ended(l.id)
+      const r = await start([a, b])
+      expect([r.did, r.lane.id === l.id, r.lane.name, r.lane.cards.map((c) => c.number)]).toEqual(['started', false, 'Race lane', [b]])
+      expect(await briefOf(r.lane.id)).toMatchObject({ text: 'Test slots: two heavy.', rev: 1 })
+      expect(r.note).toContain(`B1's lane ${l.id} had just ended (all merged): started a new lane with its brief and name`)
+      expect(r.note).toMatch(/is already Done: left out\./)
+    })
+
+    it('a start with its own brief uses that', async () => {
+      const [a, b] = [await make('Own a'), await make('Own b')]
+      const l = (await named([a], 'The old brief.')).lane
+      await move(a, 'done')
+      await ended(l.id)
+      const r = await start([b], 'A new brief.')
+      expect(await briefOf(r.lane.id)).toMatchObject({ text: 'A new brief.', rev: 1 })
+      expect(r.note ?? '').not.toContain('had just ended')
+    })
+
+    it('a start long after it ended carries nothing', async () => {
+      const [a, b] = [await make('Late a'), await make('Late b')]
+      const l = (await named([a], 'Long gone.')).lane
+      await move(a, 'done')
+      await ended(l.id, lanes.LANE_CARRY_MS + 60_000)
+      // The earlier tests' lanes, ended just now, too.
+      await lanes.mutateLanes(w, (all) => {
+        for (const x of all) if (x.state === 'ended') x.endedAt = new Date(Date.now() - lanes.LANE_CARRY_MS - 60_000).toISOString()
+      })
+      const r = await start([b])
+      expect([r.did, r.lane.name, await briefOf(r.lane.id)]).toEqual(['started', null, undefined])
+    })
+
+    it('a list of only Done cards starts no lane', async () => {
+      const a = await make('All done a')
+      const l = (await named([a], 'Done already.')).lane
+      await move(a, 'done')
+      await ended(l.id)
+      await expect(start([a])).rejects.toThrow(/already Done: no lane started/)
+      expect((await lanes.rawLanes(w)).filter((x) => x.state === 'active')).toEqual([])
+    })
+  })
 })
