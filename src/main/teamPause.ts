@@ -54,6 +54,12 @@ const told = new Map<string, string>()
 const resumed = new Map<string, number>()
 /** Each workspace's lock: pause, resume and the gates' admission checks go one at a time. */
 const locks = new Map<string, Promise<unknown>>()
+/**
+ * The profile's pause file's lock (HR1's round 1 finding): each read-modify-write or removal of it goes one at a time, so
+ * two workspaces resuming at once can't each drop the other from `resumedIn`. Taken inside a workspace's lock, never the
+ * other way round.
+ */
+let appLock: Promise<unknown> = Promise.resolve()
 
 /** A workspace's .hive folder, from its path (the same as its hiveDir, which a stand-in for one may not have). */
 const hiveOf = (ws: Pick<WorkspaceService, 'path'>): string => join(ws.path ?? '', HIVE_DIR)
@@ -183,6 +189,13 @@ export function resumedAt(projectPath: string): number {
   return ws?.path ? (resumed.get(keyOf(ws)) ?? 0) : 0
 }
 
+/** Runs `fn` under the profile's pause file's lock (after any workspace's lock it needs). */
+function withAppLock<T>(fn: () => Promise<T> | T): Promise<T> {
+  const run = appLock.then(fn, fn)
+  appLock = run.catch(() => undefined)
+  return run
+}
+
 /** Runs `fn` under the workspace's lock (pause and resume, and the gates' final checks). */
 export function withLock<T>(ws: WorkspaceService, fn: () => Promise<T> | T): Promise<T> {
   const k = keyOf(ws)
@@ -280,13 +293,16 @@ export async function resumeTeam(ws: WorkspaceService): Promise<boolean> {
  * own workspace): that pause no longer holds it, here or after a restart. The profile's pause goes once no other open
  * workspace is held by it; else it names this workspace as resumed from it.
  */
-async function leaveAppPause(ws: WorkspaceService, p: TeamPause): Promise<void> {
-  const all = appPause()
-  if (!all || all.pauseId !== p.pauseId) return
-  const k = keyOf(ws)
-  const others = openWorkspaces().some((w) => w.path && keyOf(w) !== k && teamPauseOf(w)?.pauseId === all.pauseId)
-  if (!others) await rm(appFile(), { force: true })
-  else if (!resumedFrom(all, ws)) await writeJsonAtomic(appFile(), { ...all, resumedIn: [...(Array.isArray(all.resumedIn) ? all.resumedIn : []), k] })
+function leaveAppPause(ws: WorkspaceService, p: TeamPause): Promise<void> {
+  return withAppLock(async () => {
+    const all = appPause()
+    if (!all || all.pauseId !== p.pauseId) return
+    const out = [...(Array.isArray(all.resumedIn) ? all.resumedIn : []), keyOf(ws)]
+    // Held still: an open workspace on this pause not resumed from it (one resuming meanwhile is named in the file already).
+    const others = openWorkspaces().some((w) => w.path && !out.includes(keyOf(w)) && teamPauseOf(w)?.pauseId === all.pauseId)
+    if (!others) await rm(appFile(), { force: true })
+    else if (!resumedFrom(all, ws)) await writeJsonAtomic(appFile(), { ...all, resumedIn: out })
+  })
 }
 
 /** What the user's pause or resume of every open workspace did: those it reached, and those it couldn't (why). */
@@ -302,9 +318,12 @@ export interface AppPauseResult {
  */
 export async function pauseApp(): Promise<AppPauseResult> {
   // Paused again: every open workspace held again, those resumed from it on their own included.
-  const was = appPause()
-  const p: TeamPause = was ? { pauseId: was.pauseId, since: was.since, by: was.by, ...(was.version ? { version: was.version } : {}) } : { pauseId: randomUUID(), since: new Date().toISOString(), by: 'user', version: app.getVersion() }
-  await writeJsonAtomic(appFile(), p)
+  const p = await withAppLock(async () => {
+    const was = appPause()
+    const next: TeamPause = was ? { pauseId: was.pauseId, since: was.since, by: was.by, ...(was.version ? { version: was.version } : {}) } : { pauseId: randomUUID(), since: new Date().toISOString(), by: 'user', version: app.getVersion() }
+    await writeJsonAtomic(appFile(), next)
+    return next
+  })
   const out: AppPauseResult = { pause: p, done: [], failed: [] }
   for (const ws of openWorkspaces()) {
     if (!ws.path) continue
@@ -321,7 +340,7 @@ export async function pauseApp(): Promise<AppPauseResult> {
 
 /** The user's resume: the profile's pause removed first (no workspace opened later is held), then each paused workspace's. */
 export async function resumeApp(): Promise<AppPauseResult> {
-  await rm(appFile(), { force: true })
+  await withAppLock(() => rm(appFile(), { force: true }))
   const out: AppPauseResult = { pause: null, done: [], failed: [] }
   for (const ws of openWorkspaces()) {
     if (!ws.path || !teamPauseOf(ws)) continue
@@ -347,5 +366,6 @@ export function resetTeamPauseForTests(): void {
   saves.clear()
   told.clear()
   locks.clear()
+  appLock = Promise.resolve()
   resumed.clear()
 }

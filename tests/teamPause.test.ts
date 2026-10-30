@@ -226,6 +226,30 @@ describe("the user's pause after a restart (HI-2156)", () => {
     expect(existsSync(appFile())).toBe(false)
   })
 
+  it("resumed at once in several workspaces (HR1's round 1 finding): none is held again after a restart, and the last one held takes the user's pause with it", async () => {
+    profile()
+    const [a, b, c] = [workspace(), workspace(), workspace()]
+    state.open = [a, b, c]
+    const r = await tp.pauseApp()
+    expect(await Promise.all([tp.resumeTeam(ws(a)), tp.resumeTeam(ws(b))])).toEqual([true, true])
+    tp.resetTeamPauseForTests()
+    tp.loadPauseClosing()
+    expect(tp.teamPauseOf(ws(a))).toBeNull()
+    expect(tp.teamPauseOf(ws(b))).toBeNull()
+    expect(tp.teamPauseOf(ws(c))?.pauseId).toBe(r.pause!.pauseId)
+    // Every workspace resumed at once: the user's pause is gone.
+    profile()
+    const [d, e] = [workspace(), workspace()]
+    state.open = [d, e]
+    await tp.pauseApp()
+    expect(await Promise.all([tp.resumeTeam(ws(d)), tp.resumeTeam(ws(e))])).toEqual([true, true])
+    expect(existsSync(appFile())).toBe(false)
+    tp.resetTeamPauseForTests()
+    tp.loadPauseClosing()
+    expect(tp.teamPauseOf(ws(d))).toBeNull()
+    expect(tp.teamPauseOf(ws(e))).toBeNull()
+  })
+
   it('one saved by another version (its update installed, however Hive closed): lifted at start; by this version: kept', async () => {
     const { w } = await savedAppPause('0.0.0-older')
     expect(tp.teamPauseOf(ws(w))).toBeNull()
