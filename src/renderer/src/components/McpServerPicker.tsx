@@ -19,10 +19,13 @@ const M = {
   runs: msg({ id: 'mcp.picker.runs', defaultMessage: 'It runs:', description: 'The Add server picker (HI-2059): above what the chosen server runs (its command, address, folder, environment).' })
 }
 
-/** The search box and filter over a list of MCP servers (HI-2059): the MCP view's and the Add server picker's. */
-export function McpSearch({ query, filter, onQuery, onFilter, errors }: { query: string; filter: McpFilter; onQuery: (q: string) => void; onFilter: (f: McpFilter) => void; errors?: boolean }) {
+/**
+ * The search box and filter over a list of MCP servers (HI-2059): the MCP view's and the Add server picker's.
+ * `stacked`: each on a row of its own at full width (the sidebar, HI-2088), so the search's placeholder isn't cut.
+ */
+export function McpSearch({ query, filter, onQuery, onFilter, errors, stacked }: { query: string; filter: McpFilter; onQuery: (q: string) => void; onFilter: (f: McpFilter) => void; errors?: boolean; stacked?: boolean }) {
   return (
-    <div className="mcp-search">
+    <div className={cx('mcp-search', stacked && 'stacked')}>
       <SearchInput value={query} onChange={onQuery} placeholder={tr(M.search)} aria-label={tr(M.search)} data-mcp-search="" />
       <select className="select" value={filter} aria-label={tr(M.filter)} data-mcp-filter="" onChange={(e) => onFilter(e.target.value as McpFilter)}>
         <option value="all">{tr(M.all)}</option>

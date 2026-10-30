@@ -2847,6 +2847,15 @@ p.hint {
 .mcp-picker .mcp-search {
   padding: 0 0 8px;
 }
+/* The sidebar's (HI-2088): the search and the filter each on a row of its own, so the placeholder shows whole. */
+.mcp-search.stacked {
+  flex-wrap: wrap;
+}
+.mcp-search.stacked .search-box,
+.mcp-search.stacked .select {
+  flex: 1 1 100%;
+  min-width: 0;
+}
 .mcp-picker-list {
   max-height: 260px;
   overflow-y: auto;

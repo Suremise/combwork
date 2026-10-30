@@ -857,7 +857,7 @@ function McpPanel() {
         </div>
       ) : (
       <div className="pane-body">
-        {servers.length > 0 && <McpSearch query={query} filter={filter} onQuery={setQuery} onFilter={setFilter} errors />}
+        {servers.length > 0 && <McpSearch query={query} filter={filter} onQuery={setQuery} onFilter={setFilter} errors stacked />}
         <Section title={tr(M.workspaceGroup)} count={servers.length}>
           {loaded.current && servers.length === 0 && <div className="pane-empty">{tr(M.noServers)}</div>}
           {servers.length > 0 && !shown.length && <div className="pane-empty">{tr(M.noMatch)}</div>}
