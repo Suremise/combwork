@@ -51,9 +51,12 @@ vi.mock('../src/main/sessions', () => ({
 vi.mock('../src/main/workspace', () => ({
   openWorkspaces: () => h.workspaces,
   workspaceOf: (p: string) => (h.workspaces as { path: string }[]).find((w) => p.toLowerCase().startsWith(w.path.toLowerCase())),
+  workspaceFor: (p: string) => (h.workspaces as { path: string }[]).find((w) => p.toLowerCase().startsWith(w.path.toLowerCase())) ?? null,
   inWorkspace: (_w: unknown, fn: () => unknown) => fn()
 }))
 vi.mock('../src/main/lanes', () => ({ listLanes: async () => [] }))
+// The team never paused here (HI-2081: restart recovery waits for a paused team, which teamPause.test covers).
+vi.mock('../src/main/teamPause', () => ({ pausedFor: () => null }))
 vi.mock('../src/main/tasks', () => ({ allTasks: () => h.tasks ?? Promise.resolve([]) }))
 vi.mock('../src/main/deliveries', () => ({ createDelivery: async () => null, leaveDelivery: async () => null, roundOf: () => 1 }))
 vi.mock('../src/main/assistantControl', () => ({ assistantHome: (ws: string) => join(ws, '.hive', 'assistant') }))
