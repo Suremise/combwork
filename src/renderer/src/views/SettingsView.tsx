@@ -2,7 +2,7 @@ import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
 import { HiveCommands, QuitPoint, WorkspaceCommands, WorkspacePoint } from '../components/CommandsSettings'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
-import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
+import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, McpCatalogSettings, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
 import { DEFAULT_MODE } from '@shared/assistant'
 import { PRICES_CHECKED, SHIPPED_PRICES, listedPriceModels, priceRows } from '@shared/prices'
@@ -44,7 +44,7 @@ interface SettingDef extends SettingEntry {
   render?: () => React.ReactNode
 }
 
-const SECTION_ICONS: Record<string, string> = { general: 'settings-gear', updates: 'cloud-download', appearance: 'symbol-color', providers: 'hubot', accounts: 'plug', notifications: 'bell', sessions: 'history', assistant: 'person', workspace: 'root-folder', board: 'project', workflow: 'git-pull-request', agents: 'organization', keybindings: 'keyboard', agentApi: 'broadcast', advanced: 'tools' }
+const SECTION_ICONS: Record<string, string> = { general: 'settings-gear', updates: 'cloud-download', appearance: 'symbol-color', providers: 'hubot', accounts: 'plug', notifications: 'bell', sessions: 'history', assistant: 'person', workspace: 'root-folder', board: 'project', workflow: 'git-pull-request', agents: 'organization', keybindings: 'keyboard', mcpCatalogs: 'package', agentApi: 'broadcast', advanced: 'tools' }
 
 const SECTIONS: (SettingsSectionInfo<Section> & { icon: string })[] = SETTINGS_SECTIONS.map((s) => ({ ...s, icon: SECTION_ICONS[s.id] ?? 'blank' }))
 
@@ -74,6 +74,7 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'assistant.mode': () => <AssistantModePicker />,
   'assistant.journal': () => <JournalSettingsPanel />,
   ...Object.fromEntries(PROVIDERS.map((p) => [`assistant.provider:${p.id}`, () => <AssistantProviderDefaults provider={p.id} />])),
+  'mcpCatalogs.sources': () => <McpCatalogSources />,
   'agentApi.status': () => <ApiStatus />,
   'agentApi.token': () => <ApiToken />,
   'agentApi.viewers': () => <ViewerTokens />,
@@ -653,6 +654,69 @@ function AssistantMcpServers() {
     <button className="btn small" data-action="assistant-mcp-view" onClick={() => showView('assistant')}>
       <Icon name="link-external" /> {tr(msg({ id: 'settings.assistant.mcp.show', defaultMessage: "Show in the Assistant's View", description: "A button in Settings → Assistant → MCP servers (HI-2059): shows the Hive Assistant's view on the activity bar, where its MCP servers are added." }))}
     </button>
+  )
+}
+
+/** Settings → MCP Catalogues (HI-545): ours first (on or off), then the user's, each on or off, reordered, removed, and one added by its address. */
+function McpCatalogSources() {
+  const saved = useStore((s) => s.settings?.mcpCatalogs ?? null)
+  const [url, setUrl] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  if (!saved) return null
+  const save = (next: McpCatalogSettings): void => {
+    setError(null)
+    void call('mcp:catalogSetSources', next).then(
+      () => set((s) => ({ mcpCatalogVersion: s.mcpCatalogVersion + 1 })),
+      (e) => setError(errorMessage(e))
+    )
+  }
+  const move = (i: number, by: number): void => {
+    const list = [...saved.sources]
+    const [x] = list.splice(i, 1)
+    list.splice(i + by, 0, x)
+    save({ ...saved, sources: list })
+  }
+  return (
+    <div className="mcp-catalog-sources">
+      <div className="toggle-list">
+        <div className="toggle-item" data-catalog-source="ours">
+          <Icon name="package" />
+          <div className="ti-text">
+            <div className="ti-name">{'Suremise/hive-mcp' /* i18n-ignore: the catalogue's name */}</div>
+            <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.ours', defaultMessage: "Hive's own catalogue, checked by Hive.", description: 'Settings → MCP Catalogues (HI-545): under the name of Hive’s own catalogue (Suremise/hive-mcp).' }))}</div>
+          </div>
+          <Switch checked={saved.oursOn} label={tr(msg({ id: 'settings.mcpCatalogs.oursSwitch', defaultMessage: "Hive's own catalogue listed", description: "Settings → MCP Catalogues (HI-545): the switch of Hive's own catalogue, for screen readers." }))} onChange={(v) => save({ ...saved, oursOn: v })} />
+        </div>
+        {saved.sources.map((s, i) => (
+          <div key={s.url} className="toggle-item" data-catalog-source={s.url}>
+            <Icon name="link" />
+            <div className="ti-text">
+              <div className="ti-name mono">{s.url}</div>
+              <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.theirs', defaultMessage: "Its servers aren't checked by Hive.", description: 'Settings → MCP Catalogues (HI-545): under a catalogue the user added.' }))}</div>
+            </div>
+            <IconButton icon="arrow-up" disabled={i === 0} title={tr(msg({ id: 'settings.mcpCatalogs.up', defaultMessage: 'Move up', description: 'Settings → MCP Catalogues (HI-545): moves a catalogue up the list.' }))} onClick={() => move(i, -1)} />
+            <IconButton icon="arrow-down" disabled={i === saved.sources.length - 1} title={tr(msg({ id: 'settings.mcpCatalogs.down', defaultMessage: 'Move down', description: 'Settings → MCP Catalogues (HI-545): moves a catalogue down the list.' }))} onClick={() => move(i, 1)} />
+            <IconButton icon="trash" title={tr(msg({ id: 'settings.mcpCatalogs.remove', defaultMessage: 'Remove this catalogue (its servers installed stay)', description: 'Settings → MCP Catalogues (HI-545): removes a catalogue the user added; servers installed from it stay.' }))} onClick={() => save({ ...saved, sources: saved.sources.filter((x) => x.url !== s.url) })} />
+            <Switch checked={s.on} label={tr(msg({ id: 'settings.mcpCatalogs.switch', defaultMessage: '{url} listed', description: 'Settings → MCP Catalogues (HI-545): the switch of a catalogue, for screen readers. {url} is its address.' }), { url: s.url })} onChange={(v) => save({ ...saved, sources: saved.sources.map((x) => (x.url === s.url ? { ...x, on: v } : x)) })} />
+          </div>
+        ))}
+      </div>
+      <form
+        className="flex mcp-catalog-add"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!url.trim()) return
+          save({ ...saved, sources: [...saved.sources, { url: url.trim(), on: true }] })
+          setUrl('')
+        }}
+      >
+        <input className="input" value={url} placeholder={'https://example.com/catalog.json' /* i18n-ignore: an example address */} aria-label={tr(msg({ id: 'settings.mcpCatalogs.addLabel', defaultMessage: "A catalogue's address", description: 'Settings → MCP Catalogues (HI-545): the box for the address of a catalogue to add, for screen readers.' }))} onChange={(e) => setUrl(e.target.value)} />
+        <button className="btn small" type="submit" disabled={!url.trim()}>
+          <Icon name="add" /> {tr(msg({ id: 'settings.mcpCatalogs.add', defaultMessage: 'Add Catalogue', description: 'Settings → MCP Catalogues (HI-545): adds the catalogue at the address typed.' }))}
+        </button>
+      </form>
+      {error && <div className="banner danger">{error}</div>}
+    </div>
   )
 }
 

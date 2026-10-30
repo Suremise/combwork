@@ -386,6 +386,12 @@ interface HiveMessageValues {
   'settings.advanced.hive.mcp.connectSeconds.title': undefined
   'settings.advanced.hive.mcp.replySeconds.desc': undefined
   'settings.advanced.hive.mcp.replySeconds.title': undefined
+  'settings.advanced.hive.mcpCatalog.downloadSeconds.desc': undefined
+  'settings.advanced.hive.mcpCatalog.downloadSeconds.title': undefined
+  'settings.advanced.hive.mcpCatalog.fetchSeconds.desc': undefined
+  'settings.advanced.hive.mcpCatalog.fetchSeconds.title': undefined
+  'settings.advanced.hive.mcpCatalog.probeSeconds.desc': undefined
+  'settings.advanced.hive.mcpCatalog.probeSeconds.title': undefined
   'settings.advanced.hive.merge.lockWaitSeconds.desc': undefined
   'settings.advanced.hive.merge.lockWaitSeconds.title': undefined
   'settings.advanced.hive.notes.deliverWorkspaceNotes.desc': undefined
@@ -951,6 +957,17 @@ interface HiveMessageValues {
   'settings.keys.terminalKey': undefined
   'settings.keys.useGlobal': undefined
   'settings.keys.useIt': undefined
+  'settings.mcpCatalogs.add': undefined
+  'settings.mcpCatalogs.addLabel': undefined
+  'settings.mcpCatalogs.down': undefined
+  'settings.mcpCatalogs.ours': undefined
+  'settings.mcpCatalogs.oursSwitch': undefined
+  'settings.mcpCatalogs.remove': undefined
+  'settings.mcpCatalogs.sources.desc': undefined
+  'settings.mcpCatalogs.sources.title': undefined
+  'settings.mcpCatalogs.switch': { url: string | number }
+  'settings.mcpCatalogs.theirs': undefined
+  'settings.mcpCatalogs.up': undefined
   'settings.metrics.resetDetail': undefined
   'settings.metrics.resetFailed': undefined
   'settings.metrics.resetMessage': undefined
@@ -1240,6 +1257,8 @@ interface HiveMessageValues {
   'settings.section.general.label': undefined
   'settings.section.keybindings.desc': undefined
   'settings.section.keybindings.label': undefined
+  'settings.section.mcpCatalogs.desc': undefined
+  'settings.section.mcpCatalogs.label': undefined
   'settings.section.notifications.desc': undefined
   'settings.section.notifications.label': undefined
   'settings.section.provider.desc': { provider: string | number }

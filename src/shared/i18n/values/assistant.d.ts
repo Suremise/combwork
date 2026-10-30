@@ -289,6 +289,8 @@ interface HiveMessageValues {
   'assistant.sidebar.loading': undefined
   'assistant.sidebar.markNotWorking': undefined
   'assistant.sidebar.markWorking': undefined
+  'assistant.sidebar.mcpCatalogue': undefined
+  'assistant.sidebar.mcpInstalled': undefined
   'assistant.sidebar.mcpNoMatch': undefined
   'assistant.sidebar.mcpServers': undefined
   'assistant.sidebar.mcpTipAdded': undefined

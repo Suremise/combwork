@@ -2898,6 +2898,48 @@ p.hint {
 .badge.mcp-tag {
   font-weight: 400;
 }
+/* The MCP view's Installed | Catalogue tabs and the Catalogue (HI-545). */
+.mcp-tabs {
+  padding: 6px 10px 0;
+}
+.mcp-catalog-filters .select {
+  flex: 1;
+  min-width: 0;
+}
+.mcp-catalog-note,
+.mcp-catalog-error {
+  font-size: 12px;
+}
+.mcp-catalog-error {
+  color: var(--danger, var(--fg-muted));
+}
+.mcp-catalog-more {
+  margin: 4px 10px 8px;
+}
+.mcp-catalog-checks {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+.mcp-catalog-checks li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.mcp-catalog-checks li[data-check='ok'] .codicon {
+  color: var(--success, var(--accent-ink));
+}
+.mcp-catalog-checks li[data-check='no'] .codicon {
+  color: var(--danger, var(--fg-muted));
+}
+.mcp-catalog-add {
+  margin-top: 8px;
+}
+.mcp-catalog-add .input {
+  flex: 1;
+  min-width: 0;
+}
 
 /* ---------- Split views (changes, memory, notes) ---------- */
 .split {

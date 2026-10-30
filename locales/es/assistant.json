@@ -287,6 +287,8 @@
   "assistant.sidebar.loading": "Cargando…",
   "assistant.sidebar.markNotWorking": "Desmarcar como activo",
   "assistant.sidebar.markWorking": "Marcar como activo",
+  "assistant.sidebar.mcpCatalogue": "Catálogo",
+  "assistant.sidebar.mcpInstalled": "Instalados",
   "assistant.sidebar.mcpNoMatch": "Ningún servidor coincide.",
   "assistant.sidebar.mcpServers": "Servidores MCP",
   "assistant.sidebar.mcpTipAdded": "Los servidores MCP del espacio de trabajo (.hive/mcp) están disponibles para todos los proyectos y para el Asistente de Hive, y solo se ejecutan donde están agregados: la pestaña MCP de un proyecto, la vista del Asistente o Agregar a… aquí. Los cambios se aplican a las sesiones nuevas.",

@@ -27,6 +27,282 @@
     "defaultMessage": "Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Hive Assistant that had the old one lose it. Or choose another name.",
     "description": "When a server of that name exists, under Replace or Choose Another Name (HI-2059)."
   },
+  "mcp.catalog.allSources": {
+    "defaultMessage": "All sources",
+    "description": "The Catalogue's source picker (HI-545): every catalogue."
+  },
+  "mcp.catalog.badName": {
+    "defaultMessage": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"hive\" is reserved.",
+    "description": "An error installing a catalogue server (HI-545) under a name a server can't have."
+  },
+  "mcp.catalog.badgeInstalled": {
+    "defaultMessage": "Installed",
+    "description": "A badge on a catalogue server (HI-545): it is installed."
+  },
+  "mcp.catalog.badgeNeeds": {
+    "defaultMessage": "Can't run here",
+    "description": "A badge on a catalogue server (HI-545): this PC doesn't meet one of its requirements."
+  },
+  "mcp.catalog.badgeOther": {
+    "defaultMessage": "Name in use",
+    "description": "A badge on a catalogue server (HI-545): a server of the same name, not from this catalogue, is installed."
+  },
+  "mcp.catalog.badgeUpdate": {
+    "defaultMessage": "Update to {version}",
+    "description": "A badge on a catalogue server (HI-545): a newer version is available."
+  },
+  "mcp.catalog.cantRun": {
+    "defaultMessage": "This PC doesn't meet a requirement above, so it can't be installed.",
+    "description": "A catalogue server's view (HI-545) when a requirement Hive checked is not met: Install is greyed out."
+  },
+  "mcp.catalog.check.app": {
+    "defaultMessage": "{value}",
+    "description": "A requirement of a catalogue server (HI-545) given in the catalogue's own words ({value}, as it is): Hive can't check it."
+  },
+  "mcp.catalog.check.build": {
+    "defaultMessage": "Windows build {value} or later",
+    "description": "A requirement of a catalogue server (HI-545): the lowest Windows build ({value}, a number)."
+  },
+  "mcp.catalog.check.docker": {
+    "defaultMessage": "Docker",
+    "description": "A requirement of a catalogue server (HI-545): Docker installed."
+  },
+  "mcp.catalog.check.edition": {
+    "defaultMessage": "Windows {value}",
+    "description": "A requirement of a catalogue server (HI-545): the Windows editions it needs ({value}: Pro, Enterprise…)."
+  },
+  "mcp.catalog.check.feature": {
+    "defaultMessage": "{value} turned on",
+    "description": "A requirement of a catalogue server (HI-545): a Windows optional feature ({value}, its name as Windows gives it, e.g. Windows Sandbox) that must be turned on."
+  },
+  "mcp.catalog.check.node": {
+    "defaultMessage": "Node.js {value} or later",
+    "description": "A requirement of a catalogue server (HI-545): the lowest Node.js version on PATH ({value})."
+  },
+  "mcp.catalog.check.os": {
+    "defaultMessage": "Runs on {value}",
+    "description": "A requirement of a catalogue server (HI-545): the systems it runs on ({value}: windows, macos, linux, as the catalogue names them)."
+  },
+  "mcp.catalog.expired": {
+    "defaultMessage": "That download has expired: choose Install or Update again.",
+    "description": "An error installing or updating a server from an MCP catalogue (HI-545): the download made for it was dropped (too old, or the window closed)."
+  },
+  "mcp.catalog.failed": {
+    "defaultMessage": "Could not get {name}",
+    "description": "An error's title (HI-545): downloading or checking a server from an MCP catalogue for Install or Update failed. {name} is the server."
+  },
+  "mcp.catalog.filter": {
+    "defaultMessage": "Show",
+    "description": "Accessible name of the Catalogue's filter (HI-545): which servers to show."
+  },
+  "mcp.catalog.filterAll": {
+    "defaultMessage": "All",
+    "description": "The Catalogue's filter (HI-545): every server."
+  },
+  "mcp.catalog.filterInstalled": {
+    "defaultMessage": "Installed",
+    "description": "The Catalogue's filter (HI-545): servers installed."
+  },
+  "mcp.catalog.filterMeets": {
+    "defaultMessage": "Runs on this PC",
+    "description": "The Catalogue's filter (HI-545): servers whose requirements this PC meets (or Hive can't check)."
+  },
+  "mcp.catalog.filterNotInstalled": {
+    "defaultMessage": "Not installed",
+    "description": "The Catalogue's filter (HI-545): servers not installed yet."
+  },
+  "mcp.catalog.filterUpdates": {
+    "defaultMessage": "Updates available",
+    "description": "The Catalogue's filter (HI-545): installed servers with a newer version."
+  },
+  "mcp.catalog.folder": {
+    "defaultMessage": "{name}'s zip doesn't hold a folder named {name}: not installed.",
+    "description": "An error installing a server from an MCP catalogue (HI-545): the zip is not laid out as catalogues require (one top folder named after the server)."
+  },
+  "mcp.catalog.from": {
+    "defaultMessage": "From {source}",
+    "description": "A catalogue server's view (HI-545): the catalogue it is in."
+  },
+  "mcp.catalog.gone": {
+    "defaultMessage": "{name} isn't in its catalogue any more: refresh the list.",
+    "description": "An error installing or updating a server from an MCP catalogue (HI-545): the catalogue read last no longer lists it."
+  },
+  "mcp.catalog.homepage": {
+    "defaultMessage": "Homepage",
+    "description": "A catalogue server's view (HI-545): opens its page in the browser."
+  },
+  "mcp.catalog.http": {
+    "defaultMessage": "{url} answered {status}.",
+    "description": "An error downloading from an MCP catalogue (HI-545): the server answered with an HTTP error {status} (a number such as 404)."
+  },
+  "mcp.catalog.installAction": {
+    "defaultMessage": "Install…",
+    "description": "A catalogue server's view (HI-545): downloads, checks and shows it, before installing."
+  },
+  "mcp.catalog.installButton": {
+    "defaultMessage": "Install",
+    "description": "Button (HI-545): installs the catalogue server."
+  },
+  "mcp.catalog.installMessage": {
+    "defaultMessage": "Downloaded and checked against its catalogue. It is added to the workspace and to no project yet. It runs:",
+    "description": "The question before installing a catalogue server (HI-545), above what it runs: its download matched its catalogue; installed, it runs nowhere until added."
+  },
+  "mcp.catalog.installTitle": {
+    "defaultMessage": "Install {name} {version}?",
+    "description": "Title of the question before installing a server from an MCP catalogue (HI-545). {name} is the server, {version} its version."
+  },
+  "mcp.catalog.installed": {
+    "defaultMessage": "Installed {name}",
+    "description": "A notification's title (HI-545): a catalogue server was installed."
+  },
+  "mcp.catalog.installedAt": {
+    "defaultMessage": "Installed: {version}",
+    "description": "A catalogue server's view (HI-545): the version installed."
+  },
+  "mcp.catalog.installedNext": {
+    "defaultMessage": "It runs nowhere yet: Add to… in its view adds it to the projects (and the Hive Assistant) that need it.",
+    "description": "Under \"Installed {name}\" (HI-545): what to do next. Add to… is the button in the server's view in the MCP view."
+  },
+  "mcp.catalog.installing": {
+    "defaultMessage": "Installing…",
+    "description": "The Install button while it works (HI-545)."
+  },
+  "mcp.catalog.loading": {
+    "defaultMessage": "Reading the catalogues…",
+    "description": "The MCP view's Catalogue while it reads the catalogues (HI-545)."
+  },
+  "mcp.catalog.mismatch": {
+    "defaultMessage": "{name}'s download doesn't match its catalogue (its size or checksum differ): not installed.",
+    "description": "An error installing a server from an MCP catalogue (HI-545): the zip downloaded is not the one the catalogue describes, so Hive used none of it. {name} is the server."
+  },
+  "mcp.catalog.more": {
+    "defaultMessage": "Show more ({left, number} left)",
+    "description": "A button under a catalogue source (HI-545): loads its next servers. {left} is how many more match."
+  },
+  "mcp.catalog.needs": {
+    "defaultMessage": "{name} can't run on this PC: {needs}.",
+    "description": "An error installing a server from an MCP catalogue (HI-545): a requirement Hive checked is not met. {needs} lists them."
+  },
+  "mcp.catalog.no": {
+    "defaultMessage": "Not met",
+    "description": "A requirement's state in a catalogue server's view (HI-545), for screen readers."
+  },
+  "mcp.catalog.noMatch": {
+    "defaultMessage": "No server matches.",
+    "description": "A catalogue source in the Catalogue (HI-545) with no server for the search and filter."
+  },
+  "mcp.catalog.none": {
+    "defaultMessage": "No catalogues are on. Turn ours on, or add one, in Settings → MCP Catalogues.",
+    "description": "The Catalogue (HI-545) with every source off. Settings → MCP Catalogues as Hive names it."
+  },
+  "mcp.catalog.notInstalled": {
+    "defaultMessage": "{name} isn't installed from this catalogue: install it instead.",
+    "description": "An error updating a server from an MCP catalogue (HI-545): no server of the name came from it."
+  },
+  "mcp.catalog.notRead": {
+    "defaultMessage": "Couldn't read this catalogue: {reason}",
+    "description": "An MCP catalogue source in the MCP view (HI-545) that could not be read or is not a catalogue Hive reads. {reason} says why (as the network, the file or the checker said it, in English)."
+  },
+  "mcp.catalog.ok": {
+    "defaultMessage": "Met",
+    "description": "A requirement's state in a catalogue server's view (HI-545), for screen readers."
+  },
+  "mcp.catalog.pick": {
+    "defaultMessage": "Select a server in the Catalogue to see what it needs and install it.",
+    "description": "The MCP view's main area with the Catalogue tab and nothing selected (HI-545)."
+  },
+  "mcp.catalog.placesChanged": {
+    "defaultMessage": "Where {name} is added changed while the update waited: look again.",
+    "description": "An error updating a server from an MCP catalogue (HI-545): a project (or the Hive Assistant) gained or lost the server after the Update dialog showed where it is added, so nothing was changed."
+  },
+  "mcp.catalog.redirects": {
+    "defaultMessage": "Too many redirects downloading {url}.",
+    "description": "An error downloading from an MCP catalogue (HI-545): more than 5 redirects. {url} is the address asked for."
+  },
+  "mcp.catalog.replaceButton": {
+    "defaultMessage": "Replace and Install",
+    "description": "Button (HI-545): installs the catalogue server over a server of the same name."
+  },
+  "mcp.catalog.replaceOther": {
+    "defaultMessage": "A server named {name} is in the workspace already, not from this catalogue: installing replaces it (the old one goes to the Recycle Bin), and where it was added it is removed.",
+    "description": "The question before installing a catalogue server (HI-545) whose name a server of the workspace has. Recycle Bin: Windows' name for it."
+  },
+  "mcp.catalog.requires": {
+    "defaultMessage": "Requirements",
+    "description": "A catalogue server's view (HI-545): the heading of what it needs on this PC."
+  },
+  "mcp.catalog.scheme": {
+    "defaultMessage": "{url} leads to an address this source may not use (only https for an https catalogue).",
+    "description": "An error downloading from an MCP catalogue (HI-545): a redirect led away from https (to http or a file). {url} is where it led."
+  },
+  "mcp.catalog.search": {
+    "defaultMessage": "Search the catalogues",
+    "description": "The MCP view's Catalogue (HI-545): its search box (by name, description and tags)."
+  },
+  "mcp.catalog.size": {
+    "defaultMessage": "Download: {size}",
+    "description": "A catalogue server's view (HI-545): the size of its zip."
+  },
+  "mcp.catalog.skipped": {
+    "defaultMessage": "{n, plural, one {# entry skipped: not as catalogues give a server} other {# entries skipped: not as catalogues give a server}}",
+    "description": "Under a catalogue source (HI-545): entries Hive left out because they are not valid."
+  },
+  "mcp.catalog.source": {
+    "defaultMessage": "Source",
+    "description": "Accessible name of the Catalogue's source picker (HI-545)."
+  },
+  "mcp.catalog.sourceTaken": {
+    "defaultMessage": "That catalogue is listed already.",
+    "description": "An error adding an MCP catalogue source (HI-545): it is in the list already."
+  },
+  "mcp.catalog.sourceUrl": {
+    "defaultMessage": "A catalogue is an https:// or file:// address of its catalog.json.",
+    "description": "An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the address is neither."
+  },
+  "mcp.catalog.timeout": {
+    "defaultMessage": "{url} took too long (over {seconds, number} s).",
+    "description": "An error downloading from an MCP catalogue (HI-545): no complete answer within the time limit (Settings → Advanced)."
+  },
+  "mcp.catalog.tooLarge": {
+    "defaultMessage": "{url} is larger than its catalogue says ({max, number} bytes at most): not used.",
+    "description": "An error downloading from an MCP catalogue (HI-545): the download went past the size its catalogue gives, or the limit. {url} is the address."
+  },
+  "mcp.catalog.unknown": {
+    "defaultMessage": "Hive can't check this: make sure it's there",
+    "description": "A requirement's state in a catalogue server's view (HI-545): Hive can't check it on this PC."
+  },
+  "mcp.catalog.unvetted": {
+    "defaultMessage": "Servers from this source aren't checked by Hive. Look at what one runs before you install it.",
+    "description": "A note under a catalogue source the user added (HI-545), shown once: Hive does not vet its servers."
+  },
+  "mcp.catalog.updateAction": {
+    "defaultMessage": "Update to {version}…",
+    "description": "A catalogue server's view (HI-545): downloads the newer version and shows what changes, before updating."
+  },
+  "mcp.catalog.updateButton": {
+    "defaultMessage": "Update",
+    "description": "Button (HI-545): updates the catalogue server to the new version."
+  },
+  "mcp.catalog.updateMessage": {
+    "defaultMessage": "{where}: those places keep it, your values for its environment and headers too. What it runs changes (− now, + after):",
+    "description": "The question before updating a catalogue server (HI-545), above the lines of what it runs that change. {where} says where it is added (\"Added in hive\", \"Not added anywhere\")."
+  },
+  "mcp.catalog.updateSame": {
+    "defaultMessage": "{where}: those places keep it, your values for its environment and headers too. What it runs stays the same:",
+    "description": "The question before updating a catalogue server (HI-545) whose command stays the same, above what it runs. {where} says where it is added."
+  },
+  "mcp.catalog.updateTitle": {
+    "defaultMessage": "Update {name} from {from} to {to}?",
+    "description": "Title of the question before updating a catalogue server (HI-545). {from} and {to} are its versions."
+  },
+  "mcp.catalog.updated": {
+    "defaultMessage": "Updated {name} to {version}",
+    "description": "A notification's title (HI-545): a catalogue server was updated."
+  },
+  "mcp.catalog.workspaceGone": {
+    "defaultMessage": "The workspace closed before {name} was installed: nothing was written.",
+    "description": "An error installing or updating a server from an MCP catalogue (HI-545): the workspace it was for closed while it downloaded."
+  },
   "mcp.enable.all": {
     "defaultMessage": "All projects",
     "description": "The MCP view’s Add to… dialog: a button that ticks every project (not the Hive Assistant, which has its own box)."

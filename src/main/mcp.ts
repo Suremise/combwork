@@ -92,8 +92,8 @@ export async function listMcp(places = false): Promise<McpServerInfo[]> {
 
 /** Converts a stored definition into the entry written to launch/mcp.json. */
 export function toLaunchDef(def: McpServerDef, mcpDir: string): McpServerDef {
-  // Hive's own fields (its description and tags, HI-2059) aren't the CLIs'.
-  const { description: _description, tags: _tags, ...rest } = def
+  // Hive's own fields (its description and tags, HI-2059, and the catalogue it came from, HI-545) aren't the CLIs'.
+  const { description: _description, tags: _tags, catalog: _catalog, ...rest } = def
   const dir = mcpDir.replace(/\\/g, '/')
   const expand = (v: string): string => v.replace(/\$\{HIVE_MCP_DIR\}/g, dir)
   const out: McpServerDef = { ...rest }
@@ -109,7 +109,7 @@ export function toLaunchDef(def: McpServerDef, mcpDir: string): McpServerDef {
  * in the middle of a replace and leave the new server added. Callers inside a turn use the *Now functions.
  */
 let mcpTurn: Promise<unknown> = Promise.resolve()
-function inTurn<T>(fn: () => Promise<T>): Promise<T> {
+export function inTurn<T>(fn: () => Promise<T>): Promise<T> {
   const run = mcpTurn.then(fn)
   mcpTurn = run.catch(() => undefined)
   return run
@@ -156,7 +156,7 @@ const usable = (def: unknown): def is McpServerDef => !!def && typeof def === 'o
  * Refuses when the server's definition is no longer `expected`, the one the user was shown what it runs from (replaced
  * or edited meanwhile), or isn't one Hive can run, so a server is never added with a definition the user hasn't seen.
  */
-async function checkShown(name: string, expected: McpShown): Promise<void> {
+export async function checkShown(name: string, expected: McpShown): Promise<void> {
   const path = join(workspace.mcpDir, `${name}.json`)
   // The installation (a replace writes a new file, even with the same text and new code beside it) and the text.
   const revision = await mcpRevision(path)
@@ -233,7 +233,7 @@ export function setMcpPlaces(name: string, expected: McpShown | undefined, proje
  * server writes a new file, so a replace changes it even when the definition's text is the same (an upgrade of the
  * code beside it); an edit changes it too. Null when there is no such file.
  */
-async function mcpRevision(path: string): Promise<string | null> {
+export async function mcpRevision(path: string): Promise<string | null> {
   const s = await stat(path, { bigint: true }).catch(() => null)
   return s ? `${s.ino}:${s.mtimeNs}:${s.size}` : null
 }
@@ -286,7 +286,7 @@ async function membershipOf(projectPath: string, name: string): Promise<ProjectC
   } catch (e) {
     throw unreadable(e)
   }
-  if (!now || typeof now !== 'object' || Array.isArray(now)) throw unreadable(new Error('project.json is not an object'))
+  if (!now || typeof now !== 'object' || Array.isArray(now)) throw unreadable(new Error('project.json is not an object')) // i18n-ignore: the cause kept with the error, for the log
   await workspace.projectConfig(projectPath).catch((e) => {
     throw unreadable(e)
   })
@@ -310,6 +310,19 @@ async function removeEverywhere(name: string): Promise<void> {
   }
   for (const p of listing) await workspace.mutateProjectConfig(p, (c) => ({ mcp: { ...c.mcp, enabled: mcpAdded(c.mcp, legacyOn()).filter((n) => n !== name), disabled: listed(c.mcp.disabled).filter((n) => n !== name), model: MCP_ADDED_MODEL } }), { existing: true })
   if (listed(workspace.config.mcp.assistant).includes(name)) await changeAssistantNow((added) => added.filter((n) => n !== name))
+}
+
+/**
+ * Where a server is added now (HI-545's update), read strictly (membershipOf: a project that can't be read is an error,
+ * never "not added"): the projects' paths (hidden ones too, sorted) and whether the Assistant has it. In the caller's turn.
+ */
+export async function placesNow(name: string): Promise<{ projects: string[]; assistant: boolean }> {
+  const projects: string[] = []
+  for (const p of await allProjectPaths()) {
+    const cfg = await membershipOf(p, name)
+    if (cfg && mcpAdded(cfg, legacyOn()).includes(name)) projects.push(p)
+  }
+  return { projects: projects.sort(), assistant: assistantMcpAdded(workspace.config.mcp).includes(name) }
 }
 
 /** The places a server is added (HI-2059): the projects' paths (hidden ones too) and whether the Assistant has it. */
@@ -508,7 +521,7 @@ function serverName(raw: string): string {
 }
 
 /** A definition's references to its zip's folder, moved to the name it is added as. */
-function retarget(def: McpServerDef, from: string, to: string): McpServerDef {
+export function retarget(def: McpServerDef, from: string, to: string): McpServerDef {
   if (from === to) return def
   const move = (v: string): string => v.replace(folderRef(from), `\${HIVE_MCP_DIR}/${to}`)
   const out: McpServerDef = { ...def }
@@ -573,46 +586,55 @@ export async function addMcpFromFile(file: string, name: string, replace = false
   if (!validMcpName(name)) throw hiveError(M.badName, undefined, { kind: 'invalid' })
   const r = await readServerFile(file)
   const def = r.folder ? retarget(r.def, r.folder, name) : r.def
+  return inTurn(() => writeServerNow(name, def, r.files, replace))
+}
+
+/**
+ * Writes a server's definition (and a .zip's folder) as `name`, in a turn (the caller's). A name in use is refused
+ * unless `replace`, which moves the old definition (and, when this one brings a folder, the old folder) to the Recycle
+ * Bin. Without `keepPlaces` it is removed everywhere first (HI-2059: added nowhere, refused while a project can't be
+ * read); with it (a catalogue update whose places were just checked, HI-545), the places keep it. Returns the server
+ * as listed.
+ */
+export async function writeServerNow(name: string, def: McpServerDef, files: Map<string, Uint8Array> | null, replace: boolean, keepPlaces = false): Promise<McpServerInfo> {
   const taken = (): Error => hiveError(msg({ id: 'content.mcp.taken', defaultMessage: 'A server named "{name}" already exists: choose another name, or replace it.', description: 'An error adding an MCP server from a file under the name {name}, which a server of the workspace has.' }), { name }, { kind: 'conflict' })
-  return inTurn(async () => {
-    const dir = workspace.mcpDir
-    const json = join(dir, `${name}.json`)
-    const folder = join(dir, name)
-    if (serverExists(name, !!r.files) && !replace) throw taken()
-    await mkdir(dir, { recursive: true })
-    // Removed everywhere before it exists: a name added earlier (the old server, or a definition deleted by hand) mustn't
-    // add it anywhere.
-    await removeEverywhere(name)
-    if (replace) {
-      // A .zip brings its own folder; a .json keeps the one there (its definition may run what is in it).
-      if (r.files && existsSync(folder)) await trash(folder)
-      if (existsSync(json)) await trash(json)
-    }
-    // The folder is claimed (created, never reused: two adds at once can't share one) and written in place, since the
-    // workspace's watcher holds the folders under .hive, so Windows refuses to rename one into place. If anything
-    // fails, what was written goes again, so a retry isn't blocked.
-    let claimed = false
-    try {
-      if (r.files) {
-        await mkdir(folder).catch((e: NodeJS.ErrnoException) => {
-          throw e.code === 'EEXIST' ? taken() : e
-        })
-        claimed = true
-        for (const [rel, data] of r.files) {
-          const to = join(folder, ...rel.split('/'))
-          await mkdir(dirname(to), { recursive: true })
-          await writeFile(to, data, { flag: 'wx' })
-        }
-      }
-      await writeFile(json, JSON.stringify(def, null, 2) + '\n', { flag: 'wx' }).catch((e: NodeJS.ErrnoException) => {
+  const dir = workspace.mcpDir
+  const json = join(dir, `${name}.json`)
+  const folder = join(dir, name)
+  if (serverExists(name, !!files) && !replace) throw taken()
+  await mkdir(dir, { recursive: true })
+  // Removed everywhere before it exists: a name added earlier (the old server, or a definition deleted by hand) mustn't
+  // add it anywhere.
+  if (!keepPlaces) await removeEverywhere(name)
+  if (replace) {
+    // A .zip brings its own folder; a .json keeps the one there (its definition may run what is in it).
+    if (files && existsSync(folder)) await trash(folder)
+    if (existsSync(json)) await trash(json)
+  }
+  // The folder is claimed (created, never reused: two adds at once can't share one) and written in place, since the
+  // workspace's watcher holds the folders under .hive, so Windows refuses to rename one into place. If anything
+  // fails, what was written goes again, so a retry isn't blocked.
+  let claimed = false
+  try {
+    if (files) {
+      await mkdir(folder).catch((e: NodeJS.ErrnoException) => {
         throw e.code === 'EEXIST' ? taken() : e
       })
-    } catch (e) {
-      if (claimed) await rm(folder, { recursive: true, force: true }).catch(() => undefined)
-      throw e
+      claimed = true
+      for (const [rel, data] of files) {
+        const to = join(folder, ...rel.split('/'))
+        await mkdir(dirname(to), { recursive: true })
+        await writeFile(to, data, { flag: 'wx' })
+      }
     }
-    return (await listMcp(true)).find((m) => m.name === name)!
-  })
+    await writeFile(json, JSON.stringify(def, null, 2) + '\n', { flag: 'wx' }).catch((e: NodeJS.ErrnoException) => {
+      throw e.code === 'EEXIST' ? taken() : e
+    })
+  } catch (e) {
+    if (claimed) await rm(folder, { recursive: true, force: true }).catch(() => undefined)
+    throw e
+  }
+  return (await listMcp(true)).find((m) => m.name === name)!
 }
 
 /** The servers a project defines in its own config (.mcp.json…), the first provider's where two name one. */

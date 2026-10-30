@@ -296,6 +296,8 @@
   "assistant.sidebar.loading": "Loading…",
   "assistant.sidebar.markNotWorking": "Mark as Not Working On",
   "assistant.sidebar.markWorking": "Mark as Working On",
+  "assistant.sidebar.mcpCatalogue": "Catalogue",
+  "assistant.sidebar.mcpInstalled": "Installed",
   "assistant.sidebar.mcpNoMatch": "No server matches.",
   "assistant.sidebar.mcpServers": "MCP Servers",
   "assistant.sidebar.mcpTipAdded": "MCP servers deployed to the workspace (.hive/mcp) are available to every project and the Hive Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.",

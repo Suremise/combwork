@@ -17,7 +17,7 @@ import { shownText } from '@shared/advanced'
 import { fmt, tr } from '@shared/i18n'
 import { msg } from '@shared/i18n/msg'
 import { HAND_OVER_TEXT } from '@shared/handOver'
-import type { McpServerInfo, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
+import type { McpCatalogRow, McpServerInfo, ProjectInfo, ProjectProviderConfig, ProviderId, SessionLayout, SessionListItem, SessionView, TemplateLoadPlan, ToastAction } from '@shared/types'
 import type { TemplateWorkflow } from '@shared/workflow/templateOptions'
 import { TEMPLATE_NAME_MAX, namesFollowKey, templateAgentNames, usesKey, type TemplateEntry, type TemplateScope } from '@shared/templates'
 import { PLATFORM_NAME } from '@shared/platform/switching'
@@ -1044,6 +1044,88 @@ export async function chooseMcpPlaces(server: Pick<McpServerInfo, 'name' | 'def'
 
 /** "Hive Assistant", where a server is added. */
 const MCP_ASSISTANT = msg({ id: 'mcp.where.assistantName', defaultMessage: 'the Hive Assistant', description: 'Where an MCP server is added (HI-2059), in a list of places beside project names.' })
+
+// ---------------------------------------------------------------------------
+// MCP catalogues (HI-545): Install and Update, each shown before anything is written.
+// ---------------------------------------------------------------------------
+
+const CATALOG_FAILED = msg({ id: 'mcp.catalog.failed', defaultMessage: 'Could not get {name}', description: "An error's title (HI-545): downloading or checking a server from an MCP catalogue for Install or Update failed. {name} is the server." })
+
+/**
+ * Install (HI-545): the catalogue server downloaded and checked against its catalogue (size, sha256) first, then what
+ * it runs shown before it is written. A server of the name not from this catalogue is replaced only if the user says
+ * so. Installed, it is added to no project yet (HI-2059): its view opens, for Add to….
+ */
+export async function installCatalogServer(row: Pick<McpCatalogRow, 'source' | 'name' | 'version'>): Promise<boolean> {
+  const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
+  if (!p) return false
+  const replacing = !!p.existing
+  const ok = await confirm({
+    title: tr(msg({ id: 'mcp.catalog.installTitle', defaultMessage: 'Install {name} {version}?', description: 'Title of the question before installing a server from an MCP catalogue (HI-545). {name} is the server, {version} its version.' }), { name: p.server.name, version: p.server.version }),
+    message: tr(msg({ id: 'mcp.catalog.installMessage', defaultMessage: 'Downloaded and checked against its catalogue. It is added to the workspace and to no project yet. It runs:', description: 'The question before installing a catalogue server (HI-545), above what it runs: its download matched its catalogue; installed, it runs nowhere until added.' })),
+    list: p.runs,
+    detail:
+      [
+        ...p.secretWarnings,
+        ...(replacing ? [tr(msg({ id: 'mcp.catalog.replaceOther', defaultMessage: 'A server named {name} is in the workspace already, not from this catalogue: installing replaces it (the old one goes to the Recycle Bin), and where it was added it is removed.', description: 'The question before installing a catalogue server (HI-545) whose name a server of the workspace has. Recycle Bin: Windows\' name for it.' }), { name: p.server.name })] : [])
+      ].join('\n') || undefined,
+    confirmLabel: replacing ? tr(msg({ id: 'mcp.catalog.replaceButton', defaultMessage: 'Replace and Install', description: 'Button (HI-545): installs the catalogue server over a server of the same name.' })) : tr(msg({ id: 'mcp.catalog.installButton', defaultMessage: 'Install', description: 'Button (HI-545): installs the catalogue server.' })),
+    busyLabel: tr(msg({ id: 'mcp.catalog.installing', defaultMessage: 'Installing…', description: 'The Install button while it works (HI-545).' })),
+    danger: replacing,
+    run: () => call('mcp:catalogInstall', p.id, p.server.name, replacing)
+  })
+  if (!ok) {
+    void call('mcp:catalogDrop', p.id).catch(() => undefined)
+    return false
+  }
+  set((s) => ({ skillsVersion: s.skillsVersion + 1, mcpCatalogVersion: s.mcpCatalogVersion + 1, mcpTab: 'installed', selectedMcp: p.server.name }))
+  notify('success', tr(msg({ id: 'mcp.catalog.installed', defaultMessage: 'Installed {name}', description: "A notification's title (HI-545): a catalogue server was installed." }), { name: p.server.name }), tr(msg({ id: 'mcp.catalog.installedNext', defaultMessage: 'It runs nowhere yet: Add to… in its view adds it to the projects (and the Hive Assistant) that need it.', description: 'Under "Installed {name}" (HI-545): what to do next. Add to… is the button in the server\'s view in the MCP view.' })))
+  await refreshWorkspace()
+  return true
+}
+
+/**
+ * Update (HI-545): never automatic. The new version downloaded and checked first; the dialog says the versions, where
+ * it is added (those places keep it) and what it runs, the changed lines marked. If the definition or the places
+ * change before it is applied, Hive writes nothing and the dialog opens again from what is there now.
+ */
+export async function updateCatalogServer(row: Pick<McpCatalogRow, 'source' | 'name' | 'version'>, again = 0): Promise<boolean> {
+  const p = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogPrepare', row.source, row.name))
+  if (!p) return false
+  const ex = p.existing
+  if (!ex || ex.version === null) {
+    void call('mcp:catalogDrop', p.id).catch(() => undefined)
+    return installCatalogServer(row)
+  }
+  const now = new Set(ex.runs)
+  const next = new Set(p.runs)
+  const changed = [...ex.runs.filter((l) => !next.has(l)).map((l) => `− ${l}`), ...p.runs.filter((l) => !now.has(l)).map((l) => `+ ${l}`)]
+  const where = mcpWhereText({ def: ex.def ?? {}, projects: ex.projects, assistant: ex.assistant }, get().workspace?.projects ?? [])
+  const ok = await confirm({
+    title: tr(msg({ id: 'mcp.catalog.updateTitle', defaultMessage: 'Update {name} from {from} to {to}?', description: 'Title of the question before updating a catalogue server (HI-545). {from} and {to} are its versions.' }), { name: p.server.name, from: ex.version, to: p.server.version }),
+    message: changed.length
+      ? tr(msg({ id: 'mcp.catalog.updateMessage', defaultMessage: '{where}: those places keep it, your values for its environment and headers too. What it runs changes (− now, + after):', description: 'The question before updating a catalogue server (HI-545), above the lines of what it runs that change. {where} says where it is added ("Added in hive", "Not added anywhere").' }), { where })
+      : tr(msg({ id: 'mcp.catalog.updateSame', defaultMessage: '{where}: those places keep it, your values for its environment and headers too. What it runs stays the same:', description: 'The question before updating a catalogue server (HI-545) whose command stays the same, above what it runs. {where} says where it is added.' }), { where }),
+    list: changed.length ? changed : p.runs,
+    detail: p.secretWarnings.join('\n') || undefined,
+    confirmLabel: tr(msg({ id: 'mcp.catalog.updateButton', defaultMessage: 'Update', description: 'Button (HI-545): updates the catalogue server to the new version.' }))
+  })
+  if (!ok) {
+    void call('mcp:catalogDrop', p.id).catch(() => undefined)
+    return false
+  }
+  const r = await attempt(tr(CATALOG_FAILED, { name: row.name }), () => call('mcp:catalogUpdate', p.id, { def: ex.def, revision: ex.revision }, { projects: ex.projects, assistant: ex.assistant }))
+  set((s) => ({ skillsVersion: s.skillsVersion + 1, mcpCatalogVersion: s.mcpCatalogVersion + 1 }))
+  if (!r) return false
+  if (r.stale) {
+    // Changed while the dialog was open: shown again from what is there now (twice at most).
+    notify('info', r.stale)
+    return again < 2 ? updateCatalogServer(row, again + 1) : false
+  }
+  notify('success', tr(msg({ id: 'mcp.catalog.updated', defaultMessage: 'Updated {name} to {version}', description: "A notification's title (HI-545): a catalogue server was updated." }), { name: p.server.name, version: p.server.version }))
+  await refreshWorkspace()
+  return true
+}
 
 /** Why a workspace MCP server can't be used, in the window's language (#849): Hive's own words, else the JSON reader's as it gave them. */
 export const mcpErrorText = (server: Pick<McpServerInfo, 'error' | 'errorText'>): string | undefined => (server.errorText ? shownText(server.errorText) : server.error)

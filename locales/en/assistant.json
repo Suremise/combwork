@@ -1151,6 +1151,14 @@
     "defaultMessage": "Mark as Working On",
     "description": "A project's right-click menu: makes it active."
   },
+  "assistant.sidebar.mcpCatalogue": {
+    "defaultMessage": "Catalogue",
+    "description": "The MCP view's second tab (HI-545): servers from the MCP catalogues, to install."
+  },
+  "assistant.sidebar.mcpInstalled": {
+    "defaultMessage": "Installed",
+    "description": "The MCP view's first tab (HI-545): the workspace's servers."
+  },
   "assistant.sidebar.mcpNoMatch": {
     "defaultMessage": "No server matches.",
     "description": "The MCP view (HI-2059) when no server matches its search and filter."

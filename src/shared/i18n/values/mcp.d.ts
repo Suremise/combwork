@@ -8,6 +8,75 @@ interface HiveMessageValues {
   'mcp.add.titleAssistant': undefined
   'mcp.addFile.messageAdded': { file: string | number; files: number }
   'mcp.addFile.replaceDetailAdded': undefined
+  'mcp.catalog.allSources': undefined
+  'mcp.catalog.badName': undefined
+  'mcp.catalog.badgeInstalled': undefined
+  'mcp.catalog.badgeNeeds': undefined
+  'mcp.catalog.badgeOther': undefined
+  'mcp.catalog.badgeUpdate': { version: string | number }
+  'mcp.catalog.cantRun': undefined
+  'mcp.catalog.check.app': { value: string | number }
+  'mcp.catalog.check.build': { value: string | number }
+  'mcp.catalog.check.docker': undefined
+  'mcp.catalog.check.edition': { value: string | number }
+  'mcp.catalog.check.feature': { value: string | number }
+  'mcp.catalog.check.node': { value: string | number }
+  'mcp.catalog.check.os': { value: string | number }
+  'mcp.catalog.expired': undefined
+  'mcp.catalog.failed': { name: string | number }
+  'mcp.catalog.filter': undefined
+  'mcp.catalog.filterAll': undefined
+  'mcp.catalog.filterInstalled': undefined
+  'mcp.catalog.filterMeets': undefined
+  'mcp.catalog.filterNotInstalled': undefined
+  'mcp.catalog.filterUpdates': undefined
+  'mcp.catalog.folder': { name: string | number }
+  'mcp.catalog.from': { source: string | number }
+  'mcp.catalog.gone': { name: string | number }
+  'mcp.catalog.homepage': undefined
+  'mcp.catalog.http': { url: string | number; status: string | number }
+  'mcp.catalog.installAction': undefined
+  'mcp.catalog.installButton': undefined
+  'mcp.catalog.installMessage': undefined
+  'mcp.catalog.installTitle': { name: string | number; version: string | number }
+  'mcp.catalog.installed': { name: string | number }
+  'mcp.catalog.installedAt': { version: string | number }
+  'mcp.catalog.installedNext': undefined
+  'mcp.catalog.installing': undefined
+  'mcp.catalog.loading': undefined
+  'mcp.catalog.mismatch': { name: string | number }
+  'mcp.catalog.more': { left: number }
+  'mcp.catalog.needs': { name: string | number; needs: string | number }
+  'mcp.catalog.no': undefined
+  'mcp.catalog.noMatch': undefined
+  'mcp.catalog.none': undefined
+  'mcp.catalog.notInstalled': { name: string | number }
+  'mcp.catalog.notRead': { reason: string | number }
+  'mcp.catalog.ok': undefined
+  'mcp.catalog.pick': undefined
+  'mcp.catalog.placesChanged': { name: string | number }
+  'mcp.catalog.redirects': { url: string | number }
+  'mcp.catalog.replaceButton': undefined
+  'mcp.catalog.replaceOther': { name: string | number }
+  'mcp.catalog.requires': undefined
+  'mcp.catalog.scheme': { url: string | number }
+  'mcp.catalog.search': undefined
+  'mcp.catalog.size': { size: string | number }
+  'mcp.catalog.skipped': { n: number }
+  'mcp.catalog.source': undefined
+  'mcp.catalog.sourceTaken': undefined
+  'mcp.catalog.sourceUrl': undefined
+  'mcp.catalog.timeout': { url: string | number; seconds: number }
+  'mcp.catalog.tooLarge': { url: string | number; max: number }
+  'mcp.catalog.unknown': undefined
+  'mcp.catalog.unvetted': undefined
+  'mcp.catalog.updateAction': { version: string | number }
+  'mcp.catalog.updateButton': undefined
+  'mcp.catalog.updateMessage': { where: string | number }
+  'mcp.catalog.updateSame': { where: string | number }
+  'mcp.catalog.updateTitle': { name: string | number; from: string | number; to: string | number }
+  'mcp.catalog.updated': { name: string | number; version: string | number }
+  'mcp.catalog.workspaceGone': { name: string | number }
   'mcp.enable.all': undefined
   'mcp.enable.assistant': undefined
   'mcp.enable.none': undefined

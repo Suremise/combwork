@@ -284,6 +284,8 @@ interface HiveMessageValues {
   'tips.mainProcessStalls.title': undefined
   'tips.maxAgents.text': undefined
   'tips.maxAgents.title': undefined
+  'tips.mcpCatalogue.text': undefined
+  'tips.mcpCatalogue.title': undefined
   'tips.mcpFromFile.textAdded': undefined
   'tips.mcpFromFile.title': undefined
   'tips.mcpPerAgent.text': undefined

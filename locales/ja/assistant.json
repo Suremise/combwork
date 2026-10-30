@@ -287,6 +287,8 @@
   "assistant.sidebar.loading": "読み込み中…",
   "assistant.sidebar.markNotWorking": "作業対象から外す",
   "assistant.sidebar.markWorking": "作業対象にする",
+  "assistant.sidebar.mcpCatalogue": "カタログ",
+  "assistant.sidebar.mcpInstalled": "インストール済み",
   "assistant.sidebar.mcpNoMatch": "一致するサーバーはありません。",
   "assistant.sidebar.mcpServers": "MCPサーバー",
   "assistant.sidebar.mcpTipAdded": "ワークスペースに配置したMCPサーバー（.hive/mcp）は、どのプロジェクトでも Hive アシスタントでも使え、追加した場所でだけ実行されます。追加はプロジェクトの「MCP」タブ、アシスタントのビュー、またはここの「追加先…」で行います。変更は新しいセッションから適用されます。",

@@ -2,6 +2,7 @@ import { DEFAULT_PERF_FILTERS, type PerfFilters } from '@shared/metricsView'
 import { create } from 'zustand'
 import { useMemo, type ReactNode } from 'react'
 import type { Period } from '@shared/usageTotals'
+import type { McpCatalogRow } from '@shared/types'
 import type { StartFailure } from '@shared/startFailure'
 import { cardLabel, setCardNaming } from '@shared/projectKeys'
 import type { AdvancedState } from '@shared/advanced'
@@ -295,6 +296,12 @@ interface State {
   /** A Hive skill to open for editing (not preview) when the Skills view shows it: from a project's Edit in workspace. */
   skillEdit: string | null
   selectedMcp: string | null
+  /** The MCP view's tab (HI-545): the installed servers, or the catalogues' servers to install. */
+  mcpTab: 'installed' | 'catalogue'
+  /** The catalogue server open in the MCP view (HI-545), as its list last had it. */
+  mcpPick: McpCatalogRow | null
+  /** Bumped to read the catalogues again (the view's ↻, an install or update). */
+  mcpCatalogVersion: number
   /** The mode open in the Modes view (its file). */
   selectedMode: string | null
   /** What the Assistant view's main area shows: its conversations or the selected mode. */
@@ -591,6 +598,9 @@ export const useStore = create<State>(() => ({
   templateFilter: 'all',
   skillEdit: null,
   selectedMcp: null,
+  mcpTab: 'installed',
+  mcpPick: null,
+  mcpCatalogVersion: 0,
   selectedMode: null,
   assistantSection: 'conversations',
   journalVersion: 0,

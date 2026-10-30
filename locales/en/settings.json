@@ -1539,6 +1539,30 @@
     "defaultMessage": "hive tools: reply timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.hive.mcpCatalog.downloadSeconds.desc": {
+    "defaultMessage": "How long Install and Update wait for a catalogue server's zip, redirects included, before they stop with nothing installed. Raise it on a slow connection.",
+    "description": "What the advanced setting \"MCP catalogues: downloading a server\" is for (Settings → Advanced, HI-545)."
+  },
+  "settings.advanced.hive.mcpCatalog.downloadSeconds.title": {
+    "defaultMessage": "MCP catalogues: downloading a server",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (HI-545)."
+  },
+  "settings.advanced.hive.mcpCatalog.fetchSeconds.desc": {
+    "defaultMessage": "How long the MCP view waits for a catalogue's list, redirects included, before it shows that catalogue couldn't be read. Raise it on a slow connection.",
+    "description": "What the advanced setting \"MCP catalogues: reading one\" is for (Settings → Advanced, HI-545)."
+  },
+  "settings.advanced.hive.mcpCatalog.fetchSeconds.title": {
+    "defaultMessage": "MCP catalogues: reading one",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds. An MCP catalogue is a list of servers to install (HI-545)."
+  },
+  "settings.advanced.hive.mcpCatalog.probeSeconds.desc": {
+    "defaultMessage": "How long each check of this PC for a catalogue server's requirements (its Windows edition and build, Node.js, Docker) may take before it shows as not checked.",
+    "description": "What the advanced setting \"MCP catalogues: checking this PC’s requirements\" is for (Settings → Advanced, HI-545)."
+  },
+  "settings.advanced.hive.mcpCatalog.probeSeconds.title": {
+    "defaultMessage": "MCP catalogues: checking this PC's requirements",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (HI-545)."
+  },
   "settings.advanced.hive.merge.lockWaitSeconds.desc": {
     "defaultMessage": "How long a merge, or another change to a repository's branches (a pull, switching branch, moving an agent's branch), waits while another Hive on this computer is merging into the same repository. After it, nothing is changed and Hive says which Hive holds the repository: try again once it has finished. Hive never takes the repository from a Hive that is still running.",
     "description": "What the advanced setting \"Merges: wait for another Hive\" is for, and what happens when the wait ends (Settings → Advanced)."
@@ -3799,6 +3823,50 @@
     "defaultMessage": "Use it",
     "description": "Button of the question when a recorded shortcut is already used: uses it for this command too."
   },
+  "settings.mcpCatalogs.add": {
+    "defaultMessage": "Add Catalogue",
+    "description": "Settings → MCP Catalogues (HI-545): adds the catalogue at the address typed."
+  },
+  "settings.mcpCatalogs.addLabel": {
+    "defaultMessage": "A catalogue's address",
+    "description": "Settings → MCP Catalogues (HI-545): the box for the address of a catalogue to add, for screen readers."
+  },
+  "settings.mcpCatalogs.down": {
+    "defaultMessage": "Move down",
+    "description": "Settings → MCP Catalogues (HI-545): moves a catalogue down the list."
+  },
+  "settings.mcpCatalogs.ours": {
+    "defaultMessage": "Hive's own catalogue, checked by Hive.",
+    "description": "Settings → MCP Catalogues (HI-545): under the name of Hive’s own catalogue (Suremise/hive-mcp)."
+  },
+  "settings.mcpCatalogs.oursSwitch": {
+    "defaultMessage": "Hive's own catalogue listed",
+    "description": "Settings → MCP Catalogues (HI-545): the switch of Hive's own catalogue, for screen readers."
+  },
+  "settings.mcpCatalogs.remove": {
+    "defaultMessage": "Remove this catalogue (its servers installed stay)",
+    "description": "Settings → MCP Catalogues (HI-545): removes a catalogue the user added; servers installed from it stay."
+  },
+  "settings.mcpCatalogs.sources.desc": {
+    "defaultMessage": "Each catalogue is a catalog.json at an https:// or file:// address. Turned off, its servers aren't listed (those installed stay). Hive reads them only when the Catalogue opens or you refresh it, and checks every download against its catalogue.",
+    "description": "What the setting \"Catalogues\" does, under its title (Settings → MCP Catalogues, HI-545). Keep catalog.json, https:// and file:// as they are."
+  },
+  "settings.mcpCatalogs.sources.title": {
+    "defaultMessage": "Catalogues",
+    "description": "A setting's title (Settings → MCP Catalogues, HI-545): the catalogues listed, each on or off."
+  },
+  "settings.mcpCatalogs.switch": {
+    "defaultMessage": "{url} listed",
+    "description": "Settings → MCP Catalogues (HI-545): the switch of a catalogue, for screen readers. {url} is its address."
+  },
+  "settings.mcpCatalogs.theirs": {
+    "defaultMessage": "Its servers aren't checked by Hive.",
+    "description": "Settings → MCP Catalogues (HI-545): under a catalogue the user added."
+  },
+  "settings.mcpCatalogs.up": {
+    "defaultMessage": "Move up",
+    "description": "Settings → MCP Catalogues (HI-545): moves a catalogue up the list."
+  },
   "settings.metrics.resetDetail": {
     "defaultMessage": "The history starts again from now.",
     "description": "More in the question before the performance metrics are cleared."
@@ -4954,6 +5022,14 @@
   "settings.section.keybindings.label": {
     "defaultMessage": "Keyboard Shortcuts",
     "description": "A section of Settings, in its list on the left."
+  },
+  "settings.section.mcpCatalogs.desc": {
+    "defaultMessage": "Where the MCP view's Catalogue finds servers to install. Hive's own comes first; add a company's or a community's list by its address.",
+    "description": "Under the heading of the section \"MCP Catalogues\" of Settings (HI-545): what it holds."
+  },
+  "settings.section.mcpCatalogs.label": {
+    "defaultMessage": "MCP Catalogues",
+    "description": "A section of Settings, in its list on the left (HI-545): the lists of MCP servers to install. MCP is a protocol’s name: keep it."
   },
   "settings.section.notifications.desc": {
     "defaultMessage": "Chimes and desktop notifications when agents finish or need you.",

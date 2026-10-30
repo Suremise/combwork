@@ -282,6 +282,8 @@
   "tips.mainProcessStalls.title": "See why Hive felt slow",
   "tips.maxAgents.text": "Maximum agents in Version Control → Workflow is how many agents a project has, so nobody brings in agents you didn’t plan for, the Assistant included. Each preset sets its team: Solo one agent, Pair a builder and a reviewer. Raise it there to add more.",
   "tips.maxAgents.title": "Your team size",
+  "tips.mcpCatalogue.text": "The MCP view's Catalogue lists servers you can install, Hive's own first. Each download is checked against its catalogue and shows what it runs; updates are offered, never automatic. Add a company's catalogue in Settings → MCP Catalogues.",
+  "tips.mcpCatalogue.title": "Install a server from a catalogue",
   "tips.mcpFromFile.textAdded": "Got a server as a .json definition or a .zip of its folder? Add MCP Server from File in the MCP view shows what it runs and adds it to the workspace: then add it to the projects that need it, with Add to… or in their MCP tab.",
   "tips.mcpFromFile.title": "Add an MCP server from a file",
   "tips.mcpPerAgent.text": "In an agent's settings, MCP servers: Only these gives it just the servers it needs, such as a sandbox server for a release tester, and keeps the others' tools out of its context.",

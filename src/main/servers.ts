@@ -7,7 +7,7 @@ import { attachableSource, cardAttachments, cardHost, checkBatch, readCardAttach
 import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachments'
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
-import type { AgentApiInfo, AgentDef, AgentInfo, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AgentInfo, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, defaultProviderPending, isKnownProvider, isProviderEnabled, offeredModes, projectDefaultProvider, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
@@ -3537,7 +3537,9 @@ route('GET', '/v1/mcp', async () => {
     const own = await inWorkspace(ws, () => workspace.projectConfig(caller.projectPath))
     return servers.map(({ name, def, error }) => ({ name, description: def?.description ?? '', added: serverOnIn({ name, def }, own.mcp, ws.config.mcp.enabled), error }))
   }
-  return servers.map(({ name, def, projects, assistant: forAssistant, error }) => ({ name, description: def?.description ?? '', added: { projects: projects.map((p) => basename(p)), assistant: forAssistant }, error }))
+  // The catalogue it was installed from (HI-545), for the workspace's callers.
+  const origin = (def: McpServerInfo['def']) => (def?.catalog && typeof def.catalog.source === 'string' ? { source: def.catalog.source, version: def.catalog.version } : null)
+  return servers.map(({ name, def, projects, assistant: forAssistant, error }) => ({ name, description: def?.description ?? '', added: { projects: projects.map((p) => basename(p)), assistant: forAssistant }, catalog: origin(def), error }))
 })
 
 route('POST', '/v1/notify', async ({ body }) => {

@@ -34,6 +34,7 @@ export const RETIRED_PERSONAS: Record<string, string> = { overseer: 'coordinator
 export const DEFAULT_SETTINGS: AppSettings = {
   keybindings: {},
   commands: { list: [], onQuit: { run: [] } },
+  mcpCatalogs: { oursOn: true, sources: [] },
   updates: {
     checkAutomatically: true,
     downloadAutomatically: true,

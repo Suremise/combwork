@@ -192,6 +192,7 @@ export const SUITES = [
   { name: 'maxagents' },
   { name: 'mcp' },
   { name: 'mcpagents' },
+  { name: 'mcpcatalog' },
   { name: 'mcpfile' },
   { name: 'mergedialogslots' },
   { name: 'mergequeue' },

@@ -79,6 +79,10 @@ import type {
   McpFileServer,
   McpShown,
   McpPlacesResult,
+  McpCatalogFilter,
+  McpCatalogPrepared,
+  McpCatalogSettings,
+  McpCatalogSourcePage,
   McpProjectServer,
   McpServerDef,
   McpServerInfo,
@@ -794,6 +798,24 @@ export interface HiveRequests {
    * old one goes to the Recycle Bin).
    */
   'mcp:addFromFile': (file: string, name: string, replace: boolean) => McpServerInfo
+  /**
+   * The MCP catalogues' pages (HI-545): each listed source's rows for a search and a filter. `refresh` reads the
+   * catalogues and this PC again (the view opening, ↻); `source` and `offset`: that source's next page.
+   */
+  'mcp:catalog': (opts: { query?: string; filter?: McpCatalogFilter; source?: string; offset?: number; refresh?: boolean }) => McpCatalogSourcePage[]
+  /** The one-time note for a source Hive doesn't check was shown (HI-545). */
+  'mcp:catalogNoted': (url: string) => void
+  /** Downloads and checks a catalogue server for Install or Update (HI-545): what it would run, held for the answer. */
+  'mcp:catalogPrepare': (source: string, name: string) => McpCatalogPrepared
+  /** Drops a prepared download the user cancelled. */
+  'mcp:catalogDrop': (id: string) => void
+  /** Installs a prepared catalogue server as `name` (added nowhere); `replace` over a server of the name. */
+  'mcp:catalogInstall': (id: string, name: string, replace: boolean) => void
+  /** Updates an installed catalogue server, refused if its definition or the places shown changed meanwhile (HI-545/s17). */
+  'mcp:catalogUpdate': (id: string, shown: McpShown, places: { projects: string[]; assistant: boolean }) => { stale?: string }
+  /** The catalogue sources (Settings → MCP Catalogues), and saving them. */
+  'mcp:catalogSources': () => McpCatalogSettings
+  'mcp:catalogSetSources': (next: McpCatalogSettings) => McpCatalogSettings
 
   'notes:tree': () => NoteFile[]
   'notes:create': (relPath: string, isDir: boolean) => string

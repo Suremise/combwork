@@ -282,6 +282,8 @@
   "tips.mainProcessStalls.title": "Descubre por qué Hive fue lento",
   "tips.maxAgents.text": "Máximo de agentes, en Control de versiones → Flujo de trabajo, es cuántos agentes tiene un proyecto, para que nadie traiga agentes que no planeaste, ni siquiera el Assistant. Cada preajuste fija su equipo: Solo un agente, Pair un autor y un revisor. Súbelo allí para agregar más.",
   "tips.maxAgents.title": "El tamaño de tu equipo",
+  "tips.mcpCatalogue.text": "El Catálogo de la vista MCP muestra servidores que puedes instalar, primero los de Hive. Cada descarga se comprueba con su catálogo y muestra lo que ejecuta; las actualizaciones se ofrecen, nunca son automáticas. Agrega el catálogo de una empresa en Configuración → Catálogos MCP.",
+  "tips.mcpCatalogue.title": "Instala un servidor desde un catálogo",
   "tips.mcpFromFile.textAdded": "¿Te dieron un servidor como definición .json o como .zip de su carpeta? Agregar servidor MCP desde un archivo, en la vista MCP, muestra lo que ejecuta y lo agrega al espacio de trabajo: luego agrégalo a los proyectos que lo necesiten, con Agregar a… o en su pestaña MCP.",
   "tips.mcpFromFile.title": "Agrega un servidor MCP desde un archivo",
   "tips.mcpPerAgent.text": "En la configuración de un agente, Servidores MCP: Solo estos le da solo los servidores que necesita, como un servidor de sandbox para quien prueba una versión, y deja las herramientas de los demás fuera de su contexto.",

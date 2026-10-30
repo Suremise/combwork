@@ -282,6 +282,8 @@
   "tips.mainProcessStalls.title": "Sprawdź, dlaczego Hive zwolnił",
   "tips.maxAgents.text": "Maksymalna liczba agentów w Kontrola wersji → Przepływ pracy to liczba agentów projektu, więc nikt nie sprowadzi agentów, których nie planowałeś, także Assistant. Każde ustawienie wstępne ustawia swój zespół: Solo jeden agent, Pair wykonawca i recenzent. Aby dodać więcej, zwiększ ją tam.",
   "tips.maxAgents.title": "Wielkość twojego zespołu",
+  "tips.mcpCatalogue.text": "Katalog w widoku MCP pokazuje serwery do zainstalowania, najpierw te z Hive. Każde pobranie jest sprawdzane z jego katalogiem i pokazuje, co uruchamia; aktualizacje są proponowane, nigdy automatyczne. Katalog firmy dodasz w Ustawienia → Katalogi MCP.",
+  "tips.mcpCatalogue.title": "Zainstaluj serwer z katalogu",
   "tips.mcpFromFile.textAdded": "Masz serwer jako definicję .json albo .zip jego folderu? Dodaj serwer MCP z pliku w widoku MCP pokazuje, co uruchamia, i dodaje go do obszaru roboczego: potem dodaj go do projektów, które go potrzebują, przez Dodaj do… albo w ich zakładce MCP.",
   "tips.mcpFromFile.title": "Dodaj serwer MCP z pliku",
   "tips.mcpPerAgent.text": "W ustawieniach agenta Serwery MCP: Tylko te daje mu tylko potrzebne serwery, np. serwer piaskownicy dla testera wydań, a narzędzia pozostałych nie trafiają do jego kontekstu.",
