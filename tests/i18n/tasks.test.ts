@@ -223,7 +223,8 @@ describe("a card's history: English as stored, its line as data for the window",
   it('the window says Active and Approved where agents read Doing and Passed (#1458)', async () => {
     const c = await run(() => tasks.createTask({ title: 'Staged', project: 'alpha', column: 'passed' }, user))
     const other = await run(() => tasks.createTask({ title: 'Other', project: 'alpha', column: 'doing' }, user))
-    await run(() => tasks.updateTask(c.number, { column: 'doing', before: other.number }, assistant))
+    // Nobody on it, by the user's reason (HI-2062: the Assistant's move into Doing with nobody on it needs one).
+    await run(() => tasks.updateTask(c.number, { column: 'doing', before: other.number, override: { reason: 'Nobody yet' } }, assistant))
     await run(() => tasks.updateTask(c.number, { position: 'bottom' }, assistant))
     await run(() => tasks.updateTask(c.number, { position: 'top' }, assistant))
     await run(() => tasks.updateTask(c.number, { column: 'passed' }, user))

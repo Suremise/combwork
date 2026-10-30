@@ -113,6 +113,22 @@ const check = (name, ok, extra = '') => {
     }
   }
 
+  // HI-2084: a hover tooltip whose anchor goes (its panel folded from the keyboard, the mouse still on it) lets go of
+  // the hover slot as it unmounts, with no other tooltip shown after it: nothing keeps the detached anchor.
+  const held = () => page.evaluate(() => window.__hiveHoveredTip())
+  const button = page.locator('.assistant-header .tip-wrap > *:first-child').first()
+  check('a hover tooltip: none holds the slot before', (await held()) === null, JSON.stringify(await held()))
+  await page.mouse.move(700, 450)
+  await button.hover()
+  const up = await lib.until(() => page.evaluate(() => {
+    const t = document.querySelector('.tip')
+    return !!t && getComputedStyle(t).visibility === 'visible'
+  }), HUNG_MS)
+  check("…its tooltip shows, holding the slot with its anchor in the page", !!up && JSON.stringify(await held()) === '{"connected":true}', JSON.stringify(await held()))
+  await page.keyboard.press('Control+Alt+I')
+  check('…its panel folded from the keyboard, the mouse not moved', !!(await lib.until(async () => (await page.locator('.assistant-panel').count()) === 0, HUNG_MS)))
+  check('…its anchor gone, the slot is let go (no detached anchor kept) and no tooltip shows', !!(await lib.until(async () => (await held()) === null, HUNG_MS)) && (await page.locator('.tip').count()) === 0, JSON.stringify(await held()))
+
   await app.close()
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nALL PASSED')
   process.exit(failed ? 1 : 0)
