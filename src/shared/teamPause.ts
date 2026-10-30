@@ -9,6 +9,8 @@ export interface TeamPause {
   pauseId: string
   since: string
   by: 'user' | 'assistant'
+  /** The version of Hive it was taken in (HI-2156): Hive starting in another has installed the update, and lifts it. */
+  version?: string
 }
 
 /** What still keeps an agent from being parked: busy (named), or can't be checked (named, never taken as parked). */

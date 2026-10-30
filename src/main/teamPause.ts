@@ -19,7 +19,9 @@ import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from
  * wakes (`pauseHolds`, deliveries.ts' admission gate). The user's pause covers every open workspace with one id, and a
  * workspace opened while it lasts (the profile's `team-pause.json`) is held by it too; the Assistant's covers its own
  * workspace only. Pause and resume take each workspace's lock, which the gates' final checks read under, so a change
- * is never half seen. Each running agent is told once per pause (TEAM_PAUSE_LINE). Rules off: the same hold.
+ * is never half seen. Each running agent is told once per pause (TEAM_PAUSE_LINE). Rules off: the same hold. A pause
+ * saved by another version of Hive is lifted as it is read (the update was installed), and a workspace resumed on its own
+ * leaves the user's pause, which goes with the last workspace it held (HI-2156).
  */
 
 const log = createLogger('teamPause')
@@ -59,6 +61,12 @@ const keyOf = (ws: Pick<WorkspaceService, 'path'>): string => hiveOf(ws).toLower
 const fileOf = (ws: Pick<WorkspaceService, 'path'>): string => join(hiveOf(ws), FILE)
 const appFile = (): string => join(app.getPath('userData'), FILE)
 
+/**
+ * The profile's pause (the user's of every workspace) as saved: a TeamPause, and the workspaces resumed from it on their
+ * own (by their .hive, lower case; HI-2156), which it no longer holds, in this run or the next.
+ */
+type AppPauseFile = TeamPause & { resumedIn?: string[] }
+
 const valid = (v: unknown): v is TeamPause => !!v && typeof v === 'object' && typeof (v as TeamPause).pauseId === 'string' && typeof (v as TeamPause).since === 'string' && ((v as TeamPause).by === 'user' || (v as TeamPause).by === 'assistant')
 
 /** A saved pause, or null: none, or one that can't be read (logged). */
@@ -78,15 +86,25 @@ function readPause(file: string): TeamPause | null {
   }
 }
 
+/**
+ * Whether a saved pause was for an update installed since (HI-2156): saved by another version of Hive than this one,
+ * however Hive closed for it (the installer run by hand after a plain quit too). A pause saved before versions were
+ * recorded is kept, and the window asks at start whether to resume it.
+ */
+const liftedByVersion = (p: TeamPause): boolean => !!p.version && p.version !== app.getVersion()
+
 /** The user's pause of every open workspace, as the profile keeps it (read again each time: tiny, and rare). */
-export const appPause = (): TeamPause | null => {
+export const appPause = (): AppPauseFile | null => {
   const p = readPause(appFile())
-  if (p && closing && /^(install|update)$/.test(closing.reason) && closing.app === p.pauseId) {
+  if (p && ((closing && /^(install|update)$/.test(closing.reason) && closing.app === p.pauseId) || liftedByVersion(p))) {
     void rm(appFile(), { force: true }).catch(() => undefined)
     return null
   }
   return p
 }
+
+/** Whether the user's pause no longer holds a workspace: resumed from it on its own (HI-2156). */
+const resumedFrom = (all: AppPauseFile, ws: Pick<WorkspaceService, 'path'>): boolean => Array.isArray(all.resumedIn) && all.resumedIn.includes(keyOf(ws))
 
 const liftedByClosing = (ws: WorkspaceService, p: TeamPause): boolean => !!closing && /^(install|update)$/.test(closing.reason) && closing.pauses.some((x) => x.hiveDir === keyOf(ws) && x.pauseId === p.pauseId)
 
@@ -129,7 +147,7 @@ export function teamPauseOf(ws: WorkspaceService | null | undefined): TeamPause 
   // Hive restarting for the update this pause was for (HR1's s10 check): lifted before anything reads it, so the team
   // resumes on its own (the restart's resume offer). Only this very pause, closed under an install or an update, in the
   // close just before this start: a crash, a plain quit or an older record keeps it.
-  if (p && liftedByClosing(ws, p)) {
+  if (p && (liftedByClosing(ws, p) || liftedByVersion(p))) {
     void withLock(ws, () => rm(fileOf(ws), { force: true })).catch((e) => log.warn("Removing a team pause lifted by the update's restart", e))
     log.info(`The team of ${userText(ws.path)} resumes after the update it was paused for (${p.pauseId})`)
     p = null
@@ -138,7 +156,7 @@ export function teamPauseOf(ws: WorkspaceService | null | undefined): TeamPause 
   saves.set(k, 'saved')
   if (!p) {
     const all = appPause()
-    if (all) {
+    if (all && !resumedFrom(all, ws)) {
       // Held at once, pending until saved (round 1, finding 2): pauseTeam saves it, tells the window and the agents, and
       // a failure is the workspace's (never parked).
       known.set(k, all)
@@ -219,7 +237,7 @@ export async function pauseTeam(ws: WorkspaceService, by: TeamPause['by'], pause
     const saved = saves.get(k) === 'saved'
     if (was && saved && (was.pauseId === pauseId || by === 'assistant')) return null
     // Taken from the user's pause and not saved yet: that very pause is saved now, as it was.
-    const next: TeamPause = was && !saved && was.pauseId === pauseId ? was : { pauseId, since: new Date().toISOString(), by }
+    const next: TeamPause = was && !saved && was.pauseId === pauseId ? was : { pauseId, since: new Date().toISOString(), by, version: app.getVersion() }
     try {
       await save(ws, next)
     } catch (e) {
@@ -245,6 +263,7 @@ export async function resumeTeam(ws: WorkspaceService): Promise<boolean> {
     const p = teamPauseOf(ws)
     if (!p) return null
     await rm(fileOf(ws), { force: true })
+    await leaveAppPause(ws, p)
     known.set(keyOf(ws), null)
     saves.set(keyOf(ws), 'saved')
     resumed.set(keyOf(ws), Date.now())
@@ -254,6 +273,20 @@ export async function resumeTeam(ws: WorkspaceService): Promise<boolean> {
   log.info(`The team of ${userText(ws.path)} resumes (${was.pauseId}: paused ${Math.round((Date.now() - Date.parse(was.since)) / 60_000)} min)`)
   changed(ws, was)
   return true
+}
+
+/**
+ * A workspace resumed while the user's pause of every workspace held it (HI-2156: the Assistant's resume, which covers its
+ * own workspace): that pause no longer holds it, here or after a restart. The profile's pause goes once no other open
+ * workspace is held by it; else it names this workspace as resumed from it.
+ */
+async function leaveAppPause(ws: WorkspaceService, p: TeamPause): Promise<void> {
+  const all = appPause()
+  if (!all || all.pauseId !== p.pauseId) return
+  const k = keyOf(ws)
+  const others = openWorkspaces().some((w) => w.path && keyOf(w) !== k && teamPauseOf(w)?.pauseId === all.pauseId)
+  if (!others) await rm(appFile(), { force: true })
+  else if (!resumedFrom(all, ws)) await writeJsonAtomic(appFile(), { ...all, resumedIn: [...(Array.isArray(all.resumedIn) ? all.resumedIn : []), k] })
 }
 
 /** What the user's pause or resume of every open workspace did: those it reached, and those it couldn't (why). */
@@ -268,7 +301,9 @@ export interface AppPauseResult {
  * held too). A workspace whose save fails is named (HR1's s12 condition): the app is never parked while one isn't paused.
  */
 export async function pauseApp(): Promise<AppPauseResult> {
-  const p: TeamPause = appPause() ?? { pauseId: randomUUID(), since: new Date().toISOString(), by: 'user' }
+  // Paused again: every open workspace held again, those resumed from it on their own included.
+  const was = appPause()
+  const p: TeamPause = was ? { pauseId: was.pauseId, since: was.since, by: was.by, ...(was.version ? { version: was.version } : {}) } : { pauseId: randomUUID(), since: new Date().toISOString(), by: 'user', version: app.getVersion() }
   await writeJsonAtomic(appFile(), p)
   const out: AppPauseResult = { pause: p, done: [], failed: [] }
   for (const ws of openWorkspaces()) {

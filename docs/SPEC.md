@@ -4691,7 +4691,7 @@ decided again in it):
 to park, and Hive's own automation started two of them again (a lane's next card, a verdict's loop wake), while someone
 checked every agent and process by hand.
 
-- **The pause** is a workspace's, saved in `.hive/team-pause.json` (`{ pauseId, since, by }`) before anything is held or
+- **The pause** is a workspace's, saved in `.hive/team-pause.json` (`{ pauseId, since, by, version }`, version: Hive's, HI-2156) before anything is held or
   told (a failed save holds and tells nothing), read once into memory, and asked by every gate; pause, resume and the gates'
   final checks take the workspace's lock. **Pause the Team** (the Progress panel's Lanes, the command palette, Help → Check
   for Updates' *Pause the Team First*) pauses every open workspace with one id, kept in the profile too, so a workspace
@@ -4744,8 +4744,14 @@ checked every agent and process by hand.
   merge queue pass, held deliveries are rebased and offered, restart recovery resumes what waited. **After an update's
   restart** the pause is lifted before anything reads it only when the closing record (`team-pause-closing.json`, written as
   Hive closes, replacing any earlier one, read and removed at the next start) says the close was an install or an update and
-  names this very pause; a crash, a plain quit or an older record keeps it, and the window says *The team is still paused*
-  with **Resume the Team**.
+  names this very pause; and a pause saved by another version of Hive (the workspace's or the profile's) is lifted as it
+  is read, however Hive closed for the update (the installer run by hand after a plain quit too, HI-2156). Otherwise a
+  crash, a plain quit or an older record keeps it, and the window asks once as it opens, *The team was paused at <time>
+  (before an update)*, *Resume it?*, with **Resume the Team**.
+- **One answer everywhere** (HI-2156): status (`hive_team`, `GET /v1/team`, the band) and every gate read the same
+  pause, the user's included where it holds a workspace. A workspace resumed on its own (the Assistant's resume) leaves the
+  user's pause: it no longer holds that workspace, in this run or after a restart (the profile's file names it,
+  `resumedIn`), and it goes once no other open workspace is held by it. **Pause the Team** again holds every one.
 - **Not here:** pausing the user's own sessions (they stop with the install as before), or a pause of one project.
 
 ### 16.11 Lanes, with or without the Assistant

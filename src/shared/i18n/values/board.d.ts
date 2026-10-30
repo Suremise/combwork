@@ -890,7 +890,7 @@ interface HiveMessageValues {
   'board.team.resume': undefined
   'board.team.showWindow': undefined
   'board.team.showWindowTitle': undefined
-  'board.team.stillPaused': undefined
+  'board.team.stillPaused': { time: string | number }
   'board.team.stillPausedBody': undefined
   'board.team.stillPausedResume': undefined
   'board.team.thisWorkspace': undefined
