@@ -26,7 +26,7 @@
 //   --build         build first (npx electron-vite build), only if the build isn't from this source (build.mjs).
 //   --packaged      include the installer's suites (need npm run dist); --no-progress: don't report to Hive.
 //   --no-wait       a heavy run (more than 5 suites, or --repeat) fails at once when every test slot on this machine is
-//                   taken, instead of waiting for one (slots.mjs; heavySlots in hive-test\config.json, default 2); and
+//                   taken, instead of waiting for one (slots.mjs; heavySlots and sideSlots in hive-test\config.json); and
 //                   any run fails at once when every test lane (10) is taken, instead of waiting for one (lanes.mjs, #707).
 //   --pre-merge     a heavy run checking a merge goes first in the queue for a test slot (#558). Not needed in the
 //                   session of an agent holding the merge slot: such a run goes first anyway (slots.mjs holdsMergeSlot).
@@ -50,7 +50,7 @@ import { devBuild, ensureBuild } from './build.mjs'
 import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, omittedLine, pruneRunDirsReleasing } from './logs.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from './lanes.mjs'
 import { endLeftCopies } from './leftCopies.mjs'
-import { describeClaim, heavySlots, needsSlot, preMerge, waitForSlot, waitLine } from './slots.mjs'
+import { SIDE_E2E_JOBS, creditFor, preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from './slots.mjs'
 import { usesCodexHome, waitForCodexHome } from './codexHomeLock.mjs'
 import { autoClean, holdLane } from './clean.mjs'
 import { recycleBinCount, recycleBinLine } from './recycleBin.mjs'
@@ -70,7 +70,8 @@ if (opts.error) {
   console.error(opts.error.startsWith('Unknown suite') ? `${opts.error}. Suites: ${SUITES.map((s) => s.name).join(', ')}` : opts.error)
   process.exit(2)
 }
-const { jobs } = opts
+// At most SIDE_E2E_JOBS on the side slot (below).
+let { jobs } = opts
 
 if (opts.fingerprint) {
   console.log(fingerprint(root))
@@ -128,29 +129,36 @@ const { devOnly, nothingRan } = packagedPlan(chosen, here, packagedExe)
 if (packagedExe) console.log(`Packaged build: ${packagedExe} (HIVE_EXE)${devOnly.size ? `. NOT RUN, as they would test the dev build: ${devOnly.size} of ${chosen.length} suites (each said with why)` : ''}.\n`)
 
 // --- A heavy run (more than a few suites, or a repeat) waits for a test slot: at most a few go at once on this machine,
-// across every worktree (slots.mjs), so runs don't slow each other until tests time out. A runner started inside a
-// suite never waits (its parent holds one: needsSlot). --no-wait: fail at once instead. A pre-merge run goes first.
+// across every worktree (slots.mjs), so runs don't slow each other until tests time out; a small one (a few suites
+// repeated a few times, HI-2070) takes the side slot, else a heavy one. A runner started inside a suite never waits
+// (its parent holds one: slotPool). --no-wait: fail at once instead. A pre-merge run goes first.
 const nested = !!parentSuite()
-if (needsSlot({ count: chosen.length, repeat: opts.repeat })) {
+const pool = slotPool({ kind: 'e2e', count: chosen.length, repeat: opts.repeat })
+if (pool) {
   const what = `e2e: ${chosen.length} suites${opts.repeat > 1 ? ` × ${opts.repeat}` : ''}`
   const queue = slotWaitProgress('e2e', `npm run e2e -- ${args.join(' ')}`.trim(), args)
   let said = ''
   const got = await waitForSlot(runContext.HEAVY_DIR, {
+    pool,
     what,
     root,
     wait: !opts.noWait,
     first: preMerge(opts.preMerge),
     onWait: (look) => {
-      const who = look.holders.map((c) => describeClaim(c)).join('; ')
       const line = waitLine(look)
       if (line !== said) console.log(line)
       said = line
-      queue.waiting(who)
+      queue.waitingAs(waitSummary(look))
     }
   })
   if (got.refused) {
-    console.error(`No test slot free (--no-wait): ${heavySlots()} heavy runs at once on this machine, held by ${got.refused.holders.map((c) => describeClaim(c)).join('; ')}.`)
+    console.error(refusedLine(got.refused))
     process.exit(2)
+  }
+  // Beside two heavy runs, a side run's suites go at most two at once (HI-2070: four took the machine near full).
+  if (got.pool === 'side' && jobs > SIDE_E2E_JOBS) {
+    console.log(`On the side slot: ${SIDE_E2E_JOBS} suites at once, not ${jobs} (HI-2070).`)
+    jobs = SIDE_E2E_JOBS
   }
   if (said) {
     const after = `${Math.round(got.waitedMs / 1000)} s`
@@ -258,7 +266,7 @@ if (lane) console.log(`Lane ${lane.lane}: ports ${lane.first}–${lane.last}\n  
  * shell inside the suite's Hive (progressreport does) knows it is inside a suite, and which port to keep clear of.
  */
 const suiteEnv = (name, port, dir) => {
-  const env = runContext.suiteEnv({ name, port, work: dir, runDir: dir ?? lib.WORK, cliLog: dir ? join(dir, CLI_LOG) : null })
+  const env = runContext.suiteEnv({ name, port, work: dir, runDir: dir ?? lib.WORK, cliLog: dir ? join(dir, CLI_LOG) : null, slots: creditFor(pool) })
   // --lang: the languages the i18n screenshot route photographs (it reads E2E_I18N_LANGS; the others are pinned to English).
   if (name === LANG_SUITE && opts.lang.length) env.E2E_I18N_LANGS = opts.lang.join(',')
   return env
