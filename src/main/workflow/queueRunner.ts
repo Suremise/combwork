@@ -32,7 +32,11 @@ import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStor
 import type { JobHost } from '../processSupervisor'
 import { clearJournal, endLeaseJob, journalOf, journalPath, launcherNotStarted, launcherSignalled, LeaseJob, queueHost, sealJournal, SIGNALLED, startLauncher, type Journalled } from './queueJobs'
 import { defaultProbe, treeOf, type Listed, type ProcessProbe } from './queueProcs'
+import { GitHost, startGitHost, type HostResult } from './gitHost'
 import type { Workflow } from './runtime'
+
+/** What a launcher is recorded as (its git host as `testMerge`, as the launchers of its git were). */
+type Launched = Exclude<QueueProcKind, 'job'>
 
 const log = createLogger('queue')
 
@@ -75,8 +79,9 @@ export interface RunnerConfig {
    * dead runner's duties. `endJob`: false makes ending a job fail (a job that won't empty). `journalDir`: where the
    * jobs' journals go (a folder that can't be written, for a journal that fails). `afterSeal`, `beforeClear`: run as a
    * takeover has sealed the earlier runners' journals, and just before it drops their duties (a late write, then).
+   * `beforeHostSend` (HI-2079): runs between a git's lease read and its sending to the git host (a takeover then).
    */
-  hooks?: { renew?: () => boolean; lingeringJob?: boolean; beforeSettle?: () => Promise<void>; afterSeal?: () => Promise<void>; beforeClear?: () => Promise<void>; endJob?: () => boolean; journalDir?: string }
+  hooks?: { renew?: () => boolean; lingeringJob?: boolean; beforeSettle?: () => Promise<void>; afterSeal?: () => Promise<void>; beforeClear?: () => Promise<void>; endJob?: () => boolean; journalDir?: string; beforeHostSend?: () => Promise<void> }
 }
 
 /** Who holds a target's lease, as the panel shows it. */
@@ -150,6 +155,13 @@ const holderOf = (l: QueueLease): Holder => ({ profile: l.profile, pid: l.pid, r
 
 export class QueueRunner {
   private released = false
+  /** HI-2079: its git host went or misbehaved: nothing starts and no fenced write commits from then on; it releases. */
+  private broken = false
+  /** The release under way (or done): one, whoever asks for it (a failure, the host's run ending). */
+  private releasing: Promise<void> | null = null
+  /** HI-2079: its git host, once started (one per lease), and the start under way. */
+  private gitHost: GitHost | null = null
+  private hostStart: Promise<GitHost | HostResult> | null = null
   private timer: NodeJS.Timeout | null = null
   private job: LeaseJob | null = null
   private host: JobHost | null = null
@@ -235,7 +247,17 @@ export class QueueRunner {
 
   /** Whether this runner still holds its lease: inside a write, as that write sees it (so a fact it guards commits only while it does). */
   holds(): boolean {
-    return !this.released && this.cfg.store.holdsQueueLease(this.lease, this.token)
+    return !this.released && !this.broken && this.cfg.store.holdsQueueLease(this.lease, this.token)
+  }
+
+  /** HI-2079: its git host went or misbehaved, so it gave its lease up: its queue takes a new one (queueHost's runHost). */
+  get failed(): boolean {
+    return this.broken
+  }
+
+  /** Whether it may start something: its job made, not released, not failed. */
+  private admits(): boolean {
+    return !!this.job && !this.released && !this.broken
   }
 
   /** Throws LeaseLost unless the runner still holds its lease (inside a write: what it writes is then refused whole). */
@@ -279,6 +301,11 @@ export class QueueRunner {
     return null
   }
 
+  /** HI-2079: its git host's process id while it has one (tests: to end it as a crash would). */
+  get gitHostPid(): number | null {
+    return this.gitHost?.pid ?? null
+  }
+
   /** The supervisor's process id (tests: to end a lingering one). */
   get supervisorPid(): number | null {
     return this.host?.pid ?? null
@@ -304,7 +331,7 @@ export class QueueRunner {
    * nothing run, when the runner no longer holds (LeaseLost), its job has gone, or the launcher couldn't be put in the
    * job or recorded. The child is the launcher: its output and exit code are the command's.
    */
-  async spawn(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'> & { input?: string } = {}): Promise<ChildProcess> {
+  async spawn(what: Launched, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'> & { input?: string } = {}): Promise<ChildProcess> {
     const { child, failed } = this.launch(what, command, args, opts)
     // Not started: nothing to record or end; the start's own error (it is told on the next tick), marked as a start that
     // definitely failed (HI-2020), apart from the lease, the job or the record failing.
@@ -319,15 +346,15 @@ export class QueueRunner {
    * nothing, and one that can't be put there or recorded ends having run nothing (its exit code is not 0). Throws LeaseLost
    * at once once the runner no longer holds.
    */
-  spawnNow(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'> = {}): ChildProcess {
+  spawnNow(what: Launched, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'> = {}): ChildProcess {
     const { child } = this.launch(what, command, args, opts)
     if (child.pid) void this.letGo(what, child, command).catch((e) => log.warn(`starting the merge queue's ${what}`, e))
     return child
   }
 
   /** Starts a command's launcher, waiting for its go-ahead, with its errors handled from the start. */
-  private launch(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'>): { child: ChildProcess; failed: Promise<Error>; after: number; before: number } {
-    if (!this.job || this.released) throw new LeaseLost(this.target)
+  private launch(what: Launched, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell' | 'windowsVerbatimArguments'>): { child: ChildProcess; failed: Promise<Error>; after: number; before: number } {
+    if (!this.admits()) throw new LeaseLost(this.target)
     const { child, after, before, nonce } = startLauncher({ command, args, shell: !!opts.shell, verbatim: !!opts.windowsVerbatimArguments }, { cwd: opts.cwd as string | undefined, env: opts.env })
     this.nonces.set(child, nonce)
     // Its errors are handled here from the start (a start that failed: a folder gone, no executable; a pipe that broke),
@@ -353,7 +380,7 @@ export class QueueRunner {
    * A launcher put in the job and recorded (a write that checks the lease), then told to run its command; one that can't
    * be is given up (it ends having run nothing) and the error thrown.
    */
-  private async letGo(what: Exclude<QueueProcKind, 'job'>, child: ChildProcess, command: string, input?: string): Promise<void> {
+  private async letGo(what: Launched, child: ChildProcess, command: string, input?: string): Promise<void> {
     const pid = child.pid!
     const { after, before } = this.started.get(child)!
     const giveUp = (): void => {
@@ -369,7 +396,7 @@ export class QueueRunner {
     }
     try {
       const job = this.job
-      if (!job || this.released) throw new LeaseLost(this.target)
+      if (!job || !this.admits()) throw new LeaseLost(this.target)
       if (!(await job.assign(pid, after, before))) throw new Error(`${command} couldn't be put in the merge queue's job`) // i18n-ignore: as above
       await this.change(() => this.cfg.store.addQueueProc({ lease: this.lease, target: this.target, pid, startAfter: after, startBefore: before, what }))
     } catch (e) {
@@ -388,7 +415,7 @@ export class QueueRunner {
    * Runs a command (spawn) to its end: its output and exit code. `timeoutMs`: once it has run that long its whole tree
    * is ended (#1350: a signer waiting for a passphrase), and the result says it timed out.
    */
-  async run(what: Exclude<QueueProcKind, 'job'>, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell'> & { input?: string; timeoutMs?: number } = {}): Promise<RunResult> {
+  async run(what: Launched, command: string, args: readonly string[], opts: Pick<SpawnOptions, 'cwd' | 'env' | 'shell'> & { input?: string; timeoutMs?: number } = {}): Promise<RunResult> {
     const { timeoutMs, ...spawnOpts } = opts
     let child: ChildProcess
     try {
@@ -439,11 +466,72 @@ export class QueueRunner {
   }
 
   /**
-   * git in a folder of the runner's (its own worktree, or the project for a ref), as Hive runs git (GIT_PREFIX), through
-   * `run`; `opts` its environment and bound (the queue's merge commits, #1350).
+   * git in a folder of the runner's (its own worktree, or the project for a ref), as Hive runs git (GIT_PREFIX); `opts`
+   * its environment and bound (the queue's merge commits, #1350; a push). HI-2079: one with no bound runs in the lease's
+   * git host (no Node start of its own); a bounded one through `run`'s launcher, whose bound ends its tree.
    */
-  git(cwd: string, args: string[], what: Exclude<QueueProcKind, 'job'> = 'testMerge', opts: { env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}): Promise<RunResult> {
-    return this.run(what, 'git', [...GIT_PREFIX, ...args], { cwd, ...opts })
+  git(cwd: string, args: string[], what: Launched = 'testMerge', opts: { env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}): Promise<RunResult> {
+    if (opts.timeoutMs) return this.run(what, 'git', [...GIT_PREFIX, ...args], { cwd, ...opts })
+    return this.hostGit(cwd, [...GIT_PREFIX, ...args], opts.env ?? process.env)
+  }
+
+  /**
+   * HI-2079: git in the lease's host, as `run` would tell it. Throws LeaseLost, with nothing sent, once the runner no
+   * longer holds (released, failed, or its lease another's: read just before it is sent). A host that goes or misbehaves
+   * fails the runner (`fail`): what was waiting is lost, never an answer (`signal: 'hostLost'`, HI-2054's again).
+   */
+  private async hostGit(cwd: string, args: string[], env: NodeJS.ProcessEnv): Promise<RunResult> {
+    if (!this.admits()) throw new LeaseLost(this.target)
+    const host = this.gitHost ?? (await (this.hostStart ??= this.startHost().finally(() => (this.hostStart = null))))
+    if (!(host instanceof GitHost)) return toRunResult('git', host)
+    if (!this.admits() || this.gitHost !== host || !this.cfg.store.holdsQueueLease(this.lease, this.token)) throw new LeaseLost(this.target)
+    await this.cfg.hooks?.beforeHostSend?.()
+    return toRunResult('git', await host.request({ command: 'git', args, cwd, env }))
+  }
+
+  /**
+   * Starts the lease's git host, as a launcher starts (letGo): put in the job, recorded (a write that checks the lease),
+   * and only then told to go, each step only while the runner still admits. One that couldn't start ran nothing: that
+   * result, for the git that asked (HI-2020), and the next git tries again. Released meanwhile: LeaseLost, the host never
+   * told to go (its input's end ends it, and it is in the job). Anything else fails the runner: no second host.
+   */
+  private async startHost(): Promise<GitHost | HostResult> {
+    const { child, after, before } = startGitHost()
+    const host = new GitHost(child, (why) => this.fail(`its git host ${child.pid ?? ''} stopped: ${why}`)) // i18n-ignore: a reason, logged
+    if (!child.pid) {
+      const start = await new Promise<Error>((res) => child.once('error', res))
+      return { out: '', err: start.message, code: null, notRun: String((start as NodeJS.ErrnoException).code ?? 'error') }
+    }
+    try {
+      const job = this.job
+      if (!job || !this.admits()) throw new LeaseLost(this.target)
+      if (!(await job.assign(child.pid, after, before))) throw new Error("the merge queue's git host couldn't be put in its job") // i18n-ignore: an internal error, logged
+      await this.change(() => this.cfg.store.addQueueProc({ lease: this.lease, target: this.target, pid: child.pid!, startAfter: after, startBefore: before, what: 'testMerge' }))
+      if (!this.admits()) throw new LeaseLost(this.target)
+    } catch (e) {
+      host.close()
+      if (child.exitCode === null && child.signalCode === null) child.kill()
+      // Released meanwhile (its job gone with it): LeaseLost, as for any start then. Else the runner fails.
+      if (this.released || e instanceof LeaseLost) throw new LeaseLost(this.target)
+      this.fail(`its git host couldn't be started: ${(e as Error).message}`) // i18n-ignore: a reason, logged
+      throw new LeaseLost(this.target)
+    }
+    child.once('exit', () => void locked(this.cfg, () => this.cfg.store.dropQueueProc(this.lease, child.pid!)).catch((e) => log.warn("forgetting the merge queue's git host", e)))
+    host.go()
+    this.gitHost = host
+    return host
+  }
+
+  /**
+   * HI-2079: the runner fails (its git host went, misbehaved, or couldn't be started): from now on nothing starts and no
+   * fenced write commits, and it releases (its job ended, so nothing of its host runs on). Its queue's host sees `failed`
+   * and takes a new lease, whose settle ends whatever this one couldn't. Once; nothing after a release.
+   */
+  private fail(why: string): void {
+    if (this.broken || this.released) return
+    this.broken = true
+    log.warn(`The merge queue for ${userText(this.target)} gave its lease up: ${userText(why)}`)
+    void this.release().catch((e) => log.warn(`releasing the merge queue for ${userText(this.target)} after its git host failed`, e))
   }
 
   /**
@@ -452,11 +540,20 @@ export class QueueRunner {
    * still needs it (else removed), its records dropped, and its lease row deleted by its own token (nothing of a
    * successor's). If the job can't be seen empty (or a process its journal names still runs), its job is let go all
    * the same (closing it ends what is in it), and its records, journal and folder stay as duties for the next runner
-   * (a followed process isn't in the job), which ends what is left before it runs; only the lease goes. Once.
+   * (a followed process isn't in the job), which ends what is left before it runs; only the lease goes. Once: every
+   * caller (a failure, the queue's run ending) waits for the same release. A lease lost to another Hive is the
+   * successor's to settle: nothing then.
    */
-  async release(): Promise<void> {
-    if (this.released) return
+  release(): Promise<void> {
+    if (this.releasing) return this.releasing
+    if (this.released) return Promise.resolve()
+    return (this.releasing = this.releaseOnce())
+  }
+
+  private async releaseOnce(): Promise<void> {
     this.stop()
+    // Its git host takes nothing more (its job's end ends what it runs).
+    this.gitHost?.close()
     const store = this.cfg.store
     // Its job and what it follows ended and seen gone, the journal's processes too (as the next runner would check them).
     // Its job and what it follows ended and seen gone; then the job let go (its supervisor can't write to its journal
@@ -623,6 +720,15 @@ export class QueueRunner {
   }
 
   /**
+   * HI-2079: the queue paused (needs you) because its git host failed two runners in a row: nothing runs until it is
+   * resumed. The next runner's settle lifts it once it has nothing left to end, as it does the pauses settling makes.
+   */
+  async pauseForHost(): Promise<void> {
+    log.warn(`The merge queue for ${userText(this.target)} is paused: its git host failed twice in a row`)
+    await this.change(() => this.cfg.store.setQueuePause(this.target, { reason: 'needsYou', card: '' })) // i18n-ignore: a pause reason's code, not text
+  }
+
+  /**
    * The target's folders as this runner starts (the target's lease is its own now, and settle has removed the earlier
    * leases' it could): one kept by a runner that released cleanly becomes its own (warm), another kept one is removed;
    * then its own recorded.
@@ -664,6 +770,19 @@ export class QueueRunner {
     await locked(this.cfg, () => this.cfg.store.dropQueueFolder(folder))
     return true
   }
+}
+
+/**
+ * HI-2079: a git host's result as `run` tells a launcher's: a start that failed (notRun), an end by a signal (never code
+ * 1, HI-2042), and a request lost with its host (`signal: 'hostLost'`: no answer, HI-2054's again).
+ */
+function toRunResult(command: string, r: HostResult): RunResult {
+  if (r.notRun) return { ok: false, code: -1, out: '', err: r.err.trim(), notRun: r.notRun }
+  const err = r.err.trim()
+  if (r.lost !== undefined) return { ok: false, code: -1, out: r.out, err: err || `${command} was lost with the merge queue's git host (${r.lost})`, signal: 'hostLost' } // i18n-ignore: the command's side of an error, in English as git's messages are
+  if (r.signal) return { ok: false, code: -1, out: r.out, err: err || endedBy(command, r.signal), signal: r.signal }
+  const code = r.code ?? -1
+  return { ok: code === 0, code, out: r.out, err }
 }
 
 /** Runs `fn` under the config's lock (the app's boardWrite), else as it is. */

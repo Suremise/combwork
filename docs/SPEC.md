@@ -3386,6 +3386,15 @@ as for agents; a process it follows is first written to the lease's journal (a f
 and one it can't write down is ended at once and the queue pauses (needs you). A command starts only once it is in the
 job and recorded in hive.db.
 
+**The runner's git** (HI-2079): its git commands with no time bound (reads, and its writes in its own folder and refs)
+run in one **git host** per lease, a process put in the job and recorded as a launcher is, before it runs anything; each
+git is its child, so in the job from its start. A git then costs git's own start only (about 80 ms less per command,
+and one process start instead of two). Its bounded commands (a push, a signed commit) keep a launcher of their own, whose
+bound ends their whole tree. A host that goes, or says something it shouldn't, is never taken for an answer: what was
+waiting is unknown (the step goes round again), the runner gives its lease up (its job ended, as a release does), and
+the queue takes a new lease, which settles what the old one left and recovers its begun entries. A second runner in a
+row whose host fails pauses the queue (needs you).
+
 **A runner works on a target only once every earlier lease of it is settled**, or the queue is paused (needs you),
 naming what couldn't be ruled out. Settled: its job, ended by its name (never the supervisor holding it, which may
 serve a living Hive's other targets and agents), is empty or gone; its journal is sealed (closed to writers for good:
