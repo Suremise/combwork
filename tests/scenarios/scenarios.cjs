@@ -2478,7 +2478,8 @@ module.exports.SCENARIOS = [
       const b = o.cards.b
       const started = (b?.history ?? []).find((h) => /^Moved to (the (top|bottom) of )?Doing\b/.test(h.what))
       return [
-        [`#${c.cards.b} is started on Coder (in Doing, its agent)`, b?.column === 'doing' && (b?.agent?.id ?? b?.agent) === c.agents.coder.id, `${b?.column} / ${JSON.stringify(b?.agent)}`],
+        // In Review once Coder has built it (HI-2047: its project has the first card's work, so it can be).
+        [`#${c.cards.b} is started on Coder (in Doing or on to Review, its agent)`, ['doing', 'review'].includes(b?.column) && (b?.agent?.id ?? b?.agent) === c.agents.coder.id, `${b?.column} / ${JSON.stringify(b?.agent)}`],
         [`Coder is given #${c.cards.b} (its task's doorbell in its pane)`, !!c.given, String(c.given)],
         // HI-2047: a running lane's builder is pointed at card-loop alone.
         ["its start names card-loop as the lane's builder, not work-on-card", /card-loop skill as this lane's builder/.test(c.start ?? '') && !/work-on-card/.test(c.start ?? ''), String(c.start)],
