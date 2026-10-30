@@ -2,17 +2,15 @@ import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
 import { HiveCommands, QuitPoint, WorkspaceCommands, WorkspacePoint } from '../components/CommandsSettings'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
-import type { AppSettings, ChimeSound, EffortLevel, EffortOption, FallbackModel, McpCatalogSettings, ModelPrice, PermissionMode, ProviderId, TaskColumn } from '@shared/types'
+import type { AppSettings, ChimeSound, EffortOption, FallbackModel, McpCatalogSettings, ModelPrice, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
 import { DEFAULT_MODE } from '@shared/assistant'
 import { PRICES_CHECKED, SHIPPED_PRICES, listedPriceModels, priceRows } from '@shared/prices'
-import { APP_SETTINGS_CATALOG, SETTINGS_SECTIONS, providerSection, settingDefault, settingPatch, settingValue, SETTINGS_TEXT, shownSetting, type SettingEntry, type SettingsSection, type SettingsSectionInfo } from '@shared/settingsCatalog'
-import { cliDefaultEffort, effortName, fallbackEfforts, fallbackModels, modelCaps, modelSource, modelSourceText, runsAsName } from '@shared/models'
+import { APP_SETTINGS_CATALOG, SETTINGS_SECTIONS, providerSection, settingDefault, settingPatch, settingValue, shownSetting, type SettingEntry, type SettingsSection, type SettingsSectionInfo } from '@shared/settingsCatalog'
+import { fallbackEfforts, fallbackModels, modelSource, modelSourceText } from '@shared/models'
 import type { SettingsPatch } from '@shared/api'
-import { PROVIDERS, defaultProviderLabel, enabledProviders, isProviderEnabled, installSourceText, inProviderOrder, offeredModes, orderedProviders, permissionLabel, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
+import { isProviderEnabled, installSourceText, inProviderOrder, orderedProviders, providerDescriptor, providerSettings, shownText as providerText } from '@shared/providers'
 import { modeName, useModes } from '../components/Assistant'
-import { ModeCaveat } from '../components/AgentDialogs'
-import { EffortPicker, ModelPicker } from '../components/ModelPicker'
 import { NumberField } from '../components/NumberField'
 import { ProviderIcon } from '../components/ProviderIcon'
 import * as actions from '../actions'
@@ -25,10 +23,9 @@ import { HiddenProjectsList } from '../components/ProjectRemoval'
 import { WorkspaceStorageList } from '../components/Storage'
 import { AntivirusPanel } from '../components/Antivirus'
 import { AccountsSettings } from '../components/AccountsSettings'
-import { ConnectionChoice, useLaunchConnection } from '../components/ConnectionChoice'
 import { AdvancedSettings } from '../components/AdvancedSettings'
 import { ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
-import { assistantAccountOf, choose, chooseTab, confirm, get, notify, set, showView, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
+import { choose, chooseTab, confirm, get, notify, set, showView, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
 import { TabPanel, Tabs } from '../components/Tabs'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
@@ -66,12 +63,9 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'workspace.onOpen': () => <WorkspacePoint which="onOpen" />,
   'workspace.onClose': () => <WorkspacePoint which="onClose" />,
   'board.colors': () => <ColumnColors />,
-  'assistant.provider': () => <AssistantProviderPicker />,
-  'assistant.connection': () => <AssistantConnectionPicker />,
   'assistant.mcp': () => <AssistantMcpServers />,
   'assistant.mode': () => <AssistantModePicker />,
   'assistant.journal': () => <JournalSettingsPanel />,
-  ...Object.fromEntries(PROVIDERS.map((p) => [`assistant.provider:${p.id}`, () => <AssistantProviderDefaults provider={p.id} />])),
   'mcpCatalogs.sources': () => <McpCatalogSources />,
   'agentApi.status': () => <ApiStatus />,
   'agentApi.token': () => <ApiToken />,
@@ -540,21 +534,6 @@ function ProvidersList() {
   )
 }
 
-/** The open workspace's Assistant's connection, for each CLI that has connections (HI-1755). */
-function AssistantConnectionPicker() {
-  const ws = useStore((s) => s.workspace)
-  const settings = useStore((s) => s.settings)
-  if (!ws) return <div className="faint">{tr(msg({ id: 'settings.assistant.connection.noWorkspace', defaultMessage: 'Open a workspace to choose its Assistant\'s connection.', description: 'Settings → Assistant → Connection with no workspace open.' }))}</div>
-  const providers = enabledProviders(settings).filter((p) => !!p.capabilities.connections)
-  return (
-    <div className="agent-form">
-      {providers.map((p) => (
-        <ConnectionChoice key={p.id} id={`assistant-connection-${p.id}`} provider={p.id} value={assistantAccountOf(ws, p.id) ?? ''} onChange={(v) => void call('connections:setAssistant', p.id, v || null).then(() => actions.refreshWorkspace()).catch((e) => notify('error', tr(msg({ id: 'settings.assistant.connection.failed', defaultMessage: "Couldn't change the Assistant's connection", description: "An error's title: saving the Assistant's connection (Settings → Assistant) failed." })), errorMessage(e)))} />
-      ))}
-    </div>
-  )
-}
-
 /** Where the Assistant's MCP servers are chosen now (HI-2059): its own view, on the activity bar. */
 function AssistantMcpServers() {
   return (
@@ -627,24 +606,6 @@ function McpCatalogSources() {
   )
 }
 
-function AssistantProviderPicker() {
-  const settings = useStore((s) => s.settings)
-  const on = enabledProviders(settings)
-  const current = settings?.assistant.provider ?? ''
-  // The window re-renders when what's installed changes: Automatic follows it.
-  useStore((s) => s.providers)
-  return (
-    <select className="select" value={current} onChange={(e) => void saveSettings({ assistant: { provider: e.target.value } })}>
-      <option value="">{tr(msg({ id: 'settings.assistant.defaultProvider', defaultMessage: 'Default provider ({provider})', description: 'The first choice of Settings → Assistant → Provider: the default provider, and which one that is now.' }), { provider: defaultProviderLabel(settings, tr) })}</option>
-      {orderedProviders(settings).filter((p) => on.includes(p) || p.id === current).map((p) => (
-        <option key={p.id} value={p.id}>
-          {on.includes(p) ? p.name : tr(SETTINGS_TEXT.providerOff, { provider: p.name })}
-        </option>
-      ))}
-    </select>
-  )
-}
-
 /** Hive's modes, for choosing a default before a workspace is open. */
 const SHIPPED_MODES = [
   { id: 'coordinator', name: 'Coordinator', icon: '🧭', bundled: 'same' as const }, // i18n-ignore: the shipped modes' names, as their files name them (modeName shows them translated)
@@ -667,64 +628,6 @@ function AssistantModePicker() {
         </option>
       ))}
     </select>
-  )
-}
-
-const CONNECTION_DEFAULT = msg({ id: 'agents.overrides.connectionDefault', defaultMessage: 'Connection default', description: "An agent's model, effort or context choice that follows its connection's default (HI-1770): the first choice of each, before that default in brackets (\"Connection default (Opus 5.5)\"). Keep it short." })
-const ON_TEXT = msg({ id: 'settings.option.on', defaultMessage: 'On', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })
-const OFF_TEXT = msg({ id: 'settings.option.off', defaultMessage: 'Off', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })
-
-/** The Assistant's model, effort, mode and arguments with one provider. */
-function AssistantProviderDefaults({ provider }: { provider: ProviderId }) {
-  const settings = useStore((s) => s.settings)
-  const p = providerDescriptor(provider)
-  const a = settings?.assistant.providers[provider] ?? { model: '', effort: '', permissionMode: '', extraArgs: '', use200kContext: '' as const }
-  // With connections (HI-1770), what an empty choice runs is the Assistant's connection's default, not the CLI's.
-  const assistantChoice = useStore((s) => assistantAccountOf(s.workspace, provider))
-  const conn = useLaunchConnection(assistantChoice || undefined, provider)
-  const legacy = providerSettings(settings, provider)
-  const g = conn === undefined ? legacy : { ...legacy, defaultModel: conn?.defaults?.model ?? '', defaultEffort: conn?.defaults?.effort ?? '', use200kContext: !!conn?.defaults?.use200kContext }
-  const connectionDefault = (value: string | null): string => (value ? tr(msg({ id: 'agents.overrides.inherited', defaultMessage: '{whose} ({value})', description: "The first choice of an agent's model, effort, mode or context: whose setting it follows ({whose}: \"Project's\") and what that is now ({value}: \"Opus 5.5\")." }), { whose: tr(CONNECTION_DEFAULT), value }) : tr(CONNECTION_DEFAULT))
-  const [args, setArgs] = useState(a.extraArgs)
-  useEffect(() => setArgs(a.extraArgs), [a.extraArgs])
-  const save = (patch: Partial<typeof a>): void => void saveSettings({ assistant: { providers: { [provider]: patch } } } as SettingsPatch)
-  const info = useStore((s) => s.providers[provider])
-  const cliDefault = info?.defaultModel ?? null
-  const runModel = a.model || g.defaultModel || cliDefault
-  // The level itself, "Default (Medium)": effortText's "Medium, default" would say default twice (#911). Not known: "Claude Code's default", no outer "Default (…)" (#916).
-  const effortLevel = g.defaultEffort && g.defaultEffort !== 'inherit' ? g.defaultEffort : modelCaps(provider, runModel, info, settings).defaultEffort
-  const effortLabel = conn !== undefined ? connectionDefault(effortLevel ? effortName(provider, effortLevel, settings, tr) : null) : !effortLevel ? cliDefaultEffort(provider, tr) : tr(msg({ id: 'settings.assistant.defaultIs', defaultMessage: 'Default ({value})', description: 'The first choice of a list in Settings → Assistant → With <provider>: what applies when nothing is chosen. {value} says what that is.' }), { value: effortName(provider, effortLevel, settings, tr) })
-  return (
-    <div className="agent-form assistant-defaults">
-      <label>{tr(msg({ id: 'settings.assistantProvider.model.title', defaultMessage: 'Model', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's model." }))}</label>
-      <ModelPicker provider={provider} value={a.model} base={{ value: '', label: conn !== undefined ? connectionDefault(g.defaultModel || cliDefault ? runsAsName(provider, (g.defaultModel || cliDefault)!, info) : null) : g.defaultModel ? tr(msg({ id: 'settings.provider.cliDefaultIs', defaultMessage: '{provider} default ({which})', description: "The first choice of a model or effort list: the CLI's own default, and which model or level that is. {provider} is its name." }), { provider: p.name, which: runsAsName(provider, g.defaultModel, info) }) : tr(msg({ id: 'settings.provider.cliDefault', defaultMessage: '{provider} default', description: "The first choice of a model or effort list: the CLI's own default. {provider} is its name." }), { provider: p.name }) }} onChange={(v) => save({ model: v })} />
-      <label>{tr(msg({ id: 'settings.assistantProvider.effort.title', defaultMessage: 'Effort', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's reasoning effort." }))}</label>
-      <EffortPicker provider={provider} model={runModel} value={a.effort} base={{ value: '', label: effortLabel }} onChange={(v) => save({ effort: v as EffortLevel | '' })} />
-      <label>{tr(msg({ id: 'settings.assistantProvider.permissionMode.title', defaultMessage: 'Permission mode', description: "A field's title in Settings → Assistant → With <provider>: the Assistant's permission mode." }))}</label>
-      <select className="select" value={a.permissionMode} onChange={(e) => save({ permissionMode: e.target.value as PermissionMode | '' })}>
-        <option value="">{tr(msg({ id: 'settings.assistant.defaultIs', defaultMessage: 'Default ({value})', description: 'The first choice of a list in Settings → Assistant → With <provider>: what applies when nothing is chosen. {value} says what that is.' }), { value: permissionLabel(provider, p.assistantMode, tr) })}</option>
-        {offeredModes(provider, settings, true)
-          .filter((m) => m.value !== p.assistantMode)
-          .map((m) => (
-            <option key={m.value} value={m.value}>
-              {permissionLabel(provider, m.value, tr)}
-            </option>
-          ))}
-      </select>
-      <ModeCaveat provider={provider} mode={a.permissionMode || p.assistantMode} model={a.model || g.defaultModel || cliDefault} />
-      {p.capabilities.contextLimit && (
-        <>
-          <label>{tr(msg({ id: 'settings.assistantProvider.use200kContext.title', defaultMessage: 'Use 200K context (instead of 1M)', description: "A field's title in Settings → Assistant → With <provider>. 200K and 1M are numbers of tokens." }))}</label>
-          <select className="select" value={a.use200kContext ?? ''} onChange={(e) => save({ use200kContext: e.target.value as '' | 'on' | 'off' })}>
-            <option value="">{conn !== undefined ? connectionDefault(tr(g.use200kContext ? ON_TEXT : OFF_TEXT)) : tr(msg({ id: 'settings.assistant.defaultIs', defaultMessage: 'Default ({value})', description: 'The first choice of a list in Settings → Assistant → With <provider>: what applies when nothing is chosen. {value} says what that is.' }), { value: g.use200kContext ? tr(msg({ id: 'settings.option.on', defaultMessage: 'On', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })) : tr(msg({ id: 'settings.option.off', defaultMessage: 'Off', description: 'A choice of a setting that is on or off, beside Inherit or Default.' })) })}</option>
-            <option value="on">{tr(msg({ id: 'settings.option.on', defaultMessage: 'On', description: 'A choice of a setting that is on or off, beside Inherit or Default.' }))}</option>
-            <option value="off">{tr(msg({ id: 'settings.option.off', defaultMessage: 'Off', description: 'A choice of a setting that is on or off, beside Inherit or Default.' }))}</option>
-          </select>
-        </>
-      )}
-      <label>{tr(msg({ id: 'settings.assistantProvider.extraArgs.title', defaultMessage: 'Extra arguments', description: "A field's title in Settings → Assistant → With <provider>: command-line arguments." }))}</label>
-      <input className="input" value={args} placeholder={tr(msg({ id: 'settings.assistantDefaults.extraArgsPlaceholder', defaultMessage: 'e.g. --verbose', description: 'The empty box\'s placeholder of the setting "Extra arguments". --verbose is an argument: keep it.' }))} onChange={(e) => setArgs(e.target.value)} onBlur={() => args !== a.extraArgs && save({ extraArgs: args.trim() })} />
-    </div>
   )
 }
 

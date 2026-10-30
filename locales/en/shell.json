@@ -1248,8 +1248,8 @@
     "description": "Provider Setup's button: looks for the CLI, git and updates again."
   },
   "shell.setup.connections": {
-    "defaultMessage": "{n, plural, =0 {{cli} signs in per connection, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per connection: # is on in this workspace.} other {{cli} signs in per connection: # are on in this workspace.}}",
-    "description": "Provider Setup, for a coding agent CLI ({cli}: \"Claude Code\") that signs in per connection (Settings → Connections) rather than here (HI-1774). {n} is how many of its connections are on in the open workspace."
+    "defaultMessage": "{n, plural, =0 {{cli} signs in per account, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per account: # is on in this workspace.} other {{cli} signs in per account: # are on in this workspace.}}",
+    "description": "Provider Setup, for a coding agent CLI ({cli}: \"Claude Code\") that signs in per account (Settings → Accounts & Connections) rather than here (HI-1774; HI-2108). {n} is how many of its accounts are on in the open workspace."
   },
   "shell.setup.docs": {
     "defaultMessage": "{provider} docs",
@@ -1324,8 +1324,8 @@
     "description": "Provider Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on."
   },
   "shell.setup.openConnections": {
-    "defaultMessage": "Open Connections",
-    "description": "Provider Setup's button: opens Settings → Connections, where a coding agent CLI's connections are added and signed in."
+    "defaultMessage": "Open Accounts & Connections",
+    "description": "Provider Setup's button (HI-2108): opens Settings → Accounts & Connections, where a coding agent CLI's accounts are added and signed in."
   },
   "shell.setup.rejected": {
     "defaultMessage": "{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Hive only uses the standalone CLI.",

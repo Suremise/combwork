@@ -86,15 +86,9 @@ describe('the settings catalog', () => {
         continue
       }
       for (const key of Object.keys(value as object)) {
-        // The Assistant's per-provider settings are one row a provider ("With Claude Code").
-        if (section === 'assistant' && key === 'providers') {
-          for (const p of PROVIDERS) {
-            if (!ids.has(`assistant.provider:${p.id}`)) missing.push(`assistant.provider:${p.id}`)
-            // And each of its fields, an entry of its own (read and explained; the Assistant can't change them).
-            for (const k of Object.keys(DEFAULT_SETTINGS.assistant.providers[p.id] ?? {})) if ((k !== 'use200kContext' || p.capabilities.contextLimit) && !ids.has(`assistant.${p.id}.${k}`)) missing.push(`assistant.${p.id}.${k}`)
-          }
-          continue
-        }
+        // The Assistant's provider and per-provider values are the accounts migration's input only (HI-2108): its
+        // connection, chosen in its dialog, holds them.
+        if (section === 'assistant' && (key === 'providers' || key === 'provider')) continue
         if (!ids.has(`${section}.${key}`)) missing.push(`${section}.${key}`)
       }
     }
@@ -179,7 +173,7 @@ describe('the settings catalog', () => {
   })
 
   it('keeps buttons, statuses and lists of things out of the values the tools set; keybindings are read-only', () => {
-    for (const id of ['advanced.reset', 'agentApi.token', 'workspace.hiddenProjects', 'claude-code.status', 'project.reset', 'assistant.provider:claude-code']) expect(entry(id).action, id).toBe(true)
+    for (const id of ['advanced.reset', 'agentApi.token', 'workspace.hiddenProjects', 'claude-code.status', 'project.reset']) expect(entry(id).action, id).toBe(true)
     expect(settingKind(entry('keybindings.editor'))).toBeNull()
     expect(entry('keybindings.editor').readOnly).toMatch(/Shortcuts are read-only to the Assistant for now/)
     for (const id of ['claude-code.prices', 'codex.modelFallback', 'claude-code.effortFallback', 'board.colors']) expect(settingKind(entry(id)), id).toBe('table')
@@ -239,16 +233,8 @@ describe('the settings catalog', () => {
     expect(texts.newText.endsWith('…')).toBe(true)
   })
 
-  it("reads the Assistant's own launch settings, a field each, and keeps them the user's", () => {
-    const s = mergeDefaults(structuredClone(DEFAULT_SETTINGS), { assistant: { providers: { 'claude-code': { model: 'opus', effort: 'high', extraArgs: '--verbose' } } } }) as AppSettings
-    expect(settingValue(entry('assistant.claude-code.model'), s)).toBe('opus')
-    expect(settingValue(entry('assistant.claude-code.effort'), s)).toBe('high')
-    expect(settingValue(entry('assistant.codex.model'), s)).toBe('')
-    expect(settingDefault(entry('assistant.claude-code.model'))).toBe('')
-    expect(settingPath(entry('assistant.claude-code.extraArgs'))).toBe('Settings → Assistant → With Claude Code → Extra arguments')
-    for (const k of ['model', 'effort', 'permissionMode', 'extraArgs']) expect(entry(`assistant.codex.${k}`).sensitive, k).toBe(true)
-    expect(entry('assistant.claude-code.model').restart).toBe('assistant')
-    expect(settingPatch(entry('assistant.claude-code.model'), 'haiku')).toEqual({ settings: { assistant: { providers: { 'claude-code': { model: 'haiku' } } } } })
+  it("has no Assistant provider, connection or per-provider values: its connection holds them (HI-2108)", () => {
+    for (const id of ['assistant.provider', 'assistant.connection', 'assistant.provider:claude-code', 'assistant.claude-code.model', 'assistant.codex.effort']) expect(settingEntry(id), id).toBeUndefined()
   })
 
   it('says where each one is', () => {
@@ -260,8 +246,6 @@ describe('the settings catalog', () => {
   it('is what Settings and Project Settings draw: a custom row has its control there, and every row comes from here', () => {
     const view = readFileSync(join(__dirname, '../src/renderer/src/views/SettingsView.tsx'), 'utf8')
     const drawn = new Set([...view.matchAll(/^\s+'([\w.:-]+)': (?:\(\)|\(\{)/gm)].map((m) => m[1]))
-    // The Assistant's row for each provider ("With Claude Code") is drawn from one template.
-    if (view.includes('[`assistant.provider:${p.id}`, () => <AssistantProviderDefaults')) for (const p of PROVIDERS) drawn.add(`assistant.provider:${p.id}`)
     // Version Control's two levels are its tabs (HI-1837), each a WorkflowLevelForm.
     if (view.includes('<WorkflowLevelForm level="global"') && view.includes('<WorkflowLevelForm level="workspace"')) drawn.add('workflow.defaults').add('workflow.workspaceDefaults')
     const custom = APP_SETTINGS_CATALOG.filter((e) => e.type === 'custom' && !e.provider && !e.hidden).map((e) => e.id)

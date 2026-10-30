@@ -68,23 +68,27 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await lib.openProjectSettings(page)
     // The list of agents is Project Settings → Agents' (HI-1765: it opens on General).
     await page.locator('.tab-body .settings-nav .row').filter({ has: page.locator('.label', { hasText: /^Agents$/ }) }).click()
+    // A row names its connection (HI-2108: an account's base connection, its id), the account only while it runs on another.
+    const rows = (await inv('connections:list')).connectionRows
+    const c1 = rows.find((c) => c.account === max1.id)?.id
+    const c2 = rows.find((c) => c.account === max2.id)?.id
     const mark = (id) => page.locator(`.agent-list-row[data-agent="${id}"] .agent-connection`)
     const attrs = async (id) => mark(id).evaluate((el) => ({ id: el.dataset.connection, state: el.dataset.connectionState, other: el.hasAttribute('data-connection-other'), text: el.textContent.trim() })).catch(() => null)
     const one = await lib.until(async () => {
       const a = await attrs('a-one')
-      return a?.id === max1.id ? a : null
+      return a?.id === c1 ? a : null
     }, HUNG_MS)
     check('the Agents list: One, which had none, pinned to Max 1, the one it runs on (HI-2106): the new top of the order moves it not', !!one && one.text === 'Max 1' && one.state === 'own' && !one.other, JSON.stringify(await attrs('a-one')))
     const two = await attrs('a-two')
-    check('…Two its own choice, Max 2', two?.id === max2.id && two.state === 'own' && !two.other && two.text === 'Max 2', JSON.stringify(two))
+    check('…Two its own choice, Max 2', two?.id === c2 && two.state === 'own' && !two.other && two.text === 'Max 2', JSON.stringify(two))
     const three = await attrs('a-three')
-    check("…Three, whose connection was removed, pinned to the workspace's first on, Max 1 (HI-2106, decision H)", three?.id === max1.id && three.state === 'own', JSON.stringify(three))
+    check("…Three, whose connection was removed, pinned to the workspace's first on, Max 1 (HI-2106, decision H)", three?.id === c1 && three.state === 'own', JSON.stringify(three))
     const tip = await lib.hoverTip(page, mark('a-one'), (t) => /Max 1/.test(t), HUNG_MS)
     check("…One's hover names Max 1", /Max 1/.test(tip) && !/Chosen now: Max 2/.test(tip), tip)
     await shots('agents')
 
     await page.locator('.tabs .tab', { hasText: 'Overview' }).first().click()
-    const running = page.locator(`.running-row .running-connection[data-connection="${max1.id}"]:not([data-connection-other])`)
+    const running = page.locator(`.running-row .running-connection[data-connection="${c1}"]:not([data-connection-other])`)
     check('the Overview: One runs on Max 1, its own, no ⟳', !!(await lib.until(async () => (await running.count()) === 1, HUNG_MS)))
     await shots('overview')
     await inv('session:stop', alpha, 'a-one')

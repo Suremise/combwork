@@ -20,6 +20,8 @@
   "session.compact.stopped": "El agente se detuvo antes de que se enviara Compactar.",
   "session.compact.userTyped": "Escribiste en la terminal del agente mientras Hive enviaba Compact, así que no se envió: lo que escribiste se queda.",
   "session.compact.waiting": "El agente espera tu respuesta. Compacta cuando haya terminado.",
+  "session.connection.fallback": "{why, select, missing {La conexión elegida para él se quitó} other {Su conexión {wanted} está desactivada en este espacio de trabajo}}, así que se inició con {name}, la primera conexión utilizable de su CLI aquí. Elige otra en su Configuración del agente.",
+  "session.connection.fallbackTitle": "{agent} se ejecuta con otra conexión",
   "session.error.agentGone": "Ese agente ya no existe.",
   "session.error.inUseElsewhere": "Otro programa tiene abierta su transcripción. Ciérralo y vuelve a intentarlo.",
   "session.error.noAgents": "Este proyecto todavía no tiene agentes. Agrega uno primero.",

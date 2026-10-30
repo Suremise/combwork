@@ -201,7 +201,8 @@ const prose = (seed, n) => {
   const projects = measure('hive_list_projects', tool('hive_list_projects', {}), 1000)
   check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, builder\] idle; Tester \[claude-code, builder\] stopped$/m.test(projects), projects)
   // About 3,030 characters: each Claude Code agent's connection fields (HI-1771), there for everyone since HI-1774.
-  measure('hive_project_status', tool('hive_project_status', {}), 3200)
+  // Each agent row names its connection (HI-2108: every agent has one, its id and name).
+  measure('hive_project_status', tool('hive_project_status', {}), 3300)
   const usage = measure('hive_session_usage', tool('hive_session_usage', {}), 1500)
   check('usage leaves out its days unless asked', !usage.includes('"days"') && tool('hive_session_usage', { days: true }).text.includes('"days"'))
   const notes = measure('hive_list_shared_notes', tool('hive_list_shared_notes', {}), 1500)
@@ -448,10 +449,9 @@ const prose = (seed, n) => {
   const recolour = measure('hive_update_setting (a table)', tool('hive_update_setting', { id: 'board.colors', value: { doing: '#ff0000' } }, 'assistant+settings'), 400)
   check('a table change says which entry changed, old → new', /^Changed Settings → Board → Column colours \(board\.colors\): doing: #[0-9a-f]{6} → doing: #ff0000\./.test(recolour), recolour)
   await inv('settings:update', { board: { colors: { doing: '#3b82f6' } } })
-  await inv('settings:update', { assistant: { providers: { 'claude-code': { model: 'opus' } } } })
+  // The Assistant's model is its connection's (HI-2108): Settings → Assistant has no setting for it.
   const ownModel = tool('hive_read_setting', { id: 'assistant.claude-code.model' }, 'assistant').text
-  check("the Assistant's own model reads as it is, and is the user's", /\(assistant\.claude-code\.model\): opus \(default \(empty\)\)/.test(ownModel) && /Read-only to you: /.test(ownModel), ownModel)
-  await inv('settings:update', { assistant: { providers: { 'claude-code': { model: '' } } } })
+  check("the Assistant's own model is no setting: its connection's", /No setting "assistant\.claude-code\.model"/.test(ownModel), ownModel)
   const colours = measure('hive_read_setting (a table)', tool('hive_read_setting', { id: 'board.colors' }, 'assistant'), 1500)
   check('a table reads as its values', /: \{"hold":"#[0-9a-f]{6}",.*"done":"#[0-9a-f]{6}"\}/.test(colours), colours)
   const refusedOwn = tool('hive_update_setting', { id: 'assistant.control', value: 'projects' }, 'assistant+settings')
@@ -521,8 +521,10 @@ const prose = (seed, n) => {
   check('activating a project confirms it', measure('hive_activate_project', tool('hive_activate_project', { project: 'gamma' }, 'assistant'), 300) === 'gamma is on.')
   measure('hive_create_project', tool('hive_create_project', { name: 'epsilon' }, 'assistant'), 300)
   const added = measure('hive_add_agent', tool('hive_add_agent', { project: 'beta', name: 'Helper' }, 'assistant'), 400)
-  check('a new agent: its name, id and folder', /^Added Helper \(id a-\w+\) to beta: claude-code, in the project folder, stopped\.$/.test(added), added)
-  measure('hive_update_agent', tool('hive_update_agent', { project: 'beta', agent: 'Helper', effort: 'high' }, 'assistant'), 1000)
+  check('a new agent: its name, id, connection and folder', /^Added Helper \(id a-\w+\) to beta: claude-code( on [^,]+)?, in the project folder, stopped\.$/.test(added), added)
+  measure('hive_update_agent', tool('hive_update_agent', { project: 'beta', agent: 'Helper', workflowRole: 'builder' }, 'assistant'), 1000)
+  // Connections (HI-2108): a row each, short.
+  measure('hive_connection (list)', tool('hive_connection', { action: 'list' }, 'assistant'), 600)
   const started = measure('hive_start_agent', tool('hive_start_agent', { project: 'beta', agent: 'Helper' }, 'assistant'), 400)
   check('a start: its status and session', /^Started Helper in beta: \w+, session [\w-]+\. Follow it with hive_wait_for_agents\.$/.test(started), started)
   const helper = async () => live(path.join(ws, 'beta'), (await inv('workspace:refresh')).projects.find((p) => p.name === 'beta').agents.find((a) => a.name === 'Helper').id)

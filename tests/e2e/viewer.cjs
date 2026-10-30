@@ -310,7 +310,7 @@ function stream(token) {
   check('…and ending it', !!(await act((a) => a.kind === 'lane-end' && a.lane === laneId && a.ok)), shown())
   await api('POST', '/v1/projects/beta/activate', {}, assistantToken)
   check('turning a project on names it', !!(await act((a) => a.kind === 'activate-project' && a.project === 'beta' && a.ok)), shown())
-  await api('PATCH', `/v1/projects/alpha/agents/${ann.id}`, { effort: '' }, assistantToken)
+  await api('PATCH', `/v1/projects/alpha/agents/${ann.id}`, { workflowRole: 'builder' }, assistantToken)
   check("changing an agent's settings names it", !!(await act((a) => a.kind === 'update-agent' && a.ok && a.agent?.id === ann.id)), shown())
   // An agent added whose start then fails, the error carrying a private value (round 3: a lower-level error can quote
   // anything): the stream says it in Hive's own words; the Assistant's panel keeps the error.

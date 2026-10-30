@@ -37,6 +37,8 @@
   "tips.assistantBatch.title": "一步处理多张卡片",
   "tips.assistantCompact.text": "助手使用的上下文通常比智能体大，所以它的“压缩”按钮更晚才变橙色：默认在超过 {tokens, plural, other {# 个 Token}}时。“设置”→“助手”→“压缩按钮高亮阈值”可以更改这个值，选“从不”则关闭。",
   "tips.assistantCompact.title": "助手何时建议压缩",
+  "tips.assistantConnection.text": "“助手设置”→“连接”用于选择助手在此工作区中运行所用的设置：请保持与你的智能体相同的模型和推理强度，更轻量的模型会让它粗心。DeepSeek 等服务器账号也可以使用，但有用户指南中列出的注意事项。",
+  "tips.assistantConnection.title": "选择助手运行所用的连接",
   "tips.assistantControl.text": "“设置”→“助手”→“控制”决定它能做什么：只提建议，或者在你要求时也添加和启动智能体、向它们交代任务并开始处理卡片。",
   "tips.assistantControl.title": "让助手运行智能体",
   "tips.assistantImages.text": "助手视图的“附件”按对话列出你粘贴或拖入其对话的每张截图和每个文件。点击对话名称可以再次阅读该对话。",

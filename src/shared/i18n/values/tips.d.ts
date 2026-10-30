@@ -39,6 +39,8 @@ interface HiveMessageValues {
   'tips.assistantBatch.title': undefined
   'tips.assistantCompact.text': { tokens: number }
   'tips.assistantCompact.title': undefined
+  'tips.assistantConnection.text': undefined
+  'tips.assistantConnection.title': undefined
   'tips.assistantControl.text': undefined
   'tips.assistantControl.title': undefined
   'tips.assistantImages.text': undefined

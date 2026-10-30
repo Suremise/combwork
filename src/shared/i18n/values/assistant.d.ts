@@ -170,11 +170,13 @@ interface HiveMessageValues {
   'assistant.panel.attentionOpen': { dismiss: string; name: string | number }
   'assistant.panel.cancel': undefined
   'assistant.panel.chooseMode': undefined
+  'assistant.panel.cliOwnConnection': undefined
   'assistant.panel.codingAgent': undefined
   'assistant.panel.compactLater': undefined
   'assistant.panel.compactMenu': undefined
   'assistant.panel.compactRecommended': undefined
   'assistant.panel.compacting': undefined
+  'assistant.panel.connectionRestart': undefined
   'assistant.panel.conversations': undefined
   'assistant.panel.counts': { running: string | number; projects: number }
   'assistant.panel.default': undefined
@@ -706,6 +708,8 @@ interface HiveMessageValues {
   'assistant.undo.why.cardPlace': undefined
   'assistant.undo.why.cardsOrder': undefined
   'assistant.undo.why.comment': undefined
+  'assistant.undo.why.connectionChanged': undefined
+  'assistant.undo.why.connectionMade': undefined
   'assistant.undo.why.context': undefined
   'assistant.undo.why.decision': undefined
   'assistant.undo.why.declarePaths': undefined

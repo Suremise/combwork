@@ -37,6 +37,8 @@
   "tips.assistantBatch.title": "Many cards in one step",
   "tips.assistantCompact.text": "The Assistant usually works with a bigger context than your agents, so its Compact button turns orange later: past {tokens, plural, one {# token} other {# tokens}} by default. Settings → Assistant → Highlight Compact over changes that, or Never turns it off.",
   "tips.assistantCompact.title": "When the Assistant suggests compacting",
+  "tips.assistantConnection.text": "Assistant Settings → Connection picks the setup it runs on, for this workspace: keep it on your agents' model and effort, since a lighter one makes it careless. A server account such as DeepSeek works too, with caveats the guide lists.",
+  "tips.assistantConnection.title": "Choose what the Assistant runs on",
   "tips.assistantControl.text": "Settings → Assistant → Control decides what it may do: only advise, or also add, start and brief agents and start cards when you ask.",
   "tips.assistantControl.title": "Let the Assistant run agents",
   "tips.assistantImages.text": "The Assistant view's Attachments shows every screenshot and file you've pasted or dropped into its conversations, by conversation. Click a conversation's name to read it again.",

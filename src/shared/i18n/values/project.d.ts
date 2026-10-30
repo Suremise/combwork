@@ -3,16 +3,10 @@
 interface HiveMessageValues {
   'project.agents.add': undefined
   'project.agents.chooseConnections': undefined
-  'project.agents.connectionSettings': { model: string | number }
   'project.agents.merge': undefined
   'project.agents.off': { provider: string | number }
-  'project.agents.own200k': { on: string }
-  'project.agents.ownEffort': { effort: string | number }
   'project.agents.ownMcp': { servers: string | number }
-  'project.agents.ownModel': { model: string | number }
-  'project.agents.ownSettings': { settings: string | number }
   'project.agents.projectFolder': undefined
-  'project.agents.projectSettings': { model: string | number }
   'project.agents.remove': undefined
   'project.agents.settings': undefined
   'project.agents.turnedOff': { provider: string | number }
@@ -182,6 +176,7 @@ interface HiveMessageValues {
   'project.empty.allSessions': undefined
   'project.empty.markActive': undefined
   'project.empty.markWorking': undefined
+  'project.empty.noAccount': undefined
   'project.empty.noAgents': undefined
   'project.empty.noSession': undefined
   'project.empty.notActive': { project: string | number }

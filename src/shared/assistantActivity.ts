@@ -33,6 +33,8 @@ export const ACTIVITY_KINDS = [
   'team-resume',
   'release-slot',
   'load-template',
+  'add-connection',
+  'update-connection',
   'create-project',
   'activate-project',
   'deactivate-project',
@@ -68,6 +70,8 @@ export interface ActivityTarget {
   column?: string
   /** A setting's id in the settings catalog (hive_list_settings), never its value. */
   settingId?: string
+  /** A connection's id (HI-2108: hive_connection), never its values. */
+  connection?: string
 }
 
 /**
@@ -103,7 +107,8 @@ export function activityFields(a: Partial<ActivityTarget>): Partial<ActivityTarg
     ...(Array.isArray(a.cards) && a.cards.every(isCard) ? { cards: [...a.cards] } : {}),
     ...(isLane(a.lane) ? { lane: a.lane } : {}),
     ...(isColumn(a.column) ? { column: a.column } : {}),
-    ...(isSetting(a.settingId) ? { settingId: a.settingId } : {})
+    ...(isSetting(a.settingId) ? { settingId: a.settingId } : {}),
+    ...(isSetting(a.connection) ? { connection: a.connection } : {})
   }
 }
 
@@ -148,6 +153,8 @@ export const UNDO_FINAL = {
   teamResumed: "A team it resumed isn't paused again: pause it if it should wait.",
   freshRetried: "A lane agent's new conversation tried again isn't stopped by undo: end the lane if it isn't wanted.",
   slotReleased: "A slot it released isn't kept or held again: the next work that needs a slot may take it.",
+  connectionMade: "A connection it made stays: remove it in Settings → Accounts & Connections if it isn't wanted.",
+  connectionChanged: "A connection it changed isn't changed back: edit it in Settings → Accounts & Connections.",
   templateCards: "The cards and lanes of the agents a template replaced stay as the load left them (cards put back, lanes ended): undo doesn't give them back."
 } as const
 

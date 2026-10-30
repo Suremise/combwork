@@ -1077,8 +1077,6 @@ export interface HiveRequests {
   'connection:remove': (id: string) => void
   /** Moves a connection to `index` among its account's (0: its base). */
   'connection:move': (id: string, index: number) => void
-  /** The Assistant's own connection for a CLI in this window's workspace (HI-1755); null: the workspace's default. */
-  'connections:setAssistant': (provider: ProviderId, id: string | null) => void
   /** Values moved from this window's workspace's projects onto their agents that their connection can't use (HI-1770), not dismissed. */
   'connections:notice': () => MovedNotice[]
   /** Dismisses those of the notice's entries (by key) that it lists now. */

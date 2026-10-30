@@ -48,7 +48,8 @@ interface HiveMessageValues {
   'panes.footer.compactions': { n: number; over: string }
   'panes.footer.connectionChanged': undefined
   'panes.footer.connectionEmail': { email: string | number }
-  'panes.footer.connectionOff': undefined
+  'panes.footer.connectionOffHere': undefined
+  'panes.footer.connectionRemoved': undefined
   'panes.footer.connectionSwitching': undefined
   'panes.footer.connectionSwitchingTip': undefined
   'panes.footer.connectionTip': { name: string | number }

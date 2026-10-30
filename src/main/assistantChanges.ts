@@ -8,7 +8,6 @@ import { boardRead, boardReadOnly, boardWrite, boardWriteOp } from './boardStore
 import type { Db } from './db'
 import { changeActor } from './workflow/recorder'
 import type { WorkspaceService } from './workspace'
-import { agentViewOf } from './accounts'
 import { config } from './config'
 import { agentProvider } from '../shared/providers'
 
@@ -29,7 +28,7 @@ export type Value = null | boolean | number | string | Value[] | { [k: string]: 
 export const laneValues = (l: LaneRecord): Record<string, Value> => ({ cards: [...(l.pending ?? l.cards)], reviewer: l.reviewer?.id ?? null, rounds: l.rounds, waitMinutes: l.waitMinutes, name: l.name })
 
 /** An agent's settings undo puts back: those the Assistant can change (servers.ts' agentSettings, and its name). */
-export const AGENT_FIELDS = ['name', 'provider', 'model', 'effort', 'permissionMode', 'use200kContext', 'mcpServers', 'workflowRole'] as const
+export const AGENT_FIELDS = ['name', 'provider', 'connection', 'mcpServers', 'workflowRole'] as const
 
 /** A field a change set: what it was, and what the change wrote. */
 export interface FieldChange {
@@ -408,9 +407,10 @@ export function noteLaneIn(db: Db['writer'], workspacePath: string, before: Reco
 
 /**
  * What a provider change resets of an agent (projectAgents' updateAgent): undo puts its provider back only with these,
- * each as the change left it, so they are all recorded with it, changed or not (round 3).
+ * each as the change left it, so they are all recorded with it, changed or not (round 3). Since HI-2108 its CLI follows its
+ * connection, so the two go back together.
  */
-export const PROVIDER_DEPENDENTS = ['model', 'effort', 'permissionMode', 'use200kContext', 'lastSessionId'] as const
+export const PROVIDER_DEPENDENTS = ['connection', 'lastSessionId'] as const
 
 /**
  * An agent's connection by its id (HI-2109, Choose Connections…), as a change records it: never the adapter's
@@ -434,10 +434,9 @@ export async function noteConnection(ws: WorkspaceService, project: string, was:
  * undo: those that changed; with a provider change, everything it resets too.
  */
 export async function noteAgent(ws: WorkspaceService, project: string, wasDef: AgentDef, nowDef: AgentDef): Promise<void> {
-  // As today's screens read them (HI-2106): its model, effort, mode and context are its connection's; a CLI it didn't name
-  // (one from before 0.2) is the one it ran, which the accounts migration pins it to (decision A: none is inherited).
-  const was = agentViewOf(wasDef.provider ? wasDef : { ...wasDef, provider: agentProvider(wasDef, null, config.settings) })
-  const now = agentViewOf(nowDef)
+  // A CLI it didn't name (one from before 0.2) is the one it ran, which the accounts migration pins it to (decision A).
+  const was = wasDef.provider ? wasDef : { ...wasDef, provider: agentProvider(wasDef, null, config.settings) }
+  const now = nowDef
   const keys: (keyof AgentDef)[] = AGENT_FIELDS.filter((k) => !sameValue(was[k], now[k]))
   if (keys.includes('provider')) for (const k of PROVIDER_DEPENDENTS) if (!keys.includes(k)) keys.push(k)
   const fields = keys.map((k) => ({ field: k, old: was[k] ?? null, new: now[k] ?? null }))

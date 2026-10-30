@@ -83,6 +83,14 @@
     "defaultMessage": "The agent is waiting for your answer. Compact after it has finished.",
     "description": "Compact is refused: the agent waits for the user."
   },
+  "session.connection.fallback": {
+    "defaultMessage": "{why, select, missing {The connection chosen for it was removed} other {Its connection {wanted} is off in this workspace}}, so it started on {name}, its CLI's first usable one here. Choose another in its Agent Settings.",
+    "description": "A notice (HI-2108) when an agent starts on another connection than its own: its own was removed, or is on an account turned off in this workspace ({wanted}: its name). {name} is the account it started on. Agent Settings names a dialog."
+  },
+  "session.connection.fallbackTitle": {
+    "defaultMessage": "{agent} runs on another connection",
+    "description": "A notice's title (HI-2108): an agent started on another connection than its own (its own is off in this workspace, or was removed). {agent} is the agent."
+  },
   "session.error.agentGone": {
     "defaultMessage": "That agent no longer exists.",
     "description": "An action on an agent is refused: it was removed meanwhile."

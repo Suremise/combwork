@@ -1,27 +1,34 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { LiveSessionState, ProviderId } from '@shared/types'
-import { connectionsApply, resolveConnection, type AccountView, type ConnectionsView } from '@shared/accounts'
-import { enabledProviders, providerDescriptor } from '@shared/providers'
+import type { AppSettings, Connection, LiveSessionState, ProviderId } from '@shared/types'
+import { connectionSummary } from './ConnectionDefaults'
+import { connectionsOn, type ConnectionsView } from '@shared/accounts'
+import { enabledProviders, providerDescriptor, providerName } from '@shared/providers'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call } from '../api'
 import { set, setActivity, useStore } from '../store'
-import { connectionOf, type ConnectionShown } from '@shared/connectionLabel'
+import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, orderedAccounts, type ConnectionShown } from '@shared/connectionLabel'
+
+export { cliReadyOf, connectionCli, firstReadyConnection, firstUsableConnection, offeredConnections }
 import { Icon, Tooltip } from './ui'
 
 /**
- * Which connection an agent, a template's agent or the Assistant runs on (HI-1755): the workspace's default for its CLI,
- * or one of the CLI's connections on in this workspace. A saved choice that is off here or gone stays listed and says
- * so, so nothing changes silently. Shown only for a CLI that has connections.
+ * Which connection an agent or the Assistant runs on (HI-2108; HI-2105's design): a named setup on an account (model,
+ * effort, context, mode), grouped by account, only those usable in this workspace (an account on here, or the CLI's own
+ * home), in the one order (decision A). The CLI follows from it. A saved choice that is off here or gone stays listed and
+ * says so, so nothing changes silently.
  */
 
 const M = {
   label: msg({ id: 'connections.choice.label', defaultMessage: 'Connection', description: "Label of the choice of connection an agent runs on (Agent Settings, Add Agent, Settings → Assistant): which login or service runs it." }),
-  default: msg({ id: 'connections.choice.default', defaultMessage: "Workspace's default ({name})", description: 'The first choice of connection: the workspace\'s default connection for the CLI, named ({name}).' }),
-  defaultNone: msg({ id: 'connections.choice.defaultNone', defaultMessage: "Workspace's default (none on)", description: 'The first choice of connection when the workspace has no connection on for the CLI: an agent on it is refused a start until one is.' }),
-  off: msg({ id: 'connections.choice.off', defaultMessage: '{name} (off in this workspace: the default runs it)', description: "A choice of connection that is chosen but off in this workspace ({name}): the workspace's default runs the agent instead." }),
-  gone: msg({ id: 'connections.choice.gone', defaultMessage: 'A removed connection (the agent is refused a start)', description: "A choice of connection that no longer exists: the agent can't start until another is chosen." }),
-  otherCli: msg({ id: 'connections.choice.otherCli', defaultMessage: '{cli} connections', description: 'A group in the choice of connection: the connections of another coding agent CLI ({cli}: "Codex"). Picking one switches the agent to that CLI (it is asked first).' }),
-  none: msg({ id: 'connections.choice.none', defaultMessage: 'No {cli} connection is on in this workspace. Add one in Settings → Connections.', description: 'Under the choice of connection when the workspace has none on for the CLI ({cli}: "Claude Code"). Settings → Connections names a section.' })
+  account: msg({ id: 'connections.choice.account', defaultMessage: '{account} ({cli})', description: 'A group in the choice of connection (HI-2108): the account the connections under it are on ({account}: its name, "Personal") and its coding agent CLI ({cli}: "Claude Code").' }),
+  off: msg({ id: 'connections.choice.offHere', defaultMessage: "{name} (its account is off here: its CLI's first usable connection runs it)", description: "A choice of connection that is chosen but on an account turned off in this workspace ({name}: the connection's name) (HI-2108): the agent runs on its CLI's first usable connection instead." }),
+  gone: msg({ id: 'connections.choice.removed', defaultMessage: "A removed connection (its CLI's first usable one runs it)", description: "A choice of connection that no longer exists (HI-2108): the agent runs on its CLI's first usable connection until another is chosen." }),
+  pick: msg({ id: 'connections.choice.pick', defaultMessage: 'Choose a connection', description: 'The first choice of connection when none is chosen yet (HI-2108).' }),
+  notInstalled: msg({ id: 'connections.choice.notInstalled', defaultMessage: "{cli} isn't installed", description: "Why a connection is greyed out in the choice of connection (HI-2108 round 1): its coding agent CLI ({cli}: \"Codex\") isn't installed on this PC. A short clause, lower case after the name." }),
+  unavailable: msg({ id: 'connections.choice.unavailable', defaultMessage: '{name} — {why}', description: "A choice of connection that can't be chosen here (HI-2108), greyed out: its name ({name}) and why ({why}, a short clause)." }),
+  newConnection: msg({ id: 'connections.choice.new', defaultMessage: 'New Connection…', description: "Button beside the choice of connection (Add Agent, HI-2108): opens the connection dialog to make another setup (model, effort, mode) on the chosen connection's account." }),
+  none: msg({ id: 'connections.choice.noneHere', defaultMessage: 'No account is on in this workspace. Add one in Settings → Accounts & Connections.', description: 'Under the choice of connection when no account is on in this workspace (HI-2108). Settings → Accounts & Connections names a section.' }),
+  noneCli: msg({ id: 'connections.choice.noneCli', defaultMessage: 'No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections.', description: 'Under the choice of connection when no account of the coding agent CLI it is limited to ({cli}: "Claude Code") is on in this workspace (HI-2108). Settings → Accounts & Connections names a section.' }),
 }
 
 /**
@@ -58,82 +65,82 @@ export function useConnections(): ConnectionsView | null {
   return view
 }
 
-/**
- * The connection a choice would start on (HI-1770), for its defaults: undefined where connections don't apply (a CLI
- * without them, or turned off), null when none can be used.
- */
-export function useLaunchConnection(own: string | undefined, provider: ProviderId): AccountView | null | undefined {
-  const view = useConnections()
-  // The layer is the connection's for every CLI with connections, a test copy on its CLI test home too (none: null).
-  if (!view?.providers.includes(provider)) return undefined
-  const r = resolveConnection({ connections: view.workspace }, provider, own || undefined, view.connections)
-  return r.ok ? (view.connections.find((c) => c.id === r.id) ?? null) : null
+/** A connection's values in a line (Settings' connection rows' own: connectionSummary), with its account found in the view. */
+export function connectionLine(view: ConnectionsView | null, c: Connection, settings: AppSettings | null): string | null {
+  const account = view ? orderedAccounts(view).find((a) => a.id === c.account) : undefined
+  return account ? connectionSummary(c, account, settings) : null
 }
 
 /**
- * `value`: the connection's id, '' for the workspace's default. `onOtherCli` (Add Agent, Agent Settings: HI-1769) also
- * lists the connections on here of the other CLIs that have them, by CLI: picking one is a change of CLI, which the
- * caller makes (and asks about).
+ * The choice of connection (HI-2108): `value` its id ('' while none is chosen); grouped by account, only accounts usable
+ * here; `cli` limits it to one CLI's. `unavailable` greys one out, saying why (the Assistant: one in the CLI's own mode).
+ * `onNew` shows New Connection…, given the account of the one chosen (else the first offered). `summary` (default on): its
+ * values under it. `label` false: no label (the caller has one).
  */
-export function ConnectionChoice({ provider, value, onChange, onOtherCli, id }: { provider: ProviderId; value: string; onChange: (v: string) => void; onOtherCli?: (provider: ProviderId, connection: string) => void; id?: string }) {
+export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew, summary = true, label = true }: { id?: string; value: string; onChange: (id: string) => void; cli?: ProviderId; unavailable?: (c: Connection) => string | null; onNew?: (account: string) => void; summary?: boolean; label?: boolean }) {
   const view = useConnections()
-  if (!providerDescriptor(provider).capabilities.connections || !view || !connectionsApply(view, provider)) return null
-  const onFor = (p: ProviderId) => view.connections.filter((c) => c.provider === p && view.workspace[p]?.on.includes(c.id))
-  const ws = view.workspace[provider]
-  const on = onFor(provider)
-  const others = onOtherCli ? view.providers.filter((p) => p !== provider && onFor(p).length) : []
-  const def = ws?.default ? view.connections.find((c) => c.id === ws.default) : undefined
-  const chosen = value ? view.connections.find((c) => c.id === value) : undefined
+  const settings = useStore((s) => s.settings)
+  const providers = useStore((s) => s.providers)
+  if (!view) return null
+  const offered = offeredConnections(view, settings, cli)
+  const ready = cliReadyOf(providers)
+  // Greyed out: its CLI isn't installed (decision A), or what the caller says (the one chosen stays choosable, to keep it).
+  const why = (c: Connection): string | null => {
+    const cliOfIt = connectionCli(view, c.id)
+    if (cliOfIt && ready(cliOfIt) === 'no') return tr(M.notInstalled, { cli: providerName(cliOfIt) })
+    return unavailable?.(c) ?? null
+  }
+  const accounts = orderedAccounts(view).filter((a) => offered.some((c) => c.account === a.id))
+  const chosen = value ? view.connectionRows?.find((c) => c.id === value) : undefined
+  const chosenOffered = offered.some((c) => c.id === value)
+  const newOn = chosen && chosenOffered ? chosen.account : offered[0]?.account
   return (
     <>
-      <label htmlFor={id}>{tr(M.label)}</label>
-      <div>
-        <select
-          id={id}
-          className="input"
-          aria-label={tr(M.label)}
-          value={value}
-          onChange={(e) => {
-            const c = view.connections.find((x) => x.id === e.target.value)
-            if (c && c.provider !== provider && onOtherCli) onOtherCli(c.provider, c.id)
-            else onChange(e.target.value)
-          }}
-        >
-          <option value="">{def ? tr(M.default, { name: def.name }) : tr(M.defaultNone)}</option>
-          {on.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-          {value && !on.some((c) => c.id === value) && <option value={value}>{chosen && chosen.provider === provider ? tr(M.off, { name: chosen.name }) : tr(M.gone)}</option>}
-          {others.map((p) => (
-            <optgroup key={p} label={tr(M.otherCli, { cli: providerDescriptor(p).name })}>
-              {onFor(p).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-        {!on.length && <div className="hint">{tr(M.none, { cli: providerDescriptor(provider).name })}</div>}
+      {label && <label htmlFor={id}>{tr(M.label)}</label>}
+      <div className="connection-choice">
+        <div className="flex">
+          <select id={id} className="input grow" aria-label={tr(M.label)} value={value} data-connection-choice={value} onChange={(e) => onChange(e.target.value)}>
+            {!value && <option value="">{tr(M.pick)}</option>}
+            {value && !chosenOffered && <option value={value}>{chosen ? tr(M.off, { name: chosen.name }) : tr(M.gone)}</option>}
+            {accounts.map((a) => (
+              <optgroup key={a.id} label={tr(M.account, { account: a.name, cli: providerName(a.provider) })}>
+                {connectionsOn(a.id, offered).map((c) => {
+                  const off = why(c)
+                  return (
+                    <option key={c.id} value={c.id} disabled={!!off && c.id !== value} data-unavailable={off ? '' : undefined}>
+                      {off ? tr(M.unavailable, { name: c.name, why: off }) : c.name}
+                    </option>
+                  )
+                })}
+              </optgroup>
+            ))}
+          </select>
+          {onNew && newOn && (
+            <button type="button" className="btn small subtle" data-new-connection onClick={() => onNew(newOn)}>
+              <Icon name="add" /> {tr(M.newConnection)}
+            </button>
+          )}
+        </div>
+        {summary && chosen && (
+          <div className="hint" data-connection-summary>
+            {connectionLine(view, chosen, settings)}
+          </div>
+        )}
+        {/* None usable (not for a test copy on its CLI test home, whose account is made as its first agent needs it). */}
+        {!offered.length && !view.testHome.length && <div className="hint">{cli ? tr(M.noneCli, { cli: providerName(cli) }) : tr(M.none)}</div>}
       </div>
     </>
   )
 }
 
 const MARK = {
-  inherited: msg({ id: 'connections.mark.inherited', defaultMessage: "{name}: the workspace's default for {cli}, which it follows", description: "The hover of an agent's connection in its row (HI-1769): it has no connection of its own, so it runs on the workspace's default ({name}) for its CLI ({cli}: \"Claude Code\"), and follows it if the default changes." }),
   own: msg({ id: 'connections.mark.own', defaultMessage: '{name}: its own choice', description: "The hover of an agent's connection in its row (HI-1769): the connection ({name}) was chosen for it in its Agent Settings." }),
-  offFallback: msg({ id: 'connections.mark.offFallback', defaultMessage: '{wanted} is off in this workspace: the default, {name}, runs it', description: "The hover of an agent's connection in its row (HI-1769): its own connection ({wanted}) is off in this workspace, so the workspace's default ({name}) runs it." }),
-  deleted: msg({ id: 'connections.mark.deleted', defaultMessage: 'Connection removed', description: "An agent's row, in place of its connection (HI-1769): the connection chosen for it was removed, so it can't start until another is chosen. Short." }),
-  deletedTip: msg({ id: 'connections.mark.deletedTip', defaultMessage: "The connection chosen for it was removed: it can't start until you choose another in its Agent Settings, or the workspace's default.", description: "The hover of an agent's row whose chosen connection was removed (HI-1769). Agent Settings names a dialog." }),
-  otherProvider: msg({ id: 'connections.mark.otherProvider', defaultMessage: "Another CLI's connection", description: "An agent's row, in place of its connection (HI-1769): the connection chosen for it belongs to another coding agent CLI, so it can't start on it. Short." }),
-  otherProviderTip: msg({ id: 'connections.mark.otherProviderTip', defaultMessage: "{wanted} is for another CLI than {cli}: it can't start until you choose one of its own in its Agent Settings.", description: "The hover of an agent's row whose chosen connection ({wanted}) belongs to another CLI than its own ({cli}) (HI-1769). Agent Settings names a dialog." }),
+  offFallback: msg({ id: 'connections.mark.offHere', defaultMessage: "{wanted} is on an account that's off in this workspace: {name}, its CLI's first usable connection, runs it", description: "The hover of an agent's connection in its row (HI-2108): its own connection ({wanted}) is on an account turned off in this workspace, so its CLI's first usable connection ({name}) runs it." }),
+  missing: msg({ id: 'connections.mark.removed', defaultMessage: "The connection chosen for it was removed: {name}, its CLI's first usable connection, runs it until you choose another in its Agent Settings", description: "The hover of an agent's connection in its row (HI-2108): its connection was removed, so its CLI's first usable connection ({name}) runs it. Agent Settings names a dialog." }),
   offNoDefault: msg({ id: 'connections.mark.offNoDefault', defaultMessage: '{wanted} is off here', description: "An agent's row, in place of its connection (HI-1769): its own connection ({wanted}) is off in this workspace and no other is on to run it. Short." }),
-  offNoDefaultTip: msg({ id: 'connections.mark.offNoDefaultTip', defaultMessage: "{wanted} is off in this workspace, and no other {cli} connection is on: it can't start until one is (Settings → Connections).", description: "The hover of an agent's row (HI-1769): its own connection ({wanted}) is off here and the workspace has no other connection on for its CLI ({cli}). Settings → Connections names a section." }),
+  offNoDefaultTip: msg({ id: 'connections.mark.offNoDefaultUsable', defaultMessage: "{wanted} is off in this workspace, and no other {cli} account is on: it can't start until one is (Settings → Accounts & Connections).", description: "The hover of an agent's row (HI-2108): its own connection ({wanted}) is on an account off here and no other account of its CLI ({cli}) is on in this workspace. Settings → Accounts & Connections names a section." }),
   none: msg({ id: 'connections.mark.none', defaultMessage: 'No connection', description: "An agent's row, in place of its connection (HI-1769): the workspace has no connection on for its CLI, so it can't start. Short." }),
-  noneTip: msg({ id: 'connections.mark.noneTip', defaultMessage: "No {cli} connection is on in this workspace: it can't start until one is (Settings → Connections).", description: "The hover of an agent's row (HI-1769): no connection is on in this workspace for its CLI ({cli}: \"Claude Code\"). Settings → Connections names a section." }),
+  noneTip: msg({ id: 'connections.mark.noneUsable', defaultMessage: "No {cli} account is on in this workspace: it can't start until one is (Settings → Accounts & Connections).", description: "The hover of an agent's row (HI-2108): no account of its CLI ({cli}: \"Claude Code\") is on in this workspace. Settings → Accounts & Connections names a section." }),
   other: msg({ id: 'connections.mark.other', defaultMessage: 'Runs on {running} until it restarts. Chosen now: {chosen}', description: "The hover of a running agent's connection in its row (HI-1769, shown with a ⟳ mark): its run is on one connection ({running}) and the one it would start on now is another ({chosen}: a connection's name, or why none can run it). It keeps the one it runs on until it restarts." }),
   anotherMark: msg({ id: 'connections.mark.anotherMark', defaultMessage: 'Running on another connection than the one chosen', description: "Accessible label of the ⟳ mark beside a running agent's connection in its row (HI-1769)." })
 }
@@ -143,8 +150,6 @@ function unusable(s: ConnectionShown, cli: string, full: boolean): string {
   const d = s.desired
   if (d.ok) return ''
   const wanted = d.wantedName ?? ''
-  if (d.why === 'deleted') return tr(full ? MARK.deletedTip : MARK.deleted)
-  if (d.why === 'otherProvider') return full ? tr(MARK.otherProviderTip, { wanted, cli }) : tr(MARK.otherProvider)
   if (d.why === 'offNoDefault') return tr(full ? MARK.offNoDefaultTip : MARK.offNoDefault, { wanted, cli })
   return full ? tr(MARK.noneTip, { cli }) : tr(MARK.none)
 }
@@ -154,7 +159,8 @@ function desiredText(s: ConnectionShown, wantedName: string | undefined, cli: st
   const d = s.desired
   if (!d.ok) return unusable(s, cli, true)
   if (d.note === 'offFallback') return tr(MARK.offFallback, { wanted: wantedName ?? '', name: d.name })
-  return s.inherited ? tr(MARK.inherited, { name: d.name, cli }) : tr(MARK.own, { name: d.name })
+  if (d.note === 'missing') return tr(MARK.missing, { name: d.name })
+  return tr(MARK.own, { name: d.name })
 }
 
 /** An agent's connection as a row's text (HI-1769: the agents' tables): its name (⟳ running on another), or why none. */
@@ -164,7 +170,7 @@ export function connectionCellText(own: string | undefined, provider: ProviderId
   return s.shown ? `${s.shown.name}${s.other ? ' ⟳' : ''}` : unusable(s, providerDescriptor(provider).name, false)
 }
 
-/** Opens Settings → Connections. */
+/** Opens Settings → Accounts & Connections. */
 export function openConnections(): void {
   set({ settingsSection: 'accounts', settingsQuery: '' })
   setActivity('settings')
@@ -178,16 +184,16 @@ export function openConnections(): void {
 export const needsConnection = (view: ConnectionsView | null, cli: ProviderId): boolean => !!view && view.providers.includes(cli) && !view.testHome.includes(cli) && !view.workspace[cli]?.default
 
 const SETUP = {
-  text: msg({ id: 'project.banner.connectionSetup', defaultMessage: "No {cli} connection is on in this workspace, so its agents can't start. Add one and sign it in.", description: 'Banner in a project whose agents\' CLI ({cli}: "Claude Code") has no connection on in the workspace (HI-1755).' }),
-  assistant: msg({ id: 'assistant.banner.connectionSetup', defaultMessage: "No {cli} connection is on in this workspace, so the Assistant can't start. Add one and sign it in.", description: 'Banner in the Assistant panel when its coding agent CLI ({cli}: "Claude Code") has no connection on in the workspace (HI-1774): it can\'t start until one is.' }),
-  add: msg({ id: 'project.banner.connectionSetupAdd', defaultMessage: 'Add a Connection', description: 'Button on the banner asking for a connection: opens Settings → Connections.' }),
-  setupLine: msg({ id: 'shell.setup.connections', defaultMessage: '{n, plural, =0 {{cli} signs in per connection, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per connection: # is on in this workspace.} other {{cli} signs in per connection: # are on in this workspace.}}', description: 'Provider Setup, for a coding agent CLI ({cli}: "Claude Code") that signs in per connection (Settings → Connections) rather than here (HI-1774). {n} is how many of its connections are on in the open workspace.' }),
-  open: msg({ id: 'shell.setup.openConnections', defaultMessage: 'Open Connections', description: "Provider Setup's button: opens Settings → Connections, where a coding agent CLI's connections are added and signed in." })
+  text: msg({ id: 'project.banner.connectionSetup', defaultMessage: "No {cli} account is on in this workspace, so its agents can't start. Add one and sign it in.", description: 'Banner in a project whose agents\' CLI ({cli}: "Claude Code") has no account (a sign-in or server) on in the workspace (HI-1755; HI-2108).' }),
+  assistant: msg({ id: 'assistant.banner.connectionSetup', defaultMessage: "No {cli} account is on in this workspace, so the Assistant can't start. Add one and sign it in.", description: 'Banner in the Assistant panel when its coding agent CLI ({cli}: "Claude Code") has no account (a sign-in or server) on in the workspace (HI-1774; HI-2108): it can\'t start until one is.' }),
+  add: msg({ id: 'project.banner.connectionSetupAdd', defaultMessage: 'Add an Account', description: 'Button on the banner asking for an account (HI-2108): opens Settings → Accounts & Connections.' }),
+  setupLine: msg({ id: 'shell.setup.connections', defaultMessage: '{n, plural, =0 {{cli} signs in per account, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per account: # is on in this workspace.} other {{cli} signs in per account: # are on in this workspace.}}', description: 'Provider Setup, for a coding agent CLI ({cli}: "Claude Code") that signs in per account (Settings → Accounts & Connections) rather than here (HI-1774; HI-2108). {n} is how many of its accounts are on in the open workspace.' }),
+  open: msg({ id: 'shell.setup.openConnections', defaultMessage: 'Open Accounts & Connections', description: "Provider Setup's button (HI-2108): opens Settings → Accounts & Connections, where a coding agent CLI's accounts are added and signed in." })
 }
 
 /**
  * Asks for a connection (HI-1755, Darren's 1a): where a CLI with connections has none on in the workspace, nothing of it
- * starts (never on the CLI's own login): Add a Connection opens Settings → Connections. `where`: a project's agents, or
+ * starts (never on the CLI's own login): Add an Account opens Settings → Accounts & Connections. `where`: a project's agents, or
  * the Assistant (HI-1774).
  */
 export function NoConnectionBanner({ cli, where = 'project' }: { cli: ProviderId; where?: 'project' | 'assistant' }) {
@@ -202,8 +208,8 @@ export function NoConnectionBanner({ cli, where = 'project' }: { cli: ProviderId
 }
 
 const INTRO = {
-  text: msg({ id: 'connections.intro.text', defaultMessage: "Agents now run on connections: add one for {clis} in Settings → Connections and sign it in there. Hive no longer uses the sign-in of your own terminal, which stays as it is.", description: 'A one-time banner in the main window (HI-1774): coding agents now each run on a connection (a sign-in Hive keeps, Settings → Connections) and none has been added yet. {clis} names the coding agent CLIs, joined ("Claude Code and Codex").' }),
-  add: msg({ id: 'connections.intro.add', defaultMessage: 'Add a Connection', description: 'The one-time connections banner\'s button: opens Settings → Connections.' }),
+  text: msg({ id: 'connections.intro.text', defaultMessage: "Agents now run on accounts: add one for {clis} in Settings → Accounts & Connections and sign it in there. Hive no longer uses the sign-in of your own terminal, which stays as it is.", description: 'A one-time banner in the main window (HI-1774; HI-2108): coding agents now each run on an account (a sign-in Hive keeps, Settings → Accounts & Connections) and none has been added yet. {clis} names the coding agent CLIs, joined ("Claude Code and Codex").' }),
+  add: msg({ id: 'connections.intro.add', defaultMessage: 'Add an Account', description: 'The one-time accounts banner\'s button (HI-2108): opens Settings → Accounts & Connections.' }),
   dismiss: msg({ id: 'connections.intro.dismiss', defaultMessage: 'Dismiss', description: 'The one-time connections banner\'s button: hides it for good.' })
 }
 
@@ -233,8 +239,8 @@ export function ConnectionsIntroBanner() {
 }
 
 /**
- * Provider Setup's line for a CLI that signs in per connection (HI-1774), in place of a sign-in of its own: how many are on
- * in this workspace, and Open Connections. Nothing for a CLI without connections, or a test copy on its CLI test home.
+ * Provider Setup's line for a CLI that signs in per account (HI-1774), in place of a sign-in of its own: how many are on
+ * in this workspace, and Open Accounts & Connections. Nothing for a CLI without connections, or a test copy on its CLI test home.
  */
 export function ConnectionSetupLine({ cli, onOpen }: { cli: ProviderId; onOpen: () => void }) {
   const view = useConnections()
@@ -264,9 +270,9 @@ export function ConnectionMark({ own, provider, launched, className, fallback = 
   const s = connectionOf(own, provider, launched, view)
   if (!s) return <>{fallback}</>
   const cli = providerDescriptor(provider).name
-  const ownName = own ? view?.connections.find((c) => c.id === own)?.name : undefined
+  const ownName = own ? view?.connectionRows?.find((c) => c.id === own)?.name : undefined
   const tip = s.other ? tr(MARK.other, { running: s.shown!.name, chosen: s.desired.ok ? s.desired.name : unusable(s, cli, false) }) : desiredText(s, ownName, cli)
-  const state = s.desired.ok ? (s.inherited ? 'inherited' : (s.desired.note ?? 'own')) : s.desired.why
+  const state = s.desired.ok ? (s.desired.note ?? 'own') : s.desired.why
   return (
     <Tooltip content={tip}>
       <span className={['agent-connection', className].filter(Boolean).join(' ')} data-connection={s.shown?.id ?? ''} data-connection-state={state} data-connection-other={s.other ? '' : undefined}>

@@ -7,16 +7,16 @@ import { compactThreshold, isCompacting } from '@shared/defaults'
 import { formatTime } from '@shared/dates'
 import { agentOpenRun, runWords } from '@shared/progress'
 import { columnName } from '@shared/tasks'
-import { agentProvider, providerDescriptor } from '@shared/providers'
-import type { AgentInfo, AgentPatch, EffortLevel, PermissionMode, ModeInfo, ProgressRun, ProjectInfo, ProviderId } from '@shared/types'
+import { agentProvider, modeOption, providerDescriptor } from '@shared/providers'
+import type { AgentInfo, AgentPatch, Connection, ModeInfo, ProgressRun, ProjectInfo, ProviderId } from '@shared/types'
 import { withSnapshot } from '@shared/assistantChangeList'
 import * as actions from '../actions'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
 import { legacyOf, placeText, placeTip } from '../agentPlace'
-import { connectionCellText, NoConnectionBanner, useConnections, useLaunchConnection } from './ConnectionChoice'
-import { assistantDefaults } from '@shared/connectionDefaults'
-import { agentProviderOf, assistantAccountOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setLoaded, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
+import { cliReadyOf, ConnectionChoice, connectionCellText, connectionCli, firstUsableConnection, NoConnectionBanner, useConnections } from './ConnectionChoice'
+import { connectionOf } from '@shared/connectionLabel'
+import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setLoaded, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { loadAssistantChanges } from '../assistantUndo'
 import { useInbox } from '../inbox'
@@ -24,12 +24,10 @@ import { useInboxSwitch } from '../advanced'
 import { useLiveUsage } from '../usage'
 import { cx, formatKeybinding, sessionLabel, timeAgo } from '../util'
 import { stoppedLine, useStoppedEnd } from '../stopped'
-import { Overrides, ProviderChoice, contextChoice, contextValue, type ContextChoice } from './AgentDialogs'
 import { PaneFooter, RESUME_TINT } from './AgentPanes'
 import { AssistantChanges, useDoneCount } from './AssistantChanges'
 import { AssistantMark } from './AssistantMark'
 import { TaskChip, useAgentCards, useAgentReviews } from './CardChip'
-import { confirmDangerousMode } from './PermissionMode'
 import { PaneResizer, usePaneSize } from './Resizer'
 import { StateMark } from './StateMark'
 import { TerminalView } from './TerminalView'
@@ -140,11 +138,13 @@ const M = {
   noProjects: msg({ id: 'assistant.panel.noProjects', defaultMessage: 'No projects in this workspace yet.', description: "The Assistant's overview with no projects." }),
   inactive: msg({ id: 'assistant.panel.inactive', defaultMessage: '{count, plural, one {# inactive project} other {# inactive projects}}', description: "The Assistant's overview: a row that shows the inactive projects folded into it." }),
   restartQuestion: msg({ id: 'assistant.panel.restartQuestion', defaultMessage: 'Restart the Assistant?', description: "Confirmation before the Assistant's coding agent is changed." }),
+  connectionRestart: msg({ id: 'assistant.panel.connectionRestart', defaultMessage: 'The Assistant restarts on the connection chosen and resumes this conversation.', description: "Confirmation before a running Assistant moves to another connection of the same coding agent CLI (HI-2108): it restarts in it and carries on the conversation." }),
+  cliOwnConnection: msg({ id: 'assistant.panel.cliOwnConnection', defaultMessage: "its mode is the CLI's own setting, and the Assistant needs to know its mode", description: "Why a connection is greyed out in Assistant Settings' choice of connection (HI-2108): its permission mode is \"The CLI's own setting\" (Hive passes none), and the Assistant's Control relies on knowing its mode. A clause, lower case." }),
   switching: msg({ id: 'assistant.panel.switching', defaultMessage: "Switching to {to} stops this conversation ({from} conversations can't move to another provider) and starts a new one.", description: "Confirmation before the Assistant's coding agent is changed ({to}, {from}: Claude Code, Codex…)." }),
   tellFailed: msg({ id: 'assistant.panel.tellFailed', defaultMessage: 'Could not tell the Assistant its mode', description: "An error notice: the running Assistant couldn't be told its new mode; the reason follows." }),
   cancel: msg({ id: 'assistant.panel.cancel', defaultMessage: 'Cancel', description: "The Assistant Settings dialog's button that closes it without saving." }),
   save: msg({ id: 'assistant.panel.save', defaultMessage: 'Save', description: "The Assistant Settings dialog's button that saves the choices." }),
-  forWorkspace: msg({ id: 'assistant.panel.forWorkspace', defaultMessage: 'For this workspace. Anything left at <i>Default</i> follows <link>Settings → Assistant</link>.', description: 'Assistant Settings, at the top. <i> is italic (the choice Default); <link> opens Settings → Assistant.' }),
+  forWorkspace: msg({ id: 'assistant.panel.forWorkspace', defaultMessage: 'For this workspace. Its connection holds its model, effort and permission mode; a mode left at <i>Default</i> follows <link>Settings → Assistant</link>.', description: 'Assistant Settings, at the top (HI-2108). <i> is italic (the choice Default of the Mode list); <link> opens Settings → Assistant.' }),
   mode: msg({ id: 'assistant.panel.mode', defaultMessage: 'Mode', description: "Assistant Settings: the mode's label." }),
   defaultMode: msg({ id: 'assistant.panel.defaultMode', defaultMessage: 'Default ({name})', description: "Assistant Settings: the mode that follows Settings → Assistant ({name}: that mode)." }),
   codingAgent: msg({ id: 'assistant.panel.codingAgent', defaultMessage: 'Coding agent', description: 'Assistant Settings: a heading (Claude Code, Codex…).' }),
@@ -206,7 +206,7 @@ export function useModes(): ModeInfo[] {
 }
 
 /** Changes the Assistant's settings for this workspace; a change that needs a new conversation restarts it after asking. */
-async function changeAssistant(patch: Omit<AgentPatch, 'name'>, restart: { title: string; message: string } | null): Promise<boolean> {
+async function changeAssistant(patch: Omit<AgentPatch, 'name'>, restart: { title: string; message: string; resume?: boolean } | null): Promise<boolean> {
   const a = get().workspace?.assistant
   const agent = a?.agents[0]
   if (!a || !agent) return false
@@ -219,7 +219,7 @@ async function changeAssistant(patch: Omit<AgentPatch, 'name'>, restart: { title
   }
   const done = await actions.attempt(tr(M.saveFailed), () => call('agents:update', a.path, AGENT, patch))
   await actions.refreshWorkspace()
-  if (done && wasLive) await actions.newSession(a.path, AGENT)
+  if (done && wasLive) await (restart!.resume ? actions.resumeLast(a.path, AGENT) : actions.newSession(a.path, AGENT))
   return !!done
 }
 
@@ -382,15 +382,14 @@ export function AssistantPanel() {
 }
 
 /**
- * Asks for a connection where the Assistant can't start without one (HI-1774): its CLI has connections, and neither its
- * own choice (Settings → Assistant) nor the workspace's default is on here. Not for a test copy on its CLI test home.
+ * Asks for an account where the Assistant can't start without one (HI-1774; HI-2108): neither its connection nor its CLI's
+ * first usable one can run it here. Not for a test copy on its CLI test home.
  */
 function AssistantConnectionBanner({ project, a }: { project: ProjectInfo; a: AgentInfo }) {
   const provider = agentProviderOf(project, a)
   const view = useConnections()
-  const choice = useStore((s) => assistantAccountOf(s.workspace, provider))
-  const conn = useLaunchConnection(choice || undefined, provider)
-  if (conn !== null || !view || view.testHome.includes(provider)) return null
+  const shown = connectionOf(a.connection, provider, undefined, view)
+  if (!shown || shown.desired.ok || !view || view.testHome.includes(provider)) return null
   return <NoConnectionBanner cli={provider} where="assistant" />
 }
 
@@ -908,67 +907,53 @@ function WorkspaceOverview() {
 // Assistant Settings: this workspace's choices, over Settings → Assistant
 // ---------------------------------------------------------------------------
 
+/**
+ * Assistant Settings (HI-2108; HI-2105's design): this workspace's Assistant's connection (which holds its model, effort,
+ * context and mode; its CLI follows from it) and its mode (Coordinator…). A connection in the CLI's own mode is greyed
+ * out, saying why: the Assistant's Control relies on knowing its mode (#1284).
+ */
 export function AssistantSettingsDialog() {
   const openFlag = useStore((s) => s.assistantSettingsOpen)
   const a = useStore((s) => s.workspace?.assistant ?? null)
   const settings = useStore((s) => s.settings)
   const modes = useModes()
+  const view = useConnections()
   const agent = a?.agents[0] ?? null
   const current: ProviderId = a && agent ? (agent.live?.provider ?? agentProvider(agent, a.config, settings)) : ''
-  const [provider, setProvider] = useState<ProviderId>(current)
   const [mode, setMode] = useState('')
-  const [model, setModel] = useState('')
-  const [effort, setEffort] = useState('')
-  const [permission, setPermission] = useState('')
-  const [context, setContext] = useState<ContextChoice>('')
+  const [connection, setConnection] = useState('')
   useEffect(() => {
-    setProvider(current)
     setMode(agent?.mode ?? '')
-    setModel(agent?.model ?? '')
-    setEffort(agent?.effort ?? '')
-    setPermission(agent?.permissionMode ?? '')
-    setContext(contextChoice(agent?.use200kContext))
+    setConnection(agent?.connection ?? '')
     // Reset each time the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openFlag])
-  // Its connection (HI-1770): with connections, an empty model, effort or context follows Settings → Assistant's, then its defaults.
-  const assistantChoice = useStore((s) => assistantAccountOf(s.workspace, provider))
-  const launchConnection = useLaunchConnection(assistantChoice || undefined, provider)
+  // None chosen yet (a new workspace's): the first usable in the order of accounts, as a new agent's (decision A).
+  const providers = useStore((s) => s.providers)
+  const first = firstUsableConnection(view, settings, cliReadyOf(providers))
+  useEffect(() => {
+    if (openFlag && !connection && first) setConnection(first)
+  }, [openFlag, connection, first])
   if (!openFlag || !a || !agent) return null
-  const inheritedFrom = launchConnection === undefined ? undefined : { defaults: assistantDefaults(settings?.assistant.providers[provider], launchConnection) }
   const close = (): void => set({ assistantSettingsOpen: false })
-  const chooseProvider = (v: ProviderId): void => {
-    setProvider(v)
-    if (v !== provider) {
-      setModel('')
-      setEffort('')
-      setPermission('')
-      setContext('')
-    }
-  }
   const defaultMode = modes.find((p) => p.id === (settings?.assistant.mode || DEFAULT_MODE))
+  const cliOf = (id: string): ProviderId => connectionCli(view, id) ?? current
+  const cliOwn = (c: Pick<Connection, 'permissionMode'>, cli: ProviderId): boolean => !!c.permissionMode && !!modeOption(cli, c.permissionMode)?.cliOwn
   const save = async (): Promise<void> => {
-    const providerChanged = provider !== current
+    const cli = connection ? cliOf(connection) : current
+    const connectionChanged = !!connection && connection !== agent.connection
     const modeChanged = assistantModeId({ mode }, settings) !== assistantModeId(agent, settings)
-    if (permission && permission !== agent.permissionMode && !(await confirmDangerousMode(provider, permission, tr(M.theAssistant)))) return
     const ok = await changeAssistant(
-      {
-        ...(providerChanged ? { provider } : {}),
-        mode: mode || undefined,
-        model: model || undefined,
-        effort: (effort || undefined) as EffortLevel | undefined,
-        permissionMode: (permission || undefined) as PermissionMode | undefined,
-        use200kContext: contextValue(context)
-      },
-      providerChanged
-        ? {
-            title: tr(M.restartQuestion),
-            message: tr(M.switching, { to: providerDescriptor(provider).name, from: providerDescriptor(current).name })
-          }
+      { mode: mode || undefined, ...(connectionChanged ? { connection } : {}) },
+      // Another connection is a restart (its model, mode or CLI), a running Assistant resuming in it; another CLI starts fresh.
+      connectionChanged
+        ? cli !== current
+          ? { title: tr(M.restartQuestion), message: tr(M.switching, { to: providerDescriptor(cli).name, from: providerDescriptor(current).name }) }
+          : { title: tr(M.restartQuestion), message: tr(M.connectionRestart), resume: true }
         : null
     )
     // A new mode needs no restart: the running Assistant is told it (#259).
-    if (ok && modeChanged && !providerChanged && agent.live) await actions.attempt(tr(M.tellFailed), () => call('assistant:switchMode', assistantModeId({ mode }, settings), false))
+    if (ok && modeChanged && !connectionChanged && agent.live) await actions.attempt(tr(M.tellFailed), () => call('assistant:switchMode', assistantModeId({ mode }, settings), false))
     if (ok) close()
   }
   return (
@@ -996,6 +981,7 @@ export function AssistantSettingsDialog() {
         )}
       </p>
       <div className="agent-form">
+        <ConnectionChoice id="assistant-connection" value={connection} onChange={setConnection} unavailable={(c) => (cliOwn(c, cliOf(c.id)) ? tr(M.cliOwnConnection) : null)} />
         <label>{tr(M.mode)}</label>
         <select className="select" value={mode} onChange={(e) => setMode(e.target.value)}>
           <option value="">{tr(M.defaultMode, { name: (defaultMode && modeName(defaultMode)) ?? settings?.assistant.mode ?? 'Overseer' /* i18n-ignore: the default mode's name, as Hive ships it */ })}</option>
@@ -1009,10 +995,6 @@ export function AssistantSettingsDialog() {
             ))}
         </select>
       </div>
-      <h3 className="agent-dialog-h">{tr(M.codingAgent)}</h3>
-      <ProviderChoice value={provider} current={current} onChange={chooseProvider} />
-      <h3 className="agent-dialog-h">{tr(M.settings)}</h3>
-      <Overrides project={a} provider={provider} model={model} effort={effort} permission={permission} context={context} onModel={setModel} onEffort={setEffort} onPermission={setPermission} onContext={setContext} inherit={tr(M.default)} inheritIsDefault assistant connection={inheritedFrom} />
       {agent.live && <div className="detail">{tr(M.appliesNext)}</div>}
     </Modal>
   )
