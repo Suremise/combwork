@@ -24,6 +24,7 @@ import type { TrustReading, TrustTarget } from './providers/types'
 import { git } from './git'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
+import { modelCaps } from '../shared/models'
 import { openWorkspaces, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
 import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStore'
 import { coverageView } from './keyCoverage'
@@ -465,17 +466,43 @@ export async function addAccount(id: ProviderId, name: string, server?: ServerCo
 export function setConnectionDefaults(id: string, patch: { model?: string | null; effort?: string | null; use200kContext?: boolean | null }): void {
   const a = mustGet(id)
   const server = isServer(a)
+  const now = baseConnection(id, allConnections())
+  const next: Connection = { ...(now ?? { id: newConnectionId(), account: id, name: a.name }) }
+  if (patch.model !== undefined) next.model = patch.model?.trim() || undefined
+  if (patch.effort !== undefined) next.effort = (!server && (patch.effort?.trim() as EffortLevel)) || undefined
+  if (patch.use200kContext !== undefined) next.use200kContext = !server && providerDescriptor(a.provider).capabilities.contextLimit && patch.use200kContext === true ? true : undefined
+  for (const k of ['model', 'effort', 'use200kContext'] as const) if (next[k] === undefined) delete next[k]
+  // Decision E: a model and effort that don't go together are refused, nothing changed.
+  if (next.effort && (patch.model !== undefined || patch.effort !== undefined)) assertEffortTaken(a.provider, next.model ?? null, a, next.effort)
   changeConnections((all) => {
-    let i = all.findIndex((x) => x.account === id)
+    const i = all.findIndex((x) => x.account === id)
     // An account without one (all removed): its base connection made again.
-    if (i < 0) i = all.push({ id: newConnectionId(), account: id, name: a.name }) - 1
-    const next = { ...all[i] }
-    if (patch.model !== undefined) next.model = patch.model?.trim() || undefined
-    if (patch.effort !== undefined) next.effort = (!server && (patch.effort?.trim() as EffortLevel)) || undefined
-    if (patch.use200kContext !== undefined) next.use200kContext = !server && providerDescriptor(a.provider).capabilities.contextLimit && patch.use200kContext === true ? true : undefined
-    for (const k of ['model', 'effort', 'use200kContext'] as const) if (next[k] === undefined) delete next[k]
-    all[i] = next
+    if (i < 0) all.push(next)
+    else all[i] = { ...next, id: all[i].id }
   })
+}
+
+/**
+ * The model that would run for a choice on an account (`model`: its connection's; else the CLI's own default in the
+ * account's home, else its catalogue's), and whether an effort is one that model takes (only where its efforts are
+ * known): an effort it doesn't take is kept but not used.
+ */
+export function effortUsable(cli: ProviderId, model: string | null, conn: Pick<Account, 'id' | 'home'> | null, effort: string): boolean {
+  const info = providerService.info(cli)
+  const runs = model || (conn && !conn.home ? provider(cli).configuredDefaultModel(accountFolder(conn.id)) : null) || info.defaultModel || null
+  const caps = modelCaps(cli, runs, info, config.settings)
+  return !caps.perModel || caps.efforts.some((e) => e.value === effort)
+}
+
+const EFFORT_REFUSED = msg({ id: 'worktrees.agent.effortRefused', defaultMessage: "{chosen, select, yes {{model}} other {The CLI's default model}} doesn't take {effort} effort. Choose one of the levels it takes.", description: "An error saving an agent's (or a connection's) settings (HI-2106): the model that would run (its name, {model}, when one is chosen; else the CLI's own default) has no such reasoning effort level ({effort}: \"max\")." })
+
+/**
+ * Refuses a connection's model and effort that don't go together (HI-2106, decision E), at every save the user makes
+ * (Agent Settings, Add Agent, the Agent API, Settings → Connections' defaults, Settings → Assistant), before anything
+ * changes. One the migration carried over, or a later CLI's catalogue left, is kept and not passed at launch.
+ */
+export function assertEffortTaken(cli: ProviderId, model: string | null, account: Pick<Account, 'id' | 'home'> | null, effort: string): void {
+  if (!effortUsable(cli, model, account, effort)) throw hiveError(EFFORT_REFUSED, { chosen: model ? 'yes' : 'no', model: model ?? '', effort }, { kind: 'invalid' })
 }
 
 /**

@@ -1,18 +1,16 @@
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
-import type { Account, AgentDef, AppSettings, Connection, LaunchValues, MovedField, ProjectConfig, ProviderId } from '../shared/types'
+import type { AgentDef, AppSettings, Connection, LaunchValues, MovedField, ProjectConfig, ProviderId } from '../shared/types'
 import { baseConnection, launchValues, valuesOf } from '../shared/accounts'
 import { COPILOT_ACCOUNT, type LegacyInputs, type MovedNotice, type AccountStore, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, waitsForConnection } from '../shared/connectionDefaults'
 import { autoProviderPending, providerDescriptor } from '../shared/providers'
 import { HIVE_DIR, projectAgents } from '../shared/defaults'
-import { modelCaps } from '../shared/models'
 import { msg, tr } from '../shared/i18n'
 import { config } from './config'
 import { onHiveEvent, toast } from './events'
 import { createLogger, userText } from './logger'
-import { accountById, accountFolder, accountHere, allConnections, connectionWith, firstUsableAccount, getConnection, newConnectionId } from './accounts'
+import { accountById, accountHere, allConnections, assertEffortTaken, connectionWith, effortUsable, firstUsableAccount, getConnection, newConnectionId } from './accounts'
 import { testHomeSeam } from './connectionSeam'
-import { provider as providerAdapter } from './providers'
 import { providerService } from './providerService'
 import { openWorkspaces, workspaceOf, type WorkspaceService } from './workspace'
 
@@ -39,13 +37,21 @@ function inputsFor(ws: WorkspaceService): LegacyInputs {
   }
 }
 
+/** Saves config.json now, refusing what would name a connection it couldn't save (HR1's round 1 on HI-2106). */
+export async function saveConnections(): Promise<void> {
+  if (!(await config.saveNow())) throw new Error("config.json couldn't be saved") // i18n-ignore: logged, and shown in English in the notice's detail
+}
+
 /**
- * Runs `plan` on the accounts as they are, then writes the project under its lock (`write`) only once every connection
- * it needs is saved in config.json: one made in the write's own run (an agent changed meanwhile) isn't written yet, it is
- * saved and the whole tried again, so a project never names a connection config.json lost.
+ * Writes a project under its lock (`write`) only with every connection it names already saved in config.json: config.json
+ * is saved first (connections made by an earlier run, and its own migration's), then `plan` runs on the accounts as they
+ * are, inside the write; when it has to make a connection (an agent changed meanwhile), that write writes nothing (`plan`
+ * returns false), the connection is saved and the whole is run again. So a project never names a connection config.json
+ * lost, and its old fields are never removed before what replaces them is on disk.
  */
-async function withConnections(write: (plan: (fn: (store: AccountStore) => void) => void) => Promise<void>): Promise<void> {
+async function withConnections(write: (plan: (fn: (store: AccountStore) => void) => boolean) => Promise<void>): Promise<void> {
   for (let tries = 0; tries < 5; tries++) {
+    await saveConnections()
     let grew = false
     await write((fn) => {
       const c = config.get()
@@ -57,9 +63,9 @@ async function withConnections(write: (plan: (fn: (store: AccountStore) => void)
           x.accounts = store.accounts
           x.connections = store.connections
         })
+      return !grew
     })
     if (!grew) return
-    if (!(await config.saveNow())) throw new Error("config.json couldn't be saved") // i18n-ignore: logged, and shown in English in the notice's detail
   }
   throw new Error('its agents kept changing') // i18n-ignore: logged, and shown in English in the notice's detail
 }
@@ -81,10 +87,11 @@ async function migrateOne(ws: WorkspaceService, projectPath: string): Promise<vo
       let made = false
       let next: ProjectConfig | null = null
       await ws.mutateProjectConfig(projectPath, (cfg) => {
-        plan((store) => {
+        const saved = plan((store) => {
           next = assistant ? migrateAssistant(cfg, inputsFor(ws), store, at) : migrateProject(cfg, inputsFor(ws), store, at)
         })
-        if (!next) return {}
+        // Connections made in this run: saved first, then the whole again.
+        if (!saved || !next) return {}
         made = true
         // Removed in this write: the project's own launch settings (its agents' connections hold them now).
         return { ...(next as ProjectConfig), providers: undefined, defaultProvider: undefined } as unknown as Partial<ProjectConfig>
@@ -104,10 +111,10 @@ async function placeLeft(ws: WorkspaceService, projectPath: string): Promise<voi
   await withConnections(async (plan) => {
     await ws.mutateProjectConfig(projectPath, (cfg) => {
       let r: ReturnType<typeof placeUnplaced> = null
-      plan((store) => {
+      const saved = plan((store) => {
         r = placeUnplaced(cfg, (cli) => accountHere(cli, ws.config)?.id ?? null, store, assistant ? 'Assistant' : undefined) // i18n-ignore: a connection's name, the user's data once made
       })
-      if (!r) return {}
+      if (!saved || !r) return {}
       writes++
       const { cfg: next, placed } = r as NonNullable<ReturnType<typeof placeUnplaced>>
       // The Assistant's record of its connection per CLI takes in the one it got.
@@ -188,17 +195,7 @@ async function migrateWorkspace(ws: WorkspaceService): Promise<void> {
   if (writes !== before) await ws.refresh().catch(() => undefined)
 }
 
-/**
- * The model that would run for a choice on an account (`model`: its connection's; else the CLI's own default in the
- * account's home, else its catalogue's), and whether an effort is one that model takes (only where its efforts are
- * known): an effort it doesn't take is kept but not used.
- */
-export function effortUsable(cli: ProviderId, model: string | null, conn: Pick<Account, 'id' | 'home'> | null, effort: string): boolean {
-  const info = providerService.info(cli)
-  const runs = model || (conn && !conn.home ? providerAdapter(cli).configuredDefaultModel(accountFolder(conn.id)) : null) || info.defaultModel || null
-  const caps = modelCaps(cli, runs, info, config.settings)
-  return !caps.perModel || caps.efforts.some((e) => e.value === effort)
-}
+export { effortUsable } from './accounts'
 
 /**
  * The values moved onto agents by HI-1770 that their connection can't use now, in one workspace's projects only (the
@@ -262,27 +259,63 @@ const MOVE_FAILED = msg({ id: 'main.connections.moveFailed', defaultMessage: "Hi
  * values its connection for that CLI has, as `values` changes them (a value emptied: the account's base connection's):
  * its agent's when it runs that CLI, else the one its record keeps for when it does. `cli` given as its CLI: it moves to it.
  */
-async function pointAssistant(ws: WorkspaceService, cli: ProviderId, opts: { account?: string | null; values?: Partial<Record<keyof LaunchValues, unknown>>; become?: boolean }): Promise<void> {
-  if (!ws.path) return
+export function pointAssistant(ws: WorkspaceService, cli: ProviderId, opts: { account?: string | null; values?: Partial<Record<keyof LaunchValues, unknown>>; become?: boolean }): Promise<void> {
+  if (!ws.path) return Promise.resolve()
+  // One change of a workspace's Assistant at a time, each from what the one before it left (HR1's round 1: two edits at
+  // once kept only one of them).
+  return serially(`assistant\n${ws.path.toLowerCase()}`, () => pointAssistantNow(ws, cli, opts))
+}
+
+/** Changes of the Assistant under way, by workspace: each starts once the one before it has ended. */
+const assistantChanges = new Map<string, Promise<void>>()
+
+function serially(key: string, fn: () => Promise<void>): Promise<void> {
+  const run = (assistantChanges.get(key) ?? Promise.resolve()).then(fn, fn)
+  const tail = run.catch(() => undefined)
+  assistantChanges.set(key, tail)
+  void tail.then(() => assistantChanges.get(key) === tail && assistantChanges.delete(key))
+  return run
+}
+
+/** The connection the Assistant's home names for a CLI: its agent's when it runs that CLI, else its record's. */
+const assistantConnectionOf = (cfg: ProjectConfig, cli: ProviderId): string | undefined => {
+  const agent = projectAgents(cfg)[0]
+  return agent?.provider === cli ? agent.connection : cfg.migrations?.accounts1?.assistant?.[cli]
+}
+
+async function pointAssistantNow(ws: WorkspaceService, cli: ProviderId, opts: { account?: string | null; values?: Partial<Record<keyof LaunchValues, unknown>>; become?: boolean }): Promise<void> {
   const home = ws.assistantHome
   await ensureMigrated(home)
-  const cfg = await ws.projectConfig(home)
-  const agent = projectAgents(cfg)[0]
-  const current = getConnection(agent?.provider === cli ? agent.connection : cfg.migrations?.accounts1?.assistant?.[cli])
-  const account = accountById(opts.account ?? (current && accountById(current.account)?.provider === cli ? current.account : undefined)) ?? accountHere(cli, ws.config)
-  if (!account) return
-  const base = baseConnection(account.id, allConnections())
-  const values: LaunchValues = { ...valuesOf(current ?? base ?? {}) }
-  for (const [k, v] of Object.entries(opts.values ?? {}) as [keyof LaunchValues, unknown][]) (values as Record<string, unknown>)[k] = v === '' || v === null || v === undefined ? base?.[k] : v
-  const c = connectionWith(account.id, values, 'Assistant') // i18n-ignore: a connection's name, the user's data once made
-  if (!(await config.saveNow())) throw new Error("config.json couldn't be saved") // i18n-ignore: logged
-  await ws.mutateProjectConfig(home, (now) => {
-    const a = projectAgents(now)[0]
-    const rec = now.migrations?.accounts1 ?? { at: new Date().toISOString() }
-    const runs = !!a && (a.provider === cli || !!opts.become)
-    return { ...(runs ? { agents: [{ ...a, provider: cli, connection: c.id }] } : {}), migrations: { ...now.migrations, accounts1: { ...rec, assistant: { ...rec.assistant, [cli]: c.id } } } }
-  })
-  await ws.refresh().catch(() => undefined)
+  // Worked out from its connection as saved; changed by something else (its dialog) before this write: worked out again.
+  for (let tries = 0; tries < 3; tries++) {
+    const cfg = await ws.projectConfig(home)
+    const was = assistantConnectionOf(cfg, cli)
+    const current = getConnection(was)
+    const account = accountById(opts.account ?? (current && accountById(current.account)?.provider === cli ? current.account : undefined)) ?? accountHere(cli, ws.config)
+    if (!account) return
+    const base = baseConnection(account.id, allConnections())
+    const values: LaunchValues = { ...valuesOf(current ?? base ?? {}) }
+    for (const [k, v] of Object.entries(opts.values ?? {}) as [keyof LaunchValues, unknown][]) (values as Record<string, unknown>)[k] = v === '' || v === null || v === undefined ? base?.[k] : v
+    // Decision E: a model and effort it was given that don't go together are refused, nothing changed.
+    if (values.effort && opts.values && ('effort' in opts.values || 'model' in opts.values)) assertEffortTaken(cli, values.model ?? null, account, values.effort)
+    const c = connectionWith(account.id, values, 'Assistant') // i18n-ignore: a connection's name, the user's data once made
+    await saveConnections()
+    let stale = false
+    await ws.mutateProjectConfig(home, (now) => {
+      if (assistantConnectionOf(now, cli) !== was) {
+        stale = true
+        return {}
+      }
+      const a = projectAgents(now)[0]
+      const rec = now.migrations?.accounts1 ?? { at: new Date().toISOString() }
+      const runs = !!a && (a.provider === cli || !!opts.become)
+      return { ...(runs ? { agents: [{ ...a, provider: cli, connection: c.id }] } : {}), migrations: { ...now.migrations, accounts1: { ...rec, assistant: { ...rec.assistant, [cli]: c.id } } } }
+    })
+    if (stale) continue
+    await ws.refresh().catch(() => undefined)
+    return
+  }
+  throw new Error("the Assistant's connection kept changing") // i18n-ignore: logged
 }
 
 /** The Assistant's account for a CLI in the asking window's workspace (Settings → Assistant; null: its CLI's first usable here). */
@@ -336,9 +369,16 @@ function followCopilotSettings(s: AppSettings, prev: AppSettings): void {
   if (!Object.keys(changed).length) return
   const account = accountById(COPILOT_ACCOUNT)
   if (!account) return
+  const base = baseConnection(account.id, allConnections())
+  const next = launchValues({ ...valuesOf(base ?? {}), ...changed }, 'copilot')
+  // Decision E: a model and effort that don't go together aren't applied (the setting was saved: logged, kept as it was).
+  if (next.effort && !effortUsable('copilot', next.model ?? null, account, next.effort)) {
+    log.warn(`Settings → GitHub Copilot: ${userText(next.model ?? 'its default model')} doesn't take ${next.effort} effort; its connection is kept as it was`)
+    return
+  }
   config.update((c) => {
-    const base = baseConnection(account.id, c.connections ?? [])
-    c.connections = (c.connections ?? []).map((x) => (x.id === base?.id ? { id: x.id, account: x.account, name: x.name, ...launchValues({ ...valuesOf(x), ...changed }, 'copilot') } : x))
+    const first = baseConnection(account.id, c.connections ?? [])
+    c.connections = (c.connections ?? []).map((x) => (x.id === first?.id ? { id: x.id, account: x.account, name: x.name, ...launchValues({ ...valuesOf(x), ...changed }, 'copilot') } : x))
   })
 }
 

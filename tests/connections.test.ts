@@ -34,7 +34,7 @@ const { config } = await import('../src/main/config')
 const { advanced } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
-const { createWorkspaceService, disposeWorkspaceService, inWorkspace, setNewWorkspaceExtras } = await import('../src/main/workspace')
+const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace, setNewWorkspaceExtras } = await import('../src/main/workspace')
 const { runSwitch } = await import('../src/main/connectionSwitch')
 const { authScope, sessions } = await import('../src/main/sessions')
 const moves = await import('../src/main/connectionMoves')
@@ -69,7 +69,7 @@ beforeAll(async () => {
   // A project whose agents change connection (HI-1771).
   mkdirSync(join(wsPath, 'api1', '.hive'), { recursive: true })
   writeFileSync(join(wsPath, 'api1', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'k', name: 'Api K', provider: 'claude-code', model: 'opus', effort: 'high', use200kContext: true, lastSessionId: 's-1' }] }))
-  for (const name of ['mv1', 'mv2', 'mv3', 'mv4', 'mv5', 'mv6', 'mv7', 'mv8']) {
+  for (const name of ['mv1', 'mv2', 'mv3', 'mv4', 'mv5', 'mv6', 'mv7', 'mv8', 'mv9']) {
     mkdirSync(join(wsPath, name, '.hive'), { recursive: true })
     writeFileSync(join(wsPath, name, '.hive', 'project.json'), JSON.stringify({ version: 2, providers: { 'claude-code': { model: 'haiku', effort: 'high', permissionMode: 'inherit', extraArgs: '', use200kContext: 'on' }, codex: { model: 'gpt-5', effort: 'low', permissionMode: 'inherit', extraArgs: '', use200kContext: 'inherit' } }, agents: [{ id: 'own', name: `${name} Own`, provider: 'claude-code', model: 'opus', use200kContext: false }, { id: 'none', name: `${name} None`, provider: 'claude-code' }, { id: 'cx', name: `${name} Codex`, provider: 'codex' }] }))
   }
@@ -956,6 +956,96 @@ describe('model, effort and context from the connection (HI-1770)', () => {
       expect((await moves.movedNotice(w)).some((n) => n.key === mine[0].key)).toBe(false)
     } finally {
       providerService.info = info
+    }
+  })
+
+  it('a project is written only once every connection it names is on disk: its config.json saved first (HR1, round 1)', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const p = join(wsPath, 'mv8')
+    const configFile = join(base, 'profile', 'config.json')
+    let seen: { names: number; on: boolean } | null = null
+    configTestHooks.beforeConfigWrite = async (written) => {
+      if (written.toLowerCase() !== p.toLowerCase()) return
+      // As config.json is on disk when project.json is about to name its connections.
+      const onDisk = JSON.parse(readFileSync(configFile, 'utf8')).connections ?? []
+      seen = { names: onDisk.length, on: onDisk.some((c: { account: string; model?: string; effort?: string }) => c.account === a.id && c.model === 'haiku' && c.effort === 'high') }
+    }
+    try {
+      await here(() => moves.ensureMigrated(p))
+    } finally {
+      configTestHooks.beforeConfigWrite = undefined
+    }
+    expect(seen).toMatchObject({ on: true })
+    expect(await savedConnection(p, 'none')).toMatchObject({ account: a.id, model: 'haiku', effort: 'high' })
+  })
+
+  it("config.json that can't be saved: nothing published, the project's old fields kept and unmarked; the next run migrates", async () => {
+    await signedInConnection('Personal', 'me@example.com')
+    const p = join(wsPath, 'mv9')
+    const before = readFileSync(join(p, '.hive', 'project.json'), 'utf8')
+    const save = vi.spyOn(config, 'saveNow').mockResolvedValue(false)
+    try {
+      expect(await outcome(here(() => moves.ensureMigrated(p)))).toMatch(/config\.json couldn't be saved/)
+      // An agent's change that would make a connection: refused the same, the agent as it was.
+      expect(await outcome(here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { effort: 'max' })))).toMatch(/config\.json couldn't be saved/)
+    } finally {
+      save.mockRestore()
+    }
+    expect(readFileSync(join(p, '.hive', 'project.json'), 'utf8')).toBe(before)
+    expect((await w.projectConfig(p)).migrations?.accounts1).toBeUndefined()
+    await here(() => moves.ensureMigrated(p))
+    expect(await savedConnection(p, 'none')).toMatchObject({ model: 'haiku', effort: 'high' })
+  })
+
+  it("two changes of the Assistant at once both kept: each from what the other left (HR1, round 1)", async () => {
+    await signedInConnection('Personal', 'me@example.com')
+    await here(() => moves.ensureMigrated(w.assistantHome))
+    await here(() => moves.pointAssistant(w, 'claude-code', { values: { model: 'opus', effort: 'medium' }, become: true }))
+    // The first change's save held until both have started.
+    let release!: () => void
+    const held = new Promise<void>((r) => (release = r))
+    const real = config.saveNow.bind(config)
+    let calls = 0
+    const save = vi.spyOn(config, 'saveNow').mockImplementation(async () => {
+      if (calls++ === 0) await held
+      return real()
+    })
+    try {
+      const one = here(() => moves.pointAssistant(w, 'claude-code', { values: { model: 'sonnet' } }))
+      const two = here(() => moves.pointAssistant(w, 'claude-code', { values: { effort: 'high' } }))
+      release()
+      await Promise.all([one, two])
+    } finally {
+      save.mockRestore()
+    }
+    const agent = (await w.projectConfig(w.assistantHome)).agents[0]
+    expect(accounts.getConnection(agent.connection)).toMatchObject({ model: 'sonnet', effort: 'high' })
+  })
+
+  it('decision E at every save: a model and effort that don\'t go together are refused, the connection unchanged', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const info = providerService.info
+    providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe', catalog: { source: 'cli', version: '1', models: [{ value: 'haiku', label: 'Haiku', efforts: [] }, { value: 'opus', label: 'Opus', efforts: ['low', 'high'] }] } })) as never
+    try {
+      // Settings → Connections' defaults (its base connection).
+      accounts.setConnectionDefaults(a.id, { model: 'opus', effort: 'high' })
+      const baseBefore = structuredClone(accounts.allConnections().find((c) => c.account === a.id))
+      expect(() => accounts.setConnectionDefaults(a.id, { model: 'haiku' })).toThrow(/haiku doesn't take high effort/)
+      expect(accounts.allConnections().find((c) => c.account === a.id)).toEqual(baseBefore)
+      // An agent: its model switched with its effort kept.
+      const alpha = join(wsPath, 'alpha')
+      await here(() => updateAgent(alpha, 'a-one', { connection: a.id, model: 'opus', effort: 'high' }))
+      const was = (await w.projectConfig(alpha)).agents.find((x) => x.id === 'a-one')!.connection
+      expect(await outcome(here(() => updateAgent(alpha, 'a-one', { model: 'haiku' })))).toMatch(/haiku doesn't take high effort/)
+      expect((await w.projectConfig(alpha)).agents.find((x) => x.id === 'a-one')!.connection).toBe(was)
+      // The Assistant (Settings → Assistant).
+      await here(() => moves.pointAssistant(w, 'claude-code', { values: { model: 'opus', effort: 'high' }, become: true }))
+      const assistantWas = (await w.projectConfig(w.assistantHome)).agents[0].connection
+      expect(await outcome(here(() => moves.pointAssistant(w, 'claude-code', { values: { model: 'haiku' } })))).toMatch(/haiku doesn't take high effort/)
+      expect((await w.projectConfig(w.assistantHome)).agents[0].connection).toBe(assistantWas)
+    } finally {
+      providerService.info = info
+      await here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { connection: null }))
     }
   })
 

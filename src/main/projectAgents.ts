@@ -27,8 +27,8 @@ import { listOf, shownText, withValues, type Text } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { capturedText, HiveError, hiveError, shownError } from './hiveError'
 import { providerService } from './providerService'
-import { accountById, allConnections, firstUsableAccount, assertConnectionHere, connectionProblem, connectionWith, firstAccountHere, getConnection } from './accounts'
-import { effortUsable, ensureMigrated } from './connectionMoves'
+import { accountById, allConnections, assertEffortTaken, firstUsableAccount, assertConnectionHere, connectionProblem, connectionWith, firstAccountHere, getConnection } from './accounts'
+import { ensureMigrated, saveConnections } from './connectionMoves'
 import { baseConnection, valuesOf } from '../shared/accounts'
 import { assertNameFree, withAgentNames, workspaceAgents } from './agentNames'
 import { sameAgentName } from '../shared/agentNames'
@@ -52,8 +52,7 @@ const M = {
   unknownProvider: msg({ id: 'worktrees.agent.unknownProvider', defaultMessage: 'Unknown provider "{provider}".', description: 'An error: {provider} is not a coding-agent CLI this Hive knows (Claude Code, Codex…).' }),
   cantCheckAgainst: msg({ id: 'worktrees.reuse.cantCheck', defaultMessage: "git couldn't check it against {base}", description: "Why an unused worktree isn't reused for a new agent: git couldn't check whether it is merged into the branch {base}. A clause, lower case." }),
   notPinned: msg({ id: 'worktrees.agent.notPinned', defaultMessage: 'Agents aren’t pinned to worktrees in 1.0: slots are lent per card or lane.', description: "An error: an agent was to be added in a worktree of its own (a new or an existing one), which 1.0 doesn't do: Hive lends a working folder (a slot) to each card or lane instead (glossary 2.5: slot, lane)." }),
-  notChecked: msg({ id: 'worktrees.reuse.notChecked', defaultMessage: 'not checked', description: "Why an unused worktree isn't reused for a new agent: it wasn't checked. A clause, lower case." }),
-  effortRefused: msg({ id: 'worktrees.agent.effortRefused', defaultMessage: "{chosen, select, yes {{model}} other {The CLI's default model}} doesn't take {effort} effort. Choose one of the levels it takes.", description: "An error saving an agent's (or a connection's) settings (HI-2106): the model that would run (its name, {model}, when one is chosen; else the CLI's own default) has no such reasoning effort level ({effort}: \"max\")." })
+  notChecked: msg({ id: 'worktrees.reuse.notChecked', defaultMessage: 'not checked', description: "Why an unused worktree isn't reused for a new agent: it wasn't checked. A clause, lower case." })
 }
 
 /** The launch fields today's screens and the Agent API still send for an agent (the adapter until HI-2108). */
@@ -87,7 +86,7 @@ function connectionFrom(projectPath: string, cli: ProviderId, named: string | nu
     const v = patch[k]
     ;(values as Record<string, unknown>)[k] = v === null || v === '' || v === undefined ? base?.[k] : v
   }
-  if (values.effort && (given.includes('effort') || given.includes('model')) && !effortUsable(cli, values.model ?? null, account, values.effort)) throw hiveError(M.effortRefused, { chosen: values.model ? 'yes' : 'no', model: values.model ?? '', effort: values.effort }, { kind: 'invalid' })
+  if (values.effort && (given.includes('effort') || given.includes('model'))) assertEffortTaken(cli, values.model ?? null, account, values.effort)
   return connectionWith(account.id, values).id
 }
 
@@ -395,7 +394,7 @@ export async function prepareAgent(projectPath: string, cfg: ProjectConfig, opts
   // Its CLI has no account here yet: what it was given waits on it, for the connection it gets once one is (placeUnplaced).
   else Object.assign(def, launch)
   // A connection made for it is saved before the agent naming it is.
-  await config.saveNow()
+  await saveConnections()
 
   return { def, discard: async () => undefined }
 }
@@ -471,7 +470,7 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
       Object.assign(clean, kept, given)
     }
     // A connection made for it is saved before the agent naming it is.
-    await config.saveNow()
+    await saveConnections()
   }
   // A name: free across the workspace (#702), checked holding the names lock against the agent as saved then, just
   // before the write (every change of a name takes that lock, so none comes between). Its own name again is no change:
@@ -519,23 +518,40 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
  */
 export async function applyProjectLaunch(projectPath: string, providers: Partial<Record<ProviderId, Partial<ProjectProviderConfig>>>): Promise<void> {
   await ensureMigrated(projectPath)
-  const cfg = await workspace.projectConfig(projectPath)
-  for (const a of projectAgents(cfg)) {
-    const pc = a.provider ? providers[a.provider] : undefined
-    if (!pc) continue
-    const patch: LaunchPatch = {}
-    for (const k of ['model', 'effort', 'permissionMode'] as const) if (k in pc) patch[k] = pc[k] === 'inherit' ? null : (pc[k] as string)
-    if ('use200kContext' in pc) patch.use200kContext = pc.use200kContext === 'on' ? true : pc.use200kContext === 'off' ? false : null
-    if ('extraArgs' in pc) {
-      const base = baseConnection(getConnection(a.connection)?.account ?? '', allConnections())?.extraArgs ?? ''
-      patch.extraArgs = [base, pc.extraArgs ?? ''].filter((x) => x.trim()).join(' ') || null
+  for (const { id } of projectAgents(await workspace.projectConfig(projectPath))) {
+    // Worked out from its connection as saved, and written only if it is still that one (another change came between:
+    // worked out again from it, so neither is lost).
+    for (let tries = 0; ; tries++) {
+      const a = projectAgents(await workspace.projectConfig(projectPath)).find((x) => x.id === id)
+      const pc = a?.provider ? providers[a.provider] : undefined
+      if (!a || !pc) break
+      const patch: LaunchPatch = {}
+      for (const k of ['model', 'effort', 'permissionMode'] as const) if (k in pc) patch[k] = pc[k] === 'inherit' ? null : (pc[k] as string)
+      if ('use200kContext' in pc) patch.use200kContext = pc.use200kContext === 'on' ? true : pc.use200kContext === 'off' ? false : null
+      if ('extraArgs' in pc) {
+        const base = baseConnection(getConnection(a.connection)?.account ?? '', allConnections())?.extraArgs ?? ''
+        patch.extraArgs = [base, pc.extraArgs ?? ''].filter((x) => x.trim()).join(' ') || null
+      }
+      const next = connectionFrom(projectPath, a.provider!, undefined, getConnection(a.connection), patch, a.name)
+      if (!next || next === a.connection) break
+      await saveConnections()
+      let stale = false
+      await workspace.updateAgent(projectPath, id, { connection: next }, (cur) => {
+        if (cur.connection === a.connection) return
+        stale = true
+        throw new ChangedMeanwhile()
+      }).catch((e) => {
+        if (!(e instanceof ChangedMeanwhile)) throw e
+      })
+      if (!stale) break
+      if (tries >= 2) throw hiveError(msg({ id: 'worktrees.agent.providerChangedMeanwhile', defaultMessage: "{agent}'s provider was changed meanwhile: nothing was changed. Try again.", description: "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name." }), { agent: a.name }, { kind: 'conflict' })
     }
-    const id = connectionFrom(projectPath, a.provider!, undefined, getConnection(a.connection), patch, a.name)
-    await config.saveNow()
-    if (id && id !== a.connection) await workspace.updateAgent(projectPath, a.id, { connection: id })
   }
   await workspaceOf(projectPath).refresh()
 }
+
+/** An agent's connection changed by something else between applyProjectLaunch's read and its write. */
+class ChangedMeanwhile extends Error {}
 
 /**
  * Removes an agent (stopped). `releaseCards` takes its open cards from it too (Doing ones back to Todo). `deleteWorktree`
