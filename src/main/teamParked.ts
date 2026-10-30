@@ -65,11 +65,11 @@ const AT_QUESTION = new Set(['waiting', 'signin'])
 async function agentItems(project: string, projectPath: string, agentId: string, agent: string, st: LiveSessionState | null, writer: string | undefined, self: boolean): Promise<ParkedItem[]> {
   const out: ParkedItem[] = []
   const add = (i: Omit<ParkedItem, 'project' | 'agent' | 'agentId'>): void => void out.push({ project, agent, agentId, ...i })
-  if (writer) add({ state: 'busy', kind: 'writer', what: `holds ${writer}, whose processes still run` })
+  if (writer) add({ state: 'busy', kind: 'writer', label: writer, what: `holds ${writer}, whose processes still run` })
   if (!st) {
     // Stopped: what its launches left running still counts.
     const left = leftoversOf(projectPath, agentId)
-    for (const p of left.processes) add({ state: 'busy', kind: 'process', what: `left running: ${p.label} (pid ${p.pid})`, ...(p.created ? { process: { pid: p.pid, created: p.created, name: p.name } } : {}), since: left.since })
+    for (const p of left.processes) add({ state: 'busy', kind: 'process', label: p.label, what: `left running: ${p.label} (pid ${p.pid})`, ...(p.created ? { process: { pid: p.pid, created: p.created, name: p.name } } : {}), since: left.since })
     if (left.more) add({ state: 'busy', kind: 'process', what: `${left.more} more processes left running` })
     return out
   }
@@ -86,7 +86,7 @@ async function agentItems(project: string, projectPath: string, agentId: string,
   else if (job !== 'none') {
     const rest = beyondCli(job.gate, job.processes)
     if (!rest) add({ state: 'unknown', kind: 'scan', what: "its CLI can't be told among its processes" })
-    else for (const p of rest) add({ state: 'busy', kind: 'process', what: `${p.run ? `${p.run} (` : ''}${p.label}${p.run ? ')' : ''} (pid ${p.pid})`, ...(p.created ? { process: { pid: p.pid, created: p.created, name: p.name }, since: new Date(msOf(p.created)).toISOString() } : {}) })
+    else for (const p of rest) add({ state: 'busy', kind: 'process', label: p.run ?? p.label, what: `${p.run ? `${p.run} (` : ''}${p.label}${p.run ? ')' : ''} (pid ${p.pid})`, ...(p.created ? { process: { pid: p.pid, created: p.created, name: p.name }, since: new Date(msOf(p.created)).toISOString() } : {}) })
   }
   return out
 }
@@ -100,7 +100,7 @@ export async function scanWorkspace(ws: WorkspaceService): Promise<TeamPauseView
   try {
     // Every run still open in the workspace (a test run, a check in a copy, a merge, a slot's warming): by its agent.
     const open = progress.list(ws.path).filter((r) => r.finishedAt === null)
-    for (const r of open) items.push({ project: r.projectPath ? basename(r.projectPath) : '', agent: r.agentName, agentId: r.agentId ?? '', state: 'busy', kind: r.defaultName === 'mergeQueue' ? 'merge' : r.defaultName === 'copy' ? 'copy' : 'run', what: `${r.title} (Progress run, ${Math.max(0, Math.round((Date.now() - r.startedAt) / 60_000))} min)`, run: r.id, since: new Date(r.startedAt).toISOString() })
+    for (const r of open) items.push({ project: r.projectPath ? basename(r.projectPath) : '', agent: r.agentName, agentId: r.agentId ?? '', state: 'busy', kind: r.defaultName === 'mergeQueue' ? 'merge' : r.defaultName === 'copy' ? 'copy' : 'run', label: r.title, what: `${r.title} (Progress run, ${Math.max(0, Math.round((Date.now() - r.startedAt) / 60_000))} min)`, run: r.id, since: new Date(r.startedAt).toISOString() })
     for (const p of ws.info()?.projects ?? []) {
       const writers = await heldSlots(p.path).catch(() => null)
       if (!writers) items.push({ project: p.name, agent: '', agentId: '', state: 'unknown', kind: 'scan', what: "its slots can't be read now" })

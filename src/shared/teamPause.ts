@@ -24,6 +24,8 @@ export interface ParkedItem {
   state: Exclude<ParkedState, 'parked'>
   /** What it is, in English (agent-facing and logged): "working", "npm run e2e (Progress run, 4 min)". */
   what: string
+  /** For the window: the user's own words it names (a run's title, a process's command, a slot's name), never Hive's. */
+  label?: string
   /** What the window shows it as: a code and its values, worded there. */
   kind: 'working' | 'starting' | 'background' | 'run' | 'process' | 'writer' | 'merge' | 'copy' | 'status' | 'scan'
   /** A process the user may end (End it): its pid and its recorded start (a Windows FILETIME, as text), with its name. */

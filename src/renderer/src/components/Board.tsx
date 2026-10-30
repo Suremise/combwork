@@ -5,7 +5,7 @@ import { gitProblemText } from '@shared/gitTool'
 import { agentRuntime, hooksMissingText } from '@shared/runtime'
 import { LOOP_STEP_WAIT_MINUTES } from '@shared/lanes'
 import { projectInfoPreferences } from '@shared/workflow/preferences'
-import { COLUMN_TEXT, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, backgroundTaskMinutes, builderJobOf, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stallAgentOf, stalledReason, startFailedReason, taskOverview, type BoardFoldChange, type LaneOrderView } from '@shared/tasks'
+import { COLUMN_TEXT, REVIEW_WAIT_STALL_MS, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, backgroundTaskMinutes, builderJobOf, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stallAgentOf, stalledReason, startFailedReason, taskOverview, type BoardFoldChange, type LaneOrderView } from '@shared/tasks'
 import { enabledProviders, isProviderEnabled, projectDefaultProvider, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -18,6 +18,7 @@ import { ForYouChip, ForYouSection } from './ForYou'
 import { KindField, KindMark, KindProposal } from './CardKind'
 import { ReviewSkipField, ReviewSkipMark, ReviewSkipProposal, useProjectReviews } from './CardReviewSkip'
 import { askedByNow, useForYou } from '../forYou'
+import { useTeamPause, workspacePaused } from '../teamPause'
 import type { ForYouItem } from '@shared/workflow/workView'
 import { useWorkBadges } from '../cardWork'
 import type { WorkBadge } from '@shared/workflow/workView'
@@ -130,6 +131,11 @@ function stallAgentsNow(projects: ProjectInfo[]): ReturnType<typeof stallAgentsO
 
 /** Why the card is stalled (cardStalled), in the window's language, and which kind of stall it is. */
 function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | null): { text: string; kind: StallKind } | null {
+  // The team paused (HI-2081): its agents parking is what was asked of them, never a stall; once it resumes, each timed
+  // stall needs its own wait since then too, as main's check has it.
+  if (workspacePaused(get().workspace?.path)) return null
+  const resumed = useTeamPause.getState().resumedAt
+  const waited = (ms: number): boolean => Date.now() - resumed >= ms
   const { agent } = cardAgent(projects, c)
   // Main's start state (HI-1977): an agent starting isn't stalled, one whose start failed says why.
   const now = agent ? stallAgentOf(agent) : null
@@ -138,8 +144,9 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
   const { loopers, watchers } = stallAgentsNow(projects)
   const looping = notWatchingReason(c, loopers, tr)
   if (looping) return { text: looping, kind: notWatchingAgent(c, loopers)?.untaken ? 'wake-untaken' : 'not-watching' }
-  const waiting = reviewWaitReason(c, watchers, Date.now(), tr)
+  const waiting = waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers, Date.now(), tr) : null
   if (!waiting) {
+    if (!waited(REVIEW_WAIT_STALL_MS)) return null
     const verdict = reviewVerdictWaitReason(c, watchers, Date.now(), tr, reviewJob(c, agent))
     // HI-2080: a reviewer waiting on its own question to the user (For you) isn't stalled, as main's check has it.
     if (verdict && !(c.review && askedByNow(c.number, c.review.agent))) return { text: verdict, kind: 'review-verdict' }
