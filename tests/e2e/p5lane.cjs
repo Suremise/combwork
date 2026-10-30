@@ -326,7 +326,10 @@ const ancestor = (x, y) => {
     const a = await startLane(laneA)
     check('lane A is started from the board: B1 / R1, its three cards in order', !!a, JSON.stringify(await inv('lanes:list')))
     await retoken()
-    await shoot('1-laneA-started', 'lanes', async () => (await onBoard('Todo', c1)) && /B1 \/ R1/.test(await laneText(a?.id)))
+    // One in Todo, or already Active on B1: Hive starts a lane's card on its builder itself once its turn is over (HI-1990),
+    // which a slow run can see before the window is shot (HI-2103).
+    const oneShown = async () => (await onBoard('Todo', c1)) || ((await onBoard('Active', c1)) && (await factsOf(c1, 'Started')).some((f) => f.actor === 'hive'))
+    await shoot('1-laneA-started', 'lanes', async () => (await oneShown()) && /B1 \/ R1/.test(await laneText(a?.id)))
 
     // --- One: merged by the queue at the approved revision; the next card waits for it.
     // The lane's slot, once recorded: a lane takes it over from its builder's own as that lease lets go (HI-2027).
@@ -371,14 +374,22 @@ const ancestor = (x, y) => {
     // The queue's update and merge leave the slot alone. Hive starts Three about a second after Two is Done (HI-1990), its
     // line made in the slot: the slot may be exactly as Three's start prepared it by now (HR1's round 2: its own
     // SlotPrepared, on the lease Three was started with: that line checked out at that revision, nothing changed), and
-    // nothing else.
-    const started3 = (await factsOf(c3, 'Started')).find((f) => f.actor === 'hive')?.data ?? null
-    const prep3 = (await factsOf(c3, 'SlotPrepared')).at(-1)?.data ?? null
-    const asThree = (now, branch) => !!started3 && !!prep3 && prep3.lease === started3.lease && now.head === prep3.revision && now.status === '' && branch === prep3.line
-    const branchNow = git(wt, 'branch', '--show-current')
+    // nothing else. Hive checks Three's line out before it writes SlotPrepared (HI-2103): the slot read first, then the
+    // facts, until they agree, so a read between the two waits for the fact rather than failing.
+    let started3 = null
+    let prep3 = null
+    let slot3 = null
+    const asThree = (now) => !!started3 && !!prep3 && prep3.lease === started3.lease && now.head === prep3.revision && now.status === '' && now.branch === prep3.line
+    const settled = await waitHung(async () => {
+      slot3 = { ...worktreeNow(), branch: git(wt, 'branch', '--show-current') }
+      if (slot3.head === two.was.head && slot3.status === two.was.status) return 'untouched'
+      started3 = (await factsOf(c3, 'Started')).find((f) => f.actor === 'hive')?.data ?? null
+      prep3 = (await factsOf(c3, 'SlotPrepared')).at(-1)?.data ?? null
+      return asThree(slot3) ? 'asThree' : null
+    })
     // …and it refuses anything else: another HEAD, a dirty file, another branch.
-    if (prep3) check('…a slot not as Three was prepared is not taken for it', !asThree({ head: two.was.head, status: '' }, prep3.line) && !asThree({ head: prep3.revision, status: ' M a.txt' }, prep3.line) && !asThree({ head: prep3.revision, status: '' }, 'main'))
-    check("…the slot untouched by the merge (its HEAD and status as they were, or exactly as Three's start prepared it)", (untouched(two.was) || asThree(worktreeNow(), branchNow)) && !(await kinds(c2)).includes('LineMoved'), JSON.stringify({ now: worktreeNow(), branch: branchNow, was: two.was, started3, prep3, two: await kinds(c2) }))
+    if (prep3) check('…a slot not as Three was prepared is not taken for it', !asThree({ head: two.was.head, status: '', branch: prep3.line }) && !asThree({ head: prep3.revision, status: ' M a.txt', branch: prep3.line }) && !asThree({ head: prep3.revision, status: '', branch: 'main' }))
+    check("…the slot untouched by the merge (its HEAD and status as they were, or exactly as Three's start prepared it)", !!settled && !(await kinds(c2)).includes('LineMoved'), JSON.stringify({ now: slot3, was: two.was, started3, prep3, two: await kinds(c2) }))
 
     // --- Three: main changes the same line while it is in review: returned (notUpToDate); B1 resumes cleanly.
     const s3 = await start(c3)
