@@ -1944,6 +1944,10 @@ textarea.input {
 .banner .btn {
   margin-left: auto;
 }
+/* Only a banner's first button pushes right; the rest sit beside it, one group (HI-2148). */
+.banner .btn + .btn {
+  margin-left: 0;
+}
 /* A notice banner (HI-1717: the presets notice and the providers banners): its icon and text, then its buttons, which go
    under the text, together, once the text would have less than about 240 px beside them; where even they don't fit the
    banner they stack, and a label wider than the banner wraps inside its button, so each stays whole and clickable at any
