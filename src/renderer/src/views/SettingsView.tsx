@@ -1159,11 +1159,24 @@ export function SettingsView() {
           {grouped.map((g) => (
             <div key={g.id} className="settings-group" data-section={g.id}>
               <h2>{sectionText(g).label}</h2>
-              <p>{sectionText(g).desc}</p>
+              <p>
+                {sectionText(g).desc}
+                {/* Its only row drawn untitled (HI-2107): its tip here, beside the one description. */}
+                {g.items.length === 1 && g.items[0].untitled && rowText(g.items[0]).tip && (
+                  <>
+                    {' '}
+                    <InfoTip text={<span style={{ whiteSpace: 'pre-line' }}>{rowText(g.items[0]).tip}</span>} />
+                  </>
+                )}
+              </p>
               {g.id === 'workflow' && <WorkflowDefaultsTabs rows={g.items} searching={!!query.trim() || modifiedOnly} />}
               {g.id !== 'workflow' && g.items.map((d) => {
                 const modified = (d.type !== 'custom' || ['defaultModel', 'defaultEffort', 'defaultProvider', 'modelFallback', 'effortFallback'].includes(d.key)) && getValue(settings, d) !== defaultValue(d)
-                return (
+                return d.untitled && g.items.length === 1 ? (
+                  <div key={`${d.section}.${d.key}`} className="setting wide" data-setting={d.id}>
+                    <div className="s-text">{d.render?.()}</div>
+                  </div>
+                ) : (
                   d.wide ? (
                     <div key={`${d.section}.${d.key}`} className="setting wide" data-setting={d.id}>
                       <div className="s-text">

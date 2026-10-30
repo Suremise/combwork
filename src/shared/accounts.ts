@@ -366,7 +366,8 @@ export function connectionName(account: Pick<Account, 'name' | 'provider'>, valu
   if (base && !sameValues(values, base)) {
     if (label) parts.push(label)
     else {
-      if ((values.model ?? '') !== (base.model ?? '')) parts.push(values.model ?? 'Default model') // i18n-ignore: a connection's name, the user's data once made
+      // The model by its name ("Haiku", as the row's summary says it), a server's or an unknown one as its id.
+      if ((values.model ?? '') !== (base.model ?? '')) parts.push(values.model ? providerDescriptor(account.provider).modelLabel(values.model) : 'Default model') // i18n-ignore: a connection's name, the user's data once made
       if ((values.effort ?? '') !== (base.effort ?? '')) parts.push(values.effort ? effortWord(values.effort) : 'Default effort') // i18n-ignore: a connection's name, the user's data once made
       if (!!values.use200kContext !== !!base.use200kContext) parts.push(values.use200kContext ? '200K' : '1M') // i18n-ignore: a connection's name (token counts)
       if ((values.permissionMode ?? '') !== (base.permissionMode ?? '')) parts.push(permissionLabel(account.provider, values.permissionMode ?? providerDescriptor(account.provider).defaultPermissionMode))

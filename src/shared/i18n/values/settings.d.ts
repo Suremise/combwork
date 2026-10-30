@@ -756,7 +756,7 @@ interface HiveMessageValues {
   'settings.connection.context': undefined
   'settings.connection.context1m': undefined
   'settings.connection.context200k': undefined
-  'settings.connection.editTitle': { account: string | number; cli: string | number; name: string | number }
+  'settings.connection.editTitle': { account: string | number; cli: string | number }
   'settings.connection.effort': undefined
   'settings.connection.effortUnusable': { model: string | number; effort: string | number }
   'settings.connection.gone': undefined

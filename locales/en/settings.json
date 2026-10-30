@@ -3020,8 +3020,8 @@
     "description": "A choice of a connection's context: a 200K-token window, which compacts sooner. 200K is a number of tokens."
   },
   "settings.connection.editTitle": {
-    "defaultMessage": "{account} ({cli}): {name}",
-    "description": "Title of the dialog editing a connection (HI-2107): its name ({name}), its account ({account}) and its coding agent CLI ({cli})."
+    "defaultMessage": "{account} ({cli}): connection",
+    "description": "Title of the dialog editing a connection (HI-2107): its account ({account}) and its coding agent CLI ({cli}). Its name is in the Name field below, so the title leaves it out."
   },
   "settings.connection.effort": {
     "defaultMessage": "Effort",
@@ -4928,8 +4928,8 @@
     "description": "Placeholder of Settings' search box."
   },
   "settings.section.accounts.desc": {
-    "defaultMessage": "An account is a sign-in Hive keeps (signed in through the CLI's own sign-in) or a server such as DeepSeek or Ollama, reached by its base URL and key. A connection is a setup on an account: its model, effort, context, permission mode and extra arguments. Agents and the Assistant each choose a connection, and every account shares your conversations.",
-    "description": "Under the heading of the section \"Accounts & Connections\" of Settings (HI-2107): what it holds."
+    "defaultMessage": "An account is a sign-in Hive keeps (signed in through the CLI's own sign-in) or a server such as DeepSeek or Ollama, reached by its base URL and key. A connection is a setup on an account: its model, effort, context, permission mode and extra arguments. Agents and the Assistant each choose a connection, and every account shares your conversations. Drag accounts into your order: a new agent gets the first connection of the first account that's on here.",
+    "description": "Under the heading of the section \"Accounts & Connections\" of Settings (HI-2107): what it holds, and what the order of accounts decides."
   },
   "settings.section.accounts.label": {
     "defaultMessage": "Accounts & Connections",

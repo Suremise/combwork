@@ -20,7 +20,7 @@ import { Icon, Modal } from './ui'
 
 const M = {
   addTitle: msg({ id: 'settings.connection.addTitle', defaultMessage: '{account} ({cli}): new connection', description: 'Title of the dialog adding a connection (HI-2107) on an account ({account}, its name; {cli}, its coding agent CLI: "Claude Code").' }),
-  editTitle: msg({ id: 'settings.connection.editTitle', defaultMessage: '{account} ({cli}): {name}', description: 'Title of the dialog editing a connection (HI-2107): its name ({name}), its account ({account}) and its coding agent CLI ({cli}).' }),
+  editTitle: msg({ id: 'settings.connection.editTitle', defaultMessage: '{account} ({cli}): connection', description: 'Title of the dialog editing a connection (HI-2107): its account ({account}) and its coding agent CLI ({cli}). Its name is in the Name field below, so the title leaves it out.' }),
   name: msg({ id: 'settings.connection.name', defaultMessage: 'Name', description: "Label of a connection's name in its dialog (HI-2107)." }),
   namePlaceholder: msg({ id: 'settings.connection.namePlaceholder', defaultMessage: 'Claude · High, Reviewer, Plan…', description: "Placeholder of a connection's name box: examples of names." }),
   model: msg({ id: 'settings.connection.model', defaultMessage: 'Model', description: "Label of a connection's model in its dialog (HI-2107)." }),
@@ -156,7 +156,7 @@ function ConnectionForm({ account: a, row, settings, onClose }: { account: Accou
       setBusy(false)
     }
   }
-  const title = row ? tr(M.editTitle, { name: row.name, account: a.name, cli: p.name }) : tr(M.addTitle, { account: a.name, cli: p.name })
+  const title = tr(row ? M.editTitle : M.addTitle, { account: a.name, cli: p.name })
   return (
     <Modal
       title={title}
