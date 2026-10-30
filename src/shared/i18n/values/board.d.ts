@@ -849,6 +849,7 @@ interface HiveMessageValues {
   'board.stalled.startFailed': { agent: string | number; why: string | number }
   'board.stalled.wakeUntaken': { agent: string | number; card: string | number }
   'board.start.busy': { status: string | number }
+  'board.start.checkingConnection': undefined
   'board.start.idle': { status: string | number }
   'board.start.intro': undefined
   'board.start.name': undefined
@@ -858,9 +859,7 @@ interface HiveMessageValues {
   'board.start.noProject': undefined
   'board.start.notGit': undefined
   'board.start.ok': undefined
-  'board.start.projectDefault': { provider: string | number }
   'board.start.projectGone': { project: string | number }
-  'board.start.provider': undefined
   'board.start.providerOff': { provider: string | number }
   'board.start.show': undefined
   'board.start.started': { card: string | number; agent: string | number }

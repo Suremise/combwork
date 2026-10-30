@@ -121,6 +121,50 @@ export function isMainGitDir(common: string): boolean {
   return /[\\/]\.git$/i.test(common)
 }
 
+/**
+ * HI-2115's one rule for Hive's git caches (the Assistant's design call after HR3's round 2): only a plain repository's
+ * answers are reused, anything else is git's every time. Plain: refs in files (no reftable); no replacements, grafts or
+ * shallow history (in the repository, or named in the environment); and no `include` or `includeIf` anywhere in the
+ * config files given (a plain text search, never parsed): `gitDir`'s `config.worktree` and the common dir's `config`
+ * always, and `configs` (others git reads). Checked before every reuse. Only what is known is plain: a file or folder
+ * that is there, or one that couldn't be read for any reason but its absence (locked, no access: HR3's round 3), makes
+ * it not plain. `gitDir` is the folder's own (a linked worktree's, whose `config.worktree` is its own).
+ */
+export function plainRepo(common: string, gitDir: string = common, configs: readonly string[] = []): boolean {
+  const env = process.env
+  if (env.GIT_SHALLOW_FILE || env.GIT_GRAFT_FILE || env.GIT_REPLACE_REF_BASE) return false
+  if (![join(common, 'reftable'), join(common, 'shallow'), join(common, 'info', 'grafts'), join(common, 'refs', 'replace')].every(absent)) return false
+  const packed = textOf(join(common, 'packed-refs'))
+  if (packed === null || / refs\/replace\//.test(packed)) return false
+  for (const f of [join(common, 'config'), join(gitDir, 'config.worktree'), ...configs]) {
+    const text = textOf(f)
+    if (text === null || /include/i.test(text)) return false
+  }
+  return true
+}
+
+/** Whether a read failed because there is nothing there (rather than locked, no access…). */
+const missing = (e: unknown): boolean => ['ENOENT', 'ENOTDIR'].includes((e as { code?: string }).code ?? '')
+
+/** Whether nothing is at `path`: false when something is, or when that couldn't be told. */
+function absent(path: string): boolean {
+  try {
+    statSync(path)
+    return false
+  } catch (e) {
+    return missing(e)
+  }
+}
+
+/** A file's text; '' when there's no such file; null when it couldn't be read. */
+function textOf(file: string): string | null {
+  try {
+    return readFileSync(file, 'utf8')
+  } catch (e) {
+    return missing(e) ? '' : null
+  }
+}
+
 /** What a git dir's HEAD names (`refs/heads/x`), when it is a symbolic ref. */
 function readHeadRef(gitDir: string): string | null {
   try {

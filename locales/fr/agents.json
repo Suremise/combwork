@@ -5,6 +5,7 @@
   "agents.add.full": "{limit} Retires-en un d’abord.",
   "agents.add.nameTaken": "Le projet {project} a déjà un agent nommé {agent} : les noms d’agents sont uniques dans tout l’espace de travail.",
   "agents.add.nameTakenHere": "Le projet {project} a déjà un agent nommé {agent}.",
+  "agents.add.noAccountStart": "Aucun compte n’est encore activé ici",
   "agents.add.startNow": "Démarrer une session maintenant",
   "agents.add.title": "Ajouter un agent au projet {project}",
   "agents.add.useSuggestion": "Utiliser {name}",

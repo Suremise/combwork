@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { ProviderId } from '@shared/types'
+import type { Connection } from '@shared/types'
 import { isKnownProvider, providerName } from '@shared/providers'
 import { ALL_KEY, answerFor, initialPicker, pickerAnswers, rolesOf, suggestedCli, type ConnectionAnswers, type ConnectionOption, type ConnectionsPlan, type PickedAgent, type PickerState } from '@shared/templateConnections'
-import { connectionValues } from '@shared/templateLoad'
 import { WORKFLOW_ROLE_TEXT, type WorkflowRole } from '@shared/workflow/roles'
 import { msg, tr } from '@shared/i18n'
-import { useStore } from '../store'
+import { ConnectionChoice } from './ConnectionChoice'
 import { ProviderIcon } from './ProviderIcon'
 import { Icon } from './ui'
 
@@ -13,7 +12,8 @@ import { Icon } from './ui'
  * The connection picker of the template dialogs (HI-2109, HI-2105's wireframe): Load template's Connections section and
  * Choose Connections… on a project's agents. Same for all (one picker), else a row per role the agents have; Per agent
  * unfolds a row per agent, over its role's. A template keeps no connection: a role's picker starts on the first
- * connection on the CLI its agents suggest, else the first usable (shared/templateConnections.ts).
+ * connection on the CLI its agents suggest, else the first usable (shared/templateConnections.ts). Each choice is the shared
+ * ConnectionChoice (HI-2118); the plan's options stay what main checks the answers against.
  */
 
 const M = {
@@ -27,43 +27,8 @@ const M = {
   keepOwn: msg({ id: 'assistant.templateConnections.keepOwn', defaultMessage: 'Keep its own ({name})', description: "Choose Connections (HI-2109), an agent's own row: it keeps the connection it has ({name})." }),
   label: msg({ id: 'assistant.templateConnections.label', defaultMessage: 'Connection for {who}', description: "Accessible name of a connection choice in the Connections section (HI-2109): {who} is all agents, a role's agents (\"Builders\") or an agent's name." }),
   all: msg({ id: 'assistant.templateConnections.all', defaultMessage: 'all agents', description: 'Stands for {who} in "Connection for {who}" (HI-2109): the Same for all choice. Lower case.' }),
-  gone: msg({ id: 'assistant.templateConnections.gone', defaultMessage: 'A connection that can’t be used here', description: 'A choice of connection (HI-2109) that was removed, or whose account is off in this workspace: shown so nothing changes silently.' }),
+  notOffered: msg({ id: 'assistant.templateConnections.notOffered', defaultMessage: 'it can’t be used for these agents', description: 'Why a connection is greyed out in the Connections section (HI-2118): Hive offers it elsewhere but not to these agents (its coding agent CLI is off or not installed, or its account is off here). A short clause, lower case, after the connection\'s name and a dash.' }),
   none: msg({ id: 'assistant.templateConnections.none', defaultMessage: 'No connection is usable in this workspace yet: agents get one once you add an account in Settings → Accounts & Connections.', description: 'The Connections section (HI-2109) when no connection is usable in this workspace: agents loaded now are made without one, and get one once an account is added. Settings → Accounts & Connections names a section: use its translated names.' })
-}
-
-/**
- * One connection choice, with the props HI-2108's ConnectionChoice takes (HB1's, so the switch is an import): `value` a
- * connection's id ('' for `empty`'s choice), `cli` only that CLI's, `unavailable` greys one out saying why, `label`
- * false for a table cell. `options` (the plan's, until the window lists connections itself) are grouped by account, in
- * the order; a value no longer among them stays listed, saying so.
- */
-export function TemplateConnectionChoice({ id, value, onChange, cli, unavailable, label, options, empty, ariaLabel }: { id?: string; value: string; onChange: (id: string) => void; cli?: ProviderId; unavailable?: (c: ConnectionOption) => string | null; label?: false; options: readonly ConnectionOption[]; empty?: string; ariaLabel?: string }) {
-  const settings = useStore((s) => s.settings)
-  const shown = cli ? options.filter((o) => o.cli === cli) : options
-  const accounts = [...new Map(shown.map((o) => [o.account, o])).values()]
-  return (
-    <>
-      {label !== false && <label htmlFor={id}>{tr(M.heading)}</label>}
-      <select id={id} className="input template-connection-choice" aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)}>
-        {empty !== undefined && <option value="">{empty}</option>}
-        {accounts.map((a) => (
-          <optgroup key={a.account} label={`${a.accountName} · ${isKnownProvider(a.cli) ? providerName(a.cli) : a.cli}`}>
-            {shown
-              .filter((o) => o.account === a.account)
-              .map((o) => {
-                const why = unavailable?.(o) ?? null
-                return (
-                  <option key={o.id} value={o.id} disabled={!!why} title={why ?? undefined}>
-                    {`${o.name} — ${connectionValues(o, settings)}`}
-                  </option>
-                )
-              })}
-          </optgroup>
-        ))}
-        {value && !shown.some((o) => o.id === value) && <option value={value}>{tr(M.gone)}</option>}
-      </select>
-    </>
-  )
 }
 
 /** The CLI a connection runs, as an icon and the connection's name (a table's cell). */
@@ -95,6 +60,11 @@ export function ConnectionsSection({ agents, options, state, onState, keep, unav
     return null
   }
   const indexes = (role: WorkflowRole | typeof ALL_KEY): number[] => agents.flatMap((a, i) => (role === ALL_KEY || a.role === role ? [i] : []))
+  // The shared choice lists the window's connections; main checks the answers against the plan's, so one it lacks is greyed out.
+  const fromPlan = (why: (c: ConnectionOption) => string | null) => (c: Connection): string | null => {
+    const o = options.find((x) => x.id === c.id)
+    return o ? why(o) : tr(M.notOffered)
+  }
   if (!options.length)
     return (
       <div className="template-connections" data-template-connections="">
@@ -112,13 +82,13 @@ export function ConnectionsSection({ agents, options, state, onState, keep, unav
         <label className="checkbox template-connections-same">
           <input type="checkbox" data-same-for-all="" checked={state.same} onChange={(e) => onState({ ...state, same: e.target.checked })} /> {tr(M.same)}
         </label>
-        <div data-connection-for="*">{state.same && <TemplateConnectionChoice label={false} options={options} value={state.all} onChange={(all) => onState({ ...state, all })} ariaLabel={tr(M.label, { who: tr(M.all) })} empty={keep ? tr(M.keep) : undefined} unavailable={groupUnavailable(indexes(ALL_KEY))} />}</div>
+        <div data-connection-for="*">{state.same && <ConnectionChoice label={false} value={state.all} onChange={(all) => onState({ ...state, all })} ariaLabel={tr(M.label, { who: tr(M.all) })} empty={keep ? tr(M.keep) : undefined} unavailable={fromPlan(groupUnavailable(indexes(ALL_KEY)))} />}</div>
         {!state.same &&
           roles.map((r) => {
             const cli = keep ? undefined : suggestedCli(agents, r)
             return (
               <RoleRow key={r} name={roleName(r)} role={r} suggests={cli && isKnownProvider(cli) ? providerName(cli) : undefined}>
-                <TemplateConnectionChoice label={false} options={options} value={state.roles[r] ?? ''} onChange={(id) => onState({ ...state, roles: { ...state.roles, [r]: id } })} ariaLabel={tr(M.label, { who: roleName(r) })} empty={keep ? tr(M.keep) : undefined} unavailable={groupUnavailable(indexes(r))} />
+                <ConnectionChoice label={false} value={state.roles[r] ?? ''} onChange={(id) => onState({ ...state, roles: { ...state.roles, [r]: id } })} ariaLabel={tr(M.label, { who: roleName(r) })} empty={keep ? tr(M.keep) : undefined} unavailable={fromPlan(groupUnavailable(indexes(r)))} />
               </RoleRow>
             )
           })}
@@ -129,15 +99,14 @@ export function ConnectionsSection({ agents, options, state, onState, keep, unav
           <div className="agent-form">
             {agents.map((a, i) => (
               <RoleRow key={i} name={a.name} agent={a.name}>
-                <TemplateConnectionChoice
+                <ConnectionChoice
                   label={false}
-                  options={options}
                   value={state.agents[i] ?? ''}
                   onChange={(id) => onState({ ...state, agents: Object.fromEntries(Object.entries({ ...state.agents, [i]: id }).filter(([, v]) => v)) })}
                   ariaLabel={tr(M.label, { who: a.name })}
                   // Unset, it takes its role's choice; with none there (Choose Connections…), it keeps its own.
                   empty={!state.roles[a.role] && own(i) ? tr(M.keepOwn, { name: own(i)! }) : tr(M.roleChoice)}
-                  unavailable={unavailable ? (c) => unavailable(i, c) : undefined}
+                  unavailable={fromPlan((c) => unavailable?.(i, c) ?? null)}
                 />
               </RoleRow>
             ))}

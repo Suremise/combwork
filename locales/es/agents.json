@@ -5,6 +5,7 @@
   "agents.add.full": "{limit} Quita uno primero.",
   "agents.add.nameTaken": "El proyecto {project} ya tiene un agente llamado {agent}: los nombres de los agentes son únicos en todo el espacio de trabajo.",
   "agents.add.nameTakenHere": "El proyecto {project} ya tiene un agente llamado {agent}.",
+  "agents.add.noAccountStart": "Todavía no hay ninguna cuenta activada aquí",
   "agents.add.startNow": "Iniciar una sesión ahora",
   "agents.add.title": "Agregar un agente al proyecto {project}",
   "agents.add.useSuggestion": "Usar {name}",

@@ -1,7 +1,9 @@
 // The connection a new agent gets (HI-2108 round 1, decision A): the first in the order of accounts whose CLI is on AND
 // installed, as main's firstUsableAccount picks it. Accounts in the order Codex (on, its CLI not installed), then Claude
 // Code (the fake, installed), both on here: Add Agent preselects Claude Code's connection and greys out Codex's, saying
-// why; the quick add (Ctrl+Alt+Shift+N) adds the agent on Claude Code's. Then (round 2) both installed, Codex's detection
+// why; the quick add (Ctrl+Alt+Shift+N) adds the agent on Claude Code's. With no account on (HI-2127), Start a session
+// now is unticked and off with its reason beside it, the agent is still added (no session), and the choice's link opens
+// Settings → Accounts & Connections (screenshots in both themes). Then (round 2) both installed, Codex's detection
 // held (HIVE_TEST_SLOW_DETECT): while it is still looked for, Add Agent chooses nothing and Add waits, saying why; an
 // Add with no connection (the window's call) waits for detection in main; once Codex is found, Codex's connection is
 // chosen and the agent added there. No session is started. The test seam off so the real rule applies.
@@ -82,6 +84,8 @@ async function settled(env) {
     const codex = select.locator('option[value="c-codex"]')
     check("…Codex's connection greyed out, saying Codex isn't installed", (await codex.count()) === 1 && (await codex.isDisabled()) && /Codex isn't installed/.test(await codex.innerText()), await codex.innerText().catch(() => ''))
     await add.screenshot({ path: path.join(lib.WORK, 'connectionfirst-add.png') })
+    const startUsable = add.locator('label', { hasText: 'Start a session now' }).locator('input')
+    check('…with a usable connection, "Start a session now" stays ticked and can be changed (HI-2127)', (await startUsable.isEnabled()) && (await startUsable.isChecked()) && (await add.locator('[data-start-now-why]').count()) === 0)
     await add.getByRole('button', { name: 'Cancel', exact: true }).click()
     await lib.until(async () => (await add.count()) === 0, HUNG_MS)
 
@@ -92,6 +96,34 @@ async function settled(env) {
     const added = await lib.until(async () => (await agents())[0] ?? null, HUNG_MS)
     check('the quick add puts the agent on Claude second, its CLI Claude Code', added?.connection === 'c-claude' && added.provider === 'claude-code', JSON.stringify(added && { connection: added.connection, provider: added.provider }))
     check('…and starts nothing', (await inv('session:live')).length === 0)
+
+    // No account on here (the Assistant's ask on HI-2108): Add Agent says so with a link to Accounts & Connections, and
+    // "Start a session now" is unticked and off, saying why.
+    await inv('connections:setOn', 'a-codex', false)
+    await inv('connections:setOn', 'a-claude', false)
+    await lib.addMenuRun(page, 'Configure Agent and Add…')
+    await lib.until(async () => (await add.count()) === 1, HUNG_MS)
+    const start = add.locator('label', { hasText: 'Start a session now' })
+    const noAccount = add.locator('[data-no-account]')
+    check('no account on here: the choice says so, with a link to Accounts & Connections', !!(await lib.until(async () => (await noAccount.count()) === 1, HUNG_MS)) && (await noAccount.locator('a', { hasText: 'Open Accounts & Connections' }).count()) === 1, await noAccount.innerText().catch(() => ''))
+    check('…and "Start a session now" is unticked and off, saying why beside it', !!(await lib.until(async () => (await start.locator('input').isDisabled()) && !(await start.locator('input').isChecked()), HUNG_MS)) && (await start.locator('[data-start-now-why]').innerText().catch(() => '')).includes('No account is on here yet') && /No account is on in this workspace/.test((await start.getAttribute('title')) ?? ''), JSON.stringify({ disabled: await start.locator('input').isDisabled(), why: await start.locator('[data-start-now-why]').innerText().catch(() => ''), title: await start.getAttribute('title') }))
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+      await add.screenshot({ path: path.join(lib.WORK, `connectionfirst-no-account-${theme}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    // Adding it anyway, for later: added, and no session started.
+    await add.locator('input.input').first().fill('Later')
+    await add.getByRole('button', { name: 'Add Agent', exact: true }).click()
+    const later = await lib.until(async () => (await agents()).find((a) => a.name === 'Later') ?? null, HUNG_MS)
+    check('…the agent is still added, for later, and no session starts', !!later && (await inv('session:live')).length === 0, JSON.stringify(later && { name: later.name, connection: later.connection }))
+    // The link opens Settings → Accounts & Connections.
+    await lib.addMenuRun(page, 'Configure Agent and Add…')
+    await lib.until(async () => (await add.locator('[data-no-account] a').count()) === 1, HUNG_MS)
+    await add.locator('[data-no-account] a').click()
+    check('…and its link opens Settings → Accounts & Connections', !!(await lib.until(async () => (await page.locator('.settings-nav .row.selected[data-section="accounts"]').count()) === 1, HUNG_MS)))
+    if ((await add.count()) === 1) await add.getByRole('button', { name: 'Cancel', exact: true }).click()
   } catch (e) {
     check('the first part ran to its end', false, e.stack)
   } finally {
@@ -119,6 +151,9 @@ async function duringDetection(env) {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
+    // Both on here again (the first part turned them off at its end).
+    await inv('connections:setOn', 'a-codex', true)
+    await inv('connections:setOn', 'a-claude', true)
     const codex = async () => (await inv('provider:info')).codex
     const pending = await lib.until(async () => {
       const info = await inv('provider:info')
