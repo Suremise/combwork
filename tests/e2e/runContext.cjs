@@ -17,6 +17,8 @@
 // - Folders: the work folder (WORK: the lane's, which the runner gives each suite as HIVE_E2E_DIR) and the CLI test
 //   homes (CODEX_HOME, CLAUDE_TEST_HOME). What a test copy of Hive deletes goes to its trash folder in the suite's
 //   (HIVE_TEST_TRASH_DIR, `<work>	rash`, #414), never the user's Recycle Bin, and goes with the suite's folder.
+// - The temp folder (TEMP, TMP, TMPDIR in ALLOW): the run's own in hive-test\tmp, which the runner sets before it
+//   starts anything (tests/tempDir.ts startRunTemp, HI-2102), never %TEMP%.
 // - Ports and lane folders: lanes.mjs (each runner claims a lane); each suite's port is HIVE_E2E_PORT, from its runner.
 // - The build: build.mjs, under a lock per worktree, so runners started together build it once.
 // - Load: slots.mjs, at most a few heavy runs at once on the machine (HEAVY_DIR); the others queue.
@@ -54,7 +56,7 @@ const CLAUDE_TEST_HOME = process.env.HIVE_TEST_CLAUDE_HOME || path.join(path.dir
  * reach their APIs through them).
  */
 const ALLOW = [
-  'PATH', 'PATHEXT', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'OS',
+  'PATH', 'PATHEXT', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'OS',
   'USERPROFILE', 'USERNAME', 'USERDOMAIN', 'USERDOMAIN_ROAMINGPROFILE', 'COMPUTERNAME', 'LOGONSERVER', 'HOME', 'HOMEDRIVE', 'HOMEPATH',
   'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA', 'ALLUSERSPROFILE', 'PUBLIC', 'DRIVERDATA',
   'PROGRAMFILES', 'PROGRAMFILES(X86)', 'PROGRAMW6432', 'COMMONPROGRAMFILES', 'COMMONPROGRAMFILES(X86)', 'COMMONPROGRAMW6432',
