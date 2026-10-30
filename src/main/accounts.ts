@@ -1652,25 +1652,16 @@ export function newWorkspaceAccounts(): WorkspaceConfig['connections'] | undefin
 }
 
 /**
- * An agent as today's screens and the Agent API read it (the adapter until HI-2108), once its project is migrated: its
- * account's id as `connection` (none for the CLI's own home: Copilot's sign-in, a test home), its connection's id and
- * name, and its connection's model, effort, mode and context as its own.
+ * An agent as the window reads it (HI-2108), once its project is migrated: `connection` is its connection's id, as saved;
+ * `permissionMode` is its connection's, for the mode badge's menu of a stopped agent (which offers the connection on its
+ * account with another mode). Its model, effort and context are its connection's, which the window reads from the
+ * connections themselves.
  */
-/** An agent as today's screens read it (agentLaunchView, over the agent): its own fields from before the migration as they are. */
-export function agentViewOf(a: AgentDef): AgentDef {
-  return getConnection(a.connection) ? ({ ...a, ...agentLaunchView(a, { migrations: { accounts1: { at: '' } } }) } as AgentDef) : a
-}
-
 export function agentLaunchView(a: AgentDef, cfg: Pick<ProjectConfig, 'migrations'>): Partial<AgentInfo> {
   // Not migrated yet, or no connection yet (its CLI has no account: its own, as kept): as it is.
   if (!cfg.migrations?.accounts1 || !a.connection) return {}
   const c = getConnection(a.connection)
-  const account = accountById(c?.account)
-  // Model, effort and context as its own only where they differ from its account's base connection (which today's
-  // screens show as its connection's defaults); its mode always (they read none from a connection).
-  const base = c ? baseConnection(c.account, allConnections()) : undefined
-  const own = <K extends 'model' | 'effort' | 'use200kContext'>(k: K): Connection[K] => (c && c[k] !== base?.[k] ? c[k] : undefined)
-  return { connection: account && !account.home ? account.id : undefined, connectionId: c?.id, connectionName: c?.name, model: own('model'), effort: own('effort'), permissionMode: c?.permissionMode, use200kContext: c && c.use200kContext !== base?.use200kContext ? !!c.use200kContext : undefined }
+  return { model: undefined, effort: undefined, use200kContext: undefined, permissionMode: c?.permissionMode }
 }
 
 // ---------------------------------------------------------------------------
@@ -1684,7 +1675,7 @@ export interface LaunchConnection {
   folder: string
   homeEnv: string
   /** Why it isn't exactly what was chosen, or what its check couldn't say: shown on the agent. */
-  note?: 'offFallback' | 'unknownLogin' | 'loginChanged'
+  note?: 'offFallback' | 'missing' | 'unknownLogin' | 'loginChanged'
   /** Who it launches as, from its fresh check (planUsage.ts usageLogin; a check that failed keeps the last one): its usage's. */
   login?: string
   /** Ends the launch's claim: once its session runs (its live state then keeps it from removal) or it failed. */
@@ -1831,7 +1822,7 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
         name: a.name,
         folder: accountFolder(id),
         homeEnv: caps.homeEnv,
-        ...(choice.note ? { note: 'offFallback' as const } : {}),
+        ...(choice.note ? { note: choice.note } : {}),
         release,
         server: part,
         stillValid: (wanted) => same() && sameAs(choose(wanted), id)
@@ -1843,7 +1834,7 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
     if (!fresh) throw hiveError(LAUNCH.changing, { name: a.name, agent: o.agentName }, { kind: 'conflict' })
     if (observed?.missing) await assertUsable(a)
     if (observed?.loggedIn === false) throw hiveError(LAUNCH.signedOut, { name: a.name, agent: o.agentName }, { kind: 'conflict' })
-    const note = (choice.note ? 'offFallback' : undefined) ?? (observed?.loggedIn === null ? 'unknownLogin' : accountState(a) === 'changed' ? 'loginChanged' : undefined)
+    const note = choice.note ?? (observed?.loggedIn === null ? 'unknownLogin' : accountState(a) === 'changed' ? 'loginChanged' : undefined)
     noteLastUsed(o.provider, id)
     return {
       id,

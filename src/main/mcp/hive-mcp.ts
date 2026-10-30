@@ -18,7 +18,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, STOP_ASK_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, templateListText, templatePlanText, templateLoadedText, type TemplatePlanPublic, type TemplateLoadPublic, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, teamText, type TeamPublic, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, connectionListText, connectionChangedText, type ConnectionPublic, templateListText, templatePlanText, templateLoadedText, type TemplatePlanPublic, type TemplateLoadPublic, agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, teamText, type TeamPublic, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
@@ -124,15 +124,11 @@ const projectArg = {
 const named = <T>(r: T, text: (r: T) => string): string => namedBy(namesFrom((r as { names?: Record<string, string> } | null)?.names), () => text(r))
 const cardArg = { type: ['number', 'string'], description: 'Its key ("HI-12").' }
 const agentArg = { type: 'string', description: 'Its name or id; optional when the project has one agent.' }
-// Values from hive_list_providers; empty follows the project (HI-2012: the cases are in use-hive-api's tools.md).
+// An agent's MCP servers and its connection (HI-2108: a connection holds its model, effort, context and mode; its CLI
+// follows from it).
 const settingsArgs = {
-  provider: { type: 'string', description: "Provider id; default: the project's." },
-  model: { type: 'string', description: 'Empty follows the project.' },
-  effort: { type: 'string', description: 'Empty follows the project.' },
-  mode: { type: 'string', description: 'Permission mode; empty follows the project.' },
-  context200k: { type: 'string', enum: ['on', 'off', ''], description: "A 200K context instead of the model's 1M; empty follows the project." },
-  mcpServers: { type: 'array', items: { type: 'string' }, description: 'The project\'s MCP servers it gets: [] none, ["*"] all (default). hive is always given.' },
-  connection: { type: 'string', description: "Its connection, by id or name; empty: its CLI's default." }
+  mcpServers: { type: 'array', items: { type: 'string' }, description: "The project's MCP servers it gets: [] none, [\"*\"] all (default). hive is always given." },
+  connection: { type: 'string', description: 'Its connection (model, effort, mode; its CLI follows), by id or name, from hive_connection. Default: the first usable here.' }
 }
 const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist'], description: 'Builds cards, reviews them, either (never its own), or generalist (never in a lane). Default: from its name.' }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
@@ -256,6 +252,8 @@ const proj = (a: Record<string, any>): string => {
 }
 /** 0.9's worktree arguments a call still gives (#1451): passed on as given, for the Agent API to refuse. */
 const legacyWorktreeArgs = (a: Record<string, any>): Record<string, unknown> => Object.fromEntries(['location', 'worktree', 'existingWorktree', 'branch', 'base'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+/** An agent's settings from before HI-2108 (decision D), passed on when sent so the Agent API refuses them, saying what to do. */
+const legacyAgentArgs = (a: Record<string, any>): Record<string, unknown> => Object.fromEntries(['provider', 'model', 'effort', 'mode', 'context200k'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
 /** A document read by section (#817): its path, and the project (this one unless named). */
 const docQuery = (a: Record<string, any>): string => {
   const p = a.project || PROJECT
@@ -463,7 +461,7 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       // 0.9's worktree arguments are passed on, not dropped, so the Agent API refuses them (#1451) and nothing is added.
-      const r = (await api('POST', `/v1/projects/${proj(a)}/agents`, { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, connection: a.connection, start: a.start, prompt: a.prompt, ...legacyWorktreeArgs(a) })) as {
+      const r = (await api('POST', `/v1/projects/${proj(a)}/agents`, { name: a.name, workflowRole: a.workflowRole, mcpServers: a.mcpServers, connection: a.connection, start: a.start, prompt: a.prompt, ...legacyWorktreeArgs(a), ...legacyAgentArgs(a) })) as {
         agent: { id: string; name: string }
         project: { name: string; agents: { id: string; provider: string; status: string; folder?: string; connection?: { name: string | null } | null }[] }
       }
@@ -475,9 +473,37 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_update_agent',
-    description: "Change an agent's name, role or settings. A running agent takes them when restarted; its provider changes only while it is stopped.",
+    description: "Change an agent's name, role, MCP servers or connection. A running agent takes them when restarted; another CLI's connection only while it is stopped.",
     inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs }, required: ['project', 'agent'] },
-    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, provider: a.provider, model: a.model, effort: a.effort, mode: a.mode, context200k: a.context200k, mcpServers: a.mcpServers, connection: a.connection })
+    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, mcpServers: a.mcpServers, connection: a.connection, ...legacyAgentArgs(a) })
+  },
+  {
+    name: 'hive_connection',
+    description:
+      "Connections, the setups agents run on (model, effort, context, mode on an account; the CLI follows): list; add one on an existing account; update one. add and update need Change settings on, and the user's OK: accounts stay the user's. (detail: use-hive-api, tools.md)",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'add', 'update'] },
+        connection: { type: 'string', description: 'update: its id or name.' },
+        account: { type: 'string', description: 'add: its account, by id or name, from list.' },
+        name: { type: 'string' },
+        model: { type: 'string', description: 'Empty: the CLI decides (each value below too).' },
+        effort: { type: 'string' },
+        mode: { type: 'string', description: 'Permission mode.' },
+        context200k: { type: 'string', enum: ['on', 'off', ''] },
+        extraArgs: { type: 'string' }
+      },
+      required: ['action']
+    },
+    run: async (a) => {
+      if (a.action === 'list') return connectionListText((await api('GET', '/v1/connections')) as Parameters<typeof connectionListText>[0])
+      const body = Object.fromEntries(['account', 'name', 'model', 'effort', 'mode', 'context200k', 'extraArgs'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      if (a.action === 'add') return connectionChangedText('Made', (await api('POST', '/v1/connections', body)) as ConnectionPublic)
+      if (a.action !== 'update') throw new Error('action must be list, add or update')
+      if (typeof a.connection !== 'string' || !a.connection) throw new Error('connection is required for update')
+      return connectionChangedText('Changed', (await api('PATCH', `/v1/connections/${enc(a.connection)}`, body)) as ConnectionPublic)
+    }
   },
   {
     name: 'hive_start_agent',
@@ -889,7 +915,7 @@ const tools: Tool[] = [
       'Start a card on an agent of its project (stopped or idle; none named: a new one): it moves to doing and the card is its prompt. For more work on one in review or done, note says what now. Follow with hive_wait_for_agents.',
     inputSchema: {
       type: 'object',
-      properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: 'What to do now, added to the card in the prompt.' }, name: { type: 'string', description: "A new agent's name." }, provider: settingsArgs.provider },
+      properties: { number: cardArg, agent: agentArg, note: { type: 'string', description: 'What to do now, added to the card in the prompt.' }, name: { type: 'string', description: "A new agent's name." }, provider: { type: 'string', description: "A new agent's CLI (provider id): it gets that CLI's first usable connection. Default: the first usable connection's." } },
       required: ['number']
     },
     run: async (a) => {

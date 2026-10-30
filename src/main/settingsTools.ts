@@ -54,12 +54,12 @@ export function entryOf(id: string): SettingEntry {
  * provider and, for a project, its model), else the provider's fallback list.
  */
 function effortsFor(e: SettingEntry, project: ProjectConfig | null): EffortOption[] {
-  const provider = e.provider ?? e.assistantProvider
+  const provider = e.provider
   if (!provider) return []
   const s = config.settings
   const info = providerService.info(provider)
   const global = providerSettings(s, provider).defaultModel
-  const own = e.scope === 'project' && project ? projectProviderConfig(project, provider).model : e.assistantProvider ? s.assistant?.providers?.[provider]?.model : ''
+  const own = e.scope === 'project' && project ? projectProviderConfig(project, provider).model : ''
   const model = (own && own !== 'inherit' ? own : global) || info?.defaultModel || null
   return modelCaps(provider, model, info, s).efforts
 }

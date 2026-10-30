@@ -252,7 +252,7 @@ export function resolveConnection(cfg: Pick<WorkspaceConfig, 'connections'> | nu
  */
 export type ConnectionRef = { ok: true; id: string } | { ok: false; why: 'ambiguous' | 'unknown'; ids?: string[] }
 
-export function connectionRef(ref: string, connections: readonly Account[], onHere: readonly string[]): ConnectionRef {
+export function connectionRef(ref: string, connections: readonly Pick<Account | Connection, 'id' | 'name'>[], onHere: readonly string[]): ConnectionRef {
   const r = ref.trim()
   if (connections.some((c) => c.id === r)) return { ok: true, id: r }
   const named = connections.filter((c) => onHere.includes(c.id) && c.name.trim().toLowerCase() === r.toLowerCase())
@@ -341,7 +341,7 @@ export function sameValues(a: LaunchValues, b: LaunchValues): boolean {
 export const valuesOf = (c: LaunchValues): LaunchValues => Object.fromEntries(VALUE_KEYS.filter((k) => c[k] !== undefined).map((k) => [k, c[k]])) as LaunchValues
 
 /** An account's connections, in their order. */
-export const connectionsOn = (account: string, connections: readonly Connection[]): Connection[] => connections.filter((c) => c.account === account)
+export const connectionsOn = <C extends Pick<Connection, 'account'>>(account: string, connections: readonly C[]): C[] => connections.filter((c) => c.account === account)
 
 /** An account's base connection (HI-2106): its first, made with it; none while it has none. */
 export const baseConnection = (account: string, connections: readonly Connection[]): Connection | undefined => connections.find((c) => c.account === account)
@@ -405,6 +405,16 @@ export function resolveAgentConnection(cfg: Pick<WorkspaceConfig, 'connections'>
     if (base) return { ok: true, connection: base, account: x, ...(wanted ? { note: c && a && a.provider === cli ? ('offFallback' as const) : ('missing' as const) } : {}) }
   }
   return wanted ? { ok: false, why: 'offNoDefault', wanted } : { ok: false, why: 'none' } // i18n-ignore: a reason's code, not text
+}
+
+/**
+ * The connections usable in a workspace (HI-2108): those on accounts usable there (on in it, or the CLI's own home), in the
+ * order (accounts', then each account's own); only `cli`'s when given. What Add Agent, Agent Settings, the Assistant dialog
+ * and the Agent API offer, and the first of which a new agent gets (decision A).
+ */
+export function usableConnections<C extends Pick<Connection, 'account'>>(cfg: Pick<WorkspaceConfig, 'connections'> | null | undefined, accounts: readonly Account[], connections: readonly C[], cli?: ProviderId): C[] {
+  const usable = accounts.filter((a) => (!cli || a.provider === cli) && accountOnIn(cfg, a, accounts))
+  return usable.flatMap((a) => connectionsOn(a.id, connections))
 }
 
 /**

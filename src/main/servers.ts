@@ -7,9 +7,9 @@ import { attachableSource, cardAttachments, cardHost, checkBatch, readCardAttach
 import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachments'
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
-import type { AgentApiInfo, AgentDef, AgentInfo, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
-import { PROVIDERS, agentProvider, defaultProviderPending, isKnownProvider, isProviderEnabled, offeredModes, projectDefaultProvider, providerDescriptor, providerName } from '../shared/providers'
+import { PROVIDERS, agentProvider, isKnownProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
 import { publicReason, UNDO_FINAL, type ActivityAgent, type ActivityKind, type ActivityTarget } from '../shared/assistantActivity'
@@ -90,8 +90,8 @@ import { startTask } from './taskStart'
 import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
 import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
-import { connectionRef, connectionsFor, connectionShown, workspaceAccounts } from '../shared/accounts'
-import { connectionProblem, getAccount, hiveAccounts } from './accounts'
+import { connectionRef, connectionsFor, connectionsOn, usableConnections, workspaceAccounts, type ConnectionPatch } from '../shared/accounts'
+import { accountById, addConnection, allAccounts, allConnections, connectionProblem, firstUsableAccount, getConnection, hiveAccounts, updateConnection } from './accounts'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
@@ -650,7 +650,9 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'queue-resume': UNDO_FINAL.queueResumed,
   'team-pause': UNDO_FINAL.teamPaused,
   'team-resume': UNDO_FINAL.teamResumed,
-  'release-slot': UNDO_FINAL.slotReleased
+  'release-slot': UNDO_FINAL.slotReleased,
+  'add-connection': UNDO_FINAL.connectionMade,
+  'update-connection': UNDO_FINAL.connectionChanged
 }
 
 /**
@@ -918,11 +920,10 @@ route('POST', '/v1/projects/:name/handover', async ({ params, body }) => {
 
 /** The providers agents can run: whether each is on and installed, and its models, effort levels and modes. */
 route('GET', '/v1/providers', async () => {
-  // Which is the default is only known once Hive has looked for the CLIs (#506).
-  const known = await providerService.detected()
+  // Installed or not is only known once Hive has looked for the CLIs (#506).
+  await providerService.detected()
   const s = config.settings
   const here = contextWorkspace()
-  const on = here ? workspaceConnections(here) : null
   return PROVIDERS.map((p) => {
     const info = providerService.info(p.id)
     return {
@@ -934,8 +935,6 @@ route('GET', '/v1/providers', async () => {
       // The version this Hive release was tested with, and how the installed one compares (#365).
       tested: info.tested ? { version: info.tested.version, installed: info.found ? info.tested.installed : 'not installed' } : null,
       problem: info.readiness?.find((r) => r.level === 'error')?.message ?? null,
-      // What new agents use now: Automatic's pick when no provider was chosen (#474).
-      isDefault: (known || !defaultProviderPending(null, s)) && projectDefaultProvider(null, s) === p.id,
       defaultModel: info.defaultModel ?? null,
       // What the pickers offer: the CLI's own models, else the fallback list in Settings (#125).
       models: modelGroups(p.id, info, s).filter((g) => !g.unavailable).flatMap((g) => g.models.map((m) => ({ value: m.value, label: m.label }))),
@@ -943,8 +942,8 @@ route('GET', '/v1/providers', async () => {
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
       context200k: p.capabilities.contextLimit,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
-      // Its connections on in the caller's workspace (HI-1771): what hive_add_agent's connection names.
-      ...(on && p.capabilities.connections ? { connections: (on[p.id]?.on ?? []).map((id: string) => ({ id, name: getAccount(id)?.name ?? id, default: on[p.id]?.default === id })) } : {})
+      // Its connections usable in the caller's workspace (HI-2108), in the order: what hive_add_agent's connection names.
+      ...(here ? { connections: connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id).map((c) => ({ id: c.id, name: c.name })) } : {})
     }
   })
 })
@@ -1115,36 +1114,16 @@ async function agentDefOf(p: string, agentId: string) {
   return a
 }
 
-/**
- * Settings from a request body: an agent's provider, model, effort, mode, 200K context and MCP servers (empty clears an
- * override; for MCP servers, "*" or null: all of the project's again).
- */
-function agentSettings(body: any): { provider?: ProviderId; model?: string; effort?: EffortLevel; permissionMode?: PermissionMode; use200kContext?: boolean | null; mcpServers?: string[] | null } {
-  const out: { provider?: ProviderId; model?: string; effort?: EffortLevel; permissionMode?: PermissionMode; use200kContext?: boolean | null; mcpServers?: string[] | null } = {}
-  if (body?.provider !== undefined) {
-    if (!isKnownProvider(String(body.provider))) throw new HttpError(400, `Unknown provider "${body.provider}". hive_list_providers lists them.`)
-    out.provider = String(body.provider) as ProviderId
-  }
-  if (body?.model !== undefined) out.model = String(body.model)
-  if (body?.effort !== undefined) out.effort = String(body.effort) as EffortLevel
-  if (body?.mode !== undefined) out.permissionMode = String(body.mode) as PermissionMode
-  const c = body?.context200k
-  if (c !== undefined) {
-    if (c === true || c === 'on') out.use200kContext = true
-    else if (c === false || c === 'off') out.use200kContext = false
-    else if (c === null || c === '') out.use200kContext = null
-    else throw new HttpError(400, 'context200k is "on", "off" or "" (follow the project).')
-  }
+/** An agent's MCP servers from a request body ("*", null or empty: all of the project's again). */
+function agentMcpArg(body: any): { mcpServers?: string[] | null } {
   const m = body?.mcpServers
-  if (m !== undefined) {
-    const all = m === null || m === '' || m === '*' || (Array.isArray(m) && m.length === 1 && m[0] === '*')
-    try {
-      out.mcpServers = all ? null : cleanMcpServers(m)!
-    } catch (e) {
-      throw new HttpError(400, `${(e as Error).message} mcpServers is a list of the project's server names, [] for none, or ["*"] for all of them.`)
-    }
+  if (m === undefined) return {}
+  const all = m === null || m === '' || m === '*' || (Array.isArray(m) && m.length === 1 && m[0] === '*')
+  try {
+    return { mcpServers: all ? null : cleanMcpServers(m)! }
+  } catch (e) {
+    throw new HttpError(400, `${(e as Error).message} mcpServers is a list of the project's server names, [] for none, or ["*"] for all of them.`)
   }
-  return out
 }
 
 /** A workspace's connections per CLI, as they apply (dropping ids gone or another CLI's). */
@@ -1153,71 +1132,175 @@ function workspaceConnections(ws: WorkspaceService): Partial<Record<ProviderId, 
   return Object.fromEntries(PROVIDERS.flatMap((x) => (x.capabilities.connections ? [[x.id, workspaceAccounts(ws.config, x.id, all) ?? { on: [], default: null }]] : [])))
 }
 
+/** The connections usable in a workspace (HI-2108), in the order: what an agent's `connection` may name there. */
+const connectionsHere = (ws: WorkspaceService): Connection[] => usableConnections(ws.config, allAccounts(), allConnections())
+
+/** A connection's values as the Agent API shows them (HI-2108): only those set (each absent: the CLI decides); its extra arguments to `wide` callers only. */
+function connectionValues(c: Connection, wide: boolean): Record<string, unknown> {
+  return { ...(c.model ? { model: c.model } : {}), ...(c.effort ? { effort: c.effort } : {}), ...(c.use200kContext ? { context200k: true } : {}), ...(c.permissionMode ? { mode: c.permissionMode } : {}), ...(wide && c.extraArgs ? { extraArgs: c.extraArgs } : {}) }
+}
+
+/** A connection as the Agent API lists it (HI-2108): its id, name, account (its name and CLI), its values, and `usable: false` where it can't be used here. */
+function connectionRow(c: Connection, usable: boolean, wide: boolean): Record<string, unknown> {
+  const a = accountById(c.account)
+  return { id: c.id, name: c.name, account: a?.name ?? c.account, cli: a?.provider ?? null, ...connectionValues(c, wide), ...(usable ? {} : { usable: false }) }
+}
+
+/** An account's connections by name, for a refusal (HI-2108): "On Personal: Personal, Personal · High." */
+function connectionNamesOn(accountId: string | undefined): string {
+  const a = accountById(accountId)
+  if (!a) return 'No account is on in this workspace: the user adds one in Settings → Accounts & Connections.'
+  return `On ${a.name}: ${connectionsOn(a.id, allConnections()).map((c) => c.name).join(', ')}.`
+}
+
 /**
- * A request's `connection` (HI-1771): an id, or a name unique among those on in the project's workspace (several: 409,
- * use its id; none: 404); null or "" clears it (the default again). With its CLI, for a call that names no provider.
- * Saving it checks it again (on here, for the agent's CLI) with the write.
+ * The settings an agent had before HI-2108, refused (decision D: removed, not aliased): a connection holds its model,
+ * effort, context and mode, and its CLI follows from it. The reply names the connections on the account concerned (the
+ * agent's, or the one a new agent would go on), so an old script fails once and says what to do.
+ */
+const OLD_AGENT_FIELDS = ['provider', 'model', 'effort', 'mode', 'context200k'] as const
+function refuseOldFields(body: any, account: string | undefined): void {
+  const old = OLD_AGENT_FIELDS.filter((k) => body && typeof body === 'object' && k in body)
+  if (!old.length) return
+  throw new HttpError(400, `An agent no longer takes ${old.join(', ')}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). ${connectionNamesOn(account)} hive_connection lists every one, and makes one when the user agrees.`)
+}
+
+/**
+ * A request's `connection` (HI-2108): a connection's id, or a name unique among those usable in the project's workspace
+ * (several: 409, use its id; none: 404); null or "" for its CLI's first usable one. With its CLI. Saving it checks it
+ * again (usable here) with the write.
  */
 function connectionArg(body: any, projectPath: string): { connection: string | null; cli?: ProviderId } | undefined {
   const v = body?.connection
   if (v === undefined) return undefined
   if (v === null || v === '') return { connection: null }
-  const all = hiveAccounts()
-  const onHere = Object.values(workspaceConnections(workspaceOf(projectPath))).flatMap((w) => w?.on ?? [])
-  const r = connectionRef(String(v), all, onHere)
-  if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, `Several connections are named "${v}": use its id (${r.ids!.join(', ')}).`) : new HttpError(404, `No connection named "${v}" is on in this workspace, and none has that id. GET /v1/connections lists them.`)
-  return { connection: r.id, cli: all.find((c) => c.id === r.id)!.provider }
+  const here = connectionsHere(workspaceOf(projectPath)).map((c) => c.id)
+  const r = connectionRef(String(v), allConnections(), here)
+  if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, `Several connections are named "${v}": use its id (${r.ids!.join(', ')}).`) : new HttpError(404, `No connection named "${v}" is usable in this workspace, and none has that id. hive_connection lists them.`)
+  return { connection: r.id, cli: accountById(getConnection(r.id)?.account)?.provider }
 }
 
 /**
- * The provider a request asks for with its connection (HI-1771): the one named, which must be the connection's CLI's
- * (409 otherwise), else the connection's CLI (a connection on another CLI than the agent's is that change of CLI).
- */
-function providerWith(set: { provider?: ProviderId }, conn: { cli?: ProviderId } | undefined): ProviderId | undefined {
-  if (conn?.cli && set.provider && set.provider !== conn.cli) throw new HttpError(409, `That connection is for ${PROVIDERS.find((x) => x.id === conn.cli)?.name ?? conn.cli}, not ${PROVIDERS.find((x) => x.id === set.provider)?.name ?? set.provider}: name one of its own, or leave out provider.`)
-  return set.provider ?? conn?.cli
-}
-
-/**
- * An agent row's connection fields (HI-1771), for a CLI with connections: `connection`, the one chosen as
- * saved (its id, its name, and `problem` when it can't be used now: removed, another CLI's, or off here), or null for
- * the default; `launchedConnection`, the one its run is on; `switchPending`. A project agent is never told the name of
- * one that isn't on in its workspace.
+ * An agent row's connection fields (HI-2108): `connection`, the one chosen as saved (its id, its name, its account's
+ * name, and `problem` when it can't be used here: removed, or its account off here, so it runs on its CLI's first usable
+ * one), or null for none; `launchedConnection`, the account its run is on; `switchPending`. A project agent is never told
+ * the name of one that can't be used in its workspace.
  */
 function agentConnectionFields(p: string, a: AgentInfo, cli: ProviderId): Record<string, unknown> {
-  if (!PROVIDERS.find((x) => x.id === cli)?.capabilities.connections) return {}
-  const problem = a.connection ? connectionProblem(a.connection, cli, p) : null
-  const name = a.connection && (!problem || !agentCaller()) ? (getAccount(a.connection)?.name ?? null) : null
+  const c = getConnection(a.connection)
+  const problem = a.connection ? (c ? connectionProblem(c.account, cli, p) : 'missing') : null
+  const shown = !!c && (!problem || !agentCaller())
   return {
-    connection: a.connection ? { id: a.connection, name, ...(problem ? { problem } : {}) } : null,
+    connection: a.connection ? { id: a.connection, name: shown ? c!.name : null, ...(shown ? { account: accountById(c!.account)?.name ?? null } : {}), ...(problem ? { problem } : {}) } : null,
     launchedConnection: a.live?.launchedConnection ? { id: a.live.launchedConnection.id, name: a.live.launchedConnection.name, ...(a.live.launchedConnection.note ? { note: a.live.launchedConnection.note } : {}) } : null,
     ...(a.live?.switchPending ? { switchPending: true } : {})
   }
 }
 
 /**
- * Hive's connections as the caller may see them (HI-1771): a project agent only those on in its workspace (id, name, CLI,
- * kind, signed in); the user's token and the Assistant all of them, with on and default here, and who each is signed in
- * as. Never a token, a key, where a login is kept, its settings or defaults.
+ * Hive's connections as the caller may see them (HI-2108): `connections`, the setups agents choose (a project agent only
+ * those usable in its workspace; the user's token and the Assistant every one, `usable: false` on the rest, with their
+ * extra arguments); `accounts`, the sign-ins and servers they are on (a project agent only those on in its workspace: id,
+ * name, CLI, kind, signed in; the others with on here and who each is signed in as). Never a token, a key or where a login
+ * is kept.
  */
 route('GET', '/v1/connections', async () => {
-  const ws = workspaceConnections(requireWorkspace())
-  const defaults = Object.fromEntries(Object.entries(ws).map(([cli, w]) => [cli, w?.default ?? null]))
-  return { connections: connectionsFor(hiveAccounts(), ws, !agentCaller()), defaults }
+  const ws = requireWorkspace()
+  const wide = !agentCaller()
+  const here = new Set(connectionsHere(ws).map((c) => c.id))
+  return { connections: allConnections().filter((c) => wide || here.has(c.id)).map((c) => connectionRow(c, here.has(c.id), wide)), accounts: connectionsFor(hiveAccounts(), workspaceConnections(ws), wide) }
 })
 
 route('GET', '/v1/connections/:ref', async ({ params }) => {
-  const ws = workspaceConnections(requireWorkspace())
-  const all = hiveAccounts()
-  const onHere = Object.values(ws).flatMap((w) => w?.on ?? [])
+  const ws = requireWorkspace()
+  const here = connectionsHere(ws).map((c) => c.id)
   const ref = decodeURIComponent(params[0] ?? '')
-  const r = connectionRef(ref, all, onHere)
-  // A project agent asking after one not on in its workspace, by id or by name: as if there were none.
-  const c = r.ok ? all.find((x) => x.id === r.id) : undefined
+  const r = connectionRef(ref, allConnections(), here)
+  // A project agent asking after one not usable in its workspace, by id or by name: as if there were none.
+  const c = r.ok ? getConnection(r.id) : undefined
   if (r.ok === false && r.why === 'ambiguous') throw new HttpError(409, `Several connections are named "${ref}": use its id (${r.ids!.join(', ')}).`)
-  if (!c || (agentCaller() && !onHere.includes(c.id))) throw new HttpError(404, `No connection named "${ref}" is on in this workspace, and none has that id.`)
-  return connectionShown(c, ws, !agentCaller(), all)
+  if (!c || (agentCaller() && !here.includes(c.id))) throw new HttpError(404, `No connection named "${ref}" is usable in this workspace, and none has that id.`)
+  return connectionRow(c, here.includes(c.id), !agentCaller())
 })
+
+/**
+ * A connection's name and values from a request body (HI-2108: hive_connection add and update): model, effort, mode,
+ * context200k and extraArgs, each "" or null for the CLI's own (on an update: cleared). Saving checks them as the
+ * connection dialog's save does (a mode the CLI has, an effort the model takes: decision E).
+ */
+function connectionValuesArg(body: any): ConnectionPatch {
+  const out: ConnectionPatch = {}
+  const text = (v: unknown): string | null => (v === null || v === undefined ? null : String(v).trim() || null)
+  if (body?.name !== undefined) {
+    const n = String(body.name ?? '').trim()
+    if (!n) throw new HttpError(400, 'A connection needs a name.')
+    out.name = n
+  }
+  if (body?.model !== undefined) out.model = text(body.model)
+  if (body?.effort !== undefined) out.effort = text(body.effort) as EffortLevel | null
+  if (body?.mode !== undefined) out.permissionMode = text(body.mode) as PermissionMode | null
+  if (body?.extraArgs !== undefined) out.extraArgs = text(body.extraArgs)
+  const c = body?.context200k
+  if (c !== undefined) {
+    if (c === true || c === 'on') out.use200kContext = true
+    else if (c === false || c === 'off' || c === null || c === '') out.use200kContext = null
+    else throw new HttpError(400, 'context200k is "on", or "off" (or "") for the model\'s 1M.')
+  }
+  return out
+}
+
+/**
+ * The Assistant makes or changes a connection (HI-2108, hive_connection): only with Settings → Assistant → Control →
+ * Change settings on, asked again at the change, and listed in its panel. Accounts (sign-ins, servers, keys) stay the
+ * user's: a connection goes only on an account that exists.
+ */
+async function connectionChange<T>(kind: 'add-connection' | 'update-connection', what: string, fn: () => Promise<{ done: string; act?: Partial<ActivityTarget>; result: T }>): Promise<T> {
+  const allowed = (): void => {
+    if (config.settings.assistant?.changeSettings !== true) throw new HttpError(403, "The user's settings don't let you change connections (Settings → Assistant → Control → Change settings is off). Tell the user how to change it in Settings → Accounts & Connections, or that turning Change settings on lets you.")
+  }
+  allowed()
+  return assistantChange('look', what, { kind }, async () => {
+    allowed()
+    return fn()
+  })
+}
+
+/** A connection change, a refusal it makes (decision E, a mode the CLI lacks, an account gone) answered as the caller's to fix. */
+async function connectionsCall<T>(fn: () => T | Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (e) {
+    if (e instanceof HttpError) throw e
+    throw new HttpError(e instanceof HiveError && e.kind === 'notFound' ? 404 : 409, (e as Error).message)
+  }
+}
+
+route('POST', '/v1/connections', async ({ body }) =>
+  connectionChange('add-connection', 'make a connection', async () => {
+    const ref = String(body?.account ?? '').trim()
+    if (!ref) throw new HttpError(400, "Name the account it goes on (account: its id or name, from hive_connection list). Adding an account is the user's, in Settings → Accounts & Connections.")
+    const accounts = allAccounts()
+    const byName = accounts.filter((a) => a.name.trim().toLowerCase() === ref.toLowerCase())
+    const account = accounts.find((a) => a.id === ref) ?? (byName.length === 1 ? byName[0] : undefined)
+    if (!account) throw byName.length > 1 ? new HttpError(409, `Several accounts are named "${ref}": use its id (${byName.map((a) => a.id).join(', ')}).`) : new HttpError(404, `No account named "${ref}": hive_connection list names them. Adding one is the user's, in Settings → Accounts & Connections.`)
+    const v = connectionValuesArg(body)
+    if (!v.name) throw new HttpError(400, 'A connection needs a name.')
+    const c = await connectionsCall(() => addConnection(account.id, { ...v, name: v.name! }))
+    return { done: `Made the connection ${c.name} on ${account.name}`, act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
+  })
+)
+
+route('PATCH', '/v1/connections/:ref', async ({ params, body }) =>
+  connectionChange('update-connection', 'change a connection', async () => {
+    const ref = decodeURIComponent(params[0] ?? '')
+    const r = connectionRef(ref, allConnections(), allConnections().map((c) => c.id))
+    if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, `Several connections are named "${ref}": use its id (${r.ids!.join(', ')}).`) : new HttpError(404, `No connection named "${ref}", and none has that id.`)
+    const v = connectionValuesArg(body)
+    if (!Object.keys(v).length) throw new HttpError(400, 'Nothing to change: give name, model, effort, mode, context200k or extraArgs.')
+    const c = await connectionsCall(() => updateConnection(r.id, v))
+    return { done: `Changed the connection ${c.name} (agents running on it take it when restarted)`, act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
+  })
+)
 
 /** A workflowRole argument (#1430): builder, reviewer, either or generalist (HI-686). */
 function workflowRoleArg(v: unknown): WorkflowRole {
@@ -1232,23 +1315,20 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
   const p = projectByName(params[0])
   const project = basename(p)
   return assistantChange('agents', `add an agent to ${project}`, { kind: 'add-agent', project }, async () => {
-    const set = agentSettings(body)
     const conn = connectionArg(body, p)
-    const named = providerWith(set, conn)
-    const cfg = await workspace.projectConfig(p)
-    if (!named && defaultProviderPending(cfg, config.settings)) await providerService.settle()
-    const provider = named ?? projectDefaultProvider(cfg, config.settings)
-    if (!isProviderEnabled(config.settings, provider)) throw new HttpError(409, `${PROVIDERS.find((x) => x.id === provider)?.name ?? provider} is turned off in Settings → Providers.`)
+    const ws = workspaceOf(p)
+    // Decision D (HI-2108): provider, model, effort, mode and context are a connection's now, refused naming those there.
+    refuseOldFields(body, getConnection(conn?.connection)?.account ?? firstUsableAccount(ws.path ? ws.config : null)?.id)
+    const mcp = agentMcpArg(body)
+    if (conn?.cli && !isProviderEnabled(config.settings, conn.cli)) throw new HttpError(409, `${PROVIDERS.find((x) => x.id === conn.cli)?.name ?? conn.cli} is turned off in Settings → Providers.`)
     // 1.0 (#1451): no agent has a worktree of its own (slots are lent per card or lane): the old arguments are refused.
     if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, NOT_PINNED)
+    // Its connection: the one named, else the first usable here (decision A), its CLI following from it.
     const def = await addAgent(p, {
       name: body?.name ? String(body.name) : undefined,
       ...(body?.workflowRole !== undefined ? { workflowRole: workflowRoleArg(body.workflowRole) } : {}),
       location: 'project',
-      ...set,
-      use200kContext: set.use200kContext ?? undefined,
-      mcpServers: set.mcpServers ?? undefined,
-      provider,
+      mcpServers: mcp.mcpServers ?? undefined,
       ...(conn?.connection ? { connection: conn.connection } : {})
     })
     // The view stays where the user has it; the new agent is marked for them.
@@ -1283,10 +1363,11 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
     // What of its settings changed, for undo (#1282): as saved when the change was made, under the project's lock.
     let was: AgentDef | undefined
     const role = body?.workflowRole !== undefined ? { workflowRole: workflowRoleArg(body.workflowRole) } : {}
-    const set = agentSettings(body)
     const conn = connectionArg(body, p)
-    const provider = providerWith(set, conn)
-    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...set, ...(provider ? { provider } : {}), ...(conn ? { connection: conn.connection } : {}), ...role }, { check: (current) => void (was = structuredClone(current)) })
+    // Decision D (HI-2108): refused, naming the connections on its account.
+    refuseOldFields(body, getConnection(a.connection)?.account)
+    // Another CLI's connection is a change of CLI: only while it is stopped (updateAgent refuses it otherwise).
+    const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentMcpArg(body), ...(conn ? { connection: conn.connection } : {}), ...role }, { check: (current) => void (was = structuredClone(current)) })
     if (was) await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
     return { done: `Changed ${def.name}'s settings in ${basename(p)}${live ? ' (it applies them when restarted)' : ''}`, act: { agent: actAgent(def) }, result: def }

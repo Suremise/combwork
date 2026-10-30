@@ -11,7 +11,7 @@ import { fmt, msg, tr, tRich } from '@shared/i18n'
 import hexUrl from '../assets/icon.svg'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
-import { needsConnection, NoConnectionBanner, useConnections } from '../components/ConnectionChoice'
+import { needsConnection, NoConnectionBanner, offeredConnections, useConnections } from '../components/ConnectionChoice'
 import { commandKeybinding, runCommand } from '../commands'
 import { AddAgentButton, PANE_FOOTER, PANE_HEADER, PaneChrome, RESUME_TINT, ResumeButton, SessionToolbar, TerminalLayer, usePanes, useWidth } from '../components/AgentPanes'
 import { terminalMinWidth } from '../components/TerminalView'
@@ -43,6 +43,7 @@ const M = {
   moreSettings: msg({ id: 'project.tabs.moreSettings', defaultMessage: 'Project Settings…', description: "The last item of the project tabs' More ▾ menu, after a separator (HI-1840): opens the project's settings. Keep the …." }),
   moreTip: msg({ id: 'project.tabs.moreTip', defaultMessage: "The project's {tabs}", description: "Tooltip on the project tabs' More ▾ button. {tabs} lists the tabs in its menu, such as Memory, Skills, Templates and MCP." }),
   tabTip: msg({ id: 'project.tabs.tip', defaultMessage: '{tab} ({key})', description: "A project tab's tooltip with its keyboard shortcut. {tab} is the tab's name, {key} the shortcut, such as Alt+4." }),
+  noAccount: msg({ id: 'project.empty.noAccount', defaultMessage: 'No account is on in this workspace — Settings → Accounts & Connections', description: "Warning on the Session tab of a project with no agents (HI-2108): no account (a sign-in or server a coding agent CLI uses) is on in this workspace, so a new agent has no connection to run on. Settings → Accounts & Connections: name it as Settings does." }),
   providerOff: msg({ id: 'project.empty.providerOff', defaultMessage: '{provider} is turned off — Settings → Providers', description: "Warning on the Session tab when the agent's provider is turned off. Settings → Providers: name it as Settings does." }),
   providerMissing: msg({ id: 'project.empty.providerMissing', defaultMessage: '{provider} is required — Help → Provider Setup', description: "Warning on the Session tab when the agent's CLI isn't installed. Help → Provider Setup is the menu item." }),
   sessionEnded: msg({ id: 'project.session.ended', defaultMessage: 'The session has ended. Resume it, or start a new one.', description: "Over an agent's terminal when its session has ended." }),
@@ -288,8 +289,13 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
   const provider = agentProviderOf(project, focused)
   const info = providers[provider]
   const on = isProviderEnabled(settings, provider)
+  const view = useConnections()
+  // No agent and no account on here (HI-2108): a new agent has no connection to run on. Not for a test copy on a CLI test home.
+  const noAccount = !focused && !!view && !offeredConnections(view, settings).length && !view.testHome.length
   // An agent's own provider by name; with none, only what the project's default needs (#474).
-  const warning = focused
+  const warning = noAccount
+    ? tr(M.noAccount)
+    : focused
     ? !on
       ? tr(M.providerOff, { provider: providerName(provider) })
       : info && !info.checking && !info.found

@@ -25,7 +25,7 @@ import { addServerConnection, cancelServerModels, editServerConnection, readServ
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
 import { maskDeep, maskKeys } from './keyMatcher'
-import { dismissMovedNotice, movedNotice, setAssistantAccount } from './connectionMoves'
+import { dismissMovedNotice, movedNotice } from './connectionMoves'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
 import { emit, emitTo, onHiveEvent } from './events'
@@ -1719,7 +1719,6 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'connection:duplicate': (id) => duplicateConnection(String(id)),
     'connection:remove': (id) => removeConnection(String(id)),
     'connection:move': (id, index) => moveConnectionInAccount(String(id), Number(index)),
-    'connections:setAssistant': (provider, id) => setAssistantAccount(workspace, provider, id),
     'connections:switchAffected': () => sessions.switchAffected(workspace.path!),
     'connections:setDefaults': (id, patch) => setConnectionDefaults(id, patch),
     'connections:notice': () => movedNotice(workspace),

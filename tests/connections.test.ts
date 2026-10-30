@@ -15,7 +15,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { connectionRef, connectionsFor, connectionShown, resolveConnection, type ConnectionsView } from '../src/shared/accounts'
-import { connectionOf } from '../src/shared/connectionLabel'
+import { connectionCli, connectionOf, firstUsableConnection, offeredConnections } from '../src/shared/connectionLabel'
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -31,7 +31,7 @@ delete process.env.HIVE_TEST_CLI_HOME_CONNECTION
 const accounts = await import('../src/main/accounts')
 const seam = await import('../src/main/connectionSeam')
 const { config } = await import('../src/main/config')
-const { advanced, updateSettingsChecked } = await import('../src/main/advanced')
+const { advanced } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
 const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace, setNewWorkspaceExtras } = await import('../src/main/workspace')
@@ -41,7 +41,6 @@ const moves = await import('../src/main/connectionMoves')
 const { assistantOwn, cliDefaults, legacyLaunchSettings: agentLaunchSettings, moveProjectOverrides } = await import('../src/shared/connectionDefaults')
 const { addAgent, updateAgent } = await import('../src/main/projectAgents')
 const templates = await import('../src/main/templates')
-const { applySetting, entryOf } = await import('../src/main/settingsTools')
 const { TEMPLATE_VERSION } = await import('../src/shared/templates')
 const { fileLockDepth, withFileLock } = await import('../src/main/fsutil')
 const { listSkills, invalidateSkillCache, machineSkillCacheSize } = await import('../src/main/skills')
@@ -183,9 +182,10 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const b = await signedInConnection('Work', 'work@example.com')
     await here(() => accounts.setAccountOn(b.id, false))
-    for (const wanted of [baseOf(b.id), 'gone']) {
+    // Off here: offFallback; removed (HI-2108): missing.
+    for (const [wanted, note] of [[baseOf(b.id), 'offFallback'], ['gone', 'missing']]) {
       const c = (await launch(wanted))!
-      expect(c).toMatchObject({ id: a.id, note: 'offFallback' })
+      expect(c).toMatchObject({ id: a.id, note })
       c.release()
     }
     config.update((x) => {
@@ -193,7 +193,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
       x.connections!.push({ id: 'c-codex', account: 'x-codex', name: 'ChatGPT' })
     })
     const c = (await launch('c-codex'))!
-    expect(c).toMatchObject({ id: a.id, note: 'offFallback' })
+    expect(c).toMatchObject({ id: a.id, note: 'missing' })
     c.release()
     // None of its CLI on here: refused.
     await here(() => accounts.setAccountOn(a.id, false))
@@ -469,6 +469,8 @@ describe('a choice saved while starting: the last look at its own choice, skills
   const oneChose = () => w.savedAgent(alpha, 'a-one').then((a) => a?.connection)
   // The Assistant's (HI-2106): its agent's connection, as a launch reads it.
   const assistantChose = () => w.savedAgent(w.assistantHome, 'assistant').then((a) => a?.connection)
+  /** An account's base connection's id (HI-2106): what choosing the account means. */
+  const baseOf = (account: string): string => accounts.allConnections().find((c) => c.account === account)!.id
 
   /**
    * A launch on `chosen` whose first `holds` runs wait, before their last look, until let go: `entered(i)` once run i
@@ -534,7 +536,7 @@ describe('a choice saved while starting: the last look at its own choice, skills
     const b = await signedInConnection('Work', 'work@example.com')
     const run = heldRun(assistantChose)
     await run.entered(0)
-    await here(() => moves.setAssistantAccount(w, 'claude-code', b.id))
+    await here(() => updateAgent(w.assistantHome, 'assistant', { connection: baseOf(b.id) }))
     run.go(0)
     await run.done
     expect(run.prepared).toEqual([a.id, b.id])
@@ -554,7 +556,7 @@ describe('a choice saved while starting: the last look at its own choice, skills
       await inWorkspace(w2, () => accounts.setAccountOn(b.id, true))
       const run = heldRun(oneChose)
       await run.entered(0)
-      await here(() => moves.setAssistantAccount(w, 'claude-code', b.id))
+      await here(() => updateAgent(w.assistantHome, 'assistant', { connection: baseOf(b.id) }))
       await inWorkspace(w2, () => updateAgent(join(ws2Path, 'beta'), 'b-one', { connection: b.id }))
       run.go(0)
       await run.done
@@ -656,34 +658,42 @@ describe('a choice saved while starting: the last look at its own choice, skills
   })
 })
 
-describe('what an agent row names (connectionOf, HI-1769)', () => {
-  const c = (id: string, cli: Account['provider'] = 'claude-code'): ConnectionsView['connections'][number] => ({ id, provider: cli, name: `Name ${id}`, createdAt: '', signingIn: false, folder: '' })
-  const view = (over: Partial<ConnectionsView> = {}): ConnectionsView => ({ providers: ['claude-code'], connections: [c('a'), c('b'), c('x', 'codex')], workspace: { 'claude-code': { on: ['a'], default: 'a' } }, testHome: [], order: [], homes: [], connectionRows: [], ...over })
-  const ran = (id: string) => ({ id, name: `Name ${id}` })
-  it('its own on here; none of its own: the default, inherited', () => {
-    expect(connectionOf('a', 'claude-code', undefined, view())).toMatchObject({ shown: { id: 'a' }, inherited: false, other: false, desired: { ok: true, id: 'a' } })
-    expect(connectionOf(undefined, 'claude-code', undefined, view())).toMatchObject({ shown: { id: 'a', name: 'Name a' }, inherited: true, other: false })
+describe('what an agent row names (connectionOf, HI-1769; HI-2108: connections)', () => {
+  const acc = (id: string, cli: Account['provider'] = 'claude-code'): ConnectionsView['connections'][number] => ({ id, provider: cli, name: `Account ${id}`, createdAt: '', signingIn: false, folder: '' })
+  const row = (id: string, account: string): ConnectionsView['connectionRows'][number] => ({ id, account, name: `Name ${id}`, users: [] })
+  // Accounts a (on here), b (off), x (Codex); connections a1, a2 on a, b1 on b, x1 on x.
+  const view = (over: Partial<ConnectionsView> = {}): ConnectionsView => ({ providers: ['claude-code'], connections: [acc('a'), acc('b'), acc('x', 'codex')], workspace: { 'claude-code': { on: ['a'], default: 'a' } }, testHome: [], order: ['a', 'b', 'x'], homes: [], connectionRows: [row('a1', 'a'), row('a2', 'a'), row('b1', 'b'), row('x1', 'x')], ...over })
+  const ran = (id: string) => ({ id, name: `Account ${id}` })
+  it('its own, its account on here', () => {
+    expect(connectionOf('a2', 'claude-code', undefined, view())).toMatchObject({ shown: { id: 'a2', name: 'Name a2' }, other: false, desired: { ok: true, id: 'a2', account: 'a' } })
   })
-  it('its own off here: the default runs it, noted; off with no default: none shown, never made up', () => {
-    expect(connectionOf('b', 'claude-code', undefined, view())).toMatchObject({ shown: { id: 'a' }, desired: { ok: true, id: 'a', note: 'offFallback' } })
+  it("its account off here, or removed, or another CLI's: its CLI's first usable connection, noted; none usable: none shown, never made up", () => {
+    expect(connectionOf('b1', 'claude-code', undefined, view())).toMatchObject({ shown: { id: 'a1' }, desired: { ok: true, id: 'a1', note: 'offFallback' } })
+    expect(connectionOf('gone', 'claude-code', undefined, view())).toMatchObject({ shown: { id: 'a1' }, desired: { ok: true, id: 'a1', note: 'missing' } })
+    expect(connectionOf('x1', 'claude-code', undefined, view())).toMatchObject({ shown: { id: 'a1' }, desired: { ok: true, id: 'a1', note: 'missing' } })
     const none = view({ workspace: { 'claude-code': { on: [], default: null } } })
-    expect(connectionOf('b', 'claude-code', undefined, none)).toMatchObject({ shown: null, desired: { ok: false, why: 'offNoDefault', wantedName: 'Name b' } })
+    expect(connectionOf('b1', 'claude-code', undefined, none)).toMatchObject({ shown: null, desired: { ok: false, why: 'offNoDefault', wantedName: 'Name b1' } })
     expect(connectionOf(undefined, 'claude-code', undefined, none)).toMatchObject({ shown: null, desired: { ok: false, why: 'none' } })
   })
-  it('removed, or another CLI’s: unusable, shown as such', () => {
-    expect(connectionOf('gone', 'claude-code', undefined, view())).toMatchObject({ shown: null, desired: { ok: false, why: 'deleted' } })
-    expect(connectionOf('x', 'claude-code', undefined, view())).toMatchObject({ shown: null, desired: { ok: false, why: 'otherProvider', wantedName: 'Name x' } })
-  })
-  it('running: always the one it runs on; ⟳ when another is chosen now, or the choice is now unusable', () => {
-    expect(connectionOf('a', 'claude-code', ran('a'), view())).toMatchObject({ shown: { id: 'a' }, other: false })
-    expect(connectionOf(undefined, 'claude-code', ran('b'), view())).toMatchObject({ shown: { id: 'b', name: 'Name b' }, other: true, desired: { ok: true, id: 'a' } })
-    expect(connectionOf('gone', 'claude-code', ran('a'), view())).toMatchObject({ shown: { id: 'a' }, other: true, desired: { ok: false, why: 'deleted' } })
-    expect(connectionOf('x', 'claude-code', ran('a'), view())).toMatchObject({ shown: { id: 'a' }, other: true, desired: { ok: false, why: 'otherProvider' } })
+  it('running: its connection while it runs on its account; the account it runs on, ⟳, when that is another', () => {
+    expect(connectionOf('a2', 'claude-code', ran('a'), view())).toMatchObject({ shown: { id: 'a2' }, other: false })
+    expect(connectionOf('a2', 'claude-code', ran('b'), view())).toMatchObject({ shown: { id: 'b', name: 'Account b' }, other: true, desired: { ok: true, id: 'a2' } })
+    const none = view({ workspace: { 'claude-code': { on: [], default: null } } })
+    expect(connectionOf('b1', 'claude-code', ran('a'), none)).toMatchObject({ shown: { id: 'a' }, other: true, desired: { ok: false } })
   })
   it('nothing where connections aren’t shown: a CLI without them (or turned off), no view yet', () => {
-    expect(connectionOf('a', 'claude-code', undefined, view({ providers: [] }))).toBeNull()
-    expect(connectionOf('x', 'codex', undefined, view())).toBeNull()
-    expect(connectionOf('a', 'claude-code', undefined, null)).toBeNull()
+    expect(connectionOf('a1', 'claude-code', undefined, view({ providers: [] }))).toBeNull()
+    expect(connectionOf('x1', 'codex', undefined, view())).toBeNull()
+    expect(connectionOf('a1', 'claude-code', undefined, null)).toBeNull()
+  })
+  it('what the choices offer: connections on accounts usable here, of CLIs turned on, in the order; the first is what a new agent gets (decision A)', () => {
+    const v = view({ providers: ['claude-code', 'codex'], workspace: { 'claude-code': { on: ['a'], default: 'a' }, codex: { on: ['x'], default: 'x' } }, order: ['x', 'a', 'b'] })
+    const s = { providers: { 'claude-code': { enabled: true }, codex: { enabled: true } } } as never
+    expect(offeredConnections(v, s).map((c) => c.id)).toEqual(['x1', 'a1', 'a2'])
+    expect(offeredConnections(v, s, 'claude-code').map((c) => c.id)).toEqual(['a1', 'a2'])
+    expect(firstUsableConnection(v, s)).toBe('x1')
+    expect(connectionCli(v, 'a2')).toBe('claude-code')
+    expect(connectionCli(v, 'gone')).toBeUndefined()
   })
 })
 
@@ -998,31 +1008,6 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     expect(await savedConnection(p, 'none')).toMatchObject({ model: 'haiku', effort: 'high' })
   })
 
-  it("two changes of the Assistant at once both kept: each from what the other left (HR1, round 1)", async () => {
-    await signedInConnection('Personal', 'me@example.com')
-    await here(() => moves.ensureMigrated(w.assistantHome))
-    await here(() => moves.pointAssistant(w, 'claude-code', { values: { model: 'opus', effort: 'medium' }, become: true }))
-    // The first change's save held until both have started.
-    let release!: () => void
-    const held = new Promise<void>((r) => (release = r))
-    const real = config.saveNow.bind(config)
-    let calls = 0
-    const save = vi.spyOn(config, 'saveNow').mockImplementation(async () => {
-      if (calls++ === 0) await held
-      return real()
-    })
-    try {
-      const one = here(() => moves.pointAssistant(w, 'claude-code', { values: { model: 'sonnet' } }))
-      const two = here(() => moves.pointAssistant(w, 'claude-code', { values: { effort: 'high' } }))
-      release()
-      await Promise.all([one, two])
-    } finally {
-      save.mockRestore()
-    }
-    const agent = (await w.projectConfig(w.assistantHome)).agents[0]
-    expect(accounts.getConnection(agent.connection)).toMatchObject({ model: 'sonnet', effort: 'high' })
-  })
-
   it('decision E at every save: a model and effort that don\'t go together are refused, the connection unchanged', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const info = providerService.info
@@ -1039,44 +1024,19 @@ describe('model, effort and context from the connection (HI-1770)', () => {
       const was = (await w.projectConfig(alpha)).agents.find((x) => x.id === 'a-one')!.connection
       expect(await outcome(here(() => updateAgent(alpha, 'a-one', { model: 'haiku' })))).toMatch(/haiku doesn't take high effort/)
       expect((await w.projectConfig(alpha)).agents.find((x) => x.id === 'a-one')!.connection).toBe(was)
-      // The Assistant (Settings → Assistant).
-      await here(() => moves.pointAssistant(w, 'claude-code', { values: { model: 'opus', effort: 'high' }, become: true }))
-      const assistantWas = (await w.projectConfig(w.assistantHome)).agents[0].connection
-      expect(await outcome(here(() => moves.pointAssistant(w, 'claude-code', { values: { model: 'haiku' } })))).toMatch(/haiku doesn't take high effort/)
-      expect((await w.projectConfig(w.assistantHome)).agents[0].connection).toBe(assistantWas)
     } finally {
       providerService.info = info
       await here(() => updateAgent(join(wsPath, 'alpha'), 'a-one', { connection: null }))
     }
   })
 
-  it("decision E for Settings → Assistant and → GitHub Copilot: refused before it is saved, settings and connections unchanged (HR1, round 2)", async () => {
+  it("decision E for Settings → GitHub Copilot: refused before it is saved, settings and connections unchanged (HR1, round 2)", async () => {
     await signedInConnection('Personal', 'me@example.com')
     const info = providerService.info
     providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe', catalog: { source: 'cli', version: '1', models: [{ value: 'haiku', label: 'Haiku', efforts: [] }, { value: 'opus', label: 'Opus', efforts: ['low', 'high'] }] } })) as never
     const off = config.onSettingsCheck(moves.checkLaunchSettings)
     const was = structuredClone(config.settings)
     try {
-      await here(() => moves.pointAssistant(w, 'claude-code', { values: { model: 'opus', effort: 'high' }, become: true }))
-      // What the window and the settings tool read the Assistant from.
-      await w.refresh()
-      // Its connection as the window's agent row has it (the adapter's `connectionId`; without it, its own).
-      const connection = () => {
-        const a = w.info()?.assistant?.agents[0] as { connectionId?: string; connection?: string } | undefined
-        return a?.connectionId ?? a?.connection
-      }
-      const before = connection()
-      expect(accounts.getConnection(before)).toMatchObject({ model: 'opus', effort: 'high' })
-      // Settings → Assistant, as settings:update saves it (its handler's call): Haiku with the High it keeps from its
-      // connection, refused to the caller.
-      expect(await outcome(updateSettingsChecked({ assistant: { providers: { 'claude-code': { model: 'haiku' } } } } as never, (p) => config.updateSettings(p)))).toMatch(/haiku doesn't take high effort/)
-      expect(config.settings.assistant.providers['claude-code']?.model).toBe(was.assistant.providers['claude-code']?.model)
-      expect(connection()).toBe(before)
-      // The settings tool (hive_update_setting) saves through updateSettings too, checked the same; the Assistant's own
-      // settings are never its to change at all.
-      expect(await outcome(applySetting(entryOf('assistant.claude-code.model'), 'haiku', null, () => undefined))).toMatch(/It decides how the Assistant itself/)
-      // A pair it takes goes through.
-      expect(() => config.updateSettings({ assistant: { providers: { 'claude-code': { effort: 'low' } } } } as never)).not.toThrow()
       // Settings → GitHub Copilot: its sign-in's base connection.
       // Its sign-in's account, as config.json's migration makes it at a start (this file's profile never started).
       if (!accounts.accountById('copilot'))

@@ -9,7 +9,7 @@ import { msg, tr } from '../shared/i18n'
 import { config } from './config'
 import { onHiveEvent, toast } from './events'
 import { createLogger, userText } from './logger'
-import { accountById, accountHere, allConnections, assertEffortTaken, connectionWith, effortUsable, firstUsableAccount, getConnection, newConnectionId } from './accounts'
+import { accountById, accountHere, allConnections, assertEffortTaken, effortUsable, getConnection, newConnectionId } from './accounts'
 import { testHomeSeam } from './connectionSeam'
 import { providerService } from './providerService'
 import { openWorkspaces, workspaceOf, type WorkspaceService } from './workspace'
@@ -250,132 +250,14 @@ export async function dismissMovedNotice(ws: WorkspaceService, keys: string[]): 
 
 const MOVE_FAILED = msg({ id: 'main.connections.moveFailed', defaultMessage: "Hive couldn't move {project}'s model settings to its agents", description: "A notice's title (HI-1770): moving a project's own model, effort and context settings onto its agents (connections now hold the defaults) failed; it is tried again at the next start. {project} is the project's name." })
 
-// ---------------------------------------------------------------------------
-// The Assistant through today's screens (the adapter until HI-2108).
-// ---------------------------------------------------------------------------
-
 /**
- * Points a workspace's Assistant, for a CLI, at the connection on `account` (or its CLI's first usable here) with the
- * values its connection for that CLI has, as `values` changes them (a value emptied: the account's base connection's):
- * its agent's when it runs that CLI, else the one its record keeps for when it does. `cli` given as its CLI: it moves to it.
- */
-export function pointAssistant(ws: WorkspaceService, cli: ProviderId, opts: { account?: string | null; values?: Partial<Record<keyof LaunchValues, unknown>>; become?: boolean }): Promise<void> {
-  if (!ws.path) return Promise.resolve()
-  // One change of a workspace's Assistant at a time, each from what the one before it left (HR1's round 1: two edits at
-  // once kept only one of them).
-  return serially(`assistant\n${ws.path.toLowerCase()}`, () => pointAssistantNow(ws, cli, opts))
-}
-
-/** Changes of the Assistant under way, by workspace: each starts once the one before it has ended. */
-const assistantChanges = new Map<string, Promise<void>>()
-
-function serially(key: string, fn: () => Promise<void>): Promise<void> {
-  const run = (assistantChanges.get(key) ?? Promise.resolve()).then(fn, fn)
-  const tail = run.catch(() => undefined)
-  assistantChanges.set(key, tail)
-  void tail.then(() => assistantChanges.get(key) === tail && assistantChanges.delete(key))
-  return run
-}
-
-/** The connection the Assistant's home names for a CLI: its agent's when it runs that CLI, else its record's. */
-const assistantConnectionOf = (cfg: ProjectConfig, cli: ProviderId): string | undefined => {
-  const agent = projectAgents(cfg)[0]
-  return agent?.provider === cli ? agent.connection : cfg.migrations?.accounts1?.assistant?.[cli]
-}
-
-async function pointAssistantNow(ws: WorkspaceService, cli: ProviderId, opts: { account?: string | null; values?: Partial<Record<keyof LaunchValues, unknown>>; become?: boolean }): Promise<void> {
-  const home = ws.assistantHome
-  await ensureMigrated(home)
-  // Worked out from its connection as saved; changed by something else (its dialog) before this write: worked out again.
-  for (let tries = 0; tries < 3; tries++) {
-    const cfg = await ws.projectConfig(home)
-    const was = assistantConnectionOf(cfg, cli)
-    const current = getConnection(was)
-    const account = accountById(opts.account ?? (current && accountById(current.account)?.provider === cli ? current.account : undefined)) ?? accountHere(cli, ws.config)
-    if (!account) return
-    const base = baseConnection(account.id, allConnections())
-    const values: LaunchValues = { ...valuesOf(current ?? base ?? {}) }
-    for (const [k, v] of Object.entries(opts.values ?? {}) as [keyof LaunchValues, unknown][]) (values as Record<string, unknown>)[k] = v === '' || v === null || v === undefined ? base?.[k] : v
-    // Decision E: a model and effort it was given that don't go together are refused, nothing changed.
-    if (values.effort && opts.values && ('effort' in opts.values || 'model' in opts.values)) assertEffortTaken(cli, values.model ?? null, account, values.effort)
-    const c = connectionWith(account.id, values, 'Assistant') // i18n-ignore: a connection's name, the user's data once made
-    await saveConnections()
-    let stale = false
-    await ws.mutateProjectConfig(home, (now) => {
-      if (assistantConnectionOf(now, cli) !== was) {
-        stale = true
-        return {}
-      }
-      const a = projectAgents(now)[0]
-      const rec = now.migrations?.accounts1 ?? { at: new Date().toISOString() }
-      const runs = !!a && (a.provider === cli || !!opts.become)
-      return { ...(runs ? { agents: [{ ...a, provider: cli, connection: c.id }] } : {}), migrations: { ...now.migrations, accounts1: { ...rec, assistant: { ...rec.assistant, [cli]: c.id } } } }
-    })
-    if (stale) continue
-    await ws.refresh().catch(() => undefined)
-    return
-  }
-  throw new Error("the Assistant's connection kept changing") // i18n-ignore: logged
-}
-
-/** The Assistant's account for a CLI in the asking window's workspace (Settings → Assistant; null: its CLI's first usable here). */
-export async function setAssistantAccount(ws: WorkspaceService, cli: ProviderId, account: string | null): Promise<void> {
-  if (account && accountById(account)?.provider !== cli) throw new Error('not an account of that CLI') // i18n-ignore: the window offers only its CLI's
-  await pointAssistant(ws, cli, { account })
-}
-
-/** Settings → Assistant changed (the adapter until HI-2108): every open workspace's Assistant follows its CLI and its values for it. */
-async function followAssistantSettings(s: AppSettings, prev: AppSettings): Promise<void> {
-  const now = s.assistant
-  const was = prev.assistant
-  for (const ws of openWorkspaces()) {
-    if (!ws.path) continue
-    try {
-      for (const p of Object.keys(now?.providers ?? {}) as ProviderId[]) {
-        const a = now.providers[p]
-        const b = was?.providers?.[p]
-        if (!a || JSON.stringify(a) === JSON.stringify(b)) continue
-        const changed: Partial<Record<keyof LaunchValues, unknown>> = {}
-        if (a.model !== b?.model) changed.model = a.model
-        if (a.effort !== b?.effort) changed.effort = a.effort
-        if (a.permissionMode !== b?.permissionMode) changed.permissionMode = a.permissionMode
-        if (a.extraArgs !== b?.extraArgs) changed.extraArgs = a.extraArgs
-        if (a.use200kContext !== b?.use200kContext) changed.use200kContext = a.use200kContext === 'on' ? true : a.use200kContext === 'off' ? false : ''
-        if (Object.keys(changed).length) await pointAssistant(ws, p, { values: changed })
-      }
-      if (now?.provider !== was?.provider) {
-        const cli = now.provider || firstUsableAccount(ws.config)?.provider
-        if (cli) await pointAssistant(ws, cli, { become: true })
-      }
-    } catch (e) {
-      log.warn("the Assistant couldn't follow Settings → Assistant", e)
-    }
-  }
-}
-
-/**
- * Decision E for Settings → Assistant and Settings → GitHub Copilot (the adapter until HI-2107 and HI-2108), checked
+ * Decision E for Settings → GitHub Copilot (the adapter until HI-2107; the Assistant chooses a connection since HI-2108), checked
  * before a change of settings is saved (config.onSettingsCheck): a change of a model or effort that, merged with the
  * connection it goes to (the effort or model it keeps from it included), makes a pair the model doesn't take is refused
- * whole, its caller told, settings and connections unchanged. For each open workspace's Assistant, its connection for
- * that CLI (its agent's, or its record's); for Copilot, its account's base connection. What the migration carried over,
+ * whole, its caller told, settings and connections unchanged: its account's base connection. What the migration carried over,
  * or a later catalogue left, isn't checked: only a change.
  */
 export function checkLaunchSettings(next: AppSettings, prev: AppSettings): void {
-  for (const p of Object.keys(next.assistant?.providers ?? {}) as ProviderId[]) {
-    const a = next.assistant.providers[p]
-    const b = prev.assistant?.providers?.[p]
-    if (!a || (a.model === b?.model && a.effort === b?.effort)) continue
-    for (const ws of openWorkspaces()) {
-      const home = ws.path ? ws.info()?.assistant : null
-      if (!home) continue
-      const agent = home.agents[0]
-      const current = getConnection(agent?.provider === p ? (agent.connectionId ?? agent.connection) : home.config.migrations?.accounts1?.assistant?.[p])
-      const account = accountById(current?.account) ?? accountHere(p, ws.config)
-      if (!account) continue
-      checkPair(p, account, current ?? baseConnection(account.id, allConnections()), { model: a.model, effort: a.effort }, { model: b?.model, effort: b?.effort })
-    }
-  }
   const c = next.providers?.copilot
   const d = prev.providers?.copilot
   const copilot = accountById(COPILOT_ACCOUNT)
@@ -433,7 +315,6 @@ export function initConnectionMoves(): void {
   }
   config.onSettingsCheck(checkLaunchSettings)
   config.onSettingsChanged((s, prev) => {
-    if (JSON.stringify(s.assistant) !== JSON.stringify(prev.assistant)) void followAssistantSettings(s, prev)
     followCopilotSettings(s, prev)
   })
   onHiveEvent((e) => {

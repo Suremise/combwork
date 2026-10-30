@@ -10,7 +10,7 @@ import { agentChoosesMcp, agentGetsMcp, agentMcpText, serverAddedIn } from '@sha
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import { UnusedHeading, UnusedWorkNotice, UnusedWorktreesLine, UnusedWorktreesSection, useUnusedWorktrees } from '../components/UnusedWorktrees'
 import { PERIODS, activeIn, costText, dailyTotals, moneyLabel, periodFrom, sumUsage, type DayTotal, type Period, type Totals } from '@shared/usageTotals'
-import { agentLimitText, contextPercent, turnPushedCompaction, effectiveModelLabel, mergeBlocked, modelLabel } from '@shared/defaults'
+import { agentLimitText, contextPercent, turnPushedCompaction, mergeBlocked } from '@shared/defaults'
 import { useAdvancedValue, useAgentLimit } from '../advanced'
 import { INBOX_PROJECT_KEY, INBOX_SWITCHES, INBOX_SWITCH_ID, type InboxSwitch } from '@shared/inboxSwitches'
 import { PROVIDERS, contextLines, defaultProviderLabel, inProviderOrder, isProviderEnabled, modeDescription, offeredModes, orderedProviders, permissionLabel, projectDefaultProvider, projectProviderConfig, providerDescriptor, providerName, providerSettings } from '@shared/providers'
@@ -35,9 +35,10 @@ import { useGitRead } from './GitTab'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { DataTable, useDateColumns, type DataColumn } from '../components/DataTable'
 import { Icon, IconButton, InfoTip, LoadFailed, SearchInput, sentences, StaleNote, statusText, StatusDot, Tooltip } from '../components/ui'
-import { ConnectionMark, useConnections } from '../components/ConnectionChoice'
+import { ConnectionMark, connectionSummary, useConnections } from '../components/ConnectionChoice'
+import { connectionOf } from '@shared/connectionLabel'
 import { useConnectionsInUse } from '../connectionUsage'
-import { connectionsApply, resolveConnection } from '@shared/accounts'
+import { connectionsApply } from '@shared/accounts'
 import { languageFor } from '../monacoLang'
 import { useScopedLoad } from '../scopedLoad'
 import { oneAtATime, withinTime } from '@shared/coalesce'
@@ -288,13 +289,7 @@ const S = {
   turnedOff: msg({ id: 'project.agents.turnedOff', defaultMessage: '{provider} is turned off in Settings → Providers', description: "Tooltip on an agent's provider icon when the provider is turned off." }),
   off: msg({ id: 'project.agents.off', defaultMessage: '{provider} (off)', description: "A provider's name when it is turned off in Settings → Providers (an agent's provider, and the Provider list)." }),
   projectFolder: msg({ id: 'project.agents.projectFolder', defaultMessage: 'project folder', description: 'Where an agent works when it has no worktree.' }),
-  ownModel: msg({ id: 'project.agents.ownModel', defaultMessage: 'model {model}', description: "One of an agent's own settings, in a list." }),
-  ownEffort: msg({ id: 'project.agents.ownEffort', defaultMessage: 'effort {effort}', description: "One of an agent's own settings, in a list." }),
-  own200k: msg({ id: 'project.agents.own200k', defaultMessage: '{on, select, yes {200K context on} other {200K context off}}', description: "One of an agent's own settings, in a list. Keep 200K." }),
   ownMcp: msg({ id: 'project.agents.ownMcp', defaultMessage: 'MCP servers {servers}', description: "One of an agent's own settings, in a list: which MCP servers it gets." }),
-  ownSettings: msg({ id: 'project.agents.ownSettings', defaultMessage: 'Own settings: {settings}', description: "Under an agent: the settings it sets for itself, as a list." }),
-  connectionSettings: msg({ id: 'project.agents.connectionSettings', defaultMessage: "Its connection's defaults ({model})", description: "Under an agent with no model, effort or context of its own, with Connections on (HI-1770): it runs with its connection's defaults. {model} is the model it runs." }),
-  projectSettings: msg({ id: 'project.agents.projectSettings', defaultMessage: 'Project settings ({model})', description: "Under an agent that uses the project's settings. {model} is the model it runs." }),
   agentSettings: msg({ id: 'project.agents.settings', defaultMessage: 'Agent settings…', description: "Tooltip on an agent's settings button." }),
   merge: msg({ id: 'project.agents.merge', defaultMessage: 'Merge…', description: "Tooltip on a worktree agent's merge button." }),
   remove: msg({ id: 'project.agents.remove', defaultMessage: 'Remove agent…', description: "Tooltip on an agent's remove button (asks first)." }),
@@ -1754,29 +1749,21 @@ function DraftInput({ value, onCommit, ...rest }: { value: string; onCommit: (v:
 
 function AgentList({ project }: { project: ProjectInfo }) {
   const settings = useStore((s) => s.settings)
-  // The connection each would start on (HI-1770): its defaults are what an agent without its own runs.
+  // Its connection as a start resolves it (HI-2108, decision H), whose values its row sums up.
   const connections = useConnections()
-  const launchConnection = (a: ProjectInfo['agents'][number], provider: ProviderId) => {
-    if (!connections?.providers.includes(provider)) return undefined
-    const r = resolveConnection({ connections: connections.workspace }, provider, a.connection, connections.connections)
-    return r.ok ? (connections.connections.find((c) => c.id === r.id) ?? null) : null
+  const connectionFor = (a: ProjectInfo['agents'][number], provider: ProviderId) => {
+    const shown = connectionOf(a.connection, provider, undefined, connections)
+    const id = shown?.desired.ok ? shown.desired.id : a.connection
+    return id ? connections?.connectionRows?.find((c) => c.id === id) : undefined
   }
   const limit = useAgentLimit(project)
-  const providers = useStore((s) => s.providers)
-  const cfg = project.config
   return (
     <div className="agent-list">
       {project.agents.map((a) => {
         const provider = agentProviderOf(project, a)
-        const conn = launchConnection(a, provider)
-        const model = conn !== undefined ? effectiveModelLabel(provider, a.model || conn?.defaults?.model, '', providers[provider]) : effectiveModelLabel(provider, a.model || projectProviderConfig(cfg, provider).model, providerSettings(settings, provider).defaultModel, providers[provider])
-        const overrides = [
-          a.model && tr(S.ownModel, { model: modelLabel(a.model, provider) }),
-          a.effort && tr(S.ownEffort, { effort: a.effort }),
-          a.permissionMode && permissionLabel(provider, a.permissionMode, tr),
-          a.use200kContext !== undefined && tr(S.own200k, { on: a.use200kContext ? 'yes' : 'no' }),
-          agentChoosesMcp(a) && tr(S.ownMcp, { servers: agentMcpText(a) })
-        ].filter((x): x is string => !!x)
+        const conn = connectionFor(a, provider)
+        // Its connection's values (its model, effort, context, mode), and its own MCP servers when it has a choice of them.
+        const line = [conn ? connectionSummary(conn, provider, settings ?? undefined) : providerName(provider), agentChoosesMcp(a) ? tr(S.ownMcp, { servers: agentMcpText(a) }) : ''].filter(Boolean).join(' · ')
         const off = !isProviderEnabled(settings, provider)
         // Its 0.9 worktree's branch, else where it works (#1442: "in slot-b", "carried: hb2"), else the project folder.
         const own = legacyOf(a)
@@ -1806,7 +1793,7 @@ function AgentList({ project }: { project: ProjectInfo }) {
                 )}
               </div>
               <div className="faint small">
-                {overrides.length ? tr(S.ownSettings, { settings: fmt.list(overrides, 'unit') }) : tr(conn !== undefined ? S.connectionSettings : S.projectSettings, { model })}
+                {line}
                 {awayFromProject(a) && <> · {agentFolder(a)}</>}
               </div>
             </div>

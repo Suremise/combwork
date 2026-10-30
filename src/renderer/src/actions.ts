@@ -1,6 +1,7 @@
 import { basename } from './util'
 import { call, errorMessage } from './api'
 import { agentLimit } from './advanced'
+import { firstUsableConnection } from '@shared/connectionLabel'
 import { agentOf, cancelDialog, agentProviderOf, cardLabelOf, choose, openVersionControl, paneCells, shownLayout, closeTile, confirm, findProject, focusAfterRemoving, focusAgent, runOnce, whileStarting, ADDING_AGENT, isAssistantPath, setAssistantOpen, focusedAgentId, get, notify, prompt, revealAgent, set, setActivity, setProjectTab, showAgent, showView, useStore } from './store'
 import { AGENT_LIMIT_MAX, MANY_AGENTS, OPEN_WORKFLOW_OPTIONS, agentLimitText, chosenLayout, layoutColumns, layoutPanes, moveAgentTo, projectLayout, projectSessionView, sessionInAgentFolder, swapAgentsIn } from '@shared/defaults'
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
@@ -420,16 +421,22 @@ export async function quickAddAgent(path: string | null = get().selectedProject,
     notify('warning', tr(msg({ id: 'actions.agent.noRoom', defaultMessage: 'No room for another agent', description: "A warning's title: the project has as many agents as it may have." })), raise ? agentLimitText(tr, limit) : tr(msg({ id: 'actions.agent.noRoomMessage', defaultMessage: '{why} Remove one first.', description: 'Under the warning that a project has no room for another agent: {why} says the limit and where it is set.' }), { why: agentLimitText(tr) }), raise)
     return null
   }
-  const provider = await detectedProvider(
-    () => forProvider ?? projectDefaultProvider(project(path)?.config, get().settings),
-    () => !forProvider && defaultProviderPending(project(path)?.config, get().settings)
-  )
-  if (!provider) return null
-  if (!isProviderEnabled(get().settings, provider) || !get().providers[provider]?.found) {
+  // Decision A (HI-2108): the first usable connection in the order of accounts (a session's CLI's, when resuming one);
+  // its CLI follows from it. None usable here (no account on, or a test copy on its CLI test home): as before accounts.
+  const view = await call('connections:list').catch(() => null)
+  const connection = firstUsableConnection(view, get().settings, forProvider)
+  const provider = connection
+    ? undefined
+    : await detectedProvider(
+        () => forProvider ?? projectDefaultProvider(project(path)?.config, get().settings),
+        () => !forProvider && defaultProviderPending(project(path)?.config, get().settings)
+      )
+  if (!connection && !provider) return null
+  if (provider && (!isProviderEnabled(get().settings, provider) || !get().providers[provider]?.found)) {
     set({ addAgentFor: path })
     return null
   }
-  const def = await attempt(tr(msg({ id: 'actions.agent.addFailed', defaultMessage: 'Could not add an agent', description: "An error's title: adding an agent failed." })), () => call('agents:add', path, { provider }))
+  const def = await attempt(tr(msg({ id: 'actions.agent.addFailed', defaultMessage: 'Could not add an agent', description: "An error's title: adding an agent failed." })), () => call('agents:add', path, connection ? { connection } : { provider: provider ?? undefined }))
   if (!def) return null
   await refreshWorkspace()
   noteManyAgents(path)

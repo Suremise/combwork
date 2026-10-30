@@ -66,7 +66,7 @@ import type {
 } from '../shared/types'
 import { provider as providerAdapter, allProviders } from './providers'
 import { runSwitch, type SwitchOp } from './connectionSwitch'
-import { agentLaunchView, allAccounts, allConnections, checkAccount, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
+import { agentLaunchView, allAccounts, allConnections, checkAccount, firstUsableAccount, getConnection, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
 import { effortUsable, ensureMigrated, migrationDue } from './connectionMoves'
 import { resolveAgentConnection } from '../shared/accounts'
 import { recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/common'
@@ -150,6 +150,8 @@ const log = createLogger('sessions')
  */
 const M = {
   assistantCliOwn: msg({ id: 'session.mode.assistantCliOwn', defaultMessage: "The Assistant can't use the CLI's own setting: its Control setting relies on knowing the mode it runs in. Choose one of the CLI's modes.", description: "Switching the Hive Assistant to the permission choice \"The CLI's own setting\" is refused. Control is the name of an Assistant setting." }),
+  connectionFallbackTitle: msg({ id: 'session.connection.fallbackTitle', defaultMessage: '{agent} runs on another connection', description: "A notice's title (HI-2108): an agent started on another connection than its own (its own is off in this workspace, or was removed). {agent} is the agent." }),
+  connectionFallback: msg({ id: 'session.connection.fallback', defaultMessage: "{why, select, missing {The connection chosen for it was removed} other {Its connection {wanted} is off in this workspace}}, so it started on {name}, its CLI's first usable one here. Choose another in its Agent Settings.", description: "A notice (HI-2108) when an agent starts on another connection than its own: its own was removed, or is on an account turned off in this workspace ({wanted}: its name). {name} is the account it started on. Agent Settings names a dialog." }),
   noSession: msg({ id: 'session.error.noSession', defaultMessage: 'No session is running for this agent.', description: "An action on an agent's session is refused: the agent isn't running." }),
   moveFailed: msg({ id: 'session.start.moveFailed', defaultMessage: "Hive couldn't move {project}'s model settings to its agents: {error}. Start it again.", description: "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start." }),
   stoppedBeforeStart: msg({ id: 'session.error.stoppedBeforeStart', defaultMessage: 'The agent was stopped before it had started.', description: "Starting an agent failed: it was stopped (or its workspace closed) while it was starting." }),
@@ -1559,13 +1561,17 @@ class SessionManager {
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
     // account on the CLI's own home (Copilot's sign-in, a test home).
-    const cli = agentProvider(forAgent, pc, s)
+    // An Assistant that names no CLI yet (a new workspace's, HI-2108): the first usable account's, as a new agent's
+    // (decision A); Settings' old choice only where none is usable.
+    const cli = assistant && !forAgent?.provider && !forAgent?.connection ? (firstUsableAccount(workspace.config)?.provider ?? agentProvider(forAgent, pc, s)) : agentProvider(forAgent, pc, s)
     const choice = resolveAgentConnection(workspace.config, cli, forAgent?.connection, allAccounts(), allConnections())
     const connection = choice.ok ? (choice.account.home ? null : choice.account.id) : `!${choice.why}`
     const l = agentLaunchSettings(cli, choice.ok ? choice.connection : null, s, choice.ok && choice.account.kind === 'server')
     const extraArgs = l.extraArgs.flatMap((a) => splitArgs(a))
     const chime = pc.chime === 'inherit' ? s.notifications.chimeEnabled : pc.chime === 'on'
-    return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode: l.permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection }
+    // Never the CLI's own setting for the Assistant (#1284: Control relies on knowing its mode), whatever its connection says.
+    const permissionMode = assistant && isCliOwnMode(l.permissionMode) ? providerDescriptor(cli).assistantMode : l.permissionMode
+    return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection }
   }
 
   signature(e: EffectiveSettings): string {
@@ -2431,6 +2437,8 @@ class SessionManager {
     state.launchedWith = { model: ctx.model ?? null, effort: ctx.effort ?? null, ...(ownModel ? { own: true as const } : {}) }
     state.launchedConnection = conn ? { id: conn.id, name: conn.name, ...(conn.note ? { note: conn.note } : {}), ...(conn.login ? { login: conn.login } : {}), ...(conn.server ? { server: { models: conn.server.models, local: conn.server.local } } : {}) } : undefined
     if (conn?.server && state.sessionId) (l.serverSids ??= new Set()).add(state.sessionId)
+    // Decision H (HI-2108): its connection is off here or gone, so it runs on its CLI's first usable one: said once a launch.
+    if (conn?.note === 'offFallback' || conn?.note === 'missing') toast('warning', tr(M.connectionFallbackTitle, { agent: this.label(state) }), tr(M.connectionFallback, { why: conn.note, wanted: getConnection(agent.connection)?.name ?? '', name: conn.name }), undefined, projectPath) // i18n-ignore: select keys, never shown
     if (!isProviderEnabled(config.settings, adapter.id)) throw hiveError(msg({ id: 'session.start.turnedOff', defaultMessage: '{provider} was turned off while {agent} was starting.', description: "Starting an agent failed: its coding agent was turned off in Settings meanwhile. {provider} is the coding agent's name, {agent} the agent's." }), { provider: adapter.descriptor.name, agent: agent.name }, { kind: 'conflict' })
     l.startAllowed?.()
     const cmd = adapter.buildCommand(info.path, ctx)

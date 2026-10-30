@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, OPEN_WORKFLOW_OPTIONS, ROLE_MAX, agentLimitText, effectiveModelLabel, mergeBlocked, projectAgents, transcriptWarnLimit } from '@shared/defaults'
+import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, OPEN_WORKFLOW_OPTIONS, ROLE_MAX, agentLimitText, mergeBlocked, projectAgents, transcriptWarnLimit } from '@shared/defaults'
 import { handOverNow, onRunningLane } from '@shared/handOver'
 import { useAgentLimit } from '../advanced'
-import { agentProvider, chosenDefaultProvider, defaultProviderPending, isProviderEnabled, modeCaveat, modeOption, offeredModes, orderedProviders, projectDefaultProvider, projectProviderConfig, projectUse200k, providerDescriptor, providerName, providerSettings, shownText } from '@shared/providers'
+import { agentProvider, isProviderEnabled, modeCaveat, orderedProviders, projectDefaultProvider, providerDescriptor } from '@shared/providers'
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import type { MergeBranch } from '@shared/types'
-import type { AccountView } from '@shared/accounts'
-import type { AgentBranchStatus, EffortLevel, MergeResult, PermissionMode, ProjectInfo, ProviderId } from '@shared/types'
+import type { AgentBranchStatus, MergeResult, PermissionMode, ProviderId } from '@shared/types'
 import { serverAddedIn } from '@shared/agentMcp'
 import { agentNameProblem, nameTaken, nameTakenMessage, sameAgentName, suggestAgentName, workspaceAgentList } from '@shared/agentNames'
 import type { TemplateAgent } from '@shared/templates'
@@ -18,15 +17,14 @@ import { call, errorMessage } from '../api'
 import { projectMergeChoice } from '../mergeChoice'
 import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
 import { msg, tr, tRich } from '@shared/i18n'
-import { confirmDangerousMode } from './PermissionMode'
 import { ProviderIcon } from './ProviderIcon'
-import { ConnectionChoice, useLaunchConnection } from './ConnectionChoice'
+import { ConnectionChoice, connectionCli, firstUsableConnection, useConnections } from './ConnectionChoice'
+import { ConnectionDialog } from './ConnectionDefaults'
 import { cx } from '../util'
 import { formatSize } from '@shared/units'
 import { MergeSlotNote, projectSlots, useMergeSlots } from './MergeSlots'
 import { confirmLineMerge, LineCardNote, QUEUE_MERGES, QueueCardNote } from './BranchMerge'
-import { EffortPicker, ModelPicker } from './ModelPicker'
-import { cliDefaultEffort, effortName, effortText, effortUnknown, modelCaps } from '@shared/models'
+import { modelCaps } from '@shared/models'
 import { pasteIntoTerminal } from './TerminalView'
 import { BusyButton, Icon, Modal, Tooltip, useBusy } from './ui'
 
@@ -38,20 +36,14 @@ const BOLD = (chunks: ReactNode[]): ReactNode => <strong key={String(chunks)}>{c
 const CANCEL = msg({ id: 'agents.dialog.cancel', defaultMessage: 'Cancel', description: "Button: closes an agent dialog without changing anything." })
 const NAME = msg({ id: 'agents.dialog.name', defaultMessage: 'Name', description: "Label of an agent's name (Add Agent, Agent Settings)." })
 const CODING_AGENT = msg({ id: 'agents.dialog.codingAgent', defaultMessage: 'Coding agent', description: 'A heading in Add Agent and Agent Settings, above the choice of provider (Claude Code, Codex, GitHub Copilot).' })
-const SETTINGS = msg({ id: 'agents.dialog.settings', defaultMessage: 'Settings', description: "A heading in Add Agent and Agent Settings, above the agent's model, effort, mode and context." })
-const CONNECTION_DEFAULT = msg({ id: 'agents.overrides.connectionDefault', defaultMessage: 'Connection default', description: "An agent's model, effort or context choice that follows its connection's default (HI-1770): the first choice of each, before that default in brackets (\"Connection default (Opus 5.5)\"). Keep it short." })
 const PROJECTS = msg({ id: 'agents.overrides.projects', defaultMessage: "Project's", description: "An agent's model, effort, mode or context choice that follows the project's: the first choice of each, before the project's value in brackets (\"Project's (Opus 5.5)\"). Keep it short." })
+const NOTE = msg({ id: 'agents.settings.note', defaultMessage: 'Note', description: "Label of an agent's note (Agent Settings): what it is for, in the user's own words. Not its role in the workflow, which is a separate choice." })
+const NOTE_NONE = msg({ id: 'agents.settings.noteNone', defaultMessage: 'Optional: what it is for, in your words', description: "Placeholder of an agent's empty note (Agent Settings)." })
 const MCP_SERVERS = msg({ id: 'agents.dialog.mcpServers', defaultMessage: 'MCP servers', description: "A heading in Agent Settings, above the agent's MCP servers." })
 const WORKS_IN = msg({ id: 'agents.dialog.worksIn', defaultMessage: 'Works in', description: 'Label of where an agent works (Agent Settings): its slot, its worktree from before 1.0, or the project folder.' })
 const PROJECT_FOLDER = msg({ id: 'agents.dialog.projectFolder', defaultMessage: 'The project folder', description: "Where an agent works: the project's own folder (not a worktree)." })
 const MERGE = msg({ id: 'agents.dialog.merge', defaultMessage: 'Merge', description: "The Merge dialog's button, and its choice of a git merge (not a squash). Keep it short." })
 const BUSY_AGENT = msg({ id: 'agents.dialog.busy', defaultMessage: 'Busy. Choose it once it has finished.', description: 'Under an agent in the Continue with… dialog: it is working, so it can\'t be chosen now.' })
-
-/** A permission mode's name as the window shows it (#800): the provider's mode, else its id. */
-const modeName = (provider: ProviderId, mode: PermissionMode): string => {
-  const m = modeOption(provider, mode)
-  return m ? shownText(m.label, m.text?.label, tr) : mode
-}
 
 /** Which provider an agent runs: enabled providers, with what each still needs (install, sign-in). */
 export function ProviderChoice({ value, current, onChange }: { value: ProviderId; current?: ProviderId; onChange: (v: ProviderId) => void }) {
@@ -92,113 +84,6 @@ export function ProviderChoice({ value, current, onChange }: { value: ProviderId
           </label>
         )
       })}
-    </div>
-  )
-}
-
-/** An agent's 200K-context choice in a form: '' follows the project. */
-export type ContextChoice = '' | 'on' | 'off'
-export const contextChoice = (v: boolean | undefined): ContextChoice => (v === undefined ? '' : v ? 'on' : 'off')
-export const contextValue = (c: ContextChoice): boolean | null => (c ? c === 'on' : null)
-
-/** The agent's own model, effort, permission mode and context for its provider; empty values follow the project (`inherit` names it). */
-export function Overrides({
-  project,
-  provider,
-  model,
-  effort,
-  permission,
-  context,
-  onModel,
-  onEffort,
-  onPermission,
-  onContext,
-  inherit,
-  inheritIsDefault,
-  assistant,
-  connection
-}: {
-  /** The Hive Assistant's: never the CLI's own setting (#1284). */
-  assistant?: boolean
-  /**
-   * The connection it would start on (HI-1770, useLaunchConnection): given (null: none usable), an empty choice follows
-   * its defaults ("Connection default (…)"), not the project's or the CLI's; undefined, as before connections.
-   */
-  connection?: Pick<AccountView, 'defaults'> | null
-  /** What an empty choice is called (the project's, by default): the caller's own words. */
-  inherit?: string
-  /** That name says it is the default ("Default"): the effort then names the level alone, not "High, default" (#916). */
-  inheritIsDefault?: boolean
-  /** Whose settings an empty choice follows: the project's (a template's agent: the project it may be loaded into, or none). */
-  project: Pick<ProjectInfo, 'config'>
-  provider: ProviderId
-  model: string
-  effort: string
-  permission: string
-  context: ContextChoice
-  onModel: (v: string) => void
-  onEffort: (v: string) => void
-  onPermission: (v: string) => void
-  onContext: (v: ContextChoice) => void
-}) {
-  useLanguage()
-  const settings = useStore((s) => s.settings)
-  const info = useStore((s) => s.providers[provider])
-  const cliDefault = info?.defaultModel ?? null
-  if (!settings) return null
-  const fromConnection = connection !== undefined
-  const d = connection?.defaults
-  const whose = inherit ?? (fromConnection ? tr(CONNECTION_DEFAULT) : tr(PROJECTS))
-  // The permission mode stays the CLI's and the project's with connections too.
-  const whoseMode = inherit ?? tr(PROJECTS)
-  /** The first choice of each: whose it is, and what that is now. */
-  const inherited = (value: string): string => tr(msg({ id: 'agents.overrides.inherited', defaultMessage: '{whose} ({value})', description: "The first choice of an agent's model, effort, mode or context: whose setting it follows ({whose}: \"Project's\") and what that is now ({value}: \"Opus 5.5\")." }), { whose, value })
-  const onOff = (on: boolean): string => (on ? tr(msg({ id: 'agents.overrides.on', defaultMessage: 'On', description: "A choice of an agent's Use 200K context setting. Keep it short." })) : tr(msg({ id: 'agents.overrides.off', defaultMessage: 'Off', description: "A choice of an agent's Use 200K context setting. Keep it short." })))
-  const p = providerDescriptor(provider)
-  const pc = projectProviderConfig(project.config, provider)
-  const g = providerSettings(settings, provider)
-  // The model's name alone: inherited() already says it is the project's (or the default), so "Default (Opus 5.5)",
-  // not "Default (Opus 5.5 (default))" (#892).
-  const projectModel = effectiveModelLabel(provider, (fromConnection ? d?.model : (pc.model && pc.model !== 'inherit' ? pc.model : '') || g.defaultModel) || cliDefault || undefined, '', info)
-  const projectPermission = modeName(provider, pc.permissionMode === 'inherit' ? g.defaultPermissionMode : pc.permissionMode)
-  // Never the CLI's own setting for the Assistant (#1284).
-  const modes = offeredModes(provider, settings, assistant)
-  // What would run: the choice here, else what it inherits.
-  const runModel = model || (fromConnection ? d?.model : pc.model && pc.model !== 'inherit' ? pc.model : g.defaultModel) || cliDefault
-  const runMode = permission || (pc.permissionMode !== 'inherit' ? pc.permissionMode : g.defaultPermissionMode)
-  const chosenEffort = fromConnection ? (d?.effort ?? '') : pc.effort !== 'inherit' ? pc.effort : g.defaultEffort
-  // Default once (#916): the CLI's own default, when it hasn't said which level that is, alone ("Claude Code's default", not
-  // "Default (Claude Code default)"); else the level, bare after "Default" ("Default (High)"), "Project's (High, default)" for an agent.
-  const defaultLevel = chosenEffort && chosenEffort !== 'inherit' ? chosenEffort : modelCaps(provider, runModel, info, settings).defaultEffort
-  const effortBase = effortUnknown(provider, chosenEffort, runModel, info, settings)
-    ? cliDefaultEffort(provider, tr)
-    : inherited(inheritIsDefault && defaultLevel ? effortName(provider, defaultLevel, settings, tr) : effortText(provider, chosenEffort, runModel, info, settings, tr))
-  return (
-    <div className="agent-form">
-      <label>{tr(msg({ id: 'agents.overrides.model', defaultMessage: 'Model', description: "Label of an agent's model choice (Add Agent, Agent Settings)." }))}</label>
-      <ModelPicker key={provider} provider={provider} value={model} base={{ value: '', label: inherited(projectModel) }} onChange={onModel} />
-      <label>{tr(msg({ id: 'agents.overrides.effort', defaultMessage: 'Effort', description: "Label of an agent's effort (reasoning) choice (Add Agent, Agent Settings)." }))}</label>
-      <EffortPicker provider={provider} model={runModel} value={effort} base={{ value: '', label: effortBase }} onChange={onEffort} />
-      <label>{tr(msg({ id: 'agents.overrides.permission', defaultMessage: 'Permission mode', description: "Label of an agent's permission mode choice (Add Agent, Agent Settings)." }))}</label>
-      <select className="select" value={permission} onChange={(e) => onPermission(e.target.value)}>
-        <option value="">{tr(msg({ id: 'agents.overrides.inherited', defaultMessage: '{whose} ({value})', description: "The first choice of an agent's model, effort, mode or context: whose setting it follows ({whose}: \"Project's\") and what that is now ({value}: \"Opus 5.5\")." }), { whose: whoseMode, value: projectPermission })}</option>
-        {modes.map((m) => (
-          <option key={m.value} value={m.value}>
-            {shownText(m.label, m.text?.label, tr)}
-          </option>
-        ))}
-      </select>
-      <ModeCaveat provider={provider} mode={runMode} model={runModel} />
-      {p.capabilities.contextLimit && (
-        <>
-          <label>{tr(msg({ id: 'agents.overrides.context', defaultMessage: 'Use 200K context (instead of 1M)', description: "Label of an agent's choice to hold its sessions to a 200K-token context window instead of the model's 1M one." }))}</label>
-          <select className="select" value={context} onChange={(e) => onContext(e.target.value as ContextChoice)}>
-            <option value="">{inherited(onOff(fromConnection ? !!d?.use200kContext : projectUse200k(pc, g)))}</option>
-            <option value="on">{onOff(true)}</option>
-            <option value="off">{onOff(false)}</option>
-          </select>
-        </>
-      )}
     </div>
   )
 }
@@ -247,29 +132,32 @@ function WorkflowRoleChoice({ value, onChange }: { value: WorkflowRole; onChange
 // Add agent
 // ---------------------------------------------------------------------------
 
+/**
+ * Add Agent (HI-2108; HI-2105's design): its name, its connection (grouped by account, the first usable in the order of
+ * accounts chosen: decision A; New Connection… makes another setup on the chosen one's account), its role, note and MCP
+ * servers. No provider, model, effort, mode or context: those are its connection's, and its CLI follows from it.
+ */
 export function AddAgentDialog() {
   useLanguage()
   const path = useStore((s) => s.addAgentFor)
   const project = useStore((s) => s.workspace?.projects.find((p) => p.path === s.addAgentFor) ?? null)
   const settings = useStore((s) => s.settings)
   const workspaceProjects = useStore((s) => s.workspace?.projects)
+  const view = useConnections()
   const [name, setName] = useState('')
-  const [model, setModel] = useState('')
-  const [effort, setEffort] = useState('')
-  const [permission, setPermission] = useState('')
-  const [context, setContext] = useState<ContextChoice>('')
-  // Its connection (HI-1755): '' for the workspace's default.
+  const [note, setNote] = useState('')
+  const [mcp, setMcp] = useState<string[] | null>(null)
+  // Its connection's id; '' until one is chosen (none usable yet: the first usable when it is added).
   const [connection, setConnection] = useState('')
-  const [provider, setProvider] = useState<ProviderId>('')
-  // The connection a new agent would start on (HI-1770): an empty model, effort or context follows its defaults.
-  const launchConnection = useLaunchConnection(connection || undefined, provider)
-  // The provider is still the project's default (not one the user picked), and whether that waits on detection (#506).
-  const [followDefault, setFollowDefault] = useState(true)
-  const defaultPending = useStore((s) => !!s.addAgentFor && defaultProviderPending(s.workspace?.projects.find((p) => p.path === s.addAgentFor)?.config, s.settings))
+  // Chosen by the user (the first usable isn't put back over it as the list changes).
+  const [chosen, setChosen] = useState(false)
+  // New Connection…'s account while its dialog is open.
+  const [newOn, setNewOn] = useState<string | null>(null)
   const [startNow, setStartNow] = useState(true)
   const [busy, setBusy] = useState(false)
   // The role chosen (#1430); null: the guess from its name, as an agent from before 1.0 reads.
   const [roleChosen, setRoleChosen] = useState<WorkflowRole | null>(null)
+  const mcpOffered = useMcpOffered(path)
 
   useEffect(() => {
     if (!path || !project) return
@@ -281,15 +169,11 @@ export function AddAgentDialog() {
     const named = (k: number): string => `Agent ${k}` // i18n-ignore: an agent's default name (stored, read by agents)
     while (everyone.some((a) => sameAgentName(a.name, named(n)))) n++
     setName(named(n))
-    setModel('')
-    setEffort('')
-    setPermission('')
-    setContext('')
-    // The project's default provider (#474): Automatic's pick is turned on; a provider the user chose stays chosen even
-    // when it is off, and the dialog says so (Add waits until it is on, or another is chosen), as quick add does.
-    const s = useStore.getState().settings
-    setProvider(projectDefaultProvider(project.config, s))
-    setFollowDefault(true)
+    setNote('')
+    setMcp(null)
+    setConnection('')
+    setChosen(false)
+    setNewOn(null)
     setStartNow(true)
     setBusy(false)
     setRoleChosen(null)
@@ -297,47 +181,35 @@ export function AddAgentDialog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path])
 
-  // Opened while Hive was still looking for the CLIs: Automatic's pick, once it is known (#506).
+  // The first usable connection in the order (decision A), until the user chooses one; read again as the list changes.
+  const first = firstUsableConnection(view, settings)
   useEffect(() => {
-    const p = useStore.getState().workspace?.projects.find((x) => x.path === path)
-    if (p && followDefault && !defaultPending) setProvider(projectDefaultProvider(p.config, useStore.getState().settings))
-  }, [path, followDefault, defaultPending])
+    if (path && !chosen) setConnection(first ?? '')
+  }, [path, chosen, first])
   const limit = useAgentLimit(project)
 
   if (!path || !project || !settings) return null
   const close = (): void => set({ addAgentFor: null })
   const workflowRole = roleChosen ?? agentWorkflowRole({ name: name.trim() })
   const full = project.agents.length >= limit
-  const checking = followDefault && defaultPending
   // A name another agent of the workspace has (#702): refused, with a free one to use.
   const everyone = workspaceAgentList(workspaceProjects)
   const owner = name.trim() ? nameTaken(name, everyone) : null
   const suggestion = owner ? suggestAgentName(name.trim(), project.name, everyone.map((a) => a.name)) : ''
-  const valid = !!name.trim() && !owner && !full && !checking && isProviderEnabled(settings, provider)
-  const chooseProvider = (v: ProviderId): void => {
-    // Model, effort, mode and context are the provider's own: another provider starts from the project's.
-    if (v === provider) return
-    setFollowDefault(false)
-    setProvider(v)
-    setModel('')
-    setEffort('')
-    setPermission('')
-    setContext('')
-    setConnection('')
+  const valid = !!name.trim() && !owner && !full
+  const choose = (id: string): void => {
+    setChosen(true)
+    setConnection(id)
   }
 
   const add = async (): Promise<void> => {
-    if (permission && !(await confirmDangerousMode(provider, permission, name.trim()))) return
     setBusy(true)
     try {
       const def = await call('agents:add', project.path, {
         name: name.trim(),
-        provider,
         workflowRole,
-        model: model || undefined,
-        effort: (effort || undefined) as EffortLevel | undefined,
-        permissionMode: (permission || undefined) as PermissionMode | undefined,
-        use200kContext: contextValue(context) ?? undefined,
+        ...(note.trim() ? { role: note.trim() } : {}),
+        ...(mcp ? { mcpServers: mcp } : {}),
         ...(connection ? { connection } : {})
       })
       await actions.refreshWorkspace()
@@ -401,43 +273,32 @@ export function AddAgentDialog() {
             <a onClick={() => setName(suggestion)}>{tr(msg({ id: 'agents.add.useSuggestion', defaultMessage: 'Use {name}', description: 'Link after a taken name in the Add Agent dialog: uses a free name ({name}) instead.' }), { name: suggestion })}</a>
           </div>
         )}
+        {/* Its connection holds its model, effort, context and mode; its CLI follows from it (HI-2108). */}
+        <ConnectionChoice id="add-agent-connection" value={connection} onChange={choose} onNew={setNewOn} />
+        <label htmlFor="add-agent-note">{tr(NOTE)}</label>
+        <input id="add-agent-note" className="input" value={note} maxLength={ROLE_MAX} placeholder={tr(NOTE_NONE)} list="add-agent-note-suggestions" onChange={(e) => setNote(e.target.value)} />
+        <datalist id="add-agent-note-suggestions">
+          {roleSuggestions(project.agents).map((r) => (
+            <option key={r} value={r} />
+          ))}
+        </datalist>
       </div>
       <WorkflowRoleChoice value={workflowRole} onChange={setRoleChosen} />
-      <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
-      <ProviderChoice value={provider} onChange={chooseProvider} />
-      <div className="agent-form">
-        {/* Another CLI's connection is a choice of that CLI too (HI-1769), as picking the CLI is. */}
-        <ConnectionChoice
-          id="add-agent-connection"
-          provider={provider}
-          value={connection}
-          onChange={setConnection}
-          onOtherCli={(p, c) => {
-            chooseProvider(p)
-            setConnection(c)
-          }}
-        />
-      </div>
-      {checking && (
-        <div className="banner info" data-provider-checking>
-          <Icon name="loading" spin />
-          <span>{tr(msg({ id: 'agents.add.checking', defaultMessage: 'Checking which coding agents are installed, for the default provider (Automatic)…', description: "The Add Agent dialog while Hive looks for the installed CLIs, to pick the default provider. Automatic is that setting's name." }))}</span>
-        </div>
-      )}
-      {!isProviderEnabled(settings, provider) && (
-        <div className="banner warn" data-provider-off={provider}>
-          <Icon name="warning" />
-          <span>
-            {tr(msg({ id: 'agents.add.providerOff', defaultMessage: '{cli} is turned off{whose, select, project {, and it is this project\'s default provider} yours {, and it is your default provider} other {}}. Turn it on in Settings → Providers, or choose another provider.', description: "The Add Agent dialog when the chosen provider ({cli}) is turned off; if it is the default provider, whose default it is: this project's (project) or the user's (yours); other: say nothing. Settings → Providers: use its translated names." }), { cli: providerName(provider), whose: chosenDefaultProvider(project.config, settings) === provider ? (project.config.defaultProvider === provider ? 'project' : 'yours') : 'none' })}
-          </span>
-        </div>
-      )}
+      <h3 className="agent-dialog-h">{tr(MCP_SERVERS)}</h3>
+      <McpChoice value={mcp} offered={mcpOffered} where="project" onChange={setMcp} />
       <h3 className="agent-dialog-h">{tr(msg({ id: 'agents.add.where', defaultMessage: 'Where it works', description: 'A heading in the Add Agent dialog, above where the new agent works.' }))}</h3>
       <div className="faint agent-dialog-note" data-where-note>
         {tr(msg({ id: 'agents.add.whereNote', defaultMessage: "In the project folder. A builder takes one of the project's slots for each card it builds and works there until the card is done; Version Control → Branches & remotes lists them.", description: "The Add Agent dialog, under Where it works: agents have no worktree of their own (1.0); a builder works in a slot (a working folder Hive lends to a card) while it builds a card. Version Control → Branches & remotes: use their translated names. Glossary: slot." }))}
       </div>
-      <h3 className="agent-dialog-h">{tr(SETTINGS)}</h3>
-      <Overrides project={project} provider={provider} model={model} effort={effort} permission={permission} context={context} onModel={setModel} onEffort={setEffort} onPermission={setPermission} onContext={setContext} connection={launchConnection} />
+      {newOn && (
+        <ConnectionDialog
+          account={newOn}
+          onClose={(saved) => {
+            setNewOn(null)
+            if (saved) choose(saved.id)
+          }}
+        />
+      )}
     </Modal>
   )
 }
@@ -460,14 +321,11 @@ interface AgentFields {
   role: string
   /** Its role in the workflow (#1430; a template's agent's too, #1436). */
   workflowRole: WorkflowRole
+  /** A template's agent: the CLI it suggests (HI-2109's decision G). A project's agent: its CLI, its connection's. */
   provider: ProviderId
-  model: string
-  effort: string
-  permission: string
-  context: ContextChoice
   /** Only these of the project's MCP servers (#537); null: all of them. */
   mcp: string[] | null
-  /** The connection it runs on (HI-1755): an id, '' for the workspace's default. */
+  /** The connection it runs on (HI-2108): its id. A template's agent has none. */
   connection: string
 }
 
@@ -531,24 +389,24 @@ function McpChoice({ value, offered, where, onChange }: { value: string[] | null
 }
 
 /**
- * The Agent Settings dialog (#126, #271): name, note, where it works, role in the workflow, coding agent, model, effort,
- * mode, context and MCP servers (#537: those added to the project, `mcpProject` its path, HI-2059, or every server of
- * the workspace for a template's agent, null; `mcpWhere` says where they are added, in words).
- * `works`: what the agent works in (a project's agent; a template's has none, #1436). `providerLocked`: why the coding
- * agent can't change now (a running agent). `config`: whose settings an empty choice follows. `nameProblem`: why a name
- * can't be used. `confirmSave`: asked first (false keeps it open); `save` runs with the dialog open, a failure staying in
- * it.
+ * The Agent Settings dialog (#126, #271; HI-2108): name, note, where it works, role in the workflow, its connection (with
+ * a summary of its values) and MCP servers (#537: those added to the project, `mcpProject` its path, HI-2059, or every
+ * server of the workspace for a template's agent, null; `mcpWhere` says where they are added, in words).
+ * `works`: what the agent works in (a project's agent; a template's has none, #1436). `cliLocked`: the CLI a running
+ * agent's connection must stay on, and why (another CLI's connection only while it is stopped). `suggestOnly`: a
+ * template's agent (HI-2109): no connection, but the CLI it suggests. `nameProblem`: why a name can't be used.
+ * `confirmSave`: asked first (false keeps it open); `save` runs with the dialog open, a failure staying in it.
  */
 function AgentSettingsModal({
   title,
   resetKey,
   initial,
-  config,
   roles,
   works,
   mcpProject,
   mcpWhere,
-  providerLocked,
+  cliLocked,
+  suggestOnly,
   note,
   nameProblem,
   confirmSave,
@@ -558,12 +416,12 @@ function AgentSettingsModal({
   title: string
   resetKey: string
   initial: AgentFields
-  config: Pick<ProjectInfo, 'config'>
   roles: string[]
   works?: ReactNode
   mcpProject: string | null
   mcpWhere: 'project' | 'workspace'
-  providerLocked?: ReactNode
+  cliLocked?: { cli: ProviderId; why: ReactNode }
+  suggestOnly?: boolean
   note?: ReactNode
   nameProblem?: (name: string) => string | null
   confirmSave?: (f: AgentFields) => Promise<boolean>
@@ -573,18 +431,18 @@ function AgentSettingsModal({
   useLanguage()
   const [f, setF] = useState<AgentFields>(initial)
   const action = useBusy()
+  // New Connection…'s account while its dialog is open.
+  const [newOn, setNewOn] = useState<string | null>(null)
   // Read as the dialog opens (the dialogs stay mounted while closed, and the workspace may have changed).
   const mcpOffered = useMcpOffered(mcpProject)
   useEffect(() => {
     action.setError(null)
     setF(initial)
+    setNewOn(null)
     // Reset when another agent's dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey])
   const put = (patch: Partial<AgentFields>): void => setF((x) => ({ ...x, ...patch }))
-  // The connection it would start on (HI-1770): an empty model, effort or context follows its defaults.
-  const launchConnection = useLaunchConnection(f.connection || undefined, f.provider)
-  const chooseProvider = (v: ProviderId): void => put(v !== f.provider ? { provider: v, model: '', effort: '', permission: '', context: '', connection: '' } : { provider: v })
   const problem = agentNameProblem(f.name, tr) ?? (nameProblem?.(f.name.trim()) ?? null)
   const submit = async (): Promise<void> => {
     if (problem) return
@@ -615,8 +473,8 @@ function AgentSettingsModal({
         <input className="input" aria-label={tr(NAME)} value={f.name} maxLength={60} autoFocus onChange={(e) => put({ name: e.target.value })} onKeyDown={enter} />
         {problem && f.name.trim() && <div className="field-error span2">{problem}</div>}
         {/* A note on what the agent is for, saved in templates (#126): free text, suggesting the agents' own. Its role in the workflow is apart (#1430). */}
-        <label htmlFor="agent-role">{tr(msg({ id: 'agents.settings.note', defaultMessage: 'Note', description: "Label of an agent's note (Agent Settings): what it is for, in the user's own words. Not its role in the workflow, which is a separate choice." }))}</label>
-        <input id="agent-role" className="input" value={f.role} maxLength={ROLE_MAX} placeholder={tr(msg({ id: 'agents.settings.noteNone', defaultMessage: 'Optional: what it is for, in your words', description: "Placeholder of an agent's empty note (Agent Settings)." }))} list="agent-role-suggestions" onChange={(e) => put({ role: e.target.value })} onKeyDown={enter} />
+        <label htmlFor="agent-role">{tr(NOTE)}</label>
+        <input id="agent-role" className="input" value={f.role} maxLength={ROLE_MAX} placeholder={tr(NOTE_NONE)} list="agent-role-suggestions" onChange={(e) => put({ role: e.target.value })} onKeyDown={enter} />
         <datalist id="agent-role-suggestions">
           {roles.map((r) => (
             <option key={r} value={r} />
@@ -628,31 +486,29 @@ function AgentSettingsModal({
             <div className="muted">{works}</div>
           </>
         )}
+        {/* Its connection holds its model, effort, context and mode; its CLI follows from it (HI-2108). */}
+        {!suggestOnly && <ConnectionChoice id="agent-connection" value={f.connection} cli={cliLocked?.cli} onChange={(connection) => put({ connection })} onNew={setNewOn} />}
+        {!suggestOnly && cliLocked && <div className="hint span2" data-cli-locked>{cliLocked.why}</div>}
       </div>
       <WorkflowRoleChoice value={f.workflowRole} onChange={(workflowRole) => put({ workflowRole })} />
-      <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
-      {providerLocked ?? <ProviderChoice value={f.provider} current={initial.provider} onChange={chooseProvider} />}
-      <div className="agent-form">
-        {/* Another CLI's connection changes its CLI (HI-1769): its model and the rest start again, and saving asks first, as a change of CLI does; not while it runs. */}
-        <ConnectionChoice id="agent-connection" provider={f.provider} value={f.connection} onChange={(connection) => put({ connection })} onOtherCli={providerLocked ? undefined : (provider, connection) => put({ provider, model: '', effort: '', permission: '', context: '', connection })} />
-      </div>
-      <h3 className="agent-dialog-h">{tr(SETTINGS)}</h3>
-      <Overrides
-        project={config}
-        provider={f.provider}
-        model={f.model}
-        effort={f.effort}
-        permission={f.permission}
-        context={f.context}
-        onModel={(model) => put({ model })}
-        onEffort={(effort) => put({ effort })}
-        onPermission={(permission) => put({ permission })}
-        onContext={(context) => put({ context })}
-        connection={launchConnection}
-      />
+      {suggestOnly && (
+        <>
+          <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
+          <ProviderChoice value={f.provider} current={initial.provider} onChange={(provider) => put({ provider })} />
+        </>
+      )}
       <h3 className="agent-dialog-h">{tr(MCP_SERVERS)}</h3>
       <McpChoice value={f.mcp} offered={mcpOffered} where={mcpWhere} onChange={(mcp) => put({ mcp })} />
       {note && <div className="detail">{note}</div>}
+      {newOn && (
+        <ConnectionDialog
+          account={newOn}
+          onClose={(saved) => {
+            setNewOn(null)
+            if (saved) put({ connection: saved.id })
+          }}
+        />
+      )}
     </Modal>
   )
 }
@@ -664,6 +520,7 @@ export function AgentSettingsDialog() {
   const agent = project?.agents.find((a) => a.id === target?.agentId) ?? null
   const settings = useStore((s) => s.settings)
   const projects = useStore((s) => s.workspace?.projects)
+  const view = useConnections()
   if (!target || !project || !agent) return null
   // Another agent of the workspace's name (#702); its own name stays, even one it shares from before names were unique.
   const nameProblem = (n: string): string | null => {
@@ -676,13 +533,12 @@ export function AgentSettingsDialog() {
   const close = (): void => set({ agentSettingsFor: null })
   const own = legacyOf(agent)
   // Its role as it reads now (the guess, for an agent from before 1.0), stored once the user saves (#1430).
-  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, model: agent.model ?? '', effort: agent.effort ?? '', permission: agent.permissionMode ?? '', context: contextChoice(agent.use200kContext), mcp: agent.mcpServers ? [...agent.mcpServers] : null, connection: agent.connection ?? '' }
+  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, mcp: agent.mcpServers ? [...agent.mcpServers] : null, connection: agent.connection ?? '' }
   return (
     <AgentSettingsModal
       title={tr(msg({ id: 'agents.settings.title', defaultMessage: '{agent} settings', description: 'Title of the Agent Settings dialog. {agent} is the agent.' }), { agent: agent.name })}
       resetKey={`${target.project}|${target.agentId}`}
       initial={initial}
-      config={project}
       roles={roleSuggestions(project.agents)}
       mcpProject={project.path}
       mcpWhere="project"
@@ -702,39 +558,27 @@ export function AgentSettingsDialog() {
           tr(PROJECT_FOLDER)
         )
       }
-      providerLocked={
-        agent.live ? (
-          <div className="muted flex">
-            <ProviderIcon provider={current} /> {providerDescriptor(current).name} <span className="faint">{tr(msg({ id: 'agents.settings.stopToChange', defaultMessage: '— stop {agent} to change it', description: "After a running agent's provider in Agent Settings ({agent}: its name): the provider can only change while it is stopped." }), { agent: agent.name })}</span>
-          </div>
-        ) : undefined
-      }
+      cliLocked={agent.live ? { cli: current, why: tr(msg({ id: 'agents.settings.otherCliStopped', defaultMessage: "Another CLI's connection can be chosen once {agent} is stopped: its conversations stay with {cli}.", description: "Under the connection in Agent Settings of a running agent ({agent}) (HI-2108): only its own CLI's ({cli}: \"Claude Code\") connections are offered while it runs." }), { agent: agent.name, cli: providerDescriptor(current).name }) } : undefined}
       note={agent.live ? tr(msg({ id: 'agents.settings.appliesNext', defaultMessage: 'Changes apply the next time {agent} starts; the running session keeps its settings until then.', description: 'Under Agent Settings for a running agent ({agent}).' }), { agent: agent.name }) : undefined}
       nameProblem={nameProblem}
       confirmSave={async (f) => {
-        if (f.provider !== current) {
-          const ok = await confirm({
-            title: tr(msg({ id: 'agents.switch.title', defaultMessage: 'Switch {agent} to {cli}?', description: "Title of the confirmation before an agent ({agent}) changes provider ({cli}: the new CLI's name)." }), { agent: agent.name, cli: providerDescriptor(f.provider).name }),
-            message: tr(msg({ id: 'agents.switch.message', defaultMessage: "Its conversations stay in the Sessions tab, but {cli} can't resume {was} conversations, so {agent} starts fresh next time.", description: "The confirmation before an agent ({agent}) changes provider: the new CLI ({cli}) can't resume the old one's ({was}) conversations." }), { agent: agent.name, cli: providerDescriptor(f.provider).name, was: providerDescriptor(current).name }),
-            detail: tr(msg({ id: 'agents.switch.detail', defaultMessage: 'To carry the work over, ask the agent for a handover before switching (Hive MCP: hive_create_handover), then ask the new agent to read it.', description: 'Under the confirmation before an agent changes provider. hive_create_handover is a tool name: keep it.' })),
-            confirmLabel: tr(msg({ id: 'agents.switch.confirm', defaultMessage: 'Switch', description: "Button: changes the agent's provider. Keep it short." }))
-          })
-          if (!ok) return false
-        }
-        return !(f.permission && f.permission !== agent.permissionMode && !(await confirmDangerousMode(f.provider, f.permission, agent.name)))
+        // Another CLI's connection is a change of CLI: its conversations can't come along.
+        const cli = connectionCli(view, f.connection) ?? current
+        if (cli === current) return true
+        return confirm({
+          title: tr(msg({ id: 'agents.switch.title', defaultMessage: 'Switch {agent} to {cli}?', description: "Title of the confirmation before an agent ({agent}) changes provider ({cli}: the new CLI's name)." }), { agent: agent.name, cli: providerDescriptor(cli).name }),
+          message: tr(msg({ id: 'agents.switch.message', defaultMessage: "Its conversations stay in the Sessions tab, but {cli} can't resume {was} conversations, so {agent} starts fresh next time.", description: "The confirmation before an agent ({agent}) changes provider: the new CLI ({cli}) can't resume the old one's ({was}) conversations." }), { agent: agent.name, cli: providerDescriptor(cli).name, was: providerDescriptor(current).name }),
+          detail: tr(msg({ id: 'agents.switch.detail', defaultMessage: 'To carry the work over, ask the agent for a handover before switching (Hive MCP: hive_create_handover), then ask the new agent to read it.', description: 'Under the confirmation before an agent changes provider. hive_create_handover is a tool name: keep it.' })),
+          confirmLabel: tr(msg({ id: 'agents.switch.confirm', defaultMessage: 'Switch', description: "Button: changes the agent's provider. Keep it short." }))
+        })
       }}
       save={async (f) => {
         await call('agents:update', project.path, agent.id, {
           name: f.name,
           role: f.role,
           workflowRole: f.workflowRole,
-          ...(f.provider !== current ? { provider: f.provider } : {}),
-          model: f.model || undefined,
-          effort: (f.effort || undefined) as EffortLevel | undefined,
-          permissionMode: (f.permission || undefined) as PermissionMode | undefined,
-          use200kContext: contextValue(f.context),
           mcpServers: f.mcp,
-          connection: f.connection || null
+          ...(f.connection !== initial.connection ? { connection: f.connection || null } : {})
         })
         await actions.refreshWorkspace()
       }}
@@ -745,8 +589,8 @@ export function AgentSettingsDialog() {
 
 /**
  * The same dialog for a template's agent (#271), from the template editor: what it saves goes back to the editor (which
- * saves the template with it, #510). An empty choice stays empty in the template (it follows the project it is loaded
- * into). Its role in the workflow and note (#1436), never where it works: that is the card's or lane's.
+ * saves the template with it, #510). Its role in the workflow and note (#1436), never where it works: that is the card's
+ * or lane's. No connection (HI-2109: the user picks connections when loading it), but the CLI it suggests.
  */
 export function TemplateAgentDialog() {
   useLanguage()
@@ -763,33 +607,26 @@ export function TemplateAgentDialog() {
     result.current = null
   }
   const provider = a?.provider ?? projectDefaultProvider(project?.config ?? DEFAULT_PROJECT_CONFIG, settings)
-  const initial: AgentFields = { name: a?.name ?? req.suggestedName, role: a?.note ?? '', workflowRole: a?.role ?? agentWorkflowRole({ name: req.suggestedName }), provider, model: a?.model ?? '', effort: a?.effort ?? '', permission: a?.permissionMode ?? '', context: contextChoice(a?.use200kContext), mcp: a?.mcpServers ? [...a.mcpServers] : null, connection: a?.connection ?? '' }
+  const initial: AgentFields = { name: a?.name ?? req.suggestedName, role: a?.note ?? '', workflowRole: a?.role ?? agentWorkflowRole({ name: req.suggestedName }), provider, mcp: a?.mcpServers ? [...a.mcpServers] : null, connection: '' }
   return (
     <AgentSettingsModal
       title={a ? tr(msg({ id: 'agents.template.title', defaultMessage: '{agent} settings (template)', description: "Title of Agent Settings for an agent of a template ({agent}), from the template editor." }), { agent: a.name }) : tr(msg({ id: 'agents.template.new', defaultMessage: 'New agent (template)', description: 'Title of Agent Settings for a new agent of a template, from the template editor.' }))}
       resetKey={`${req.key}`}
       initial={initial}
-      config={project ?? { config: DEFAULT_PROJECT_CONFIG }}
       roles={roleSuggestions(req.others.map((o) => ({ role: o.note })))}
       mcpProject={null}
       mcpWhere="workspace"
+      suggestOnly
       note={tr(msg({ id: 'agents.template.note', defaultMessage: 'For the template "{template}": Save saves it in the template. Settings left as "{projects}" follow the project it is loaded into.', description: "Under Agent Settings for a template's agent: Save (a button) saves it in the template ({template}); {projects} is the first choice of each setting (\"Project's\")." }), { template: req.template, projects: tr(PROJECTS) })}
       nameProblem={(n) => (!n.includes('{n}') && req.others.some((o) => o.name.toLowerCase() === n.toLowerCase()) ? tr(msg({ id: 'agents.template.nameTaken', defaultMessage: 'Another agent of the template is called "{name}".', description: "Why a template's agent can't take a name ({name}): another agent of the template has it." }), { name: n }) : null)}
-      confirmSave={async (f) => !(f.permission && f.permission !== a?.permissionMode && !(await confirmDangerousMode(f.provider, f.permission, f.name.trim())))}
       save={async (f) => {
         const note = f.role.replace(/\s+/g, ' ').trim()
-        const ctx = contextValue(f.context)
         result.current = {
           name: f.name.replace(/\s+/g, ' ').trim(),
           role: f.workflowRole,
           ...(note ? { note } : {}),
           provider: f.provider,
-          ...(f.model ? { model: f.model } : {}),
-          ...(f.effort ? { effort: f.effort as EffortLevel } : {}),
-          ...(f.permission ? { permissionMode: f.permission as PermissionMode } : {}),
-          ...(ctx !== null ? { use200kContext: ctx } : {}),
-          ...(f.mcp ? { mcpServers: f.mcp } : {}),
-          ...(f.connection ? { connection: f.connection } : {})
+          ...(f.mcp ? { mcpServers: f.mcp } : {})
         }
       }}
       onClose={() => close(result.current)}

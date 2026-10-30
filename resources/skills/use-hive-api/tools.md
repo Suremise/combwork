@@ -136,13 +136,18 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 
 ## Agents' settings
 
-`hive_add_agent`, `hive_update_agent` and `hive_start_task` take values from `hive_list_providers`; empty follows the project.
-- `workflowRole`: builder, reviewer, either (never its own cards) or generalist (does what it is asked in its pane; never in a lane or the reviewer pool). Default: from its name.
-- `connection`: by id or name (a name two share is refused: use the id); its CLI is the provider; empty: its CLI's default connection.
-- `context200k`: for providers that have it.
-- `mcpServers`: the project's servers it gets, `[]` none, `["*"]` all (the default); the hive server is always given.
-- A new agent starts in the project folder; a card or lane it builds is lent a slot. A running agent takes a change when restarted; its provider (or a connection of another CLI) changes only while it is stopped.
-- `hive_start_agent`: a folder new to its CLI asks the user to trust it first (the agent shows as waiting).
+`hive_add_agent`, `hive_update_agent`: an agent's model, effort, context and mode are its connection's; its CLI follows. `provider`, `model`, `effort`, `mode`, `context200k` are refused.
+- `connection`: id or name (`hive_connection`). Default or empty: the first usable here.
+- `workflowRole`: builder, reviewer, either (never its own cards) or generalist (no lanes or reviews). Default: from its name.
+- `mcpServers`: `[]` none, `["*"]` all (default); hive is always given.
+- A running agent takes a change when restarted; another CLI's connection only while stopped. One whose connection is gone or off here runs on its CLI's first usable one, saying so.
+- `hive_start_agent`: a folder new to its CLI asks the user to trust it.
+
+## Connections (`hive_connection`)
+
+- A named setup (model, effort, context, mode, arguments) on an account (the user's alone).
+- `list`: id, account, CLI and values each.
+- `add` on an existing `account`; `update` a `connection`: each value given set, `""` the CLI's own. Need Change settings and the user's OK; `hive_undo` doesn't undo them.
 
 ## Documents (`hive_doc_outline` and `hive_read_section`)
 

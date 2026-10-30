@@ -426,6 +426,9 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
     patch.name = patch.name.trim()
     if (!patch.name) throw hiveError(msg({ id: 'worktrees.agent.enterName', defaultMessage: 'Enter a name.', description: "An error: an agent's name was emptied." }), undefined, { kind: 'invalid' })
   }
+  // Its CLI follows the connection named (HI-2108): another CLI's is a change of CLI, made only while it is stopped.
+  const namedCli = accountById(getConnection(patch.connection)?.account)?.provider
+  if (namedCli && patch.provider === undefined) patch.provider = namedCli
   // Empty values clear an override so the agent follows the project again (and an empty role: its name is its role).
   const { use200kContext, mcpServers, workflowRole, connection, model, effort, permissionMode, ...rest } = patch
   const clean: Partial<AgentDef> = { ...rest }
