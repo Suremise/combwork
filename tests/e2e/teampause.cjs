@@ -120,10 +120,22 @@ const PARK_LINE = '[Hive] The team is pausing for an update.'
     const named = async () => (await inv('team:state')).workspaces.find((w) => w.workspacePath.toLowerCase() === wsA.toLowerCase())?.items ?? []
     check('the run keeps the team unparked, named', !!(await until(async () => (await named()).some((i) => i.kind === 'run' && i.label === 'probe run'))), JSON.stringify(await named()))
     check('…not All parked', (await inv('team:state')).allParked === false)
+    // The status bar's Team paused opens the Progress panel, whose Lanes band names what still runs.
+    await page.locator('.status-item.team-paused').click()
+    const band = page.locator('.team-pause-band')
+    check("the status bar's item opens the Progress panel, where the band names the run", !!(await until(async () => /Pausing the team: 1 still running/.test((await band.innerText().catch(() => '')) ?? '') && /probe run/.test((await band.innerText().catch(() => '')) ?? ''))), await band.innerText().catch(() => ''))
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)
+      await band.screenshot({ path: at(`band-${theme}.png`) }).catch(() => undefined)
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
     const early = await inv('team:install')
     check('Install Now while not parked installs nothing', early.installed === false)
     fs.writeFileSync(release, '')
     check('once the run ends, All parked', !!(await until(async () => (await inv('team:state')).allParked, 60000)), JSON.stringify((await inv('team:state')).workspaces.map((w) => [w.workspacePath, w.pause?.by, w.items])))
+    check('…and the band says so', !!(await until(async () => /All parked: safe to install/.test((await band.innerText().catch(() => '')) ?? ''))), await band.innerText().catch(() => ''))
+    await band.screenshot({ path: at('band-parked.png') }).catch(() => undefined)
     const install = await inv('team:install')
     check('Install Now with no update ready installs nothing', install.installed === false && install.state.allParked === true)
 
