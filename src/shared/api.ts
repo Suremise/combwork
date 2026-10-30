@@ -5,12 +5,13 @@ import type { SessionHooks } from './hooks'
 import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
-import type { ConnectionsView } from './accounts'
+import type { ConnectionPatch, ConnectionsView } from './accounts'
 import type { ServerModelsRead } from './serverConnection'
 import type { MovedNotice } from './connectionDefaults'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
+  Connection,
   CopyView,
   SlotTestOp,
   SlotOptions,
@@ -1057,9 +1058,18 @@ export interface HiveRequests {
   'connections:keepLogin': (id: string) => void
   /** Turns an account on or off in this window's workspace. */
   'connections:setOn': (id: string, on: boolean) => void
-  /** Makes an account this window's workspace's default for its CLI. */
-  /** Moves a connection to `index` in its CLI's preference order (HI-1875; 0: the top, Make Default); never on or off. */
+  /** Moves an account to `index` in the one order of accounts (HI-2107, decision A; 0: the top); never on or off. */
   'connections:move': (id: string, index: number) => void
+  /** Adds a connection on an account (HI-2107), after its others; refused for an effort its model doesn't take (decision E). */
+  'connection:add': (account: string, input: ConnectionPatch & { name: string }) => Connection
+  /** Changes a connection's name or values (each null leaves it to the CLI); running agents on it are offered Restart or Switch Now. */
+  'connection:update': (id: string, patch: ConnectionPatch) => Connection
+  /** A copy of a connection, after it. */
+  'connection:duplicate': (id: string) => Connection
+  /** Removes a connection; refused while an agent or the Assistant in an open workspace uses it, naming them. */
+  'connection:remove': (id: string) => void
+  /** Moves a connection to `index` among its account's (0: its base). */
+  'connection:move': (id: string, index: number) => void
   /** The Assistant's own connection for a CLI in this window's workspace (HI-1755); null: the workspace's default. */
   'connections:setAssistant': (provider: ProviderId, id: string | null) => void
   /** A connection's defaults for the agents on it (HI-1770): model, effort and context; '' or null leaves one to the CLI. */

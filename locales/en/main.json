@@ -143,6 +143,10 @@
     "defaultMessage": "{branch} can't be merged into itself.",
     "description": "An error merging from the Merge dialog: the branch picked and the target are the same ({branch})."
   },
+  "main.connections.badMode": {
+    "defaultMessage": "{cli} has no permission mode {mode}.",
+    "description": "An error saving a connection (HI-2107): the permission mode asked for ({mode}, as given) is not one of the coding agent CLI's ({cli}: \"Codex\")."
+  },
   "main.connections.choice.missing": {
     "defaultMessage": "The connection chosen for {agent} no longer exists. Choose another, or the workspace's default.",
     "description": "An error saving an agent's settings (or adding one): the connection chosen for it ({agent}, its name) was removed. A connection is how a coding agent CLI signs in or reaches its model (Settings → Connections)."
@@ -154,6 +158,10 @@
   "main.connections.choice.otherCli": {
     "defaultMessage": "{name} is for another CLI than {agent}'s. Choose one of its own.",
     "description": "An error saving an agent's settings (or adding one): the connection chosen ({name}) belongs to another coding agent CLI than the agent's ({agent}, its name)."
+  },
+  "main.connections.inUse": {
+    "defaultMessage": "{name} is used by {users}. Choose another connection for them first, then remove it.",
+    "description": "An error removing a connection (Settings → Accounts & Connections, HI-2107): agents or the Assistant use it ({users}: their names, listed, each with its project)."
   },
   "main.connections.launch.changedAgain": {
     "defaultMessage": "{agent}'s connection was changed again while it was starting. Start it again.",
@@ -190,6 +198,22 @@
   "main.connections.moveFailed": {
     "defaultMessage": "Hive couldn't move {project}'s model settings to its agents",
     "description": "A notice's title (HI-1770): moving a project's own model, effort and context settings onto its agents (connections now hold the defaults) failed; it is tried again at the next start. {project} is the project's name."
+  },
+  "main.connections.nameTaken": {
+    "defaultMessage": "{account} already has a connection named {name}. Choose another name.",
+    "description": "An error saving a connection (Settings → Accounts & Connections, HI-2107): another connection on the same account ({account}, its name) has this name ({name})."
+  },
+  "main.connections.noName": {
+    "defaultMessage": "Give the connection a name.",
+    "description": "An error saving a connection (Settings → Accounts & Connections, HI-2107): its name is empty."
+  },
+  "main.connections.notFound": {
+    "defaultMessage": "There is no such connection.",
+    "description": "An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile)."
+  },
+  "main.connections.userIn": {
+    "defaultMessage": "{agent} in {project}",
+    "description": "One user of a connection in the error refusing its removal (HI-2107): an agent ({agent}) and its project ({project})."
   },
   "main.console.noWorkspace": {
     "defaultMessage": "Open a workspace first: the developer console shows a workspace's agents and Hive's work there.",

@@ -7,10 +7,11 @@ import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDef
 import { HIVE_DIR } from '../shared/defaults'
 import { readKeptJson } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
-import { acceptable, accountState, baseConnection, resolveAgentConnection, type AgentConnection, type ConnectionTrust, movedConnection, resolveConnection, topOfOrder, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
+import { acceptable, accountState, baseConnection, connectionsOn, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, resolveConnection, topOfOrder, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
+import { ASSISTANT_NAME } from '../shared/assistant'
 import { profileFolder } from '../shared/appName'
-import { agentProvider, isProviderEnabled, providerDescriptor, PROVIDERS } from '../shared/providers'
-import { msg, type Msg } from '../shared/i18n'
+import { agentProvider, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS } from '../shared/providers'
+import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { advanced } from './advanced'
 import { config } from './config'
 import { emit, onHiveEvent } from './events'
@@ -563,6 +564,142 @@ export function connectionWith(accountId: string, values: LaunchValues, label?: 
   })
   if (made) emit({ type: 'connections-changed' })
   return out!
+}
+
+const NO_CONNECTION = msg({ id: 'main.connections.notFound', defaultMessage: 'There is no such connection.', description: 'An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile).' })
+const NO_CONNECTION_NAME = msg({ id: 'main.connections.noName', defaultMessage: 'Give the connection a name.', description: 'An error saving a connection (Settings → Accounts & Connections, HI-2107): its name is empty.' })
+const NAME_TAKEN = msg({ id: 'main.connections.nameTaken', defaultMessage: '{account} already has a connection named {name}. Choose another name.', description: 'An error saving a connection (Settings → Accounts & Connections, HI-2107): another connection on the same account ({account}, its name) has this name ({name}).' })
+const BAD_MODE = msg({ id: 'main.connections.badMode', defaultMessage: "{cli} has no permission mode {mode}.", description: 'An error saving a connection (HI-2107): the permission mode asked for ({mode}, as given) is not one of the coding agent CLI\'s ({cli}: "Codex").' })
+const CONNECTION_IN_USE = msg({ id: 'main.connections.inUse', defaultMessage: '{name} is used by {users}. Choose another connection for them first, then remove it.', description: 'An error removing a connection (Settings → Accounts & Connections, HI-2107): agents or the Assistant use it ({users}: their names, listed, each with its project).' })
+const USER_IN = msg({ id: 'main.connections.userIn', defaultMessage: '{agent} in {project}', description: 'One user of a connection in the error refusing its removal (HI-2107): an agent ({agent}) and its project ({project}).' })
+
+function mustConnection(id: string): { c: Connection; a: Account } {
+  const c = getConnection(id)
+  const a = accountById(c?.account)
+  if (!c || !a) throw hiveError(NO_CONNECTION, undefined, { kind: 'notFound' })
+  return { c, a }
+}
+
+/**
+ * A connection's values as saved (HI-2107), from what it had and a patch: each null or '' left to the CLI; a server
+ * account's take no effort or context; a permission mode its CLI doesn't have is refused, and a model and effort that
+ * don't go together (decision E), before anything changes.
+ */
+function savedValues(a: Account, now: LaunchValues, patch: ConnectionPatch): LaunchValues {
+  const next: Record<string, unknown> = { ...valuesOf(now) }
+  for (const k of ['model', 'effort', 'use200kContext', 'permissionMode', 'extraArgs'] as const) if (patch[k] !== undefined) next[k] = patch[k] ?? undefined
+  const mode = next.permissionMode as string | undefined
+  if (mode && !modeOption(a.provider, mode as LaunchValues['permissionMode'])) throw hiveError(BAD_MODE, { cli: providerDescriptor(a.provider).name, mode }, { kind: 'invalid' })
+  // Kept as the user chose it (a mode the CLI calls its default is still the user's choice), only emptied values dropped.
+  const out = launchValues(next as LaunchValues, a.provider, isServer(a))
+  if (mode) out.permissionMode = mode as LaunchValues['permissionMode']
+  if (out.effort && (patch.model !== undefined || patch.effort !== undefined)) assertEffortTaken(a.provider, out.model ?? null, a, out.effort)
+  return out
+}
+
+function assertNameFree(a: Account, name: string, except?: string): string {
+  const n = name.trim()
+  if (!n) throw hiveError(NO_CONNECTION_NAME, undefined, { kind: 'invalid' })
+  if (connectionsOn(a.id, allConnections()).some((x) => x.id !== except && x.name.trim().toLowerCase() === n.toLowerCase())) throw hiveError(NAME_TAKEN, { account: a.name, name: n }, { kind: 'conflict' })
+  return n
+}
+
+/** Each open workspace read again after a connection changed: running agents on it are offered Restart, or Switch Now for its mode. */
+function refreshOpen(): void {
+  for (const w of openWorkspaces()) void w.refresh().catch(() => undefined)
+}
+
+/** Adds a connection on an account (HI-2107: Settings' Add Connection, the Agent API's), after its others. */
+export function addConnection(accountId: string, input: ConnectionPatch & { name: string }): Connection {
+  const a = accountById(accountId)
+  if (!a) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
+  const name = assertNameFree(a, input.name)
+  const made: Connection = { id: newConnectionId(), account: a.id, name, ...savedValues(a, {}, input) }
+  changeConnections((all) => {
+    // After the account's last, so the base stays first.
+    const last = all.map((x) => x.account).lastIndexOf(a.id)
+    all.splice(last < 0 ? all.length : last + 1, 0, made)
+  })
+  log.info(`connection ${made.id} added on ${a.id}`)
+  return made
+}
+
+/** Changes a connection's name or values (HI-2107); running agents on it are offered Restart, or Switch Now for a mode. */
+export function updateConnection(id: string, patch: ConnectionPatch): Connection {
+  const { c, a } = mustConnection(id)
+  const name = patch.name === undefined ? c.name : assertNameFree(a, patch.name, id)
+  const next: Connection = { id, account: a.id, name, ...savedValues(a, c, patch) }
+  changeConnections((all) => {
+    const i = all.findIndex((x) => x.id === id)
+    if (i >= 0) all[i] = next
+  })
+  refreshOpen()
+  return next
+}
+
+/** A copy of a connection, after it, named "<name> (2)" (the first number free on its account). */
+export function duplicateConnection(id: string): Connection {
+  const { c, a } = mustConnection(id)
+  const taken = new Set(connectionsOn(a.id, allConnections()).map((x) => x.name.trim().toLowerCase()))
+  let n = 2
+  while (taken.has(`${c.name} (${n})`.toLowerCase())) n++
+  const made: Connection = { ...valuesOf(c), id: newConnectionId(), account: a.id, name: `${c.name} (${n})` }
+  changeConnections((all) => {
+    const i = all.findIndex((x) => x.id === id)
+    all.splice(i + 1, 0, made)
+  })
+  return made
+}
+
+/**
+ * Who uses each connection in the open workspaces (HI-2107): their projects' agents and their Assistants, as their
+ * project.json says (an agent's `connection` is its connection's id there). Workspaces not open aren't read: an agent of
+ * theirs whose connection is removed launches on its CLI's first usable one, saying so (decision H).
+ */
+export function connectionUsers(): Map<string, ConnectionUser[]> {
+  const out = new Map<string, ConnectionUser[]>()
+  const add = (id: string | undefined, u: ConnectionUser): void => {
+    if (id) out.set(id, [...(out.get(id) ?? []), u])
+  }
+  for (const w of openWorkspaces()) {
+    const info = w.info()
+    if (!info) continue
+    for (const p of info.projects) for (const a of p.config.agents ?? []) add(a.connection, { projectPath: p.path, project: p.name, agentId: a.id, agent: a.name ?? a.id })
+    const home = info.assistant
+    const own = home?.config.agents?.[0]
+    if (home && own) add(own.connection, { projectPath: home.path, project: info.name, agentId: own.id, agent: ASSISTANT_NAME, assistant: true })
+  }
+  return out
+}
+
+/** Removes a connection (HI-2107): refused while an agent or the Assistant in an open workspace uses it, naming them. */
+export function removeConnection(id: string): void {
+  const { c } = mustConnection(id)
+  const users = connectionUsers().get(id) ?? []
+  if (users.length) throw hiveError(CONNECTION_IN_USE, { name: c.name, users: fmt.list(users.map((u) => (u.assistant ? u.agent : tr(USER_IN, { agent: u.agent, project: u.project })))) }, { kind: 'conflict' })
+  changeConnections((all) => all.splice(0, all.length, ...all.filter((x) => x.id !== id)))
+  log.info(`connection ${id} removed`)
+}
+
+/** Moves a connection to `index` among its account's (HI-2107; 0: its base, what a new agent on the account gets first). */
+export function moveConnectionInAccount(id: string, index: number): void {
+  mustConnection(id)
+  const before = allConnections().map((x) => x.id).join()
+  config.update((c) => void (c.connections = movedInGroup(c.connections ?? [], id, Math.trunc(index), (x) => x.account)))
+  if (allConnections().map((x) => x.id).join() !== before) emit({ type: 'connections-changed' })
+}
+
+/** The connections as Settings shows them (HI-2107): in their accounts' order, then their own, with who uses each. */
+function connectionRows(): ConnectionRow[] {
+  const users = connectionUsers()
+  const order = allAccounts().map((a) => a.id)
+  const conns = allConnections().filter((c) => order.includes(c.account))
+  const rows = [...conns].sort((x, y) => order.indexOf(x.account) - order.indexOf(y.account) || conns.indexOf(x) - conns.indexOf(y))
+  return rows.map((c) => {
+    const a = accountById(c.account)!
+    const unusable = !!c.effort && !isServer(a) && !effortUsable(a.provider, c.model ?? null, a, c.effort)
+    return { ...c, users: users.get(c.id) ?? [], ...(unusable ? { effortUnusable: true as const } : {}) }
+  })
 }
 
 /**
@@ -1405,7 +1542,7 @@ export function accountsView(check = false): ConnectionsView {
     return k && k.origin === originOf(a.server?.baseUrl ?? '') ? { key: { last4: k.last4, at: k.at } } : {}
   }
   const intro = !config.get().ui.connectionsIntroShown && !all.length ? providers.filter((p) => !testHome.includes(p)) : []
-  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), defaults: defaultsOf(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a), ...(setUpRead.has(a.id) ? { setUp: setUpRead.get(a.id) } : {}), ...trustOf(a) })), workspace: ws, testHome, masking: coverageView() }
+  return { ...(intro.length ? { intro } : {}), providers, connections: all.map((a) => ({ ...shownServer(a), defaults: defaultsOf(a), signingIn: hasPty(loginKey(a)), folder: accountFolder(a.id), ...keyOf(a), ...(setUpRead.has(a.id) ? { setUp: setUpRead.get(a.id) } : {}), ...trustOf(a) })), workspace: ws, testHome, masking: coverageView(), order: allAccounts().map((a) => a.id), homes: allAccounts().filter((a) => a.home), connectionRows: connectionRows() }
 }
 
 /** An account's defaults as today's screens show them (HI-2106, until HI-2107): its base connection's model, effort and context. */
@@ -1442,14 +1579,15 @@ export async function setAccountOn(id: string, on: boolean): Promise<void> {
 }
 
 /**
- * Moves a connection to `index` in its CLI's preference order (HI-1875: Hive-wide; 0, the top: Make Default). It never
- * turns one on or off: which is used in a workspace is the first in the order that's on there, for new launches only.
+ * Moves an account to `index` in the one order of accounts (HI-2107, decision A: every CLI's, the CLI's own homes too;
+ * Hive-wide). It never turns one on or off: what a new agent gets, and what an agent whose connection can't be used
+ * here falls back to, is the first in the order that's on there, for new launches only.
  */
 export function moveConnection(id: string, index: number): void {
-  mustGet(id)
-  const before = list().map((a) => a.id).join()
-  config.update((c) => void (c.accounts = movedConnection(c.accounts ?? [], id, Math.trunc(index))))
-  if (list().map((a) => a.id).join() === before) return
+  if (!accountById(id)) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
+  const before = allAccounts().map((a) => a.id).join()
+  config.update((c) => void (c.accounts = movedInGroup(c.accounts ?? [], id, Math.trunc(index))))
+  if (allAccounts().map((a) => a.id).join() === before) return
   emit({ type: 'connections-changed' })
   // Running agents keep their connection; each open workspace is read again, so one now on another connection than
   // the order picks shows the restart banner's offer to switch it at its next safe point (HI-1755).

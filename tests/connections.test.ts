@@ -658,7 +658,7 @@ describe('a choice saved while starting: the last look at its own choice, skills
 
 describe('what an agent row names (connectionOf, HI-1769)', () => {
   const c = (id: string, cli: Account['provider'] = 'claude-code'): ConnectionsView['connections'][number] => ({ id, provider: cli, name: `Name ${id}`, createdAt: '', signingIn: false, folder: '' })
-  const view = (over: Partial<ConnectionsView> = {}): ConnectionsView => ({ providers: ['claude-code'], connections: [c('a'), c('b'), c('x', 'codex')], workspace: { 'claude-code': { on: ['a'], default: 'a' } }, testHome: [], ...over })
+  const view = (over: Partial<ConnectionsView> = {}): ConnectionsView => ({ providers: ['claude-code'], connections: [c('a'), c('b'), c('x', 'codex')], workspace: { 'claude-code': { on: ['a'], default: 'a' } }, testHome: [], order: [], homes: [], connectionRows: [], ...over })
   const ran = (id: string) => ({ id, name: `Name ${id}` })
   it('its own on here; none of its own: the default, inherited', () => {
     expect(connectionOf('a', 'claude-code', undefined, view())).toMatchObject({ shown: { id: 'a' }, inherited: false, other: false, desired: { ok: true, id: 'a' } })
@@ -1259,6 +1259,85 @@ describe('the Agent API and connections (HI-1771)', () => {
     expect((await w.projectConfig(p)).agents[0].connection).toBe(was)
     raw.agents[0].provider = 'claude-code'
     writeFileSync(file, JSON.stringify(raw))
+  })
+})
+
+describe('connections as Settings → Accounts & Connections changes them (HI-2107)', () => {
+  const opus = { provider: 'claude-code', found: true, path: 'claude.exe', catalog: { source: 'cli', version: '1', models: [{ value: 'haiku', label: 'Haiku', efforts: [] }, { value: 'opus', label: 'Opus', efforts: ['low', 'high'] }] } }
+  const names = (account: string): string[] => accounts.allConnections().filter((c) => c.account === account).map((c) => c.name)
+
+  it('add: after its account’s others, values kept as chosen; no name, a name taken, a mode its CLI lacks and a model and effort that don’t go together refused (decision E)', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const b = await signedInConnection('Work', 'work@example.com')
+    const info = providerService.info
+    providerService.info = ((id: string) => ({ ...opus, provider: id })) as never
+    try {
+      const high = accounts.addConnection(a.id, { name: 'Claude · High', model: 'opus', effort: 'high', permissionMode: 'plan', extraArgs: ' --verbose ' })
+      expect(high).toMatchObject({ account: a.id, name: 'Claude · High', model: 'opus', effort: 'high', permissionMode: 'plan', extraArgs: '--verbose' })
+      // After Personal's base, before Work's: each account's connections stay together, its base first.
+      expect(accounts.allConnections().filter((c) => c.account === a.id || c.account === b.id).map((c) => c.name)).toEqual(['Personal', 'Claude · High', 'Work'])
+      expect(await outcome(Promise.resolve().then(() => accounts.addConnection(a.id, { name: '  ' })))).toMatch(/Give the connection a name/)
+      expect(await outcome(Promise.resolve().then(() => accounts.addConnection(a.id, { name: 'claude · high' })))).toMatch(/Personal already has a connection named claude · high/)
+      // Another account may use the same name.
+      expect(accounts.addConnection(b.id, { name: 'Claude · High' }).account).toBe(b.id)
+      expect(await outcome(Promise.resolve().then(() => accounts.addConnection(a.id, { name: 'X', permissionMode: 'nope' as never })))).toMatch(/Claude Code has no permission mode nope/)
+      expect(await outcome(Promise.resolve().then(() => accounts.addConnection(a.id, { name: 'X', model: 'haiku', effort: 'high' })))).toMatch(/haiku doesn't take high effort/)
+      expect(names(a.id)).toEqual(['Personal', 'Claude · High'])
+    } finally {
+      providerService.info = info
+    }
+  })
+
+  it('update clears a value with null and checks the pair it makes with what it keeps; duplicate names the copy; a server account’s take no effort or context', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const info = providerService.info
+    providerService.info = ((id: string) => ({ ...opus, provider: id })) as never
+    try {
+      const c = accounts.addConnection(a.id, { name: 'High', model: 'opus', effort: 'high', use200kContext: true })
+      // Haiku with the High it keeps: refused, nothing changed.
+      expect(await outcome(Promise.resolve().then(() => accounts.updateConnection(c.id, { model: 'haiku' })))).toMatch(/haiku doesn't take high effort/)
+      expect(accounts.getConnection(c.id)).toMatchObject({ model: 'opus', effort: 'high' })
+      expect(accounts.updateConnection(c.id, { model: 'haiku', effort: null, use200kContext: null, name: 'Fast' })).toEqual({ id: c.id, account: a.id, name: 'Fast', model: 'haiku' })
+      const copy = accounts.duplicateConnection(c.id)
+      expect(copy).toMatchObject({ account: a.id, name: 'Fast (2)', model: 'haiku' })
+      expect(accounts.duplicateConnection(c.id).name).toBe('Fast (3)')
+      expect(names(a.id)).toEqual(['Personal', 'Fast', 'Fast (3)', 'Fast (2)'])
+      // Moved within its account; 0 makes it the base.
+      accounts.moveConnectionInAccount(copy.id, 0)
+      expect(names(a.id)).toEqual(['Fast (2)', 'Personal', 'Fast', 'Fast (3)'])
+    } finally {
+      providerService.info = info
+    }
+    config.update((c) => void (c.accounts = [...(c.accounts ?? []), { id: 'a-srv1', provider: 'claude-code', kind: 'server', server: { baseUrl: 'http://127.0.0.1:9', models: [{ id: 'm1' }], modelsFrom: 'typed' }, name: 'Server', createdAt: '' }]))
+    const s = accounts.addConnection('a-srv1', { name: 'Srv', model: 'm1', effort: 'high', use200kContext: true, permissionMode: 'manual' })
+    expect(s).toEqual({ id: s.id, account: 'a-srv1', name: 'Srv', model: 'm1', permissionMode: 'manual' })
+  })
+
+  it('remove: refused while an agent or the Assistant of an open workspace uses it, naming them; the one order of accounts across CLIs', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    const c = accounts.addConnection(a.id, { name: 'Used' })
+    const p = join(wsPath, 'cr1')
+    mkdirSync(join(p, '.hive'), { recursive: true })
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [{ id: 'u1', name: 'Builder', provider: 'claude-code', connection: c.id }] }))
+    try {
+      await w.refresh()
+      expect(accounts.connectionUsers().get(c.id)).toEqual([{ projectPath: expect.any(String), project: 'cr1', agentId: 'u1', agent: 'Builder' }])
+      const row = here(() => accounts.accountsView()).connectionRows.find((r) => r.id === c.id)
+      expect(row?.users.map((u) => u.agent)).toEqual(['Builder'])
+      expect(await outcome(Promise.resolve().then(() => accounts.removeConnection(c.id)))).toMatch(/Used is used by Builder in cr1/)
+      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [] }))
+      await w.refresh()
+      accounts.removeConnection(c.id)
+      expect(accounts.getConnection(c.id)).toBeUndefined()
+    } finally {
+      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    }
+    // One order for every CLI (decision A): a Codex account moved above Claude Code's.
+    const x = await accounts.addAccount('codex', 'Codex One')
+    expect(accounts.allAccounts().filter((y) => !y.home).map((y) => y.name)).toEqual(['Personal', 'Codex One'])
+    accounts.moveConnection(x.id, 0)
+    expect(accounts.allAccounts().filter((y) => !y.home).map((y) => y.name)).toEqual(['Codex One', 'Personal'])
+    expect(here(() => accounts.accountsView()).order.filter((id) => id === x.id || id === a.id)).toEqual([x.id, a.id])
   })
 })
 
