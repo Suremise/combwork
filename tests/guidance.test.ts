@@ -875,7 +875,9 @@ describe("the repository's AGENTS.md", () => {
       /\*\*Line endings\*\*/,
       /\*\*Translations\*\*/,
       /`TIP_ENTRIES`/,
-      /\*\*Merge checks\*\*, this repository's \(#1010\): a merge into main or an integration branch .* runs typecheck, lint, the unit tests and the cards' own focused e2e suites/,
+      /\*\*Merge checks\*\*, this repository's \(#1010\): a merge into main or an integration branch .* runs typecheck, lint and `npm run check:repo` .* and the cards' own focused e2e suites/,
+      // HI-2244: where the full unit run happens, now that a merge doesn't run it.
+      /The full unit run \(`npm test`\) is a release's final checks, and on request/,
       /never open the main checkout .* with one until the 1\.0 baseline is installed \(#1288\)/,
       /\*\*Test isolation\*\*/,
       /\*\*The machine is shared\*\*/,

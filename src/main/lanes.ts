@@ -567,6 +567,16 @@ export function freshStartsNow(ws: WorkspaceService, id: string): FreshStart[] {
   return rec && running(rec) ? (rec.freshStart ?? []).filter((f) => (f.role === 'builder' ? rec.builder.id : rec.reviewer?.id) === f.agent) : []
 }
 
+/**
+ * Whether lane `id` runs now, as kept, with `agent` in `role` (HI-2232, HR1's round 1: a renewal's launch checks it just
+ * before the old conversation stops and again before the new one spawns). Read synchronously, as freshStartsNow is.
+ */
+export function laneRunsWith(ws: WorkspaceService, id: string, role: 'builder' | 'reviewer', agent: string): boolean {
+  if (!ws.path) return false
+  const rec = readLanes({ version: 1, lanes: readTable(ws.path, 'lanes').docs as Record<string, unknown>[] }).find((l) => l.id === id)
+  return !!rec && running(rec) && (role === 'builder' ? rec.builder.id : rec.reviewer?.id) === agent
+}
+
 /** The lanes as kept (#1438's slot passes: their state, cards and builders, without reading the board). */
 export async function rawLanes(ws: WorkspaceService): Promise<LaneRecord[]> {
   return ws.path ? read(ws) : []
