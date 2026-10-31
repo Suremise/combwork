@@ -36,7 +36,7 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
-## Haiku's regressions since the baselines (HI-2228): fakes, Claude Code Haiku, fixtures v107 (v111 once merged), 31 October 2026
+## Haiku's regressions since the baselines (HI-2228): fakes, Claude Code Haiku, fixtures v107 (v112 once merged), 31 October 2026
 
 HI-2190's Haiku ×3 trials on ac799cd25 (fixtures v101) passed four scenarios less often than their sections below
 record. The 3-sample transcripts pointed at two changes since those baselines. A Haiku `--repeat 5` before and after

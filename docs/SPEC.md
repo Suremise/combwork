@@ -4906,8 +4906,8 @@ role, since, the old session, and the note its brief was made with, the user's S
 its later launch says the same through its wait, a restart and a retry; kept in the row's `extra`, changed only under
 the lanes' lock) and reports it
 `deferred` (the dialog's info toast: *B1 starts once it is free*). Asked to sign in again, or any other refusal that
-doesn't pass by itself, stays `failed`. A `stoppedOnly` start (the Assistant's, HI-1934) never owes one: a running
-agent is left as it is. **The pass** (`laneStarts.ts` `freshPass`, on board and lane changes, each owed agent's
+doesn't pass by itself, stays `failed`. A `stoppedOnly` start (the Assistant's, HI-1934) owes one only for an idle
+builder outside slots it renews (HI-2232, below): another running agent is left as it is. **The pass** (`laneStarts.ts` `freshPass`, on board and lane changes, each owed agent's
 status changes and the 30 s tick, builders and reviewers alike, whether or not a card is due, and with the workflow
 rules off too: only Hive's own card starts need them) launches each owed agent
 once free (`launchFresh`: as Start Lane would, the lane's brief, a new conversation, or started if it stopped
@@ -4938,7 +4938,20 @@ working it (27 Oct, three lanes for 50 minutes). A new lane started so now start
 does (`launchRecordedLane`): with the builder stopped, its slot lent first where it works in slots (`lendLane`; none
 free: the lane's slot wait recorded with `stoppedOnly`, shown as waiting for a slot, and slotCards' pass starts its
 agents stopped then once one is lent), then each stopped agent with the generated brief (`launchAgents`, `stoppedOnly`).
-**A running agent, idle or busy, is left as it is** (HI-1934, Darren's decision, 28 Oct): the lane is recorded for it
+**An idle builder outside slots gets the lane in a new conversation** (HI-2232, Darren's decision (a), 31 Oct), as
+Start Lane gives it: `ready` or `finished` as the lane is recorded and its builder not working in slots (`builderWhere`),
+it is launched with the lane's brief through `newConversation` (`stoppedOnly`'s `renew`), its last conversation kept in
+its Sessions history; found not free at its launch, its new conversation is owed (`freshStart`, as above), never the
+old one kept; stopped meanwhile, it is started with the brief. Its lane is checked again (`laneRunsWith`: running,
+this agent its builder) before its brief is made, just before the old run stops and before the new one spawns
+(`newConversation`'s `allowed`) [HR1's round 1]: a lane ended or given to another builder meanwhile replaces nothing
+and owes nothing. Its brief (`brief`, HI-1795) then reaches the new
+conversation, never the old one (`briefNotIn`). The reply says *Gave B1 the lane in a new conversation (its last stays
+in its Sessions history): don't prompt it*, or *B1 wasn't free: Hive gives it the lane in a new conversation once it
+is, so don't prompt it*. [HI-2190's runs: a lane over an idle running builder outside slots carried on in its old
+conversation, against run-lanes and the Guidance bullet's new conversation per lane (#437).] In slots its card's
+start gives it one in its slot; a builder in a turn or on a watch, and the reviewer, are left as below.
+**Any other running agent, idle or busy, is left as it is** (HI-1934, Darren's decision, 28 Oct): the lane is recorded for it
 as before HI-1900, never refused nor given a new conversation (one started meanwhile too), and no slot is lent for a
 running builder (it takes one as it starts the lane's card). [HI-1900 first refused a new lane over a busy agent and
 gave an idle one a new conversation: lanes the Assistant, scripts and the test suites register for running agents
