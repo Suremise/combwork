@@ -4,6 +4,8 @@
 
 <p align="center"><strong>Your AI coding agents, organised.</strong><br>Run Claude Code, Codex and GitHub Copilot CLI agents across your projects, on your own accounts or a model server you choose.</p>
 
+<p align="center"><a href="https://github.com/Suremise/hive-desktop/actions/workflows/ci.yml"><img src="https://github.com/Suremise/hive-desktop/actions/workflows/ci.yml/badge.svg" alt="CI"></a> <a href="https://github.com/Suremise/hive-desktop/releases/latest"><img src="https://img.shields.io/github/v/release/Suremise/hive-desktop" alt="Latest release"></a> <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-blue.svg" alt="Licence: MIT"></a></p>
+
 <p align="center"><strong><a href="https://surmise.it">Website</a></strong> · <a href="https://surmise.it/docs/user-guide/">User Guide</a> · <a href="https://github.com/Suremise/hive-desktop/releases/latest">Download</a></p>
 
 ---
