@@ -13,6 +13,7 @@ const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const lib = require('../e2e/lib.cjs')
+const { processes, leftoverIdentities } = require('../e2e/folderProcesses.cjs')
 const { measuresOf, metricsTotals } = require('./benchmark.cjs')
 
 /**
@@ -891,11 +892,21 @@ async function runScenario(sc, providerKey, opts = {}) {
     for (const x of await inv('session:live').catch(() => [])) await inv('session:stop', x.projectPath, x.agentId).catch(() => undefined)
     // Closed once every session has stopped (a CLI still writing its transcript as Hive closes leaves it half-written).
     await lib.until(async () => !(await inv('session:live').catch(() => [])).some((x) => !['stopped', 'error'].includes(x.status)), HUNG_MS)
+    // What the agents left running, as their launches' jobs hold it (HI-2217): a command whose parent has exited and that
+    // names no scenario folder is in neither the tree nor a command line. Asked once their leftovers are settled.
+    const left = await inv('session:leftovers', true).catch(() => [])
+    if (left?.some((l) => l.processes?.length)) {
+      try {
+        tree.push(...leftoverIdentities(processes(), left))
+      } catch {
+        // No process list: the tree and the folder's own still go.
+      }
+    }
     await app.close().catch(() => undefined)
     await standIn?.close()
     // A command an agent started can outlive its session (#542): stop it, so it doesn't hold the folder.
     const leftOver = lib.stopProcessesIn(root, started, tree)
-    if (leftOver) result.leftOver = `${leftOver} process(es) the scenario's Hive started, or still running from its folder, were stopped`
+    if (leftOver) result.leftOver = `${leftOver} process(es) the scenario's Hive or its agents started, or still running from its folder, were stopped`
     result.seconds = Math.round((Date.now() - started) / 1000)
     // Unless a card cites it now, or the board can't be read (evidence.cjs reads it afresh): then it stays, said in the result.
     const kept = opts.keep ? null : opts.evidence?.protects(root)

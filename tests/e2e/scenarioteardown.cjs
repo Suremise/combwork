@@ -8,6 +8,7 @@ const fs = require('fs')
 const path = require('path')
 const lib = require('./lib.cjs')
 const { runScenario } = require('../scenarios/harness.cjs')
+const { processes, namesFolder } = require('./folderProcesses.cjs')
 
 let failed = 0
 function check(name, ok, extra) {
@@ -102,6 +103,32 @@ const scenario = {
     check(`run ${run}: the command's node is no longer running`, !!pid && (await lib.until(() => !alive(pid), 10000)), String(pid))
     check(`run ${run}: the scenario's folder went`, !r.kept && !fs.existsSync(root), r.kept ?? root)
   }
+  // HI-2217: what an agent leaves that names no scenario folder and whose parent has exited (a model's `find / …`) is
+  // in no tree and named by no command line: only its launch's job knows it, and the harness asks Hive for that.
+  const hiddenPidFile = path.join(workRoot, 'left-unnamed-fake', 'claude-home', 'fake-hidden-linger.jsonl')
+  const hiddenPid = () => pidIn(hiddenPidFile)
+  let hidden = null
+  const unnamed = {
+    id: 'left-unnamed',
+    title: 'An agent leaves a command running that names no scenario folder, its parent gone (HI-2217)',
+    prompt: 'Start a long command in the background and end your turn without waiting for it.',
+    fake: 'hidden-linger then work 1',
+    keepWaiting: async () => !hiddenPid(),
+    expect: () => {
+      hidden = hiddenPid()
+      const cmd = hidden ? processes().find((p) => p.pid === hidden)?.commandLine : null
+      return [
+        ['its agent left the command running', !!hidden && alive(hidden), String(hidden)],
+        ['its command line names no scenario folder', !!cmd && !namesFolder(cmd, path.join(workRoot, 'left-unnamed-fake')), String(cmd)]
+      ]
+    }
+  }
+  const u = await runScenario(unnamed, 'fake', { workRoot, port: lib.port(47824), timeoutMs: 60000 })
+  check('unnamed: the scenario ran (no error)', !u.error, u.error)
+  check('unnamed: its agent left a command naming no scenario folder, its parent gone', u.checks.length === 2 && u.checks.every((c) => c.ok === true), JSON.stringify(u.checks))
+  check('unnamed: the harness stopped it, and counts it', /^[1-9]\d* process\(es\).*were stopped/.test(u.leftOver ?? ''), u.leftOver)
+  check("unnamed: the command's node is no longer running", !!hidden && (await lib.until(() => !alive(hidden), 10000)), String(hidden))
+
   // Nothing of either run is left holding the folder.
   check('nothing still runs from its folder', lib.stopProcessesIn(workRoot) === 0)
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nALL PASSED')
