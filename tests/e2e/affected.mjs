@@ -731,6 +731,11 @@ export const UNIT_SCANS = [
   // Advanced settings (#367): the list, and the recorded fixtures each CLI-facing default is checked against.
   { test: 'tests/advanced.test.ts', paths: ['src/shared/advanced.ts', 'tests/fixtures/'] },
   { test: 'tests/settingsWorkspace.test.ts', paths: ['src/shared/advanced.ts'] },
+  // npm run check:repo's test files and the tests it picks by name exist (HI-2244): its script, a test file renamed or
+  // deleted, or a describe or test renamed in a file it runs by name.
+  { test: 'tests/checkRepo.test.ts', paths: ['package.json'] },
+  { test: 'tests/checkRepo.test.ts', paths: ['tests/'], adds: true },
+  { test: 'tests/checkRepo.test.ts', paths: ['tests/e2esuites.test.ts', 'tests/folderProcesses.test.ts', 'tests/i18nCatalogues.test.ts'], lines: ['\\bdescribe\\(', '\\bit\\('] },
   // This table's own check: a test file added, or one starting to scan the repository.
   { test: 'tests/focusedPick.test.ts', paths: ['tests/'], adds: true },
   { test: 'tests/focusedPick.test.ts', paths: ['tests/'], lines: ['ls-files', 'readdir', '\\bglob'] }
