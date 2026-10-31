@@ -1017,8 +1017,8 @@ function checkHold(column: TaskColumn, actor: TaskActor, n?: number): void {
   if (column !== 'hold' || actor.kind !== 'agent' || !actor.self) return
   throw new TaskPermissionError(
     n
-      ? withValues(msg({ id: 'tasks.error.holdCard', defaultMessage: 'Only the user or the Assistant puts cards On Hold: ask the user to park {card}.', description: 'An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do.' }), { card: cardRef(n) })
-      : msg({ id: 'tasks.error.holdNew', defaultMessage: 'Only the user or the Assistant puts cards On Hold: ask the user to park it.', description: 'An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do.' })
+      ? withValues(msg({ id: 'tasks.error.holdCard', defaultMessage: 'Only the user or the Assistant puts cards On Hold. Where the user has decided to park {card}, ask the Assistant (hive_ask_assistant); otherwise ask the user.', description: 'An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do (HI-2227): a decision already made goes to the Assistant, hive_ask_assistant (a tool name: keep it as it is), else the user is asked.' }), { card: cardRef(n) })
+      : msg({ id: 'tasks.error.holdNew', defaultMessage: 'Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (hive_ask_assistant), otherwise ask the user.', description: 'An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do (HI-2227): add it to Todo, then a decision already made goes to the Assistant, hive_ask_assistant (a tool name: keep it as it is), else the user is asked.' })
   )
 }
 

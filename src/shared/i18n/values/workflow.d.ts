@@ -333,7 +333,7 @@ interface HiveMessageValues {
   'workflow.refused.submit.decisionsReceived.next': undefined
   'workflow.refused.submit.empty.message': { card: string | number }
   'workflow.refused.submit.empty.messageForUser': undefined
-  'workflow.refused.submit.empty.next': undefined
+  'workflow.refused.submit.empty.next': { changes: string }
   'workflow.refused.submit.empty.nextForUser': undefined
   'workflow.refused.submit.focusedChosen.change': undefined
   'workflow.refused.submit.focusedChosen.message': { card: string | number; revision: string | number; state: string; why: string }

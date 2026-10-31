@@ -54,7 +54,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'submit.clean': r(
     msg({ id: 'workflow.refused.submit.clean.message', defaultMessage: "{card} can't go to review: {folder} has uncommitted changes ({files}).", description: 'A refused submit: the working folder has uncommitted changes. {folder} is a folder path, {files} a list of file paths.' }),
-    msg({ id: 'workflow.refused.submit.clean.next', defaultMessage: "Commit your changes (or remove them), then submit for review again. If the user didn't ask you to commit, ask them.", description: "The next step after a refused submit for review with uncommitted changes, addressed to the agent: committing is the user's call (HI-1618)." }),
+    msg({ id: 'workflow.refused.submit.clean.next', defaultMessage: "Commit the card's changes (committing is part of doing the card), then submit for review again. Changes that aren't the card's: ask before removing them.", description: "The next step after a refused submit for review with uncommitted changes (HI-1618, HI-2227): the agent given the card commits its work as part of doing it; changes that aren't the card's are removed only once asked about." }),
     msg({ id: 'workflow.refused.submit.clean.change', defaultMessage: 'This rule comes with review and merging in Version Control.', description: 'Where the rule that refused a submit with uncommitted changes comes from.' })
   ),
   'submit.trailer': r(
@@ -231,7 +231,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   // decision): what is missing is said in git's words, and committing stays the user's call.
   'submit.empty': r(
     msg({ id: 'workflow.refused.submit.empty.message', defaultMessage: '{card}: nothing committed to review.', description: "A refused submit for review: the card's line has no commit since it started (git's words: nothing committed). {card} is a card key." }),
-    msg({ id: 'workflow.refused.submit.empty.next', defaultMessage: "Commit the card's work, then submit for review. If the user didn't ask you to commit, ask them.", description: "The next step after a refused submit for review with nothing committed, addressed to the agent: committing is the user's call." })
+    msg({ id: 'workflow.refused.submit.empty.next', defaultMessage: "{changes, select, yes {Commit the card's work (committing is part of doing the card), then submit for review again.} none {Its folder has no changes either. A card that needs none (it only runs or checks something, or its work is already there) is no-code: ask for that with hive_ask_user (action noCode), or hive_ask_assistant where it's already decided. Otherwise make its change, commit it and submit again.} other {Commit the card's work (committing is part of doing the card), then submit for review again. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).}}", description: "The next step after a refused submit for review with nothing committed (HI-2227). {changes} (select): yes when the card's folder has uncommitted changes (commit them: part of doing the card), none when it has none (a card needing no change is made no-code by the user, asked with the tools named), other when unknown. hive_ask_user, hive_ask_assistant and noCode are names of tools and an option: keep them as they are; translate each branch's whole sentences." })
   ),
   // A project with no version control: nothing is committed there, only the card's files changed or not.
   'submit.unchanged': r(
@@ -364,7 +364,8 @@ const IN_ENGLISH: RefusalFormat = { one: (m, values) => englishText(values ? { m
  */
 const VALUES_BEFORE: Partial<Record<RuleId, Record<string, string>>> = {
   'submit.checksPassed': { why: 'none', files: 'none', copy: 'no' }, // i18n-ignore: select keys, never shown
-  'move.doingNobody': { also: 'no' } // i18n-ignore: select keys, never shown
+  'move.doingNobody': { also: 'no' }, // i18n-ignore: select keys, never shown
+  'submit.empty': { changes: 'unknown' } // i18n-ignore: select keys, never shown
 }
 
 /** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */

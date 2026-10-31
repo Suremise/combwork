@@ -86,8 +86,11 @@ describe("the user's drags run their intents", () => {
     expect(s.latest).not.toBeNull()
     const empty = e.wf.createCard({ title: 'Nothing yet' })
     moved(await e.wf.start(empty.key, B2))
-    refusedBy(await e.wf.move(empty.key, 'review', 'user', { confirm: true }), 'submit.empty')
+    // Its folder clean: nothing to commit either (HI-2227); then with a change not committed, a commit is what it needs.
+    expect(refusedBy(await e.wf.move(empty.key, 'review', 'user', { confirm: true }), 'submit.empty').values).toMatchObject({ changes: 'none' })
     expect(e.wf.state(empty)).toMatchObject({ stage: 'active', latest: null })
+    writeFileSync(join(e.wf.folderOf(e.wf.state(empty)), 'e.txt'), 'e\n')
+    expect(refusedBy(await e.wf.move(empty.key, 'review', 'user', { confirm: true }), 'submit.empty').values).toMatchObject({ changes: 'yes' })
   })
 
   it('a no-code card dragged to Review gets a submission to review', async () => {

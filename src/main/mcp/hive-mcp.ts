@@ -814,7 +814,7 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        title: { type: 'string', description: "About 70 characters: the outcome or problem in words; no people's names." },
+        title: { type: 'string', description: 'About 70 characters: the outcome or problem in words. Names, measurements, files and paths go in the description.' },
         description: { type: 'string', description: 'What to do and how to tell it is done, in full: whoever starts it reads only the card.' },
         project: projectArg,
         agent: { type: 'string', description: 'Give it to this agent (name or id).' },
