@@ -205,6 +205,50 @@ describe("the lane and wait lists, moves and intents name a card by its number o
     expect(namesCards(o, ['AL-2', 'AL-1'], [1, 3])).toBe(false)
   })
 
+  // HR1 round 1: the wait lists and Hive's text that card-loop-released, assistant-dispatch and inbox-stale read.
+  const run = (id: string, obs: Record<string, unknown>, c: Record<string, unknown>) => {
+    const sc = SCENARIOS.find((s) => s.id === id)!
+    return Object.fromEntries(sc.expect({ ...o, hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', cards: {}, facts: {}, ...obs }, c).map(([name, ok]) => [name, ok]))
+  }
+
+  it("card-loop-released: a wait on another project's same digits isn't a wait on its card; its own key is", () => {
+    // Its cards: #1 (AL-1, reassigned) then #3 (AL-2).
+    const released = (hiveCalls: unknown[]) => run('card-loop-released', { hiveCalls }, { cards: { a: 1, b: 3 } })
+    const AGAIN = "didn't wait on #1 again"
+    const ON_B = 'went on to #3 (began its review, or watched it)'
+    const r = released([call('hive_wait_for_tasks', { cards: ['BE-1'], wake: true }), call('hive_start_review', { card: 'AL-2' })])
+    expect(r[AGAIN]).toBe(true)
+    expect(r[ON_B]).toBe(true)
+    expect(released([call('hive_wait_for_tasks', { cards: ['AL-1'], wake: true })])[AGAIN]).toBe(false)
+    expect(released([call('hive_wait_for_tasks', { cards: ['#1'], wake: true })])[AGAIN]).toBe(false)
+    // A watch of AL-2 (#3) is going on to it; of AL-3 or BE-1 isn't.
+    expect(released([call('hive_wait_for_tasks', { cards: ['AL-2'], wake: true })])[ON_B]).toBe(true)
+    expect(released([call('hive_wait_for_tasks', { cards: ['AL-3'], wake: true })])[ON_B]).toBe(false)
+  })
+
+  it("assistant-dispatch: a watch on the started card by its own key or number counts; on another project's same digits it doesn't", () => {
+    const WATCH = 'then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked'
+    // The card started is #3 (AL-2).
+    const dispatch = (watch: unknown) => run('assistant-dispatch', { hiveCalls: [call('hive_start_task', { number: 'AL-2', agent: 'Coder' }), call('hive_wait_for_tasks', watch)], cards: { i: { number: 3, key: 'AL-2', column: 'review' } } }, { cards: { i: 3 }, agents: { coder: { id: 'a-coder' } }, read: () => '* text=auto\n' })[WATCH]
+    expect(dispatch({ cards: ['AL-2'], wake: true })).toBe(true)
+    expect(dispatch({ cards: [3], wake: true })).toBe(true)
+    expect(dispatch({ cards: ['BE-1'], wake: true })).toBe(false)
+    expect(dispatch({ cards: ['AL-3'], wake: true })).toBe(false)
+    expect(dispatch({ cards: [13], wake: true })).toBe(false)
+  })
+
+  it("inbox-stale: Hive's message names the card by its own key or #n, not another card's key", () => {
+    const LEFT = 'the message was left, tied to its round'
+    const STALE = 'stale once the card passed, never given'
+    const stale = (sent: string, detail: string) =>
+      run('inbox-stale', { cards: { a: { number: 3, key: 'AL-2', column: 'passed', history: [] } } }, { cards: { a: 3 }, sent, got: [{ kind: 'rebrief', state: 'stale', detail, received: false }], read: () => 'Hi there!' })
+    expect(stale('Left for Coder: for AL-2 round 1.', 'AL-2 passed review')[LEFT]).toBe(true)
+    expect(stale('Left for Coder: for AL-2 round 1.', 'AL-2 passed review')[STALE]).toBe(true)
+    expect(stale('Left for Coder: for #3 round 1.', '#3 passed review')[STALE]).toBe(true)
+    expect(stale('Left for Coder: for BE-1 round 1.', 'BE-1 passed review')[LEFT]).toBe(false)
+    expect(stale('Left for Coder: for AL-3 round 1.', 'AL-3 passed review')[STALE]).toBe(false)
+  })
+
   it("movesOf: a move or an intent on the card's own key or number; another project's same digits isn't one", () => {
     const calls = [
       call('hive_update_task', { number: 'BE-1', column: 'done' }),

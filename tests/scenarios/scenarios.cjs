@@ -329,6 +329,8 @@ const cardIs = (o, ref, n) => {
   const key = keyOf(o, n)
   return !!key && s.toUpperCase() === String(key).toUpperCase()
 }
+/** A pattern for card `n` as Hive's text names it (HI-2231): its own key, or #n; never another card's key. */
+const refOf = (o, n) => [keyOf(o, n), `#${n}`].filter(Boolean).map((r) => r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
 /** Whether a call's list of cards names card `n`, each by number or key (HI-1950: a model names cards by key). */
 const namesCard = (o, refs, n) => Array.isArray(refs) && refs.some((r) => cardIs(o, r, n))
 /** Whether a call's list of cards is exactly cards `ns`, in that order, each by number or key. */
@@ -1432,8 +1434,8 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const msg = (c.got ?? []).find((d) => d.kind === 'rebrief')
       return [
-        ['the message was left, tied to its round', new RegExp(`for ([A-Z]{2,4}-\\d+|#${c.cards.a}) round 1`).test(c.sent ?? ''), c.sent],
-        ['stale once the card passed, never given', msg?.state === 'stale' && new RegExp(`^([A-Z]{2,4}-\\d+|#${c.cards.a}) passed review$`).test(msg.detail ?? '') && !msg.received, JSON.stringify(msg)],
+        ['the message was left, tied to its round', new RegExp(`for (${refOf(o, c.cards.a)}) round 1`).test(c.sent ?? ''), c.sent],
+        ['stale once the card passed, never given', msg?.state === 'stale' && new RegExp(`^(${refOf(o, c.cards.a)}) passed review$`).test(msg.detail ?? '') && !msg.received, JSON.stringify(msg)],
         ['the greeting is the card\'s, not the stale one', !/Stale!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
         ["didn't reopen the passed card", o.cards.a?.column === 'passed', history(o.cards.a).join(' | ')]
       ]
@@ -3453,7 +3455,7 @@ module.exports.SCENARIOS = [
         ['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')],
         ['started the card with hive_start_task, which worked', start >= 0, calls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         // An agent watch or wait, or a card watch on the card it started (#416: coordinate-agents points card work there).
-        ['then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked', start >= 0 && calls.slice(start + 1).some((x) => x.ok && (x.tool === 'hive_wait_for_agents' || (x.tool === 'hive_wait_for_tasks' && new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.i}\\b`).test(String(x.args)))))],
+        ['then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked', start >= 0 && calls.slice(start + 1).some((x) => x.ok && (x.tool === 'hive_wait_for_agents' || (x.tool === 'hive_wait_for_tasks' && namesCard(o, argsOf(x).cards, c.cards.i))))],
         ["didn't type the card into the agent instead", called(o, 'hive_prompt_agent').length === 0],
         ['the agent did it: the card handed on (in Review, or past it by its submission) and the file is there', handedOn(o, c, 'i') && /text=auto/.test(c.read('.gitattributes') ?? ''), `${o.cards.i?.column}`]
       ]
@@ -3768,7 +3770,7 @@ module.exports.SCENARIOS = [
       `You are the reviewer in a card loop (the card-loop skill): cards #${c.cards.a}, then #${c.cards.b}; rounds 3; wait 1h. You were waiting for #${c.cards.a} to arrive in Review when Hive typed this line: [Hive] #${c.cards.a} was reassigned to Other (your watch on it ended). Your card watch has ended: drop it from your list and carry on with your next card.`,
     fake: (c) => `skill card-loop then ${fakeStartReview(c.cards.b)}`,
     expect: (o, c) => {
-      const watchedA = ran(o, 'hive_wait_for_tasks').some((x) => new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.a}\\b`).test(String(x.args)))
+      const watchedA = ran(o, 'hive_wait_for_tasks').some((x) => namesCard(o, argsOf(x).cards, c.cards.a))
       const onB = ran(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, c.cards.b) && field(x.args, 'review', 'start')) || ran(o, 'hive_start_review').some((x) => cardIs(o, argsOf(x).card, c.cards.b)) || ran(o, 'hive_wait_for_tasks').some((x) => namesCard(o, argsOf(x).cards, c.cards.b))
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
