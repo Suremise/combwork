@@ -226,6 +226,210 @@ describe("the card read and update checks count the card by its number or its ow
   })
 })
 
+describe("the checks follow what the current skills say (HI-2222): the right behaviour passes, the old or a wrong one doesn't", () => {
+  const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  const hiveTool = (name: string, input: unknown, result: string) => ({ name: `mcp__hive__${name}`, input: JSON.stringify(input), result, isError: false })
+  const run = (id: string, o: Record<string, unknown>, c: Record<string, unknown>) => {
+    const sc = SCENARIOS.find((s) => s.id === id)!
+    return Object.fromEntries(sc.expect({ hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', ...o }, c).map(([name, ok]) => [name, ok]))
+  }
+  const agents = { coder: { id: 'a-coder' }, implementer: { id: 'a-impl' }, builder2: { id: 'a-b2' } }
+
+  describe('review-asks-user and card-loop-disputed: a hive_ask_user that worked, its request open on the card', () => {
+    const ASKED = 'asked the user on the card (hive_ask_user, kind decide: open under For you)'
+    const ask = (actor = 'agent:a-coder', kind = 'decide') => ({ kind: 'ApprovalRequested', actor, data: { request: 'AL-1/r4', kind } })
+    const review = (hiveCalls: unknown[], facts: unknown[], forYou: unknown[] = [{ request: 'AL-1/r4' }], extra: Record<string, unknown> = {}) =>
+      run('review-asks-user', { hiveCalls, facts: { q: facts }, cards: { q: { number: 1, key: 'AL-1', column: 'review', agent: { id: 'a-impl' }, forYou, history: [], ...extra } }, allCards: [{ number: 1, key: 'AL-1' }] }, { cards: { q: 1 }, agents })[ASKED]
+
+    it('passes its own Decide request, by number or key', () => {
+      expect(review([call('hive_ask_user', { card: 'AL-1', kind: 'decide', text: 'Which currency?' })], [ask()])).toBe(true)
+      expect(review([call('hive_ask_user', { card: '#1', kind: 'decide', text: 'Which currency?' })], [ask()])).toBe(true)
+    })
+
+    it('fails the old block and notification, a refused ask, another card, an answered request or another agent asking', () => {
+      expect(review([call('hive_update_task', { number: 1, blocked: 'Which currency?' }), call('hive_notify', { title: 'AL-1', message: 'Which currency?' })], [], [], { blocked: 'Which currency?' })).toBe(false)
+      expect(review([call('hive_ask_user', { card: 'AL-1', kind: 'decide', text: 'Which?' }, false)], [])).toBe(false)
+      expect(review([call('hive_ask_user', { card: 'AL-2', kind: 'decide', text: 'Which?' })], [ask()])).toBe(false)
+      expect(review([call('hive_ask_user', { card: 'AL-1', kind: 'decide', text: 'Which?' })], [ask()], [])).toBe(false)
+      expect(review([call('hive_ask_user', { card: 'AL-1', kind: 'decide', text: 'Which?' })], [ask('agent:a-impl')])).toBe(false)
+    })
+
+    it('card-loop-disputed: the same, on its card', () => {
+      const disputed = (hiveCalls: unknown[], facts: unknown[]) => run('card-loop-disputed', { hiveCalls, facts: { p: facts }, cards: { p: { number: 1, key: 'AL-1', column: 'review', forYou: [{ request: 'AL-1/r4' }], history: [] } }, allCards: [{ number: 1, key: 'AL-1' }] }, { cards: { p: 1 }, agents })[ASKED]
+      expect(disputed([call('hive_ask_user', { card: 'AL-1', kind: 'decide', text: 'Backoff or not?' })], [ask()])).toBe(true)
+      expect(disputed([call('hive_notify', { title: 'AL-1', message: 'Backoff or not?' })], [])).toBe(false)
+    })
+  })
+
+  describe('coordinator-team-lanes: each lane started with hive_lane start; a reviewer briefed only by its start or a prompt', () => {
+    const cards = { a: 1, b: 2, c: 3 }
+    const board = [1, 2, 3].map((n) => ({ number: n, key: `AL-${n}` }))
+    // A lane start: its call in Hive's log (JSON arguments), its reply in the transcript (whose input is display text).
+    type Start = { call: unknown; tool: unknown }
+    const start = (builder: string, reviewer: string, laneCards: unknown[], reply: string, brief = 'Use card-loop as the builder.', ok = true): Start => {
+      const args = { action: 'start', project: 'alpha', builder, reviewer, cards: laneCards, brief }
+      return { call: call('hive_lane', args, ok), tool: { ...hiveTool('hive_lane', `action: start\nbuilder: ${builder}`, reply), isError: !ok } }
+    }
+    const lanes = (starts: Start[], hiveCalls: unknown[] = []) => run('coordinator-team-lanes', { tools: starts.map((s) => s.tool), hiveCalls: [...starts.map((s) => s.call), ...hiveCalls], allCards: board, cards: {} }, { cards, agents })
+    const STARTED = (who: string) => `Lane started: ${who} (alpha) L: active. Its brief is delivered to the builder now. Started ${who.replace(' / ', ' and ')} with the lane's brief.`
+    const both = [start('Coder', 'Implementer', ['AL-1', 'AL-2'], STARTED('Coder / Implementer')), start('Builder2', 'Reviewer2', [3], STARTED('Builder2 / Reviewer2'))]
+
+    it('passes two lane starts whose replies say Hive started every agent with the brief', () => {
+      const r = lanes(both)
+      expect(r["started Coder's lane (hive_lane start: its cards, its reviewer, a card-loop brief)"]).toBe(true)
+      expect(r['Implementer briefed: started by the lane with its brief, or prompted with card-loop, the cards and its builder']).toBe(true)
+      expect(r["started Builder2's lane (hive_lane start: its card, its reviewer, a card-loop brief)"]).toBe(true)
+      expect(r['Reviewer2 briefed: started by the lane with its brief, or prompted with card-loop, the card and its builder']).toBe(true)
+    })
+
+    it("a reviewer already running isn't briefed by the lane naming it, only by the prompt its reply asks for", () => {
+      const running = "Lane started: Coder / Implementer (alpha) L: active. Started Coder with the lane's brief. Implementer is running, so Hive left it as it is: tell it about the lane."
+      const IMPL = 'Implementer briefed: started by the lane with its brief, or prompted with card-loop, the cards and its builder'
+      expect(lanes([start('Coder', 'Implementer', [1, 2], running)])[IMPL]).toBe(false)
+      expect(lanes([start('Coder', 'Implementer', [1, 2], running)], [call('hive_prompt_agent', { project: 'alpha', agent: 'Implementer', text: 'Use card-loop as the reviewer. Cards: AL-1, AL-2. Your builder is Coder.' })])[IMPL]).toBe(true)
+    })
+
+    it("fails the old prompt-only briefs, another lane's cards, the wrong reviewer, a brief without card-loop and a refused start", () => {
+      const CODER = "started Coder's lane (hive_lane start: its cards, its reviewer, a card-loop brief)"
+      expect(lanes([], [call('hive_start_agent', { project: 'alpha', agent: 'Coder', prompt: 'Builder in a card-loop lane: cards #1, #2; your reviewer is Implementer.' })])[CODER]).toBe(false)
+      expect(lanes([start('Coder', 'Implementer', [1, 3], STARTED('Coder / Implementer'))])[CODER]).toBe(false)
+      expect(lanes([start('Coder', 'Implementer', ['BE-1', 'AL-2'], STARTED('Coder / Implementer'))])[CODER]).toBe(false)
+      expect(lanes([start('Coder', 'Reviewer2', [1, 2], STARTED('Coder / Reviewer2'))])[CODER]).toBe(false)
+      expect(lanes([start('Coder', 'Implementer', [1, 2], STARTED('Coder / Implementer'), 'Build these.')])[CODER]).toBe(false)
+      expect(lanes([start('Coder', 'Implementer', [1, 2], 'Coder has no such card', 'Use card-loop as the builder.', false)])[CODER]).toBe(false)
+      // Another lane's reply doesn't stand in for this one's.
+      expect(lanes([start('Coder', 'Implementer', [1, 2], STARTED('Builder2 / Reviewer2'))])[CODER]).toBe(false)
+      // A reply that doesn't say the brief reaches the builder.
+      expect(lanes([start('Coder', 'Implementer', [1, 2], "Lane started: Coder / Implementer (alpha) L: active. Started Coder and Implementer with the lane's brief.")])[CODER]).toBe(false)
+    })
+
+    it("HR1 round 1: a second start of the same pair gets its own reply, never the first's", () => {
+      const IMPL = 'Implementer briefed: started by the lane with its brief, or prompted with card-loop, the cards and its builder'
+      const CODER = "started Coder's lane (hive_lane start: its cards, its reviewer, a card-loop brief)"
+      // Started on [3] (Hive started both), then updated to [1, 2], whose own reply says Implementer is running: tell it.
+      const first = start('Coder', 'Implementer', [3], STARTED('Coder / Implementer'))
+      const update = start('Coder', 'Implementer', [1, 2], 'Lane updated: Coder / Implementer (alpha) L: active. Coder and Implementer are running, so Hive left them as they are: tell them about the lane.')
+      const r = lanes([first, update])
+      expect(r[IMPL]).toBe(false)
+      expect(r[CODER]).toBe(false)
+      // Its prompt then briefs it.
+      expect(lanes([first, update], [call('hive_prompt_agent', { project: 'alpha', agent: 'Implementer', text: 'Use card-loop as the reviewer. Cards: AL-1, AL-2. Your builder is Coder.' })])[IMPL]).toBe(true)
+      // The other way round: [1, 2] started both with the brief, then a second start of the pair: the first's own reply counts.
+      const ok = lanes([start('Coder', 'Implementer', [1, 2], STARTED('Coder / Implementer')), start('Coder', 'Implementer', [1, 2], 'Lane updated: Coder / Implementer (alpha) L: active. Its brief is delivered to the builder now.')])
+      expect(ok[IMPL]).toBe(true)
+      expect(ok[CODER]).toBe(true)
+    })
+  })
+
+  describe("assistant-new-lane: hive_lane start, Coder left to Hive's start as the reply says", () => {
+    const LEFT = "left Coder to Hive's start as the reply said (no prompt where Hive gives it the card; a new conversation where it said to tell it)"
+    const STARTED = "started Coder's lane with hive_lane start, which worked: its card, rounds 3, wait 60 minutes"
+    const byHive = "Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it."
+    const tellIt = 'Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Hive left it as it is: tell it about the lane.'
+    const lane = { builder: { name: 'Coder' }, cards: [{ number: 1 }], rounds: 3, waitMinutes: 60 }
+    const newLane = (reply: string, hiveCalls: unknown[] = [], lanes = [lane]) =>
+      run('assistant-new-lane', { tools: [hiveTool('hive_lane', 'action: start\nbuilder: Coder', reply)], hiveCalls: [call('hive_lane', { action: 'start', builder: 'Coder', cards: ['AL-1'], rounds: 3, waitMinutes: 60 }), ...hiveCalls], lanes }, { cards: { n: 1 }, agents })
+    const prompt = call('hive_prompt_agent', { project: 'alpha', agent: 'Coder', text: 'Use card-loop as the builder of lane L.', newConversation: true })
+
+    it('passes the lane start with no prompt where Hive gives Coder the card, and the one prompt where its reply says to tell it', () => {
+      expect(newLane(byHive)[STARTED]).toBe(true)
+      expect(newLane(byHive)[LEFT]).toBe(true)
+      expect(newLane(tellIt, [prompt])[LEFT]).toBe(true)
+    })
+
+    it("fails the old hive_prompt_agent alone, a prompt racing Hive's start, and a lane with other rounds or wait", () => {
+      expect(run('assistant-new-lane', { hiveCalls: [prompt], lanes: [] }, { cards: { n: 1 }, agents })[STARTED]).toBe(false)
+      expect(newLane(byHive, [prompt])[LEFT]).toBe(false)
+      expect(newLane(tellIt)[LEFT]).toBe(false)
+      expect(newLane(byHive, [], [{ ...lane, rounds: 10, waitMinutes: 360 }])[STARTED]).toBe(false)
+    })
+  })
+
+  describe("coordinator-follow-up: a card queued for Coder's lane is on it", () => {
+    const PLACED = "placed in the lane that owns greet.js: Coder's (its agent, its lane, or named on it)"
+    const OTHERS = "not in Builder2's lane"
+    const followUp = (lanes: unknown[]) =>
+      run('coordinator-follow-up', { allCards: [{ number: 4, key: 'AL-4', title: 'greet() escapes HTML', description: 'src/greet.js: escape the name before greeting, so greet("<b>") returns Hi, &lt;b&gt;.', agent: null, comments: [] }], lanes }, { cards: { a: 1, b: 2, c: 3 }, agents })
+    it('counts the lane list and its queued change, and no other lane', () => {
+      expect(followUp([{ builder: { name: 'Coder' }, cards: [{ number: 1 }, { number: 2 }], queued: [1, 2, 4] }])[PLACED]).toBe(true)
+      expect(followUp([{ builder: { name: 'Coder' }, cards: [{ number: 1 }, { number: 2 }, { number: 4 }] }])[PLACED]).toBe(true)
+      expect(followUp([{ builder: { name: 'Coder' }, cards: [{ number: 1 }, { number: 2 }] }])[PLACED]).toBe(false)
+      const theirs = followUp([{ builder: { name: 'Coder' }, cards: [{ number: 1 }, { number: 2 }] }, { builder: { name: 'Builder2' }, cards: [{ number: 3 }], queued: [3, 4] }])
+      expect(theirs[PLACED]).toBe(false)
+      expect(theirs[OTHERS]).toBe(false)
+    })
+  })
+
+  it('card-loop-merge-decision: each question it asked closed by the decision once, and the answer told to it once; missing or duplicate fails', () => {
+    const CLOSED = 'the decision closed each question it asked, once'
+    const TOLD = 'Hive told it of the answer, once on each card it asked on'
+    const ASKED = 'asked the user on a lane card (hive_cannot_within_rules or hive_ask_user: open under For you), and ended its turn'
+    const answeredAt = Date.parse('2026-10-31T12:00:00.000Z')
+    const decided = { at: '2026-10-31T12:00:00.100Z', by: 'You', what: 'Recorded a decision: "The maintainer allowed the lane\'s commit…"' }
+    const told = { at: '2026-10-31T12:00:01.000Z', by: 'Hive', what: 'Told agent Coder (alpha) of your answer' }
+    const approval = (request: string) => ({ kind: 'Approval', data: { request, answer: 'answered', byDecision: { decision: 'd1' } } })
+    const merge = (asked: { key: string; request: string }[] | null, facts: unknown[], history: unknown[] = [decided, told]) =>
+      run('card-loop-merge-decision', { cards: { a: { number: 1, history: [] }, b: { number: 2, history } }, facts: { a: [], b: facts } }, { cards: { a: 1, b: 2 }, agents, answeredAt, ...(asked ? { atAnswer: { asked, columns: ['passed', 'passed'] } } : {}), read: () => '', git: () => 'x', head: 'x' })
+    const onB = [{ key: 'b', request: 'AL-2/r2' }]
+    expect(merge(onB, [approval('AL-2/r2')])[CLOSED]).toBe(true)
+    expect(merge(onB, [approval('AL-2/r2')])[TOLD]).toBe(true)
+    expect(merge(onB, [approval('AL-2/r2')])[ASKED]).toBe(true)
+    expect(merge(onB, [])[CLOSED]).toBe(false)
+    expect(merge(onB, [approval('AL-2/r9')])[CLOSED]).toBe(false)
+    expect(merge(onB, [approval('AL-2/r2')], [told])[CLOSED]).toBe(false)
+    // HR1 round 1: closed is not told. The answer never delivered, delivered twice, or a delivery from before the answer.
+    expect(merge(onB, [approval('AL-2/r2')], [decided])[TOLD]).toBe(false)
+    expect(merge(onB, [approval('AL-2/r2')], [decided, told, { ...told, at: '2026-10-31T12:00:05.000Z' }])[TOLD]).toBe(false)
+    expect(merge(onB, [approval('AL-2/r2')], [{ ...told, at: '2026-10-31T11:59:00.000Z' }, decided])[TOLD]).toBe(false)
+    expect(merge(onB, [approval('AL-2/r2')], [decided, { ...told, what: 'Told agent Implementer (alpha) of your answer' }])[TOLD]).toBe(false)
+    expect(merge(null, [])[CLOSED]).toBe(false)
+    expect(merge(null, [])[TOLD]).toBe(false)
+    expect(merge(null, [])[ASKED]).toBe(false)
+  })
+
+  describe("assistant-new-lane's observations: the Sessions history read whether or not a new conversation began (HR1 round 1)", () => {
+    const NEW = 'Coder runs in a new conversation'
+    const KEPT = 'its last conversation stays in the Sessions history'
+    const sc = SCENARIOS.find((s) => s.id === 'assistant-new-lane') as unknown as { during: (c: unknown) => Promise<void>; observe: (o: unknown, c: unknown) => [string, boolean, string?][] }
+    // The scenario's own during(), against a stand-in Hive: Coder's live state and its project's session list.
+    const look = async (live: { runId: string; sessionId: string; status: string }, sessions: string[]) => {
+      const c: Record<string, unknown> = {
+        alpha: 'C:/w/alpha',
+        agents,
+        before: { runId: 'r1', sessionId: 's-old', status: 'finished' },
+        inv: async (channel: string) => (channel === 'session:list' ? sessions.map((id) => ({ id })) : channel === 'session:live' ? [{ projectPath: 'C:/w/alpha', agentId: 'a-coder', ...live }] : [])
+      }
+      return c
+    }
+    it('the same conversation kept: none new, the old one listed (read, not assumed)', async () => {
+      const c = await look({ runId: 'r1', sessionId: 's-old', status: 'working' }, ['s-old', 's-older'])
+      await sc.during(c)
+      const obs = Object.fromEntries(sc.observe({}, c).map(([n, v, d]) => [n, [v, d]]))
+      expect(obs[NEW][0]).toBe(false)
+      expect(obs[KEPT]).toEqual([true, 's-old in [s-old,s-older]'])
+    })
+    it('a new conversation: it, and the old one still listed; and an old one gone from the list is recorded as gone', async () => {
+      const c = await look({ runId: 'r2', sessionId: 's-new', status: 'working' }, ['s-new', 's-old'])
+      await sc.during(c)
+      const obs = Object.fromEntries(sc.observe({}, c).map(([n, v]) => [n, v]))
+      expect(obs[NEW]).toBe(true)
+      expect(obs[KEPT]).toBe(true)
+      const gone = await look({ runId: 'r2', sessionId: 's-new', status: 'working' }, ['s-new'])
+      await sc.during(gone)
+      expect(Object.fromEntries(sc.observe({}, gone).map(([n, v]) => [n, v]))[KEPT]).toBe(false)
+    })
+  })
+
+  it("mode-*-plans: a question through the CLI's own question tool surfaces the decision; none at all doesn't", () => {
+    const SURFACED = 'surfaced a decision for the user (a question put to them, or on a card)'
+    const plans = (tools: unknown[], finalReply = 'Planned.') => run('mode-coordinator-plans', { tools, finalReply }, { ws: tempDir('hive-2222-plans'), agents })[SURFACED]
+    expect(plans([{ name: 'AskUserQuestion', input: JSON.stringify({ questions: [{ question: 'Should the CSV include archived cards?' }] }), result: 'Yes', isError: false }])).toBe(true)
+    expect(plans([], 'Should the CSV include archived cards?')).toBe(true)
+    expect(plans([])).toBe(false)
+    expect(plans([{ name: 'AskUserQuestion', input: JSON.stringify({ questions: [{ question: 'Should the CSV include archived cards?' }] }), result: '', isError: true }])).toBe(false)
+  })
+})
+
 describe('the submit scenarios count a question about committing, never a notice (HI-1618, HR5 round 1)', () => {
   type Obs = { hiveCalls?: unknown[]; tools?: { name: string; input: string }[]; finalReply?: string; status?: string; column?: string; submitted?: boolean }
   const call = (name: string, args: unknown, ok = true, error?: string) => ({ tool: name, args: JSON.stringify(args), ok, ...(error ? { error } : {}) })
