@@ -8,6 +8,7 @@ import type { ConversationParserLike, ImageLocation, LiveDetails } from '../type
 import { advancedValues as advanced } from '../../advancedValues'
 import { countSafeguards, SAFEGUARD_DEFAULTS } from '../../../shared/safeguards'
 import { codexSafeguards, errorKind } from './safeguards'
+import { scriptCall } from './scriptCalls'
 
 /**
  * Codex's rollout files (~/.codex/sessions/YYYY/MM/DD/rollout-<time>-<id>.jsonl): one JSON record per
@@ -339,6 +340,11 @@ export class CodexConversationParser implements ConversationParserLike {
   offset = 0
   private tools = new Map<string, TranscriptTool>()
   private root: string | null
+  /**
+   * The latest code-mode script (HI-2240): the calls Codex records as they end are its, whether inside its run or later,
+   * from a command it left running. With its code, when it was shown as the Edit of the patch it applies.
+   */
+  private script: { tool: TranscriptTool; code: string | null } | null = null
 
   constructor(projectPath: string | null = null) {
     this.root = projectPath
@@ -362,6 +368,24 @@ export class CodexConversationParser implements ConversationParserLike {
     const tool: TranscriptTool = { toolUseId: callId, name: toolLabel(name), summary, input, result: null, isError: false, images: [] }
     this.tools.set(callId, tool)
     this.push({ kind: 'tool', timestamp: ts, tool })
+  }
+
+  /**
+   * A call Codex recorded as it ended (HI-2240), added to the latest script's `calls`. A direct call recorded as an item
+   * too (its id the call's own) is shown already; one before any script has none to go in. A script shown as the Edit of
+   * the patch it applies that did more is shown as the Script it is.
+   */
+  private scriptCall(item: Record<string, any>): void {
+    const s = this.script
+    if (!s || this.tools.has(String(item.id ?? ''))) return
+    const call = scriptCall(item, this.root)
+    if (!call) return
+    const calls = (s.tool.calls ??= [])
+    calls.push(call)
+    if (s.code !== null && !(calls.length === 1 && call.name === 'Edit')) {
+      Object.assign(s.tool, { name: 'Script', input: s.code, summary: firstLine(s.code).slice(0, 200) }) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+      s.code = null
+    }
   }
 
   private line(text: string, offset: number, length: number): void {
@@ -418,6 +442,7 @@ export class CodexConversationParser implements ConversationParserLike {
           if (patch !== null) {
             this.tool(String(p.call_id ?? ''), 'Edit', patch, patchPaths(patch).map((f) => shortPath(f, this.root)).join(', ').slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
           } else this.tool(String(p.call_id ?? ''), name === 'exec' ? 'Script' : name, input, firstLine(input).slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+          if (name === 'exec') this.script = { tool: this.tools.get(String(p.call_id ?? ''))!, code: scripted !== null ? input : null }
           break
         }
         case 'function_call_output':
@@ -446,7 +471,8 @@ export class CodexConversationParser implements ConversationParserLike {
       const summary = typeof p.message === 'string' ? p.message : null
       this.push({ kind: 'compaction', timestamp: ts, trigger: 'auto', preTokens: 0, postTokens: 0, nextRequestTokens: null, summary })
     } else if (r.type === 'event_msg') {
-      if (p.type === 'turn_aborted') this.push({ ...noticeOf(p.reason === 'interrupted' ? NOTICE_TEXT.interrupted : p.reason ? { m: NOTICE_TEXT.turnEnded, values: { reason: String(p.reason) } } : NOTICE_TEXT.aborted, 'info'), timestamp: ts })
+      if (p.type === 'item_completed' && p.item && typeof p.item === 'object') this.scriptCall(p.item)
+      else if (p.type === 'turn_aborted') this.push({ ...noticeOf(p.reason === 'interrupted' ? NOTICE_TEXT.interrupted : p.reason ? { m: NOTICE_TEXT.turnEnded, values: { reason: String(p.reason) } } : NOTICE_TEXT.aborted, 'info'), timestamp: ts })
       else if (p.type === 'error' && typeof p.message === 'string') this.push({ kind: 'notice', timestamp: ts, text: p.message, level: 'error' })
     }
   }

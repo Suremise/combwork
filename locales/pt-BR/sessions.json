@@ -155,6 +155,7 @@
   "sessions.tool.loadFailed": "Não foi possível carregar a chamada de ferramenta",
   "sessions.tool.noResult": "sem resultado",
   "sessions.tool.result": "Resultado",
+  "sessions.tool.scriptCalls": "{n, plural, one {# chamada} many {# chamadas} other {# chamadas}}{failed, plural, =0 {} one {, # com falha} many {, # com falha} other {, # com falha}}: {names}",
   "sessions.tool.showAll": "Mostrar tudo ({n, plural, =0 {# caracteres} one {# caractere} other {# caracteres}})",
   "sessions.tree.both": "{n, plural, =0 {# sessões} one {# sessão} other {# sessões}} e {subs, plural, =0 {# subsessões} one {# subsessão} other {# subsessões}}",
   "sessions.tree.none": "nenhuma sessão",

@@ -623,6 +623,10 @@
     "defaultMessage": "Result",
     "description": "Label above a tool call's result in a transcript."
   },
+  "sessions.tool.scriptCalls": {
+    "defaultMessage": "{n, plural, one {# call} other {# calls}}{failed, plural, =0 {} other {, # failed}}: {names}",
+    "description": "A folded Codex script's line in a transcript (HI-2240): how many tool calls the script made, how many of them failed (nothing when none did), then their names ({names}: a list of tool names such as \"Shell, Edit, hive · hive_read_task\", not translated)."
+  },
   "sessions.tool.showAll": {
     "defaultMessage": "Show all ({n, plural, one {# character} other {# characters}})",
     "description": "Button under a long tool call cut short in a transcript: shows it all ({n}: its length in characters)."

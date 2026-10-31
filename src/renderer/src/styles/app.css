@@ -6333,6 +6333,13 @@ h2.section#unused-worktrees {
 .tx-fold-body {
   padding: 4px 10px 10px 30px;
 }
+/* A Codex script's calls (HI-2240), each folded, above the script's own code and output. */
+.tx-calls {
+  margin: 2px 0 8px -6px;
+}
+.tx-calls .tx-fold.open {
+  background: var(--bg);
+}
 .tx-thinking .tx-fold-body .tx-pre {
   font-family: inherit;
   font-style: italic;

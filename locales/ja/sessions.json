@@ -155,6 +155,7 @@
   "sessions.tool.loadFailed": "ツール呼び出しを読み込めませんでした",
   "sessions.tool.noResult": "結果なし",
   "sessions.tool.result": "結果",
+  "sessions.tool.scriptCalls": "{n, plural, other {#件の呼び出し}}{failed, plural, =0 {} other {（#件失敗）}}: {names}",
   "sessions.tool.showAll": "すべて表示（{n, plural, other {#文字}}）",
   "sessions.tree.both": "{n, plural, other {セッション#件}}、{subs, plural, other {サブセッション#件}}",
   "sessions.tree.none": "セッションなし",

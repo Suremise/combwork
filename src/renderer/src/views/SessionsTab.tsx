@@ -1290,9 +1290,9 @@ function Reply({ items, project, sessionId, assistant, isOpen, toggle, onImage }
   )
 }
 
-function Collapsible({ id, open, toggle, icon, label, detail, badge, className, children }: { id: number; open: boolean; toggle: (id: number) => void; icon: string; label: React.ReactNode; detail?: string; badge?: React.ReactNode; className?: string; children: React.ReactNode }) {
+function Collapsible({ id, open, toggle, icon, label, detail, badge, className, anchored = true, children }: { id: number; open: boolean; toggle: (id: number) => void; icon: string; label: React.ReactNode; detail?: string; badge?: React.ReactNode; className?: string; anchored?: boolean; children: React.ReactNode }) {
   return (
-    <div className={cx('tx-fold', open && 'open', className)} id={`tx-${id}`}>
+    <div className={cx('tx-fold', open && 'open', className)} id={anchored ? `tx-${id}` : undefined}>
       <div className="tx-fold-head" onClick={() => toggle(id)}>
         <Icon name={open ? 'chevron-down' : 'chevron-right'} />
         <Icon name={icon} />
@@ -1305,23 +1305,55 @@ function Collapsible({ id, open, toggle, icon, label, detail, badge, className, 
   )
 }
 
-const TOOL_ICON: Record<string, string> = { Bash: 'terminal', PowerShell: 'terminal', Read: 'go-to-file', Edit: 'edit', MultiEdit: 'edit', Write: 'edit', Glob: 'search', Grep: 'search', Agent: 'hubot', Task: 'hubot', WebFetch: 'globe', WebSearch: 'globe' }
+const TOOL_ICON: Record<string, string> = { Bash: 'terminal', PowerShell: 'terminal', Shell: 'terminal', Script: 'code', view_image: 'file-media', Read: 'go-to-file', Edit: 'edit', MultiEdit: 'edit', Write: 'edit', Glob: 'search', Grep: 'search', Agent: 'hubot', Task: 'hubot', WebFetch: 'globe', WebSearch: 'globe' }
 
-function ToolCall({ id, tool, open, toggle, project, sessionId, onImage }: { id: number; tool: TranscriptTool; open: boolean; toggle: (id: number) => void; project: ProjectInfo; sessionId: string; onImage: (img: TranscriptImageRef) => void }) {
+const NO_CALLS_OPEN: ReadonlySet<number> = new Set()
+
+/** A Codex script's calls in a line (HI-2240): how many, how many failed, and their names, each once. */
+function callsSummary(calls: TranscriptTool[]): string {
+  const names = [...new Set(calls.map((c) => c.name))]
+  return tr(msg({ id: 'sessions.tool.scriptCalls', defaultMessage: '{n, plural, one {# call} other {# calls}}{failed, plural, =0 {} other {, # failed}}: {names}', description: "A folded Codex script's line in a transcript (HI-2240): how many tool calls the script made, how many of them failed (nothing when none did), then their names ({names}: a list of tool names such as \"Shell, Edit, hive · hive_read_task\", not translated)." }), { n: calls.length, failed: calls.filter((c) => c.isError).length, names: fmt.list(names, 'unit') })
+}
+
+/**
+ * A tool call in a transcript, folded. A Codex code-mode script shows the calls it made (HI-2240): folded, how many and
+ * which; open, each call folded in turn with its own icon and result, then the script's code and what it printed.
+ * `nested`: a script's call, the `index`th of the tool `id` (its whole text is loaded from it).
+ */
+function ToolCall({ id, tool, open, toggle, project, sessionId, onImage, nested }: { id: number; tool: TranscriptTool; open: boolean; toggle: (id: number) => void; project: ProjectInfo; sessionId: string; onImage: (img: TranscriptImageRef) => void; nested?: { parent: number; index: number } }) {
   const [full, setFull] = useState<TranscriptTool | null>(null)
+  const [openCalls, setOpenCalls] = useState<ReadonlySet<number>>(NO_CALLS_OPEN)
+  const toggleCall = useCallback((i: number) => setOpenCalls((was) => {
+    const next = new Set(was)
+    if (!next.delete(i)) next.add(i)
+    return next
+  }), [])
   const t = full ?? tool
+  const calls = t.calls ?? []
   const truncated = !full && (tool.inputLength !== undefined || tool.resultLength !== undefined)
+  const load = async (): Promise<TranscriptTool | null> => {
+    const whole = await call('transcript:tool', project.path, sessionId, nested ? nested.parent : id)
+    return nested ? (whole.calls?.[nested.index] ?? null) : whole
+  }
   return (
     <Collapsible
       id={id}
       open={open}
       toggle={toggle}
+      anchored={!nested}
       icon={TOOL_ICON[tool.name] ?? (tool.name.includes(' · ') ? 'plug' : 'tools')}
       label={tool.name}
-      detail={tool.summary}
+      detail={tool.calls?.length ? callsSummary(tool.calls) : tool.summary}
       badge={tool.isError ? <span className="badge error">{tr(msg({ id: 'sessions.tool.errorBadge', defaultMessage: 'error', description: 'A badge on a tool call in a transcript that failed. Lower case; keep it short.' }))}</span> : tool.result === null ? <span className="badge">{tr(msg({ id: 'sessions.tool.noResult', defaultMessage: 'no result', description: 'A badge on a tool call in a transcript that has no result (yet). Lower case; keep it short.' }))}</span> : null}
       className="tx-tool"
     >
+      {calls.length > 0 && (
+        <div className="tx-calls">
+          {calls.map((c, i) => (
+            <ToolCall key={i} id={i} tool={c} open={openCalls.has(i)} toggle={toggleCall} project={project} sessionId={sessionId} onImage={onImage} nested={{ parent: nested?.parent ?? id, index: i }} />
+          ))}
+        </div>
+      )}
       <div className="tx-io-label">
         {tr(msg({ id: 'sessions.tool.input', defaultMessage: 'Input', description: "Label above a tool call's input in a transcript." }))} <CopyButton text={t.input} title={tr(msg({ id: 'sessions.tool.copyInput', defaultMessage: 'Copy Input', description: "Tooltip: copies a tool call's input." }))} />
       </div>
@@ -1335,7 +1367,7 @@ function ToolCall({ id, tool, open, toggle, project, sessionId, onImage }: { id:
         </>
       )}
       {truncated && (
-        <button className="btn small subtle" style={{ marginTop: 6 }} onClick={() => void actions.attempt(tr(msg({ id: 'sessions.tool.loadFailed', defaultMessage: 'Could not load the tool call', description: "An error's title: loading a long tool call in full failed." })), () => call('transcript:tool', project.path, sessionId, id)).then((f) => f && setFull(f))}>
+        <button className="btn small subtle" style={{ marginTop: 6 }} onClick={() => void actions.attempt(tr(msg({ id: 'sessions.tool.loadFailed', defaultMessage: 'Could not load the tool call', description: "An error's title: loading a long tool call in full failed." })), load).then((f) => f && setFull(f))}>
           {tr(msg({ id: 'sessions.tool.showAll', defaultMessage: 'Show all ({n, plural, one {# character} other {# characters}})', description: 'Button under a long tool call cut short in a transcript: shows it all ({n}: its length in characters).' }), { n: (tool.inputLength ?? 0) + (tool.resultLength ?? 0) })}
         </button>
       )}

@@ -151,6 +151,8 @@
   "tips.closeWindow.title": "1つのウィンドウを閉じる、またはすべて閉じる",
   "tips.codexSandboxConnections.text": "Codex接続が何度も管理者権限を求めますか？ 接続ごとの管理者サンドボックスのセットアップが、ほかの接続のものをリセットするためです。「設定」→「詳細」→「Codex」→「接続：Codexの管理者権限なしのサンドボックスを使う」をオンにすると、すべて管理者権限なしで動きます。その代わり、別のサンドボックス用アカウントは使われません。",
   "tips.codexSandboxConnections.title": "複数のCodex接続で管理者の確認をなくす",
+  "tips.codexScriptCalls.text": "コードモードのCodexは、スクリプトからツールを実行します。「セッション履歴」タブでは、Scriptの行に呼び出しの数と種類が表示されます。開くと、各呼び出しとその結果を読めます。",
+  "tips.codexScriptCalls.title": "Codexのスクリプトが何をしたかを見る",
   "tips.commandName": "「{command}」",
   "tips.compactFocus.text": "「コンパクト化」は会話を要約し、以降のメッセージのコストを下げます。焦点を指定すれば（「APIの決定事項は残し、テスト出力は捨てる」）、エージェントは大事なものを残します。{key}",
   "tips.compactFocus.title": "焦点を指定してコンパクト化",

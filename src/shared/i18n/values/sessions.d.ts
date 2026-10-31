@@ -157,6 +157,7 @@ interface HiveMessageValues {
   'sessions.tool.loadFailed': undefined
   'sessions.tool.noResult': undefined
   'sessions.tool.result': undefined
+  'sessions.tool.scriptCalls': { n: number; failed: number; names: string | number }
   'sessions.tool.showAll': { n: number }
   'sessions.tree.both': { n: number; subs: number }
   'sessions.tree.none': undefined

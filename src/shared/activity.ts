@@ -4,7 +4,7 @@
 // history". From what Hive already has: the board, the session records, the agents' live state, a session's transcript
 // parse and Stop's tracking's processes.
 import type { AgentProcess } from './agentProcesses'
-import type { BackgroundTaskType, SessionListItem, SessionStatus, TranscriptItem } from './types'
+import type { BackgroundTaskType, SessionListItem, SessionStatus, TranscriptItem, TranscriptTool } from './types'
 import { maskText } from './redact'
 import type { ActivityHookBlock } from './hooks'
 
@@ -16,6 +16,12 @@ export const ACTIVITY_TURNS = 50
 const LINE = 160
 /** A prompt, input or reply shown in the details, cut to this many characters. */
 export const DETAIL = 4000
+
+/**
+ * The calls a tool call stands for (HI-2240): a Codex script's, when its Codex recorded them (they are what it did: an
+ * agent's activity lists them), else the call itself.
+ */
+export const callsMade = (tool: TranscriptTool): TranscriptTool[] => (tool.calls?.length ? tool.calls : [tool])
 
 /** A tool call of a turn, from the transcript. */
 export interface ActivityTool {

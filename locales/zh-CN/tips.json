@@ -151,6 +151,8 @@
   "tips.closeWindow.title": "关闭一个窗口，或全部关闭",
   "tips.codexSandboxConnections.text": "Codex 连接总是请求管理员权限？每个连接的管理员沙盒设置都会重置其他连接的设置。“设置”→“高级”→“Codex”→“连接：使用 Codex 的非管理员沙盒”可让它们都无需管理员权限运行，代价是不再使用独立的沙盒账户。",
   "tips.codexSandboxConnections.title": "多个 Codex 连接，无需管理员提示",
+  "tips.codexScriptCalls.text": "在代码模式下，Codex 通过脚本运行它的工具。在“会话历史”标签页中，Script 行会显示脚本发出了多少次调用以及是哪些；展开它即可查看每次调用及其结果。",
+  "tips.codexScriptCalls.title": "查看 Codex 脚本做了什么",
   "tips.commandName": "“{command}”",
   "tips.compactFocus.text": "压缩会总结对话，让之后的每条消息都更省钱。给它一个重点（“保留 API 相关的决定，去掉测试输出”），智能体就会留下重要的内容。{key}",
   "tips.compactFocus.title": "带重点压缩",

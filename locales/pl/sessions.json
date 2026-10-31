@@ -155,6 +155,7 @@
   "sessions.tool.loadFailed": "Nie udało się wczytać wywołania narzędzia",
   "sessions.tool.noResult": "brak wyniku",
   "sessions.tool.result": "Wynik",
+  "sessions.tool.scriptCalls": "{n, plural, one {# wywołanie} few {# wywołania} many {# wywołań} other {# wywołania}}{failed, plural, =0 {} one {, # nieudane} few {, # nieudane} many {, # nieudanych} other {, # nieudanego}}: {names}",
   "sessions.tool.showAll": "Pokaż wszystko ({n, plural, one {# znak} few {# znaki} many {# znaków} other {# znaku}})",
   "sessions.tree.both": "{n, plural, one {# sesja} few {# sesje} many {# sesji} other {# sesji}} i {subs, plural, one {# podrzędna} few {# podrzędne} many {# podrzędnych} other {# podrzędnej}}",
   "sessions.tree.none": "brak sesji",

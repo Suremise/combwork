@@ -3240,6 +3240,11 @@ export interface TranscriptTool {
   /** Set when input/result were shortened for display; fetch the full call with transcript:tool. */
   inputLength?: number
   resultLength?: number
+  /**
+   * The calls a Codex code-mode script made, in the order they ended (HI-2240): each a tool of its own, named as the same
+   * call made directly is. Absent for any other tool, and for a script whose Codex records none.
+   */
+  calls?: TranscriptTool[]
 }
 
 export interface TranscriptImageRef {

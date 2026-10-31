@@ -155,6 +155,7 @@
   "sessions.tool.loadFailed": "Der Tool-Aufruf konnte nicht geladen werden",
   "sessions.tool.noResult": "kein Ergebnis",
   "sessions.tool.result": "Ergebnis",
+  "sessions.tool.scriptCalls": "{n, plural, one {# Aufruf} other {# Aufrufe}}{failed, plural, =0 {} other {, # fehlgeschlagen}}: {names}",
   "sessions.tool.showAll": "Alles anzeigen ({n, plural, one {# Zeichen} other {# Zeichen}})",
   "sessions.tree.both": "{n, plural, one {# Sitzung} other {# Sitzungen}} und {subs, plural, one {# Untersitzung} other {# Untersitzungen}}",
   "sessions.tree.none": "keine Sitzungen",

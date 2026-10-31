@@ -153,6 +153,8 @@ interface HiveMessageValues {
   'tips.closeWindow.title': undefined
   'tips.codexSandboxConnections.text': undefined
   'tips.codexSandboxConnections.title': undefined
+  'tips.codexScriptCalls.text': undefined
+  'tips.codexScriptCalls.title': undefined
   'tips.commandName': { command: string | number }
   'tips.compactFocus.text': { key: string | number }
   'tips.compactFocus.title': undefined

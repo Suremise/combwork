@@ -151,6 +151,8 @@
   "tips.closeWindow.title": "Zamknij jedno okno albo wszystkie",
   "tips.codexSandboxConnections.text": "Połączenia Codex wciąż proszą o uprawnienia administratora? Konfiguracja piaskownicy administratora każdego z nich resetuje pozostałe. Ustawienia → Zaawansowane → Codex → Połączenia: używaj piaskownicy Codex bez uprawnień administratora uruchamia je wszystkie bez tego, kosztem osobnych kont piaskownicy.",
   "tips.codexSandboxConnections.title": "Kilka połączeń Codex bez monitów administratora",
+  "tips.codexScriptCalls.text": "W trybie kodu Codex uruchamia swoje narzędzia ze skryptu. W zakładce Sesje wiersz Script mówi, ile wywołań wykonał i jakich; otwórz go, aby przeczytać każde wywołanie z jego własnym wynikiem.",
+  "tips.codexScriptCalls.title": "Zobacz, co zrobił skrypt Codex",
   "tips.commandName": "„{command}”",
   "tips.compactFocus.text": "Kompaktowanie streszcza rozmowę, więc każda kolejna wiadomość kosztuje mniej. Podaj mu cel („zachowaj decyzje o API, pomiń wyniki testów”), a agent zachowa to, co ważne. {key}",
   "tips.compactFocus.title": "Kompaktowanie z celem",

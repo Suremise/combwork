@@ -134,11 +134,16 @@ function forDisplay(item: TranscriptItem): TranscriptItem {
   // Hive's own notices in the language the window shows (#797); the cache keeps them as data.
   if (item.kind === 'notice') return item.message ? { ...item, text: shownNotice(item) } : item
   if (item.kind !== 'tool') return item
-  const t = item.tool
+  return { ...item, tool: toolForDisplay(item.tool) }
+}
+
+/** A tool call shortened for display, and each call a Codex script made (HI-2240); transcript:tool has them in full. */
+function toolForDisplay(t: TranscriptTool): TranscriptTool {
   const tool: TranscriptTool = { ...t, input: clip(t.input), result: t.result === null ? null : clip(t.result) }
   if (t.input.length > DISPLAY_LIMIT) tool.inputLength = t.input.length
   if (t.result && t.result.length > DISPLAY_LIMIT) tool.resultLength = t.result.length
-  return { ...item, tool }
+  if (t.calls) tool.calls = t.calls.map(toolForDisplay)
+  return tool
 }
 
 export const transcripts = {

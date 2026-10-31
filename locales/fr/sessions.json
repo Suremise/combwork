@@ -155,6 +155,7 @@
   "sessions.tool.loadFailed": "Impossible de charger l’appel d’outil",
   "sessions.tool.noResult": "aucun résultat",
   "sessions.tool.result": "Résultat",
+  "sessions.tool.scriptCalls": "{n, plural, one {# appel} many {# appels} other {# appels}}{failed, plural, =0 {} one {, # en échec} many {, # en échec} other {, # en échec}} : {names}",
   "sessions.tool.showAll": "Tout afficher ({n, plural, one {# caractère} many {# caractères} other {# caractères}})",
   "sessions.tree.both": "{n, plural, one {# session} many {# sessions} other {# sessions}} et {subs, plural, one {# sous-session} many {# sous-sessions} other {# sous-sessions}}",
   "sessions.tree.none": "aucune session",
