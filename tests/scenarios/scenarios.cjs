@@ -3553,14 +3553,20 @@ module.exports.SCENARIOS = [
       await c.card('n', { title: 'Farewell helper', description: 'bye.js returns "Bye, <name>".' })
     },
     prompt: (c) => `Move #${c.cards.h} and #${c.cards.n} to Doing.`,
-    fake: (c) => `skill coordinate-agents then hive hive_update_task {"number":${c.cards.h},"column":"doing"} then hive hive_update_task {"number":${c.cards.n},"column":"doing"}`,
+    // Both in one batch (HI-2238): its reply carries the refusal's next step, as a single move's does.
+    fake: (c) => `skill coordinate-agents then hive hive_update_tasks {"numbers":[${c.cards.h},${c.cards.n}],"column":"doing"}`,
     expect: (o, c) => {
-      // Its moves to Doing naming no agent and no reason of the user's (a model may rightly ask before trying any).
+      // Its moves to Doing naming no agent and no reason of the user's (a model may rightly ask before trying any), one
+      // card at a time or in a batch (HI-2238). A batch's refusal is in its reply, the call itself succeeding: each such
+      // batch needs a reply naming the choices (the session's own tool results; the MCP log keeps no reply text).
       const untold = called(o, 'hive_update_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.n) && argsOf(x).column === 'doing' && !argsOf(x).agent && !argsOf(x).override)
+      const batches = called(o, 'hive_update_tasks').filter((x) => (argsOf(x).numbers ?? []).some((r) => cardIs(o, r, c.cards.n)) && argsOf(x).column === 'doing' && !argsOf(x).agent && !argsOf(x).override)
+      const choices = /nobody on it.*hive_start_task/s
+      const batchReplies = o.tools.filter((t) => /hive_update_tasks\b/.test(t.name)).map((t) => String(t.result ?? ''))
       return [
         ["the card with Coder on it went into Doing, still Coder's", o.cards.h?.column === 'doing' && o.cards.h?.agentName === 'Coder', `${o.cards.h?.column}, ${o.cards.h?.agentName}`],
         ['the card with nobody on it is not in Doing with nobody on it', o.cards.n?.column !== 'doing' || !!o.cards.n?.agent, `${o.cards.n?.column}, ${o.cards.n?.agentName ?? 'nobody'}`],
-        ['each move of it with nobody on it was refused, naming the choices', untold.every((x) => !x.ok && /nobody on it.*hive_start_task/s.test(String(x.error ?? ''))), untold.map((x) => (x.ok ? 'ok' : String(x.error).slice(0, 120))).join(' | ')],
+        ['each move of it with nobody on it was refused, naming the choices (one card or a batch)', untold.every((x) => !x.ok && choices.test(String(x.error ?? ''))) && batches.every((x) => x.ok) && batchReplies.filter((r) => choices.test(r)).length >= batches.length, [...untold.map((x) => (x.ok ? 'ok' : String(x.error).slice(0, 120))), ...batchReplies.map((r) => `batch: ${r.slice(0, 200)}`)].join(' | ')],
         ['asked the user which they meant', asksTheUser(o.finalReply), String(o.finalReply ?? '').slice(0, 200)]
       ]
     },

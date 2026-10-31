@@ -477,6 +477,23 @@ describe('the batch reply', () => {
     expect(text).toContain('Refused, left as they were: #9 (Unknown task #9).')
   })
 
+  it("a card refused by its rules reads as hive_update_task's refusal: its message and rule, the next step, who can change it (HI-2238)", () => {
+    const text = batchText({
+      changed: [],
+      refused: [
+        { number: 9, error: 'Unknown task #9' },
+        { number: 2, error: 'AL-2 would be in Active with nobody on it.', rule: 'move.doingNobody', next: 'Ask the user which they want: nobody on it, an agent on it (agent), or an agent started on it (hive_start_task).', change: 'Set in Version Control.' }
+      ]
+    })
+    expect(text.split('\n')).toEqual([
+      'No card changed.',
+      'Refused, left as they were: #9 (Unknown task #9).',
+      'Refused, left as it was: AL-2 would be in Active with nobody on it. (move.doingNobody)',
+      'Ask the user which they want: nobody on it, an agent on it (agent), or an agent started on it (hive_start_task).',
+      'Set in Version Control.'
+    ])
+  })
+
   it('says so when nothing changed', () => {
     expect(batchText({ changed: [], refused: [{ number: 9, error: 'Unknown task #9' }] })).toMatch(/^No card changed\./)
   })
