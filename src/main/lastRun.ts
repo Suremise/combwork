@@ -14,6 +14,7 @@ import { leaveDelivery } from './deliveries'
 import { journalFactAt } from './journalService'
 import { emit, onHiveEvent, toast } from './events'
 import { crashDumps, type CrashDump } from './exitLog'
+import { renameRetrying } from './fsutil'
 import { hiveError } from './hiveError'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
@@ -154,22 +155,33 @@ function writeMarker(): void {
     })
 }
 
+/** A marker write stopped because the run ended meanwhile (writeMarkerFile's guard). */
+class NotWanted extends Error {}
+
 /**
  * Writes a marker whole beside its file, without holding the main process up (#1111: it was written synchronously on
- * every status change), then renames it into place, so a reader never sees half of one. `wanted` is asked just before
- * the rename, with nothing awaited between: a marker removed meanwhile (Hive quitting) is never put back. True if written.
+ * every status change), then renames it into place, so a reader never sees half of one. The rename is tried again while
+ * the marker is held for a moment (HI-2201: a reader or a virus scanner had it open, the write that had a hive-progress
+ * run's processes failed with EPERM, and the marker missed them until the next heartbeat). `wanted` is asked just before
+ * each rename, with nothing awaited between: a marker removed meanwhile (Hive quitting) is never put back. So each try is
+ * synchronous, in the guard's turn (HR2's round 1: an asynchronous rename, started after the guard, could finish after
+ * endRunMarker's removal and put the marker back); only the waits between tries are not. True if written.
+ * `renameOnce` is the single rename (tests replace it).
  */
-export async function writeMarkerFile(file: string, marker: RunMarker, wanted: () => boolean): Promise<boolean> {
+export async function writeMarkerFile(file: string, marker: RunMarker, wanted: () => boolean, renameOnce: (from: string, to: string) => Promise<void> = async (from, to) => renameSync(from, to)): Promise<boolean> {
   const tmp = `${file}.tmp`
   try {
     await writeFile(tmp, `${JSON.stringify(marker)}\n`)
-    if (!wanted()) {
-      await rm(tmp, { force: true })
-      return false
+    const guard = (): void => {
+      if (!wanted()) throw new NotWanted()
     }
-    renameSync(tmp, file)
+    await renameRetrying(tmp, file, 20, guard, renameOnce)
     return true
   } catch (e) {
+    if (e instanceof NotWanted) {
+      await rm(tmp, { force: true }).catch(() => undefined)
+      return false
+    }
     log.warn("Couldn't write the running marker", e)
     await rm(tmp, { force: true }).catch(() => undefined)
     return false
