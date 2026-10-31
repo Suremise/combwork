@@ -338,8 +338,10 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     expect(state.calls).toEqual([])
     // The rules on: Hive gives the builder its first card itself (HI-2029), so the caller tells only the reviewer (HR1).
     expect(recordedLaneNote(l)).toBe("B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it. R1 is running, so Hive left it as it is: tell it about the lane.")
-    // The rules off: nothing starts the builder's card, so the caller tells both.
+    // The rules off: nothing starts the builder's card, so the caller tells both (a busy builder: an idle one outside
+    // slots gets the lane in a new conversation, HI-2232).
     state.enforced = false
+    state.live.set('b2', { status: 'working', sessionId: 's-b2' })
     expect(recordedLaneNote(await launchRecordedLane(ws, ALPHA, 'lane-9'))).toBe('B2 and R1 are running, so Hive left them as they are: tell them about the lane.')
   })
 
@@ -360,6 +362,71 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
     expect(state.calls).toEqual(['lend lane-9', 'start b2'])
     expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief, in slot-c. R1 is running, so Hive left it as it is: tell it about the lane.")
+  })
+
+  describe('an idle builder outside slots (HI-2232, decision (a)): given the lane in a new conversation, as Start Lane… gives it', () => {
+    for (const rules of ['off', 'on, folder per agent'] as const) {
+      it(`rules ${rules}: its conversation is replaced with the lane's brief; an idle reviewer is left as it is`, async () => {
+        recorded()
+        if (rules !== 'off') {
+          state.enforced = true
+          state.options = { ...allOff('git'), review: 'agent' }
+        }
+        state.live.set('b2', { status: 'finished', sessionId: 's-b2' })
+        state.live.set('r1', { status: 'ready', sessionId: 's-r1' })
+        const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+        expect(state.calls).toEqual(['newConversation b2'])
+        expect(state.live.get('b2')?.sessionId).toBe('new-b2')
+        expect(state.live.get('r1')?.sessionId).toBe('s-r1')
+        expect(state.briefs).toHaveLength(1)
+        expect(state.briefs[0]).toContain('AL-1')
+        expect(l?.started.map((s) => [s.name, s.how])).toEqual([['B2', 'fresh']])
+        expect(recordedLaneNote(l)).toBe("Gave B2 the lane in a new conversation (its last stays in its Sessions history): don't prompt it. R1 is running, so Hive left it as it is: tell it about the lane.")
+      })
+    }
+
+    it('with its reviewer stopped: the builder gets its new conversation and the reviewer starts', async () => {
+      recorded()
+      state.live.set('b2', { status: 'ready', sessionId: 's-b2' })
+      const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+      expect(state.calls).toEqual(['newConversation b2', 'start r1'])
+      expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. Gave B2 the lane in a new conversation (its last stays in its Sessions history): don't prompt it.")
+    })
+
+    for (const status of ['working', 'watching', 'waiting', 'starting']) {
+      it(`a builder ${status} (in a turn or on a watch) is never renewed: left as it is, as before`, async () => {
+        recorded()
+        state.enforced = true
+        state.options = { ...allOff('git'), review: 'agent' }
+        state.live.set('b2', { status, sessionId: 's-b2' })
+        const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+        expect(state.calls).toEqual(['start r1'])
+        expect(state.owed).toEqual([])
+        expect(state.live.get('b2')?.sessionId).toBe('s-b2')
+        expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.")
+      })
+    }
+
+    it('idle as the lane is recorded, not free at its launch (a prompt not taken yet): its new conversation is owed (HI-2034), never the old one kept', async () => {
+      recorded()
+      state.live.set('b2', { status: 'ready', sessionId: 's-b2' })
+      state.live.set('r1', { status: 'ready', sessionId: 's-r1' })
+      state.beforeLaunch = (id) => void (id === 'b2' && state.pending.add('b2'))
+      const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+      expect(state.calls).toEqual([])
+      expect(state.owed).toEqual([{ lane: 'lane-9', agent: 'b2', role: 'builder', oldSession: 's-b2' }])
+      expect(recordedLaneNote(l)).toBe("B2 wasn't free: Hive gives it the lane in a new conversation once it is, so don't prompt it. R1 is running, so Hive left it as it is: tell it about the lane.")
+    })
+
+    it('stopped meanwhile: started with the brief', async () => {
+      recorded()
+      state.live.set('b2', { status: 'ready', sessionId: 's-b2' })
+      state.live.set('r1', { status: 'ready', sessionId: 's-r1' })
+      state.onGetTask = () => void state.live.delete('b2')
+      const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+      expect(state.calls).toEqual(['start b2'])
+      expect(recordedLaneNote(l)).toBe("Started B2 with the lane's brief. R1 is running, so Hive left it as it is: tell it about the lane.")
+    })
   })
 
   it('an agent started by someone else as it is launched is left as it is, never given a new conversation', async () => {

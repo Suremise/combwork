@@ -541,10 +541,13 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     expect(merge(null, [])[ASKED]).toBe(false)
   })
 
-  describe("assistant-new-lane's observations: the Sessions history read whether or not a new conversation began (HR1 round 1)", () => {
+  // Checks since HI-2232 (decision (a): Hive gives the idle builder the lane in a new conversation); HI-2222 recorded them.
+  describe("assistant-new-lane's conversation checks: the Sessions history read whether or not a new conversation began (HR1 round 1)", () => {
     const NEW = 'Coder runs in a new conversation'
     const KEPT = 'its last conversation stays in the Sessions history'
-    const sc = SCENARIOS.find((s) => s.id === 'assistant-new-lane') as unknown as { during: (c: unknown) => Promise<void>; observe: (o: unknown, c: unknown) => [string, boolean, string?][] }
+    const sc = SCENARIOS.find((s) => s.id === 'assistant-new-lane') as unknown as { during: (c: unknown) => Promise<void>; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }
+    const o = { hiveCalls: [], tools: [], skillsRead: [], finalReply: '', lanes: [] }
+    const checked = (c: unknown) => sc.expect(o, c).filter(([n]) => n === NEW || n === KEPT)
     // The scenario's own during(), against a stand-in Hive: Coder's live state and its project's session list.
     const look = async (live: { runId: string; sessionId: string; status: string }, sessions: string[]) => {
       const c: Record<string, unknown> = {
@@ -558,19 +561,19 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     it('the same conversation kept: none new, the old one listed (read, not assumed)', async () => {
       const c = await look({ runId: 'r1', sessionId: 's-old', status: 'working' }, ['s-old', 's-older'])
       await sc.during(c)
-      const obs = Object.fromEntries(sc.observe({}, c).map(([n, v, d]) => [n, [v, d]]))
+      const obs = Object.fromEntries(checked(c).map(([n, v, d]) => [n, [v, d]]))
       expect(obs[NEW][0]).toBe(false)
       expect(obs[KEPT]).toEqual([true, 's-old in [s-old,s-older]'])
     })
     it('a new conversation: it, and the old one still listed; and an old one gone from the list is recorded as gone', async () => {
       const c = await look({ runId: 'r2', sessionId: 's-new', status: 'working' }, ['s-new', 's-old'])
       await sc.during(c)
-      const obs = Object.fromEntries(sc.observe({}, c).map(([n, v]) => [n, v]))
+      const obs = Object.fromEntries(checked(c).map(([n, v]) => [n, v]))
       expect(obs[NEW]).toBe(true)
       expect(obs[KEPT]).toBe(true)
       const gone = await look({ runId: 'r2', sessionId: 's-new', status: 'working' }, ['s-new'])
       await sc.during(gone)
-      expect(Object.fromEntries(sc.observe({}, gone).map(([n, v]) => [n, v]))[KEPT]).toBe(false)
+      expect(Object.fromEntries(checked(gone).map(([n, v]) => [n, v]))[KEPT]).toBe(false)
     })
   })
 

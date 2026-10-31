@@ -2099,8 +2099,9 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     const told = briefed ? await briefNote(ws, rec ?? { project: basename(p) }) : null
     if (briefed) await settleLaneBriefs(ws)
     // Started for its builder by the Assistant or a script (HI-1900: a lane over stopped agents sat active, nothing lent,
-    // nobody working it): its stopped agents started as Start Lane… starts them, its slot lent for a stopped builder; a
-    // running one is left as it is, and the reply says to tell it (HI-1934). A builder registering its own loop is
+    // nobody working it): its stopped agents started as Start Lane… starts them, its slot lent for a stopped builder; an
+    // idle builder outside slots given the lane in a new conversation (HI-2232); another running one is left as it is,
+    // and the reply says to tell it (HI-1934). A builder registering its own loop is
     // already at work. A running lane updated while its builder isn't running: its builder started on it.
     let launched = ''
     if (!a && r.did === 'started') launched = recordedLaneNote(await launchRecordedLane(ws, p, r.lane.id))
