@@ -824,7 +824,7 @@ describe('a pass covers only the revision submitted; a stale pass says so (HI-17
     expect(s.staleSince).toBeTruthy()
     expect(e.wakes.some((w) => w.agent === 'B1' && w.why === `${card.key}: its pass is stale: it is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)} (changed since). Submit ${now.slice(0, 7)} for review (hive_submit). Or put its branch back at ${passed.slice(0, 7)}.`)).toBe(true)
     expect(e.wf.queueLineOf(card.key)).toContain(`Its pass is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)}`)
-    expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges').next).toBe(`Its pass is stale: its line changed since it was approved (it is at ${now.slice(0, 7)}). Submit it again for review; it is queued once that is approved.`)
+    expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges').next).toBe(`Its pass is stale: its line changed since it passed review (it is at ${now.slice(0, 7)}). Submit it again for review; it is queued once it passes again.`)
     expect(await e.queue().runOnce('main')).toBeNull()
   })
 })
