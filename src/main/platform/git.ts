@@ -474,15 +474,53 @@ export async function sameChange(repo: string, a: { base: string; revision: stri
  * Is the change base→rev in the target (§16.3.2 Containment)? In order: an ancestor of the target (a merge or a
  * fast-forward); a target commit since the base whose parent replays the change to its tree (a squash or a cherry-pick
  * of the whole change); else the whole target already holds it (a squash split across commits). Null when not found.
- * `at`: the target's head as the caller read it (asked about that commit, not read again); then, with fixed endpoints,
- * the answer is asked once per step (#1386: the queue's test merge tested again on the same head).
+ * `at`: the target's head as the caller read it (asked about that commit, not read again); else the target's head now,
+ * from the ref files where they can say (targetHeadSync). With fixed endpoints (base, revision, key, the target's
+ * head) the answer is about commits alone, so it is kept as onceForever's (HI-2182: the reconciler asked it again of
+ * every Done or Approved card at each pass, about six gits and a `log -p` each); the target moving or the change
+ * rewritten asks about other commits.
  */
 export async function contains(repo: string, target: string, c: { base: string; revision: string; key?: string | null }, at?: string): Promise<Maybe<Containment | null>> {
-  if (at) return onceInStep(repo, `contains\0${target}\0${c.key === undefined ? '?' : (c.key ?? '-')}`, [c.base, c.revision, at], () => containsAt(repo, target, c, at))
-  const t = await resolve(repo, target)
-  if (isUnknown(t)) return t
-  if (!t) return unknown(U.target, { target })
-  return containsAt(repo, target, c, t)
+  let t = at ?? targetHeadSync(repo, target)
+  if (!t) {
+    const r = await resolve(repo, target)
+    if (isUnknown(r)) return r
+    if (!r) return unknown(U.target, { target })
+    t = r
+  }
+  const th = t
+  return onceForever(repo, `contains\0${c.key === undefined ? '?' : (c.key ?? '-')}`, [c.base, c.revision, th], () => containsAt(repo, target, c, th))
+}
+
+/**
+ * A target's head as `resolve(target)` would find it, from the ref files with no git process (HI-2182), or null
+ * whenever git must say: the name isn't a plain branch's, or could be a hex id, or git would find another ref first
+ * by that name (its own `<name>`, `refs/<name>`, `refs/tags/<name>`, loose or packed, before `refs/heads/<name>`), or
+ * the branch's ref files can't say (branchRefSync).
+ */
+function targetHeadSync(repo: string, target: string): string | null {
+  if (!plainBranch(target) || /^[0-9a-f]+$/i.test(target)) return null
+  const own = gitDirSync(repo)
+  const common = commonDirSync(repo)
+  if (!own || !common) return null
+  const first = [join(own, target), join(common, target), join(own, 'refs', target), join(common, 'refs', target), join(common, 'refs', 'tags', target)]
+  for (const p of first) {
+    try {
+      statSync(p)
+      return null
+    } catch (e) {
+      const code = (e as { code?: string }).code
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') return null
+    }
+  }
+  try {
+    const packed = readFileSync(join(common, 'packed-refs'), 'utf8')
+    if (packed.split(/\r?\n/).some((l) => [`refs/${target}`, `refs/tags/${target}`].includes(l.split(' ')[1]))) return null
+  } catch (e) {
+    const code = (e as { code?: string }).code
+    if (code !== 'ENOENT' && code !== 'ENOTDIR') return null
+  }
+  return branchRefSync(common, target)
 }
 
 async function containsAt(repo: string, target: string, c: { base: string; revision: string; key?: string | null }, t: string): Promise<Maybe<Containment | null>> {
