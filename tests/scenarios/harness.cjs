@@ -570,8 +570,16 @@ async function runScenario(sc, providerKey, opts = {}) {
     // A subject Hive starts itself (HI-2046: a reviewer given a card that reached Review outside a lane): its launch is
     // the session under test, and Hive's line its prompt.
     const byHive = !!sc.startedByHive
-    if (!byHive) await inv('session:start', host, { agentId })
-    else if (!(await lib.until(async () => !!(await live()), 90000))) {
+    if (!byHive) {
+      // Refused as already running or starting (HI-2215): Hive started it itself after setup (a lane's card, a review),
+      // which a scenario says with startedByHive; never taken as Hive's start here, whose line would then race the prompt.
+      const refused = await inv('session:start', host, { agentId }).then(() => null, (e) => e)
+      if (refused && /already running or starting/i.test(String(refused.message))) {
+        result.error = `setup: Hive started the session under test itself (${String(refused.message).replace(/^.*Error: /, '')}): mark the scenario startedByHive, or have its setup leave it unstarted`
+        return result
+      }
+      if (refused) throw refused
+    } else if (!(await lib.until(async () => !!(await live()), 90000))) {
       result.error = "Hive didn't start the session under test"
       return result
     }
