@@ -202,6 +202,7 @@ export const AREAS = [
   { paths: ['tests/e2e/connections-codex.cjs', 'tests/e2e/fake-codex/', 'src/main/providers/codex/', 'src/shared/codex.ts'], suites: ['connections-codex'] },
   // Plan usage per connection, the status bar's and Overview's (HI-1756).
   { paths: ['src/main/planUsage.ts', 'src/renderer/src/connectionUsage.ts', 'tests/e2e/connectionusage.cjs'], suites: ['connectionusage', 'planusage'] },
+  { paths: ['src/main/usageMoves.ts', 'src/shared/usageMoves.ts', 'src/main/connectionSwitch.ts', 'src/main/agentChoice.ts', 'src/renderer/src/components/UsageMoveRule.tsx', 'tests/e2e/usagemove.cjs'], suites: ['usagemove'] },
   // The Agent API and connections (HI-1771): references, visibility, the agent routes' connection, the status.
   { paths: ['src/main/servers.ts', 'src/main/mcp/hive-mcp.ts', 'tests/e2e/connectionapi.cjs'], suites: ['connectionapi'] },
   // Model, effort and context belong to the connection (HI-1770): the resolver, the move, the defaults and the notice.

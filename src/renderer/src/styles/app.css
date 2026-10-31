@@ -4886,6 +4886,33 @@ h2.section#unused-worktrees {
   align-items: center;
   margin-top: 4px;
 }
+/* An account's usage move (HI-2195): one sentence with its controls in it, wrapping on a narrow window. */
+.usage-move {
+  margin-top: 6px;
+}
+.usage-move-line {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+/* The sentence flows as text, its controls in it (translations put them in their own order). */
+.usage-move-line > span {
+  line-height: 30px;
+}
+.usage-move-line > span > .input,
+.usage-move-line > span > .select {
+  display: inline-block;
+  width: auto;
+  margin: 0 3px;
+  vertical-align: middle;
+}
+.usage-move-line > span > .usage-move-percent {
+  width: 4.5em;
+}
+.usage-move-note {
+  margin: 2px 0 0 22px;
+  font-size: 12px;
+}
 /* On the right of the account's own line (HI-2107): what it needs now, On here and its ⋯, in the same place on every row. */
 .account-actions {
   display: flex;

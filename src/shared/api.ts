@@ -137,6 +137,7 @@ import type {
   WorkflowLevelCheck,
   ProjectStages,
   ToastTarget,
+  UsageMoveRule,
   WorkspaceInfo
 } from './types'
 import type { PlatformId } from './platform/descriptors'
@@ -1057,6 +1058,8 @@ export interface HiveRequests {
   'connections:keepLogin': (id: string) => void
   /** Turns an account on or off in this window's workspace. */
   'connections:setOn': (id: string, on: boolean) => void
+  /** An account's usage move (HI-2195): its agents move to another account at a share of a limit; null turns it off. */
+  'connections:setUsageMove': (id: string, rule: UsageMoveRule | null) => void
   /** Moves an account to `index` in the one order of accounts (HI-2107, decision A; 0: the top); never on or off. */
   'connections:move': (id: string, index: number) => void
   /** Adds a connection on an account (HI-2107), after its others; refused for an effort its model doesn't take (decision E). */

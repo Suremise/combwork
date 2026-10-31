@@ -645,6 +645,11 @@ export interface AppConfig {
   planUsage: Record<ProviderId, PlanUsage>
   /** Per connection (its id, HI-1756): the plan usage its sessions last reported, that login's own limits. */
   connectionPlanUsage?: Record<string, ConnectionPlanUsage>
+  /**
+   * The usage moves fired (HI-2195), per account and limit: one record per reset period, saying which agents it handled.
+   * Kept until that period's reset passes.
+   */
+  usageMoves?: Record<string, Record<string, UsageMoveRecord>>
   /** Highest warning shown per "provider:limit", and for which reset period. */
   planWarnings: Record<string, { resetsAt: string | null; level: number }>
   /**
@@ -757,6 +762,32 @@ export interface Account {
   observed?: ConnectionObserved
   /** A removal that stopped partway, in English: what is left, for Remove to try again. */
   leftover?: string
+  /** Its usage move (HI-2195): at this share of a limit, its agents move to another account's connections. Absent: off. */
+  usageMove?: UsageMoveRule
+}
+
+/** Which of an account's limits a usage move watches (HI-2195): the weekly one, the 5-hour one, or whichever gets there first. */
+export type UsageMoveLimit = 'weekly' | 'fiveHour' | 'any'
+
+/** An account's usage move (HI-2195): when `limit` reaches `percent`, its agents move to the account `to` (its id). */
+export interface UsageMoveRule {
+  percent: number
+  limit: UsageMoveLimit
+  to: string
+}
+
+/**
+ * A usage move fired for one limit's reset period (HI-2195): the rule it fired with (`firing` tells two firings apart),
+ * each agent it handled (by `<project id>/<agent id>`: moved, kept on the user's own choice, or given up after failed
+ * writes), the reasons it was noticed for, and failed tries.
+ */
+export interface UsageMoveRecord {
+  resetsAt: string
+  firing: string
+  rule: UsageMoveRule
+  handled: Record<string, 'moved' | 'kept' | 'failed'>
+  noticed?: string[]
+  tries?: Record<string, number>
 }
 
 /**

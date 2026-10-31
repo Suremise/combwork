@@ -263,6 +263,9 @@ export const TERMINAL_TYPE = 'hive.sessions.terminalType'
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
 export const COPIES_REVIEW = 'hive.copies.review'
 
+/** Whether accounts' usage moves run (HI-2195): main's usageMoves.ts. Off, no rule fires; the rules are kept. */
+export const USAGE_MOVES = 'hive.accounts.usageMoves'
+
 /** Whether workflow rules are enforced (#1265): the switch every gate answers to (workflow/service.ts's ENFORCE). */
 export const WORKFLOW_ENFORCE = 'hive.workflow.enforce'
 
@@ -1076,6 +1079,15 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now'
   },
   // Review and check copies (#1435, SPEC §16.10.5, §16.13): reviewers read and run commands in a copy at the exact revision.
+  {
+    id: USAGE_MOVES,
+    group: 'hive',
+    title: msg({ id: 'settings.advanced.hive.accounts.usageMoves.title', defaultMessage: 'Move agents at a usage threshold', description: "An advanced setting's title (Settings → Advanced), listed under Hive. An account in Settings → Accounts & Connections can move its agents to another account when it has used a share of its plan's limit." }),
+    desc: msg({ id: 'settings.advanced.hive.accounts.usageMoves.desc', defaultMessage: "Move an account's agents to another account when it reaches the share of its limit set on it in Settings → Accounts & Connections. Turned off, no account moves its agents and moves waiting for an agent's turn to end are dropped; the rules are kept.", description: 'What the advanced setting "Move agents at a usage threshold" does (Settings → Advanced, under Hive). Settings → Accounts & Connections names a section.' }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now'
+  },
   {
     id: COPIES_REVIEW,
     group: 'hive',

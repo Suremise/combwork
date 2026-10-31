@@ -599,7 +599,7 @@ export interface WaitChange {
  * card, where it is now, who changed it, the latest comment's author and first line), or no change; with `since` for the
  * next wait. Short: the full comment is hive_read_task with latestComment.
  */
-type WaitReply = { done?: string; watching?: string; limitAt?: string; already?: WaitChange; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
+type WaitReply = { done?: string; watching?: string; limitAt?: string; already?: WaitChange; usageAlready?: string[]; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
 
 /**
  * HI-1987: a card or agent watch that replaces a lane watch while its lanes run says what it drops, and how to keep them
@@ -630,6 +630,8 @@ function waitText(r: WaitReply): string {
     `${cardRef(c.number)} ${c.changes === 'gone' ? (c.archived ? 'was archived' : 'was archived or deleted') : `is in ${c.column[0].toUpperCase()}${c.column.slice(1)} (${c.changes.join(', ')}${c.by ? `, by ${c.by}` : ''})`}${c.comment ? `; latest comment by ${c.comment.by}: "${c.comment.firstLine}"` : ''}`
   if (r.watching) return `${r.watching}. End your turn now: Hive types a line into this session when it changes, or at ${r.limitAt ?? 'the limit'} if nothing does. Nothing runs meanwhile.${lanesLeftText(r.lanesLeft)}`
   if (r.already) return `Already: ${line(r.already)}.${lanesLeftText(r.lanesLeft)}`
+  // A usage watch whose account is there already (HI-2195): no watch started, the one before it ended.
+  if (r.usageAlready) return `Already: ${r.usageAlready.join('; ')}.${r.replaced ? ` Your watch (${r.replaced.replace(/^Waiting/, 'waiting')}) has ended.` : ''}${lanesLeftText(r.lanesLeft)}`
   const since = r.since ? `\nsince: ${r.since}` : ''
   if (r.timedOut || !r.changes?.length) return `No change.${since}`
   return `${r.changes.map(line).join('\n')}${since}`
@@ -997,11 +999,30 @@ export interface ConnectionPublic {
 /** A connection's values, short: "opus · high · 200K · plan", or "the CLI's defaults". */
 const connectionValuesText = (c: ConnectionPublic): string => [c.model, c.effort, c.context200k ? '200K' : '', c.mode, c.extraArgs ? `args ${c.extraArgs}` : ''].filter(Boolean).join(' · ') || "the CLI's defaults"
 
-/** hive_connection list (HI-2108): one row per connection, by account, those not usable here marked; then the accounts with none. */
-export function connectionListText(r: { connections: ConnectionPublic[]; accounts: { id: string; name: string; cli: string; on?: boolean }[] }): string {
+/**
+ * hive_connection list (HI-2108): one row per connection, by account, those not usable here marked; then the accounts with
+ * none; then each account's plan usage and usage move (HI-2195).
+ */
+export function connectionListText(r: { connections: ConnectionPublic[]; accounts: { id: string; name: string; cli: string; on?: boolean }[]; usage?: AccountUsagePublic[] }): string {
   const rows = r.connections.map((c) => `${c.name} (id ${c.id}) on ${c.account}, ${c.cli ?? 'unknown CLI'}: ${connectionValuesText(c)}${c.usable === false ? '. Not usable here: its account is off' : ''}`)
   const bare = r.accounts.filter((a) => !r.connections.some((c) => c.account === a.name)).map((a) => `Account ${a.name} (id ${a.id}), ${a.cli}: no connections${a.on === false ? ', off here' : ''}`)
-  return [...rows, ...bare].join('\n') || 'No connections: the user adds an account in Settings → Accounts & Connections.'
+  return [...rows, ...bare, ...(r.usage ?? []).map(accountUsageText)].join('\n') || 'No connections: the user adds an account in Settings → Accounts & Connections.'
+}
+
+/** An account's plan usage and usage move (HI-2195), as GET /v1/connections gives them. */
+export interface AccountUsagePublic {
+  account: string
+  limits: { label: string; usedPercent: number; resetsAt: string | null }[]
+  move?: { percent: number; limit: 'weekly' | 'fiveHour' | 'any'; to: string }
+}
+
+const MOVE_LIMIT = { weekly: 'the weekly limit', fiveHour: 'the 5-hour limit', any: 'either limit' } as const
+
+/** hive_connection list's line for an account's usage (HI-2195): each limit's share and reset (UTC), and its usage move. */
+export function accountUsageText(u: AccountUsagePublic): string {
+  const limits = u.limits.map((l) => `${l.label} ${l.usedPercent}%${l.resetsAt ? ` (resets ${new Date(l.resetsAt).toISOString().slice(0, 16)}Z)` : ''}`).join(', ')
+  const move = u.move ? `moves its agents to ${u.move.to} at ${u.move.percent}% of ${MOVE_LIMIT[u.move.limit]}` : ''
+  return `Usage of ${u.account}: ${[limits || 'no figures yet', move].filter(Boolean).join('; ')}`
 }
 
 /** hive_connection add or update (HI-2108): what it is now. */

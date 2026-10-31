@@ -501,6 +501,8 @@ interface HiveMessageValues {
   'tips.unusedWorktrees.title': undefined
   'tips.updateFromTarget.text': undefined
   'tips.updateFromTarget.title': undefined
+  'tips.usageMoves.text': undefined
+  'tips.usageMoves.title': undefined
   'tips.versionControlSwitch.text': undefined
   'tips.versionControlSwitch.title': undefined
   'tips.versionControlTab.text': undefined

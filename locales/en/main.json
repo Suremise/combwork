@@ -59,6 +59,10 @@
     "defaultMessage": "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Hive checked its folders.",
     "description": "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started."
   },
+  "main.accounts.usageMove.bad": {
+    "defaultMessage": "Choose a share from 1% to 100%, a limit, and another account of the same CLI to move its agents to.",
+    "description": "An error setting an account's usage move in Settings → Accounts & Connections (HI-2195): the share, the limit or the account to move to isn't one it can be."
+  },
   "main.antivirus.allExcluded": {
     "defaultMessage": "Every folder Hive may offer is already excluded.",
     "description": "An error in Settings → Workspace → Antivirus scanning: nothing to add."
@@ -1646,6 +1650,22 @@
   "main.update.whatsNew": {
     "defaultMessage": "What's New",
     "description": "The notice's button: opens the release notes."
+  },
+  "main.usageMove.blockedBody": {
+    "defaultMessage": "{reason, select, missing {That account is gone, or isn't for the same CLI: choose another in Settings → Accounts & Connections.} signedOut {{to} is signed out: sign it in, and they move then.} noConnections {{to} has no connections: add one, and they move then.} full {{to} has also used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}, so they stay where they are.} off {{to} isn't on in {workspace}: turn it on in Settings → Accounts & Connections, and they move then.} other {Their connection couldn't be saved: {agents}. Hive stops trying until the limit resets.}}",
+    "description": "Why an account's agents can't move to another (HI-2195), under the title saying so. {to} is the account they should move to, {workspace} a workspace's name, {share} a share of a usage limit (\"98%\"), {agents} agents' names joined into a list. The limit is the weekly one or the 5-hour one. Settings → Accounts & Connections names a section."
+  },
+  "main.usageMove.blockedTitle": {
+    "defaultMessage": "Hive can't move {from}'s agents to {to}",
+    "description": "A notice's title (HI-2195): an account ({from}) reached the share of its usage limit its rule sets, but its agents can't move to the account the rule names ({to}); the text says why."
+  },
+  "main.usageMove.movedBody": {
+    "defaultMessage": "{from} has used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}. {agents}: each moves to the matching connection on {to} and resumes its conversation there, a working agent once its turn ends. Hive doesn't move them back: to move one back, choose its connection in Agent Settings.",
+    "description": "A notice's text (HI-2195), under the title saying agents move from one account to another. {from} and {to} are accounts' names, {share} how much of the limit is used (\"98%\"), {agents} the agents' names joined into a list. The limit is the weekly one or the 5-hour one. Agent Settings names a dialog."
+  },
+  "main.usageMove.movedTitle": {
+    "defaultMessage": "{count, plural, one {# agent moves} other {# agents move}} from {from} to {to}",
+    "description": "A notice's title (HI-2195): an account ({from}, the user's name for it in Settings → Accounts & Connections) reached the share of its plan's usage limit its rule sets, so Hive moves its agents to another account ({to})."
   },
   "main.window.openLogs": {
     "defaultMessage": "Open Logs",
