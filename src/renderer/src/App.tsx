@@ -49,6 +49,7 @@ import { MoveRepairDialog, MovedBanner } from './components/MoveRepair'
 import { SetAsideDialog } from './components/SetAside'
 import { NoticeBanners, addNotice, resolveNotices } from './components/NoticeBanners'
 import { chimeAllowed } from '@shared/bursts'
+import { sessionEpochBook } from '@shared/sessionEpoch'
 import { loadAdvanced } from './advanced'
 import { applyProjectPref } from './projectPrefs'
 import { useLayoutRoom } from './layoutRoom'
@@ -83,6 +84,8 @@ function noticeUnmanagedMcp(): void {
 
 /** When the last chime played, and how many have (for tests). */
 let lastChimeAt: number | null = null
+/** The run each agent terminal's epoch was made for (HI-2213). */
+const epochBook = sessionEpochBook()
 let chimesPlayed = 0
 ;(window as unknown as { __hiveChimes?: () => number }).__hiveChimes = () => chimesPlayed
 
@@ -117,8 +120,16 @@ function handleEvent(e: HiveEvent): void {
       const key = projectKey(path, e.state.agentId)
       // As last told, a state not shown yet too (applyLiveState shows them a few times a second, HI-1806).
       const prev = liveStateOf(path, e.state.agentId)
-      // Its new terminal shown with its start, in the same update (HI-1862: a dozen agents started at once).
-      if (e.state.status === 'starting' && !prev?.settingUp) setWithLive((s) => ({ sessionEpoch: { ...s.sessionEpoch, [key]: (s.sessionEpoch[key] ?? 0) + 1 } }), true)
+      // Its new terminal shown with its start, in the same update (HI-1862: a dozen agents started at once); once per
+      // run, however often its start is told (HI-2213).
+      if (e.state.status === 'starting' && !prev?.settingUp) {
+        const { runId } = e.state
+        const shown = prev?.runId
+        setWithLive((s) => {
+          const epoch = epochBook.starting(key, runId, s.sessionEpoch[key], shown)
+          return epoch === undefined ? {} : { sessionEpoch: { ...s.sessionEpoch, [key]: epoch } }
+        }, true)
+      }
       // A new launch: the last one's failure no longer applies.
       if (e.state.status === 'starting') clearStartFailure(path, e.state.agentId)
       // An agent on screen is seen as it finishes: it never shows as unseen.

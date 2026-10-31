@@ -110,6 +110,17 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Control+Alt+I')
   const panel = page.locator('.assistant-panel')
   await until(async () => (await panel.count()) === 1, 5000)
+  // Every terminal the Assistant's panel mounts, from its start (HI-2213): main tells a run's start more than once (the
+  // workspace's report, then its starting status, sometimes twice), and each used to make a new terminal. Under load the
+  // last of them came after remember(); counted from the start, a re-mount shows whenever it comes.
+  await page.evaluate(() => {
+    const seen = (window.__probeMounts = [])
+    new MutationObserver(() => {
+      const host = document.querySelector('.assistant-panel .terminal-host')
+      if (host && seen.at(-1) !== host) seen.push(host)
+    }).observe(document.body, { childList: true, subtree: true })
+  })
+  const mounts = () => page.evaluate(() => window.__probeMounts.length)
   await panel.locator('.assistant-header').getByRole('button', { name: 'Start', exact: true }).click()
   check('the Assistant runs', !!(await until(async () => (await liveOf(home, 'assistant'))?.status === 'ready', HUNG_MS)))
   // Drawing with WebGL; kept, to tell a re-mount or a lost context later.
@@ -150,6 +161,7 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'assistantbatch-2-after.png') })
   check("the Assistant's terminal is the same one (not re-mounted)", after.same, JSON.stringify(after))
   check("the Assistant's terminal kept its WebGL context", !after.lost, JSON.stringify(after))
+  check("the Assistant's start made one terminal, however often its start was told", (await mounts()) === 1, `${await mounts()} mounted`)
   check('Chromium dropped no WebGL context', lost.length === 0, JSON.stringify(lost))
   check('every terminal that ended gave its WebGL context back', (await leaked()) === 0, `${await leaked()} still alive`)
   check('the Assistant still draws with WebGL', after.webgl, JSON.stringify(after))
