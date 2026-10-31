@@ -9,7 +9,7 @@ import { tempDir } from './tempDir'
 type Proc = { pid: number; parent?: number; commandLine: string; started: number }
 type Tree = { pid: number; started: number }[]
 const req = createRequire(import.meta.url)
-const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree } = req('./e2e/folderProcesses.cjs') as {
+const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs, leftoverIdentities, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree } = req('./e2e/folderProcesses.cjs') as {
   processes: () => Proc[]
   endExactly: (targets: Tree) => number
   suspendExactly: (targets: Tree, resume?: boolean) => { done: Tree; failed: { pid: number; why: string }[] }
@@ -20,6 +20,8 @@ const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, processes,
   ownedBy: (list: Proc[], folder: string, since?: number, self?: number) => number[]
   descendantsIn: (list: Proc[], root: number) => Tree
   stillRunning: (list: Proc[], tree: Tree) => number[]
+  filetimeMs: (created: string | undefined) => number | null
+  leftoverIdentities: (list: Proc[], leftovers: { processes: { pid: number; created?: string }[] }[] | undefined) => Tree
   stopProcessesIn: (folder: string, since?: number, tree?: Tree) => number
   identify: (pids: number[]) => Tree
   stillSame: (ids: Tree) => number[]
@@ -79,6 +81,33 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     // Once Hive closed: 103 still runs, 102 ended, and 101's pid now belongs to another process.
     const after = [list[3], { pid: 101, parent: 7, started: 5000, commandLine: 'someone else' }, list[5]]
     expect(stillRunning(after, tree)).toEqual([103])
+  })
+
+  it("what Hive lists as its agents' leftovers: those processes by pid and start time, never a pid given to another since (HI-2217)", () => {
+    // 2026-10-31T09:49:34.123Z as a FILETIME, and as ms.
+    const at = Date.parse('2026-10-31T09:49:34.123Z')
+    const ft = (ms: number, extra = 0n): string => String(BigInt(ms) * 10000n + 116444736000000000n + extra)
+    expect(filetimeMs(ft(at, 9999n))).toBe(at)
+    expect(filetimeMs('not a time')).toBeNull()
+    expect(filetimeMs(undefined)).toBeNull()
+    const list = [
+      { pid: 90676, parent: 89920, started: at, commandLine: 'find.exe / -name cache.js' },
+      { pid: 75552, parent: 30344, started: at + 1, commandLine: 'head.exe' },
+      { pid: 4242, parent: 1, started: at + 60_000, commandLine: 'someone else, given the pid since' }
+    ]
+    const leftovers = [
+      { projectPath: 'C:\\alpha', agentId: 'a-1', agentName: 'Coder', more: 0, since: '', processes: [
+        { pid: 90676, name: 'find.exe', label: 'find / -name cache.js', created: ft(at) },
+        // Its start time 1 ms off (the two clocks' rounding): the same process.
+        { pid: 75552, name: 'head.exe', label: 'head', created: ft(at) },
+        { pid: 4242, name: 'node.exe', label: 'node x', created: ft(at) },
+        { pid: 777, name: 'gone.exe', label: 'gone', created: ft(at) },
+        { pid: 90676, name: 'find.exe', label: 'no start time' }
+      ] }
+    ]
+    expect(leftoverIdentities(list, leftovers)).toEqual([{ pid: 90676, started: at }, { pid: 75552, started: at + 1 }])
+    expect(leftoverIdentities(list, [])).toEqual([])
+    expect(leftoverIdentities(list, undefined)).toEqual([])
   })
 
   it('children are ended before their parents, which can take them with them (#615)', () => {

@@ -14,7 +14,14 @@ if (role === 'app-starter') {
 } else if (role === 'starter') {
   spawn(process.execPath, [__filename, 'linger', file, agent], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
   setTimeout(() => process.exit(0), 200)
+} else if (role === 'unnamed-starter') {
+  // fake-claude's "hidden-linger" (HI-2217): the same, but what is left names no test folder on its command line (its
+  // file comes in its environment), as a model's `find / -name x` did: only its launch's job (Hive's) knows it.
+  spawn(process.execPath, [__filename, 'linger-unnamed', agent], { detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, FAKE_LINGER_FILE: file } }).unref()
+  setTimeout(() => process.exit(0), 200)
 } else {
-  fs.appendFileSync(file, JSON.stringify({ agent, pid: process.pid, at: new Date().toISOString() }) + '\n')
+  const to = role === 'linger-unnamed' ? process.env.FAKE_LINGER_FILE : file
+  const who = role === 'linger-unnamed' ? file : agent
+  fs.appendFileSync(to, JSON.stringify({ agent: who, pid: process.pid, at: new Date().toISOString() }) + '\n')
   setTimeout(() => process.exit(0), 120000)
 }

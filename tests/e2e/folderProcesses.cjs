@@ -93,6 +93,28 @@ function processTree(pid) {
 /** Of `tree` (processTree's), those still running as the same process (pid and start time): in `list`. */
 const stillRunning = (list, tree) => tree.filter((t) => list.some((p) => p.pid === t.pid && p.started === t.started)).map((t) => t.pid)
 
+/** A Windows FILETIME as text (100 ns since 1601: Hive's `created`) in ms since 1970; null if it isn't one. */
+const filetimeMs = (created) => (/^\d+$/.test(String(created ?? '')) ? Number((BigInt(created) - 116444736000000000n) / 10000n) : null)
+
+/**
+ * The processes Hive lists as left running by its agents (`session:leftovers`: AgentLeftovers, each process with its
+ * pid and `created`), as identities ({ pid, started }) of `list` (processes()): the same pid and start time within
+ * endExactly's 1 ms, so a pid given to another process since is never one. HI-2217: what an agent's command left whose
+ * parent has exited, and that names no test folder (a model's `find / …`), is in no process tree and named by no
+ * command line: only its launch's job, Hive's, knows it.
+ */
+function leftoverIdentities(list, leftovers) {
+  const out = []
+  for (const l of leftovers ?? []) {
+    for (const p of l?.processes ?? []) {
+      const at = filetimeMs(p?.created)
+      const now = at === null ? null : list.find((x) => x.pid === p.pid && Math.abs(x.started - at) <= 1)
+      if (now && now.pid !== process.pid) out.push({ pid: now.pid, started: now.started })
+    }
+  }
+  return out
+}
+
 /**
  * Ends each of `targets` ({ pid, started }) only while that pid is still the same process: a handle to it is opened, its
  * start time checked against `started`, and it is ended through that same handle. So a pid Windows has given another
@@ -395,4 +417,4 @@ function endCopies(folders, { before = Infinity, list } = {}) {
   return { ended: pick.size ? endExactly(childrenFirst(list, [...pick].map(([pid, started]) => ({ pid, started })))) : 0, unrecorded }
 }
 
-module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, processTree, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree, COPIES_FILE, recordCopy, recordMainProcess, launchedCopy, recordedCopies, copiesIn, lookLikeCopies, endCopies }
+module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs, leftoverIdentities, processTree, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree, COPIES_FILE, recordCopy, recordMainProcess, launchedCopy, recordedCopies, copiesIn, lookLikeCopies, endCopies }

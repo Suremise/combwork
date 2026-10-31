@@ -148,7 +148,8 @@ runner's build stamp, `tests/e2e/build.mjs`) and rebuilds it if not, so a run or
 Hive's test copies run quiet (`src/main/testQuiet.ts`): no window on screen, no focus taken, no notifications.
 After each scenario, once Hive has closed, the harness stops what of it still runs (a command an agent started can
 outlive its session: #542): what the scenario's Hive started (its process tree, taken before it closes, each by pid and
-start time), and what names the scenario's folder on its command line (the folder itself, never a sibling whose name
+start time), what Hive lists as its agents' leftovers once their sessions have stopped (their launches' jobs hold what
+they started, so a command whose parent has exited and that names no folder is among them: HI-2217), and what names the scenario's folder on its command line (the folder itself, never a sibling whose name
 starts the same) and started after the scenario did (`tests/e2e/folderProcesses.cjs`; the result's `leftOver` says how
 many). A folder it still can't remove is kept and named in the result (`kept`) rather than ending the run. Setup helpers
 that start an agent for the fixture (a builder working, an agent idle) fail the scenario (`setup: …`, with the

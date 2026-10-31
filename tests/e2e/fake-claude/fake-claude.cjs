@@ -35,7 +35,8 @@
 //   through the session's hive-progress shim, as a Codex agent once did (#542): cmd → hive-progress → a lingering node
 //   (linger.cjs; its pid in fake-progress-linger.jsonl in its home), and ends its turn once that node runs (#1100: as
 //   an agent's command has started by then; fake-progress-delay-ms.txt in its home (N) starts it N ms late, as under load).
-//   "progress-linger nowait" ends its turn at once, the command still to start (#1134).
+//   "progress-linger nowait" ends its turn at once, the command still to start (#1134). "hidden-linger" leaves one as
+//   "linger 1" does, but its command line names no test folder (HI-2217; its pid in fake-hidden-linger.jsonl).
 //   "devapp" leaves a dev copy of an Electron app running, as an agent's dev launch of Hive did (#614): Electron's
 //   executable with Playwright's --inspect=0 --remote-debugging-port=0 and a copy of devapp in its home (a hidden window; quits after two
 //   minutes, in case), started through a detached node that exits at once (linger.cjs); its pid in fake-devapp.jsonl.
@@ -698,6 +699,7 @@ async function runPrompt(text, enter = null) {
   for (const [k, m] of [...text.matchAll(/\bsubagent\s+(\d+)/gi)].entries()) await startSubagent(Number(m[1]), k + 1)
   const linger = /(?<!-)\blinger\s+(\d+)/i.exec(text)
   if (linger) leaveRunning(Number(linger[1]))
+  if (/\bhidden-linger\b/i.test(text)) leaveUnnamedRunning()
   if (/\bprogress-linger\b/i.test(text)) await leaveProgressRunning(!/\bnowait\b/i.test(text))
   if (/\bdevapp\b/i.test(text)) leaveAppRunning()
   const secs = Number(/\bwork\s+(\d+)/i.exec(text)?.[1] ?? 1)
@@ -1359,6 +1361,11 @@ process.stdin.on('data', (data) => {
 /** "linger N": N processes left running after it ends (linger.cjs), started through one that exits at once. */
 function leaveRunning(n) {
   for (let i = 0; i < n; i++) spawn(process.execPath, [path.join(__dirname, 'linger.cjs'), 'starter', path.join(home, 'fake-linger.jsonl'), process.env.HIVE_AGENT || 'agent'], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
+}
+
+/** "hidden-linger": one process left running as "linger 1" leaves it, but naming no test folder (HI-2217; fake-hidden-linger.jsonl). */
+function leaveUnnamedRunning() {
+  spawn(process.execPath, [path.join(__dirname, 'linger.cjs'), 'unnamed-starter', path.join(home, 'fake-hidden-linger.jsonl'), process.env.HIVE_AGENT || 'agent'], { detached: true, stdio: 'ignore', windowsHide: true }).unref()
 }
 
 /** "devapp": a dev copy of an Electron app left running (devapp/main.js), started through one that exits at once (#614). */
