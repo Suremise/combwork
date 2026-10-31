@@ -12,10 +12,10 @@ import type { CardState, FileChange } from '../../shared/workflow/facts'
 import type { GuardInputs, GuardRefusal } from '../../shared/workflow/guards'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { CardRecord } from '../workflow/factStore'
-import { reconcileGit, type ReconcileHooks } from '../workflow/reconcile'
+import { attributeFolder, reconcileGit, type ReconcileHooks } from '../workflow/reconcile'
 import { snapshot } from '../workflow/checks'
 import { lineName, type Workflow } from '../workflow/runtime'
-import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
+import type { CheckBracket, FinishInputs, HeadMove, LineNow, PlatformAdapter, RunRevision, StartPlan, SubmitPlan, Unsubmitted } from './adapter'
 import * as G from './git'
 import { observer, type Disposable, type ObserveEvent } from './observe'
 import { UNREADABLE } from '../../shared/workflow/texts'
@@ -32,7 +32,10 @@ function statLine(p: string): string {
   }
 }
 
-const unknownRefusal = (card: CardRecord, what: Unknown, rule: string): GuardRefusal => ({ rule: 'platform.unknown', values: { card: card.key, what: what.whatText ?? what.what, rule } })
+/** The most commits an unsubmitted read counts (HI-2245): past it, a lower bound. */
+export const UNSUBMITTED_MAX = 100
+
+const unknownRefusal =(card: CardRecord, what: Unknown, rule: string): GuardRefusal => ({ rule: 'platform.unknown', values: { card: card.key, what: what.whatText ?? what.what, rule } })
 
 /** What `prime` reads once per intent for the evidence: the card's folder, and the tracked files it covers. */
 interface Primed {
@@ -451,6 +454,38 @@ export class GitPlatform implements PlatformAdapter {
     const base = b2 && !isUnknown(b2) ? b2 : null
     const same = o.sameness === 'change' && !!base && !!from.base && (await G.sameChange(this.project, { base: from.base, revision: from.revision, key: from.key }, { base, revision: h }))
     return { to: h, base, same }
+  }
+
+  /**
+   * HI-2245: the commits on the card's line past its submission, in its folder (its slot, or the project folder) as
+   * checked out there. Proven only: the folder there, on the card's line (not another branch, not detached), its HEAD the
+   * line's head, the submission strictly an ancestor of it, and, in the shared folder, only the commits attributed to the
+   * card. The folder is read again after the history: a checkout or reset meanwhile drops it. A dirty tree is never read.
+   */
+  async unsubmitted(card: CardRecord, s0: CardState, submitted: string, between?: () => void | Promise<void>): Promise<Unsubmitted | null> {
+    const line = s0.started?.line
+    if (card.kind === 'no-code' || !line) return null
+    const folder = this.wf.folderOf(s0)
+    const shared = !this.wf.ownLine(s0)
+    const at = async (): Promise<string | null> => {
+      if (!existsSync(folder)) return null
+      const [b, h, lh] = await Promise.all([G.branch(folder), G.head(folder), G.lineHead(folder, line)])
+      return isUnknown(b) || isUnknown(h) || isUnknown(lh) || b !== line || !lh || h !== lh ? null : h
+    }
+    // The shared folder's attribution brought up to date first: a commit just made is the card's once attributed.
+    if (shared && !(await attributeFolder(this.wf).then(() => true, () => false))) return null
+    const head = await at()
+    if (!head || head === submitted || (await G.isAncestor(folder, submitted, head)) !== true) return null
+    const ids = await G.commitIds(folder, `${submitted}..${head}`, UNSUBMITTED_MAX + 1)
+    if (isUnknown(ids)) return null
+    const capped = ids.length > UNSUBMITTED_MAX
+    const read = ids.slice(0, UNSUBMITTED_MAX)
+    // In the shared folder, of those on the line now, only the card's: an old attribution elsewhere never counts.
+    const mine = shared ? new Set(this.wf.state(card).attributed) : null
+    const count = mine ? read.filter((c) => mine.has(c)).length : read.length
+    await between?.()
+    if (!count || (await at()) !== head) return null
+    return { count, atLeast: capped, since: submitted.slice(0, 7) }
   }
 
   contains(target: string, change: { base: string; revision: string; key?: string | null }, at?: string): Promise<Maybe<Containment | null>> {

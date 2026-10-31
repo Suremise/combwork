@@ -2,6 +2,7 @@ import { currentCard, laneCardState } from './laneBar'
 import type { LaneCard, LaneInfo, LaneSlotInfo, LaneState, LaneStatus, LaneWaitReason, TaskCard } from './types'
 import type { StageId } from './workflow/facts'
 import { cardRef } from './projectKeys'
+import { unsubmittedText, type UnsubmittedCard } from './unsubmitted'
 
 /**
  * Lanes (#483): a builder and a reviewer taking a project's cards in order, as the card-loop skill registers them. What
@@ -569,7 +570,7 @@ export function laneEndText(l: LaneInfo & { note?: string }): string {
  * `queue`: the lane's passed cards Hive merges, each with where it is in the merge queue (#1354): the lane takes one card
  * at a time, so the next waits for them to be Done.
  */
-export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null; queue?: { card: number; line: string }[] }): string {
+export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null; queue?: { card: number; line: string }[]; unsubmitted?: UnsubmittedCard[] }): string {
   if (r.lane.state === 'paused' && r.waits) return `The lane waits: ${laneStatusText(r.waits)}. Start nothing new meanwhile.`
   const queued = r.queue?.length ? r.queue.map((q) => `${cardRef(q.card)}: ${q.line}`).join(' ') : ''
   if (!r.next) return queued ? `${queued} Nothing else to start: the lane ends by itself once all are Done.` : 'Every card of the lane is Done or past review: nothing to start. The lane ends by itself once all are Done.'
@@ -577,6 +578,8 @@ export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: s
   const also = r.waits ? ` (${laneStatusText(r.waits)})` : ''
   // Its slot (#1438): where the card is built; Hive makes its line there as it starts.
   const where = r.lane.slot ? ` in ${r.lane.slot}` : ''
-  if (r.next.carryOn) return `Carry on with ${card}${where}${also}.`
+  // HI-2245: carried on in Review with commits past its submission: not handed over yet.
+  const first = r.next.carryOn ? unsubmittedText(r.unsubmitted?.filter((u) => u.card === r.next!.card), undefined, true) : null
+  if (r.next.carryOn) return `Carry on with ${card}${where}${also}.${first ? ` ${first}` : ''}`
   return queued ? `${queued} Next: ${card}, once ${r.queue!.length > 1 ? 'they are' : 'it is'} Done.` : `Next: ${card}. Start it${where ? `: it is built${where}, on a new branch Hive makes there` : ''}.`
 }

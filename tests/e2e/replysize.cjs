@@ -785,6 +785,42 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   // A request for the Assistant (HI-1866): the card, and its id in the Assistant's inbox.
   const askedAssistant = measure('hive_ask_assistant', intent('hive_ask_assistant', { card: `#${todo[40]}`, text: 'Please put this card On Hold.' }), 120)
   check('asking the Assistant names the card and its inbox id', /^[A-Z]+-\d+: asked the Hive Assistant \(m\d+ in its inbox\)\. Its answer comes to your inbox\.$/.test(askedAssistant), askedAssistant)
+  // HI-2245: the builder's card watch on its card in Review whose folder has a commit past its submission: hand it over
+  // first, then end the turn (the watch is registered as ever); without one, the plain watch.
+  // A reviewer agent reviews it (alpha's rules have none): set for this card's start, put back after it (a card keeps
+  // the rules it started under).
+  const alphaRules = await inv('workflow:form', alpha)
+  await inv('workflow:setOptions', alpha, { preset: alphaRules.preset, options: { ...alphaRules.own, review: 'agent', noSelfReview: true } })
+  const builtCard = todo[44]
+  const builtStart = intent('hive_start_card', { card: `#${builtCard}` }).text
+  const builtFolder = builtStart.match(/folder: ([^;]+);/)?.[1]
+  check('a card started for the unsubmitted watch, with its folder', !!builtFolder && fs.existsSync(builtFolder), builtStart)
+  await inv('workflow:setOptions', alpha, { preset: alphaRules.preset, options: alphaRules.own })
+  const builtCommit = (file) => {
+    fs.writeFileSync(path.join(builtFolder, file), `${file}\n`)
+    lib.git(builtFolder, ['add', file])
+    lib.git(builtFolder, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', `${K(builtCard)}: ${file}`, '--trailer', `Hive-Card: ${K(builtCard)}`])
+  }
+  // The suite's own untracked files in alpha (attachments, a long doc) kept out of the card's clean check meanwhile.
+  const exclude = path.join(alpha, '.git', 'info', 'exclude')
+  const excluded = fs.existsSync(exclude) ? fs.readFileSync(exclude, 'utf8') : null
+  fs.mkdirSync(path.dirname(exclude), { recursive: true })
+  fs.writeFileSync(exclude, `${excluded ?? ''}\nattach-src/\ndocs/\n`)
+  builtCommit('built.txt')
+  const builtSubmitted = intent('hive_submit', { card: `#${builtCard}`, summary: 'Built.' }).text
+  check('…submitted for review', / → review\b/.test(builtSubmitted), builtSubmitted)
+  const plainWatch = intent('hive_wait_for_tasks', { cards: [`#${builtCard}`], wake: true }).text
+  check('…its watch with nothing unsubmitted is the plain one', /^Waiting for [A-Z]+-\d+\. End your turn now: /.test(plainWatch), plainWatch)
+  builtCommit('asked.txt')
+  const unsubmittedWatch = measure('hive_wait_for_tasks (wake, unsubmitted commits)', intent('hive_wait_for_tasks', { cards: [`#${builtCard}`], wake: true }), 400)
+  check('…with a commit past its submission: hand it over first, then end the turn', new RegExp(`^Waiting for ${K(builtCard)}\\. First hand ${K(builtCard)} over: ${K(builtCard)}'s line has 1 commit since its submission \\([0-9a-f]{7}\\); hive_submit with followUp: true, then end your turn: `).test(unsubmittedWatch) && !unsubmittedWatch.includes('End your turn now'), unsubmittedWatch)
+  // Its builder only: another agent's watch on it (Starter's, the own token) is the plain one.
+  const otherWatch = tool('hive_wait_for_tasks', { cards: [`#${builtCard}`], wake: true }, 'own').text
+  check('…and only its builder is told', /^Waiting for [A-Z]+-\d+\. End your turn now: /.test(otherWatch), otherWatch)
+  tool('hive_wait_for_tasks', { cancel: true }, 'own')
+  intent('hive_wait_for_tasks', { cancel: true })
+  if (excluded === null) fs.rmSync(exclude)
+  else fs.writeFileSync(exclude, excluded)
   const plainRefused = intent('hive_put_back', { card: String(todo[40]), why: 'Not yet.' })
   check("an intent refuses the coder's plain number, naming the card by its key", plainRefused.isError && plainRefused.text.includes(`Name the card by its key: ${K(todo[40])}.`) && plainRefused.text.length <= 600, plainRefused.text)
   check('metrics: a project agent has no role or mode', g?.roleBytes === 0 && g?.modeBytes === 0, JSON.stringify(g))
