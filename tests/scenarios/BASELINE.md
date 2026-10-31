@@ -53,7 +53,7 @@ record. The 3-sample transcripts pointed at two changes since those baselines. A
 - **assistant-decision-answers**. The split left "Hive tells the card's agent" only in coordinate-agents/cards.md,
   and hands-off.md offered "the user's answer" as something to message. Most misses read no skill at all and typed the
   answer into Coder (`hive_prompt_agent`, refused while it worked). The side effect is now stated where every sample
-  looks, `decision` in hive_update_task's schema ("Hive normally tells the card's agent itself"). coordinate-agents
+  looks, `decision` in hive_update_task's schema ("Hive normally tells the card's agent"; the Haiku samples below had "…tells the card's agent itself", shortened after them to the 120-character limit on a parameter's text). coordinate-agents
   SKILL.md (After acting) says a decision goes on the card and nothing more is sent; cards.md keeps the cases where it
   isn't enough (loop wakes off, a block cleared in Review, decisions in old comments); hands-off.md's example is a
   re-brief.
