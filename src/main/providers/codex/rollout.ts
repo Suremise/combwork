@@ -470,6 +470,8 @@ export class CodexConversationParser implements ConversationParserLike {
           } else this.tool(String(p.call_id ?? ''), name === 'exec' ? 'Script' : name, input, firstLine(input).slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
           if (name === 'exec') {
             const script = { tool: this.tools.get(String(p.call_id ?? ''))!, code: scripted !== null ? input : null, start: ts ? Date.parse(ts) : NaN, end: null }
+            // A script whatever it is shown as (HR1 on HI-2246: an Edit made of one that never ran its patch is no call).
+            script.tool.script = true
             if (this.recorded) script.tool.calls ??= []
             this.scripts.push(script)
             this.scriptById.set(String(p.call_id ?? ''), script)

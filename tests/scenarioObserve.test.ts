@@ -218,6 +218,34 @@ describe("a Codex code-mode script's calls, as Hive's parser gives them (HI-2235
     expect(helpers.testRunsIn(ran.tools.flatMap(helpers.commandsOf))).toEqual([])
   })
 
+  it('a script shown as the Edit of its patch is a script all the same: unknown credits nothing; a direct patch is an Edit (HR1 on HI-2246)', () => {
+    const patch = '*** Begin Patch\n*** Add File: notes.txt\n+one\n*** End Patch'
+    const code = `if (false) await tools.apply_patch(${JSON.stringify(patch)}); text("not run")`
+    const user = done({ type: 'UserMessage', id: 'u1', content: [] })
+    const change = done({ type: 'FileChange', id: 'exec-1', changes: { 'notes.txt': { type: 'add', content: 'one\n' } }, status: 'completed' })
+    const direct = { type: 'response_item', payload: { type: 'custom_tool_call', name: 'apply_patch', call_id: 'd1', input: patch } }
+    const directOut = { type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: 'd1', output: 'Success.' } }
+    // Its Codex records no calls: Hive shows the Edit, but it is an unknown script, and credits nothing.
+    const unknown = parsed(rollout(call('s1', code), output('s1', 'not run')))
+    expect((unknown[0] as { tool: { name: string; script?: boolean } }).tool).toMatchObject({ name: 'Edit', script: true })
+    expect(withScriptCalls(unknown)).toMatchObject({ scripts: 0, calls: 0, unknown: 1 })
+    expect(observeItems(unknown).tools).toEqual([])
+    // Its Codex records calls, and it made none: known to have made none, still no tool.
+    const none = parsed(rollout(user, call('s1', code), output('s1', 'not run')))
+    expect(withScriptCalls(none)).toMatchObject({ scripts: 1, calls: 0, unknown: 0 })
+    expect(observeItems(none).tools).toEqual([])
+    // Its patch recorded as applied: the Edit it made, once.
+    const applied = parsed(rollout(user, call('s1', `await tools.apply_patch(${JSON.stringify(patch)})`), change, output('s1', '')))
+    expect(withScriptCalls(applied)).toMatchObject({ scripts: 1, calls: 1, unknown: 0 })
+    expect(observeItems(applied).tools.map((t) => [t.name, t.input])).toEqual([['Edit', patch]])
+    // A direct apply_patch, with or without a Codex that records calls: an Edit, no script.
+    for (const lines of [[direct, directOut], [user, direct, directOut]]) {
+      const items = parsed(rollout(...lines))
+      expect(withScriptCalls(items)).toMatchObject({ scripts: 0, calls: 0, unknown: 0 })
+      expect(observeItems(items).tools.map((t) => t.name)).toEqual(['Edit'])
+    }
+  })
+
   it('reads a skill from a command the script ran, never from a patch it wrote; a failed command reads nothing', () => {
     const text = rollout(
       call('s1', 'text(await tools.exec_command({cmd:"Get-Content .agents/skills/hive-work-on-card/SKILL.md"}))'),

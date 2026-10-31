@@ -3246,6 +3246,11 @@ export interface TranscriptTool {
    * for a script whose calls aren't known (its Codex records none, HI-2246: the scenario checks credit it nothing).
    */
   calls?: TranscriptTool[]
+  /**
+   * A Codex code-mode script (its `exec` tool, HI-2246), whatever it is shown as (Script, or the Edit of the patch it
+   * applies): what it did is its `calls`, and with none known, unknown (the scenario checks credit it nothing).
+   */
+  script?: true
   /** A command's exit code, once it has ended with one (a Codex script's command, HI-2240). */
   exitCode?: number
 }

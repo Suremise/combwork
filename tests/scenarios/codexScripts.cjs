@@ -9,9 +9,11 @@
 /**
  * A transcript's items (as `transcript:read` gives them, each tool read whole) with each code-mode script (Hive's
  * Script, or the Edit it makes of one that patches) replaced by the calls it made, in order, each a tool item of its
- * own; the script itself is kept as a `script` item (no tool: its code names calls, which are mentions). A Script whose
- * calls aren't known (its Codex records none: no `calls`) is a `script` item too, with none (`unknown`): neither its
- * code nor what it printed is evidence of a call (HI-2235, HR1 round 1), so what it ran is unobservable, never credited.
+ * own; the script itself is kept as a `script` item (no tool: its code names calls, which are mentions). A script whose
+ * calls aren't known (its Codex records none: no `calls`), whatever Hive shows it as (Hive marks every one `script`, an
+ * Edit of a patch it may never have applied too: HR1 on HI-2246), is a `script` item too, with none (`unknown`): neither
+ * its code nor what it printed is evidence of a call (HI-2235, HR1 round 1), so what it ran is unobservable, never
+ * credited. A direct call (an Edit from apply_patch called directly) is no script, and stays a tool.
  */
 function withScriptCalls(items) {
   let scripts = 0
@@ -26,7 +28,8 @@ function withScriptCalls(items) {
       calls += nested.length
       out.push({ ...it, kind: 'script' })
       for (const tool of nested) out.push({ kind: 'tool', timestamp: it.timestamp ?? null, tool, script: id })
-    } else if (it.kind === 'tool' && it.tool?.name === 'Script') {
+    } else if (it.kind === 'tool' && (it.tool?.script === true || it.tool?.name === 'Script')) {
+      // Any code-mode script, whatever Hive shows it as (an Edit of a patch it may never have applied, HR1 on HI-2246).
       unknown++
       out.push({ ...it, kind: 'script', unknown: true })
     } else out.push(it)
