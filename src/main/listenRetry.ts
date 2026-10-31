@@ -90,6 +90,8 @@ export async function listenWithRetry<S extends Server>(make: () => S, port: num
       if (!retry || (e as NodeJS.ErrnoException).code !== 'EADDRINUSE' || now() + retryMs > deadline) throw Object.assign(e as Error, { tries })
       if (tries === 1) onWait?.()
       await pause(retryMs, signal)
+      // A pause that ended late (a busy event loop) makes no try past the bound: that try's error is the answer.
+      if (now() > deadline) throw Object.assign(e as Error, { tries })
     }
   }
 }

@@ -29,11 +29,6 @@ const free = async (port: number): Promise<boolean> => {
     s.listen(port, HOST, () => s.close(() => r(true)))
   })
 }
-/** A clock that moves on by step at each read. */
-const clock = (step: number): (() => number) => {
-  let t = 0
-  return () => (t += step) - step
-}
 
 afterEach(async () => {
   for (const s of [...open, ...made]) await close(s)
@@ -58,12 +53,26 @@ describe('listenWithRetry', () => {
   it('a port held past the bound: EADDRINUSE once the next try would start after it, counted from the first try', async () => {
     const held = await holder()
     let waits = 0
-    // Each read of the clock 100 ms on, a bound of 1000 ms and tries 10 ms apart: the tenth failure would retry past it.
-    const err = await listenWithRetry(make, held.port, HOST, { retry: true, retryMs: 10, boundMs: 1000, now: clock(100), onWait: () => void waits++ }).catch((e) => e)
+    // Each try takes 100 ms of the clock, with a bound of 1000 ms and tries 10 ms apart: the tenth failure would retry past it.
+    let t = 0
+    const slow = (): Server => ((t += 100), make())
+    const err = await listenWithRetry(slow, held.port, HOST, { retry: true, retryMs: 10, boundMs: 1000, now: () => t, onWait: () => void waits++ }).catch((e) => e)
     expect(err.code).toBe('EADDRINUSE')
     expect(err.tries).toBe(10)
     expect(waits).toBe(1)
     expect(made).toHaveLength(10)
+    expect(made.every((s) => !s.listening)).toBe(true)
+  })
+
+  it('a pause that ends after the bound makes no other try, even with the port free by then (HR2, round 1)', async () => {
+    const held = await holder()
+    // The clock reads 0 for the first try and its check; the wait (as a busy event loop resumes the timer late) moves it
+    // past the bound, and frees the port, which a try now would get.
+    let t = 0
+    const err = await listenWithRetry(make, held.port, HOST, { retry: true, retryMs: 10, boundMs: 100, now: () => t, onWait: () => void ((t = 101), held.server.close()) }).catch((e) => e)
+    expect(err.code).toBe('EADDRINUSE')
+    expect(err.tries).toBe(1)
+    expect(made).toHaveLength(1)
     expect(made.every((s) => !s.listening)).toBe(true)
   })
 
