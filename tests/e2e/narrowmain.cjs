@@ -134,6 +134,52 @@ const check = (name, ok, extra = '') => {
   await run('light, 125%, no agents', 'alpha', [['New Session', '.session-empty-card .btn.act-start']], 1)
   await page.screenshot({ path: path.join(lib.WORK, 'narrowmain-light-125-alpha.png') })
 
+  // The Assistant's empty state, short of room there, scrolls inside its area: the WORKSPACE section's inactive-projects
+  // row is what is under its own middle, nothing of the empty state is over the section or the footer, and Start
+  // Assistant, scrolled to, is under the pointer at its middle (HI-2198: centred, it spilled up over the row).
+  /** The Assistant's empty state at the least window, or null while the panel isn't there. */
+  const assistantIdle = () =>
+    page.evaluate(() => {
+      const panel = document.querySelector('.assistant-panel')
+      const idle = panel?.querySelector('.assistant-idle')
+      if (!idle) return null
+      const fold = panel.querySelector('.assistant-fold')
+      fold?.scrollIntoView({ block: 'nearest' })
+      const f = fold?.getBoundingClientRect()
+      const hit = f && document.elementFromPoint(f.left + f.width / 2, f.top + f.height / 2)
+      const over = []
+      for (const sel of ['.assistant-top', '.assistant-footer']) {
+        const r = panel.querySelector(sel).getBoundingClientRect()
+        for (let x = r.left + 2; x < r.right - 1; x += 6)
+          for (let y = r.top + 2; y < r.bottom - 1; y += 6) if (idle.contains(document.elementFromPoint(x, y))) over.push(`${sel} ${Math.round(x)},${Math.round(y)}`)
+      }
+      const btn = idle.querySelector('.btn.act-start')
+      btn.scrollIntoView({ block: 'nearest' })
+      const b = btn.getBoundingClientRect()
+      const onTop = btn.contains(document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2))
+      idle.scrollTop = 0
+      return { fold: !!fold, foldOnTop: !!hit && fold.contains(hit), under: hit ? String(hit.className).slice(0, 40) : null, scrolls: idle.scrollHeight > idle.clientHeight + 1, over: over.slice(0, 3), overCount: over.length, startOnTop: onTop }
+    })
+  await lib.fitWindow(app, page, { width: 900, height: 560 })
+  for (const side of ['left', 'right']) {
+    await inv('settings:update', { assistant: { panelSide: side } })
+    await page.reload()
+    await lib.appReady(page)
+    await lib.until(async () => (await page.locator(side === 'left' ? '.assistant-panel.on-left' : '.assistant-panel:not(.on-left)').count()) === 1 && (await page.locator('.assistant-idle .btn.act-start').count()) === 1, HUNG_MS)
+    for (const z of [1, 1.25]) {
+      await zoom(z)
+      await lib.until(() => page.evaluate((f) => Math.abs(innerHeight * f - 560) < 2, z), HUNG_MS)
+      // As laid out once it holds (the panels settle after a zoom): else its last read.
+      let idle = null
+      await lib.until(async () => (idle = await assistantIdle()) && idle.fold && idle.foldOnTop && idle.overCount === 0 && idle.startOnTop, HUNG_MS)
+      const tag = `least window, Assistant ${side}, ${z * 100}%`
+      check(`${tag}: the inactive-projects row is under its own middle, with nothing of the empty state over the workspace or the footer`, !!idle && idle.fold && idle.foldOnTop && idle.overCount === 0, JSON.stringify(idle))
+      check(`${tag}: Start Assistant, scrolled to, is on top at its middle`, !!idle && idle.startOnTop, JSON.stringify(idle))
+      await page.screenshot({ path: path.join(lib.WORK, `narrowmain-least-assistant-${side}-${z * 100}.png`) })
+    }
+    await zoom(1)
+  }
+
   // The window at its least (900 × 560, WINDOW_MIN), at 100% and 125%: every activity bar button, Settings last, scrolled
   // into view, is what is under the pointer at its middle (elementFromPoint, no click) and ends above the status bar
   // (HI-1957: thirteen buttons since HI-1664 put Settings under it in a 650 px window; termsize clicks Settings there).
