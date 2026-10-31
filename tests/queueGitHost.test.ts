@@ -13,10 +13,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
-import { FactStore } from '../src/main/workflow/factStore'
+import { FactStore, withWriteFence } from '../src/main/workflow/factStore'
 import { FRAME_MAX, frameOf, FrameDecoder, GitHost, HOST, OUT_CHUNK, REQUEST_MAX, startGitHost, type Frame, type FrameKind } from '../src/main/workflow/gitHost'
 import { endLeaseJob, queueHost } from '../src/main/workflow/queueJobs'
-import { LeaseLost, QueueRunner } from '../src/main/workflow/queueRunner'
+import { forgetEnded, LeaseLost, QueueRunner } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed } from '../src/main/workflow/queueProcs'
 import { checkGit, gitExe, gitTool, realGitBehind, setGitToolForTests } from '../src/main/gitTool'
 import { git as hiveGit, withGitRoute } from '../src/main/git'
@@ -688,6 +688,28 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       // Settled for real (its job is closed: kill on close ended what was in it).
       const last = await QueueRunner.acquire({ store: w.store, project: w.project, target: 'main', root: w.root, profile: 'C' })
       if (last.ok) await last.runner.release()
+      w.close()
+    }
+  })
+
+  it("HI-2177: a process's exit told in the queue's fenced work after its lease went (the release ending its git host): its record forgotten, never refused as LeaseLost", async () => {
+    const w = world()
+    const runner = await acquire(w)
+    const lease = runner.lease
+    try {
+      // The lease given up (its release), and a record of it left, as one whose process ends after that.
+      await runner.release()
+      w.store.addQueueProc({ lease, target: 'main', pid: 4242, startAfter: 1, startBefore: 2, what: 'testMerge' })
+      expect(w.store.queueLease('main')).toBeNull()
+      // The exit, in the async context of the fenced work its start ran in (MergeQueue's fence: the lease held).
+      const fence = () => {
+        if (!w.store.queueLease('main')) throw new LeaseLost('main')
+      }
+      await expect(withWriteFence(fence, async () => w.store.dropQueueProc(lease, 1))).rejects.toThrow(LeaseLost)
+      await withWriteFence(fence, () => forgetEnded({ store: w.store }, lease, 4242))
+      expect(w.store.queueProcs(lease).map((p) => p.pid)).not.toContain(4242)
+    } finally {
+      await runner.release()
       w.close()
     }
   })

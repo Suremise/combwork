@@ -160,7 +160,12 @@ async function releaseHeld(fx, h) {
   for (const s of await h.inv('slots:list', fx.alpha)) {
     if (!s.writer?.held) continue
     const w = await h.inv('slots:heldWriter', fx.alpha, s.name)
-    if (w) await h.inv('slots:releaseWriter', fx.alpha, s.name, w.run, false)
+    // Refused as changed meanwhile: Hive may have freed it itself since it was read (HI-2055: a gone Hive's writer whose
+    // run left nothing running), which is what the release was for (HI-2177). Still held by that run: a real failure.
+    if (w) await h.inv('slots:releaseWriter', fx.alpha, s.name, w.run, false).catch(async (e) => {
+      const now = await h.inv('slots:heldWriter', fx.alpha, s.name).catch(() => null)
+      if (now?.run === w.run) throw e
+    })
     out.push(s.name)
   }
   return out

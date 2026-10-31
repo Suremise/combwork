@@ -30,7 +30,7 @@ import { onOutputSettled, withLauncherEnv, type GitOutcome, type GitRequest } fr
 import { gitExe, gitExeGone, PATH_GIT, type GitExe } from '../gitTool'
 import { createLogger, userText } from '../logger'
 import { endTree } from '../progressReporters/wrapper'
-import type { FactStore, QueueLease, QueueProc, QueueProcKind } from './factStore'
+import { withoutWriteFence, type FactStore, type QueueLease, type QueueProc, type QueueProcKind } from './factStore'
 import type { JobHost } from '../processSupervisor'
 import { clearJournal, endLeaseJob, journalOf, journalPath, launcherNotStarted, launcherSignalled, LeaseJob, queueHost, sealJournal, SIGNALLED, startLauncher, type Journalled } from './queueJobs'
 import { defaultProbe, treeOf, type Listed, type ProcessProbe } from './queueProcs'
@@ -407,7 +407,7 @@ export class QueueRunner {
     }
     child.once('exit', () => {
       // The launcher's tree may live on (a detached server), in the job: the job, the lease's own duty, owns it.
-      void locked(this.cfg, () => this.cfg.store.dropQueueProc(this.lease, pid)).catch((e) => log.warn('forgetting a merge queue process that ended', e))
+      void forgetEnded(this.cfg, this.lease, pid).catch((e) => log.warn('forgetting a merge queue process that ended', e))
     })
     child.stdin!.write(`go\n${input ?? ''}`) // i18n-ignore: the launcher's go-ahead (queueJobs.ts), not text
     child.stdin!.end()
@@ -561,7 +561,7 @@ export class QueueRunner {
       this.fail(`its git host couldn't be started: ${(e as Error).message}`) // i18n-ignore: a reason, logged
       throw new LeaseLost(this.target)
     }
-    child.once('exit', () => void locked(this.cfg, () => this.cfg.store.dropQueueProc(this.lease, child.pid!)).catch((e) => log.warn("forgetting the merge queue's git host", e)))
+    child.once('exit', () => void forgetEnded(this.cfg, this.lease, child.pid!).catch((e) => log.warn("forgetting the merge queue's git host", e)))
     host.go()
     this.gitHost = host
     return host
@@ -855,6 +855,16 @@ export async function outcomeOf(r: HostResult, cwd: string): Promise<GitOutcome>
 /** Runs `fn` under the config's lock (the app's boardWrite), else as it is. */
 function locked<T>(cfg: Pick<RunnerConfig, 'locked'>, fn: () => T): Promise<T> {
   return cfg.locked ? cfg.locked(fn) : Promise.resolve().then(fn)
+}
+
+/**
+ * A lease's process that ended, its record dropped. Outside the queue's write fence (HI-2177): the exit is told in the
+ * async context its start ran in, the queue's fenced work, whose fence throws LeaseLost once the lease is gone, as it is
+ * when the runner's release ends its git host. That release dropped its records, and a successor only settles what
+ * still runs, so the record of one that ended goes whoever holds the lease now.
+ */
+export function forgetEnded(cfg: Pick<RunnerConfig, 'locked' | 'store'>, lease: string, pid: number): Promise<void> {
+  return withoutWriteFence(() => locked(cfg, () => cfg.store.dropQueueProc(lease, pid)))
 }
 
 /** Whether a listed process is the one a record names: its pid, and a start between the readings around its start. */
