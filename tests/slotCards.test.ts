@@ -453,6 +453,68 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     expect(branch(slot)).toBe(line)
   })
 
+  // HI-2170: a request raised and closed within a merge (the pool's detach of a released slot read halfway through as
+  // uncommitted changes). Its first two reads are the pass's and the lock's, before git's; the change comes after them.
+  it.each([
+    ['turns busy (an operation, the pool’s settle)', { busy: true }],
+    ['changes in the pool (a settle ran and ended meanwhile)', { state: 'ready' }],
+    ['is taken by a later card of its lane', { taken: true }]
+  ])('HI-2170: a dirty slot that %s while git reads it: nothing asked on the finished card', async (_what, change) => {
+    const { e, n, line, slot } = await doneInSlot('Changed while read')
+    writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
+    let reads = 0
+    const changing = () => ({ ...view(slot)(), state: 'dirty', ...(++reads > 2 ? change : {}) })
+    await finishedSlot(e.project, e.wf, n, 'l-1', changing)
+    expect(reads).toBeGreaterThan(2)
+    expect(asked(e, n)).toBe(0)
+    expect(branch(slot)).toBe(line)
+    // Unchanged, the same slot is asked about.
+    await finishedSlot(e.project, e.wf, n, 'l-1', () => ({ ...view(slot)(), state: 'dirty' }))
+    expect(asked(e, n)).toBe(1)
+  })
+
+  it("HI-2170: a released lease's dirty slot is asked about only once the pool has looked at it and nothing holds it", async () => {
+    const { e, n, slot } = await doneInSlot('Released, settling')
+    writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
+    const lease = { id: 'l-1', project: 'project', slot: 'slot-a', kind: 'card', card: n, lane: null, agent: 'b1', from: '2026-01-01T00:00:00Z', to: '2026-01-01T01:00:00Z', why: 'done', endRev: null }
+    let row: Record<string, unknown> = { name: 'slot-a', folder: slot, target: 'main', state: 'lent', op: null, writer: null }
+    const pool = { openLeases: () => [], endedSince: () => [lease], slotOf: () => row, openLease: () => null, lease: () => lease }
+    const pass = () => finishedSlots({ lifetime: { aborted: false } } as never, e.project, e.wf, pool as never, new Map())
+    // Its builder's session still draining there, the pool not having looked since the lease ended.
+    row = { ...row, writer: { run: 'r-1', lease: 'l-1', agent: 'b1', pid: 1, started: 1 } }
+    await pass()
+    expect(asked(e, n)).toBe(0)
+    // The writer gone, no look yet (still lent).
+    row = { ...row, writer: null }
+    await pass()
+    expect(asked(e, n)).toBe(0)
+    // The pool settling it (from dirty, say): its operation holds the slot.
+    row = { ...row, state: 'dirty', op: { token: 'o-1', kind: 'warm', lease: null, pid: 1, started: 1 } }
+    await pass()
+    expect(asked(e, n)).toBe(0)
+    // Looked at, and dirty, nothing holding it: the real case, asked once.
+    row = { ...row, op: null }
+    await pass()
+    await pass()
+    expect(asked(e, n)).toBe(1)
+  })
+
+  it("HI-2170: a running lane's dirty slot, a later card of the lane under way on its lease: nothing asked on the finished card", async () => {
+    const { e, n, slot } = await doneInSlot('First of the lane')
+    writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
+    const next = e.wf.createCard({ title: 'Second of the lane' })
+    moved(await e.wf.start(next.key, B1))
+    const lease = { id: 'l-1', project: 'project', slot: 'slot-a', kind: 'lane', card: null, lane: 'lane-1', agent: 'b1', from: '2026-01-01T00:00:00Z', to: null, why: null, endRev: null }
+    const pool = { openLeases: () => [lease], endedSince: () => [], slotOf: () => ({ name: 'slot-a', folder: slot, target: 'main', state: 'lent', op: null, writer: null }), openLease: () => lease, lease: () => lease }
+    const lanes = new Map([['lane-1', { id: 'lane-1', cards: [n, next.id], state: 'active' }]])
+    await finishedSlots({ lifetime: { aborted: false } } as never, e.project, e.wf, pool as never, lanes as never)
+    expect(asked(e, n)).toBe(0)
+    // The later card put back: the finished card's slot is asked about.
+    moved(await e.wf.move(next.key, 'todo', 'user', { confirm: true, reason: 'put back' }))
+    await finishedSlots({ lifetime: { aborted: false } } as never, e.project, e.wf, pool as never, lanes as never)
+    expect(asked(e, n)).toBe(1)
+  })
+
   it('HI-2115: a slot git found on another line is asked again only once its repository’s refs move; never where they aren’t watched', async () => {
     const { e, n, line, slot } = await doneInSlot('Moved on')
     /** How many times the slot's checkout was asked of git (heads) while `fn` ran. */

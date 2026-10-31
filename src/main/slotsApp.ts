@@ -285,6 +285,8 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
           slotFreed?.(ws, projectPath)
         }
       },
+      // A finished card's slot asked about only once its settle is over (HI-2170): the slots' pass looks again.
+      looked: () => slotFreed?.(ws, projectPath),
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
       renamer: renamerFor(ws, projectPath)
     })

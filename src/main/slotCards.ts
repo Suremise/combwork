@@ -714,12 +714,23 @@ export async function finishedSlots(ws: WorkspaceService, projectPath: string, w
     // A lane's cards from the list, or, once an ended lane has left it, from the board's own record of the lane: its
     // finished cards' slot questions are still settled (HR2's HI-2014 round 1, finding 3).
     const cards = l.kind === 'card' && l.card !== null ? [l.card] : (lane?.cards ?? (l.kind === 'lane' && l.lane ? (wf.store.lane(l.lane)?.cards ?? []) : []))
-    // The slot as the lease still has it: null once another lease holds it (or it is gone).
+    // A later card of the lane under way on this lease, as the board has it now (its own start moves the slot on, or
+    // tells its builder of what isn't committed there).
+    const later = (): boolean =>
+      cards.some((n) => {
+        const c = cardOf(wf, n)
+        return !!c && wf.state(c).started?.lease === l.id && wf.state(c).stage !== 'done' && wf.state(c).stage !== 'todo'
+      })
+    // The slot as the lease still has it: null once another lease holds it (or it is gone). Read again at each call.
     const slotNow = (): FinishedSlotView | null => {
       const now = pool.slotOf(l)
-      // Busy: an operation holds it, or (a running lane's) its builder works there: nothing of it changes until quiet,
-      // as a preparation waits (HR1's #1438 round 1).
-      return now && !(l.to && pool.openLease(now.name)) ? { name: now.name, folder: now.folder, target: now.target, busy: !!now.op || (!l.to && !quiet(projectPath, l.agent)), open: !l.to } : null
+      if (!now || (l.to && pool.openLease(now.name))) return null
+      // Busy: an operation holds it (the pool's settle among them, HI-2170), or (a running lane's) its builder works
+      // there: nothing of it changes until quiet, as a preparation waits (HR1's #1438 round 1). A released one's is the
+      // pool's until it has looked at it: its builder's session still drains there (its writer), or no look since the
+      // lease ended (still `lent`).
+      const busy = !!now.op || (l.to ? !!now.writer || now.state === 'lent' : !quiet(projectPath, l.agent))
+      return { name: now.name, folder: now.folder, target: now.target, busy, open: !l.to, state: now.state, taken: !l.to && later() }
     }
     for (const n of cards) {
       if (ended(ws)) return detached
@@ -728,11 +739,7 @@ export async function finishedSlots(ws: WorkspaceService, projectPath: string, w
     // A running lane's slot its builder kept busy: looked at again once it is quiet (as a preparation waits), once per lease.
     const card = cards.map((n) => cardOf(wf, n)).find((c) => !!c && !!wf.state(c).finished && wf.state(c).started?.lease === l.id)
     // Not while a later card of the lane is under way there (its own start moves the slot on).
-    const later = cards.some((n) => {
-      const c = cardOf(wf, n)
-      return !!c && wf.state(c).started?.lease === l.id && wf.state(c).stage !== 'done' && wf.state(c).stage !== 'todo'
-    })
-    if (!l.to && card && !later && !quiet(projectPath, l.agent) && !quietWaits.has(l.id)) {
+    if (!l.to && card && !later() && !quiet(projectPath, l.agent) && !quietWaits.has(l.id)) {
       quietWaits.add(l.id)
       void until(projectPath, l.agent, () => quiet(projectPath, l.agent), () => ended(ws) || !!pool.lease(l.id)?.to)
         .then((ok) => (ok ? settleSlotCards(ws, projectPath) : undefined))
@@ -758,13 +765,19 @@ export function forgetOffLine(): void {
   offLine.clear()
 }
 
-/** A finished card's slot as its lease still has it (HI-2014): `busy`, an operation or its builder's work holds it; `open`, its lease (a lane's) is. */
+/**
+ * A finished card's slot as its lease still has it (HI-2014): `busy`, an operation or its builder's work holds it; `open`,
+ * its lease (a lane's) is; `state`, the pool's record of it; `taken`, a later card of its lane is under way there (HI-2170:
+ * nothing is asked on the finished card, its own start sees to the slot).
+ */
 export interface FinishedSlotView {
   name: string
   folder: string
   target: string | null
   busy: boolean
   open: boolean
+  state?: string
+  taken?: boolean
 }
 
 /**
@@ -788,6 +801,11 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
     return now.stage === 'done' && now.finished?.seq === finish && now.started?.lease === lease && now.started.line === line
   }
   const asked = (): boolean => wf.state(card).requests.some((r) => r.gate === SLOT_DIRTY_GATE)
+  // The slot as `was` read it, still: the card's own finish, the same slot, not busy, and no change of the pool's state.
+  const still = (was: FinishedSlotView): boolean => {
+    const at = slotNow()
+    return own() && !!at && !at.busy && at.name === was.name && at.folder === was.folder && at.state === was.state
+  }
   const slot = slotNow()
   if (!slot) {
     if (asked()) await wf.closeSlotDirty(card, finish)
@@ -826,6 +844,9 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
       const d = await G.dirty(now.folder)
       if (isUnknown(d) || !own()) return
       if (d.length) {
+        // Asked only of the slot as it was read, after git's reads too (HI-2170): still the lease's, free, in the pool's
+        // same state (no settle switched it meanwhile), and no later card of the lane taking it.
+        if (!still(now) || slotNow()?.taken) return
         if (!asked()) await wf.askSlotDirty(card, finish, { slot: now.name, line, target })
         return
       }
