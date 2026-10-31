@@ -37,4 +37,16 @@ function withScriptCalls(items) {
 /** Whether a tool item was cut short for display, itself or any call of a script's: the harness reads those whole. */
 const clipped = (tool) => !!(tool && (tool.inputLength || tool.resultLength || (Array.isArray(tool.calls) && tool.calls.some(clipped))))
 
-module.exports = { withScriptCalls, clipped }
+/**
+ * The transcript's items (`transcript:read`'s, shortened for display) with each tool cut short, itself or a call of a
+ * script's, read whole: `whole(itemId)` is `transcript:tool`'s (the parser's own tool, every call in full), or null when
+ * it can't be read (the item kept as it is). In place; the items, for chaining.
+ */
+async function readWhole(items, whole) {
+  for (const it of items) {
+    if (it.kind === 'tool' && clipped(it.tool)) it.tool = (await whole(it.id).catch(() => null)) ?? it.tool
+  }
+  return items
+}
+
+module.exports = { withScriptCalls, clipped, readWhole }

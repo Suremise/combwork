@@ -8,11 +8,12 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { createRequire } from 'module'
 import { tempDir } from './tempDir'
 import { CodexConversationParser } from '../src/main/providers/codex/rollout'
+import { DISPLAY_LIMIT, toolForDisplay } from '../src/main/transcriptDisplay'
 
 const require = createRequire(import.meta.url)
 const { observeTranscript } = require('./scenarios/harness.cjs') as { observeTranscript: (items: unknown[], skills: string[]) => { skillsRead: string[]; hiveMentions: string[]; finalReply: string } }
 const { SCENARIOS, helpers } = require('./scenarios/scenarios.cjs') as { SCENARIOS: { id: string; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }[]; helpers: { LANES_RUNNING_TAIL: string; testRunsIn: (commands: string[]) => unknown[]; checkRunsOf: (c: unknown) => { start: number; end: number | null; ok: boolean | null; head: string | null; where: string | null }[]; mergedInto: (c: unknown) => { at: { from: number; to: number } | null } | null; commandsOf: (t: unknown) => string[] } }
-const { withScriptCalls, clipped } = require('./scenarios/codexScripts.cjs') as { withScriptCalls: (items: unknown[]) => { items: unknown[]; scripts: number; calls: number; unknown: number }; clipped: (tool: unknown) => boolean }
+const { withScriptCalls, clipped, readWhole } = require('./scenarios/codexScripts.cjs') as { withScriptCalls: (items: unknown[]) => { items: unknown[]; scripts: number; calls: number; unknown: number }; clipped: (tool: unknown) => boolean; readWhole: <T>(items: T[], whole: (id: number) => Promise<unknown>) => Promise<T[]> }
 
 const tool = (name: string, input: unknown, result = '', isError = false) => ({ kind: 'tool', tool: { name, summary: '', input: typeof input === 'string' ? input : JSON.stringify(input), result, isError } })
 const SKILLS = ['work-on-card', 'review-agent-work', 'handover']
@@ -254,6 +255,33 @@ describe("a Codex code-mode script's calls, as Hive's parser gives them (HI-2235
     const direct = { kind: 'tool', tool: { toolUseId: 'call_d', name: 'hive · hive_inbox', summary: '', input: '{}', result: 'Nothing new.', isError: false, images: [] } }
     const others = [direct, { kind: 'assistant', text: 'Done.' }]
     expect(withScriptCalls(others)).toEqual({ items: others, scripts: 0, calls: 0, unknown: 0 })
+  })
+
+  it("reads a script's call cut short for display whole, and the checks see it all (HR1 on HI-2246)", async () => {
+    // A command whose output is over the display limit, as transcript:read gives it (toolForDisplay, the IPC's own) and
+    // as transcript:tool gives it (the parser's item); the harness's readWhole between them, then the observer.
+    const long = `ACCEPT-START ${'x'.repeat(6000)} ACCEPT-END`
+    const text = rollout(call('s1', 'text(await tools.exec_command({cmd:"npm test"}))'), shell('exec-1', 'npm test', long), output('s1', ''))
+    const p = new CodexConversationParser(null)
+    p.feed(Buffer.from(text))
+    const shown = p.items.map((x) => (x.kind === 'tool' ? { ...x, tool: toolForDisplay(x.tool) } : x))
+    const shownCall = (shown.find((x) => x.kind === 'tool') as { tool: { calls: { result: string; resultLength?: number }[] } }).tool.calls[0]
+    expect(shownCall.result.length).toBe(DISPLAY_LIMIT)
+    expect(shownCall.resultLength).toBe(long.length)
+    const asked: number[] = []
+    const whole = await readWhole(shown, async (id: number) => {
+      asked.push(id)
+      const x = p.items[id]
+      return x.kind === 'tool' ? x.tool : null
+    })
+    expect(asked).toEqual([p.items.findIndex((x) => x.kind === 'tool')])
+    const o = observeItems(whole)
+    expect(o.tools).toEqual([expect.objectContaining({ name: 'Shell', result: long })])
+    // Nothing cut short: nothing read again.
+    asked.length = 0
+    const small = (parsed(rollout(call('s2', 'text(1)'), shell('exec-2', 'ls', 'ok'), output('s2', ''))) as { kind: string; tool: Parameters<typeof toolForDisplay>[0] }[]).map((x) => (x.kind === 'tool' ? { ...x, tool: toolForDisplay(x.tool) } : x))
+    await readWhole(small, async (id: number) => (asked.push(id), null))
+    expect(asked).toEqual([])
   })
 
   it("reads a clipped script's calls whole: clipped() says so for the script or any of its calls", () => {

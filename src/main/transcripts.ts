@@ -13,6 +13,7 @@ import { sessions } from './sessions'
 import { setViewing, whileReading } from './transcriptReads'
 import { workspace } from './workspace'
 import { isGz, readBytes, readTranscript } from './transcriptFiles'
+import { toolForDisplay } from './transcriptDisplay'
 
 /** The Sessions tab's refusals, in the window's language (#850). */
 const M = {
@@ -41,8 +42,6 @@ const versionOf = (e: Entry): string => (isGz(e.path) ? `gz:${e.stamp}` : String
 const MAX_CACHED = 6
 /** How much of a transcript is read at a time. */
 const READ_CHUNK = 4 * 1024 * 1024
-/** Tool input and output longer than this are shortened in transcript:read; transcript:tool has the full text. */
-const DISPLAY_LIMIT = 4000
 const cache = new Map<string, Entry>()
 
 async function readRange(path: string, from: number, to: number): Promise<Buffer> {
@@ -128,22 +127,11 @@ async function parseNow(projectPath: string, sessionId: string, key: string): Pr
   return e
 }
 
-const clip = (s: string): string => (s.length > DISPLAY_LIMIT ? s.slice(0, DISPLAY_LIMIT) : s)
-
 function forDisplay(item: TranscriptItem): TranscriptItem {
   // Hive's own notices in the language the window shows (#797); the cache keeps them as data.
   if (item.kind === 'notice') return item.message ? { ...item, text: shownNotice(item) } : item
   if (item.kind !== 'tool') return item
   return { ...item, tool: toolForDisplay(item.tool) }
-}
-
-/** A tool call shortened for display, and each call a Codex script made (HI-2240); transcript:tool has them in full. */
-function toolForDisplay(t: TranscriptTool): TranscriptTool {
-  const tool: TranscriptTool = { ...t, input: clip(t.input), result: t.result === null ? null : clip(t.result) }
-  if (t.input.length > DISPLAY_LIMIT) tool.inputLength = t.input.length
-  if (t.result && t.result.length > DISPLAY_LIMIT) tool.resultLength = t.result.length
-  if (t.calls) tool.calls = t.calls.map(toolForDisplay)
-  return tool
 }
 
 export const transcripts = {

@@ -15,7 +15,7 @@ const { execFileSync } = require('child_process')
 const lib = require('../e2e/lib.cjs')
 const { processes, leftoverIdentities } = require('../e2e/folderProcesses.cjs')
 const { measuresOf, metricsTotals } = require('./benchmark.cjs')
-const { clipped, withScriptCalls } = require('./codexScripts.cjs')
+const { readWhole, withScriptCalls } = require('./codexScripts.cjs')
 
 /**
  * The Claude Code home the model trials use: a test home signed in once by hand (never the user's own ~/.claude, and
@@ -846,10 +846,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     const transcript = sessionId ? await inv('transcript:read', host, sessionId).catch(() => null) : null
     // Tool calls the parser shortened for display are read in full (for the token check and read evidence), a Codex
     // script's calls too (HI-2246).
-    const items = transcript?.items ?? []
-    for (const it of items) {
-      if (it.kind === 'tool' && clipped(it.tool)) it.tool = (await inv('transcript:tool', host, sessionId, it.id).catch(() => null)) ?? it.tool
-    }
+    const items = await readWhole(transcript?.items ?? [], (itemId) => inv('transcript:tool', host, sessionId, itemId))
     // Codex in code mode (HI-2235): each script's calls as Hive's parser gives them (HI-2240, HI-2246), in the script's
     // place. A script whose calls aren't known is no tool: what it ran is unobservable (codeMode.unknown).
     const code = p.provider === 'codex' ? withScriptCalls(items) : { items, scripts: 0, calls: 0, unknown: 0 }
