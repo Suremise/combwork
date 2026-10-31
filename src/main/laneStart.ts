@@ -9,7 +9,7 @@ import { legacyWorktree, slotsMigrated } from './agentFolders'
 import { lendLane } from './slotCards'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
 import { HiveError, hiveError } from './hiveError'
-import { changeFreshStart, freshStartsNow, holdLaneStart, listLanes, oweFreshStart, rawLanes, refuseWhileTeamPaused, retryFreshStarts, setLaneSlotWait, startLane } from './lanes'
+import { changeFreshStart, freshStartsNow, holdLaneStart, laneRunsWith, listLanes, oweFreshStart, rawLanes, refuseWhileTeamPaused, retryFreshStarts, setLaneSlotWait, startLane } from './lanes'
 import { createLogger, userText } from './logger'
 import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
@@ -206,6 +206,13 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
     if (over()) break
     // Left as it is, unless it is to be given its new conversation (HI-2232).
     const leftAlone = !!stoppedOnly && !stoppedOnly.renew?.has(a.id)
+    // A renewal's lane still this one, running with this agent in this role (HR1 on HI-2232): its conversation is replaced
+    // only while it is, checked where an owed fresh start's obligation is (gone: nothing launched, nothing owed).
+    const renewing = !!stoppedOnly?.renew?.has(a.id)
+    const stillOurs = (): void => {
+      fresh?.still()
+      if (renewing && !laneRunsWith(ws, laneId, role, a.id)) throw new FreshGone()
+    }
     if (stoppedOnly && leftAlone && (stoppedOnly.left.has(a.id) || sessions.liveFor(projectPath, a.id))) continue
     try {
       // Still the project's agent, read again after the awaits above.
@@ -231,19 +238,21 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
       // nothing replaces the conversation once it is gone (the lane ended or changed, a retry, cleared).
       const free = (): void => {
         if (over()) throw new LaunchOver()
-        fresh?.still()
+        stillOurs()
         const st = sessions.liveFor(projectPath, a.id)
         if (st?.status === 'signin') throw hiveError(M.busy, { agent: a.name, status: st.status }, { kind: 'conflict' })
         if (st && (BUSY.has(st.status) || sessions.agentNow(projectPath, a.id)?.pending || whyNoLine(projectPath, a.id, 'free') !== null)) throw new NotFreeYet(st.status)
       }
+      // A renewal's lane gone during the awaits above: no brief made for it.
+      if (renewing) stillOurs()
       const launched = await launchWith(projectPath, { agentId: a.id, agentName: a.name, kind: 'task', from: { kind: 'user', name: 'the user' }, body: brief(role), source: BRIEF, ref }, (line) => { // i18n-ignore: who the brief is from, as agents read it
         // Running by now (stoppedOnly), whatever it is doing: left as it is, before the busy check would call it failed.
         if (leftAlone && !over() && sessions.liveFor(projectPath, a.id)) throw new StartedMeanwhile()
         free()
         // An owed fresh start's obligation (HR1 on HI-2034) is checked at every boundary the session layer gives: just
         // before the old run stops, and again before the new launch spawns (after the stop's awaits), for a stopped agent's
-        // start too; the lane ended or changed in between, nothing is launched.
-        const owner = fresh ? (): void => fresh.still() : undefined
+        // start too; the lane ended or changed in between, nothing is launched. A renewal's lane likewise (HI-2232).
+        const owner = fresh || renewing ? stillOurs : undefined
         if (!sessions.liveFor(projectPath, a.id)) return sessions.start(projectPath, { agentId: a.id, prompt: line, ...(owner ? { allowed: owner } : {}) })
         how = 'fresh'
         // Its first call is just before the agent is stopped: free then (idle, nothing pending). Later ones (as the new

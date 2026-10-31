@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type Live = { status: string; sessionId: string }
-const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), pending: new Set<string>(), owed: [] as unknown[] }))
+const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), whileStopping: null as null | ((agentId: string) => void), pending: new Set<string>(), owed: [] as unknown[] }))
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
@@ -20,6 +20,9 @@ vi.mock('../src/main/sessions', () => ({
     },
     // As the real one: `allowed` before the agent is stopped, and again while the new conversation starts.
     newConversation: async (_p: string, id: string, _line: string, allowed?: () => void) => {
+      allowed?.()
+      // While the old run stops (an await in the real one): what changes meanwhile (HR1 on HI-2232).
+      state.whileStopping?.(id)
       allowed?.()
       state.calls.push(`newConversation ${id}`)
       state.live.set(id, { status: 'starting', sessionId: `new-${id}` })
@@ -48,6 +51,8 @@ vi.mock('../src/main/lanes', () => ({
     return { lane: { id: 'lane-1', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, rounds: 3 }, did: 'started', replaced: null }
   },
   holdLaneStart: () => () => undefined,
+  // A renewal's lane as kept now (HI-2232, HR1's round 1): `state.lanes`, read synchronously.
+  laneRunsWith: (_ws: unknown, id: string, role: string, agent: string) => (state.lanes as { id: string; state: string; builder: { id: string }; reviewer?: { id: string } | null }[]).some((l) => l.id === id && l.state === 'active' && (role === 'builder' ? l.builder.id : l.reviewer?.id) === agent),
   // A new conversation owed (HI-2034), as recorded.
   oweFreshStart: async (_ws: unknown, lane: string, agent: string, role: string, oldSession: string | null, note = '') => void state.owed.push({ lane, agent, role, oldSession, ...(note ? { note } : {}) }),
   rawLanes: async () => {
@@ -101,6 +106,7 @@ beforeEach(() => {
   state.waits.length = 0
   state.onGetTask = null
   state.beforeLaunch = null
+  state.whileStopping = null
 })
 
 describe('Start Lane… with the reviewer pool (#1443)', () => {
@@ -417,6 +423,47 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
       expect(state.owed).toEqual([{ lane: 'lane-9', agent: 'b2', role: 'builder', oldSession: 's-b2' }])
       expect(recordedLaneNote(l)).toBe("B2 wasn't free: Hive gives it the lane in a new conversation once it is, so don't prompt it. R1 is running, so Hive left it as it is: tell it about the lane.")
     })
+
+    // HR1's round 1: the lane is read before the awaits of the launch; it is checked again just before the old run stops
+    // and before the new one spawns, so a lane ended or given to another builder meanwhile replaces nothing and owes nothing.
+    const ended = (): void => void ((state.lanes as { state: string }[])[0].state = 'ended')
+    const reassigned = (): void => void ((state.lanes as { builder: { id: string; name: string } }[])[0].builder = { id: 'b1', name: 'B1' })
+    for (const [what, change] of [['ended', ended], ['given to another builder', reassigned]] as const) {
+      it(`its lane ${what} as the brief is saved: the old conversation kept, nothing launched or owed`, async () => {
+        recorded()
+        state.live.set('b2', { status: 'ready', sessionId: 's-b2' })
+        state.live.set('r1', { status: 'ready', sessionId: 's-r1' })
+        state.beforeLaunch = (id) => void (id === 'b2' && change())
+        const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+        expect(state.calls).toEqual([])
+        expect(state.owed).toEqual([])
+        expect(state.live.get('b2')?.sessionId).toBe('s-b2')
+        expect(l?.started).toEqual([])
+      })
+
+      it(`its lane ${what} during the awaits before the launch (its cards read): no brief made, nothing launched`, async () => {
+        recorded()
+        state.live.set('b2', { status: 'ready', sessionId: 's-b2' })
+        state.live.set('r1', { status: 'ready', sessionId: 's-r1' })
+        state.onGetTask = change
+        const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+        expect(state.briefs).toEqual([])
+        expect(state.calls).toEqual([])
+        expect(state.owed).toEqual([])
+        expect(l?.started).toEqual([])
+      })
+
+      it(`its lane ${what} while the old run stops: the new conversation isn't spawned, nothing owed`, async () => {
+        recorded()
+        state.live.set('b2', { status: 'ready', sessionId: 's-b2' })
+        state.live.set('r1', { status: 'ready', sessionId: 's-r1' })
+        state.whileStopping = (id) => void (id === 'b2' && change())
+        const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+        expect(state.calls).toEqual([])
+        expect(state.owed).toEqual([])
+        expect(l?.started).toEqual([])
+      })
+    }
 
     it('stopped meanwhile: started with the brief', async () => {
       recorded()

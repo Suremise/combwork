@@ -4942,7 +4942,10 @@ agents stopped then once one is lent), then each stopped agent with the generate
 Start Lane gives it: `ready` or `finished` as the lane is recorded and its builder not working in slots (`builderWhere`),
 it is launched with the lane's brief through `newConversation` (`stoppedOnly`'s `renew`), its last conversation kept in
 its Sessions history; found not free at its launch, its new conversation is owed (`freshStart`, as above), never the
-old one kept; stopped meanwhile, it is started with the brief. Its brief (`brief`, HI-1795) then reaches the new
+old one kept; stopped meanwhile, it is started with the brief. Its lane is checked again (`laneRunsWith`: running,
+this agent its builder) before its brief is made, just before the old run stops and before the new one spawns
+(`newConversation`'s `allowed`) [HR1's round 1]: a lane ended or given to another builder meanwhile replaces nothing
+and owes nothing. Its brief (`brief`, HI-1795) then reaches the new
 conversation, never the old one (`briefNotIn`). The reply says *Gave B1 the lane in a new conversation (its last stays
 in its Sessions history): don't prompt it*, or *B1 wasn't free: Hive gives it the lane in a new conversation once it
 is, so don't prompt it*. [HI-2190's runs: a lane over an idle running builder outside slots carried on in its old
