@@ -537,18 +537,18 @@ export async function contains(repo: string, target: string, c: { base: string; 
   // Git's own computation, timed and kept where it runs (HR2's round 1: never a step's answer used again). The expiry
   // counts from before git computed it; an answer that took that long is given but not kept.
   const computed = async (): Promise<Maybe<{ found: Containment | null; at: number }>> => {
-    const at = Date.now()
+    const since = Date.now()
     const v = await squashedInto(repo, target, c, th)
     if (isUnknown(v)) return v
-    if (key && v === null && Date.now() < at + NOT_FOUND_MS && notFoundKey(repo, target, c, th) === key) {
+    if (key && v === null && Date.now() < since + NOT_FOUND_MS && notFoundKey(repo, target, c, th) === key) {
       // A newer answer kept meanwhile (another pass's) stands.
-      if ((notFound.get(key) ?? 0) < at + NOT_FOUND_MS) {
+      if ((notFound.get(key) ?? 0) < since + NOT_FOUND_MS) {
         notFound.delete(key)
-        notFound.set(key, at + NOT_FOUND_MS)
+        notFound.set(key, since + NOT_FOUND_MS)
       }
       if (notFound.size > NOT_FOUND_MAX) notFound.delete(notFound.keys().next().value!)
     }
-    return { found: v, at }
+    return { found: v, at: since }
   }
   const step = await onceInStep(repo, `contains\0${target}\0${c.key === undefined ? '?' : (c.key ?? '-')}`, [c.base, c.revision, th], computed)
   if (isUnknown(step)) return step
