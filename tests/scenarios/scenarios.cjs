@@ -598,6 +598,11 @@ async function laneEndAsks(c) {
   }
   return out
 }
+/**
+ * How many times Hive told Coder of the user's answer on a card (its history's "Told agent Coder (alpha) of your
+ * answer": the answer's delivery received, HI-2222), since `since` (ms).
+ */
+const answerToldTo = (card, since = 0) => (card?.history ?? []).filter((h) => h.by === 'Hive' && h.what === 'Told agent Coder (alpha) of your answer' && (Date.parse(h.at) || 0) >= since).length
 const LANE_END = {
   files: { 'greet.js': "module.exports = () => 'Hello'\n" },
   async setup(c) {
@@ -2185,10 +2190,15 @@ module.exports.SCENARIOS = [
         await c.inv('tasks:update', c.cards[key], { decision: "The maintainer allowed the lane's commit: the hook lets it through now. Finish the lane's end.", answers })
       }
     },
-    // A fake stops once its question is closed; a model's turn goes on until the last card is Done (4 minutes).
+    // A fake stops once Hive has told it of the answer on every card it asked on (at most 40 s); a model's turn goes on
+    // until the last card is Done (4 minutes).
     async keepWaiting(c) {
       if (!c.answeredAt) return false
-      if (c.fake) return Date.now() - c.answeredAt < 40000 && (await laneEndAsks(c)).length > 0
+      if (c.fake) {
+        if (Date.now() - c.answeredAt >= 40000) return false
+        const cards = await Promise.all([...new Set(c.atAnswer.asked.map((x) => x.key))].map(async (k) => (await c.api('GET', `/v1/tasks/${c.cards[k]}`)).body))
+        return !cards.every((x) => answerToldTo(x, c.answeredAt) >= 1)
+      }
       return Date.now() - c.answeredAt < 240000 && (await c.api('GET', `/v1/tasks/${c.cards.b}`)).body?.column !== 'done'
     },
     prompt: LANE_END.prompt,
@@ -2196,11 +2206,14 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const keys = [...new Set((c.atAnswer?.asked ?? []).map((x) => x.key))]
       const decided = Math.min(...keys.map((k) => historyAt(o.cards[k], /^Recorded a decision: "The maintainer allowed/) || Infinity))
-      // Each question it asked closed by the decision, once (its Approval by decision), which wakes its asker once.
+      // Each question it asked closed by the decision, once (its Approval by decision).
       const closed = (c.atAnswer?.asked ?? []).map((x) => factsOf(o, x.key, 'Approval').filter((f) => f.data?.request === x.request && f.data?.byDecision).length)
+      // And the answer given to it (HR1, HI-2222 round 1): Hive's delivery to Coder, once on each card it asked on.
+      const told = keys.map((k) => answerToldTo(o.cards[k], c.answeredAt))
       return [
         ...LANE_END.before(o, c),
-        ['the decision closed each question it asked, once (Hive wakes it with the answer)', closed.length > 0 && closed.every((n) => n === 1) && Number.isFinite(decided), `${JSON.stringify(c.atAnswer?.asked ?? [])} closed ${JSON.stringify(closed)}; ${keys.map((k) => history(o.cards[k]).join(' | ')).join(' || ')}`],
+        ['the decision closed each question it asked, once', closed.length > 0 && closed.every((n) => n === 1) && Number.isFinite(decided), `${JSON.stringify(c.atAnswer?.asked ?? [])} closed ${JSON.stringify(closed)}`],
+        ['Hive told it of the answer, once on each card it asked on', told.length > 0 && told.every((n) => n === 1), `told ${JSON.stringify(told)}; ${keys.map((k) => history(o.cards[k]).join(' | ')).join(' || ')}`],
         ['read the card after the decision', Number.isFinite(decided) && keys.some((k) => cardReads(o, c.cards[k]).some((t) => t > decided)), `decided ${decided}, reads ${keys.map((k) => cardReads(o, c.cards[k]).join(',')).join(' | ')}`],
         ...LANE_END.after(o, c)
       ]
@@ -3560,14 +3573,13 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `Coder has finished its last lane and is idle. Start its next lane: Coder builds card #${c.cards.n} with the card-loop skill (rounds: 3, wait: 1h); there is no reviewer yet. Don't wait for it.`,
     fake: (c) => `skill coordinate-agents then hive hive_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', cards: [`#${c.cards.n}`], rounds: 3, waitMinutes: 60, brief: `Use card-loop as the builder. Card: #${c.cards.n}. No reviewer yet.` })}`,
-    // Coder's session while the Assistant works, and the project's conversations (the old one must stay listed).
+    // Coder's session while the Assistant works, and the project's conversations, read at every look whether or not a new
+    // conversation began (HR1, HI-2222 round 1: Hive may keep the old one, and that is what is recorded).
     during: async (c) => {
       const s = await coderLive(c)
       c.seen = [...(c.seen ?? []), `${s?.runId === c.before?.runId ? 'old' : s ? 'new' : 'none'}:${s?.status}:${s?.sessionId ?? ''}`].slice(-12)
-      if (s?.sessionId && s.sessionId !== c.before?.sessionId) {
-        c.after = s
-        c.history = (await c.inv('session:list', c.alpha)).map((x) => x.id)
-      }
+      if (s?.sessionId && s.sessionId !== c.before?.sessionId) c.after = s
+      c.history = (await c.inv('session:list', c.alpha)).map((x) => x.id)
     },
     expect: (o, c) => {
       const starts = laneStartsOf(o).filter((s) => /^coder$/i.test(String(s.args.builder ?? '')))
@@ -3588,7 +3600,7 @@ module.exports.SCENARIOS = [
     // Hive's behaviour, not the Assistant's (HI-2222, HI-2232): whether a new conversation began, and the old one is kept.
     observe: (o, c) => [
       ['Coder runs in a new conversation', !!c.before?.sessionId && !!c.after && c.after.runId !== c.before.runId, JSON.stringify({ before: c.before?.sessionId, after: c.after?.sessionId, seen: c.seen })],
-      ['its last conversation stays in the Sessions history', (c.history ?? []).includes(c.before?.sessionId), (c.history ?? []).join(',')]
+      ['its last conversation stays in the Sessions history', (c.history ?? []).includes(c.before?.sessionId), c.history ? `${c.before?.sessionId} in [${c.history.join(',')}]` : 'not read']
     ]
   },
   {
@@ -3981,19 +3993,24 @@ const briefsTo = (o, name) =>
     .map((x) => String(argsOf(x).text ?? argsOf(x).prompt ?? argsOf(x).note ?? ''))
 /**
  * The lanes the Assistant started with `hive_lane start` that worked (HI-2222), each with its arguments (Hive's log of
- * the call) and Hive's reply to it (the transcript's, which says whom Hive started with the lane's brief), the reply the
- * one naming the lane's own builder and reviewer ("Lane started: Coder / Implementer (alpha) …").
+ * the call) and Hive's own reply to it (the transcript's, which says whom Hive started with the lane's brief). The log
+ * and the transcript don't share an id, so the calls and the replies are paired in order (HR1, round 1): each start takes
+ * the next reply not yet taken that names its builder and reviewer ("Lane started: Coder / Implementer (alpha) …"), so a
+ * second start of the same pair gets its own reply, never the first's. One with no such reply left is left out.
  */
 const laneStartsOf = (o) => {
   const laneReplies = hiveReplies(o, 'hive_lane').map((t) => String(t.result ?? ''))
-  return ran(o, 'hive_lane')
-    .map((x) => argsOf(x))
-    .filter((a) => a.action === 'start')
-    .map((args) => {
-      const head = `${args.builder ?? ''} / ${args.reviewer ?? 'no reviewer'} (`.toLowerCase()
-      return { args, reply: laneReplies.find((r) => /^Lane (started|updated): /.test(r) && r.replace(/^Lane (started|updated): /, '').toLowerCase().startsWith(head)) ?? '' }
-    })
-    .filter((s) => s.reply)
+  let next = 0
+  const out = []
+  for (const args of ran(o, 'hive_lane').map((x) => argsOf(x))) {
+    if (args.action !== 'start') continue
+    const head = `${args.builder ?? ''} / ${args.reviewer ?? 'no reviewer'} (`.toLowerCase()
+    const at = laneReplies.findIndex((r, i) => i >= next && /^Lane (started|updated): /.test(r) && r.replace(/^Lane (started|updated): /, '').toLowerCase().startsWith(head))
+    if (at < 0) continue
+    next = at + 1
+    out.push({ args, reply: laneReplies[at] })
+  }
+  return out
 }
 /** Whether Hive's reply to a lane start says it started `name` with the lane's brief ("Started Coder and Implementer with the lane's brief"). */
 const startedWithBrief = (reply, name) => [...reply.matchAll(/Started ([^.]*?) with the lane's brief/g)].some((m) => new RegExp(`\\b${name}\\b`, 'i').test(m[1]))
@@ -4033,14 +4050,15 @@ module.exports.SCENARIOS.push(
       const { a, b } = c.cards
       const cc = c.cards.c
       const lanes = laneStartsOf(o)
-      // The lane start of builder `who`, with its reviewer and exactly its cards, in order.
-      const laneOf = (who, reviewer, cards) =>
-        lanes.find((s) => new RegExp(`^${who}$`, 'i').test(String(s.args.builder ?? '')) && new RegExp(`^${reviewer}$`, 'i').test(String(s.args.reviewer ?? '')) && Array.isArray(s.args.cards) && s.args.cards.length === cards.length && cards.every((n, i) => cardIs(o, s.args.cards[i], n)))
-      // A builder: its lane's brief names card-loop (the cards and reviewer are the lane's own).
-      const builderBriefed = (who, reviewer, cards) => /card[- ]loop/i.test(String(laneOf(who, reviewer, cards)?.args.brief ?? ''))
-      // A reviewer: Hive started it with the lane's brief (its reply says so), or a prompt briefed it; a lane naming one
-      // already running briefs nobody (its reply says to tell it).
-      const reviewerBriefed = (who, builder, cards) => startedWithBrief(laneOf(builder, who, cards)?.reply ?? '', who) || briefsTo(o, who).some((t) => names(t, 'card[- ]loop', ...cards, builder))
+      // The lane starts of builder `who`, with its reviewer and exactly its cards, in order (each with its own reply).
+      const lanesOf = (who, reviewer, cards) =>
+        lanes.filter((s) => new RegExp(`^${who}$`, 'i').test(String(s.args.builder ?? '')) && new RegExp(`^${reviewer}$`, 'i').test(String(s.args.reviewer ?? '')) && Array.isArray(s.args.cards) && s.args.cards.length === cards.length && cards.every((n, i) => cardIs(o, s.args.cards[i], n)))
+      // A builder: such a start's brief names card-loop, and its reply says the brief reaches the builder ("Its brief is
+      // delivered to the builder now", or given with each of its cards in slots).
+      const builderBriefed = (who, reviewer, cards) => lanesOf(who, reviewer, cards).some((s) => /card[- ]loop/i.test(String(s.args.brief ?? '')) && /Its brief is (delivered|given)\b/.test(s.reply))
+      // A reviewer: Hive started it with the lane's brief (that start's own reply says so), or a prompt briefed it; a lane
+      // naming one already running briefs nobody (its reply says to tell it).
+      const reviewerBriefed = (who, builder, cards) => lanesOf(builder, who, cards).some((s) => startedWithBrief(s.reply, who)) || briefsTo(o, who).some((t) => names(t, 'card[- ]loop', ...cards, builder))
       const detail = lanes.map((s) => `${JSON.stringify({ builder: s.args.builder, reviewer: s.args.reviewer, cards: s.args.cards })} → ${s.reply.slice(0, 200)}`).join(' | ') || 'no lane started'
       return [
         ['read the run-lanes skill', read(o, 'run-lanes'), o.skillsRead.join(',')],

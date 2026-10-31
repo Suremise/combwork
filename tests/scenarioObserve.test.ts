@@ -299,6 +299,25 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
       expect(lanes([start('Coder', 'Implementer', [1, 2], 'Coder has no such card', 'Use card-loop as the builder.', false)])[CODER]).toBe(false)
       // Another lane's reply doesn't stand in for this one's.
       expect(lanes([start('Coder', 'Implementer', [1, 2], STARTED('Builder2 / Reviewer2'))])[CODER]).toBe(false)
+      // A reply that doesn't say the brief reaches the builder.
+      expect(lanes([start('Coder', 'Implementer', [1, 2], "Lane started: Coder / Implementer (alpha) L: active. Started Coder and Implementer with the lane's brief.")])[CODER]).toBe(false)
+    })
+
+    it("HR1 round 1: a second start of the same pair gets its own reply, never the first's", () => {
+      const IMPL = 'Implementer briefed: started by the lane with its brief, or prompted with card-loop, the cards and its builder'
+      const CODER = "started Coder's lane (hive_lane start: its cards, its reviewer, a card-loop brief)"
+      // Started on [3] (Hive started both), then updated to [1, 2], whose own reply says Implementer is running: tell it.
+      const first = start('Coder', 'Implementer', [3], STARTED('Coder / Implementer'))
+      const update = start('Coder', 'Implementer', [1, 2], 'Lane updated: Coder / Implementer (alpha) L: active. Coder and Implementer are running, so Hive left them as they are: tell them about the lane.')
+      const r = lanes([first, update])
+      expect(r[IMPL]).toBe(false)
+      expect(r[CODER]).toBe(false)
+      // Its prompt then briefs it.
+      expect(lanes([first, update], [call('hive_prompt_agent', { project: 'alpha', agent: 'Implementer', text: 'Use card-loop as the reviewer. Cards: AL-1, AL-2. Your builder is Coder.' })])[IMPL]).toBe(true)
+      // The other way round: [1, 2] started both with the brief, then a second start of the pair: the first's own reply counts.
+      const ok = lanes([start('Coder', 'Implementer', [1, 2], STARTED('Coder / Implementer')), start('Coder', 'Implementer', [1, 2], 'Lane updated: Coder / Implementer (alpha) L: active. Its brief is delivered to the builder now.')])
+      expect(ok[IMPL]).toBe(true)
+      expect(ok[CODER]).toBe(true)
     })
   })
 
@@ -341,20 +360,64 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     })
   })
 
-  it('card-loop-merge-decision: each question it asked closed by the decision once; an ask never made, or a decision closing nothing, fails', () => {
-    const CLOSED = 'the decision closed each question it asked, once (Hive wakes it with the answer)'
+  it('card-loop-merge-decision: each question it asked closed by the decision once, and the answer told to it once; missing or duplicate fails', () => {
+    const CLOSED = 'the decision closed each question it asked, once'
+    const TOLD = 'Hive told it of the answer, once on each card it asked on'
     const ASKED = 'asked the user on a lane card (hive_cannot_within_rules or hive_ask_user: open under For you), and ended its turn'
-    const decided = { at: '2026-10-31T12:00:00.000Z', what: 'Recorded a decision: "The maintainer allowed the lane\'s commit…"' }
+    const answeredAt = Date.parse('2026-10-31T12:00:00.000Z')
+    const decided = { at: '2026-10-31T12:00:00.100Z', by: 'You', what: 'Recorded a decision: "The maintainer allowed the lane\'s commit…"' }
+    const told = { at: '2026-10-31T12:00:01.000Z', by: 'Hive', what: 'Told agent Coder (alpha) of your answer' }
     const approval = (request: string) => ({ kind: 'Approval', data: { request, answer: 'answered', byDecision: { decision: 'd1' } } })
-    const merge = (asked: { key: string; request: string }[] | null, facts: unknown[], history = [decided]) =>
-      run('card-loop-merge-decision', { cards: { a: { number: 1, history: [] }, b: { number: 2, history } }, facts: { a: [], b: facts } }, { cards: { a: 1, b: 2 }, agents, ...(asked ? { atAnswer: { asked, columns: ['passed', 'passed'] } } : {}), read: () => '', git: () => 'x', head: 'x' })
-    expect(merge([{ key: 'b', request: 'AL-2/r2' }], [approval('AL-2/r2')])[CLOSED]).toBe(true)
-    expect(merge([{ key: 'b', request: 'AL-2/r2' }], [approval('AL-2/r2')])[ASKED]).toBe(true)
-    expect(merge([{ key: 'b', request: 'AL-2/r2' }], [])[CLOSED]).toBe(false)
-    expect(merge([{ key: 'b', request: 'AL-2/r2' }], [approval('AL-2/r9')])[CLOSED]).toBe(false)
-    expect(merge([{ key: 'b', request: 'AL-2/r2' }], [approval('AL-2/r2')], [])[CLOSED]).toBe(false)
+    const merge = (asked: { key: string; request: string }[] | null, facts: unknown[], history: unknown[] = [decided, told]) =>
+      run('card-loop-merge-decision', { cards: { a: { number: 1, history: [] }, b: { number: 2, history } }, facts: { a: [], b: facts } }, { cards: { a: 1, b: 2 }, agents, answeredAt, ...(asked ? { atAnswer: { asked, columns: ['passed', 'passed'] } } : {}), read: () => '', git: () => 'x', head: 'x' })
+    const onB = [{ key: 'b', request: 'AL-2/r2' }]
+    expect(merge(onB, [approval('AL-2/r2')])[CLOSED]).toBe(true)
+    expect(merge(onB, [approval('AL-2/r2')])[TOLD]).toBe(true)
+    expect(merge(onB, [approval('AL-2/r2')])[ASKED]).toBe(true)
+    expect(merge(onB, [])[CLOSED]).toBe(false)
+    expect(merge(onB, [approval('AL-2/r9')])[CLOSED]).toBe(false)
+    expect(merge(onB, [approval('AL-2/r2')], [told])[CLOSED]).toBe(false)
+    // HR1 round 1: closed is not told. The answer never delivered, delivered twice, or a delivery from before the answer.
+    expect(merge(onB, [approval('AL-2/r2')], [decided])[TOLD]).toBe(false)
+    expect(merge(onB, [approval('AL-2/r2')], [decided, told, { ...told, at: '2026-10-31T12:00:05.000Z' }])[TOLD]).toBe(false)
+    expect(merge(onB, [approval('AL-2/r2')], [{ ...told, at: '2026-10-31T11:59:00.000Z' }, decided])[TOLD]).toBe(false)
+    expect(merge(onB, [approval('AL-2/r2')], [decided, { ...told, what: 'Told agent Implementer (alpha) of your answer' }])[TOLD]).toBe(false)
     expect(merge(null, [])[CLOSED]).toBe(false)
+    expect(merge(null, [])[TOLD]).toBe(false)
     expect(merge(null, [])[ASKED]).toBe(false)
+  })
+
+  describe("assistant-new-lane's observations: the Sessions history read whether or not a new conversation began (HR1 round 1)", () => {
+    const NEW = 'Coder runs in a new conversation'
+    const KEPT = 'its last conversation stays in the Sessions history'
+    const sc = SCENARIOS.find((s) => s.id === 'assistant-new-lane') as unknown as { during: (c: unknown) => Promise<void>; observe: (o: unknown, c: unknown) => [string, boolean, string?][] }
+    // The scenario's own during(), against a stand-in Hive: Coder's live state and its project's session list.
+    const look = async (live: { runId: string; sessionId: string; status: string }, sessions: string[]) => {
+      const c: Record<string, unknown> = {
+        alpha: 'C:/w/alpha',
+        agents,
+        before: { runId: 'r1', sessionId: 's-old', status: 'finished' },
+        inv: async (channel: string) => (channel === 'session:list' ? sessions.map((id) => ({ id })) : channel === 'session:live' ? [{ projectPath: 'C:/w/alpha', agentId: 'a-coder', ...live }] : [])
+      }
+      return c
+    }
+    it('the same conversation kept: none new, the old one listed (read, not assumed)', async () => {
+      const c = await look({ runId: 'r1', sessionId: 's-old', status: 'working' }, ['s-old', 's-older'])
+      await sc.during(c)
+      const obs = Object.fromEntries(sc.observe({}, c).map(([n, v, d]) => [n, [v, d]]))
+      expect(obs[NEW][0]).toBe(false)
+      expect(obs[KEPT]).toEqual([true, 's-old in [s-old,s-older]'])
+    })
+    it('a new conversation: it, and the old one still listed; and an old one gone from the list is recorded as gone', async () => {
+      const c = await look({ runId: 'r2', sessionId: 's-new', status: 'working' }, ['s-new', 's-old'])
+      await sc.during(c)
+      const obs = Object.fromEntries(sc.observe({}, c).map(([n, v]) => [n, v]))
+      expect(obs[NEW]).toBe(true)
+      expect(obs[KEPT]).toBe(true)
+      const gone = await look({ runId: 'r2', sessionId: 's-new', status: 'working' }, ['s-new'])
+      await sc.during(gone)
+      expect(Object.fromEntries(sc.observe({}, gone).map(([n, v]) => [n, v]))[KEPT]).toBe(false)
+    })
   })
 
   it("mode-*-plans: a question through the CLI's own question tool surfaces the decision; none at all doesn't", () => {
