@@ -11,8 +11,10 @@
 const lib = require('./lib.cjs')
 const { processes, descendantsIn, endExactly, childrenFirst } = require('./folderProcesses.cjs')
 const { _electron } = require('playwright-core')
-const { spawn } = require('child_process')
+const { spawn, execFileSync } = require('child_process')
+const { baseEnv } = require('./runContext.cjs')
 const fs = require('fs')
+const net = require('net')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 20000
@@ -88,6 +90,26 @@ async function endFromOutside(app, outlives) {
   const ended = tree.length ? endExactly(childrenFirst(list, tree)) : 0
   const exited = await Promise.race([gone, new Promise((r) => setTimeout(() => r(false), HUNG_MS))])
   return ended > 0 && exited
+}
+
+/** Whether nothing listens on the Agent API port (on 127.0.0.1, where Hive listens), told as lanes.mjs portFree tells it. */
+const apiPortFree = () =>
+  new Promise((resolve) => {
+    const srv = net.createServer()
+    srv.once('error', () => resolve(false))
+    srv.listen(API_PORT, '127.0.0.1', () => srv.close(() => resolve(true)))
+  })
+
+/** What listens on the Agent API port (netstat), each owner by pid and command line: for a port that is never freed. */
+const portHolders = () => {
+  try {
+    const out = execFileSync('netstat', ['-ano', '-p', 'TCP'], { encoding: 'utf8', env: baseEnv(), windowsHide: true })
+    const pids = new Set(out.split(/\r?\n/).filter((l) => l.includes(`127.0.0.1:${API_PORT} `) && /LISTENING/.test(l)).map((l) => Number(l.trim().split(/\s+/).pop())))
+    const list = processes()
+    return JSON.stringify([...pids].map((pid) => list.find((p) => p.pid === pid) ?? { pid, gone: true }))
+  } catch (e) {
+    return String(e)
+  }
 }
 
 /** The notice's text in the window, once it is shown. */
@@ -168,6 +190,9 @@ const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toa
 
     // --- 2. The next start: the notice says it still runs, with Stop Them; nothing stops on its own.
     {
+      // The ended copy's Agent API socket is gone before the next copy listens on its port (HI-2193: once in 28 runs it
+      // wasn't yet, and the next copy's API failed to start). If something keeps it, the check names what.
+      check("the ended copy's Agent API port is free again", !!(await lib.until(apiPortFree, HUNG_MS)), portHolders())
       current = await start()
       const { page, inv } = current
       const text = await lib.until(() => notice(page), START_MS)
