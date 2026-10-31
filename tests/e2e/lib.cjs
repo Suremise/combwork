@@ -354,6 +354,9 @@ async function addAgent(inv, proj, opts = {}) {
  * pointed at it. Returns the agent as saved. Its CLI must have an account here (a test home's counts).
  */
 async function setLaunch(inv, proj, agentId, values) {
+  // Anything else (a provider: HI-2210) would be dropped unseen, leaving the agent on its account's CLI.
+  const other = Object.keys(values).filter((k) => !LAUNCH_KEYS.includes(k))
+  if (other.length) throw new Error(`setLaunch: not launch values: ${other.join(', ')} (change an agent's CLI with agents:update first)`)
   const rows = (await inv('connections:list')).connectionRows
   const ws = await inv('workspace:refresh')
   const host = [...ws.projects, ...(ws.assistant ? [ws.assistant] : [])].find((p) => p.path.toLowerCase() === proj.toLowerCase())

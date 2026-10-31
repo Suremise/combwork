@@ -19,9 +19,12 @@ const TURN_MS = 180000
 const SHOWN_MS = 30000
 // Codex 0.163 calls MCP tools from one script (Hive's transcript: "Script"), whose result waits for every call in it:
 // its screen says each call done, with its reply ("Called", redrawn over "Calling" as its last letters).
-const LISTED = /ed hive\.hive_list_projects\s*└\s*demo \(on/
+// Codex redraws a line by moving the cursor over letters that didn't change, and plainText makes each move a space: any
+// letter of a reply can read as a space ("DE-1 crea ed in Todo", HI-2210).
+const gappy = (text) => [...text].map((c) => (c === ' ' ? ' ' : `[${c.replace(/[\\\]^-]/g, '\\$&')} ]`)).join('')
+const LISTED = new RegExp(`ed hive\\.hive_list_projects\\s*└\\s*${gappy('demo')} \\(on`)
 // Its reply names the card by its key alone (#1219, HI-1661): "DE-1 created in Todo".
-const CREATED = /ed hive\.hive_create_task\s*└\s*([A-Z]{2,4}-\d+) created in Todo/
+const CREATED = new RegExp(`ed hive\\.hive_create_task\\s*└\\s*([A-Z]{2,4}-\\d+) ${gappy('created in Todo')}`)
 const record = {}
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -153,7 +156,10 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
     lib.trustForCodex(home)
     // In Ask (on-request), not its Approve for me, whose reviewer would decide a tool outside its subset itself: here
     // Codex asks the user, so the subset's tools are seen running unasked and the others asking.
-    await lib.setLaunch(inv, home, 'assistant', { ...small, permissionMode: 'ask' })
+    // On Codex first: its CLI follows its account's (HI-2122), and setLaunch sets values on the account it is on.
+    const { provider, ...launch } = small
+    await inv('agents:update', home, 'assistant', { provider })
+    await lib.setLaunch(inv, home, 'assistant', { ...launch, permissionMode: 'ask' })
     // A native server named hive in the Codex config of the folder the Assistant works in (the workspace's, trusted here),
     // approving every tool and the note's tool by name: Codex merges it into Hive's key by key, and Hive's approvals must
     // still win (#1281).
