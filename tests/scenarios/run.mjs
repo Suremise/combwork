@@ -304,6 +304,8 @@ for (const [i, { sc, sample, name }] of trials.entries()) {
   const failed = r.checks.filter((c) => c.ok === false)
   console.log(`${r.error ? `ERROR (${r.error.split('\n')[0]})` : failed.length ? `${failed.length} failed` : 'ok'}, ${r.seconds}s${r.usage?.costUsd ? `, $${r.usage.costUsd.toFixed(3)}` : ''}${r.kept ? ` (its folder is kept: ${r.kept})` : ''}`)
   for (const c of r.checks) console.log(`  ${c.ok === null ? 'SKIP' : c.ok ? 'PASS' : 'FAIL'} ${c.name}${c.ok === false && c.detail ? ` (${c.detail})` : ''}`)
+  // Codex scripts whose calls its rollout didn't record (HI-2235): what they ran can't be seen, so no check credits it.
+  if (r.observed?.codeMode?.unknown) console.log(`  NOTE unobservable: ${r.observed.codeMode.unknown} Codex script(s) whose calls the rollout didn't record; no check credits what they ran`)
   progress.done(sc.id, r.seconds * 1000, r.error || failed.length ? 'failed' : 'ok')
   keepSoFar()
 }

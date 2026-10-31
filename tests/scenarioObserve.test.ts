@@ -10,8 +10,8 @@ import { tempDir } from './tempDir'
 
 const require = createRequire(import.meta.url)
 const { observeTranscript } = require('./scenarios/harness.cjs') as { observeTranscript: (items: unknown[], skills: string[]) => { skillsRead: string[]; hiveMentions: string[]; finalReply: string } }
-const { SCENARIOS, helpers } = require('./scenarios/scenarios.cjs') as { SCENARIOS: { id: string; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }[]; helpers: { LANES_RUNNING_TAIL: string; checkRunsOf: (c: unknown) => { start: number; end: number | null; ok: boolean | null }[]; mergedInto: (c: unknown) => { at: { from: number; to: number } | null } | null; commandsOf: (t: unknown) => string[] } }
-const { withScriptCalls, codexRollout } = require('./scenarios/codexScripts.cjs') as { withScriptCalls: (items: unknown[], rollout: string) => { items: unknown[]; scripts: number; calls: number }; codexRollout: (home: string | undefined, id: string) => string | null }
+const { SCENARIOS, helpers } = require('./scenarios/scenarios.cjs') as { SCENARIOS: { id: string; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }[]; helpers: { LANES_RUNNING_TAIL: string; testRunsIn: (commands: string[]) => unknown[]; checkRunsOf: (c: unknown) => { start: number; end: number | null; ok: boolean | null }[]; mergedInto: (c: unknown) => { at: { from: number; to: number } | null } | null; commandsOf: (t: unknown) => string[] } }
+const { withScriptCalls, codexRollout } = require('./scenarios/codexScripts.cjs') as { withScriptCalls: (items: unknown[], rollout: string | null) => { items: unknown[]; scripts: number; calls: number }; codexRollout: (home: string | undefined, id: string) => string | null }
 
 const tool = (name: string, input: unknown, result = '', isError = false) => ({ kind: 'tool', tool: { name, summary: '', input: typeof input === 'string' ? input : JSON.stringify(input), result, isError } })
 const SKILLS = ['work-on-card', 'review-agent-work', 'handover']
@@ -138,7 +138,7 @@ describe("a Codex code-mode script's calls, read from its rollout (HI-2235)", ()
   const rollout = (...lines: unknown[]) => lines.map((l) => JSON.stringify(l)).join('\n') + '\n'
   // The script as Hive's parser shows it: one tool, Script, its result what the code printed.
   const script = (id: string, code: string, result = '') => ({ kind: 'tool', tool: { toolUseId: id, name: 'Script', summary: '', input: code, result, isError: false, images: [] } })
-  const observe = (items: unknown[], text: string) => observeTranscript(withScriptCalls(items, text).items, SKILLS) as unknown as { tools: { name: string; input: string; result: string; isError: boolean }[]; skillsRead: string[]; hiveMentions: string[] }
+  const observe = (items: unknown[], text: string | null) => observeTranscript(withScriptCalls(items, text).items, SKILLS) as unknown as { tools: { name: string; input: string; result: string; isError: boolean }[]; skillsRead: string[]; hiveMentions: string[] }
 
   it('replaces a script with the calls it made, named as direct calls, with the replies it got', () => {
     const code = 'const r = await tools.mcp__hive__hive_read_task({number:"AL-1"}); if (false) await tools.mcp__hive__hive_wait_for_agents({});'
@@ -159,17 +159,46 @@ describe("a Codex code-mode script's calls, read from its rollout (HI-2235)", ()
     const acceptance = "its reply had the card's acceptance line"
     expect(check('card-detail', acceptance, got, { cards: { q: 1 } })).toBe(true)
     expect(check('card-detail', acceptance, refused, { cards: { q: 1 } })).toBe(false)
-    // Only the script's code, its calls unknown: nothing is credited from what it names.
-    expect(check('card-detail', acceptance, observeTranscript([script('c1', read)], SKILLS), { cards: { q: 1 } })).toBe(false)
 
     const ps = 'text(await tools.exec_command({cmd:"pwsh -File scripts/cards.ps1"}))'
     const ran = observe([script('c2', ps)], rollout(call('c2', ps), shell('exec-2', 'pwsh -File scripts/cards.ps1', 'HTTP 200 … Scoped card for alpha\nHTTP 403 only for your own project'), output('c2', '')))
     const ctx = { read: (f: string) => (f === 'scripts/cards.ps1' ? 'Get-Content $env:HIVE_API_TOKEN_FILE' : null) }
     expect(check('raw-api', 'it ran, and listed its own card', ran, ctx)).toBe(true)
     expect(check('raw-api', "it didn't get beta's card, and Hive refused it", ran, ctx)).toBe(true)
-    // Written in the script, never run (no call recorded): not a run.
-    const notRun = observe([script('c2', `if (false) ${ps}`)], rollout(call('c2', `if (false) ${ps}`), output('c2', 'HTTP 200 Scoped card for alpha')))
+    // Written in the script, never run (the rollout records the script's other call, not this one): not a run, whatever it printed.
+    const never = `if (false) ${ps}; text(await tools.mcp__hive__hive_inbox({})); text("HTTP 200 Scoped card for alpha HTTP 403 only for your own project")`
+    const notRun = observe([script('c2', never, 'HTTP 200 Scoped card for alpha HTTP 403 only for your own project')], rollout(call('c2', never), mcp('exec-3', 'hive_inbox', {}, 'Nothing new.'), output('c2', 'HTTP 200 Scoped card for alpha HTTP 403 only for your own project')))
     expect(check('raw-api', 'it ran, and listed its own card', notRun, ctx)).toBe(false)
+    expect(notRun.tools.map((t) => t.name)).toEqual(['mcp__hive__hive_inbox'])
+  })
+
+  it("credits nothing from a script whose calls aren't known (no calls recorded, or no rollout): neither its code nor what it printed (HR1 round 1)", () => {
+    const scenario = (id: string) => SCENARIOS.find((s) => s.id === id)!
+    const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], hiveCalls: [], hiveMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
+    const ctx = { read: (f: string) => (f === 'scripts/cards.ps1' ? 'Get-Content $env:HIVE_API_TOKEN_FILE' : null) }
+    // HR1's case: a command never run, then text that looks like its output, which the script printed.
+    const printed = 'HTTP 200 Scoped card for alpha HTTP 403 only for your own project'
+    const code = `if (false) await tools.exec_command({cmd:"pwsh -File scripts/cards.ps1"}); if (false) await tools.exec_command({cmd:"npm test"}); if (false) await tools.mcp__hive__hive_read_task({number:"AL-1"}); text(${JSON.stringify(printed)}); text("ACCEPT-ZEBRA-42"); text(${JSON.stringify(SKILL_TEXT('work-on-card'))})`
+    const items = [script('c1', `${code} // .agents/skills/hive-work-on-card/SKILL.md`, `${printed}
+ACCEPT-ZEBRA-42
+${SKILL_TEXT('work-on-card')}`)]
+    const noRecords = rollout(call('c1', code), output('c1', printed))
+    for (const [what, text] of [['a rollout with no calls recorded', noRecords], ['no rollout', null]] as const) {
+      const o = observe(items, text)
+      expect(o.tools, what).toEqual([])
+      expect(check('raw-api', 'it ran, and listed its own card', o, ctx), what).toBe(false)
+      expect(check('raw-api', "it didn't get beta's card, and Hive refused it", o, ctx), what).toBe(false)
+      expect(check('card-detail', "its reply had the card's acceptance line", o, { cards: { q: 1 } }), what).toBe(false)
+      expect(helpers.testRunsIn(o.tools.flatMap(helpers.commandsOf)), what).toEqual([])
+      expect(o.skillsRead, what).toEqual([])
+      // Still mentions, and counted as unobservable for the run's report.
+      expect(o.hiveMentions, what).toEqual(['hive_read_task'])
+      expect(withScriptCalls(items, text), what).toMatchObject({ scripts: 0, calls: 0, unknown: 1 })
+    }
+    // With the same script's calls recorded, what ran counts: provider parity, never a fabricated call.
+    const ran = observe(items, rollout(call('c1', code), shell('exec-1', 'pwsh -File scripts/cards.ps1', printed), output('c1', printed)))
+    expect(check('raw-api', 'it ran, and listed its own card', ran, ctx)).toBe(true)
+    expect(helpers.testRunsIn(ran.tools.flatMap(helpers.commandsOf))).toEqual([])
   })
 
   it('reads a skill from a command the script ran, never from a patch it wrote; a failed command reads nothing', () => {
@@ -188,7 +217,7 @@ describe("a Codex code-mode script's calls, read from its rollout (HI-2235)", ()
     expect(helpers.commandsOf(o.tools[0])).toEqual(['Get-Content .agents/skills/hive-work-on-card/SKILL.md'])
   })
 
-  it("keeps a direct call once, gives a call that ends after its script (a wait read it on) to that script, and keeps the transcript when the rollout records no calls", () => {
+  it("keeps a direct call once, gives a call that ends after its script (a wait read it on) to that script, and leaves other tools as they are", () => {
     const direct = { kind: 'tool', tool: { toolUseId: 'call_d', name: 'mcp__hive__hive_inbox', summary: '', input: '{}', result: 'Nothing new.', isError: false, images: [] } }
     const text = rollout(
       { type: 'response_item', payload: { type: 'function_call', name: 'mcp__hive__hive_inbox', call_id: 'call_d', arguments: '{}' } },
@@ -201,10 +230,8 @@ describe("a Codex code-mode script's calls, read from its rollout (HI-2235)", ()
     )
     const o = observe([direct, script('s1', 'const p = tools.exec_command({cmd:"npm test"})', 'still running')], text)
     expect(o.tools.map((t) => [t.name, t.result])).toEqual([['mcp__hive__hive_inbox', 'Nothing new.'], ['Shell', '3 passing']])
-    const old = [script('s1', 'text(await tools.mcp__hive__hive_read_task({number:1}))', 'ACCEPT')]
-    const unknown = rollout(call('s1', 'x'), output('s1', 'ACCEPT'))
-    expect(withScriptCalls(old, unknown)).toEqual({ items: old, scripts: 0, calls: 0 })
-    expect(withScriptCalls(old, '')).toEqual({ items: old, scripts: 0, calls: 0 })
+    const others = [direct, { kind: 'assistant', text: 'Done.' }]
+    expect(withScriptCalls(others, null)).toEqual({ items: others, scripts: 0, calls: 0, unknown: 0 })
   })
 
   it("finds the session's own rollout in a Codex home, and nothing for another session", () => {

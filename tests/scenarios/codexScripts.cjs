@@ -117,35 +117,40 @@ function scriptCalls(text) {
 /**
  * A transcript's items with each code-mode script (Hive's Script, or the Edit it makes of one that patches) replaced by
  * the calls it made, in order, each a tool item of its own; the script itself is kept as a `script` item (no tool: its
- * code names calls, which are mentions). Unchanged when the rollout records no calls (unknown) or there is no rollout.
- * Calls of a script the transcript doesn't show come last.
+ * code names calls, which are mentions). A Script whose calls aren't known (no rollout, a rollout that records no calls,
+ * or one without that script) is a `script` item too, with none (`unknown`): neither its code nor what it printed is
+ * evidence of a call (HI-2235, HR1 round 1), so what it ran is unobservable, never credited. Calls of a script the
+ * transcript doesn't show come last. `rolloutText`: the rollout's text, or null when there is none.
  */
 function withScriptCalls(items, rolloutText) {
   const { recorded, byScript } = scriptCalls(rolloutText)
-  if (!recorded || !byScript.size) return { items, scripts: 0, calls: 0 }
   const placed = new Set()
   let scripts = 0
   let calls = 0
+  let unknown = 0
   const out = []
   for (const it of items) {
     const id = it.kind === 'tool' ? it.tool?.toolUseId : undefined
-    const nested = id !== undefined ? byScript.get(String(id)) : undefined
-    if (!nested) {
-      out.push(it)
-      continue
+    const nested = recorded && id !== undefined ? byScript.get(String(id)) : undefined
+    if (nested) {
+      placed.add(String(id))
+      scripts++
+      calls += nested.length
+      out.push({ ...it, kind: 'script' })
+      for (const tool of nested) out.push({ kind: 'tool', timestamp: it.timestamp ?? null, tool, script: String(id) })
+    } else if (it.kind === 'tool' && it.tool?.name === 'Script') {
+      unknown++
+      out.push({ ...it, kind: 'script', unknown: true })
+    } else out.push(it)
+  }
+  if (recorded) {
+    for (const [id, nested] of byScript) {
+      if (placed.has(id)) continue
+      calls += nested.length
+      for (const tool of nested) out.push({ kind: 'tool', timestamp: null, tool, script: id })
     }
-    placed.add(String(id))
-    scripts++
-    calls += nested.length
-    out.push({ ...it, kind: 'script' })
-    for (const tool of nested) out.push({ kind: 'tool', timestamp: it.timestamp ?? null, tool, script: String(id) })
   }
-  for (const [id, nested] of byScript) {
-    if (placed.has(id)) continue
-    calls += nested.length
-    for (const tool of nested) out.push({ kind: 'tool', timestamp: null, tool, script: id })
-  }
-  return { items: out, scripts, calls }
+  return { items: out, scripts, calls, unknown }
 }
 
 module.exports = { codexRollout, scriptCalls, withScriptCalls, callTool }

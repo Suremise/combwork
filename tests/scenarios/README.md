@@ -22,8 +22,9 @@ ran:
   made as it ends (MCP calls, commands, file changes, images viewed) with its arguments and result, and puts those calls in
   the script's place, named as the same call made directly (`mcp__hive__<tool>`, `Shell`, `Edit`, `view_image`): the
   checks read what Codex called and got back, as for the other CLIs, and a call written in a script that never ran isn't
-  one (`codexScripts.cjs`). A rollout that records no calls leaves the transcript as it was. The fake Codex works in code
-  mode in the scenarios too (`fake-code-mode.txt` in its home).
+  one (`codexScripts.cjs`). A script whose calls aren't recorded (no rollout, or one that records no calls) is no evidence
+  of any: neither its code nor what it printed counts, and the run notes it as unobservable (`NOTE unobservable`,
+  `observed.codeMode.unknown`). The fake Codex works in code mode in the scenarios too (`fake-code-mode.txt` in its home).
 - **The merge slot** comes from Hive's own record: development builds write each change to the slots (who holds one,
   told so or not, and who waits in line) and each claim or release as Hive resolved it (the branch, and what it did:
   held or in line; released, left the line or nothing), with its time, to the file named by `HIVE_TEST_MERGE_SLOT_LOG`.

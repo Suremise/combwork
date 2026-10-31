@@ -849,11 +849,12 @@ async function runScenario(sc, providerKey, opts = {}) {
     for (const it of items) {
       if (it.kind === 'tool' && (it.tool.inputLength || it.tool.resultLength)) it.tool = (await inv('transcript:tool', host, sessionId, it.id).catch(() => null)) ?? it.tool
     }
-    // Codex in code mode (HI-2235): each script's calls as its rollout recorded them, in the script's place.
+    // Codex in code mode (HI-2235): each script's calls as its rollout recorded them, in the script's place. A script
+    // whose calls it didn't record (or no rollout) is no tool: what it ran is unobservable (codeMode.unknown).
     const rollout = p.provider === 'codex' ? codexRollout(env.CODEX_HOME, sessionId) : null
-    const code = rollout ? withScriptCalls(items, fs.readFileSync(rollout, 'utf8')) : { items, scripts: 0, calls: 0 }
+    const code = p.provider === 'codex' ? withScriptCalls(items, rollout ? fs.readFileSync(rollout, 'utf8') : null) : { items, scripts: 0, calls: 0, unknown: 0 }
     const observed = observeTranscript(code.items, skillNames, skillRefsOf(ctx.skillsDir, skillNames))
-    observed.codeMode = { scripts: code.scripts, calls: code.calls }
+    observed.codeMode = { scripts: code.scripts, calls: code.calls, unknown: code.unknown }
     observed.status = s?.status ?? 'stopped'
     // Every status it reported during the turn, in order (HI-2022): `watching` seen even when it came and went between looks.
     observed.statuses = await ctx.statusesSeen().catch(() => [])
@@ -866,12 +867,12 @@ async function runScenario(sc, providerKey, opts = {}) {
     observed.turnWatch = states.length ? (states.findLast((x) => x.status === 'watching')?.watch ?? null) : observed.status === 'watching' ? observed.watch : null
     // What Hive woke it with (#402), in order: a line it typed in, or (#650: its doorbell) what the session's next
     // hive_inbox call read, the inbox's own items after the doorbell. Codex calls hive tools from its code tool (Script):
-    // its read is the hive_inbox call the script made (HI-2235), or with its calls unknown the script itself (#1537).
+    // its read is the hive_inbox call the script made (HI-2235); with the script's calls unknown, the doorbell's line.
     observed.wakeLines = code.items.flatMap((x, i) => {
       const line = String(x.kind === 'user' ? (x.text ?? '') : '').trim()
       if (!line.startsWith('[Hive]')) return []
       if (!line.startsWith('[Hive] New in your inbox: ')) return [line.slice(0, 1000)]
-      const read = code.items.slice(i + 1).find((y) => y.kind === 'tool' && (/hive_inbox/.test(y.tool.name) || (y.tool.name === 'Script' && /hive_inbox/.test(String(y.tool.input ?? '')))))
+      const read = code.items.slice(i + 1).find((y) => y.kind === 'tool' && /hive_inbox/.test(y.tool.name))
       return [String(read?.tool.result ?? line).trim().slice(0, 1000)]
     })
     observed.guidance = result.guidance
