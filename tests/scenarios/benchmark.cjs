@@ -348,12 +348,40 @@ function benchmarkOf(meta, results, appVersion) {
   }
 }
 
-/** Keeps the newest `keep` run folders in `dir` (named by time), removing older ones. */
-function pruneResults(dir, keep = LIMITS.resultsKept, spare = () => null) {
+/** The file in a results folder naming the runner writing it ({ pid, at }): while that process lives, the folder is held. */
+const HOLD = 'runner.json'
+
+/** Whether a process is alive (one we may not signal is). */
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return e.code === 'EPERM'
+  }
+}
+
+/** Whether a runner still writes into results folder `folder` (HI-2234): its runner.json names a live process. */
+function resultsHeld(folder, alive = processAlive) {
+  let hold
+  try {
+    hold = JSON.parse(fs.readFileSync(path.join(folder, HOLD), 'utf8'))
+  } catch {
+    return false
+  }
+  return !!hold && Number.isInteger(hold.pid) && hold.pid > 0 && alive(hold.pid)
+}
+
+/**
+ * Keeps the newest `keep` run folders in `dir` (named by time), removing older ones. Never one a card cites (spare) or
+ * one a runner still writes into (resultsHeld, HI-2234: another lane's fake runs starting every few minutes pushed a
+ * two-hour model run's folder out from under it); neither counts towards `keep`.
+ */
+function pruneResults(dir, keep = LIMITS.resultsKept, spare = () => null, alive = processAlive) {
   if (!fs.existsSync(dir)) return
   const runs = fs
     .readdirSync(dir, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && /^\d{4}-\d\d-\d\dT/.test(d.name) && !spare(path.join(dir, d.name)))
+    .filter((d) => d.isDirectory() && /^\d{4}-\d\d-\d\dT/.test(d.name) && !spare(path.join(dir, d.name)) && !resultsHeld(path.join(dir, d.name), alive))
     .map((d) => d.name)
     .sort()
   for (const old of runs.slice(0, Math.max(0, runs.length - keep))) fs.rmSync(path.join(dir, old), { recursive: true, force: true })
@@ -401,16 +429,66 @@ function saveBaseline(dir, name, file, spare = () => null) {
   return dest
 }
 
-/** A results folder of its own for a run (a second run in the same second gets -2, -3…, never another run's folder). */
-function resultsFolder(dir, base) {
+/**
+ * A results folder of its own for a run (a second run in the same second gets -2, -3…, never another run's folder),
+ * held by this process (runner.json) so no other run's prune removes it while it runs.
+ */
+function resultsFolder(dir, base, pid = process.pid) {
   fs.mkdirSync(dir, { recursive: true })
   for (let i = 1; ; i++) {
     const f = path.join(dir, `${base}${i > 1 ? `-${i}` : ''}`)
     try {
       fs.mkdirSync(f)
+      holdResults(f, pid)
       return f
     } catch (e) {
       if (e.code !== 'EEXIST') throw e
+    }
+  }
+}
+
+/** Marks `folder` as held by process `pid`. */
+function holdResults(folder, pid = process.pid) {
+  fs.writeFileSync(path.join(folder, HOLD), JSON.stringify({ pid, at: new Date().toISOString() }))
+}
+
+/** Lets `folder` go (the run has written everything): a later prune may count it. Never fails. */
+function releaseResults(folder) {
+  try {
+    fs.rmSync(path.join(folder, HOLD), { force: true })
+  } catch {
+    // Gone already, or can't be removed: the process ending lets it go anyway.
+  }
+}
+
+/** How many times writeResults makes a vanished folder again before it gives up. */
+const WRITE_ATTEMPTS = 3
+
+/**
+ * Writes `name` in the run's results folder `folder`, which this process holds. Should the folder be gone when the
+ * write is made (something outside the prune removed it, HI-2234), it is made again and held, `rewrite()` puts back
+ * each file the run had written (from what it holds in memory), onRecreated says so, and the write is tried again:
+ * whenever the folder goes, before the write or during the recovery. Only a missing folder (ENOENT) is retried, at most
+ * WRITE_ATTEMPTS times in all; any other error, or the folder still going after that, is thrown.
+ */
+function writeResults(folder, name, data, { rewrite = () => {}, onRecreated = () => {}, write = fs.writeFileSync } = {}) {
+  let restore = false
+  for (let attempt = 1; ; attempt++) {
+    try {
+      if (restore) {
+        fs.mkdirSync(folder, { recursive: true })
+        holdResults(folder)
+        onRecreated()
+        rewrite()
+        restore = false
+      }
+      write(path.join(folder, name), data)
+      return
+    } catch (e) {
+      // Gone (again, during the recovery too): the next attempt starts the recovery over, so the write is only made
+      // once every earlier file is back.
+      if (e.code !== 'ENOENT' || attempt >= WRITE_ATTEMPTS) throw e
+      restore = true
     }
   }
 }
@@ -446,4 +524,4 @@ function spendText(meta) {
   return meta.unknownCostTrials ? `${known} reported, plus ${meta.unknownCostTrials} trial${meta.unknownCostTrials === 1 ? '' : 's'} with no reported cost: the total is unknown` : `${known} (API-equivalent)`
 }
 
-module.exports = { SCHEMA, LIMITS, benchmarkOf, sampleOf, pruneResults, saveBaseline, resultsFolder, measuresOf, metricsTotals, parseBudget, budgetGate, spendText }
+module.exports = { SCHEMA, LIMITS, benchmarkOf, sampleOf, pruneResults, resultsHeld, saveBaseline, resultsFolder, releaseResults, writeResults, WRITE_ATTEMPTS, measuresOf, metricsTotals, parseBudget, budgetGate, spendText }
