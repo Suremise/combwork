@@ -3535,6 +3535,9 @@ class SessionManager {
   private noteUserReply(l: LiveSession, text: string | null | undefined): void {
     const st = l.state
     if (!text?.trim() || text.trim().startsWith('/') || workspace.isAssistantHome(st.projectPath)) return
+    // A launch's task on its command line is its CLI's first prompt (HI-2218, #712), Hive's whatever Enter the user
+    // pressed on its start screen; `prompted` has counted it already.
+    if (l.launchTask && (l.prompts ?? 0) <= 1) return
     const enterAt = this.userEnter.get(this.key(st.projectPath, st.agentId)) ?? 0
     // Not when Hive's own Enter came after the user's (HI-2218): its line, reported taken while its typing still waits.
     if (enterAt <= Math.max(l.typed?.at ?? 0, l.hiveEnterAt ?? 0) || Date.now() - enterAt > USER_REPLY_MS) return

@@ -1,7 +1,8 @@
 // Hive's own line is never told as the user's reply (HI-2218, #418): the user pressed Enter in an agent's pane, then
 // within 15 s Hive typed a line there whose prompt its CLI reported taken while sendPrompt still waited for it (its
-// confirm loop, before `typed` was recorded). With the real SessionManager on a stand-in Claude Code input: no reply is
-// told for Hive's line; the user's own prompt after it still is.
+// confirm loop, before `typed` was recorded); or a launch's task on its command line was taken just after the user
+// answered its start screen. With the real SessionManager on a stand-in Claude Code input: no reply is told for Hive's
+// line or task; the user's own prompt after it still is.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { claudeInput } from './claudeInputStandIn'
 
@@ -81,5 +82,21 @@ describe("Hive's own line isn't the user's reply (HI-2218)", () => {
     sessions.noteUserInput(pty, 'Red\r')
     prompted(e, 'Red')
     expect(replies).toEqual(['Red'])
+  })
+
+  it("a launch's task on its command line, taken just after the user answered its start screen: no reply; the user's next prompt is one", () => {
+    const replies: string[] = []
+    vi.spyOn(sessions, 'userReplied').mockImplementation((_p, _a, _n, text) => void replies.push(text))
+    // Launched with its first task on its command line (#712): nothing typed, so no `typed` and no Enter of Hive's.
+    const e = running()
+    e.launchTask = true
+    // The user answers its trust screen with Enter (the reported case: a new sign-in's home), then its CLI takes the task.
+    sessions.noteUserInput(pty, '\r')
+    prompted(e, '[Hive] New in your inbox: 1 task (m672)')
+    expect(replies, "the launch task is told as nobody's reply").toEqual([])
+    // The user then sends a prompt of their own: told.
+    sessions.noteUserInput(pty, 'Blue\r')
+    prompted(e, 'Blue')
+    expect(replies).toEqual(['Blue'])
   })
 })
