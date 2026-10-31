@@ -92,6 +92,30 @@ export const OPENABLE_WAIT_MS = 20_000
 const OPENABLE_POLL_MS = 100
 
 /**
+ * The I/O error an open of `file` would fail with now because its `-shm` is still mapped elsewhere (untilOpenable), or
+ * null: no `-shm`, it opens, or any other error (left for the open to report). One read-only probe, which changes
+ * nothing in the files.
+ */
+function refusal(file: string): Error | null {
+  if (!existsSync(`${file}-shm`)) return null
+  try {
+    // A busy file isn't waited for here (the open's own busy wait has it).
+    const probe = new DatabaseSync(file, { readOnly: true, timeout: 100 })
+    try {
+      probe.prepare('SELECT count(*) FROM sqlite_master').get()
+    } finally {
+      probe.close()
+    }
+    return null
+  } catch (e) {
+    return isIoError(e) ? (e as Error) : null
+  }
+}
+
+/** Whether `file` can be opened now, as untilOpenable would find at its first try (HI-2200: a read that never waits). */
+export const openableNow = (file: string): boolean => refusal(file) === null
+
+/**
  * Waits, without holding main's thread, until a WAL database left as a Hive that ended without quitting left it can be opened
  * (HI-2199): its `-shm` still there, and another process still mapping it. The first connection to such a file truncates
  * the `-shm` (SQLite 3.53's winLockSharedMemory), which Windows refuses while any process has it mapped, so every open
@@ -108,29 +132,20 @@ export async function untilOpenable(file: string, o: { onWait?: (error: Error) =
   const started = performance.now()
   for (let told = false; ; told = true) {
     if (signal?.aborted) return performance.now() - started
-    try {
-      // A busy file isn't waited for here (the open's own busy wait has it).
-      const probe = new DatabaseSync(file, { readOnly: true, timeout: 100 })
-      try {
-        probe.prepare('SELECT count(*) FROM sqlite_master').get()
-      } finally {
-        probe.close()
+    const e = refusal(file)
+    if (!e) return performance.now() - started
+    const waited = performance.now() - started
+    if (waited >= boundMs) return waited
+    if (!told) onWait?.(e)
+    await new Promise<void>((r) => {
+      const done = (): void => {
+        clearTimeout(t)
+        signal?.removeEventListener('abort', done)
+        r()
       }
-      return performance.now() - started
-    } catch (e) {
-      const waited = performance.now() - started
-      if (!isIoError(e) || waited >= boundMs) return waited
-      if (!told) onWait?.(e as Error)
-      await new Promise<void>((r) => {
-        const done = (): void => {
-          clearTimeout(t)
-          signal?.removeEventListener('abort', done)
-          r()
-        }
-        const t = setTimeout(done, OPENABLE_POLL_MS)
-        signal?.addEventListener('abort', done, { once: true })
-      })
-    }
+      const t = setTimeout(done, OPENABLE_POLL_MS)
+      signal?.addEventListener('abort', done, { once: true })
+    })
   }
 }
 
