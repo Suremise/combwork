@@ -262,6 +262,11 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     await c.inv('advanced:set', 'hive.restart.resumeReadySeconds', 90)
     // Worker working again; a close for an install records it (and the lane's two); then it is held at its next resume.
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-2', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
+    // Other working too, so the install records it and the start after the kill resumes it (as a slow machine does when
+    // Other is still on its note, HI-2202): section 3 then has it running.
+    const liveAny = async (project, id) => (await c.inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === id)
+    await lib.sendPrompt(c.inv, lib.ptyKey(beta, agents.Other.id), 'holduntil go-other-2', { ready: async () => (await liveAny(beta, agents.Other.id))?.status === 'ready', submitted: async () => (await liveAny(beta, agents.Other.id))?.status === 'working' })
+    check('Worker and Other work before the install', (await c.live(agents.Worker.id))?.status === 'working' && (await liveAny(beta, agents.Other.id))?.status === 'working')
     writeRequest(c.pid, '8b3e0d4c-2c65-4f80-9d7c-5e4f3a2b1c09')
     check('Hive quits by itself for the install', !!(await gone(c.pid)))
     c = null
@@ -283,11 +288,11 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     // workspace, was recorded by the install too and resumed with the others: it may still be working on its note or
     // the install's line when the test quits (HI-2202), and a quit records it then.
     check('the queue settles', !!(await lib.until(() => !fs.existsSync(recordFile), HUNG_MS)), JSON.stringify(record()))
+    check('…Other resumed with the others', !!(await liveAny(beta, agents.Other.id)))
     const others = ['Watcher', 'Builder', 'Reviewer']
     for (const n of others) await c.inv('session:stop', alpha, agents[n].id)
     // The second workspace's window stops Other (a window's calls are its own workspace's).
     for (const p of c.app.windows()) await p.evaluate(([x, id]) => window.hive.invoke('session:stop', x, id), [beta, agents.Other.id]).catch(() => undefined)
-    const liveAny = async (project, id) => (await c.inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === id)
     check('Watcher, Builder, Reviewer and Other are stopped', !!(await lib.until(async () => (await Promise.all([...others.map((n) => c.live(agents[n].id)), liveAny(beta, agents.Other.id)])).every((s) => !s), HUNG_MS, 300)))
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-3', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
     check('Hive quits', await quit(c))
