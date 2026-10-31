@@ -5,7 +5,8 @@
 // in whole lanes, never squeezing the runs, double-click for four, kept folded and through a restart (#569), running lanes first, the card being worked as current, an ended or abandoned lane frozen as it was left
 // (#512), hover text (with what a failed review's underline and the hatching mean, #706), a click opening the card, and the section folding to its bar; running lanes
 // put in the user's order (#568): dragged with a line where they go (the list scrolled, and scrolling near its edge), Alt+Up and Alt+Down said to screen
-// readers, the context menu, a new lane on top, a finished one to the very bottom, kept through a restart, and the usual order again; while an agent holds the merge slot, a
+// readers, the context menu, a new lane on top, a finished one to the very bottom, kept through a restart, and the usual order again; a lane's
+// queued list change shown in the Lanes tab, gone once it applies (HI-2151); while an agent holds the merge slot, a
 // card in the merge colour on top (holder, branch → main, its running step, time, who waits) with a divider, folding to
 // one line; a short, zoomed window keeps the lanes inside the panel and a run readable. Screenshots of the idle, lanes,
 // merging and short states in both themes. The lanes are #483's, started through the Agent API. Dev build, throwaway
@@ -725,6 +726,40 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const usualOrder = [l8, l7, l3, l2, l1, l4, l5, l6]
   const saved2 = () => page2.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.laneOrder?.[w.toLowerCase()] ?? null), ws)
   check('Usual Order puts the lanes back, and keeps no order', !!(await until(async () => (await order2()).join() === usualOrder.join() && (await saved2()) === null, HUNG_MS)), JSON.stringify({ order: await order2(), saved: await saved2() }))
+
+  // --- A lane's queued list change in the Lanes tab (HI-2151): B10's lane, its first card in flight, changed to add a
+  // card and reorder the rest, so Hive queues it behind that card. The tab says what it will do under the lane's bar;
+  // once that card is Done the change applies and the line goes.
+  const panel2 = page2.locator('.progress-panel')
+  const b10 = await lib.addAgent(inv2, alpha, { name: 'B10' })
+  const make2 = async (title, column) => {
+    const c = await inv2('tasks:create', { title, project: 'alpha', column, agent: b10?.id })
+    keyOf.set(c.number, c.key)
+    return c.number
+  }
+  const [q1, q2, q3] = [await make2('Queued one', 'doing'), await make2('Queued two', 'todo'), await make2('Queued three', 'todo')]
+  const l9 = await startLane('B10', 'R1', 'queued change', [q1, q2, q3])
+  const q4 = await make2('Queued four', 'todo')
+  const change = await api(workspaceToken, 'POST', '/v1/lanes', { project: 'alpha', builder: 'B10', reviewer: 'R1', cards: [q1, q4, q3, q2] })
+  const laneNow = async () => (await inv2('lanes:list')).find((l) => l.id === l9)
+  check('a list change to a lane with its card in flight is queued', change.status === 200 && !!(await until(async () => (await laneNow())?.queued?.join() === [q1, q4, q3, q2].join(), HUNG_MS)), JSON.stringify({ change, lane: await laneNow() }))
+  await panel2.locator('.progress-tab[data-tab="lanes"]').click()
+  const queuedLine = panel2.locator(`.progress-tab-lanes .progress-lane[data-lane="${l9}"] .progress-lane-queued`)
+  const wantLine = `Next, once ${K(q1)} is Done: ${K(q4)} added, new order: ${K(q1)}, ${K(q4)}, ${K(q3)}, ${K(q2)}`
+  check('the Lanes tab shows the queued change under the lane', !!(await until(async () => ((await queuedLine.count()) === 1 ? (await queuedLine.innerText()).trim() : '') === wantLine, HUNG_MS)), JSON.stringify({ got: await queuedLine.innerText().catch(() => null), want: wantLine }))
+  check('…its whole text in its title', (await queuedLine.getAttribute('title')) === wantLine)
+  check('…and no other lane shows one', (await panel2.locator('.progress-lane-queued').count()) === 1)
+  await queuedLine.scrollIntoViewIfNeeded()
+  for (const theme of ['dark', 'light']) {
+    await inv2('settings:update', { appearance: { theme } })
+    await until(async () => (await page2.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    await lib.sleep(250)
+    await page2.screenshot({ path: path.join(shots, `lanes-queued-${theme}.png`) })
+  }
+  await inv2('settings:update', { appearance: { theme: 'dark' } })
+  await inv2('tasks:update', q1, { column: 'done' })
+  check('once its card is Done, the change applies', !!(await until(async () => { const l = await laneNow(); return !!l && l.queued === null && l.cards.map((c) => c.number).join() === [q1, q4, q3, q2].join() }, HUNG_MS)), JSON.stringify(await laneNow()))
+  check('…and the line goes', !!(await until(async () => (await queuedLine.count()) === 0, HUNG_MS)))
   await app2.close().catch(() => undefined)
   console.log(failed ? `\n${failed} FAILED` : '\nAll passed')
   process.exit(failed ? 1 : 0)

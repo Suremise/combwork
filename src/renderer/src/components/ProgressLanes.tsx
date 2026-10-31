@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { clampScroll, edgeSpeed, frameStep } from '@shared/edgeScroll'
-import { RUNS_KEEP_PX, laneCardTime, laneWaitTime, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneOldRulesNote, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, pulseLanes, foldedMarks, laneWaitText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type FoldedMarks, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
+import { RUNS_KEEP_PX, laneCardTime, laneWaitTime, draggedLaneRows, droppedLaneOrder, fitSegments, frozenSegment, keyedLaneRows, laneCards, laneOldRulesNote, laneRowsNow, laneRunning, laneSummary, mergedLaneOrder, nudgedLaneOrder, pulseLanes, foldedMarks, laneWaitText, queuedChange, queuedChangeText, segmentMarks, segmentName, segmentsThatFit, laneSegmentWork, type FoldedMarks, type LaneSegment, type SegmentMarks } from '@shared/laneBar'
 import { laneLegend, legendSources, segmentStage, type LegendGroup } from '@shared/laneStages'
 import { revisionShort } from '@shared/platform/descriptors'
 import type { WorkBadge } from '@shared/workflow/workView'
@@ -335,7 +335,7 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
         // Whole lanes, the next one's top at the bottom edge; all of them, with the list's padding, when they fit.
         <div className="progress-lanes-list" ref={list} style={!full && shown < lanes.length ? { maxHeight: shown * pitch } : undefined} onDragOver={overList}>
           {lanes.map((l) => (
-            <LaneRow key={l.id} lane={l} max={segmentsThatFit(width - BAR_INSET_PX)} reorder={reorder(l)} badges={badges} runs={runs} stages={stages.get(l.project.toLowerCase())} enforced={enforced} {...(full ? { expanded: expanded.has(l.id), onExpand: () => expand(l.id) } : {})} />
+            <LaneRow key={l.id} lane={l} max={segmentsThatFit(width - BAR_INSET_PX)} reorder={reorder(l)} badges={badges} runs={runs} stages={stages.get(l.project.toLowerCase())} enforced={enforced} {...(full ? { expanded: expanded.has(l.id), onExpand: () => expand(l.id), all } : {})} />
           ))}
         </div>
       )}
@@ -598,7 +598,7 @@ function LanePoolTip({ lane: l }: { lane: Lane }) {
  * `stages`: its project's stages and names (#1421), so its segments say their cards' stages; `enforced`: whether workflow
  * rules are enforced now, for what its old rules marks say.
  */
-function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, expanded, onExpand }: { lane: Lane; max: number; reorder: LaneReorder | null; badges: Map<number, WorkBadge>; runs: ProgressRun[]; stages: ProjectStages | undefined; enforced: boolean; expanded?: boolean; onExpand?: () => void }) {
+function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, expanded, onExpand, all }: { lane: Lane; max: number; reorder: LaneReorder | null; badges: Map<number, WorkBadge>; runs: ProgressRun[]; stages: ProjectStages | undefined; enforced: boolean; expanded?: boolean; onExpand?: () => void; all?: Lane[] }) {
   const tasks = useStore((s) => s.tasks)
   const projects = useStore((s) => s.workspace?.projects ?? NO_PROJECTS)
   // Read again each minute: a card waiting in Review becomes stalled with time (#521).
@@ -624,6 +624,9 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
   const pair = lanePair(l)
   // Why it waits (#1279, from #1270's status): said in its header instead of just "paused", and in its accessible name.
   const why = l.status && !l.frozen ? laneWaitText(l.status, (n) => cardLabelOf({ tasks }, n), tr) : null
+  // Its queued list change (HI-2151), under its cards in the Lanes tab (`all`: every lane, to say where a card moves).
+  const change = all ? queuedChange(l, all) : null
+  const queued = change ? queuedChangeText(change, (n) => cardLabelOf({ tasks }, n), tr, fmt.list) : null
   const word = stateWord(l.state)
   // How long it has waited (HI-1926: since main saw the wait begin), marked past its bound (Settings → Advanced).
   const youMin = useAdvancedValue<number>('hive.lanes.waitYouMinutes')
@@ -786,6 +789,11 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
           <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : []} marks={s.kind === 'card' ? segmentMarks(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES, enforced) : {}} folded={s.kind === 'card' ? null : foldedMarks(l, badges, cards, s.numbers, shortFor, tr, OVERRIDE_NAMES, enforced)} />
         ))}
       </div>
+      {queued && (
+        <div className="progress-lane-queued faint" data-queued="" title={queued}>
+          <Icon name="history" /> <span className="progress-lane-queued-text">{queued}</span>
+        </div>
+      )}
       {expanded && <LaneQueue lane={l} badges={badges} />}
     </div>
   )

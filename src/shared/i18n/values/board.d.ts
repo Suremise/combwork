@@ -521,6 +521,11 @@ interface HiveMessageValues {
   'board.lanes.projectLink': { project: string | number }
   'board.lanes.queue': { lane: string | number }
   'board.lanes.queueState': { state: string }
+  'board.lanes.queuedAdded': { n: number; cards: string | number }
+  'board.lanes.queuedChange': { after: string; card: string | number; changes: string | number }
+  'board.lanes.queuedMoves': { n: number; cards: string | number; builder: string | number }
+  'board.lanes.queuedOrder': { cards: string | number }
+  'board.lanes.queuedRemoved': { n: number; cards: string | number }
   'board.lanes.retryFresh': undefined
   'board.lanes.retryFreshFailed': { lane: string | number }
   'board.lanes.retryFreshShort': { agent: string | number }

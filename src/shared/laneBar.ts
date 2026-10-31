@@ -262,6 +262,67 @@ export function laneWaitText(s: LaneStatus, name: (n: number) => string, tr: Tr)
   )
 }
 
+/** What queuedChange reads of a lane: the window's Lane, or main's. */
+export interface QueuedLane {
+  id: string
+  state: LaneState
+  builder: { name: string }
+  cards: readonly number[]
+  info: readonly Pick<LaneCard, 'number' | 'column' | 'elsewhere'>[]
+  queued: readonly number[] | null
+  status: LaneStatus | null
+}
+
+/**
+ * A running lane's queued list change (HI-2151, #1270), as Progress → Lanes shows it under its cards: the card in flight
+ * it applies after (null: none known), the cards it adds, those it takes off (each with the builder of another running
+ * lane that lists it now, or will, else null), and the whole new list when the cards it keeps change order. Null: none
+ * queued, or one the same as its cards.
+ */
+export interface QueuedChange {
+  after: number | null
+  added: number[]
+  removed: { card: number; to: string | null }[]
+  order: number[] | null
+}
+
+export function queuedChange(lane: QueuedLane, all: readonly QueuedLane[]): QueuedChange | null {
+  const q = lane.queued
+  if (!q || (lane.state !== 'active' && lane.state !== 'paused')) return null
+  const now = new Set(lane.cards)
+  const next = new Set(q)
+  const added = q.filter((n) => !now.has(n))
+  const others = all.filter((l) => l.id !== lane.id && (l.state === 'active' || l.state === 'paused'))
+  const removed = lane.cards.filter((n) => !next.has(n)).map((card) => ({ card, to: others.find((l) => l.cards.includes(card) || !!l.queued?.includes(card))?.builder.name ?? null }))
+  const kept = q.filter((n) => now.has(n))
+  const was = lane.cards.filter((n) => next.has(n))
+  const order = kept.some((n, i) => n !== was[i]) ? [...q] : null
+  if (!added.length && !removed.length && !order) return null
+  // As its status names it, else its own card in flight (Active, In review or Approved), as main keys the change to it.
+  const flying = lane.info.find((c) => !c.elsewhere && (c.column === 'doing' || c.column === 'review' || c.column === 'passed'))
+  const after = lane.status?.reason === 'listChanges' && lane.status.card !== null ? lane.status.card : (flying?.number ?? null)
+  return { after, added, removed, order }
+}
+
+/**
+ * A queued list change in a line (HI-2151): "Next, once HI-2148 is Done: HI-2149 added, HI-2121 moves to HB6’s lane".
+ * `name`: a card as the window names it (its key).
+ */
+export function queuedChangeText(c: QueuedChange, name: (n: number) => string, tr: Tr, list: ListOf): string {
+  const cards = (ns: readonly number[], type: 'conjunction' | 'unit' = 'conjunction'): string => list(ns.map(name), type)
+  const said: string[] = []
+  if (c.added.length) said.push(tr(msg({ id: 'board.lanes.queuedAdded', defaultMessage: '{n, plural, one {{cards} added} other {{cards} added}}', description: "Part of a lane's queued list change (Progress panel → Lanes, HI-2151): the cards {cards} (their keys, such as HI-12, joined: \"HI-12 and HI-13\"; {n} of them) are added to the lane's list. Hive joins the parts with commas." }), { n: c.added.length, cards: cards(c.added) }))
+  const off = c.removed.filter((r) => r.to === null).map((r) => r.card)
+  if (off.length) said.push(tr(msg({ id: 'board.lanes.queuedRemoved', defaultMessage: '{n, plural, one {{cards} taken off} other {{cards} taken off}}', description: "Part of a lane's queued list change (Progress panel → Lanes, HI-2151): the cards {cards} (their keys, joined; {n} of them) are taken off the lane's list. Hive joins the parts with commas." }), { n: off.length, cards: cards(off) }))
+  const to = [...new Set(c.removed.flatMap((r) => (r.to === null ? [] : [r.to])))]
+  for (const builder of to) {
+    const moved = c.removed.filter((r) => r.to === builder).map((r) => r.card)
+    said.push(tr(msg({ id: 'board.lanes.queuedMoves', defaultMessage: '{n, plural, one {{cards} moves to {builder}’s lane} other {{cards} move to {builder}’s lane}}', description: "Part of a lane's queued list change (Progress panel → Lanes, HI-2151): the cards {cards} (their keys, joined; {n} of them) leave this lane's list for another lane's, whose builder is {builder} (an agent's name, such as HB6). Hive joins the parts with commas." }), { n: moved.length, cards: cards(moved), builder }))
+  }
+  if (c.order) said.push(tr(msg({ id: 'board.lanes.queuedOrder', defaultMessage: 'new order: {cards}', description: "Part of a lane's queued list change (Progress panel → Lanes, HI-2151), lower case: its cards change order, and {cards} is the whole new list in order (keys, such as HI-12, joined with commas). Hive joins the parts with commas." }), { cards: cards(c.order, 'unit') }))
+  return tr(msg({ id: 'board.lanes.queuedChange', defaultMessage: '{after, select, yes {Next, once {card} is Done: {changes}} other {Next: {changes}}}', description: "A line under a lane's cards in the Progress panel's Lanes tab (HI-2151): a change to the lane's list of cards made while a card was in flight, which Hive applies once that card ({card}, its key such as HI-12) is Done (merged); other: the card isn't known. {changes}: what changes, such as \"HI-13 added, HI-9 moves to HB6’s lane\". Keep the select keys. Glossary: Done, lane." }), { after: c.after !== null ? 'yes' : 'no', card: c.after !== null ? name(c.after) : '', changes: list(said, 'unit') }) // i18n-ignore: select keys, never shown
+}
+
 /**
  * A folded segment's marks ("✓ n", "+n": HR6's #1279 round 1): every mark of the cards folded into it, so folding never
  * hides one (an override is never invisible, a refusal never lost on a long lane). Each kind is shown once on the folded
