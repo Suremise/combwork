@@ -43,4 +43,4 @@ Hive gives `Workspace notes.md` to every agent at each launch, on every CLI and 
    Keep it short, name files, commands and settings exactly, and never include secrets, tokens or personal data.
 4. **Save it** with `hive_write_shared_note`. Rewriting an existing note, pass `expectedRevision`, the revision your read gave, so you never drop a change someone made since. If it is refused, read the note again, merge your change into what is there now, and write with the new revision.
 
-Tell the user in a line which note you created or changed. Without Hive's tools, show the note in your reply and suggest where it goes.
+Tell the user in a line which note you created or changed. No hive tool listed: show the note in your reply and suggest where it goes.

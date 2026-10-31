@@ -20,7 +20,11 @@ const LONG_DESIGN = (() => {
   return `# Storage service design\n\n${sections.join('\n')}`
 })()
 
-/** The subject's hive tool calls that the server ran, by tool (each has ok, error and args). */
+/**
+ * The subject's hive tool calls, by tool, refused ones too (each has ok, error and args): for checks where an attempt
+ * is the fault ("didn't X") or that read refusals. A check that it did something counts only accepted calls, `ran`
+ * (HI-2229: a model guessing a deferred tool's arguments makes refused calls).
+ */
 const called = (o, tool) => o.hiveCalls.filter((c) => c.tool === tool)
 /** A hive call's arguments (logged as JSON text), or {} when they can't be read. */
 const argsOf = (x) => {
@@ -1253,7 +1257,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const msg = (c.got ?? []).find((d) => d.kind === 'rebrief')
       // hive_ask_user is the intent for it (a request under For you, #1537: Claude Code asked that way).
-      const asked = ran(o, 'hive_ask_user').length > 0 || called(o, 'hive_notify').length > 0 || !!o.cards.a?.blocked || asksTheUser(o.finalReply) || (o.cards.a?.comments ?? []).some((x) => asksTheUser(x.text))
+      const asked = ran(o, 'hive_ask_user').length > 0 || ran(o, 'hive_notify').length > 0 || !!o.cards.a?.blocked || asksTheUser(o.finalReply) || (o.cards.a?.comments ?? []).some((x) => asksTheUser(x.text))
       return [
         ['read it with hive_inbox', ran(o, 'hive_inbox').length > 0 && !!msg?.received, JSON.stringify(msg)],
         ['kept legacy.js', c.read('legacy.js') !== null, String(c.read('legacy.js'))],
@@ -1967,7 +1971,7 @@ module.exports.SCENARIOS = [
       const onDoc = o.tools.filter((t) => !t.isError && !/hive_/.test(t.name) && t.input.includes('DESIGN.md'))
       const whole = onDoc.filter((t) => (/^Read$/i.test(t.name) ? !/\b(limit|offset)\b/.test(t.input) : /bash|shell|powershell|exec|command/i.test(t.name) && /\b(cat|type|Get-Content|gc|more|less)\b/i.test(t.input) && !/-(TotalCount|Tail|First|Head)\b|\| *(head|Select-Object|Select-String|findstr|grep)/i.test(t.input)))
       const closestRead = ran(o, 'hive_read_section').some((x) => /^#?retry-policy$/i.test(String(argsOf(x).heading ?? ''))) || (onDoc.length > 0 && whole.length === 0)
-      const asked = called(o, 'hive_notify').length > 0 || !!o.cards.b?.blocked || asksTheUser(o.finalReply)
+      const asked = ran(o, 'hive_notify').length > 0 || !!o.cards.b?.blocked || asksTheUser(o.finalReply)
       // #819 round 2: a read of the closest through Hive names the project's copy, as the prompt says.
       const reads = ran(o, 'hive_read_section')
       return [
@@ -3498,7 +3502,7 @@ module.exports.SCENARIOS = [
     prompt: (c) => `In alpha, Coder's lane is working on #${c.cards.a}, but the user wants #${c.cards.b} done first. Move #${c.cards.a} to the end of the lane now, not after it is finished.`,
     fake: (c) => `skill run-lanes then hive hive_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.b, c.cards.a], applyNow: true })}`,
     expect: (o, c) => {
-      const starts = called(o, 'hive_lane').map((x) => argsOf(x)).filter((x) => x.action === 'start')
+      const starts = ran(o, 'hive_lane').map((x) => argsOf(x)).filter((x) => x.action === 'start')
       return [
         ['reordered the lane with hive_lane start and applyNow, the cards in the new order', starts.some((x) => x.applyNow === true && JSON.stringify((x.cards ?? []).map((n) => Number(String(n).replace(/\D/g, '')))) === JSON.stringify([c.cards.b, c.cards.a])), JSON.stringify(starts)],
         ['abandoned or ended no lane', !called(o, 'hive_lane').some((x) => argsOf(x).action === 'end'), o.hiveCalls.map((x) => x.tool).join(',')],
