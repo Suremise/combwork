@@ -170,6 +170,9 @@ function state() {
   onBranch(a.slot.folder, 'hive/HI-1758-blocked', 'blocked.txt')
   const b = await op({ op: 'lend', agent: b2.id, card: 7 })
   onBranch(b.slot.folder, 'hive/left-free', 'free.txt')
+  // Left with uncommitted work: a clean slot is detached at its target once its card's lease ends (HI-2014), so only a
+  // dirty one stays free on its card's branch.
+  fs.writeFileSync(path.join(b.slot.folder, 'unsaved.txt'), 'not committed\n')
   await op({ op: 'release', lease: b.lease.id, why: 'done' })
   // The picker reads the branches again as the tab opens.
   await page.locator('.tab', { hasText: 'Overview' }).click()
