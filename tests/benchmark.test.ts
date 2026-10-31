@@ -526,6 +526,66 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it("never prunes a results folder a live runner holds, nor counts it; a dead runner's goes by age (HI-2234)", () => {
+    const { resultsHeld, releaseResults } = require_('./scenarios/benchmark.cjs')
+    const dir = tempDir('hive-results-held-')
+    try {
+      // The oldest run is still going (pid 101, alive), as HI-2190's two-hour Codex trials were; then 40 short runs.
+      const running = resultsFolder(dir, '2026-10-31T14-27-32-codex', 101)
+      const finished = resultsFolder(dir, '2026-10-31T14-28-00-fake', 202)
+      for (let i = 0; i < 40; i++) mkdirSync(join(dir, `2026-10-31T15-${String(i).padStart(2, '0')}-00-fake`))
+      const alive = (pid: number) => pid === 101
+      expect(resultsHeld(running, alive)).toBe(true)
+      expect(resultsHeld(finished, alive)).toBe(false)
+      pruneResults(dir, 29, () => null, alive)
+      const left = readdirSync(dir).sort()
+      // The held folder stays besides the newest 29; the dead runner's folder went with the other older ones.
+      expect(left).toHaveLength(30)
+      expect(left[0]).toBe('2026-10-31T14-27-32-codex')
+      expect(left).not.toContain('2026-10-31T14-28-00-fake')
+      // Let go (the run ended), it goes by age like any other.
+      releaseResults(running)
+      expect(resultsHeld(running, alive)).toBe(false)
+      pruneResults(dir, 29, () => null, alive)
+      expect(readdirSync(dir)).not.toContain('2026-10-31T14-27-32-codex')
+      expect(readdirSync(dir)).toHaveLength(29)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a run whose results folder is removed under it makes it again with everything it had written (HI-2234)', () => {
+    const { writeResults, resultsHeld } = require_('./scenarios/benchmark.cjs')
+    const dir = tempDir('hive-results-gone-')
+    try {
+      const out = resultsFolder(dir, '2026-10-31T14-27-32-codex')
+      const written = new Map<string, string>()
+      let said = 0
+      const save = (name: string, data: string) => {
+        writeResults(out, name, data, {
+          rewrite: () => {
+            for (const [n, d] of written) writeFileSync(join(out, n), d)
+          },
+          onRecreated: () => said++
+        })
+        written.set(name, data)
+      }
+      save('results.json', '{"results":[1]}')
+      save('notes.md', 'kept')
+      rmSync(out, { recursive: true, force: true })
+      save('results.json', '{"results":[1,2]}')
+      expect(said).toBe(1)
+      expect(readFileSync(join(out, 'results.json'), 'utf8')).toBe('{"results":[1,2]}')
+      expect(readFileSync(join(out, 'notes.md'), 'utf8')).toBe('kept')
+      // Held again, so no other run's prune takes it.
+      expect(resultsHeld(out)).toBe(true)
+      save('summary.md', 'done')
+      expect(said).toBe(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('kept comparisons (main/benchmarks.ts)', async () => {

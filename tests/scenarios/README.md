@@ -221,7 +221,9 @@ its hive tool does, so a model trial gets the same fixture as a fake (#1545).
   checks, skills read, executed hive calls and mentions, the final reply whole up to 6,000 characters, so a check that
   judged it can be audited (HI-2230; `finalReplyLength` when longer), versions, guidance and source, usage) and `summary.md` (a
   table). `results.json` is written as each trial ends (`meta.incomplete` says how many of how many until the run
-  has ended), so a run cut short keeps what it had. `BASELINE.md` here records the latest baseline. Run the trials
+  has ended), so a run cut short keeps what it had. A run holds its folder while it runs (`runner.json`, its process):
+  no other run's start prunes it, however many start meanwhile (HI-2234), and should the folder go all the same, the
+  run makes it again with everything it had written, says so, and carries on. `BASELINE.md` here records the latest baseline. Run the trials
   again after changing Hive's guidance, a skill or a tool's description, and compare.
 - **Progress** (#1457): run in a Hive agent's session, a run shows in that Hive's Progress panel with a step per trial,
   named with the results so far (`review-card · 11 ok, 1 failed`), and an estimate from the trials timed before (by
@@ -299,7 +301,8 @@ spread to judge a change by: use `--repeat N` for model trials.
 - **Baselines**: `--save-baseline NAME` copies the run's `benchmark.json` to `scenarios/baselines/NAME.json`: the new
   one is read first and swapped in atomically, and an existing baseline of that name is archived as
   `NAME.<its time>.json` (`-2`, `-3`… if that name is taken), never overwritten; the 5 newest archives are kept. Each run
-  gets a results folder of its own; the newest 30 are kept. Nothing is invented for a run that wasn't recorded.
+  gets a results folder of its own; the newest 30 are kept, besides those a card cites and those a run still writes
+  into. Nothing is invented for a run that wasn't recorded.
 - `tests/fixtures/benchmarks` holds a baseline from a real fake run, an intentional reduction of it and the same
   reduction that broke `card-detail`. `tests/benchmark.test.ts` checks that the first is "smaller, still correct" and the
   second "smaller but failing".

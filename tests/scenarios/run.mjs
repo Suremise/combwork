@@ -21,7 +21,8 @@
 // as soon as a trial reports no cost (the spend can't be checked then; --allow-unknown-cost goes on anyway); --only runs
 // some; --keep leaves each scenario's profile and workspace; --repeat N runs each N times (samples, for spread);
 // --save-baseline NAME keeps this run's benchmark as a named baseline (an older one of that name is kept, not
-// overwritten). Results go to %LOCALAPPDATA%\hive-test\scenarios\results (the newest 30 runs are kept): results.json
+// overwritten). Results go to %LOCALAPPDATA%\hive-test\scenarios\results (the newest 30 runs are kept, besides those a
+// card cites and those a run still writes into: runner.json, HI-2234): results.json
 // (every scenario's checks, skills read, hive calls, versions, usage, measures), benchmark.json (hive-benchmark/1: the
 // Performance page compares two) and summary.md; results.json is written as each trial ends (#1457: a run cut short keeps
 // what it had). Run in a Hive agent's session it shows in the Progress panel, a step per trial (--no-progress: not).
@@ -68,7 +69,7 @@ const runContext = require('../e2e/runContext.cjs')
 const { runScenario, sourceFingerprint, claudeSignedIn, environmentAdvice, CLAUDE_TEST_HOME, PROVIDERS } = require('./harness.cjs')
 const { copilotInstalled } = require('../e2e/fake-copilot-api.cjs')
 const { SCENARIOS, FIXTURES_VERSION } = require('./scenarios.cjs')
-const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, parseBudget, budgetGate, spendText } = require('./benchmark.cjs')
+const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, releaseResults, writeResults, parseBudget, budgetGate, spendText } = require('./benchmark.cjs')
 
 const argv = process.argv.slice(2)
 const arg = (name, fallback) => {
@@ -243,6 +244,19 @@ const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
 const resultsDir = join(lib.WORK, '..', 'scenarios', 'results')
 pruneResults(resultsDir, 29, spare)
 const out = resultsFolder(resultsDir, `${stamp}-${provider}`)
+// Held while this process runs (runner.json: no other run's prune takes it, HI-2234), let go as it exits.
+process.on('exit', () => releaseResults(out))
+// What the run has written to its folder, by name, so a folder removed under it is made again with all of it.
+const written = new Map()
+const save = (name, data) => {
+  writeResults(out, name, data, {
+    rewrite: () => {
+      for (const [n, d] of written) writeFileSync(join(out, n), d)
+    },
+    onRecreated: () => console.warn(`\nThe results folder was removed during the run: made it again with what the run has so far (${out}).`)
+  })
+  written.set(name, data)
+}
 const results = []
 let spent = 0
 let unknownCostTrials = 0
@@ -260,7 +274,7 @@ const metaNow = (complete) => ({
   guidance: results.find((r) => r.guidance?.atStart)?.guidance.atStart.revision ?? null,
   provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
 // Each trial's result written as it ends (#1457): a run cut short keeps what it had.
-const keepSoFar = () => writeFileSync(join(out, 'results.json'), JSON.stringify({ meta: metaNow(false), results }, null, 2))
+const keepSoFar = () => save('results.json', JSON.stringify({ meta: metaNow(false), results }, null, 2))
 // The Progress panel (#1457): a step per trial, named with the results so far, so a long run shows it moving.
 const trials = Array.from({ length: repeats }, (_, k) => chosen.map((sc) => ({ sc, sample: k + 1, name: repeats > 1 ? `${sc.id} (${k + 1}/${repeats})` : sc.id }))).flat()
 const progress = scenariosProgress(trials.map((t) => t.name), provider, argv)
@@ -310,10 +324,10 @@ for (const [i, { sc, sample, name }] of trials.entries()) {
 
 const sourceAtEnd = sourceFingerprint()
 const meta = { ...metaNow(true), ...(sourceAtEnd.head !== sourceAtStart.head || sourceAtEnd.dirty !== sourceAtStart.dirty ? { sourceChangedDuringRun: sourceAtEnd } : {}) }
-writeFileSync(join(out, 'results.json'), JSON.stringify({ meta, results }, null, 2))
+save('results.json', JSON.stringify({ meta, results }, null, 2))
 const appVersion = JSON.parse(readFileSync(join(lib.ROOT, 'package.json'), 'utf8')).version
 const benchmarkFile = join(out, 'benchmark.json')
-writeFileSync(benchmarkFile, JSON.stringify(benchmarkOf(meta, results, appVersion), null, 2))
+save('benchmark.json', JSON.stringify(benchmarkOf(meta, results, appVersion), null, 2))
 if (baselineName) console.log(`Baseline "${baselineName}": ${saveBaseline(join(lib.WORK, '..', 'scenarios', 'baselines'), baselineName, benchmarkFile, spare)}`)
 /** What Hive's own parts cost in the scenario (its measures): tool reply characters, requests, guidance at launch. */
 const hiveCost = (m) => (m ? `${m.toolChars.toLocaleString('en')} chars in ${m.toolCalls} tool calls; ${m.apiRequests} requests; ${(m.coreBytes + m.customBytes + m.roleBytes + m.modeBytes + m.catalogBytes).toLocaleString('en')} B guidance` : 'not measured')
@@ -325,8 +339,8 @@ const row = (r) => {
   return `| ${r.scenario} | ${r.error ? `error: ${r.error.split('\n')[0]}` : failed.length ? `**${failed.length} failed**: ${failed.map((c) => c.name).join('; ')}` : 'pass'} | ${passed}/${r.checks.length}${skipped ? ` (${skipped} skipped)` : ''} | ${r.observed?.skillsRead.join(', ') || '–'} | ${[...new Set(r.observed?.hiveCalls.map((c) => c.tool) ?? [])].join(', ') || '–'} | ${hiveCost(r.measures)} | ${r.usage?.costUsd != null ? `$${r.usage.costUsd.toFixed(3)}` : '–'}, ${r.seconds}s |`
 }
 const cli = results.find((r) => r.cliVersion)?.cliVersion ?? 'unknown'
-writeFileSync(
-  join(out, 'summary.md'),
+save(
+  'summary.md',
   [
     `# Scenarios: ${provider}${model ? ` (${model})` : ''}${repeats > 1 ? `, ${repeats} samples each` : ''}`,
     '',
