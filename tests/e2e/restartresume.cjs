@@ -142,10 +142,11 @@ async function anyToast(c, re) {
   }
   return null
 }
-/** Clicks a notice's button in the window that shows it. */
+/** Clicks a notice's button in the window that shows it; a check fails when no window shows the notice. */
 async function clickToast(c, title, button) {
   const found = await lib.until(() => anyToast(c, new RegExp(title.replace(/[?()]/g, '\\$&'))), HUNG_MS)
-  await found.page.locator('.toast', { hasText: title }).first().getByRole('button', { name: button, exact: true }).click()
+  check(`a notice "${title}" to click ${button} on`, !!found)
+  if (found) await found.page.locator('.toast', { hasText: title }).first().getByRole('button', { name: button, exact: true }).click()
 }
 const toastText = (page, re) => page.evaluate((src) => [...document.querySelectorAll('.toast')].map((t) => t.innerText).find((t) => new RegExp(src).test(t)) ?? '', re.source)
 
@@ -276,17 +277,22 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     await lib.until(() => resumedLines() >= 1 && !fs.existsSync(recordFile), HUNG_MS)
     check('…its resume logged once since', resumedLines() === 1, String(resumedLines()))
 
-    // --- 3. An ordinary quit: offered at the next start, nothing resumed until Resume. The lane's agents stopped first,
-    // so Worker is the one working.
-    // Once this start's resumes have their outcomes (the record gone), the others are stopped.
+    // --- 3. An ordinary quit: offered at the next start, nothing resumed until Resume. The lane's agents and Other
+    // stopped first, so Worker is the one working.
+    // Once this start's resumes have their outcomes (the record gone), the others are stopped. Other, of the second
+    // workspace, was recorded by the install too and resumed with the others: it may still be working on its note or
+    // the install's line when the test quits (HI-2202), and a quit records it then.
     check('the queue settles', !!(await lib.until(() => !fs.existsSync(recordFile), HUNG_MS)), JSON.stringify(record()))
     const others = ['Watcher', 'Builder', 'Reviewer']
     for (const n of others) await c.inv('session:stop', alpha, agents[n].id)
-    await lib.until(async () => (await Promise.all(others.map((n) => c.live(agents[n].id)))).every((s) => !s), HUNG_MS, 300)
+    // The second workspace's window stops Other (a window's calls are its own workspace's).
+    for (const p of c.app.windows()) await p.evaluate(([x, id]) => window.hive.invoke('session:stop', x, id), [beta, agents.Other.id]).catch(() => undefined)
+    const liveAny = async (project, id) => (await c.inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === id)
+    check('Watcher, Builder, Reviewer and Other are stopped', !!(await lib.until(async () => (await Promise.all([...others.map((n) => c.live(agents[n].id)), liveAny(beta, agents.Other.id)])).every((s) => !s), HUNG_MS, 300)))
     await lib.sendPrompt(c.inv, lib.ptyKey(alpha, agents.Worker.id), 'holduntil go-worker-3', { submitted: async () => (await c.live(agents.Worker.id))?.status === 'working' })
     check('Hive quits', await quit(c))
     c = null
-    check('the quit recorded Worker, and the record is a quit', record()?.reason === 'quit' && record()?.entries?.some((e) => e.agentName === 'Worker' && e.state === 'pending'), JSON.stringify(record()))
+    check('the quit recorded Worker alone, and the record is a quit', record()?.reason === 'quit' && record()?.entries?.length === 1 && record()?.entries?.[0]?.agentName === 'Worker' && record()?.entries?.[0]?.state === 'pending', JSON.stringify(record()))
     c = await start()
     const offer = await lib.until(async () => (await anyToast(c, /Resume the agent that was working\?/))?.text, HUNG_MS)
     check('the next start offers to resume Worker', !!offer && /Hive was quit while they were working or in a card loop: Worker \(alpha\)/.test(offer), offer)
