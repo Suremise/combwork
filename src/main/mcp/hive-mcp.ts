@@ -598,7 +598,7 @@ const tools: Tool[] = [
         lanes: { type: 'array', items: { type: 'string' }, description: 'Lane ids, or ["all"] (with wake); cards and agents then follow beside them.' },
         agents: { type: 'array', items: { type: 'object', properties: { project: { type: 'string' }, agent: { type: 'string' } }, required: ['project'] }, description: 'With lanes: agents followed beside them.' },
         events: { type: 'array', items: { type: 'string', enum: [...LANE_EVENTS] }, description: 'What a lane watch counts; the default is in tools.md.' },
-        usage: { type: 'array', items: { type: 'object', properties: { account: { type: 'string' }, percent: { type: 'number' }, limit: { type: 'string', enum: ['weekly', 'fiveHour', 'any'] } }, required: ['account', 'percent'] }, description: "With wake: an account's limit reaching percent wakes you too." }
+        usage: { type: 'array', items: { type: 'object', properties: { account: { type: 'string' }, percent: { type: 'number' }, limit: { type: 'string', enum: ['weekly', 'fiveHour', 'any'] } }, required: ['account', 'percent'] }, description: "With wake: also when an account's use reaches percent." }
       }
     },
     run: async (a) =>
@@ -829,7 +829,7 @@ const tools: Tool[] = [
           type: ['string', 'object'],
           description: ASSISTANT
             ? "Put it on a lane as it is made, never by a guessed key: a builder's name, or { builder, reviewer, brief, position }."
-            : 'Onto your lane: your name, or { builder, reviewer, position }.',
+            : 'Your lane: your name, or { builder, reviewer, position }.',
           properties: { builder: { type: 'string' }, reviewer: { type: 'string' }, brief: { type: 'string' }, name: { type: 'string' }, position: { type: 'string', enum: ['last', 'next'], ...(ASSISTANT ? { description: 'next: before its first card still in Todo.' } : {}) } }
         }
       },
@@ -848,16 +848,16 @@ const tools: Tool[] = [
         number: cardArg,
         comment: { type: 'string', description: 'Added to its comments.' },
         column: columnArg,
-        position: { type: 'string', enum: ['top', 'bottom'], description: 'The top (highest priority) or bottom of its column.' },
+        position: { type: 'string', enum: ['top', 'bottom'], description: 'In its column; top is highest priority.' },
         before: { type: ['number', 'string'], description: 'Just above this card, in the column it ends in.' },
         blocked: { type: 'string' },
         title: { type: 'string', description: 'About 70 characters; detail goes in the description.' },
         description: { type: 'string' },
         ...(ASSISTANT ? { project: { type: 'string' } } : {}),
-        agent: { type: 'string', description: 'Agent name or id; empty takes it from its agent.' },
-        labels: { type: 'array', items: { type: 'string' }, description: 'Replaces its labels (addLabels, removeLabels tag it).' },
-        addLabels: { type: 'array', items: { type: 'string' }, description: 'Labels added, its others kept.' },
-        removeLabels: { type: 'array', items: { type: 'string' }, description: 'Labels taken off, its others kept.' },
+        agent: { type: 'string', description: 'Name or id; empty unassigns it.' },
+        labels: { type: 'array', items: { type: 'string' }, description: 'Replaces its labels.' },
+        addLabels: { type: 'array', items: { type: 'string' }, description: 'Added; others kept.' },
+        removeLabels: { type: 'array', items: { type: 'string' }, description: 'Taken off; others kept.' },
         blockedBy: cardsArg('Cards that have to be done first (replaces the list).'),
         links: cardsArg('Related cards (replaces the list).'),
         context: contextArg,
