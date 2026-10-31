@@ -16,6 +16,7 @@ import { placeKey, samePlace } from './fsutil'
 import { withRepoLock } from './repoLock'
 import { createLogger } from './logger'
 import { checkProject } from './branchWatch'
+import { noteManualChoice } from './agentChoice'
 import { sessions } from './sessions'
 import { endReviews, releaseAgentCards } from './tasks'
 import { laneAgentRemoved } from './lanes'
@@ -477,6 +478,9 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
     if (account && !(kept && connectionProblem(account, cli, projectPath) === 'off')) assertConnectionHere(account, cli, projectPath, current.name)
     // Changed meanwhile (another save, the migration): this one was worked out from what it was before.
     if (touches && current.connection !== before?.connection && clean.connection !== current.connection) throw hiveError(msg({ id: 'worktrees.agent.providerChangedMeanwhile', defaultMessage: "{agent}'s provider was changed meanwhile: nothing was changed. Try again.", description: "An error saving an agent's settings (HI-1771): its provider (coding agent CLI) was changed by something else while this change was being saved, so nothing was saved. {agent} is its name." }), { agent: current.name }, { kind: 'conflict' })
+    // The user's own choice (HI-2195), counted under the lock with its write: a usage move waiting for the agent's safe
+    // point is dropped, and none moves it for the rest of that period.
+    if (connection !== undefined) noteManualChoice(projectPath, current)
   }
   const def =
     name !== undefined

@@ -356,6 +356,7 @@ export const SUITES = [
   { name: 'unusedwt' },
   { name: 'update' },
   { name: 'upgradelane' },
+  { name: 'usagemove' },
   { name: 'vcswitch' },
   { name: 'versioncontrol' },
   { name: 'viewer' },

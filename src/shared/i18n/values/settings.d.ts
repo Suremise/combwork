@@ -81,6 +81,17 @@ interface HiveMessageValues {
   'settings.accounts.switchAffected': undefined
   'settings.accounts.thisPc': undefined
   'settings.accounts.usage': { window: string; label: string | number; used: number }
+  'settings.accounts.usageMove.any': undefined
+  'settings.accounts.usageMove.failed': undefined
+  'settings.accounts.usageMove.fiveHour': undefined
+  'settings.accounts.usageMove.how': undefined
+  'settings.accounts.usageMove.limitLabel': undefined
+  'settings.accounts.usageMove.offInAdvanced': undefined
+  'settings.accounts.usageMove.percentLabel': undefined
+  'settings.accounts.usageMove.rule': { percent: string | number; limit: string | number; target: string | number }
+  'settings.accounts.usageMove.targetLabel': undefined
+  'settings.accounts.usageMove.turnOn': undefined
+  'settings.accounts.usageMove.weekly': undefined
   'settings.accounts.usedBy': { assistant: string; n: number }
   'settings.advanced.claude-code.accounts.dropEnv.desc': undefined
   'settings.advanced.claude-code.accounts.dropEnv.title': undefined
@@ -347,6 +358,8 @@ interface HiveMessageValues {
   'settings.advanced.error.oneLine': { title: string | number; most: string | number }
   'settings.advanced.error.pattern': { title: string | number }
   'settings.advanced.error.text': { title: string | number }
+  'settings.advanced.hive.accounts.usageMoves.desc': undefined
+  'settings.advanced.hive.accounts.usageMoves.title': undefined
   'settings.advanced.hive.assistant.startView.desc': undefined
   'settings.advanced.hive.assistant.startView.title': undefined
   'settings.advanced.hive.cards.attachmentMax.desc': undefined

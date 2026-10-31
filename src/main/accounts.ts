@@ -3,7 +3,7 @@ import { basename, join, resolve, sep } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
-import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, LaunchValues, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
+import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, LaunchValues, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, UsageMoveRule, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
 import { HIVE_DIR } from '../shared/defaults'
 import { readKeptJson, withFileLock } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
@@ -767,6 +767,21 @@ export function firstAccountHere(cli: ProviderId, cfg: WorkspaceConfig | null): 
   return a ?? null
 }
 
+/**
+ * Sets an account's usage move (HI-2195), or turns it off (null): at `percent` of its weekly or 5-hour limit (or either),
+ * its agents move to another account of the same CLI. Refused for an account it can't name.
+ */
+export function setUsageMove(id: string, rule: UsageMoveRule | null): void {
+  const a = mustGet(id)
+  if (rule) {
+    const percent = Math.round(Number(rule.percent))
+    const target = getAccount(String(rule.to))
+    const BAD = msg({ id: 'main.accounts.usageMove.bad', defaultMessage: 'Choose a share from 1% to 100%, a limit, and another account of the same CLI to move its agents to.', description: "An error setting an account's usage move in Settings → Accounts & Connections (HI-2195): the share, the limit or the account to move to isn't one it can be." })
+    if (!(percent >= 1 && percent <= 100) || !['weekly', 'fiveHour', 'any'].includes(rule.limit) || !target || target.id === a.id || target.provider !== a.provider) throw hiveError(BAD, undefined, { kind: 'invalid' })
+    changeAccount(id, (x) => (x.usageMove = { percent, limit: rule.limit, to: target.id }))
+  } else changeAccount(id, (x) => delete x.usageMove)
+}
+
 export function renameAccount(id: string, name: string): void {
   mustGet(id)
   const n = name.trim()
@@ -830,7 +845,11 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
     }
     // Its connections go with it (HI-2106): agents on one launch on their CLI's first usable connection, saying so (decision H).
     config.update((c) => void (c.connections = (c.connections ?? []).filter((x) => x.account !== id)))
-    changeAccounts((all) => all.splice(0, all.length, ...all.filter((x) => x.id !== id)))
+    changeAccounts((all) => {
+      all.splice(0, all.length, ...all.filter((x) => x.id !== id))
+      // A usage move to it has nowhere to go (HI-2195): turned off, and Settings shows it so.
+      for (let i = 0; i < all.length; i++) if (all[i].usageMove?.to === id) all[i] = { ...all[i], usageMove: undefined }
+    })
     config.update((c) => {
       for (const [p, v] of Object.entries(c.lastUsedConnection ?? {})) if (v === id) delete c.lastUsedConnection![p as ProviderId]
     })

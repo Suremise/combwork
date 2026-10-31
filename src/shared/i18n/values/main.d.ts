@@ -16,6 +16,7 @@ interface HiveMessageValues {
   'main.accounts.removeFailed': { name: string | number; error: string | number }
   'main.accounts.running': { name: string | number }
   'main.accounts.setUpCancelled': { name: string | number }
+  'main.accounts.usageMove.bad': undefined
   'main.antivirus.allExcluded': undefined
   'main.antivirus.changed': undefined
   'main.antivirus.closed': undefined
@@ -413,6 +414,10 @@ interface HiveMessageValues {
   'main.update.updated': { app: string | number; version: string | number }
   'main.update.updatedBody': undefined
   'main.update.whatsNew': undefined
+  'main.usageMove.blockedBody': { reason: string; to: string | number; share: number; window: string; workspace: string | number; agents: string | number }
+  'main.usageMove.blockedTitle': { from: string | number; to: string | number }
+  'main.usageMove.movedBody': { from: string | number; share: number; window: string; agents: string | number; to: string | number }
+  'main.usageMove.movedTitle': { count: number; from: string | number; to: string | number }
   'main.window.openLogs': undefined
   'main.window.quit': undefined
   'main.window.reload': undefined

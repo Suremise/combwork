@@ -501,6 +501,8 @@
   "tips.unusedWorktrees.title": "Ordena los worktrees conservados",
   "tips.updateFromTarget.text": "Control de versiones → Ramas y remotos: una rama por detrás del destino tiene Actualizar. Fusiona el destino o haz rebase sobre él, donde está la rama; un conflicto se deshace al momento, nombrando sus archivos.",
   "tips.updateFromTarget.title": "Poner una rama al día con su destino",
+  "tips.usageMoves.text": "En una cuenta de Configuración → Cuentas y conexiones, marca «Al llegar al 98 % de su límite semanal, mover sus agentes a» otra cuenta: pasan cuando termina su turno y siguen allí.",
+  "tips.usageMoves.title": "Mueve los agentes antes de que se agote un plan",
   "tips.versionControlSwitch.text": "Haz clic en Ninguno o Git arriba en la pestaña Control de versiones de un proyecto para cambiarlo desde la próxima tarjeta; las ya en marcha siguen con las reglas anteriores. Cada uno guarda sus opciones del flujo de trabajo y, si la carpeta cambia (git init), Hive ofrece cambiar ahí.",
   "tips.versionControlSwitch.title": "Cambia entre Ninguno y Git",
   "tips.versionControlTab.text": "La pestaña Control de versiones de un proyecto dice qué encontró Hive en su carpeta y empieza por Flujo de trabajo: quién revisa, qué comprobaciones pasan antes y quién fusiona. Su encabezado indica el ajuste predefinido, y un clic en él abre las opciones.",

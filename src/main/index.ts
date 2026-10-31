@@ -29,6 +29,7 @@ import type { AppInfo, CloseReason, McpServerDef, QuitChoice, QuitScope, QuitSes
 import { providerService } from './providerService'
 import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
+import { initUsageMoves } from './usageMoves'
 import { checkGit } from './gitTool'
 import { handoverSession, hiveInstructions, withJournal, withLatestHandover, wrapsLongCommands } from '../shared/hiveGuidance'
 import { handoversFor } from './notes'
@@ -1099,6 +1100,7 @@ app.whenReady().then(async () => {
   // one-time move (HI-1875) is done before any workspace opens or the Agent API starts.
   await initConnections()
   initConnectionMoves()
+  initUsageMoves()
 
   // Hook auth files of an earlier run of Hive: their tokens died with it (#345).
   await clearHookAuth()

@@ -1553,4 +1553,52 @@ describe('agent watches (main/watches.ts)', async () => {
     }
     await disposeWorkspaceService(w)
   })
+
+  // HI-2195: a usage watch, its whole life: started (saved), answered at once when already there, fired by a usage
+  // report and typed, and (HR1's round 1) one read back as its workspace reopens checked at once against the usage kept
+  // now, with no new report.
+  describe('usage watches (HI-2195)', async () => {
+    const { config } = await import('../src/main/config')
+    const { emit } = await import('../src/main/events')
+    // Hive's own wiring of the watches to its events (a usage report among them), as it starts.
+    watches.initWatches()
+    const watch = [{ account: 'a-acct1', name: 'Max 1', percent: 98, limit: 'weekly' as const }]
+    const weekly = (used: number) => ({ provider: 'claude-code' as const, plan: null, limits: [{ id: 'seven_day', label: 'weekly', windowMinutes: 10080, usedPercent: used, resetsAt: new Date(Date.now() + 48 * 3600e3).toISOString() }], updatedAt: new Date().toISOString() })
+    const setUsage = (used: number) => config.update((c) => (c.connectionPlanUsage = { ...c.connectionPlanUsage, 'a-acct1': weekly(used) }))
+
+    it('starts and is saved below the share, answers at once above it, and fires on a report', async () => {
+      const { w, path, alpha } = await open()
+      const st = fake(alpha)
+      setUsage(50)
+      const r = await watches.registerUsageWatch(w, alpha, 'a1', watch)
+      expect(r).toMatchObject({ watching: { label: 'Waiting for usage: Max 1 at 98% of its weekly limit' } })
+      expect(savedOf(path)[0].usage).toEqual(watch)
+      // A report under the share: nothing; one at it: the line, typed once the watcher is idle.
+      setUsage(97)
+      emit({ type: 'plan-usage', provider: 'claude-code', usage: weekly(97), connection: 'a-acct1' })
+      await watches.settled()
+      expect(st.told).toEqual([])
+      setUsage(98.5)
+      emit({ type: 'plan-usage', provider: 'claude-code', usage: weekly(98.5), connection: 'a-acct1' })
+      await vi.waitFor(() => expect(st.told).toEqual([expect.stringMatching(/^\[Hive\] Usage reached: Max 1: weekly 98\.5% \(resets /)]), { timeout: HUNG_MS })
+      // Already there: answered at once, no watch kept.
+      expect(await watches.registerUsageWatch(w, alpha, 'a1', watch)).toMatchObject({ already: [expect.stringMatching(/^Max 1: weekly 98\.5%/)] })
+      expect(savedOf(path)).toEqual([])
+      await disposeWorkspaceService(w)
+    })
+
+    it('one read back as its workspace reopens is checked against the usage kept now, with no new report', async () => {
+      const { w, path, alpha } = await open()
+      const st = fake(alpha)
+      setUsage(50)
+      expect(await watches.registerUsageWatch(w, alpha, 'a1', watch)).toHaveProperty('watching')
+      // Closed; meanwhile another workspace's session reported Max 1 over the share (no event reaches this one).
+      watches.forgetWatches(w)
+      setUsage(99)
+      await watches.stampWatchProjects(w)
+      await vi.waitFor(() => expect(st.told).toEqual([expect.stringMatching(/^\[Hive\] Usage reached: Max 1: weekly 99%/)]), { timeout: HUNG_MS })
+      expect(savedOf(path)).toEqual([])
+      await disposeWorkspaceService(w)
+    })
+  })
 })
