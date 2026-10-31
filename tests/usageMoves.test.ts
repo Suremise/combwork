@@ -115,6 +115,8 @@ const { usageHits, usageWakeLine, readSavedUsage } = await import('../src/shared
 const { accountUsageText } = await import('../src/shared/toolReplies')
 
 const HOUR = 3600e3
+// The longest a wait here waits: a bound for a hung run, never how long it should take.
+const HUNG_MS = 10_000
 const ahead = (h: number): string => new Date(Date.now() + h * HOUR).toISOString()
 const weekly = (used: number, resetsAt = ahead(48)): PlanLimit => ({ id: 'seven_day', label: 'weekly', windowMinutes: 10080, usedPercent: used, resetsAt })
 const fiveHour = (used: number, resetsAt = ahead(2)): PlanLimit => ({ id: 'five_hour', label: '5-hour', windowMinutes: 300, usedPercent: used, resetsAt })
@@ -243,7 +245,7 @@ describe('usageMoves.ts', () => {
   const turnEnds = async (id: string): Promise<void> => {
     S.busy.delete(key(id))
     S.looks.get(key(id))?.()
-    await vi.waitFor(() => expect(S.ops.has(key(id))).toBe(false))
+    await vi.waitFor(() => expect(S.ops.has(key(id))).toBe(false), { timeout: HUNG_MS })
     await lock
   }
 
@@ -275,7 +277,7 @@ describe('usageMoves.ts', () => {
     setUsage('a1', [weekly(98.2)])
     await settle()
     // Idle: switched at once (quit, resumed) on the same-named connection. Stopped: written now. Busy: waits.
-    await vi.waitFor(() => expect(S.resumed).toContain(key('idle')))
+    await vi.waitFor(() => expect(S.resumed).toContain(key('idle')), { timeout: HUNG_MS })
     expect(connectionOf('idle')).toBe('c2b')
     expect(connectionOf('stopped')).toBe('c2')
     expect(connectionOf('busy')).toBe('c1b')
@@ -340,7 +342,7 @@ describe('usageMoves.ts', () => {
     H.advanced = false
     const { emit } = await import('../src/main/events')
     emit({ type: 'advanced-changed' })
-    await vi.waitFor(() => expect(S.ops.has(key('busy'))).toBe(false))
+    await vi.waitFor(() => expect(S.ops.has(key('busy'))).toBe(false), { timeout: HUNG_MS })
     S.busy.delete(key('busy'))
     await settle()
     expect(connectionOf('busy')).toBe('c1b')
