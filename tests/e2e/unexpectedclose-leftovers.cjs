@@ -133,6 +133,8 @@ const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toa
   stranger.unref()
 
   let current = null
+  // The suite's own hold on the Agent API port, while the second copy starts (HI-2196).
+  let held = null
   try {
     // --- 1. An agent whose command leaves a node running; the copy ended from outside while the agent runs.
     let node
@@ -193,7 +195,20 @@ const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toa
       // The ended copy's Agent API socket is gone before the next copy listens on its port (HI-2193: once in 28 runs it
       // wasn't yet, and the next copy's API failed to start). If something keeps it, the check names what.
       check("the ended copy's Agent API port is free again", !!(await lib.until(apiPortFree, HUNG_MS)), portHolders())
-      current = await start()
+      // HI-2196: held as the next copy starts (as the copy just ended may still hold it), the port is tried again after
+      // the unexpected close, and the API listens once it is freed.
+      const logFile = path.join(userData, 'logs', 'hive.log')
+      const logFrom = fs.existsSync(logFile) ? fs.statSync(logFile).size : 0
+      const newLog = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8').slice(logFrom) : '')
+      held = net.createServer()
+      await new Promise((r, j) => (held.once('error', j), held.listen(API_PORT, '127.0.0.1', r)))
+      const starting = start()
+      starting.catch(() => undefined)
+      check('after the unexpected close, the next copy tries its port again while it is in use', !!(await lib.until(() => newLog().includes(`port ${API_PORT} is in use after an unexpected close`), START_MS)), newLog().split('\n').filter((l) => /\[servers\]/.test(l)).join(' | '))
+      await new Promise((r) => held.close(r))
+      held = null
+      current = await starting
+      check('…and its Agent API listens once the port is free', !!(await lib.until(() => new RegExp(`Agent API listening on 127\\.0\\.0\\.1:${API_PORT} after \\d+ tries`).test(newLog()), HUNG_MS)), newLog().split('\n').filter((l) => /\[servers\]/.test(l)).join(' | '))
       const { page, inv } = current
       const text = await lib.until(() => notice(page), START_MS)
       // The node, and the hive-progress run as one item named by its title (cmd, hive-progress and its node).
@@ -220,6 +235,7 @@ const notice = (page) => page.evaluate(() => [...document.querySelectorAll('.toa
   } catch (e) {
     check('no unexpected error', false, e?.stack ?? String(e))
   } finally {
+    if (held) held.close()
     if (current) await current.app.close().catch(() => undefined)
     // Anything left of a copy this suite started, by its own pid and start time only, and the processes naming the
     // suite's folder (the node, the stranger), each ended as the process it was.

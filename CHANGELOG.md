@@ -235,6 +235,7 @@ Every change Hive makes to how a CLI behaves now has a switch in Settings → Ad
 
 ### Fixes
 
+- **Hive started just after it closed unexpectedly keeps its Agent API** (HI-2196). If the port was still in use as Hive started again, the Agent API stayed off for the whole session, and agents resumed after the close had no hive tools. Hive now tries the port again for up to 5 seconds after an unexpected close; any other start fails at once as before.
 - **The Assistant at Look and advise is no longer told to watch running lanes.** Its "Lanes are running" reminder at the end of a turn now comes only when **Settings → Assistant → Control** lets it control agents; at Look and advise the lanes are yours to run, and the reminder cost it an extra step for a job that isn't its own (HI-2187).
 - **Hive reopens your workspace when started again just after it closed unexpectedly** (HI-2179). Started straight after a crash, Hive could fail to open the workspace's board with *disk I/O error* and show the start page instead, with no merge left half done in its notice and with nothing to resume into. Hive now tries the open again a few times, for under two seconds in all, before it gives up.
 - **The Lanes tab's buttons stay inside the Progress panel** (HI-2164). In a long language (French, say) Legend, Start Lane… and Pause the Team didn't fit a narrow panel and spilled out to its left, over Settings' *Modified only* box. They now wrap onto further lines within the panel, and in a narrow window Settings' search box gives way so *Modified only* stays whole.
