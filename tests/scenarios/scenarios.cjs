@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 110
+const FIXTURES_VERSION = 111
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -3688,10 +3688,10 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'assistant-new-lane',
-    // HI-2222: coordinate-agents' A new lane is hive_lane start, never a prompt to a builder Hive gives the lane's first
-    // card. Whether Hive gives it in a new conversation (#437) is Hive's, recorded (observe), not the Assistant's check:
-    // run-lanes' "each lane starts in a new conversation" and Hive's start of an idle running builder differ (HI-2232).
-    title: "The Assistant starting an idle agent's next lane (#437, HI-2222): hive_lane start (Coder, the card, rounds and wait), Coder left to Hive's start, no prompt (#1169: run-lanes or coordinate-agents read); Hive's conversations recorded",
+    // HI-2222: coordinate-agents' A new lane is hive_lane start, never a prompt to a builder Hive gives the lane. Hive gives
+    // an idle running builder outside slots the lane in a new conversation (#437; HI-2232, Darren's decision (a)), its last
+    // kept in the Sessions history: checked again (HI-2222 had recorded them while that was undecided).
+    title: "The Assistant starting an idle agent's next lane (#437, HI-2222, HI-2232): hive_lane start (Coder, the card, rounds and wait), Coder left to Hive, no prompt (#1169: run-lanes or coordinate-agents read); Coder in a new conversation, its last kept",
     role: 'assistant',
     control: 'agents',
     async setup(c) {
@@ -3703,8 +3703,8 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `Coder has finished its last lane and is idle. Start its next lane: Coder builds card #${c.cards.n} with the card-loop skill (rounds: 3, wait: 1h); there is no reviewer yet. Don't wait for it.`,
     fake: (c) => `skill coordinate-agents then hive hive_lane ${JSON.stringify({ action: 'start', project: 'alpha', builder: 'Coder', cards: [`#${c.cards.n}`], rounds: 3, waitMinutes: 60, brief: `Use card-loop as the builder. Card: #${c.cards.n}. No reviewer yet.` })}`,
-    // Coder's session while the Assistant works, and the project's conversations, read at every look whether or not a new
-    // conversation began (HR1, HI-2222 round 1: Hive may keep the old one, and that is what is recorded).
+    // Coder's session while the Assistant works, and the project's conversations, read at every look (HR1, HI-2222 round 1:
+    // whether a new conversation began, and the old one is kept).
     during: async (c) => {
       const s = await coderLive(c)
       c.seen = [...(c.seen ?? []), `${s?.runId === c.before?.runId ? 'old' : s ? 'new' : 'none'}:${s?.status}:${s?.sessionId ?? ''}`].slice(-12)
@@ -3724,14 +3724,12 @@ module.exports.SCENARIOS = [
         ["started Coder's lane with hive_lane start, which worked: its card, rounds 3, wait 60 minutes", starts.length > 0 && !!lane && lane.rounds === 3 && lane.waitMinutes === 60, `${starts.map((s) => s.reply.slice(0, 200)).join(' | ') || 'no lane start'}; lane: ${JSON.stringify(lane && { cards: lane.cards.map((x) => x.number), rounds: lane.rounds, waitMinutes: lane.waitMinutes })}`],
         // lanes.md: never prompt a builder Hive gives the lane's first card; one the reply says to tell, in a new conversation.
         ["left Coder to Hive's start as the reply said (no prompt where Hive gives it the card; a new conversation where it said to tell it)", tell ? fresh.length === 1 && prompts.length === 1 : prompts.length === 0, `${tell ? 'told to tell Coder' : 'Hive gives Coder the card'}; ${prompts.map((x) => `${x.args}${x.ok ? '' : '!'}`).join(' | ') || 'no prompt'}`],
-        ['no stop, start or hand-over of Coder', called(o, 'hive_stop_agent').length === 0 && called(o, 'hive_start_agent').length === 0 && called(o, 'hive_hand_over').length === 0]
+        ['no stop, start or hand-over of Coder', called(o, 'hive_stop_agent').length === 0 && called(o, 'hive_start_agent').length === 0 && called(o, 'hive_hand_over').length === 0],
+        // Hive's part (HI-2232, decision (a)): the idle builder outside slots gets the lane in a new conversation.
+        ['Coder runs in a new conversation', !!c.before?.sessionId && !!c.after && c.after.runId !== c.before.runId, JSON.stringify({ before: c.before?.sessionId, after: c.after?.sessionId, seen: c.seen })],
+        ['its last conversation stays in the Sessions history', (c.history ?? []).includes(c.before?.sessionId), c.history ? `${c.before?.sessionId} in [${c.history.join(',')}]` : 'not read']
       ]
-    },
-    // Hive's behaviour, not the Assistant's (HI-2222, HI-2232): whether a new conversation began, and the old one is kept.
-    observe: (o, c) => [
-      ['Coder runs in a new conversation', !!c.before?.sessionId && !!c.after && c.after.runId !== c.before.runId, JSON.stringify({ before: c.before?.sessionId, after: c.after?.sessionId, seen: c.seen })],
-      ['its last conversation stays in the Sessions history', (c.history ?? []).includes(c.before?.sessionId), c.history ? `${c.before?.sessionId} in [${c.history.join(',')}]` : 'not read']
-    ]
+    }
   },
   {
     id: 'assistant-message-watching',
