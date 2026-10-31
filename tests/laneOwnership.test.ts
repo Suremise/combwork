@@ -187,6 +187,49 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     expect(await lanes.freshCardsNote(w, [other], 'HB6', turn, null, at)).toMatch(/^Warning: .+ was created \d+ s ago by /)
   })
 
+  it("HI-2169: a builder's own start with its first card alone keeps the Assistant's second (set with applyNow): the first goes Done, the lane goes on to the second", async () => {
+    const [a, b] = [await make('Own a'), await make('Own b')]
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [a], by: 'Assistant' })).lane
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a, b], applyNow: true, by: 'Assistant' })).lane.cards.map((c) => c.number)).toEqual([a, b])
+    // HB6's card-loop registration, naming only the card its start prompt gave it.
+    const own = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [a], ownBuilder: true, by: 'B2 (alpha)' })
+    expect([own.lane.id, own.lane.cards.map((c) => c.number)]).toEqual([l.id, [a, b]])
+    expect(own.note).toMatch(new RegExp(`#${b} stays on the lane, after the cards you listed: a builder's own hive_lane start adds or reorders cards, never takes one off`))
+    // It still reorders and adds.
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [b, a], ownBuilder: true, by: 'B2 (alpha)' })).lane.cards.map((c) => c.number)).toEqual([b, a])
+    await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a, b], by: 'Assistant' })
+    await run(() => tasks.updateTask(a, { column: 'doing', agent: 'b2' }, user))
+    await run(() => tasks.updateTask(a, { column: 'done' }, user))
+    await vi.waitFor(async () => expect((await lanes.laneNext(w, 'alpha', 'b2')).next?.card).toBe(b), { timeout: HUNG_MS })
+    expect((await lane(l.id)).state).not.toBe('ended')
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  it("HI-2169: a builder's re-registration with its card in flight keeps the queued list, which applies once that card is Done", async () => {
+    const [a, b] = [await make('Queue a'), await make('Queue b')]
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [a], by: 'Assistant' })).lane
+    await run(() => tasks.updateTask(a, { column: 'doing', agent: 'b2' }, user))
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a, b], by: 'Assistant' })).lane.queued).toEqual([a, b])
+    const own = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a], ownBuilder: true, by: 'B2 (alpha)' })
+    expect([own.lane.cards.map((c) => c.number), own.lane.queued]).toEqual([[a], [a, b]])
+    await run(() => tasks.updateTask(a, { column: 'done' }, user))
+    await vi.waitFor(async () => expect((await lane(l.id)).cards.map((c) => c.number)).toEqual([a, b]), { timeout: HUNG_MS })
+    await vi.waitFor(async () => expect((await lanes.laneNext(w, 'alpha', 'b2')).next?.card).toBe(b), { timeout: HUNG_MS })
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  it("HI-2169: the Assistant's, the user's or a script's start still takes a card off; with rules off, the builder's own does too", async () => {
+    const [a, b] = [await make('Off a'), await make('Off b')]
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a, b], by: 'Assistant' })).lane
+    const takenOff = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a], by: 'Assistant' })
+    expect([takenOff.lane.cards.map((c) => c.number), takenOff.note]).toEqual([[a], undefined])
+    await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a, b], by: 'Assistant' })
+    await advanced.set(ENFORCE, false)
+    const unruled = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a], ownBuilder: true, by: 'B2 (alpha)' })
+    expect(unruled.lane.cards.map((c) => c.number)).toEqual([a])
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
   it('between cards a change applies at once; with rules off, at once even mid-card', async () => {
     const [a, b, c] = [await make('Now a'), await make('Now b'), await make('Now c')]
     await lanes.startLane(w, { project: 'alpha', builder: 'b1', cards: [a], by: 'B1 (alpha)' })
@@ -655,5 +698,26 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     expect([r.lane.cards.map((c) => c.number), r.lane.queued]).toEqual([[u, a1], [a1, u]])
     expect(r.note).toMatch(new RegExp(`queued: it applies once #${u} is Done`))
     for (const l of [la, lb]) await lanes.endLane(w, l.id, { abandoned: true })
+  })
+
+  // Last in this describe: it gives the projects keys, which the tests above match as #n.
+  it("HI-2169 (HR3's round 1): a builder's own start names the cards it keeps as it may see them: its project's by key; another project's, a workspace card, one moved out and a missing one by number alone", async () => {
+    const keys = await import('../src/main/projectKeys')
+    await keys.keyProjects(w)
+    const own = (await run(() => tasks.createTask({ title: 'Keyed own', project: 'alpha' }, user))).number
+    const kept = (await run(() => tasks.createTask({ title: 'Keyed kept', project: 'alpha' }, user))).number
+    const beta = await run(() => tasks.createTask({ title: 'Keyed beta', project: 'beta' }, user))
+    const loose = (await run(() => tasks.createTask({ title: 'Keyed loose' }, user))).number
+    const moved = await run(() => tasks.createTask({ title: 'Keyed moved', project: 'alpha' }, user))
+    const missing = 999_999
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [own, kept, beta.number, loose, moved.number, missing], by: 'Assistant' })).lane
+    await run(() => tasks.updateTask(moved.number, { project: 'beta' }, user))
+    const movedKey = (await run(() => tasks.getTask(moved.number))).key!
+    const r = await keys.withCardNames(w, () => lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [own], ownBuilder: true, by: 'B2 (alpha)' }), 'alpha')
+    const keptKey = (await run(() => tasks.getTask(kept))).key!
+    expect(keptKey).toBeTruthy()
+    expect(r.note).toContain(`${keptKey}, #${beta.number}, #${loose}, #${moved.number}, #${missing} stay on the lane`)
+    for (const k of [beta.key!, movedKey]) expect(r.note).not.toContain(k)
+    await lanes.endLane(w, l.id, { abandoned: true })
   })
 })

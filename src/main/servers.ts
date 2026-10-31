@@ -2069,7 +2069,7 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     }
   }
   const started = async () => {
-    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}) })
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}) })
     // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
     // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
     const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)

@@ -4798,7 +4798,12 @@ a returned card gets its own slot and a fresh conversation) is put to Darren as 
   a message naming the lane's cards now. Between cards a change applies at once. A queued list keeps every card named
   (none dropped); a queued empty list leaves the lane as it was. Any new list for the builder's running lane is an edit
   of it, one sharing no card too (never a new lane abandoning it); a card only in a queued list waits for the card in
-  flight. Applying a queued list and ending a lane are checked again under the board's lock as they are saved: a card
+  flight. **A builder's own start never takes a card off** [HI-2169: on 30 Oct HB6's card-loop registration named
+  only its first card, cutting the second the Assistant had just added; the lane ended once the first merged, the second
+  left in Todo; a re-registration with its card in flight dropped a queued list too]: with the rules on, the calling
+  agent's own start keeps every card of its lane's list (its queued one, when it has one) that it leaves out, after the
+  given ones, and the reply names them (`StartLane.ownBuilder`, from the authenticated caller only); it still adds and
+  reorders. The Assistant, the user (Start Lane) and scripts take cards off. Applying a queued list and ending a lane are checked again under the board's lock as they are saved: a card
   that moved on meanwhile (reopened) leaves the lane as it was, to be read again.
 - **The lane's ruleset:** a card of a running lane (its list or its queued list) starts under the ruleset stored when
   the lane started (the recorder's start and the runtime's `rulesetOf`); a Todo card outside a lane under the current
