@@ -36,6 +36,26 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## A builder told of its unsubmitted commits (HI-2245): fakes, Claude Code Haiku, fixtures v112, 31 October 2026
+
+HI-2228's card-loop-follow-up misses (below) read the rule, saw the asked change committed and the card in Review, and
+took it as handed over. Hive's reply now says it as a fact: a builder's card watch on its own card in Review (and
+`hive_lane next`'s "Carry on with…") whose folder has commits on its line past the submitted revision says "First hand
+AL-1 over: AL-1's line has 1 commit since its submission (59f92a2); hive_submit with followUp: true, then end your
+turn: …" in place of "End your turn now". No guidance, skill or tool description changed; no fixture bump.
+
+| Haiku, `--repeat 5` (CLI 2.1.316) | before (HI-2228's after) | after |
+|---|---|---|
+| card-loop-follow-up | 2 of 5: `2026-10-31T17-20-28-claude-code`, head 9b4b56f0c with HI-2228's change uncommitted (fingerprint 93ec529ab027) | **5 of 5**: `2026-10-31T18-54-45-claude-code`, source 5d043adcd, guidance 8bcc3c142cad49aa, $0.041 |
+
+- **Authorization:** the lane brief of lane-18c973 (from the Assistant, 31 Oct): "Darren already OK'd paid Haiku runs
+  for this scenario's family on HI-2228. Run card-loop-follow-up Haiku `--repeat 5` once, after the fix (HI-2228's 2/5
+  run is the before)". The before is HI-2228's run, not run again.
+- **What the samples did:** three watched the card first and got the new reply (one each, its commit named), then
+  submitted with `followUp: true`; two submitted without watching. 5 samples a side give no rates, and the before ran
+  HI-2228's uncommitted change (the same guidance hash), so the difference is the reply's fact, as far as 5 samples show.
+- **Fakes:** card-loop-follow-up passes (`2026-10-31T18-53-55-fake`).
+
 ## Haiku's regressions since the baselines (HI-2228): fakes, Claude Code Haiku, fixtures v107 (v112 once merged), 31 October 2026
 
 HI-2190's Haiku ×3 trials on ac799cd25 (fixtures v101) passed four scenarios less often than their sections below

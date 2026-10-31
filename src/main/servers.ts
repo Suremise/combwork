@@ -109,6 +109,7 @@ import { ASK_ACTIONS, ASK_ACTIONS_MAX, CATEGORY_STAGE, LOOP_STEPS, type AskActio
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
 import { actorOf, recordDecisionsReceived } from './workflow/recorder'
 import { workflowFor } from './workflow/service'
+import { unsubmittedOf } from './unsubmitted'
 import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
@@ -2037,7 +2038,9 @@ route('GET', '/v1/lanes/next', async () =>
       const line = await queueLineFor(r.lane.project, c.number)
       if (line) queue.push({ card: c.number, line })
     }
-    return queue.length ? { ...r, queue } : r
+    // HI-2245: a card carried on with commits past its submission (its builder's only): not handed over yet.
+    const unsubmitted = r.next?.carryOn ? await unsubmittedOf(requireWorkspace(), a.projectPath, a.agentId, [r.next.card]) : []
+    return { ...r, ...(queue.length ? { queue } : {}), ...(unsubmitted.length ? { unsubmitted } : {}) }
   })
 )
 
@@ -3347,8 +3350,11 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, `limitMinutes must be from 1 to ${WATCH_MAX_LIMIT_MINUTES}`)
     const r = await registerWatch(ws, who.projectPath, who.agentId, cond, limit)
     const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
-    if ('already' in r) return { already: r.already, ...left, ...withNames([r.already.number]) }
-    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, ...left }
+    // HI-2245: an agent's own cards in Review with commits past their submission: its reply says to hand them over first.
+    const mine = me ? await unsubmittedOf(ws, me.projectPath, me.agentId, 'already' in r ? [r.already.number] : cond.cards) : []
+    const unsubmitted = mine.length ? { unsubmitted: mine } : {}
+    if ('already' in r) return { already: r.already, ...unsubmitted, ...left, ...withNames([r.already.number]) }
+    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, ...unsubmitted, ...left, ...(mine.length ? withNames(mine.map((u) => u.card)) : {}) }
   }
   const seconds = body?.timeoutSeconds === undefined ? 300 : Number(body.timeoutSeconds)
   // The longest is Settings → Advanced's (#367), under Codex's timeout for hive's tools.

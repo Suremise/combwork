@@ -25,7 +25,7 @@ import type { StoredText } from '../../shared/types'
 import { parseCardRef } from '../../shared/workflow/cardRefs'
 import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
 import { LANE_MAX_ROUNDS } from '../../shared/lanes'
-import type { FinishInputs, LineNow, PlatformAdapter } from '../platform/adapter'
+import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
 import { GitPlatform } from '../platform/gitPlatform'
 import { NoneAdapter } from '../platform/none'
 import { NonePlatform } from '../platform/nonePlatform'
@@ -178,7 +178,7 @@ export interface WorkflowConfig {
   autoRun?: boolean
   effects?: Effects
   /** Test seams: called between gathering and the transaction. */
-  hooks?: { beforeWrite?: (move: string) => void | Promise<void> }
+  hooks?: { beforeWrite?: (move: string) => void | Promise<void>; unsubmittedRead?: () => void | Promise<void> }
   /**
    * Runs a write of the store under the lock its store needs (#1217): in the app, a change of the workspace's board
    * (boardWrite), since the board's store writes only inside one; left out, the write runs as it is (a store on its own
@@ -1085,6 +1085,21 @@ export class Workflow {
       if (!c) out.push(key)
     }
     return out
+  }
+
+  /**
+   * HI-2245: the commits past its submission on a card in Review, for its builder (`agent`, its id) only: its platform's
+   * answer, kept only while the card is still that cycle's, in Review, on the same submission, builder and folder.
+   */
+  async unsubmitted(card: CardRecord, agent: string): Promise<Unsubmitted | null> {
+    const s = this.state(card)
+    const submitted = s.latest?.revision
+    const same = (x: CardState): boolean => x.stage === 'review' && x.cycle === s.cycle && x.latest?.id === s.latest?.id && x.latest?.revision === submitted && x.started?.builder === agent && x.started?.folder === s.started?.folder && x.started?.line === s.started?.line
+    if (card.kind !== 'code' || !submitted || !same(s)) return null
+    const p = this.platformOf(card, s)
+    if (!p.unsubmitted) return null
+    const r = await p.unsubmitted(card, s, submitted, () => this.cfg.hooks?.unsubmittedRead?.()).catch(() => null)
+    return r && same(this.state(this.store.card(card.id))) ? r : null
   }
 
   /** The card's revision now (its platform's answer). */

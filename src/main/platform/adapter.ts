@@ -51,6 +51,16 @@ export interface HeadMove {
   same: boolean
 }
 
+/**
+ * Commits on a card's line past its submitted revision, in its folder (HI-2245): how many (`atLeast`: a lower bound, the
+ * read was capped) and the submission's short id.
+ */
+export interface Unsubmitted {
+  count: number
+  atLeast: boolean
+  since: string
+}
+
 /** A check run's bracket: the card's revision, what was tested, the run's result, and why it doesn't count, if not. */
 /** An agent's worktree as a lane's next card finds it (lineNow). */
 export interface LineNow {
@@ -116,6 +126,11 @@ export interface PlatformAdapter {
    * `expect` (its line and head as checked): true; git's reason; or null when the line changed since (nothing moved).
    */
   moveLine?(folder: string, to: string, expect: { line: string | null; head: string; target?: string }, go: () => boolean): Promise<true | string | null>
+  /**
+   * Commits on the card's line past `submitted` in its folder as checked out there (HI-2245; Git only), committed only;
+   * null where that can't be proven. `between` runs after the history is read, before the folder is read again (a seam).
+   */
+  unsubmitted?(card: CardRecord, s: CardState, submitted: string, between?: () => void | Promise<void>): Promise<Unsubmitted | null>
   /** The commits on a line from `from` (exclusive) to `to`, oldest first, as short ids and subjects. */
   commitsBetween?(folder: string, from: string, to: string): Promise<Maybe<string[]>>
   /** Reconciles a card with the platform (§16.4.4). */

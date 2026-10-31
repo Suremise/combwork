@@ -106,6 +106,15 @@ describe('a lane on slots (#1438)', () => {
     const none = laneView(rec(), cards)
     expect(laneNextText({ lane: none, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it.')
   })
+
+  it('HI-2245: hive_lane next says to hand over a card carried on with commits past its submission, and nothing more without them', () => {
+    const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false })
+    const u = [{ card: 2, count: 2, atLeast: false, since: 'ab30f52' }]
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: u })).toBe('Carry on with #2 Card 2 in slot-b. First hand it over: its line has 2 commits since its submission (ab30f52); hive_submit with followUp: true.')
+    // Another card's fact isn't this one's; with none, the reply is as before.
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [{ ...u[0], card: 3 }] })).toBe('Carry on with #2 Card 2 in slot-b.')
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [] })).toBe('Carry on with #2 Card 2 in slot-b.')
+  })
 })
 
 describe('a lane against the board', () => {
