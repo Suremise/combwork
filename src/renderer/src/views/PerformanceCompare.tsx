@@ -514,7 +514,9 @@ function detailRows(s: ScenarioComparison): DetailRow[] {
   for (const d of s.measures) {
     const own = s.split?.subject.find((x) => x.key === d.key)
     const others = s.split?.others.find((x) => x.key === d.key)
-    if (own && others && (own.base || own.run || others.base || others.run)) out.push({ d: own, part: 'subject' }, { d: others, part: 'others' }, { d, part: 'all' })
+    // Split only where a part has something (a measure that is 0 for every agent stays one row).
+    const some = (x: MeasureDelta): boolean => !!(x.base?.mean || x.run?.mean)
+    if (own && others && (some(own) || some(others))) out.push({ d: own, part: 'subject' }, { d: others, part: 'others' }, { d, part: 'all' })
     else out.push({ d })
   }
   return [...out, ...(s.usage ?? []).map((d) => ({ d }))]
