@@ -113,6 +113,11 @@ const check = (name, ok, extra = '') => {
     await dialog.getByRole('button', { name: 'Move Anyway' }).click()
     check('Move Anyway moves it to Done', !!(await lib.until(async () => (await card(a))?.column === 'done', HUNG_MS)))
     check('…with one Override, and no Integrated faked', (await facts(a)).filter((k) => k === 'Override').length === 1 && !(await facts(a)).includes('Integrated'), JSON.stringify(await facts(a)))
+    // Done ends the lease B1's adopted 0.9 worktree carried for it, so the slot moves out of the workspace folder and the
+    // window drops alpha-b1 as a project, with its "how do you work?" notice above the board. Hovered before that lands,
+    // the board moved up from under a still pointer and the mark's tooltip never showed (HI-2208): waited for first.
+    const notice = page.locator('[data-step-notice]')
+    check("…and B1's adopted worktree leaves the workspace, its notice with it", !!(await lib.until(async () => !fs.existsSync(alphaWt) && (await notice.count()) === 0, HUNG_MS)), `${fs.existsSync(alphaWt) ? 'alpha-b1 still there; ' : ''}${await notice.innerText().catch(() => 'no notice')}`)
     const mark = tile(a).locator('[data-badge="override"]')
     check('the card shows its override mark', !!(await lib.until(async () => (await mark.count()) === 1, HUNG_MS)))
     const label = (await mark.getAttribute('aria-label')) ?? ''
