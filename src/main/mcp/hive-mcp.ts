@@ -1131,24 +1131,33 @@ async function instructions(): Promise<string> {
  * whose it was, whether it worked and its reply's size as the model got it (HI-2186), so tests (tests/scenarios) see what
  * was executed, not what a transcript mentions, and whose work it was.
  */
-function testLog(name: string, args: unknown, error: string | null, size: { mode: CallReport['mode']; chars: number; bytes: number }): void {
-  testLine({ tool: name, ok: error === null, ...(error ? { error } : {}), args: JSON.stringify(args ?? {}).slice(0, 4000), ...size })
+function testLog(name: string, args: unknown, error: string | null, size: { mode: CallReport['mode']; chars: number; bytes: number }): string | undefined {
+  return testLine({ tool: name, ok: error === null, ...(error ? { error } : {}), args: JSON.stringify(args ?? {}).slice(0, 4000), ...size })
 }
 
 /** Tests only: the tool list as this server first sent it (HI-2186), once a server, as `kind: 'list'` (not a call). */
-function testLogList(size: { tools: number; toolsBytes: number; toolsChars: number }): void {
-  testLine({ kind: 'list', tools: size.tools, bytes: size.toolsBytes, chars: size.toolsChars })
+function testLogList(size: { tools: number; toolsBytes: number; toolsChars: number }): string | undefined {
+  return testLine({ kind: 'list', tools: size.tools, bytes: size.toolsBytes, chars: size.toolsChars })
 }
 
-function testLine(fields: Record<string, unknown>): void {
+let testSeq = 0
+
+/**
+ * Tests only: a line of the test log. A call's or a list's has an id of its own (this server's pid and a sequence),
+ * which a `kind: 'reported'` line names once Hive has taken its metrics report (HI-2186). Returns that id, or nothing
+ * when there is no test log.
+ */
+function testLine(fields: Record<string, unknown>): string | undefined {
   const file = process.env.HIVE_TEST_MCP_LOG
-  if (!file) return
+  if (!file) return undefined
+  const id = fields.kind === 'reported' ? undefined : `${process.pid}.${++testSeq}`
   try {
-    const line = { at: new Date().toISOString(), role: ASSISTANT ? 'assistant' : 'agent', project: PROJECT, agent: process.env.HIVE_AGENT_ID ?? null, ...fields }
+    const line = { at: new Date().toISOString(), role: ASSISTANT ? 'assistant' : 'agent', project: PROJECT, agent: process.env.HIVE_AGENT_ID ?? null, ...(id ? { id } : {}), ...fields }
     appendFileSync(file, JSON.stringify(line) + '\n')
   } catch {
     // A test log that can't be written doesn't change the call.
   }
+  return id
 }
 
 function reply(id: unknown, result: unknown): void {
@@ -1172,9 +1181,11 @@ interface CallReport {
   chars: number
   bytes: number
   ms: number
+  /** Tests only: its line in the test log, named again once Hive has taken the report (never sent). */
+  testId?: string
 }
 const pending: CallReport[] = []
-let catalog: { tools: number; toolsBytes: number; toolsChars: number; descriptionChars: number; paramChars: number } | null = null
+let catalog: { tools: number; toolsBytes: number; toolsChars: number; descriptionChars: number; paramChars: number; testId?: string } | null = null
 let flushTimer: NodeJS.Timeout | null = null
 /** At most this many calls in one report (the API's limit), sent at most every 2 seconds. */
 const REPORT_MAX = 50
@@ -1189,8 +1200,13 @@ function flushReports(): void {
   if (flushTimer) clearTimeout(flushTimer)
   flushTimer = null
   if (sending || (!pending.length && !catalog)) return
-  const calls = pending.splice(0, REPORT_MAX)
-  const body = { calls, ...(catalog ? { catalog } : {}) }
+  const batch = pending.splice(0, REPORT_MAX)
+  const calls = batch.map((c) => ({ tool: c.tool, mode: c.mode, ok: c.ok, chars: c.chars, bytes: c.bytes, ms: c.ms }))
+  const listed = catalog ? { tools: catalog.tools, toolsBytes: catalog.toolsBytes, toolsChars: catalog.toolsChars, descriptionChars: catalog.descriptionChars, paramChars: catalog.paramChars } : null
+  // Tests only: the test log's lines this report carries, and when it went and when Hive had taken it (HI-2186).
+  const testIds = [...batch.map((c) => c.testId), catalog?.testId].filter((x): x is string => !!x)
+  const sentAt = new Date().toISOString()
+  const body = { calls, ...(listed ? { catalog: listed } : {}) }
   catalog = null
   sending = true
   // Not api(): a report has its own short deadline, and never waits as long as a tool call may.
@@ -1203,7 +1219,10 @@ function flushReports(): void {
     body: JSON.stringify(body),
     signal: stop.signal
   })
-    .then((res) => res.arrayBuffer())
+    .then(async (res) => {
+      await res.arrayBuffer()
+      if (res.ok && testIds.length) testLine({ kind: 'reported', ids: testIds, sentAt, doneAt: new Date().toISOString() })
+    })
     // Hive didn't take it in time (or at all): what is still waiting is dropped too, so a stalled endpoint costs at most
     // one deadline, not one per batch.
     .catch(() => {
@@ -1271,8 +1290,9 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       // descriptions' and the parameters' descriptions' parts), once a session.
       if (!listed) {
         listed = true
-        catalog = { tools: list.length, toolsBytes: Buffer.byteLength(JSON.stringify(list), 'utf8'), ...toolListSize(list) }
-        testLogList(catalog)
+        const size = { tools: list.length, toolsBytes: Buffer.byteLength(JSON.stringify(list), 'utf8'), ...toolListSize(list) }
+        const testId = testLogList(size)
+        catalog = { ...size, ...(testId ? { testId } : {}) }
         scheduleReports()
       }
       return
@@ -1285,6 +1305,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       calling++
       let text: string
       let ok = true
+      let testId: string | undefined
       const said = new Set<string>()
       try {
         const result = await notices.run(said, () => tool.run(args))
@@ -1292,17 +1313,17 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         text = typeof result === 'string' ? result : JSON.stringify(result)
         // Hive's flag (a new decision on a card the agent works on) goes after the reply, on its own line.
         if (said.size) text += `\n${[...said].join('\n')}`
-        testLog(tool.name, params?.arguments, null, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
+        testId = testLog(tool.name, params?.arguments, null, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
         reply(id, { content: [{ type: 'text', text }] })
       } catch (e) {
         ok = false
         text = `Hive error: ${(e as Error).message}`
-        testLog(tool.name, params?.arguments, (e as Error).message, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
+        testId = testLog(tool.name, params?.arguments, (e as Error).message, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
         reply(id, { content: [{ type: 'text', text }], isError: true })
       }
       // After the reply: the model's text exactly as sent (characters as UTF-16 code units, and UTF-8 bytes).
       calling--
-      reportCall({ tool: tool.name, mode: modeOf(args), ok, chars: text.length, bytes: Buffer.byteLength(text, 'utf8'), ms: performance.now() - started })
+      reportCall({ tool: tool.name, mode: modeOf(args), ok, chars: text.length, bytes: Buffer.byteLength(text, 'utf8'), ms: performance.now() - started, ...(testId ? { testId } : {}) })
       return
     }
     default:

@@ -135,30 +135,26 @@ function roleMeasures(before, after, role) {
 
 /**
  * Tool-call measures from the hive servers' test log (HI-2186): `calls` (each { ok, direct, mode, chars, bytes }) and
- * `lists` (each server's tool list, { bytes, chars }). A size is known only when every call it sums logged it (a log
- * from before HI-2186 has none). Tool lists are counted from the list lines when the log has them (`listsLogged`); for a
- * fake CLI's log without them (`fakeCli`: it starts a server per hive call, and each lists the tools once) one a call;
- * otherwise unknown.
+ * `lists` (each server's tool list, { bytes, chars }), those of the measured window. A size is known only when every
+ * call (or list) it sums logged it.
  */
-function logMeasures(calls, lists, { listsLogged, fakeCli }) {
+function logMeasures(calls, lists) {
   const served = calls.filter((c) => !c.direct)
   const m = { toolCalls: served.length, toolErrors: served.filter((c) => !c.ok).length }
   const all = (k, f) => served.every((c) => f(c[k]))
   if (all('mode', (v) => typeof v === 'string')) m.toolDetailCalls = served.filter((c) => c.mode === 'detail').length
   if (all('chars', Number.isFinite)) m.toolChars = served.reduce((n, c) => n + c.chars, 0)
   if (all('bytes', Number.isFinite)) m.toolBytes = served.reduce((n, c) => n + c.bytes, 0)
-  if (listsLogged) {
-    m.toolListStarts = lists.length
-    if (lists.every((l) => Number.isFinite(l.bytes))) m.toolListBytes = lists.reduce((n, l) => n + l.bytes, 0)
-    if (lists.every((l) => Number.isFinite(l.chars))) m.toolListChars = lists.reduce((n, l) => n + l.chars, 0)
-  } else if (fakeCli) m.toolListStarts = served.length
+  m.toolListStarts = lists.length
+  if (lists.every((l) => Number.isFinite(l.bytes))) m.toolListBytes = lists.reduce((n, l) => n + l.bytes, 0)
+  if (lists.every((l) => Number.isFinite(l.chars))) m.toolListChars = lists.reduce((n, l) => n + l.chars, 0)
   return m
 }
 
 /** What Hive itself records as a tool call (its start view, src/main/metrics.ts START_VIEW_METRIC): in no server's log. */
 const HIVE_OWN_CALLS = new Set(['session start view'])
 
-/** The hive tool calls the servers reported, Hive's own records left out: what their test log should hold. */
+/** The hive tool calls the servers reported, Hive's own records left out. */
 function servedCalls(r) {
   let n = 0
   for (const part of [...Object.values(r?.projects ?? {}), ...(r?.workspace ? [r.workspace] : [])]) for (const m of part.mcp ?? []) if (!HIVE_OWN_CALLS.has(m.tool)) n += m.count
@@ -166,15 +162,35 @@ function servedCalls(r) {
 }
 
 /**
+ * Where a served call or a tool list of the log is against the two metrics snapshots (HI-2186), by when its own report
+ * reached Hive (the server's `kind: 'reported'` line naming its id: when the report was sent, and when Hive had taken
+ * it). `snapshots`: each snapshot's request, from before it was sent to after its answer. 'before': Hive had it before
+ * the first snapshot was asked for; 'in': sent after the first's answer and taken before the last was asked for;
+ * 'after': sent after the last's answer. Null when that can't be told: a report that overlapped a snapshot, or no report
+ * on record for a line logged before the last snapshot's answer (its report failed, or was still on its way).
+ */
+function placeOf(x, reports, { before, after }) {
+  const r = x.id ? reports.get(x.id) : undefined
+  if (!r) return String(x.at ?? '') > after.end ? 'after' : null
+  if (r.doneAt < before.start) return 'before'
+  if (r.sentAt > before.end && r.doneAt < after.start) return 'in'
+  if (r.sentAt > after.end) return 'after'
+  return null
+}
+
+/**
  * The subject apart from the other agents (HI-2186), each from its own series or log lines, never one as the total less
- * the other. `subject`: { kind: 'assistant' | 'agent', agentId, since and until (ISO: the measured window, from before
- * the first metrics snapshot to after the last), complete (the metrics' coverage was whole), fakeCli, roster: [{ id,
- * name, workflowRole }], lanes (the run's, for builder and reviewer) }. `observed.allHiveCalls` and `observed.mcpLists`:
- * the hive servers' test log.
+ * the other. `subject`: { kind: 'assistant' | 'agent', agentId, snapshots ({ before, after }: each metrics snapshot's
+ * request, { start, end }), complete (the metrics' coverage was whole), roster: [{ id, name, workflowRole }], lanes (the
+ * run's, for builder and reviewer) }. `observed.allHiveCalls`, `observed.mcpLists` and `observed.mcpReports`: the hive
+ * servers' test log.
  *
- * The log's lines in the window are used only when they are exactly what the metrics counted between the snapshots: as
- * many served calls (and, where the log has them, tool lists). A call logged on one side of a snapshot and reported on
- * the other makes them differ, and then nothing from the log is used (`split: 'partial'`): unknown, never guessed.
+ * The log is used only when it says, for every served call and tool list in it, on which side of each snapshot Hive took
+ * it (placeOf), by the line's own report: so the window holds the very calls the metrics counted between the
+ * snapshots, not as many others. A call it can't place (a report that overlapped a snapshot, one not on record, a log
+ * from before HI-2186 without ids), or a window whose counts still differ from the metrics', leaves the log unused
+ * (`split: 'partial'`): unknown, never guessed. A fake's board move straight to the API (`direct`) ran no server and is
+ * in no metric: a hive call of the window when logged between the snapshots' requests.
  *
  * - The Assistant as subject: Hive's metrics by caller role, the Assistant's and project agents', every measure (with
  *   complete coverage only, else neither part).
@@ -184,22 +200,27 @@ function servedCalls(r) {
  * Also `agents`: each agent's hive calls (and tool lists) in the window, by its fixture name, the subject first.
  */
 function splitOf(before, after, observed, subject) {
-  const since = subject.since ?? ''
-  const until = subject.until ?? '\uffff'
-  const inWindow = (x) => String(x.at ?? '') >= since && String(x.at ?? '') <= until
-  const calls = (observed?.allHiveCalls ?? []).filter(inWindow)
-  const lists = (observed?.mcpLists ?? []).filter(inWindow)
-  const listsLogged = (observed?.mcpLists ?? []).length > 0 || (observed?.allHiveCalls ?? []).some((c) => !c.direct && Number.isFinite(c.chars))
-  const opts = { listsLogged, fakeCli: !!subject.fakeCli }
-  const agrees = calls.filter((c) => !c.direct).length === Math.max(0, servedCalls(after) - servedCalls(before)) && (!listsLogged || lists.length === between(before, after).toolListStarts)
+  const snaps = subject.snapshots
+  const reports = new Map()
+  for (const r of observed?.mcpReports ?? []) for (const id of r.ids ?? []) reports.set(id, r)
+  const logged = observed?.allHiveCalls ?? []
+  const served = logged.filter((c) => !c.direct)
+  const listed = observed?.mcpLists ?? []
+  const places = snaps?.before && snaps?.after ? new Map([...served, ...listed].map((x) => [x, placeOf(x, reports, snaps)])) : null
+  const placed = !!places && [...places.values()].every((p) => p !== null)
+  const inside = (x) => places.get(x) === 'in'
+  const calls = placed ? logged.filter((c) => (c.direct ? String(c.at ?? '') >= snaps.before.start && String(c.at ?? '') <= snaps.after.end : inside(c))) : []
+  const lists = placed ? listed.filter(inside) : []
+  // A guard, never the proof: the window's counts are the metrics' between the snapshots.
+  const agrees = placed && calls.filter((c) => !c.direct).length === servedCalls(after) - servedCalls(before) && lists.length === between(before, after).toolListStarts
   const mine = subject.kind === 'assistant' ? (c) => c.role === 'assistant' : (c) => c.role !== 'assistant' && c.agent === subject.agentId
-  const out = agrees ? { agents: agentRows(calls, lists, subject, mine, opts) } : {}
+  const out = agrees ? { agents: agentRows(calls, lists, subject, mine) } : {}
   if (subject.kind === 'assistant') {
     if (!subject.complete) return { ...out, split: 'partial' }
     return { ...out, subject: roleMeasures(before, after, 'assistant'), others: roleMeasures(before, after, 'agent'), ...(agrees ? {} : { split: 'partial' }) }
   }
   if (!subject.complete || !agrees) return { ...out, split: 'partial' }
-  const part = (c) => logMeasures(calls.filter(c), lists.filter(c), opts)
+  const part = (c) => logMeasures(calls.filter(c), lists.filter(c))
   return { ...out, subject: part(mine), others: part((c) => !mine(c)) }
 }
 
@@ -208,7 +229,7 @@ function splitOf(before, after, observed, subject) {
  * `unattributed` for an agent the roster doesn't have), never by when its calls came: the subject first, then by name.
  * Past AGENT_ROWS, the rest in one `overflow` row (`agents`: how many), so the rows' calls always add up to the log's.
  */
-function agentRows(calls, lists, subject, mine, opts) {
+function agentRows(calls, lists, subject, mine) {
   const byId = new Map((subject.roster ?? []).map((a) => [a.id, a]))
   const laneRole = new Map()
   for (const l of subject.lanes ?? []) {
@@ -235,8 +256,7 @@ function agentRows(calls, lists, subject, mine, opts) {
   for (const c of calls) rowOf(c).calls.push(c)
   for (const l of lists) rowOf(l).lists.push(l)
   const shaped = [...rows.values()].map((r) => {
-    const m = logMeasures(r.calls, r.lists, opts)
-    return { agent: r.agent, role: r.role, side: r.side, hiveCalls: r.calls.length, ...(m.toolListStarts !== undefined ? { toolListStarts: m.toolListStarts } : {}) }
+    return { agent: r.agent, role: r.role, side: r.side, hiveCalls: r.calls.length, toolListStarts: r.lists.length }
   })
   const rank = (r) => (r.side === 'subject' ? 0 : r.agent === 'unattributed' ? 2 : 1)
   shaped.sort((a, b) => rank(a) - rank(b) || a.agent.localeCompare(b.agent, 'en') || a.role.localeCompare(b.role, 'en'))

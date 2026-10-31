@@ -249,11 +249,12 @@ measured on its own, and each agent's hive calls in the measured window (`measur
 - An agent as subject: its tool calls, replies and tool lists from the hive servers' test log (`HIVE_TEST_MCP_LOG`: each
   call with its reply's size, and a `kind: 'list'` line per server's tool list); its API and launch measures are unknown
   (Hive's metrics don't say which agent a request or launch was).
-- The log's lines count only from before the first metrics snapshot to after the last, and only when they are exactly
-  the served calls (and tool lists) the metrics counted between them (Hive's own start-view record left out): a call
-  logged on one side of a snapshot and reported on the other leaves the log's parts and rows out (`split: 'partial'`).
-- An older log (no sizes, no list lines): calls are known, sizes unknown, and tool lists one a call for the fake CLIs
-  only, else unknown.
+- Which calls the window holds is told call by call, not by counting: each call and list line has an id, and the
+  server logs a `kind: 'reported'` line with the ids each metrics report carried, when it was sent and when Hive had
+  taken it. The harness times each metrics snapshot's request; a call is the window's when its report was sent after
+  the first snapshot's answer and taken before the last was asked for. A report that overlapped a snapshot, a call with
+  no report on record, or a log without ids (before HI-2186) leaves the log's parts and rows out (`split: 'partial'`);
+  so does a window whose counts still differ from the metrics' (Hive's own start-view record left out).
 
 **The fakes count per hive call.** The fake Claude Code and fake Codex (not fake-copilot: the real Copilot CLI) start a hive MCP server for every hive call (and
 each lists the tools), where a real CLI starts one a session: with them, tool-list starts and API requests count calls,
