@@ -63,7 +63,14 @@ function callTool(item) {
     case 'CommandExecution': {
       const cmd = commandText(item.command)
       const code = typeof item.exit_code === 'number' ? item.exit_code : null
-      return { ...base, name: 'Shell', summary: cmd.split('\n')[0].slice(0, 200), input: cmd, result: String(item.aggregated_output ?? ''), isError: item.status !== 'completed' || (code !== null && code !== 0) }
+      // Where it ran (HI-2239), as the rollout records it (a file:// URL), as a path: what a relative path in it is relative to.
+      let cwd = null
+      try {
+        cwd = typeof item.cwd === 'string' && item.cwd ? (/^file:/i.test(item.cwd) ? require('url').fileURLToPath(item.cwd) : item.cwd) : null
+      } catch {
+        // Not a path we can read: none (a relative path in it is then unobservable).
+      }
+      return { ...base, name: 'Shell', summary: cmd.split('\n')[0].slice(0, 200), input: cmd, result: String(item.aggregated_output ?? ''), isError: item.status !== 'completed' || (code !== null && code !== 0), ...(cwd ? { cwd } : {}) }
     }
     case 'FileChange':
       return { ...base, name: 'Edit', summary: Object.keys(item.changes ?? {}).join(', ').slice(0, 200), input: changesPatch(item.changes), result: [item.stdout, item.stderr].filter(Boolean).join('\n'), isError: item.status !== 'completed' }

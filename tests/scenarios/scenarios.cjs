@@ -4184,17 +4184,20 @@ const DEPLOY_FACTS = /staging\.example\.com|deploy:staging|ALPHA_ENV=staging/
 /** And only its card's description says this: in a listing's reply, the card was in it, in full. */
 const DEPLOY_CARD_FACT = 'docs/DEPLOY.md, its Staging section'
 /**
- * HI-2239's read policy (HR1, round 2): a file was read when a recorded call that worked is a known read of exactly that
- * file, and what it gave back has its facts. The facts alone are never a read (an echo or a write can print them), nor
- * is a call's mention of the path. Known reads:
- * - a structured read: Claude Code's `Read`, its whole `file_path` (absolute, or relative to the workspace, the
- *   Assistant's home or the project) resolving to the file;
+ * HI-2239's read policy (HR1, rounds 2 and 3): a file was read when a recorded call that worked is a known read of
+ * exactly that file, and what it gave back has its facts. The facts alone are never a read (an echo or a write can print
+ * them), nor is a call's mention of the path. Known reads:
+ * - a structured read: Claude Code's `Read`, its `file_path` the file;
  * - a shell command that is, as a whole, one of SHELL_READ's forms on that file: `Get-Content`/`gc` (with -Raw,
  *   -Encoding <name>, -Path or -LiteralPath), `cat` or `type`, its path one literal operand (bare, or quoted with no
  *   $, backtick or other expansion), optionally piped to one read-only filter (`Select-Object -First <n>`, `head -n <n>`
  *   or `head -<n>`). Anything else (several commands, a comment, a redirection, a substitution, a script block, other
  *   flags) isn't a read we can see: unobservable, never credited. The shell tools are a call's own (Bash, PowerShell, a
  *   Codex script's recorded Shell call, HI-2235), never a Script's code.
+ * The path is the file when it is absolute and is it, or relative to the call's own working directory as recorded (a
+ * Codex script's command: its rollout's cwd; a direct exec_command: its workdir), never a guessed one (HR1 round 3): a
+ * relative path with no recorded directory (a Bash or PowerShell call's, whose shell may have changed directory) is
+ * unobservable.
  */
 const SHELL_TOOLS = /^(Bash|PowerShell|Shell|powershell|bash|shell|local_shell|(functions\.)?exec_command)$/
 const SHELL_PATH = String.raw`(?:"([^"$\`]+)"|'([^']+)'|([^\s"'$\`;|&<>(){}#,]+))`
@@ -4203,36 +4206,36 @@ const SHELL_READ = new RegExp(
     String.raw`(?:\s*\|\s*(?:Select-Object\s+-First\s+\d+|head\s+-n\s*\d+|head\s+-\d+))?\s*$`,
   'i'
 )
-/** Whether `p` (as written: absolute, or relative to one of `dirs`) is the file `target` (case-insensitive, as on Windows). */
-const isFile = (p, target, dirs) => {
+/**
+ * Whether `p` is the file `target` (case-insensitive, as on Windows): absolute, or relative to `base`, the call's own
+ * recorded working directory; relative with none, unknown (false).
+ */
+const isFile = (p, target, base) => {
   const path = require('path')
   const want = path.resolve(target).toLowerCase()
-  return path.isAbsolute(p) ? path.resolve(p).toLowerCase() === want : dirs.some((d) => path.resolve(d, p).toLowerCase() === want)
+  if (path.isAbsolute(p)) return path.resolve(p).toLowerCase() === want
+  return typeof base === 'string' && path.isAbsolute(base) && path.resolve(base, p).toLowerCase() === want
 }
 /** The shell command's path operand when the whole command is one of SHELL_READ's forms, or null. */
 const shellReadPath = (cmd) => {
   const m = SHELL_READ.exec(String(cmd ?? ''))
   return m ? (m.slice(1).find((x) => x !== undefined) ?? null) : null
 }
-/** Whether a transcript tool call is a known read of `target` (READ policy above) that worked and gave back `facts`. */
-const readOf = (t, target, dirs, facts) => {
+/** Whether a transcript tool call is a known read of `target` (the read policy above) that worked and gave back `facts`. */
+const readOf = (t, target, facts) => {
   if (!t || t.isError || !facts.test(String(t.result ?? ''))) return false
-  if (t.name === 'Read') {
-    let file = null
-    try {
-      file = JSON.parse(t.input)?.file_path ?? null
-    } catch {}
-    return typeof file === 'string' && isFile(file, target, dirs)
-  }
-  if (!SHELL_TOOLS.test(t.name)) return false
-  let cmd = t.input
+  let a = null
   try {
-    const a = JSON.parse(t.input)
-    cmd = typeof a === 'string' ? a : (a?.command ?? a?.cmd)
+    a = JSON.parse(t.input)
   } catch {}
+  if (t.name === 'Read') return typeof a?.file_path === 'string' && isFile(a.file_path, target, null)
+  if (!SHELL_TOOLS.test(t.name)) return false
+  let cmd = a === null ? t.input : typeof a === 'string' ? a : (a?.command ?? a?.cmd)
   if (Array.isArray(cmd)) cmd = cmd.length === 3 && /^-(Command|c)$/i.test(String(cmd[1])) ? cmd[2] : null
   const file = typeof cmd === 'string' ? shellReadPath(cmd) : null
-  return !!file && isFile(file, target, dirs)
+  // Its own recorded directory: the call's (a Codex script's command), or the one it named (exec_command's workdir).
+  const base = t.cwd ?? (typeof a?.workdir === 'string' ? a.workdir : typeof a?.cwd === 'string' ? a.cwd : null)
+  return !!file && isFile(file, target, base)
 }
 /**
  * A hive tool's successful calls with their own replies (HR1, HI-2239 round 2): Hive's log of the calls (exact
@@ -4775,9 +4778,8 @@ module.exports.SCENARIOS.push(
       const listed = callsWithReplies(o, 'hive_list_tasks').some(({ args, reply }) => (args.project === undefined || args.project === 'alpha') && !!own?.key && new RegExp(`\\b${own.key}\\b`).test(reply) && reply.includes(DEPLOY_CARD_FACT))
       const cardRead = ran(o, 'hive_read_task').some((x) => cardIs(o, argsOf(x).number, p)) || listed
       const doc = require('path').join(c.alpha, 'docs', 'DEPLOY.md')
-      const dirs = [c.ws, require('path').join(c.ws, '.hive', 'assistant'), c.alpha]
       const sectioned = callsWithReplies(o, 'hive_read_section').some(({ args, reply }) => args.project === 'alpha' && String(args.path ?? '').replace(/\\/g, '/') === 'docs/DEPLOY.md' && DEPLOY_FACTS.test(reply))
-      const docRead = sectioned || (o.tools ?? []).some((t) => readOf(t, doc, dirs, DEPLOY_FACTS))
+      const docRead = sectioned || (o.tools ?? []).some((t) => readOf(t, doc, DEPLOY_FACTS))
       const lookedUp = cardRead || docRead
       return [
         ['looked the card or its doc up (the card in full: hive_read_task or a detailed listing; or the doc, through Hive or read)', lookedUp, o.hiveCalls.map((x) => x.tool).join(',')],

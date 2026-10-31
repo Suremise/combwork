@@ -140,6 +140,23 @@ describe("a Codex code-mode script's calls, read from its rollout (HI-2235)", ()
   const script = (id: string, code: string, result = '') => ({ kind: 'tool', tool: { toolUseId: id, name: 'Script', summary: '', input: code, result, isError: false, images: [] } })
   const observe = (items: unknown[], text: string | null) => observeTranscript(withScriptCalls(items, text).items, SKILLS) as unknown as { tools: { name: string; input: string; result: string; isError: boolean }[]; skillsRead: string[]; hiveMentions: string[] }
 
+  it("keeps a command's working directory as its rollout records it (a file:// URL, as a path), and none when it has none (HI-2239)", () => {
+    const code = 'text(await tools.exec_command({cmd:"Get-Content docs/DEPLOY.md"}))'
+    const text = rollout(
+      call('s1', code),
+      done({ type: 'CommandExecution', id: 'exec-1', command: ['pwsh.exe', '-Command', 'Get-Content docs/DEPLOY.md'], cwd: 'file:///C:/w/alpha', status: 'completed', aggregated_output: 'staging.example.com', exit_code: 0 }),
+      shell('exec-2', 'Get-Content docs/DEPLOY.md', 'staging.example.com'),
+      done({ type: 'CommandExecution', id: 'exec-3', command: ['pwsh.exe', '-Command', 'gc x'], cwd: 'file://not a path%', status: 'completed', aggregated_output: '', exit_code: 0 }),
+      output('s1', '')
+    )
+    const tools = observe([script('s1', code)], text).tools as unknown as { name: string; input: string; cwd?: string }[]
+    expect(tools.map((t) => [t.name, t.input, t.cwd])).toEqual([
+      ['Shell', 'Get-Content docs/DEPLOY.md', 'C:\\w\\alpha'],
+      ['Shell', 'Get-Content docs/DEPLOY.md', undefined],
+      ['Shell', 'gc x', undefined]
+    ])
+  })
+
   it('replaces a script with the calls it made, named as direct calls, with the replies it got', () => {
     const code = 'const r = await tools.mcp__hive__hive_read_task({number:"AL-1"}); if (false) await tools.mcp__hive__hive_wait_for_agents({});'
     const text = rollout(call('call_a', code), mcp('exec-1', 'hive_read_task', { number: 'AL-1' }, '{"key":"AL-1","description":"ACCEPT-ZEBRA-42"}'), output('call_a', ''))
@@ -716,18 +733,33 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
     const fact = (tools: unknown[], hiveCalls: unknown[] = []) => run('coordinator-fact-before-asking', { hiveCalls: [...hiveCalls, start], tools, cards: { p: { number: 1, key: 'AL-1' } } }, ctx)
     const looked = (tools: unknown[], hiveCalls: unknown[] = []) => fact(tools, hiveCalls)[LOOKED]
 
-    it('reads that count: Read of its whole path, a known shell read of it (Bash, PowerShell, a Codex Shell call), hive_read_section of alpha', () => {
+    it('reads that count: Read of its path, a known shell read of it by absolute path or from its recorded directory, hive_read_section of alpha', () => {
       expect(looked([t('Read', JSON.stringify({ file_path: 'C:/w/alpha/docs/DEPLOY.md' }), DOC)])).toBe(true)
       expect(looked([t('Read', JSON.stringify({ file_path: 'C:\\w\\alpha\\docs\\DEPLOY.md' }), DOC)])).toBe(true)
-      expect(looked([sh('PowerShell', 'Get-Content -Raw alpha/docs/DEPLOY.md', DOC)])).toBe(true)
-      expect(looked([sh('PowerShell', 'Get-Content -Path "alpha/docs/DEPLOY.md" -Encoding utf8', DOC)])).toBe(true)
-      expect(looked([sh('Bash', "cat 'alpha/docs/DEPLOY.md' | head -20", DOC)])).toBe(true)
+      expect(looked([sh('PowerShell', 'Get-Content -Raw C:/w/alpha/docs/DEPLOY.md', DOC)])).toBe(true)
+      expect(looked([sh('PowerShell', 'Get-Content -Path "C:\\w\\alpha\\docs\\DEPLOY.md" -Encoding utf8', DOC)])).toBe(true)
+      expect(looked([sh('Bash', "cat 'C:/w/alpha/docs/DEPLOY.md' | head -20", DOC)])).toBe(true)
       expect(looked([sh('PowerShell', 'gc C:/w/alpha/docs/DEPLOY.md | Select-Object -First 40', DOC)])).toBe(true)
-      // Relative to the Assistant's home, as Codex runs from there.
-      expect(looked([sh('Bash', 'cat ../../alpha/docs/DEPLOY.md', DOC)])).toBe(true)
-      // A Codex script's call as HI-2235 records it: a Shell tool of its own, its input the command.
-      expect(looked([t('Shell', 'Get-Content alpha/docs/DEPLOY.md', DOC)])).toBe(true)
+      // A Codex script's call as HI-2235 records it: a Shell tool of its own, its input the command, its cwd recorded.
+      expect(looked([{ ...t('Shell', 'Get-Content alpha/docs/DEPLOY.md', DOC), cwd: 'C:\\w' }])).toBe(true)
+      expect(looked([{ ...t('Shell', 'Get-Content docs/DEPLOY.md', DOC), cwd: 'C:\\w\\alpha' }])).toBe(true)
+      // A direct exec_command naming its workdir.
+      expect(looked([t('functions.exec_command', JSON.stringify({ cmd: 'Get-Content docs/DEPLOY.md', workdir: 'C:/w/alpha' }), DOC)])).toBe(true)
       expect(looked([t('mcp__hive__hive_read_section', 'project: alpha\npath: docs/DEPLOY.md\nheading: Staging', 'Run `npm run deploy:staging`. The host is staging.example.com.')], [call('hive_read_section', { project: 'alpha', path: 'docs/DEPLOY.md', heading: 'Staging' })])).toBe(true)
+    })
+
+    it('HR1 round 3: a relative path resolves against its own recorded directory only; another one, or none, is no read of it', () => {
+      // HR1's probe: beta's doc read from beta's folder, with alpha's facts in its output.
+      expect(looked([t('functions.exec_command', JSON.stringify({ cmd: 'Get-Content docs/DEPLOY.md', workdir: 'C:/w/beta' }), 'ALPHA_ENV=staging')])).toBe(false)
+      expect(looked([{ ...t('Shell', 'Get-Content docs/DEPLOY.md', DOC), cwd: 'C:\\w\\beta' }])).toBe(false)
+      expect(looked([{ ...t('Shell', 'Get-Content alpha/docs/DEPLOY.md', DOC), cwd: 'C:\\w\\.hive\\assistant' }])).toBe(false)
+      // No recorded directory: a Bash or PowerShell call (its shell may have changed directory), a Codex Shell with none,
+      // a Read with a relative path. Unknown, so no read, though each would be alpha's from some directory.
+      expect(looked([sh('Bash', 'cat alpha/docs/DEPLOY.md', DOC)])).toBe(false)
+      expect(looked([sh('PowerShell', 'Get-Content -Raw docs/DEPLOY.md', DOC)])).toBe(false)
+      expect(looked([sh('Bash', 'cat ../../alpha/docs/DEPLOY.md', DOC)])).toBe(false)
+      expect(looked([t('Shell', 'Get-Content alpha/docs/DEPLOY.md', DOC)])).toBe(false)
+      expect(looked([t('Read', JSON.stringify({ file_path: 'alpha/docs/DEPLOY.md' }), DOC)])).toBe(false)
     })
 
     it('the card read: hive_read_task of it, or a listing of alpha whose own reply has it in full', () => {
@@ -738,11 +770,11 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
     })
 
     it('HR1 round 2: the same facts echoed, written or printed by a command that reads nothing: none is a read', () => {
-      expect(looked([sh('PowerShell', 'Write-Output "alpha/docs/DEPLOY.md ALPHA_ENV=staging"', 'alpha/docs/DEPLOY.md ALPHA_ENV=staging')])).toBe(false)
-      expect(looked([sh('PowerShell', 'Set-Content alpha/docs/DEPLOY.md ALPHA_ENV=staging -PassThru', 'ALPHA_ENV=staging')])).toBe(false)
-      expect(looked([sh('Bash', 'echo staging.example.com > alpha/docs/DEPLOY.md; cat alpha/docs/DEPLOY.md', 'staging.example.com')])).toBe(false)
-      expect(looked([sh('PowerShell', 'Get-Content alpha/docs/DEPLOY.md; echo ALPHA_ENV=staging', 'ALPHA_ENV=staging')])).toBe(false)
-      expect(looked([sh('Bash', 'printf "staging.example.com" && cat alpha/docs/DEPLOY.md', DOC)])).toBe(false)
+      expect(looked([sh('PowerShell', 'Write-Output "C:/w/alpha/docs/DEPLOY.md ALPHA_ENV=staging"', 'C:/w/alpha/docs/DEPLOY.md ALPHA_ENV=staging')])).toBe(false)
+      expect(looked([sh('PowerShell', 'Set-Content C:/w/alpha/docs/DEPLOY.md ALPHA_ENV=staging -PassThru', 'ALPHA_ENV=staging')])).toBe(false)
+      expect(looked([sh('Bash', 'echo staging.example.com > C:/w/alpha/docs/DEPLOY.md; cat C:/w/alpha/docs/DEPLOY.md', 'staging.example.com')])).toBe(false)
+      expect(looked([sh('PowerShell', 'Get-Content C:/w/alpha/docs/DEPLOY.md; echo ALPHA_ENV=staging', 'ALPHA_ENV=staging')])).toBe(false)
+      expect(looked([sh('Bash', 'printf "staging.example.com" && cat C:/w/alpha/docs/DEPLOY.md', DOC)])).toBe(false)
       // A Script's code and output are never a read (pre-HI-2235 Codex observations): an unexecuted read, a printed fact.
       expect(looked([t('Script', '// tools.exec_command({cmd:"Get-Content alpha/docs/DEPLOY.md"})\ntext("ALPHA_ENV=staging")', 'Script completed\nOutput:\nALPHA_ENV=staging')])).toBe(false)
       expect(looked([t('Script', 'text(await tools.exec_command({cmd:"Get-Content alpha/docs/DEPLOY.md"}))', `Script completed\nOutput:\n${DOC}`)])).toBe(false)
@@ -752,16 +784,16 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
       // The same ending elsewhere, another project, a bare path from the Assistant's home: not this file.
       expect(looked([t('Read', JSON.stringify({ file_path: 'C:/other/alpha/docs/DEPLOY.md' }), DOC)])).toBe(false)
       expect(looked([t('Read', JSON.stringify({ file_path: 'C:/w/beta/docs/DEPLOY.md' }), DOC)])).toBe(false)
-      expect(looked([sh('PowerShell', 'Get-Content beta/docs/DEPLOY.md', DOC)])).toBe(false)
+      expect(looked([sh('PowerShell', 'Get-Content C:/w/beta/docs/DEPLOY.md', DOC)])).toBe(false)
       // The path elsewhere than the read's operand: a comment, another argument, a variable, a substitution.
-      expect(looked([sh('PowerShell', 'Get-Content alpha/README.md # alpha/docs/DEPLOY.md', DOC)])).toBe(false)
-      expect(looked([sh('PowerShell', 'Get-Content -Path alpha/README.md -Filter alpha/docs/DEPLOY.md', DOC)])).toBe(false)
+      expect(looked([sh('PowerShell', 'Get-Content C:/w/alpha/README.md # C:/w/alpha/docs/DEPLOY.md', DOC)])).toBe(false)
+      expect(looked([sh('PowerShell', 'Get-Content -Path C:/w/alpha/README.md -Filter C:/w/alpha/docs/DEPLOY.md', DOC)])).toBe(false)
       expect(looked([sh('PowerShell', 'Get-Content $env:DOC', DOC)])).toBe(false)
-      expect(looked([sh('PowerShell', 'Get-Content "$(Resolve-Path alpha/docs/DEPLOY.md)"', DOC)])).toBe(false)
-      expect(looked([sh('Bash', 'cat `echo alpha/docs/DEPLOY.md`', DOC)])).toBe(false)
+      expect(looked([sh('PowerShell', 'Get-Content "$(Resolve-Path C:/w/alpha/docs/DEPLOY.md)"', DOC)])).toBe(false)
+      expect(looked([sh('Bash', 'cat `echo C:/w/alpha/docs/DEPLOY.md`', DOC)])).toBe(false)
       // A failed read, and a read whose output has none of the facts.
       expect(looked([t('Read', JSON.stringify({ file_path: 'C:/w/alpha/docs/DEPLOY.md' }), DOC, true)])).toBe(false)
-      expect(looked([sh('Bash', 'cat alpha/docs/DEPLOY.md', 'cat: alpha/docs/DEPLOY.md: No such file or directory')])).toBe(false)
+      expect(looked([sh('Bash', 'cat C:/w/alpha/docs/DEPLOY.md', 'cat: C:/w/alpha/docs/DEPLOY.md: No such file or directory')])).toBe(false)
       // Hive's section read of beta's doc, though its reply had the same facts.
       expect(looked([t('mcp__hive__hive_read_section', 'project: beta\npath: docs/DEPLOY.md', 'The host is staging.example.com.')], [call('hive_read_section', { project: 'beta', path: 'docs/DEPLOY.md', heading: 'Staging' })])).toBe(false)
     })
