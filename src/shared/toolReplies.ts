@@ -373,8 +373,14 @@ function batchLines(b: TaskBatch): string {
   for (const c of b.changed) lines.push(changedText(c))
   const plain = b.refused.filter((r) => !r.rule)
   if (plain.length) lines.push(`Refused, left as they were: ${plain.map((r) => (r.ref ? r.error : `${cardRef(r.number)} (${r.error})`)).join('; ')}.`)
-  // Refused by its rules: as hive_update_task's refusal reads (the message, its rule, the next step, who can change it).
-  for (const r of b.refused) if (r.rule) lines.push(`Refused, left as it was: ${r.error} (${r.rule})`, ...(r.next ? [r.next] : []), ...(r.change ? [r.change] : []))
+  // Refused by its rules: as hive_update_task's refusal reads (the message, its rule, the next step, who can change it),
+  // named by its card first where its message doesn't name it ("{revision} was already reviewed.").
+  for (const r of b.refused) {
+    if (!r.rule) continue
+    const ref = cardRef(r.number)
+    const named = new RegExp(`(^|[^\\w-])${ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`).test(r.error)
+    lines.push(`Refused, left as it was: ${named ? '' : `${ref}: `}${r.error} (${r.rule})`, ...(r.next ? [r.next] : []), ...(r.change ? [r.change] : []))
+  }
   return lines.join('\n')
 }
 

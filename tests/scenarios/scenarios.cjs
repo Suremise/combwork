@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 106
+const FIXTURES_VERSION = 107
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -3558,15 +3558,18 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       // Its moves to Doing naming no agent and no reason of the user's (a model may rightly ask before trying any), one
       // card at a time or in a batch (HI-2238). A batch's refusal is in its reply, the call itself succeeding: each such
-      // batch needs a reply naming the choices (the session's own tool results; the MCP log keeps no reply text).
+      // batch's own reply (the MCP log's, by call, whichever CLI or script made it) refuses this card, by its key, naming
+      // the choices on the next line.
       const untold = called(o, 'hive_update_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.n) && argsOf(x).column === 'doing' && !argsOf(x).agent && !argsOf(x).override)
       const batches = called(o, 'hive_update_tasks').filter((x) => (argsOf(x).numbers ?? []).some((r) => cardIs(o, r, c.cards.n)) && argsOf(x).column === 'doing' && !argsOf(x).agent && !argsOf(x).override)
       const choices = /nobody on it.*hive_start_task/s
-      const batchReplies = o.tools.filter((t) => /hive_update_tasks\b/.test(t.name)).map((t) => String(t.result ?? ''))
+      const key = String(keyOf(o, c.cards.n) ?? `#${c.cards.n}`).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const refusedHere = new RegExp(`^Refused, left as it was: ${key}\\b[^\\n]*\\(move\\.doingNobody\\)\\r?\\n[^\\n]*nobody on it[^\\n]*hive_start_task`, 'm')
+      const batchReplies = batches.map((x) => String(x.reply ?? ''))
       return [
         ["the card with Coder on it went into Doing, still Coder's", o.cards.h?.column === 'doing' && o.cards.h?.agentName === 'Coder', `${o.cards.h?.column}, ${o.cards.h?.agentName}`],
         ['the card with nobody on it is not in Doing with nobody on it', o.cards.n?.column !== 'doing' || !!o.cards.n?.agent, `${o.cards.n?.column}, ${o.cards.n?.agentName ?? 'nobody'}`],
-        ['each move of it with nobody on it was refused, naming the choices (one card or a batch)', untold.every((x) => !x.ok && choices.test(String(x.error ?? ''))) && batches.every((x) => x.ok) && batchReplies.filter((r) => choices.test(r)).length >= batches.length, [...untold.map((x) => (x.ok ? 'ok' : String(x.error).slice(0, 120))), ...batchReplies.map((r) => `batch: ${r.slice(0, 200)}`)].join(' | ')],
+        ['each move of it with nobody on it was refused, naming the choices (one card or a batch)', untold.every((x) => !x.ok && choices.test(String(x.error ?? ''))) && batches.every((x) => x.ok) && batchReplies.every((r) => refusedHere.test(r)),[...untold.map((x) => (x.ok ? 'ok' : String(x.error).slice(0, 120))), ...batchReplies.map((r) => `batch: ${r.slice(0, 200)}`)].join(' | ')],
         ['asked the user which they meant', asksTheUser(o.finalReply), String(o.finalReply ?? '').slice(0, 200)]
       ]
     },

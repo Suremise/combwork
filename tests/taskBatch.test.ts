@@ -482,16 +482,27 @@ describe('the batch reply', () => {
       changed: [],
       refused: [
         { number: 9, error: 'Unknown task #9' },
-        { number: 2, error: 'AL-2 would be in Active with nobody on it.', rule: 'move.doingNobody', next: 'Ask the user which they want: nobody on it, an agent on it (agent), or an agent started on it (hive_start_task).', change: 'Set in Version Control.' }
-      ]
+        { number: 2, error: 'AL-2 would be in Active with nobody on it.', rule: 'move.doingNobody', next: 'Ask the user which they want: nobody on it, an agent on it (agent), or an agent started on it (hive_start_task).', change: 'Set in Version Control.' },
+        // A message that doesn't name its card (HR2's round 1): the row names it.
+        { number: 3, error: 'a3f2c1d was already reviewed.', rule: 'submit.sameRevisionNote', next: 'Submit it again with a note saying what changed in your answer, or commit a new revision.' },
+        // One card's key ending in another's (AL-21 isn't AL-2): named, not taken for the other.
+        { number: 21, error: 'AL-2 would be in Active with nobody on it.', rule: 'move.doingNobody', next: 'Ask the user.' }
+      ],
+      names: { '2': 'AL-2', '3': 'AL-3', '9': 'AL-9', '21': 'AL-21' }
     })
     expect(text.split('\n')).toEqual([
       'No card changed.',
-      'Refused, left as they were: #9 (Unknown task #9).',
+      'Refused, left as they were: AL-9 (Unknown task #9).',
       'Refused, left as it was: AL-2 would be in Active with nobody on it. (move.doingNobody)',
       'Ask the user which they want: nobody on it, an agent on it (agent), or an agent started on it (hive_start_task).',
-      'Set in Version Control.'
+      'Set in Version Control.',
+      'Refused, left as it was: AL-3: a3f2c1d was already reviewed. (submit.sameRevisionNote)',
+      'Submit it again with a note saying what changed in your answer, or commit a new revision.',
+      'Refused, left as it was: AL-21: AL-2 would be in Active with nobody on it. (move.doingNobody)',
+      'Ask the user.'
     ])
+    // Without names (a script's full reply): by number.
+    expect(batchText({ changed: [], refused: [{ number: 3, error: 'a3f2c1d was already reviewed.', rule: 'submit.sameRevisionNote' }] })).toContain('Refused, left as it was: #3: a3f2c1d was already reviewed. (submit.sameRevisionNote)')
   })
 
   it('says so when nothing changed', () => {

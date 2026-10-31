@@ -1383,3 +1383,32 @@ describe("Copilot's stand-in model when a scenario's launch fails (#464)", () =>
     }
   })
 })
+
+describe("assistant-doing-nobody checks each batch by its own reply (HI-2238, HR2's round 1)", () => {
+  const CHECK = 'each move of it with nobody on it was refused, naming the choices'
+  const NEXT = 'Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (hive_start_task).'
+  const refusedRow = (key: string) => `1 card changed:\n#1 Greeting helper: Moved to Doing.\nRefused, left as it was: ${key} would be in Active with nobody on it. (move.doingNobody)\n${NEXT}`
+  const batch = (reply: string | undefined, numbers: unknown[] = [1, 'AL-2']) => ({ tool: 'hive_update_tasks', args: JSON.stringify({ numbers, column: 'doing' }), ok: true, ...(reply !== undefined ? { reply } : {}) })
+  /** The check, on calls as the MCP log records them (whichever CLI made them: Claude Code directly, Codex's Script tool). */
+  const check = (hiveCalls: unknown[], tools: unknown[] = []) => {
+    const sc = SCENARIOS.find((s) => s.id === 'assistant-doing-nobody')!
+    const o = { hiveCalls, tools, finalReply: '', cards: { h: { number: 1, key: 'AL-1', column: 'doing', agentName: 'Coder' }, n: { number: 2, key: 'AL-2', column: 'todo' } } }
+    return Object.fromEntries(sc.expect(o, { cards: { h: 1, n: 2 } }).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))[CHECK]
+  }
+
+  it('passes on a batch whose own reply refuses the card by its key, naming the choices; a single refusal as before', () => {
+    expect(check([batch(refusedRow('AL-2'))])).toBe(true)
+    // Codex calls through its Script tool: the session's tool is "Script", the MCP log has the call and its reply all the same.
+    expect(check([batch(refusedRow('AL-2'))], [{ name: 'Script', input: 'hive_update_tasks', result: 'done' }])).toBe(true)
+    expect(check([{ tool: 'hive_update_task', args: JSON.stringify({ number: 2, column: 'doing' }), ok: false, error: `AL-2 would be in Active with nobody on it. (move.doingNobody)\n${NEXT}` }])).toBe(true)
+  })
+
+  it("fails a batch whose reply refuses another card, says no choices, or wasn't recorded; another tool's reply doesn't count", () => {
+    expect(check([batch(refusedRow('AL-9'))])).toBe(false)
+    expect(check([batch(refusedRow('AL-21'))])).toBe(false)
+    expect(check([batch('No card changed.\nRefused, left as they were: AL-2 (AL-2 would be in active with nobody on it.).')])).toBe(false)
+    expect(check([batch(undefined)])).toBe(false)
+    // A reply naming the choices for AL-2, but to an unrelated batch (not moving AL-2), doesn't stand in for the one that did.
+    expect(check([batch('No card changed.'), batch(refusedRow('AL-2'), ['AL-9'])], [{ name: 'hive_update_tasks', result: refusedRow('AL-2') }])).toBe(false)
+  })
+})
