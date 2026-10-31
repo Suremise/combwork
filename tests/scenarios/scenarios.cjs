@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 106
+const FIXTURES_VERSION = 107
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -3118,7 +3118,7 @@ module.exports.SCENARIOS = [
       await inReview(c, true)
     },
     // The line Hive's pass gives its reviewer (reviewerPool.ts), the card named: no pool lane holds it, so it is loose.
-    prompt: (c) => `[Hive] #${c.cards.r} (Implementer's card) is in Review, outside a lane: you review it. Review its latest submission (hive_read_task, then hive_start_review and hive_verdict); your verdict frees you for the next card.`,
+    prompt: (c) => `[Hive] #${c.cards.r} (Implementer's card) is in Review, outside a lane: you review it. Review its latest submission with the review-agent-work skill; your verdict frees you for the next card.`,
     fake: (c) => `skill review-agent-work then hive hive_read_task {"number":${c.cards.r}} then hive hive_start_review {"card":"#${c.cards.r}"} then hive hive_verdict {"card":"#${c.cards.r}","pass":true,"comment":"Round 1: PASSED. greet trims the name."}`,
     expect: (o) => {
       const joins = called(o, 'hive_lane').filter((x) => argsOf(x).action === 'join')

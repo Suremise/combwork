@@ -863,7 +863,7 @@ const tools: Tool[] = [
         blockedBy: cardsArg('Cards that have to be done first (replaces the list).'),
         links: cardsArg('Related cards (replaces the list).'),
         context: contextArg,
-        decision: { type: 'string', description: "A decision the user made, in a sentence, recorded as theirs. Never your own choice." },
+        decision: { type: 'string', description: "A decision the user made, in a sentence, recorded as theirs. Never your own choice. Hive normally tells the card's agent itself." },
         attachments: attachmentsArg('linked in its comment'),
         ...(ASSISTANT
           ? {
