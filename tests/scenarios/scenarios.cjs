@@ -443,10 +443,14 @@ const REPO = ${JSON.stringify(repo.gitDir)}
 const LOG = ${JSON.stringify(repo.log)}
 const id = process.pid + '-' + Date.now()
 const where = process.cwd()
+// git's environment: the run context's allowlist (HI-2243), so a shell's GIT_DIR or GIT_INDEX_FILE can't reach it, and
+// the session's git config by name (a test Hive gives its agents one): the checks read the settings the agent's git does.
+const ENV = require(${JSON.stringify(require.resolve('../e2e/runContext.cjs'))}).baseEnv()
+for (const k of ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM']) if (process.env[k] !== undefined) ENV[k] = process.env[k]
 /** git's output, trimmed, or null when it fails. */
 const git = (args, more = {}) => {
   try {
-    return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, ...more } }).trim()
+    return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...ENV, ...more } }).trim()
   } catch {
     return null
   }
