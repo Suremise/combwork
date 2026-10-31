@@ -843,7 +843,7 @@ const tools: Tool[] = [
     name: 'hive_update_task',
     description: ASSISTANT
       ? "Change a card and/or comment on it. Into doing it starts nothing (hive_start_task does). hold and done are the user's: only when they ask. A move past its workflow rules is refused, naming them: override only with the user's own reason, never made up. (detail: use-hive-api, tools.md)"
-      : "Change a card of your project and/or comment on it. Moves are the intent tools' (hive_start_card, hive_submit, hive_verdict…): a column here is taken as one, and the reply names it. decision records only what the user decided.",
+      : "Change a card of your project and/or comment on it. Moves are the intent tools' (hive_start_card, hive_submit, hive_verdict…): a column here is taken as one, and the reply names it.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -863,7 +863,7 @@ const tools: Tool[] = [
         blockedBy: cardsArg('Cards that have to be done first (replaces the list).'),
         links: cardsArg('Related cards (replaces the list).'),
         context: contextArg,
-        decision: { type: 'string', description: "A decision the user made, in a sentence, recorded as theirs. Never your own choice." },
+        decision: { type: 'string', description: "The user's decision in a sentence, recorded as theirs. Never your own choice. Hive normally tells the card's agent." },
         attachments: attachmentsArg('linked in its comment'),
         ...(ASSISTANT
           ? {

@@ -36,6 +36,53 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## Haiku's regressions since the baselines (HI-2228): fakes, Claude Code Haiku, fixtures v107 (v112 once merged), 31 October 2026
+
+HI-2190's Haiku ×3 trials on ac799cd25 (fixtures v101) passed four scenarios less often than their sections below
+record. The 3-sample transcripts pointed at two changes since those baselines. A Haiku `--repeat 5` before and after
+(Darren's OK, HI-2228/r8) measured them:
+- **review-card**, **review-in-copy** (only the skill-read check failed; the review was right). Since HI-2046
+  (30 Oct) Hive starts the reviewer itself, with the line from reviewerPool.ts, which spelled out the review's steps
+  ("hive_read_task, then hive_start_review and hive_verdict"). The misses followed it and opened no skill; the
+  baselines (v59, v78) began with "Review card #N.", which the contract routes to review-agent-work. The line now names
+  the skill instead: "Review its latest submission with the review-agent-work skill" (the scenarios' copy of it too).
+- **card-loop-follow-up**. HI-2011 (29 Oct) split card-loop into a contents page; builder.md's step 2 (`hive_submit`
+  with `followUp: true` before the wait) was read, but SKILL.md, read first, said to start the watch before "a
+  follow-up", whose reply says "End your turn now". The rule (the follow-up submitted first) now opens SKILL.md's
+  Waiting, and "a follow-up" there is "a follow-up step" (`hive_loop_step`, a Passed card's); builder.md points to it.
+- **assistant-decision-answers**. The split left "Hive tells the card's agent" only in coordinate-agents/cards.md,
+  and hands-off.md offered "the user's answer" as something to message. Most misses read no skill at all and typed the
+  answer into Coder (`hive_prompt_agent`, refused while it worked). The side effect is now stated where every sample
+  looks, `decision` in hive_update_task's schema ("Hive normally tells the card's agent"; the Haiku samples below had "…tells the card's agent itself", shortened after them to the 120-character limit on a parameter's text). coordinate-agents
+  SKILL.md (After acting) says a decision goes on the card and nothing more is sent; cards.md keeps the cases where it
+  isn't enough (loop wakes off, a block cleared in Review, decisions in old comments); hands-off.md's example is a
+  re-brief.
+
+Each SKILL.md stays within 4,000 characters (card-loop 3,996, coordinate-agents 3,983).
+
+| Haiku, `--repeat 5` (CLI 2.1.316) | before: `2026-10-31T16-53-19-claude-code`, $0.21 | after: `2026-10-31T17-20-28-claude-code`, $0.20 |
+|---|---|---|
+| review-card | 4 of 5 (the miss read no skill) | **5 of 5** |
+| review-in-copy | 4 of 5 (the same) | **5 of 5** |
+| pool-reviewer-wake | 5 of 5 | 5 of 5 |
+| card-loop-follow-up | **0 of 5** (each watched, none submitted) | **2 of 5** |
+| assistant-decision-answers | **1 of 5** (4 typed it into Coder, none of them reading a skill) | **5 of 5** |
+
+Before: 9b4b56f0c, clean, baseline `hi2228-haiku-before`; after: the change uncommitted (fingerprint 93ec529ab027),
+`hi2228-haiku-after`; the contract the same in both (8bcc3c142cad49aa), card-loop's revision 1289cc89 → 8166252c. A
+first "after" run was stopped before it ended, with nothing saved, to cover the schema's final wording (HR2).
+- **What this shows, and what it doesn't.** The before run confirms the regressions at 5 samples (0/5 against HI-1843's
+  4/5, 1/5 against HI-1932's 5/5), and the transcripts show the mechanism in each miss. That each change caused its
+  regression is what the transcripts support, not proven: the model or the CLI (2.1.312 then, 2.1.316 now) may also
+  differ, and 5 samples a side give no rates. HI-2190's final-head trials measure them again.
+- **Left:** card-loop-follow-up's three misses read the rule, saw the commit and the card in Review, and took it as
+  handed over (one loaded hive_submit and didn't call it). A fact in Hive's reply that the card's folder has commits
+  past its submission is HI-2245.
+- **Fakes**: the seven scenarios (with card-loop-follow-up-check and assistant-decision-answers-one) pass before
+  (`hi2228-before-a`, `hi2228-before-b`) and after (`hi2228-after-a`, `hi2228-after-b2`). The tool list a session gets
+  grew 45 to 225 bytes (the `decision` line); delivered skills 76,108 → 76,064 bytes (agents), 76,090 → 76,104 (the
+  Assistant).
+
 ## A decision that answers a card's open requests (HI-1932): fakes, Claude Code Haiku, fixtures v97, 28 October 2026
 
 `hive_update_task` gains `answers` (the Assistant's only: the ids of the card's open requests the user's decision answers,
