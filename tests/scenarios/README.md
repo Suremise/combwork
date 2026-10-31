@@ -216,7 +216,8 @@ its hive tool does, so a model trial gets the same fixture as a fake (#1545).
   `--repeat`, is a heavy run: it waits for one of the machine's test slots, as heavy e2e runs do, saying who holds them
   (`--no-wait` fails at once instead; tests/e2e/README.md, "Heavy runs queue").
 - **Results** go to `%LOCALAPPDATA%\hive-test\scenarios\results\<time>-<provider>`: `results.json` (each scenario's
-  checks, skills read, executed hive calls and mentions, versions, guidance and source, usage) and `summary.md` (a
+  checks, skills read, executed hive calls and mentions, the final reply whole up to 6,000 characters, so a check that
+  judged it can be audited (HI-2230; `finalReplyLength` when longer), versions, guidance and source, usage) and `summary.md` (a
   table). `results.json` is written as each trial ends (`meta.incomplete` says how many of how many until the run
   has ended), so a run cut short keeps what it had. `BASELINE.md` here records the latest baseline. Run the trials
   again after changing Hive's guidance, a skill or a tool's description, and compare.

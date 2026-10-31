@@ -778,6 +778,23 @@ describe('a trial the environment stops (trialEnvironment)', () => {
     })
   })
 
+  // HI-2230: a check judged on the final reply couldn't be audited when the results kept only its first 400 characters.
+  describe('the final reply a trial keeps (keptReply)', () => {
+    const { keptReply, REPLY_KEPT } = require('./scenarios/harness.cjs') as { keptReply: (t: string) => { finalReply: string; finalReplyLength?: number }; REPLY_KEPT: number }
+
+    it('keeps a usual reply whole, its question at the end too', () => {
+      const reply = `${'Not done: legacy.js is still there. '.repeat(30)}Shall I delete it?`
+      expect(reply.length).toBeGreaterThan(400)
+      expect(keptReply(reply)).toEqual({ finalReply: reply })
+    })
+
+    it('bounds a runaway one, saying how long it was', () => {
+      const long = 'x'.repeat(REPLY_KEPT + 50)
+      expect(keptReply(long)).toEqual({ finalReply: long.slice(0, REPLY_KEPT), finalReplyLength: REPLY_KEPT + 50 })
+      expect(keptReply('')).toEqual({ finalReply: '' })
+    })
+  })
+
   // HI-2225: Hive's relaunch of the session under test in a slot asked to trust that folder, unanswered, and the trial
   // ended waiting. HR2's round 1: the launch's run is the one session:start replied with, so a relaunch that came before
   // the prompt was taken is still a later run, whose question is answered.
