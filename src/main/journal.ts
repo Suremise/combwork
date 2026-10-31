@@ -5,7 +5,7 @@ import { dirname, join } from 'path'
 import type { DatabaseSync } from 'node:sqlite'
 import { app } from 'electron'
 import { BROWSE_LIMITS, ENTRY_LIMITS, JOURNAL_KINDS, KEPT_IMPORTANCE, LINK_TYPES, inScope, isoWeek, weekStart, type JournalFilter, type JournalForgetPreview, type JournalForgetResult, type JournalKind, type JournalPage, type JournalRow, type JournalSettings, type JournalSource, type LinkType } from '../shared/journal'
-import { openDb, transaction, type Db, type Migration } from './db'
+import { openDb, OPENABLE_WAIT_MS, transaction, untilOpenable, type Db, type Migration } from './db'
 import { realPath } from './fsutil'
 import { createLogger, userText } from './logger'
 import { checkpointWhenIdle, checkpointsReleased } from './walCheckpoint'
@@ -168,6 +168,28 @@ function journalOf(home: string, at: Located = located(home)): Db {
   open.set(k, { db, file: at.file, owner: at.owner })
   return db
 }
+
+/**
+ * Before a workspace's open lets its Assistant use the journal (HI-2200, as the board's HI-2199): while its file, as a
+ * Hive that ended without quitting left it, can't be opened yet (another process still maps its `-shm`), waits for that,
+ * bounded (untilOpenable), instead of its first use failing. At once for a journal open already or a file closed
+ * cleanly; ended when `signal` (the open's lifetime) aborts.
+ */
+export async function untilJournalOpenable(home: string, signal: AbortSignal): Promise<void> {
+  const file = journalFile(home)
+  if (open.has(keyOf(file))) return
+  let waiting = false
+  const onWait = (e: Error): void => {
+    waiting = true
+    journalTestHooks.openableWait?.(home)
+    log.warn(`the journal ${userText(file)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its -shm, as just after a Hive ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
+  }
+  const waited = await untilOpenable(file, { onWait, signal })
+  if (waiting) log.info(`the journal ${userText(file)}: ${signal.aborted ? 'its wait ended with its open' : 'openable'} after ${Math.round(waited)} ms`)
+}
+
+/** For tests: told as a workspace's open starts waiting for its journal to be openable (HI-2200). */
+export const journalTestHooks: { openableWait: ((home: string) => void) | null } = { openableWait: null }
 
 /** Opens the journal at `file`, where it really is (its backups beside it). */
 const openJournalDb = (file: string): Db => openDb(file, { migrations: JOURNAL_MIGRATIONS, hiveVersion: hiveVersion(), backupDir: join(dirname(file), 'backups'), setup, checkpointer: checkpointWhenIdle, onIoRetry: (e, ms) => log.warn(`opening the journal ${userText(file)}: ${userText(e.message)}, tried again in ${ms} ms`) })

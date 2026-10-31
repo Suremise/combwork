@@ -3,12 +3,12 @@
 // leaves a session another writer recorded meanwhile as that writer wrote it.
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { spawn, type ChildProcess } from 'child_process'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { Worker } from 'worker_threads'
 import { build } from 'esbuild'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
-import { handleRequest, type IngestJob, type IngestResult, type WorkerReply, type WorkerRequest } from '../src/main/usageWorker'
+import { handleRequest, logInProcess, openableWaits, openFiles, type IngestJob, type IngestResult, type WorkerReply, type WorkerRequest } from '../src/main/usageWorker'
 import { cursorOf, writeSession, type StoredSession } from '../src/main/usageDb'
 import { rowsPart, summaryOf, usageFromRows } from '../src/shared/usageLedger'
 import { priceUsage } from '../src/shared/usageDays'
@@ -17,12 +17,15 @@ import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { estimateCost } from '../src/shared/prices'
 import type { AppSettings, ProviderId, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { leftByAKill, refusedNow, whileMapped } from './mappedShm'
 
 const T0 = Date.parse('2026-10-12T10:00:00.000Z')
 const line = (i: number, output = 100): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'claude-opus-5-5', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: output } } }) + '\n'
 const prompt = (i: number): string => JSON.stringify({ type: 'user', timestamp: new Date(T0 + i * 1000).toISOString(), message: { role: 'user', content: `go ${i}` } }) + '\n'
 
 let id = 0
+// The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
+const HUNG_MS = 10_000
 
 /** Holds a file open the way an editor or a virus scanner can: no sharing, so it can't be read (as sessionInUse.test.ts does). */
 async function hold(file: string): Promise<ChildProcess> {
@@ -582,5 +585,134 @@ describe('the usage worker as main starts it (HI-1729)', () => {
     } finally {
       await w.terminate()
     }
+  })
+})
+
+describe.runIf(process.platform === 'win32')('a usage history whose -shm another process still maps (HI-2200)', () => {
+  const logged: string[] = []
+  const capture = (m: WorkerReply): void => {
+    if ('log' in m) logged.push(m.text)
+  }
+
+  it('its requests wait for it to be let go, then the history opens with what it kept', async () => {
+    const t = await setup()
+    writeFileSync(t.transcript, prompt(0) + line(1, 100))
+    await t.ingest()
+    await t.close()
+    await leftByAKill(t.file)
+    logInProcess(capture)
+    try {
+      await whileMapped(dirname(t.file), `${t.file}-shm`, async (release) => {
+        expect(refusedNow(t.file)).toBe(1546)
+        const output = t.output()
+        await vi.waitFor(() => expect(logged.some((l) => l.includes("can't be opened yet"))).toBe(true), { timeout: HUNG_MS, interval: 20 })
+        release()
+        expect(await output).toBe(100)
+      })
+    } finally {
+      logInProcess(() => undefined)
+      logged.length = 0
+      await t.close()
+    }
+  })
+
+  // A resumed session's read takes its saved state up from the history (#1147): shown by a change before the offset,
+  // which only a read from the start sees (as "after a restart, takes the session's saved state up" does).
+  const pad = JSON.stringify({ type: 'user', timestamp: new Date(T0).toISOString(), message: { role: 'user', content: 'x'.repeat(10_000) } }) + '\n'
+  const changeRead = (file: string): void => writeFileSync(file, readFileSync(file, 'utf8').replace('"output_tokens":100}', '"output_tokens":900}'))
+  const seeded = async () => {
+    const t = await setup()
+    writeFileSync(t.transcript, prompt(0) + line(1) + pad + line(2))
+    await t.ingest({ keepState: 'now' })
+    await t.close()
+    await call({ type: 'forgetReads' })
+    changeRead(t.transcript)
+    appendFileSync(t.transcript, line(3))
+    await leftByAKill(t.file)
+    const read = (noWait?: boolean) => call({ type: 'read', path: t.transcript, session: 'abc', provider: 'claude-code', seed: { file: t.file, scope: 'p1' }, ...(noWait ? { noWait } : {}) }) as Promise<{ usage: SessionUsage } | null>
+    return { ...t, read }
+  }
+
+  it("a resumed session's read waits for its history too, then takes its saved state up", async () => {
+    const t = await seeded()
+    logInProcess(capture)
+    try {
+      await whileMapped(dirname(t.file), `${t.file}-shm`, async (release) => {
+        const reading = t.read()
+        await vi.waitFor(() => expect(logged.some((l) => l.includes("can't be opened yet"))).toBe(true), { timeout: HUNG_MS, interval: 20 })
+        release()
+        // 300: only what was added since its saved state was read (from the start, it would be 1100).
+        expect((await reading)!.usage.outputTokens).toBe(300)
+        expect(logged.some((l) => l.includes("couldn't look for a session's saved state"))).toBe(false)
+      })
+    } finally {
+      logInProcess(() => undefined)
+      logged.length = 0
+      await t.close()
+    }
+    expect(openableWaits()).toBe(0)
+  })
+
+  it("a start's read never waits for it: it gets nothing while the history can't be opened, and its state once it can", async () => {
+    const t = await seeded()
+    logInProcess(capture)
+    try {
+      await whileMapped(dirname(t.file), `${t.file}-shm`, async () => {
+        expect(await t.read(true)).toBeNull()
+        // Nothing waited, nothing is left waiting.
+        expect(logged.some((l) => l.includes("can't be opened yet"))).toBe(false)
+        expect(openableWaits()).toBe(0)
+      })
+      expect((await t.read(true))!.usage.outputTokens).toBe(300)
+    } finally {
+      logInProcess(() => undefined)
+      logged.length = 0
+      await t.close()
+    }
+  })
+
+  it("a close while a resumed session's read waits: the read goes on without the history, which isn't opened again", async () => {
+    const t = await seeded()
+    logInProcess(capture)
+    try {
+      await whileMapped(dirname(t.file), `${t.file}-shm`, async () => {
+        const reading = t.read()
+        await vi.waitFor(() => expect(logged.some((l) => l.includes("can't be opened yet"))).toBe(true), { timeout: HUNG_MS, interval: 20 })
+        await t.close()
+        // 1100 (900 + 100 + 100): read from the start, its saved state not taken up from a history that has gone.
+        expect((await reading)!.usage.outputTokens).toBe(1100)
+        expect(openFiles()).not.toContain(t.file.toLowerCase())
+        expect(openableWaits()).toBe(0)
+      })
+    } finally {
+      logInProcess(() => undefined)
+      logged.length = 0
+    }
+  })
+
+  it('a close while they wait ends the wait at once, and the requests that waited are refused', async () => {
+    const t = await setup()
+    writeFileSync(t.transcript, prompt(0) + line(1, 100))
+    await t.ingest()
+    await t.close()
+    await leftByAKill(t.file)
+    logInProcess(capture)
+    try {
+      await whileMapped(dirname(t.file), `${t.file}-shm`, async () => {
+        const waiting = t.stored().then(() => 'answered', (e: Error) => e.message)
+        await vi.waitFor(() => expect(logged.some((l) => l.includes("can't be opened yet"))).toBe(true), { timeout: HUNG_MS, interval: 20 })
+        await t.close()
+        // Still mapped: the wait ended for the close, not for the file.
+        expect(await waiting).toMatch(/closed while it waited/)
+        expect(refusedNow(t.file)).toBe(1546)
+        expect(openableWaits()).toBe(0)
+      })
+    } finally {
+      logInProcess(() => undefined)
+      logged.length = 0
+    }
+    // Let go: a request after the close opens it.
+    expect(await t.output()).toBe(100)
+    await t.close()
   })
 })

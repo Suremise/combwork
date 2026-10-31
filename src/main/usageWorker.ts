@@ -4,7 +4,7 @@ import { open, stat } from 'original-fs/promises'
 import { dirname, join } from 'path'
 import type { AppSettings, ProviderId, SessionUsage } from '../shared/types'
 import { baselineOfRows, baselineOfUsage, baselineAsFree, baselineWithoutReports, dominates, ledgerRows, mergeBaselines, reshareRows, rowsAsFree, rowsWithoutReports, sessionRows, summaryOf, unknownOnCards, type SessionHold } from '../shared/usageLedger'
-import { openDb, type Db } from './db'
+import { OPENABLE_WAIT_MS, openableNow, openDb, untilOpenable, type Db } from './db'
 import { advancedValues, readAdvancedFrom, valuesReader } from './advancedValues'
 import type { DatabaseSync } from 'node:sqlite'
 import { baselineOf, cardRows, cursorOf, fileSpace, getMeta, giveSpaceBack, markLocality, replaceRows, rollUpCandidates, rollUpSession, sessionIds, setMeta, storedSession, storedSessions, storedTimelines, updateMeta, USAGE_MIGRATIONS, writeSession, type SessionMeta, type SessionWrite } from './usageDb'
@@ -120,6 +120,62 @@ function close(file: string): void {
   const key = file.toLowerCase()
   dbs.get(key)?.close()
   dbs.delete(key)
+}
+
+/**
+ * Each file's wait to be openable before its first open (HI-2200, as the board's HI-2199): just after a Hive ended
+ * without quitting, another process can still map its `-shm`, and every open fails until it lets go. Here, in the
+ * worker, the wait holds no one's typing; the file's requests wait with it. A close of the file meanwhile ends the wait,
+ * marks it closed and lets it go, and the requests that waited on it are refused (the file isn't opened again for a
+ * workspace that has gone); a request after the close waits afresh. Kept only while a wait runs: nothing stays per file.
+ */
+interface Openable {
+  wait: Promise<void>
+  stop: AbortController
+  closed: boolean
+}
+const openables = new Map<string, Openable>()
+
+/**
+ * Waits for `file` to be openable, unless it is open already. `noWait` (a start's read, #1177): never waits, false when
+ * it couldn't be opened now (or a wait for it is under way). Throws when the file was closed while it waited.
+ */
+async function whenOpenable(file: string, noWait = false): Promise<boolean> {
+  const key = file.toLowerCase()
+  if (dbs.has(key)) return true
+  let w = openables.get(key)
+  if (noWait) return !w && openableNow(file)
+  if (!w) {
+    const stop = new AbortController()
+    let waiting = false
+    const onWait = (e: Error): void => {
+      waiting = true
+      log('warn', `the usage history can't be opened yet: ${e.message} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its -shm, as just after a Hive ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`, file)
+    }
+    const entry: Openable = { wait: Promise.resolve(), stop, closed: false }
+    entry.wait = untilOpenable(file, { onWait, signal: stop.signal }).then((ms) => {
+      if (openables.get(key) === entry) openables.delete(key)
+      if (waiting) log('info', `the usage history: ${entry.closed ? 'its wait ended with its close' : 'openable'} after ${Math.round(ms)} ms`, file)
+    })
+    openables.set(key, entry)
+    w = entry
+  }
+  await w.wait
+  if (w.closed) throw new Error('The usage history was closed while it waited to be opened.') // i18n-ignore: an internal error, for the log
+  return true
+}
+
+/** How many files a wait to be openable is under way for (tests: nothing stays once each has ended). */
+export const openableWaits = (): number => openables.size
+
+/** A close received: what waits for the file to be openable stops, and is refused (HI-2200). */
+function closing(file: string): void {
+  const key = file.toLowerCase()
+  const w = openables.get(key)
+  if (!w) return
+  w.closed = true
+  w.stop.abort()
+  openables.delete(key)
 }
 
 const send = (m: WorkerReply): void => parentPort!.postMessage(m)
@@ -283,6 +339,9 @@ async function readUsage(path: string, session: string, provider: ProviderId, se
       let taken: Awaited<ReturnType<typeof takeUp>> = null
       if (seed) {
         try {
+          // Its history openable first (HI-2200); a start's read never waits for it: it gets nothing instead, as when the
+          // file's turn is taken.
+          if (!(await whenOpenable(seed.file, noWait))) return null
           taken = await takeUp(cursorOf(dbOf(seed.file).reader, seed.scope, session), path, st.size, provider, session)
         } catch (e) {
           log('warn', `usage history: couldn't look for a session's saved state (${(e as Error).message})`, seed.file)
@@ -578,6 +637,8 @@ function spaceBack(file: string): { before: number; after: number; whole: boolea
 let jobs: Promise<unknown> = Promise.resolve()
 
 export async function handleRequest(m: WorkerRequest): Promise<unknown> {
+  if (m.type === 'close') closing(m.file)
+  else if ('file' in m) await whenOpenable(m.file)
   switch (m.type) {
     case 'config':
       readAdvancedFrom(valuesReader(m.advanced))
