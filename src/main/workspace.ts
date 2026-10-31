@@ -3,7 +3,7 @@ import { carryLegacyAgentFields, legacyWorktree, type LegacyAgentFields, type Na
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, statSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
-import { boardWrite, closeBoard, inBoardWrite } from './boardStore'
+import { boardWrite, closeBoard, inBoardWrite, untilBoardOpenable } from './boardStore'
 import { closeJournal } from './journal'
 import { AsyncLocalStorage } from 'async_hooks'
 import type { BrowserWindow } from 'electron'
@@ -481,6 +481,9 @@ export class WorkspaceService {
       // Each project's own folders, all at once (HI-1705).
       await whenAll((await this.listProjectPaths()).map((p) => this.ensureProject(p).catch((e) => log.warn(`ensureProject ${userText(p)}`, e))))
       done('its projects') // i18n-ignore: a part of a log line's timing
+      // Its board openable first (HI-2199: just after a Hive ended without quitting, it may not be for some seconds).
+      await untilBoardOpenable(abs)
+      done('its board openable') // i18n-ignore: a part of a log line's timing
       // Every project has its id (#508) before the board, lanes and watches are read by it.
       await this.projectIds().catch((e) => log.warn('reading the project ids', e))
       done('their ids') // i18n-ignore: a part of a log line's timing
