@@ -13,7 +13,7 @@ import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
-import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
+import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { beginWrite, countedWrite } from './dbWrites'
 import { timedStep } from './stallWork'
@@ -707,7 +707,7 @@ function boardOf(path: string, transient = false): Board {
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e))
     failures.set(key, { error: err, place: placeKey(path) })
-    log.error(`opening the board of ${userText(path)}`, e)
+    log.error(`opening the board of ${userText(path)}${isIoError(e) ? ` (SQLite code ${(e as { errcode?: number }).errcode})` : ''}`, e)
     throw hiveError(M.unavailable, { error: err.message }, { kind: 'conflict' })
   }
 }
@@ -735,6 +735,7 @@ function openBoard(path: string, upgrade: boolean): Board {
       },
       whileGroupLocked: boardTestHooks.whileUpgrading ?? holdForTest,
       checkpointer: checkpointWhenIdle,
+      onIoRetry: (e, ms) => log.warn(`opening the board of ${userText(path)}: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}), tried again in ${ms} ms`),
       // Each step's time (HI-1694: an upgrade that took a minute said only that it had finished).
       onSteps: (steps, copyMs) => {
         const ms = (x: number): string => `${Math.round(x)} ms`

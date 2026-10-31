@@ -18,7 +18,7 @@ const HUNG_MS = 10_000
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
-const { backupTo, openDb, schemaVersion } = await import('../src/main/db')
+const { backupTo, OPEN_IO_RETRY_MS, openDb, schemaVersion } = await import('../src/main/db')
 const { renameRetrying } = await import('../src/main/fsutil')
 const { refusal } = await import('../src/main/openingFence')
 
@@ -121,6 +121,47 @@ describe('the database layer (db.ts)', () => {
     } finally {
       db.close()
     }
+  })
+
+  // SQLite's own error, as node:sqlite throws it: an I/O error has errcode 10 (or an extended code of it).
+  const sqliteError = (errcode: number, message: string): Error => Object.assign(new Error(message), { code: 'ERR_SQLITE_ERROR', errcode })
+
+  it('an open that fails with an I/O error is tried again, and opens once the error has gone (HI-2179)', () => {
+    const file = join(base, `layer-${++n}`, 'x.db')
+    const steps = [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }]
+    // As just after a Hive ended without quitting: the first two opens fail (4618: SQLITE_IOERR_SHMOPEN).
+    let failing = 2
+    const retries: number[] = []
+    const db = openDb(file, {
+      migrations: steps,
+      hiveVersion: '1',
+      setup: () => {
+        if (failing-- > 0) throw sqliteError(4618, 'disk I/O error')
+      },
+      onIoRetry: (e, ms) => {
+        expect(e.message).toBe('disk I/O error')
+        retries.push(ms)
+      }
+    })
+    try {
+      expect(retries).toEqual(OPEN_IO_RETRY_MS.slice(0, 2))
+      expect(schemaVersion(db.writer)).toBe(1)
+    } finally {
+      db.close()
+    }
+  })
+
+  it('an I/O error that stays fails the open after its retries, and any other error at once', () => {
+    const file = join(base, `layer-${++n}`, 'x.db')
+    const steps = [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }]
+    const retries: number[] = []
+    expect(() => openDb(file, { migrations: steps, hiveVersion: '1', setup: () => { throw sqliteError(10, 'disk I/O error') }, onIoRetry: (_e, ms) => retries.push(ms) })).toThrow('disk I/O error')
+    expect(retries).toEqual(OPEN_IO_RETRY_MS)
+    retries.length = 0
+    expect(() => openDb(file, { migrations: steps, hiveVersion: '1', setup: () => { throw sqliteError(11, 'database disk image is malformed') }, onIoRetry: (_e, ms) => retries.push(ms) })).toThrow('malformed')
+    expect(retries).toEqual([])
+    // Closed each time it failed: the file opens now.
+    openDb(file, { migrations: steps, hiveVersion: '1' }).close()
   })
 })
 
