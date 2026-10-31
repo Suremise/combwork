@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 107
+const FIXTURES_VERSION = 108
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -1249,10 +1249,10 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await c.card('a', { title: 'Friendlier greeting', column: 'doing', agent: 'coder', description: 'Change greeting.txt to a friendlier greeting. The user picks it: before changing anything, ask them in your reply whether they want "Hi there!" or "Welcome back!", then end your turn and wait for their answer. Don\'t choose yourself.' })
     },
-    // Once its turn has ended (it asked) with the card still in Doing, the user answers through the Assistant: a decision.
+    // Once its turn has ended (it asked; idle, or watching the card as while-working.md says, HI-2237) with the card still in Doing, the user answers through the Assistant: a decision.
     async during(c, status) {
       if (status === 'working') c.worked = true
-      if (c.decidedAt || !c.worked || !['finished', 'ready'].includes(status)) return
+      if (c.decidedAt || !c.worked || !['finished', 'ready', 'watching'].includes(status)) return
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
       if (card?.column !== 'doing') return
       await c.inv('tasks:update', c.cards.a, { decision: 'Use "Welcome back!" as the greeting.' })
@@ -1292,7 +1292,7 @@ module.exports.SCENARIOS = [
     // Once its turn has ended (it asked), wherever the card is, the user answers through the Assistant: a decision.
     async during(c, status) {
       if (status === 'working') c.worked = true
-      if (c.decidedAt || !c.worked || !['finished', 'ready'].includes(status)) return
+      if (c.decidedAt || !c.worked || !['finished', 'ready', 'watching'].includes(status)) return
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
       if (!card || ['review', 'passed', 'done'].includes(card.column)) return
       await c.inv('tasks:update', c.cards.a, { decision: 'Use "Welcome back!" as the greeting.' })
@@ -1423,7 +1423,7 @@ module.exports.SCENARIOS = [
     // Once the card is in Review and the agent's turn has ended, a re-brief for its round is left for it, and the reviewer
     // passes the card at once (as HR6 passed #699 a second before the Assistant's message reached HB6).
     async during(c, status) {
-      if (!c.sentAt && ['ready', 'finished'].includes(status) && (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column === 'review') {
+      if (!c.sentAt && ['ready', 'finished', 'watching'].includes(status) && (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column === 'review') {
         c.sentAt = Date.now()
         c.sent = await c.assistantMessage('coder', `Darren decided on #${c.cards.a}: the greeting is "Stale!", not "Hi there!". Change it.`, { card: c.cards.a })
         c.passed = await c.inv('tasks:update', c.cards.a, { column: 'passed' })
@@ -1455,7 +1455,7 @@ module.exports.SCENARIOS = [
     },
     // Once its first turn has ended, the Assistant leaves it the work: typed to it as the doorbell.
     async during(c, status) {
-      if (!c.sentAt && ['ready', 'finished'].includes(status)) {
+      if (!c.sentAt && ['ready', 'finished', 'watching'].includes(status)) {
         c.sentAt = Date.now()
         c.sent = await c.assistantMessage('coder', `Please work on card #${c.cards.a} now.`)
       }
