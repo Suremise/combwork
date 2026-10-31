@@ -282,17 +282,22 @@ describe("the scenarios' hooks act once the agent's turn has ended, watching too
 })
 
 describe("the override scenarios' checks count every move of the card, by number or key (#1474)", () => {
-  const { isCard } = helpers as unknown as { isCard: (ref: unknown, n: number) => boolean }
+  const { cardIs } = helpers as unknown as { cardIs: (o: unknown, ref: unknown, n: number) => boolean }
   const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  // AL-1 is #1, and BE-1 (another project's first card) #2 (HI-2231: a key's digits aren't its card's number).
+  const board = [
+    { number: 1, key: 'AL-1' },
+    { number: 2, key: 'BE-1' }
+  ]
   const checks = (id: string, hiveCalls: unknown[], column: string) => {
     const sc = SCENARIOS.find((s) => s.id === id)!
-    return Object.fromEntries(sc.expect({ hiveCalls, cards: { m: { column } }, facts: { m: [] }, replies: ['It skips its review: why?'] }, { cards: { m: 1 } }).map(([name, ok]) => [name, ok]))
+    return Object.fromEntries(sc.expect({ hiveCalls, allCards: board, cards: { m: { number: 1, key: 'AL-1', column } }, facts: { m: [] }, replies: ['It skips its review: why?'] }, { cards: { m: 1 } }).map(([name, ok]) => [name, ok]))
   }
   const NO_OVERRIDE = 'passed no override (the move skips nothing)'
 
-  it('takes a number, "#n" or a key, and no other card', () => {
-    for (const ref of [1, '1', '#1', 'AL-1']) expect(isCard(ref, 1)).toBe(true)
-    for (const ref of [11, '#11', 'AL-11', '21', undefined]) expect(isCard(ref, 1)).toBe(false)
+  it('takes a number, "#n" or its own key, and no other card', () => {
+    for (const ref of [1, '1', '#1', 'AL-1']) expect(cardIs({ allCards: board }, ref, 1)).toBe(true)
+    for (const ref of [11, '#11', 'AL-11', '21', 'BE-1', undefined]) expect(cardIs({ allCards: board }, ref, 1)).toBe(false)
   })
 
   it('unneeded: a keyed hive_update_task, hive_update_tasks or hive_put_back that worked counts; a refused one alone does not', () => {
@@ -316,6 +321,98 @@ describe("the override scenarios' checks count every move of the card, by number
     expect(checks('assistant-override-reason', [call('hive_update_task', { number: 'AL-1', column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(true)
     expect(checks('assistant-override-reason', [call('hive_update_tasks', { numbers: ['AL-1'], column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(true)
     expect(checks('assistant-override-reason', [call('hive_update_task', { number: 'AL-11', column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(false)
+  })
+
+  it("HI-2231: another project's card with the same digits (BE-1, #2) is never this card's move", () => {
+    expect(checks('assistant-override-unneeded', [call('hive_update_task', { number: 'BE-1', column: 'todo' })], 'todo')[NO_OVERRIDE]).toBe(false)
+    expect(checks('assistant-override-unneeded', [call('hive_put_back', { card: 'BE-1', why: 'Not ready' })], 'todo')[NO_OVERRIDE]).toBe(false)
+    const none = 'passed no override (the user gave no reason)'
+    expect(checks('assistant-override-none', [call('hive_update_task', { number: 'BE-1', column: 'done', override: { reason: 'invented' } })], 'doing')[none]).toBe(true)
+    expect(checks('assistant-override-none', [call('hive_update_tasks', { numbers: ['BE-1'], column: 'done', override: { reason: 'invented' } })], 'doing')[none]).toBe(true)
+    const given = "moved it with an override giving the user's reason (merged by hand)"
+    expect(checks('assistant-override-reason', [call('hive_update_task', { number: 'BE-1', column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(false)
+  })
+})
+
+describe("the lane and wait lists, moves and intents name a card by its number or its own key (HI-2231)", () => {
+  const { namesCard, namesCards, movesOf } = helpers as unknown as {
+    namesCard: (o: unknown, refs: unknown, n: number) => boolean
+    namesCards: (o: unknown, refs: unknown, ns: number[]) => boolean
+    movesOf: (o: unknown, n: number) => unknown[]
+  }
+  const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  // AL-1 is #1, BE-1 #2 (another project's), AL-2 #3: a key's digits aren't its card's number.
+  const o = { allCards: [{ number: 1, key: 'AL-1' }, { number: 2, key: 'BE-1' }, { number: 3, key: 'AL-2' }] }
+
+  it('namesCard: its number, "#n" or its own key in the list; not another card whose key ends in its digits', () => {
+    for (const refs of [[1], ['#1'], ['AL-1'], [3, 'AL-1']]) expect(namesCard(o, refs, 1)).toBe(true)
+    for (const refs of [['BE-1'], ['AL-11'], [2, 3], [], undefined]) expect(namesCard(o, refs, 1)).toBe(false)
+    expect(namesCard(o, ['AL-2'], 3)).toBe(true)
+    expect(namesCard(o, ['AL-3'], 3)).toBe(false)
+  })
+
+  it('namesCards: exactly those cards in that order, each by number or its own key', () => {
+    expect(namesCards(o, ['AL-1', 'AL-2'], [1, 3])).toBe(true)
+    expect(namesCards(o, [1, '#3'], [1, 3])).toBe(true)
+    expect(namesCards(o, ['AL-1', 'AL-3'], [1, 3])).toBe(false)
+    expect(namesCards(o, ['BE-1', 'AL-2'], [1, 3])).toBe(false)
+    expect(namesCards(o, ['AL-2', 'AL-1'], [1, 3])).toBe(false)
+  })
+
+  // HR1 round 1: the wait lists and Hive's text that card-loop-released, assistant-dispatch and inbox-stale read.
+  const run = (id: string, obs: Record<string, unknown>, c: Record<string, unknown>) => {
+    const sc = SCENARIOS.find((s) => s.id === id)!
+    return Object.fromEntries(sc.expect({ ...o, hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', cards: {}, facts: {}, ...obs }, c).map(([name, ok]) => [name, ok]))
+  }
+
+  it("card-loop-released: a wait on another project's same digits isn't a wait on its card; its own key is", () => {
+    // Its cards: #1 (AL-1, reassigned) then #3 (AL-2).
+    const released = (hiveCalls: unknown[]) => run('card-loop-released', { hiveCalls }, { cards: { a: 1, b: 3 } })
+    const AGAIN = "didn't wait on #1 again"
+    const ON_B = 'went on to #3 (began its review, or watched it)'
+    const r = released([call('hive_wait_for_tasks', { cards: ['BE-1'], wake: true }), call('hive_start_review', { card: 'AL-2' })])
+    expect(r[AGAIN]).toBe(true)
+    expect(r[ON_B]).toBe(true)
+    expect(released([call('hive_wait_for_tasks', { cards: ['AL-1'], wake: true })])[AGAIN]).toBe(false)
+    expect(released([call('hive_wait_for_tasks', { cards: ['#1'], wake: true })])[AGAIN]).toBe(false)
+    // A watch of AL-2 (#3) is going on to it; of AL-3 or BE-1 isn't.
+    expect(released([call('hive_wait_for_tasks', { cards: ['AL-2'], wake: true })])[ON_B]).toBe(true)
+    expect(released([call('hive_wait_for_tasks', { cards: ['AL-3'], wake: true })])[ON_B]).toBe(false)
+  })
+
+  it("assistant-dispatch: a watch on the started card by its own key or number counts; on another project's same digits it doesn't", () => {
+    const WATCH = 'then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked'
+    // The card started is #3 (AL-2).
+    const dispatch = (watch: unknown) => run('assistant-dispatch', { hiveCalls: [call('hive_start_task', { number: 'AL-2', agent: 'Coder' }), call('hive_wait_for_tasks', watch)], cards: { i: { number: 3, key: 'AL-2', column: 'review' } } }, { cards: { i: 3 }, agents: { coder: { id: 'a-coder' } }, read: () => '* text=auto\n' })[WATCH]
+    expect(dispatch({ cards: ['AL-2'], wake: true })).toBe(true)
+    expect(dispatch({ cards: [3], wake: true })).toBe(true)
+    expect(dispatch({ cards: ['BE-1'], wake: true })).toBe(false)
+    expect(dispatch({ cards: ['AL-3'], wake: true })).toBe(false)
+    expect(dispatch({ cards: [13], wake: true })).toBe(false)
+  })
+
+  it("inbox-stale: Hive's message names the card by its own key or #n, not another card's key", () => {
+    const LEFT = 'the message was left, tied to its round'
+    const STALE = 'stale once the card passed, never given'
+    const stale = (sent: string, detail: string) =>
+      run('inbox-stale', { cards: { a: { number: 3, key: 'AL-2', column: 'passed', history: [] } } }, { cards: { a: 3 }, sent, got: [{ kind: 'rebrief', state: 'stale', detail, received: false }], read: () => 'Hi there!' })
+    expect(stale('Left for Coder: for AL-2 round 1.', 'AL-2 passed review')[LEFT]).toBe(true)
+    expect(stale('Left for Coder: for AL-2 round 1.', 'AL-2 passed review')[STALE]).toBe(true)
+    expect(stale('Left for Coder: for #3 round 1.', '#3 passed review')[STALE]).toBe(true)
+    expect(stale('Left for Coder: for BE-1 round 1.', 'BE-1 passed review')[LEFT]).toBe(false)
+    expect(stale('Left for Coder: for AL-3 round 1.', 'AL-3 passed review')[STALE]).toBe(false)
+  })
+
+  it("movesOf: a move or an intent on the card's own key or number; another project's same digits isn't one", () => {
+    const calls = [
+      call('hive_update_task', { number: 'BE-1', column: 'done' }),
+      call('hive_update_tasks', { numbers: ['BE-1'], column: 'done' }),
+      call('hive_put_back', { card: 'BE-1', why: 'x' }),
+      call('hive_submit', { card: 'BE-1', summary: 'x' })
+    ]
+    expect(movesOf({ ...o, hiveCalls: calls }, 1)).toHaveLength(0)
+    expect(movesOf({ ...o, hiveCalls: calls }, 2)).toHaveLength(4)
+    expect(movesOf({ ...o, hiveCalls: [call('hive_verdict', { card: 'AL-1', pass: true }), call('hive_update_task', { number: '#1', column: 'review' })] }, 1)).toHaveLength(2)
   })
 })
 
@@ -1538,5 +1635,34 @@ describe("Copilot's stand-in model when a scenario's launch fails (#464)", () =>
       lib.launch = launch
       fs.rmSync(work, { recursive: true, force: true })
     }
+  })
+})
+
+describe("assistant-doing-nobody checks each batch by its own reply (HI-2238, HR2's round 1)", () => {
+  const CHECK = 'each move of it with nobody on it was refused, naming the choices'
+  const NEXT = 'Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (hive_start_task).'
+  const refusedRow = (key: string) => `1 card changed:\n#1 Greeting helper: Moved to Doing.\nRefused, left as it was: ${key} would be in Active with nobody on it. (move.doingNobody)\n${NEXT}`
+  const batch = (reply: string | undefined, numbers: unknown[] = [1, 'AL-2']) => ({ tool: 'hive_update_tasks', args: JSON.stringify({ numbers, column: 'doing' }), ok: true, ...(reply !== undefined ? { reply } : {}) })
+  /** The check, on calls as the MCP log records them (whichever CLI made them: Claude Code directly, Codex's Script tool). */
+  const check = (hiveCalls: unknown[], tools: unknown[] = []) => {
+    const sc = SCENARIOS.find((s) => s.id === 'assistant-doing-nobody')!
+    const o = { hiveCalls, tools, finalReply: '', cards: { h: { number: 1, key: 'AL-1', column: 'doing', agentName: 'Coder' }, n: { number: 2, key: 'AL-2', column: 'todo' } } }
+    return Object.fromEntries(sc.expect(o, { cards: { h: 1, n: 2 } }).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))[CHECK]
+  }
+
+  it('passes on a batch whose own reply refuses the card by its key, naming the choices; a single refusal as before', () => {
+    expect(check([batch(refusedRow('AL-2'))])).toBe(true)
+    // Codex calls through its Script tool: the session's tool is "Script", the MCP log has the call and its reply all the same.
+    expect(check([batch(refusedRow('AL-2'))], [{ name: 'Script', input: 'hive_update_tasks', result: 'done' }])).toBe(true)
+    expect(check([{ tool: 'hive_update_task', args: JSON.stringify({ number: 2, column: 'doing' }), ok: false, error: `AL-2 would be in Active with nobody on it. (move.doingNobody)\n${NEXT}` }])).toBe(true)
+  })
+
+  it("fails a batch whose reply refuses another card, says no choices, or wasn't recorded; another tool's reply doesn't count", () => {
+    expect(check([batch(refusedRow('AL-9'))])).toBe(false)
+    expect(check([batch(refusedRow('AL-21'))])).toBe(false)
+    expect(check([batch('No card changed.\nRefused, left as they were: AL-2 (AL-2 would be in active with nobody on it.).')])).toBe(false)
+    expect(check([batch(undefined)])).toBe(false)
+    // A reply naming the choices for AL-2, but to an unrelated batch (not moving AL-2), doesn't stand in for the one that did.
+    expect(check([batch('No card changed.'), batch(refusedRow('AL-2'), ['AL-9'])], [{ name: 'hive_update_tasks', result: refusedRow('AL-2') }])).toBe(false)
   })
 })

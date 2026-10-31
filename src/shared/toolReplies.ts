@@ -356,8 +356,11 @@ export interface TaskReorder {
 /** What a batch change did (reply: "short"): each card changed, and each card refused with why (left as it was). */
 export interface TaskBatch {
   changed: TaskChange[]
-  /** `ref`: a key no card has (its number 0), as it was given. */
-  refused: { number: number; ref?: string; error: string }[]
+  /**
+   * `ref`: a key no card has (its number 0), as it was given. A refusal by the card's rules has its `rule`, `next` step
+   * and `change` (who can change the rule), as hive_update_task's refusal does (HI-2238); `error` is then its message.
+   */
+  refused: { number: number; ref?: string; error: string; rule?: string; next?: string; change?: string }[]
   /** How its text names the cards refused (#1219), by number (namesOf). */
   names?: Record<string, string>
 }
@@ -368,7 +371,16 @@ export function batchText(b: TaskBatch): string {
 function batchLines(b: TaskBatch): string {
   const lines = [b.changed.length ? `${b.changed.length} card${b.changed.length === 1 ? '' : 's'} changed:` : 'No card changed.']
   for (const c of b.changed) lines.push(changedText(c))
-  if (b.refused.length) lines.push(`Refused, left as they were: ${b.refused.map((r) => (r.ref ? r.error : `${cardRef(r.number)} (${r.error})`)).join('; ')}.`)
+  const plain = b.refused.filter((r) => !r.rule)
+  if (plain.length) lines.push(`Refused, left as they were: ${plain.map((r) => (r.ref ? r.error : `${cardRef(r.number)} (${r.error})`)).join('; ')}.`)
+  // Refused by its rules: as hive_update_task's refusal reads (the message, its rule, the next step, who can change it),
+  // named by its card first where its message doesn't name it ("{revision} was already reviewed.").
+  for (const r of b.refused) {
+    if (!r.rule) continue
+    const ref = cardRef(r.number)
+    const named = new RegExp(`(^|[^\\w-])${ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`).test(r.error)
+    lines.push(`Refused, left as it was: ${named ? '' : `${ref}: `}${r.error} (${r.rule})`, ...(r.next ? [r.next] : []), ...(r.change ? [r.change] : []))
+  }
   return lines.join('\n')
 }
 
