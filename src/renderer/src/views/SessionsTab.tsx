@@ -1309,10 +1309,24 @@ const TOOL_ICON: Record<string, string> = { Bash: 'terminal', PowerShell: 'termi
 
 const NO_CALLS_OPEN: ReadonlySet<number> = new Set()
 
-/** A Codex script's calls in a line (HI-2240): how many, how many failed, and their names, each once. */
+/** What kind of call a Codex script's call is, as its line counts it (HI-2240): an MCP server's (by server), or Hive's name for it. */
+const callKind = (c: TranscriptTool): string => (c.name.includes(' · ') ? `mcp:${c.name.split(' · ')[0]}` : c.name === 'Shell' ? 'command' : c.name === 'Edit' ? 'edit' : c.name === 'view_image' ? 'image' : 'other')
+
+/**
+ * A Codex script's calls in a line (HI-2240, Darren's decision): how many of each kind, in the order they first came
+ * ("3 hive calls, 1 command, 2 edits"), and how many failed.
+ */
 function callsSummary(calls: TranscriptTool[]): string {
-  const names = [...new Set(calls.map((c) => c.name))]
-  return tr(msg({ id: 'sessions.tool.scriptCalls', defaultMessage: '{n, plural, one {# call} other {# calls}}{failed, plural, =0 {} other {, # failed}}: {names}', description: "A folded Codex script's line in a transcript (HI-2240): how many tool calls the script made, how many of them failed (nothing when none did), then their names ({names}: a list of tool names such as \"Shell, Edit, hive · hive_read_task\", not translated)." }), { n: calls.length, failed: calls.filter((c) => c.isError).length, names: fmt.list(names, 'unit') })
+  const counts = new Map<string, number>()
+  for (const c of calls) counts.set(callKind(c), (counts.get(callKind(c)) ?? 0) + 1)
+  const parts = [...counts].map(([kind, n]) =>
+    kind.startsWith('mcp:')
+      ? tr(msg({ id: 'sessions.tool.scriptMcpCalls', defaultMessage: '{n, plural, one {# {server} call} other {# {server} calls}}', description: "Part of a folded Codex script's line in a transcript (HI-2240), in a list such as \"3 hive calls, 1 command, 2 edits\": how many calls the script made to one MCP server's tools ({server}: the server's name, such as hive, not translated)." }), { n, server: kind.slice(4) })
+      : tr(msg({ id: 'sessions.tool.scriptKindCalls', defaultMessage: '{kind, select, command {{n, plural, one {# command} other {# commands}}} edit {{n, plural, one {# edit} other {# edits}}} image {{n, plural, one {# image view} other {# image views}}} other {{n, plural, one {# other call} other {# other calls}}}}', description: "Part of a folded Codex script's line in a transcript (HI-2240), in a list such as \"3 hive calls, 1 command, 2 edits\": how many calls of one kind the script made. {kind}: shell commands it ran, file edits it made, images it looked at, or (other) any other tool calls." }), { n, kind })
+  )
+  const failed = calls.filter((c) => c.isError).length
+  if (failed) parts.push(tr(msg({ id: 'sessions.tool.scriptFailedCalls', defaultMessage: '{n, plural, one {# failed} other {# failed}}', description: "The last part of a folded Codex script's line in a transcript (HI-2240), after \"3 hive calls, 1 command\": how many of the script's calls failed." }), { n: failed }))
+  return fmt.list(parts, 'unit')
 }
 
 /**
