@@ -45,50 +45,75 @@ const lanes = [
 /** A call line of the hive servers' test log; `sized`: as a server from HI-2186 on writes it (mode, chars, bytes). */
 const call = (who: { agent?: string; assistant?: boolean }, at = LATER, sized = true, extra: object = {}) => ({ at, tool: 'hive_inbox', role: who.assistant ? 'assistant' : 'agent', project: who.assistant ? '' : 'alpha', agent: who.agent ?? null, ok: true, args: '{}', ...(sized ? { mode: 'compact', chars: 10, bytes: 12 } : {}), ...extra })
 const list = (who: { agent?: string; assistant?: boolean }, at = LATER) => ({ at, kind: 'list', role: who.assistant ? 'assistant' : 'agent', project: 'alpha', agent: who.agent ?? null, tools: 40, bytes: 27000, chars: 26900 })
-const assistantSubject = (extra: object = {}) => ({ kind: 'assistant', agentId: 'assistant', since: AT, complete: true, fakeCli: true, roster, lanes, ...extra })
-const coderSubject = (extra: object = {}) => ({ kind: 'agent', agentId: 'a-coder', since: AT, complete: true, fakeCli: true, roster, lanes, ...extra })
+const UNTIL = '2026-10-31T01:01:00.000Z'
+const assistantSubject = (extra: object = {}) => ({ kind: 'assistant', agentId: 'assistant', since: AT, until: UNTIL, complete: true, fakeCli: true, roster, lanes, ...extra })
+const coderSubject = (extra: object = {}) => ({ kind: 'agent', agentId: 'a-coder', since: AT, until: UNTIL, complete: true, fakeCli: true, roster, lanes, ...extra })
+/** Each agent's calls and tool lists (one a call), as the log has them, matching what `report` counts. */
+const logOf = (...who: { agent?: string; assistant?: boolean }[]) => ({ hiveCalls: [], allHiveCalls: who.map((w) => call(w)), mcpLists: who.map((w) => list(w)) })
+/** A report with Hive's own start-view record of the Assistant (a tool call in the metrics, in no server's log). */
+const withStartView = (r: any) => ({ ...r, workspace: { ...r.workspace, mcp: [...r.workspace.mcp, { role: 'assistant', tool: 'session start view', mode: 'compact', outcome: 'ok', count: 1, chars: 900, bytes: 900, totalMs: 1 }] } })
+const A = { assistant: true }
+const CODER = { agent: 'a-coder' }
+const IMPL = { agent: 'a-impl' }
 
 describe('the harness measures the subject apart from the other agents (benchmark.cjs)', () => {
   it('the Assistant as subject: every measure by caller role, and the parts add up to the total where coverage is whole', () => {
-    const observed = { hiveCalls: [], allHiveCalls: [call({ assistant: true }), call({ agent: 'a-coder' }), call({ agent: 'a-impl' })], mcpLists: [] }
-    const m = measuresOf(report(0, 0), report(2, 3), observed, null, assistantSubject())
-    expect(m.subject).toMatchObject({ apiRequests: 2, toolCalls: 2, toolChars: 10, launches: 1, coreBytes: 200, toolListStarts: 2, toolListBytes: 100, toolListChars: 98 })
+    const observed = logOf(A, A, CODER, IMPL, IMPL)
+    const m = measuresOf(report(0, 0), withStartView(report(2, 3)), observed, null, assistantSubject())
+    // Hive's start view is the Assistant's tool call in the metrics (and its reply its context), in no server's log.
+    expect(m.subject).toMatchObject({ apiRequests: 2, toolCalls: 3, toolChars: 910, launches: 1, coreBytes: 200, toolListStarts: 2, toolListBytes: 100, toolListChars: 98 })
     expect(m.others).toMatchObject({ apiRequests: 3, toolCalls: 3, toolChars: 15, launches: 1, toolListStarts: 3 })
+    expect(m).not.toHaveProperty('split')
     // The parts, each its own series, add up to the total (the harness's own requests in neither); the skill service is
     // shared, in neither part.
     for (const k of Object.keys(m.subject)) expect(m.subject[k] + m.others[k]).toBe(m[k])
     expect(m.subject).not.toHaveProperty('skillScans')
     expect(m.others).not.toHaveProperty('dropped')
     // The total's meaning is unchanged: what it was without a split.
-    expect(measuresOf(report(0, 0), report(2, 3), observed, null)).toEqual(Object.fromEntries(Object.entries(m).filter(([k]) => !['subject', 'others', 'agents', 'split'].includes(k))))
+    expect(measuresOf(report(0, 0), withStartView(report(2, 3)), observed, null)).toEqual(Object.fromEntries(Object.entries(m).filter(([k]) => !['subject', 'others', 'agents', 'split'].includes(k))))
     expect(metricsTotals(report(2, 3)).apiRequests).toBe(5)
+    expect(m.agents.map((r: any) => [r.agent, r.hiveCalls, r.toolListStarts])).toEqual([
+      ['Assistant', 2, 2],
+      ['Coder', 1, 1],
+      ['Implementer', 2, 2]
+    ])
   })
 
   it('incomplete coverage leaves both parts out (unknown), never a part guessed from the other', () => {
-    const m = measuresOf(report(0, 0), report(2, 3), { allHiveCalls: [call({ assistant: true })] }, null, assistantSubject({ complete: false }))
+    const m = measuresOf(report(0, 0), report(1, 0), logOf(A), null, assistantSubject({ complete: false }))
     expect(m).not.toHaveProperty('subject')
     expect(m).not.toHaveProperty('others')
     expect(m.split).toBe('partial')
-    expect(m.agents).toEqual([{ agent: 'Assistant', role: 'assistant', side: 'subject', hiveCalls: 1, toolListStarts: 0 }])
+    expect(m.agents).toEqual([{ agent: 'Assistant', role: 'assistant', side: 'subject', hiveCalls: 1, toolListStarts: 1 }])
   })
 
-  it('an agent as subject: its tool calls and lists from the log by agent; API and launches only when no other agent worked', () => {
-    const alone = { allHiveCalls: [call({ agent: 'a-coder' }), call({ agent: 'a-coder' }, LATER, true, { ok: false, mode: 'detail' })], mcpLists: [list({ agent: 'a-coder' }), list({ agent: 'a-coder' })] }
-    const a = measuresOf(report(0, 0), report(0, 2), alone, null, coderSubject())
-    expect(a.subject).toMatchObject({ toolCalls: 2, toolErrors: 1, toolDetailCalls: 1, toolChars: 20, toolBytes: 24, toolListStarts: 2, toolListBytes: 54000, toolListChars: 53800, apiRequests: 2, launches: 1, coreBytes: 200 })
+  it('an agent as subject: its tool calls and lists from the log by agent; its API and launches unknown', () => {
+    const own = { hiveCalls: [], allHiveCalls: [call(CODER), call(CODER, LATER, true, { ok: false, mode: 'detail' })], mcpLists: [list(CODER), list(CODER)] }
+    const a = measuresOf(report(0, 0), report(0, 2), own, null, coderSubject())
+    expect(a.subject).toEqual({ toolCalls: 2, toolErrors: 1, toolDetailCalls: 1, toolChars: 20, toolBytes: 24, toolListStarts: 2, toolListBytes: 54000, toolListChars: 53800 })
     expect(a.others).toEqual({ toolCalls: 0, toolErrors: 0, toolDetailCalls: 0, toolChars: 0, toolBytes: 0, toolListStarts: 0, toolListBytes: 0, toolListChars: 0 })
-    // Implementer called too: the agent role's API and launches aren't Coder's alone, so unknown for it.
-    const shared = { allHiveCalls: [...alone.allHiveCalls, call({ agent: 'a-impl' })], mcpLists: [...alone.mcpLists, list({ agent: 'a-impl' })] }
-    const s = measuresOf(report(0, 0), report(0, 3), shared, null, coderSubject())
-    expect(s.subject).toMatchObject({ toolCalls: 2, toolListStarts: 2 })
-    expect(s.subject).not.toHaveProperty('apiRequests')
-    expect(s.subject).not.toHaveProperty('launches')
-    expect(s.others).toMatchObject({ toolCalls: 1, toolChars: 10, toolListStarts: 1 })
-    expect(s.others).not.toHaveProperty('apiRequests')
+    const shared = measuresOf(report(0, 0), report(0, 3), logOf(CODER, CODER, IMPL), null, coderSubject())
+    expect(shared.subject).toMatchObject({ toolCalls: 2, toolListStarts: 2 })
+    expect(shared.others).toMatchObject({ toolCalls: 1, toolChars: 10, toolListStarts: 1 })
+    for (const part of [shared.subject, shared.others]) for (const k of ['apiRequests', 'launches', 'coreBytes']) expect(part).not.toHaveProperty(k)
   })
 
-  it("a log from before HI-2186: counts known, sizes unknown; tool lists one a call for a fake CLI only, else unknown", () => {
-    const old = { allHiveCalls: [call({ agent: 'a-coder' }, LATER, false), call({ agent: 'a-impl' }, LATER, false), call({ agent: 'a-coder' }, LATER, false, { direct: true })] }
+  it('another agent that launched and listed its tools but made no call: none of its launch or list is the subject’s', () => {
+    // Coder runs on and calls twice; Implementer is launched (guidance) and lists the tools, calling nothing.
+    const after = report(0, 2)
+    after.projects.alpha.guidance[0].launches = 1
+    after.projects.alpha.catalog[0].starts = 3
+    after.projects.alpha.catalog[0].charStarts = 3
+    const observed = { hiveCalls: [], allHiveCalls: [call(CODER), call(CODER)], mcpLists: [list(CODER), list(CODER), list(IMPL)] }
+    const m = measuresOf(report(0, 0), after, observed, null, coderSubject())
+    expect(m.subject).toMatchObject({ toolCalls: 2, toolListStarts: 2 })
+    for (const k of ['launches', 'coreBytes', 'apiRequests']) expect(m.subject).not.toHaveProperty(k)
+    expect(m.others).toMatchObject({ toolCalls: 0, toolListStarts: 1 })
+    expect(m.agents.find((r: any) => r.agent === 'Implementer')).toEqual({ agent: 'Implementer', role: 'reviewer', side: 'other', hiveCalls: 0, toolListStarts: 1 })
+  })
+
+  it('a log from before HI-2186: counts known, sizes unknown; tool lists one a call for a fake CLI only, else unknown', () => {
+    const old = { allHiveCalls: [call(CODER, LATER, false), call(IMPL, LATER, false), call(CODER, LATER, false, { direct: true })] }
     const fake = measuresOf(report(0, 0), report(0, 2), old, null, coderSubject())
     expect(fake.subject).toMatchObject({ toolCalls: 1, toolErrors: 0, toolListStarts: 1 })
     for (const k of ['toolChars', 'toolBytes', 'toolDetailCalls', 'toolListBytes', 'toolListChars']) expect(fake.subject).not.toHaveProperty(k)
@@ -100,31 +125,54 @@ describe('the harness measures the subject apart from the other agents (benchmar
   })
 
   it('agents by their fixture identity, the subject first, whatever order their calls came in', () => {
-    const calls = [call({ agent: 'a-b2' }), call({ agent: 'a-coder' }), call({ agent: 'a-b2' }), call({ assistant: true }), call({ agent: 'a-stranger' })]
-    const rows = (xs: object[]) => measuresOf(report(0, 0), report(1, 4), { allHiveCalls: xs, mcpLists: [] }, null, assistantSubject()).agents
-    const one = rows(calls)
+    const who = [{ agent: 'a-b2' }, CODER, { agent: 'a-b2' }, A, { agent: 'a-stranger' }]
+    const rows = (ws: typeof who) => measuresOf(report(0, 0), report(1, 4), logOf(...ws), null, assistantSubject()).agents
+    const one = rows(who)
     expect(one).toEqual([
-      { agent: 'Assistant', role: 'assistant', side: 'subject', hiveCalls: 1, toolListStarts: 0 },
-      { agent: 'Builder2', role: 'builder', side: 'other', hiveCalls: 2, toolListStarts: 0 },
-      { agent: 'Coder', role: 'builder', side: 'other', hiveCalls: 1, toolListStarts: 0 },
-      { agent: 'unattributed', role: 'agent', side: 'other', hiveCalls: 1, toolListStarts: 0 }
+      { agent: 'Assistant', role: 'assistant', side: 'subject', hiveCalls: 1, toolListStarts: 1 },
+      { agent: 'Builder2', role: 'builder', side: 'other', hiveCalls: 2, toolListStarts: 2 },
+      { agent: 'Coder', role: 'builder', side: 'other', hiveCalls: 1, toolListStarts: 1 },
+      { agent: 'unattributed', role: 'agent', side: 'other', hiveCalls: 1, toolListStarts: 1 }
     ])
-    expect(rows([...calls].reverse())).toEqual(one)
-    // Calls before the measured window (a setup's) are no agent's part of it.
-    expect(rows([call({ agent: 'a-impl' }, '2026-10-31T00:59:00.000Z'), ...calls]).some((r: any) => r.agent === 'Implementer')).toBe(false)
+    expect(rows([...who].reverse())).toEqual(one)
+  })
+
+  it('the log counts only in the window, and only when it holds exactly what the metrics counted there (HR3 round 1)', () => {
+    // A call logged after the last snapshot (the run read the log later): outside the window, so the parts stand.
+    const late = { ...logOf(CODER), allHiveCalls: [call(CODER), call(CODER, '2026-10-31T01:02:00.000Z')] }
+    expect(measuresOf(report(0, 0), report(0, 1), late, null, coderSubject()).subject).toMatchObject({ toolCalls: 1 })
+    // A setup's call before the window is no agent's part of it.
+    const early = { ...logOf(CODER), allHiveCalls: [call(IMPL, '2026-10-31T00:59:00.000Z'), call(CODER)] }
+    expect(measuresOf(report(0, 0), report(0, 1), early, null, coderSubject()).agents.some((r: any) => r.agent === 'Implementer')).toBe(false)
+    // Logged in the window but not in the metrics between the snapshots (reported after the last one): unchanged
+    // snapshots and a logged call give no part at all, never a subject with a call the total hasn't.
+    const unreported = measuresOf(report(0, 0), report(0, 0), logOf(CODER), null, coderSubject())
+    expect(unreported.toolCalls).toBe(0)
+    expect(unreported).not.toHaveProperty('subject')
+    expect(unreported).not.toHaveProperty('agents')
+    expect(unreported.split).toBe('partial')
+    // In the metrics between the snapshots but logged before the window (reported after the first snapshot): the same.
+    const sooner = '2026-10-31T00:59:59.000Z'
+    const before = measuresOf(report(0, 0), report(0, 1), { allHiveCalls: [call(CODER, sooner)], mcpLists: [list(CODER, sooner)] }, null, coderSubject())
+    expect(before).not.toHaveProperty('subject')
+    expect(before.split).toBe('partial')
+    // The Assistant's parts are the metrics' own, so they stand; only the log's rows go.
+    const asst = measuresOf(report(0, 0), report(1, 1), logOf(A), null, assistantSubject())
+    expect(asst.subject).toMatchObject({ toolCalls: 1 })
+    expect(asst).not.toHaveProperty('agents')
+    expect(asst.split).toBe('partial')
   })
 
   it('at most 10 rows, an overflow row among them: the subject kept, no call lost', () => {
     const many = Array.from({ length: 14 }, (_, i) => ({ id: `a-${i}`, name: `Agent${String(i).padStart(2, '0')}`, workflowRole: null }))
-    const calls = [call({ agent: 'a-13' }), ...many.flatMap((a, i) => Array.from({ length: i + 1 }, () => call({ agent: a.id })))]
-    const m = measuresOf(report(0, 0), report(0, 1), { allHiveCalls: calls, mcpLists: [] }, null, coderSubject({ agentId: 'a-13', roster: many, lanes: [] }))
+    const calls = [call({ agent: 'a-13' }, LATER, false), ...many.flatMap((a, i) => Array.from({ length: i + 1 }, () => call({ agent: a.id }, LATER, false)))]
+    const m = measuresOf(report(0, 0), report(0, calls.length), { allHiveCalls: calls }, null, coderSubject({ agentId: 'a-13', roster: many, lanes: [] }))
     expect(m.agents.length).toBe(10)
     expect(m.agents[0]).toMatchObject({ agent: 'Agent13', side: 'subject', hiveCalls: 15 })
-    const overflow = m.agents[9]
-    expect(overflow).toMatchObject({ agent: 'overflow', side: 'other', agents: 5 })
+    expect(m.agents[9]).toMatchObject({ agent: 'overflow', side: 'other', agents: 5 })
     expect(m.agents.reduce((n: number, r: any) => n + r.hiveCalls, 0)).toBe(calls.length)
     // The subject's row is there even when it made no call.
-    expect(measuresOf(report(0, 0), report(0, 1), { allHiveCalls: [call({ agent: 'a-impl' })] }, null, coderSubject()).agents[0]).toEqual({ agent: 'Coder', role: 'builder', side: 'subject', hiveCalls: 0, toolListStarts: 0 })
+    expect(measuresOf(report(0, 0), report(0, 1), logOf(IMPL), null, coderSubject()).agents[0]).toEqual({ agent: 'Coder', role: 'builder', side: 'subject', hiveCalls: 0, toolListStarts: 0 })
   })
 })
 
@@ -191,7 +239,15 @@ describe('Compare shows the subject apart from the other agents (shared/benchmar
     expect(wo(compareArtifacts(back, a)).split).not.toBeNull()
   })
 
-  it('a fake run says its API requests and tool lists count per hive call', () => {
-    expect(compareArtifacts(withSplit(1, 1), withSplit(1, 1)).notes.some((n) => /per call, not per session/.test(n))).toBe(true)
+  it('a run on the fake Claude Code or fake Codex says its API requests and tool lists count per hive call; fake-copilot’s doesn’t', () => {
+    const perCall = (x: Artifact, y: Artifact) => compareArtifacts(x, y).notes.some((n) => /per call, not per session/.test(n))
+    expect(perCall(withSplit(1, 1), withSplit(1, 1))).toBe(true)
+    const on = (provider: string): Artifact => {
+      const x = withSplit(1, 1)
+      return { ...x, run: { ...x.run!, provider } }
+    }
+    expect(perCall(on('fake-codex'), on('fake-codex'))).toBe(true)
+    // fake-copilot runs the real Copilot CLI offline: one hive server a session, as a real CLI.
+    expect(perCall(on('fake-copilot'), on('fake-copilot'))).toBe(false)
   })
 })

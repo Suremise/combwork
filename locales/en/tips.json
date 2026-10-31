@@ -1411,6 +1411,14 @@
     "defaultMessage": "Before and after a change",
     "description": "A tip's title."
   },
+  "tips.perfCompareAgents.text": {
+    "defaultMessage": "Comparing two scenario benchmarks? Open a scenario in Performance → Compare: its measures show the session under test first, then the other agents (a lane’s builder and reviewer) and all of them together, with each agent’s hive calls.",
+    "description": "A tip (HI-2186). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Keep hive (Hive's tools). Glossary: builder, reviewer."
+  },
+  "tips.perfCompareAgents.title": {
+    "defaultMessage": "Which agent a change came from",
+    "description": "A tip's title."
+  },
   "tips.performance.text": {
     "defaultMessage": "Performance, in the activity bar, shows what Hive's API, tools and guidance cost for the last day, week or month: the whole workspace or one project. Each project has its own Performance tab too.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."

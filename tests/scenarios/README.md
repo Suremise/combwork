@@ -247,12 +247,15 @@ measured on its own, and each agent's hive calls in the measured window (`measur
 - The Assistant as subject: Hive's metrics by caller role (the Assistant's, project agents'), every measure, only when
   the coverage is whole (else `split: 'partial'` and neither part).
 - An agent as subject: its tool calls, replies and tool lists from the hive servers' test log (`HIVE_TEST_MCP_LOG`: each
-  call with its reply's size, and a `kind: 'list'` line per server's tool list); its API and launch measures only when
-  no other agent called or launched in the window, else unknown.
+  call with its reply's size, and a `kind: 'list'` line per server's tool list); its API and launch measures are unknown
+  (Hive's metrics don't say which agent a request or launch was).
+- The log's lines count only from before the first metrics snapshot to after the last, and only when they are exactly
+  the served calls (and tool lists) the metrics counted between them (Hive's own start-view record left out): a call
+  logged on one side of a snapshot and reported on the other leaves the log's parts and rows out (`split: 'partial'`).
 - An older log (no sizes, no list lines): calls are known, sizes unknown, and tool lists one a call for the fake CLIs
   only, else unknown.
 
-**The fakes count per hive call.** The fake Claude Code and fake Codex start a hive MCP server for every hive call (and
+**The fakes count per hive call.** The fake Claude Code and fake Codex (not fake-copilot: the real Copilot CLI) start a hive MCP server for every hive call (and
 each lists the tools), where a real CLI starts one a session: with them, tool-list starts and API requests count calls,
 not sessions. HI-2181 read a lane scenario's doubled tool-list starts as twice the fetches per session; it was the lane's
 agents making more calls.

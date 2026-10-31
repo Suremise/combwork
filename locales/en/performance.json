@@ -788,8 +788,8 @@
     "description": "Performance → Compare, a note on a scenario of model trials. Keep ≈ (it marks an estimate)."
   },
   "performance.compare.note.fakePerCall": {
-    "defaultMessage": "With a fake CLI, each hive call starts a hive MCP server of its own: API requests and tool-list starts count per call, not per session.",
-    "description": "Performance → Compare, a note on a comparison of scenario runs on a fake CLI (HI-2186): what the fake does differs from a real CLI. Keep hive (Hive's tools) and MCP."
+    "defaultMessage": "With the fake Claude Code or fake Codex, each hive call starts a hive MCP server of its own: API requests and tool-list starts count per call, not per session.",
+    "description": "Performance → Compare, a note on a comparison of scenario runs on the scripted fake CLIs (HI-2186): what they do differs from a real CLI. Keep hive (Hive's tools), MCP, Claude Code and Codex."
   },
   "performance.compare.note.fakeUsage": {
     "defaultMessage": "Provider usage isn’t compared: a fake’s tokens are simulated, not a provider’s.",

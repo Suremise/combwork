@@ -352,6 +352,8 @@
   "tips.pauseTeam.title": "Wstrzymaj zespół przed aktualizacją",
   "tips.perfCompare.text": "Wydajność → Porównaj: zachowaj bieżący widok przed zmianą i ponownie po niej i sprawdź, czy ruch Hive spadł, a praca nadal została wykonana.",
   "tips.perfCompare.title": "Przed zmianą i po niej",
+  "tips.perfCompareAgents.text": "Porównujesz dwa benchmarki scenariuszy? Otwórz scenariusz w Wydajność → Porównaj: jego miary pokazują najpierw testowaną sesję, potem innych agentów (wykonawcę i recenzenta toru) i wszystkich razem, z wywołaniami hive każdego agenta.",
+  "tips.perfCompareAgents.title": "Od którego agenta pochodzi zmiana",
   "tips.performance.text": "Wydajność na pasku aktywności pokazuje, ile kosztowały API, narzędzia i instrukcje Hive w ostatnim dniu, tygodniu lub miesiącu: w całym obszarze roboczym lub w jednym projekcie. Każdy projekt ma też własną zakładkę Wydajność.",
   "tips.performance.title": "Ile kosztuje sam Hive",
   "tips.permissionMode.text": "Kliknij tryb w stopce agenta lub naciśnij {key}, żeby przełączać między pytaniem najpierw, akceptowaniem edycji i planowaniem.",

@@ -801,8 +801,9 @@ traffic and guidance smaller while the work still got done:
   fully measured isn't judged. A scenario's details show its measures for the session it tests (the Assistant, or the
   agent under test) first, then for the other agents (a lane's builder and reviewer, agents it or Hive started) and for
   all of them together, which is what its result is judged on, with each agent's hive calls under them. A benchmark from
-  before Hive split them has totals only, and Compare says so. With a fake CLI, API requests and tool-list starts count
-  per hive call, since the fake starts a hive server for each one.
+  before Hive split them has totals only, and Compare says so. With the fake Claude Code or fake Codex, API requests
+  and tool-list starts count per hive call, since those fakes start a hive server for each one (fake-copilot runs the
+  real Copilot CLI, which keeps one a session).
 - If the two measured different things (other scenarios, provider, model or filters, or a fake against a real model), the
   page says **Not comparable** and why.
 - The scope is the page's: the whole workspace, **Workspace's own work** or one project each keep their own list. A

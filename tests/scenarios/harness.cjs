@@ -555,7 +555,8 @@ async function runScenario(sc, providerKey, opts = {}) {
       result.metricsOverheadMs += Date.now() - t
       return r.status === 200 ? r.body : null
     }
-    // The measured window's start (HI-2186): the hive calls each agent made from here are its part of the measures.
+    // The measured window's start (HI-2186): the hive calls each agent made from here are its part of the measures (only
+    // when the log's calls in the window are exactly those the metrics counted: benchmark.cjs splitOf).
     const measuredFrom = new Date().toISOString()
     const metricsBefore = await snapshot()
     // A change made inside the measured window (a skill edited after the snapshot, before the launch), for scenarios
@@ -774,6 +775,8 @@ async function runScenario(sc, providerKey, opts = {}) {
         metricsAfter = (await snapshot()) ?? metricsAfter
         return allCallsReported(readMcpLog(mcpLog), metricsAfter)
       }, HUNG_MS))
+    // The measured window's end (HI-2186): the hive calls logged by now are the last its parts may count.
+    const measuredTo = new Date().toISOString()
     const sessionId = s?.sessionId ?? (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')?.agents.find((a) => a.id === coder.id)?.lastSessionId
     // The session under test, for checks of what it was launched with (Codex's rollout carries its instructions, #520).
     ctx.session = { id: sessionId ?? null, codexHome: env.CODEX_HOME }
@@ -843,7 +846,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     // The subject apart from the other agents (HI-2186): who is who by the fixture's roster (the project's agents, by
     // their fixture names) and the run's lanes.
     const roster = (((await api('GET', '/v1/projects/alpha')).body?.agents ?? []) || []).map((a) => ({ id: a.id, name: a.name, workflowRole: a.workflowRole ?? null }))
-    const parts = { kind: sc.role === 'assistant' ? 'assistant' : 'agent', agentId, since: measuredFrom, complete: partial.length === 0, fakeCli: providerKey === 'fake' || providerKey === 'fake-codex', roster, lanes: observed.lanes }
+    const parts = { kind: sc.role === 'assistant' ? 'assistant' : 'agent', agentId, since: measuredFrom, until: measuredTo, complete: partial.length === 0, fakeCli: providerKey === 'fake' || providerKey === 'fake-codex', roster, lanes: observed.lanes }
     result.measures = metricsBefore && metricsAfter ? measuresOf(metricsBefore, metricsAfter, observed, result.usage, parts) : null
     // Every scenario starts a new session (session:start with no resumeId): its usage is the scenario's own.
     result.resumed = false

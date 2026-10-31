@@ -354,6 +354,8 @@ interface HiveMessageValues {
   'tips.pauseTeam.title': undefined
   'tips.perfCompare.text': undefined
   'tips.perfCompare.title': undefined
+  'tips.perfCompareAgents.text': undefined
+  'tips.perfCompareAgents.title': undefined
   'tips.performance.text': undefined
   'tips.performance.title': undefined
   'tips.permissionMode.text': { key: string | number }
