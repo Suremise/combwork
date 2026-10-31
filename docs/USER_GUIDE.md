@@ -1925,7 +1925,7 @@ A question or dialog of a CLI's own that Hive doesn't recognise can take an agen
 
 - The agent shows **Needs input** with *Something on its screen is taking its keys: answer it there, then Try again*, and its pane's header says **Its input takes no keys**. You're notified, and the Hive Assistant is told it waits for you. If the agent already waits for you on something else, that stays its reason.
 - Hive types nothing more into it and presses no key there, however long it waits. Wakes and messages wait, and a card its lane would hand it waits too: nothing is retried in the meantime.
-- Answer what its terminal shows, then press **Try again** beside its status. Hive tries the input once. If it takes the key, the agent is idle again and what waited is typed; if not, Hive says *Its input still takes no keys*. Typing in its pane so your text shows in its input frees it too, as does the agent carrying on by itself. Your own text in the input is never cleared.
+- Answer what its terminal shows, then press **Try again** beside its status (in a narrow pane, it's in the pane's **⋯** menu). Hive tries the input once. If it takes the key, the agent is idle again and what waited is typed; if not, Hive says *Its input still takes no keys*. Typing in its pane so your text shows in its input frees it too, as does the agent carrying on by itself. Your own text in the input is never cleared.
 
 ### Agents that need you <a id="agents-that-need-you"></a>
 

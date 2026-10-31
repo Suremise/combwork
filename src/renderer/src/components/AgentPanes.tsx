@@ -688,6 +688,12 @@ function paneItems(project: ProjectInfo, a: AgentInfo, left: AgentLeftovers | un
     // Without its button beside the status, ⋯ says it needs a look.
     if (narrow) alert.push(unknownStateText(a.live, Date.now(), tr)!)
   }
+  // Its input taking no keys (HI-2191): Try again here too, the only way back after a dialog put off with no hook.
+  const blocked = a.live?.inputBlocked
+  if (blocked) {
+    items.push({ label: tr(TRY_INPUT), icon: 'refresh', onClick: () => retryInput(project, a, blocked.since) })
+    if (narrow) alert.push(tr(INPUT_BLOCKED))
+  }
   return { items: items.length ? [...items, { separator: true }] : items, alert, warn }
 }
 
@@ -1244,6 +1250,7 @@ export function useWidth<T extends HTMLElement>(): [(el: T | null) => void, numb
   return [ref, w]
 }
 
+const INPUT_BLOCKED = msg({ id: 'panes.header.inputBlocked', defaultMessage: 'Its input takes no keys', description: "A pane's status: keys Hive typed into the agent's input didn't reach it (something on its screen takes them). Keep it short." })
 const TRY_INPUT = msg({ id: 'panes.header.inputRetry', defaultMessage: 'Try again', description: "Button beside a pane's status when the agent's input takes no keys: Hive checks once that its input takes keys again (after the user answered what took them). Keep it short." })
 const MARK_IDLE = msg({ id: 'panes.header.markIdle', defaultMessage: 'Mark idle', description: "Button beside a pane's unknown state, and an item of its ⋯ menu: tells Hive the agent is idle (its terminal shows it at its prompt). Keep it short." })
 
@@ -1344,7 +1351,7 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
         // Something on its screen takes its keys (HI-2191): the user answers it there; Try again checks its input takes keys.
         <span className="pane-status input-blocked">
           <Tooltip content={tr(msg({ id: 'panes.header.inputBlockedTip', defaultMessage: "Keys Hive typed into this agent's input didn't reach it: something on its screen, such as a question of its CLI's own, is taking them. Hive types nothing more into it and gives it nothing until it takes keys again. Answer it in its terminal, then press Try again.", description: "Tooltip of a pane's status when the agent's input takes no keys. Try again is the button beside it: keep its name as it is translated there." }))}>
-            <span className="faint pane-status asks">{tr(msg({ id: 'panes.header.inputBlocked', defaultMessage: 'Its input takes no keys', description: "A pane's status: keys Hive typed into the agent's input didn't reach it (something on its screen takes them). Keep it short." }))}</span>
+            <span className="faint pane-status asks">{tr(INPUT_BLOCKED)}</span>
           </Tooltip>
           {!narrow && (
             <button className="btn small subtle mark-idle" aria-label={tr(TRY_INPUT)} onClick={() => retryInput(project, a, live.inputBlocked!.since)}>

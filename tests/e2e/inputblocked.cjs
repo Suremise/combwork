@@ -83,7 +83,12 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     /** What B1's CLI read (fake-input.jsonl), from `from` on. */
     const b1Reads = (from = '') => jsonl('fake-input.jsonl').filter((r) => r.agent === 'B1' && r.at >= from)
     /** The letters Hive typed into B1's input to see it empty (CLEAR_PROBE). */
-    const probes = (from) => b1Reads(from).filter((r) => r.data === 'x')
+    /**
+     * The letters Hive typed into B1's input to see it empty (CLEAR_PROBE), as keys: one read can carry several (a
+     * Backspace and the next letter), so its keys are counted, not its reads. Hive's own lines are bracketed pastes (an
+     * "x" in "inbox"), left out.
+     */
+    const probes = (from) => [...b1Reads(from).filter((r) => !r.data.includes('\x1b[200~')).map((r) => r.data).join('')].filter((k) => k === 'x').length
     const hiveLog = () => {
       const f = path.join(userData, 'logs', 'hive.log')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
@@ -140,11 +145,9 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     })
     check('B1 waits for the user: something on its screen takes its keys', !!blocked && /taking its keys/.test(String(blocked.statusMessage)), JSON.stringify(blocked && { status: blocked.status, message: blocked.statusMessage }))
     // The fake reads its input late on a busy machine: its log of a key may come after Hive gave up waiting for it.
-    // At most three: an unanswered clear just before (Hive typing as the lane started, on a busy machine) counts too.
-    const blockedAt = new Date().toISOString()
-    const tried = probes(before).filter((r) => r.at <= blockedAt).length
-    check('…after at most three letters typed and not answered', tried >= 1 && tried <= 3,`${probes(before).length}: ${JSON.stringify(b1Reads(before))}`)
-    check('…its pane says so, with Try again', !!(await until(async () => (await page.locator('.pane-status.input-blocked').count()) >= 1)) && (await page.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1)
+    check('…after three letters typed and not answered', !!(await until(() => probes(before) >= 3, 10000)) && probes(before) === 3, `${probes(before)}: ${JSON.stringify(b1Reads(before))}`)
+    const header = lib.paneHeader(page, 'B1')
+    check('…its pane says so, with Try again', !!(await until(async () => (await header.locator('.pane-status.input-blocked').count()) >= 1)) && (await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1)
     const waitLine = () => assistantWakes().slice(wakesBefore).filter((t) => t.startsWith('[Hive] B1 (alpha) is waiting for the user'))
     check("the Assistant's lane watch is woken: B1 waits for the user", !!(await until(() => waitLine().length > 0)), JSON.stringify(assistantWakes().slice(wakesBefore)))
     // What had been tried when it was blocked: whichever came first (card 1's event, or the lane's placement of card 2)
@@ -153,11 +156,20 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const placedAt = placements(c2)
     await page.screenshot({ path: at('blocked.png') })
 
-    // While it is blocked: Try again, the dialog still showing, types one letter, and says it still takes no keys.
+    // In a narrow pane (its header under 300 px) the button goes, and Try again is in its ⋯ menu.
+    await header.evaluate((el) => (el.style.width = '280px'))
+    check('in a narrow pane there is no button beside its status', !!(await until(async () => (await header.locator('.pane-status.input-blocked button').count()) === 0)))
+    const items = await lib.agentMenu(page, 'B1')
+    check("…and its ⋯ menu has Try again", items.includes('Try again'), JSON.stringify(items))
+
+    // While it is blocked: Try again (from that menu), the dialog still showing, types one letter, and says it still
+    // takes no keys.
     const tryAt = new Date().toISOString()
-    await page.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).click()
+    await lib.menuEntry(page, 'Try again').click()
     check('Try again with the dialog still showing: it still takes no keys', !!(await until(() => page.getByText('Its input still takes no keys').first().isVisible().catch(() => false))))
-    check('…one letter typed for it, nothing more', !!(await until(() => probes(tryAt).length >= 1, 10000)) && probes(tryAt).length === 1,JSON.stringify(b1Reads(tryAt)))
+    check('…one letter typed for it, nothing more', !!(await until(() => probes(tryAt) >= 1, 10000)) && probes(tryAt) === 1, JSON.stringify(b1Reads(tryAt)))
+    await header.evaluate((el) => (el.style.width = ''))
+    check('its pane wide again, the button is back', !!(await until(async () => (await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1)))
     check('…B1 still waits for the user', (await live(b1.id))?.status === 'waiting' && !!(await live(b1.id))?.inputBlocked)
     // Nothing given meanwhile: card 2 isn't placed again, and no delivery is made and called off.
     check('while it is blocked, card 2 is not placed and no delivery is made and called off', placedAt <= 1 && placements(c2) === placedAt && (await cancelled()) === cancelledAt, JSON.stringify({ placements: [placedAt, placements(c2)], cancelled: [cancelledAt, await cancelled()] }))
@@ -171,7 +183,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
     // Try again: its box takes the letter. B1 is free: what waited is typed, then card 2 is placed, once.
     const freeAt = new Date().toISOString()
-    await page.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).click()
+    await header.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).click()
     check('Try again after the user answered: B1 takes keys again', !!(await until(async () => !(await live(b1.id))?.inputBlocked)), JSON.stringify(await live(b1.id)))
     const given = () => b1Reads(freeAt).filter((r) => /\[Hive\] New in your inbox/.test(r.data))
     check('…what waited is typed into it', !!(await until(() => given().length >= 1)), JSON.stringify(b1Reads(freeAt).map((r) => r.data.slice(0, 60))))

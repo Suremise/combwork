@@ -1129,8 +1129,8 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
  */
 export async function place(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<void> {
   const gone = (): boolean => !workflowEnforced() || ended(ws) || !current(first, n, cycle.seq, l.id)
-  while ((await placeOnce(ws, projectPath, first, n, cycle, l)) === 'wait') {
-    if (!(await nextLook(projectPath, l.agent, gone))) break
+  for (let r = await placeOnce(ws, projectPath, first, n, cycle, l); r !== 'done'; r = await placeOnce(ws, projectPath, first, n, cycle, l)) {
+    if (!(await nextLook(projectPath, l.agent, gone, r === 'builder'))) break
   }
   // Placed, or its cycle obsolete or gone: what it kept is let go (HI-1804). A throw keeps it for ensure's next try.
   releaseTrack(ws, projectPath, n, refOf(n, cycle, l))
@@ -1189,9 +1189,10 @@ const slotFreed = new Set<(projectPath: string) => void>()
  * Resolves at the next change that may matter to a waiting placement: its builder's status, a run, its restart resume, a
  * slot of its project freed, or within 30 s; false once `over`. For a builder that can't take a line (HI-2191: whyNoLine),
  * also what ends each reason that changes no status: Hive's line there done with (typed, or its take checked), the pause
- * after the user typed there over (one timer, at its end), its folder steady again, its hive tools connected.
+ * after the user typed there over (one timer, at its end), its folder steady again, its hive tools connected. `builder`:
+ * the pass waited for that, so it is looked at again once these listen (a change between the pass and them is not lost).
  */
-function nextLook(projectPath: string, agentId: string, over: () => boolean): Promise<boolean> {
+function nextLook(projectPath: string, agentId: string, over: () => boolean, builder = false): Promise<boolean> {
   return new Promise((resolve) => {
     const same = (p: string, a: string): boolean => a === agentId && p.toLowerCase() === projectPath.toLowerCase()
     const freed = (p: string): void => {
@@ -1227,10 +1228,13 @@ function nextLook(projectPath: string, agentId: string, over: () => boolean): Pr
     })
     const timer = setTimeout(finish, 30_000)
     timer.unref?.()
+    // Waiting for its builder (HI-2191, HR3's round 2): what freed it may have come between the pass's look and these
+    // listeners (a line done with, the user's pause over), with nothing more to come. Looked at again now they listen.
+    if (builder && !whyNoLine(projectPath, agentId, 'free')) finish()
   })
 }
 
-async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<'done' | 'wait'> {
+async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<'done' | 'wait' | 'builder'> {
   let wf = first
   const agentId = l.agent
   const gone = (): boolean => !workflowEnforced() || ended(ws) || !current(wf, n, cycle.seq, l.id)
@@ -1356,7 +1360,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
           track.told.add(`busy:${busy}`)
           log.info(`#${n} waits for its builder ${userText(agent.name)}, which can't take a line now (${busy}): given once it can`)
         }
-        throw new Waits()
+        throw new BuilderBusy()
       }
       log.info(`Giving ${userText(agent.name)} #${n} in ${userText(cycle.started.slot)} (${how})`)
       // A refusal (NotGiven: its agent got busy) or a launch that couldn't start throws: nothing recorded, tried again.
@@ -1369,6 +1373,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       offered.delete(offerKey(projectPath, n))
     }
   } catch (e) {
+    if (e instanceof BuilderBusy) return 'builder'
     if (e instanceof GaveUp || e instanceof Waits) return 'wait'
     throw e
   }
@@ -1387,6 +1392,8 @@ const isPlacedHow = (x: unknown): x is FactData['BuilderPlaced']['how'] => typeo
 class GaveUp extends Error {}
 /** A placement's resume refused for now (its slot not ready for it): it waits, the try not counted. */
 class Waits extends Error {}
+/** A placement's builder can't take a line now (HI-2191, whyNoLine): it waits for what frees it (nextLook's `builder`). */
+class BuilderBusy extends Waits {}
 
 /** A placement's notice on its card, and its builder woken with the English (as a preparation's failure is). */
 async function tellCard(wf: Workflow, card: Parameters<Workflow['write']>[0], builder: string, shown: ReturnType<typeof workflowText>, english: string): Promise<void> {

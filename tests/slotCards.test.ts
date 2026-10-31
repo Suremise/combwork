@@ -66,11 +66,27 @@ const state = vi.hoisted(() => ({
   /** When the pause after the user typed in its builder's pane ends (sessions.userQuietAt), or null. */
   quietAt: null as number | null,
   /** What listens for Hive being done with an agent's line (lineWriter.onLineFreed). */
-  lineFreed: new Set<(projectPath: string, agentId: string) => void>()
+  lineFreed: new Set<(projectPath: string, agentId: string) => void>(),
+  /**
+   * Its builder freed right after the pass's look, before the wait listens (HR3's round 2): 'line', Hive's line done
+   * with (its notice told then, to whoever listens); 'quiet', the user's pause over (nothing told).
+   */
+  freeAfterLook: null as null | { how: 'line' | 'quiet'; project: string }
 }))
 vi.mock('../src/main/lineWriter', async (orig) => ({
   ...(await orig<object>()),
-  whyNoLine: () => state.busy,
+  whyNoLine: () => {
+    const busy = state.busy
+    const f = state.freeAfterLook
+    if (busy && f) {
+      state.freeAfterLook = null
+      queueMicrotask(() => {
+        state.busy = null
+        if (f.how === 'line') for (const fn of [...state.lineFreed]) fn(f.project, 'B1')
+      })
+    }
+    return busy
+  },
   onLineFreed: (fn: (projectPath: string, agentId: string) => void) => (state.lineFreed.add(fn), () => void state.lineFreed.delete(fn))
 }))
 vi.mock('../src/main/restartResume', async (orig) => ({ ...(await orig<object>()), isResuming: () => state.resuming }))
@@ -226,7 +242,7 @@ afterEach(() => {
   env?.close()
   env = null
   resetAgentStartsForTests()
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null })
 })
 
 /**
@@ -831,6 +847,14 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
       state.busy = null
       for (const fn of [...state.lineFreed]) fn(e.project, 'B1')
       await givenOnce(e, n, placing)
+    })
+
+    it.each(['line', 'quiet'] as const)("freed between the pass's look and the wait's listening (%s): not lost, given at once (HR3's round 2)", async (how) => {
+      const { e, n, slot, cycle, ws } = await prepared()
+      state.live = { cwd: slot, sessionId: 's1' }
+      state.busy = how === 'line' ? 'Hive is already typing a line into it' : 'the user has just typed in its terminal and may still be writing there'
+      state.freeAfterLook = { how, project: e.project }
+      await givenOnce(e, n, place(ws, e.project, e.wf, n, cycle, lease))
     })
 
     it('the user typing in its pane: woken once, at the end of the pause after they typed, with no status change', async () => {
