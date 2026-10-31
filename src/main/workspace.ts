@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, statSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
 import { boardWrite, closeBoard, inBoardWrite, untilBoardOpenable } from './boardStore'
-import { closeJournal } from './journal'
+import { closeJournal, untilJournalOpenable } from './journal'
 import { AsyncLocalStorage } from 'async_hooks'
 import type { BrowserWindow } from 'electron'
 import chokidar, { type FSWatcher } from 'chokidar'
@@ -481,13 +481,14 @@ export class WorkspaceService {
       // Each project's own folders, all at once (HI-1705).
       await whenAll((await this.listProjectPaths()).map((p) => this.ensureProject(p).catch((e) => log.warn(`ensureProject ${userText(p)}`, e))))
       done('its projects') // i18n-ignore: a part of a log line's timing
-      // Its board openable first (HI-2199: just after a Hive ended without quitting, it may not be for some seconds). A
-      // close or another open meanwhile ends the wait, and this open goes no further: the service is the successor's.
+      // Its board and its Assistant's journal openable first (HI-2199, HI-2200: just after a Hive ended without quitting,
+      // they may not be for some seconds). A close or another open meanwhile ends the wait, and this open goes no
+      // further: the service is the successor's.
       const gen = this.generation
       const life = this.life.signal
-      await untilBoardOpenable(abs, life)
+      await Promise.all([untilBoardOpenable(abs, life), untilJournalOpenable(this.assistantHome, life)])
       if (life.aborted || this.generation !== gen || this.path !== abs) throw hiveError(M.closed, undefined, { kind: 'conflict' })
-      done('its board openable') // i18n-ignore: a part of a log line's timing
+      done('its board and journal openable') // i18n-ignore: a part of a log line's timing
       // Every project has its id (#508) before the board, lanes and watches are read by it.
       await this.projectIds().catch((e) => log.warn('reading the project ids', e))
       done('their ids') // i18n-ignore: a part of a log line's timing
