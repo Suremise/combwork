@@ -113,6 +113,21 @@ describe('HI-2245: commits past the submission, in the card folder', () => {
     expect(await fact(e, card)).toBeNull()
   })
 
+  it("nothing for another repository in the card's folder: a clone of the project on a line of the same name (HR2's round 1)", async () => {
+    const e = pair()
+    const { card, folder } = await inReview(e)
+    const line = e.wf.state(card).started!.line!
+    const before = sh(e.project, 'rev-parse', line)
+    renameSync(folder, `${folder}-original`)
+    execFileSync('git', ['clone', '-q', '--branch', line, e.project, folder], { stdio: 'pipe' })
+    sh(folder, 'config', 'user.name', 'Hive Test')
+    sh(folder, 'config', 'user.email', 'test@hive.invalid')
+    commit(folder, { 'other.txt': 'only in the clone\n' }, 'clone only')
+    // The project's line is still the submission: nothing past it in the card's repository.
+    expect(sh(e.project, 'rev-parse', line)).toBe(before)
+    expect(await fact(e, card)).toBeNull()
+  })
+
   it('nothing for a card not in Review: back in Doing after a failed verdict', async () => {
     const e = pair()
     const { card, folder } = await inReview(e)

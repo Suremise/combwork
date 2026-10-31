@@ -459,18 +459,23 @@ export class GitPlatform implements PlatformAdapter {
   /**
    * HI-2245: the commits on the card's line past its submission, in its folder (its slot, or the project folder) as
    * checked out there. Proven only: the folder there, on the card's line (not another branch, not detached), its HEAD the
-   * line's head, the submission strictly an ancestor of it, and, in the shared folder, only the commits attributed to the
-   * card. The folder is read again after the history: a checkout or reset meanwhile drops it. A dirty tree is never read.
+   * project's line ref (read in the project, HR2's round 1: a clone put in its place has a line of the same name), the
+   * folder one of the project's own worktrees (the same common git dir), the submission strictly an ancestor of it, and,
+   * in the shared folder, only the commits attributed to the card. The folder is read again after the history: a
+   * checkout, reset or swap meanwhile drops it. A dirty tree is never read.
    */
   async unsubmitted(card: CardRecord, s0: CardState, submitted: string, between?: () => void | Promise<void>): Promise<Unsubmitted | null> {
     const line = s0.started?.line
     if (card.kind === 'no-code' || !line) return null
     const folder = this.wf.folderOf(s0)
     const shared = !this.wf.ownLine(s0)
+    const repo = await G.commonDir(this.project)
+    if (isUnknown(repo)) return null
     const at = async (): Promise<string | null> => {
       if (!existsSync(folder)) return null
-      const [b, h, lh] = await Promise.all([G.branch(folder), G.head(folder), G.lineHead(folder, line)])
-      return isUnknown(b) || isUnknown(h) || isUnknown(lh) || b !== line || !lh || h !== lh ? null : h
+      const [c, b, h, lh] = await Promise.all([G.commonDir(folder), G.branch(folder), G.head(folder), G.lineHead(this.project, line)])
+      if (isUnknown(c) || isUnknown(b) || isUnknown(h) || isUnknown(lh) || !samePath(c, repo)) return null
+      return b !== line || !lh || h !== lh ? null : h
     }
     // The shared folder's attribution brought up to date first: a commit just made is the card's once attributed.
     if (shared && !(await attributeFolder(this.wf).then(() => true, () => false))) return null
