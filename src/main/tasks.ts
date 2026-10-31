@@ -2065,7 +2065,9 @@ async function decideAndAnswer(n: number, patch: TaskPatch, actor: TaskActor, op
     // The decision and the history's lines with the answers' write: one transaction, with the Assistant's change record
     // (assistantChange's commit: Control, its session, the change limit) in it.
     // Only with the write that holds its answers: a refusal is written too (its Refused fact), and takes no decision.
-    (w) => (w.written.some((f) => f.kind === 'Approval' && !!(f.data as { byDecision?: unknown }).byDecision) ? { patch: { decision: t, decisionId }, opts: { note: lines, ...(opts.commit ? { commit: opts.commit } : {}) } } : {})
+    // HI-2220: what it wrote (the decision, each question closed) goes to the caller's `said` with that write only, so
+    // the short reply confirms it rather than "No change", and a refusal confirms nothing.
+    (w) => (w.written.some((f) => f.kind === 'Approval' && !!(f.data as { byDecision?: unknown }).byDecision) ? { patch: { decision: t, decisionId }, opts: { note: lines, ...(opts.commit ? { commit: opts.commit } : {}), ...(opts.said ? { said: opts.said } : {}) } } : {})
   )
   if (isRefusal(reply)) throw new WorkflowRefusedError(reply)
   return getTask(n, ws)

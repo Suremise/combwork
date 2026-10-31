@@ -732,6 +732,17 @@ describe("a decision that answers a card's open requests (HI-1932)", () => {
     ])
   })
 
+  it('HI-2220: the change confirms the decision and each question it closed, in the history\'s words, not "No change"; a refusal confirms nothing', async () => {
+    const { w, card, ids } = await asked()
+    const refused: string[] = []
+    await expect(update(w, card, { decision: 'Yes, push it', answers: [ids[2]] }, assistant, { said: refused })).rejects.toThrow(/can't answer/)
+    expect(refused).toEqual([])
+    const said: string[] = []
+    await update(w, card, { decision: 'The bee icon, in amber.', answers: [ids[0], ids[1]] }, assistant, { said })
+    // PATCH's short reply (changedText) joins these; empty, it said "No change".
+    expect(said).toEqual(['Recorded a decision: "The bee icon, in amber."', 'Closed a question for you with your decision: "Which icon?"', 'Closed a question for you with your decision: "Which colour?"'])
+  })
+
   it('refused with nothing written: a project agent, an Approve, a request not open, a first one valid and a later not, a bad shape', async () => {
     const { w, card, ids } = await asked()
     const before = facts(w, card).length
