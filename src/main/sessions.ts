@@ -243,6 +243,8 @@ export interface HookObservation {
 const GUARD_ASK_MS = 10_000
 /** An agent at its prompt, between turns: where its CLI's question by itself shows (HI-1959). */
 const AT_PROMPT: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['ready', 'finished', 'background', 'watching'])
+/** What a CLI's hooks say that shows it took input or moved by itself (HI-2191): a blocked input is free again. Not its idle notice. */
+const MOVES_INPUT: ReadonlySet<HookEvent['kind']> = new Set<HookEvent['kind']>(['start', 'prompt', 'toolStart', 'toolEnd', 'ask', 'stop', 'interrupt', 'compactStart', 'compactEnd', 'signIn', 'retry'])
 /** How many stops seen only on screen a session's record keeps (SessionRecord.screenStops). */
 const MAX_SCREEN_STOPS = 200
 /**
@@ -535,6 +537,15 @@ interface LiveSession {
   untakenPrompts?: number
   /** Its CLI's own question while idle, on its screen (HI-1959): the ask the agent waits on while it shows. */
   idleAsk?: Ask
+  /** Clears refused in a row because a key wasn't answered while its input box read empty (HI-2191); a clear that empties it resets. */
+  unanswered?: number
+  /**
+   * Its input box taking no keys (HI-2191): INPUT_BLOCKED_AFTER clears in a row refused so, something else on its screen
+   * takes them (a dialog Hive doesn't know). The agent waits for the user with `ask`, and Hive presses no key there until
+   * it is seen to take keys again (inputBlockedDrawn, a hook, Try again), in this run (`runId`). `box`: its box as read
+   * then; `since`: when (ms); `retrying` while Try again's clear runs.
+   */
+  inputBlocked?: { runId: string; ask: Ask; box: string | null; since: number; retrying?: boolean }
   /** A look at its screen for that question and a lost line is queued (one at a time, however much the CLI draws). */
   idleChecking?: boolean
   /** The held line first seen lost (HI-1959): a second look after hive.lostLine.steadySeconds decides. */
@@ -1079,6 +1090,11 @@ const CLEAR_KEYS_MOST = 200
  * was empty when it came. A plain letter: in an empty Claude Code input `/`, `?`, `!`, `#` and `@` each open something.
  */
 const CLEAR_PROBE = 'x'
+/**
+ * Clears refused in a row, each because a key wasn't answered while its input box read empty, after which the input
+ * counts as blocked (HI-2191): one delivery's tries. A clear answered late but answered resets the count.
+ */
+const INPUT_BLOCKED_AFTER = 3
 
 /**
  * A launch's task on its CLI's command line not taken yet (#712): the CLI is ready at its SessionStart and takes the task
@@ -1288,6 +1304,8 @@ class SessionManager {
     if (this.userTypedOverLine(projectPath, agentId)) return false
     // Nor while its CLI's own question shows (HI-1959): Enter would answer it (HB4's wake answered Claude Code's offer).
     if (this.cliAsks(projectPath, agentId)) return false
+    // Nor while something on its screen takes its keys (HI-2191).
+    if (this.inputBlocked(projectPath, agentId)) return false
     writePty(key, '\r')
     return true
   }
@@ -2568,6 +2586,7 @@ class SessionManager {
           this.readFooterMode(l, screen)
           this.screenDrawn(id, l)
           this.idleScreenDrawn(id, l)
+          this.inputBlockedDrawn(id, l)
         })
         this.watchTitle(id, data)
         this.watchReadyOutput(id, data)
@@ -3524,6 +3543,12 @@ class SessionManager {
     return Date.now() - u.at < (s?.typingPause ?? 15) * 1000
   }
 
+  /** When userMayBeTyping ends for an agent (ms since the epoch), while it holds; null when it doesn't (HI-2191: a wait for it). */
+  userQuietAt(projectPath: string, agentId: string): number | null {
+    if (!this.userMayBeTyping(projectPath, agentId)) return null
+    return this.userInput.get(this.key(projectPath, agentId))!.at + (config.settings.assistant?.typingPause ?? 15) * 1000
+  }
+
   /**
    * The run `runId` of the Hive Assistant was told its mode `modeId`: its conversation records it, so a resume
    * tells it again only after another switch (#334).
@@ -3587,6 +3612,8 @@ class SessionManager {
       return hiveError(msg({ id: 'session.prompt.inputNotCleared', defaultMessage: "Its input couldn't be seen empty after Hive cleared it: nothing is typed into it until it can be.", description: "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Hive pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards." }), undefined, { kind: 'conflict' })
     }
     const waitMs = advanced.number(CLEAR_KEY_WAIT) * 1000
+    // Refused because a key went unanswered while the box read empty (HI-2191): something else may take its keys.
+    let unanswered = false
     /** The box once the key just pressed is answered: drawn differently from `before`, or null while it can't be read and the screen changed. */
     const answered = async (keyName: string, before: string | null, shown: string | null): Promise<string | null> => {
       const t = Date.now()
@@ -3595,7 +3622,10 @@ class SessionManager {
         const box = read()
         if (box !== before && box !== null) return box
         if (before === null && box === null && shown !== null && screen!.text() !== shown) return null
-        if (Date.now() - t > waitMs) throw notCleared(before === null ? "its input box isn't on the screen" : `${keyName} wasn't answered within ${waitMs} ms (the box read "${userText(words(before).slice(0, 60))}")`) // i18n-ignore: why, for the log
+        if (Date.now() - t > waitMs) {
+          unanswered = before === ''
+          throw notCleared(before === null ? "its input box isn't on the screen" : `${keyName} wasn't answered within ${waitMs} ms (the box read "${userText(words(before).slice(0, 60))}")`) // i18n-ignore: why, for the log
+        }
       }
     }
     /** Presses a key and waits for it to be answered, from the box and the screen as they were before it. */
@@ -3624,13 +3654,116 @@ class SessionManager {
           probe = false
           if (box !== '') throw notCleared(`the letter Hive typed and took back left "${userText(words(box).slice(0, 60))}"`) // i18n-ignore: why, for the log
           check()
+          l.unanswered = 0
           return
         }
         box = await press('\x15', 'A Ctrl+U', box)
       }
     } catch (e) {
-      if (probe && this.live.get(liveId(projectPath, agentId))?.state.runId === runId && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x7f')
+      const same = this.live.get(liveId(projectPath, agentId)) === l && l.state.runId === runId
+      if (probe && same && this.userTypedAt(projectPath, agentId) < since) writePty(key, '\x7f')
+      if (unanswered && same) this.inputUnanswered(l)
       throw e
+    }
+  }
+
+  /**
+   * Whether something on an agent's screen takes the keys its input box should (HI-2191): nothing is typed into it, and
+   * no Enter pressed, until it is seen to take keys again.
+   */
+  inputBlocked(projectPath: string, agentId: string): boolean {
+    const l = this.live.get(liveId(projectPath, agentId))
+    return !!l?.inputBlocked && l.inputBlocked.runId === l.state.runId
+  }
+
+  /** Its input box as drawn now, as clearInput reads it ('' when empty, null when none is on the screen). */
+  private boxNow(l: LiveSession): string | null {
+    const box = l.screen && l.adapter.promptBox ? l.adapter.promptBox(l.screen.textWithoutDim()) : null
+    return box === null ? null : box.trim() ? box : ''
+  }
+
+  /**
+   * A clear refused because a key went unanswered while its box read empty (HI-2191: Claude Code 2.1.314's offer to teach
+   * auto mode, drawn under the empty box, took Hive's keys 105 times while nobody was told). At INPUT_BLOCKED_AFTER in a
+   * row the input is blocked: the agent waits for the user with why, unless it already waits on something else, whose
+   * reason stays (nothing is typed meanwhile either way).
+   */
+  private inputUnanswered(l: LiveSession): void {
+    l.unanswered = (l.unanswered ?? 0) + 1
+    if (l.unanswered < INPUT_BLOCKED_AFTER || l.inputBlocked) return
+    const st = l.state
+    const id = liveId(st.projectPath, st.agentId)
+    const text = msg({ id: 'session.status.inputBlocked', defaultMessage: 'Something on its screen is taking its keys: answer it there, then Try again', description: "An agent's status: Hive typed into its coding agent's input and nothing reached it (a dialog or question of the coding agent's own, which Hive doesn't recognise, takes the keys). The user answers it in the agent's terminal. Try again is the button beside this status: keep its name as it is translated there." })
+    const ask: Ask = { kind: 'question', blocking: true, message: englishText(text), text }
+    const at = Date.now()
+    l.inputBlocked = { runId: st.runId, ask, box: this.boxNow(l), since: at }
+    st.inputBlocked = { since: new Date(at).toISOString() }
+    log.info(`${userText(this.label(st))}: its input took no key in ${l.unanswered} clears in a row: something on its screen takes them; it waits for the user, and nothing is typed into it until it takes keys again`) // i18n-ignore: for the log
+    const ev: HookEvent = { kind: 'ask', ask }
+    if (AT_PROMPT.has(st.status)) this.carryOut(id, l, hookStep(ev, this.statusInput(l)), 'screen', ev)
+    else this.emitState(st)
+  }
+
+  /**
+   * Its input is seen to take keys again (HI-2191: its box answered the user's key, a hook moved it, or Try again's clear
+   * was answered), in the run it was blocked in: typing goes on, and the agent that waited on it is idle again. Another
+   * reason it waits for (a newer question) stays.
+   */
+  private unblockInput(id: string, l: LiveSession, why: string): void {
+    const b = l.inputBlocked
+    if (!b || this.live.get(id) !== l || l.state.runId !== b.runId) return
+    l.inputBlocked = undefined
+    l.unanswered = 0
+    l.state.inputBlocked = undefined
+    log.info(`${userText(this.label(l.state))}: its input takes keys again (${why})`) // i18n-ignore: for the log
+    if (l.state.status === 'waiting' && l.waitingOn === b.ask) this.carryOut(id, l, idleQuestionGone(this.statusInput(l)), 'screen')
+    else this.emitState(l.state)
+  }
+
+  /**
+   * The screen drawn while its input is blocked (HI-2191): once the user has typed there, a box drawn differently from
+   * when it was blocked took a key of theirs, so the input takes keys. Keys that only move about a dialog leave it so.
+   */
+  private inputBlockedDrawn(id: string, l: LiveSession): void {
+    const b = l.inputBlocked
+    if (!b || b.retrying || this.userTypedAt(l.state.projectPath, l.state.agentId) < b.since) return
+    const box = this.boxNow(l)
+    if (box !== null && box !== b.box) this.unblockInput(id, l, "its input box took the user's key") // i18n-ignore: for the log
+  }
+
+  /**
+   * Try again (HI-2191), the user's, beside a blocked input's status: one clear of its input, as before typing, for the
+   * block `since` names (LiveSessionState.inputBlocked) in its run, one at a time. Answered, typing goes on; not, it stays
+   * blocked. The user's own click, so the pause after they type doesn't hold it (their Esc that put a dialog off is
+   * typing too); a box holding their text took a key already, and is never cleared, and their typing meanwhile stops it.
+   * 'gone': that block is over (or another began); 'busy': a try or a line is being typed.
+   */
+  async retryInput(projectPath: string, agentId: string, since: string): Promise<'clear' | 'blocked' | 'gone' | 'busy'> {
+    const id = liveId(projectPath, agentId)
+    const l = this.live.get(id)
+    const b = l?.inputBlocked
+    if (!l || !b || b.runId !== l.state.runId || l.state.inputBlocked?.since !== since) return 'gone'
+    const key = this.key(projectPath, agentId)
+    if (b.retrying || this.delivering.has(key)) return 'busy'
+    const box = this.boxNow(l)
+    if (box) {
+      this.unblockInput(id, l, 'Try again: its input box holds text') // i18n-ignore: for the log
+      return 'clear'
+    }
+    b.retrying = true
+    this.delivering.add(key)
+    const started = Date.now()
+    try {
+      await this.clearInput(l, key, () => {
+        if (this.live.get(id) !== l || l.inputBlocked !== b || this.userTypedAt(projectPath, agentId) > started) throw hiveError(M.stoppedBeforePrompt)
+      })
+      this.unblockInput(id, l, 'Try again: its input took the key') // i18n-ignore: for the log
+      return 'clear'
+    } catch {
+      return l.inputBlocked === b ? 'blocked' : 'gone'
+    } finally {
+      b.retrying = false
+      this.delivering.delete(key)
     }
   }
 
@@ -3657,6 +3790,8 @@ class SessionManager {
     // Its CLI's own question on its screen (HI-1959): it takes the keys, and Enter answers it.
     const asked = (): void => {
       if (this.cliAsks(projectPath, agentId)) throw hiveError(msg({ id: 'session.prompt.cliAsks', defaultMessage: 'Its CLI shows a question for you: nothing is typed into it until you answer it there.', description: "Typing into an agent is refused: its coding agent shows a question of its own on its screen (such as Claude Code's offer to teach auto mode about your environment), which the keys would answer." }), undefined, { kind: 'conflict' })
+      // Something on its screen takes its keys (HI-2191): nothing more goes into it until it is seen to take them again.
+      if (this.inputBlocked(projectPath, agentId)) throw hiveError(msg({ id: 'session.prompt.inputBlocked', defaultMessage: 'Something on its screen is taking its keys: nothing is typed into it until you answer it there.', description: "Typing into an agent is refused: keys Hive typed into its coding agent's input didn't reach it (a dialog or question of the coding agent's own takes them)." }), undefined, { kind: 'conflict' })
     }
     waiting()
     asked()
@@ -6087,8 +6222,18 @@ class SessionManager {
     // failed on something else) while the sign-in is still expired: it needs sign-in again, not told as finished.
     if (st.signIn && this.signedOut.has(authScope(st)) && (ev?.kind === 'interrupt' || (ev?.kind === 'stop' && ev.failed)))
       step = { ...step, next: 'signin', message: null, actions: step.actions.filter((a) => a !== 'notifyFinished') }
+    // Its CLI moved by itself (HI-2191: a prompt taken, a tool, a turn's end, a question of its own): its input is no
+    // longer blocked, and the ask it waited on goes, a newer question's kept.
+    const unblocked = l.inputBlocked && l.inputBlocked.runId === st.runId && ev && cause !== 'screen' && MOVES_INPUT.has(ev.kind) && !(ev.kind === 'prompt' && ev.injected) ? l.inputBlocked : null
+    if (unblocked) {
+      l.inputBlocked = undefined
+      l.unanswered = 0
+      st.inputBlocked = undefined
+      log.info(`${userText(label)}: its input takes keys again (its CLI sent ${ev!.kind})`) // i18n-ignore: for the log
+    }
     if (step.open !== undefined) l.open = step.open
     if (step.waitingOn !== undefined) l.waitingOn = step.waitingOn
+    if (unblocked) l.open = l.open?.filter((a) => a !== unblocked.ask)
     for (const action of step.actions) {
       switch (action) {
         case 'answered':
@@ -6173,6 +6318,9 @@ class SessionManager {
     const guarded = this.settleSafeguard(l)
     // A turn's end is reported even when the status stays (its background task count may have changed).
     if (stepped || step.actions.includes('turnEnded') || carriedOn || facts || guarded) this.emitState(st)
+    // At its prompt now: its screen looked at once for its question by itself (HI-2191), which its CLI may have drawn
+    // before this hook was carried out, with nothing drawn since to look at it by.
+    if (stepped && cause !== 'screen' && AT_PROMPT.has(st.status)) this.idleScreenDrawn(id, l)
     // The CLI is signed in again, for its other agents too (this one's status is already set).
     if (worked) this.signedInAgain(authScope(st))
     // A turn's end types the go-ahead for an Allow given during it; an interrupt (the user stopping it) drops it.
@@ -6182,6 +6330,9 @@ class SessionManager {
     // i18n-ignore: the log (English)
     const told = step.actions.includes('notifyWaiting') ? 'waits for you' : step.actions.includes('notifyQuestion') ? 'asks a question' : needed && !asksYou(st) ? 'no longer needs you' : null
     if (told) log.debug(`${userText(label)}: ${told} (${cause})`)
+    // Still waiting on the block a hook ended (one that moves no status): idle again; else its new status is shown.
+    if (unblocked && st.status === 'waiting' && l.waitingOn === unblocked.ask) this.carryOut(id, l, idleQuestionGone(this.statusInput(l)), 'screen')
+    else if (unblocked && !stepped) this.emitState(st)
   }
 
   /**

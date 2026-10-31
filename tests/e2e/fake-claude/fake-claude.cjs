@@ -89,7 +89,9 @@
 // - Its offer to teach auto mode, as Claude Code 2.1.312 made it to HB4 (HI-1959): "envsetup": after its turn's Stop,
 //   "Teach auto mode about your environment?" on a cleared screen, with no hook; keys go to it, not the input: Esc puts
 //   it off (its input back, empty), Enter answers it (recorded in fake-envsetup.jsonl). With fake-input-box.txt in its
-//   home at its start, its input is 2.1.312's box (a rule, `❯` and a no-break space, a rule below). The test making
+//   home at its start, its input is 2.1.312's box (a rule, `❯` and a no-break space, a rule below). "envsetupunder": the
+//   same offer as 2.1.314 draws it (HI-2191), under its input box and footer, the empty box kept above it; "swallow": a
+//   dialog of its own Hive doesn't know ("Choose how long replies are kept?"), drawn and answered the same way. The test making
 //   fake-clear-line-<agent> clears its input line while idle, as that screen took HB4's wake.
 // - Notices (#650), as Claude Code 2.1.296 takes them: context in a PostToolUse or Stop reply reaches "the model", and a
 //   Stop answered with context (or a block) carries the turn on to another Stop with stop_hook_active. Each notice
@@ -714,6 +716,8 @@ async function runPrompt(text, enter = null) {
   await endTurn(`Done: ${text}${mode}`, Number(/\bcontext\s+(\d+)/i.exec(text)?.[1] ?? 20), /\bloststop\b/i.test(text), { late, carryOn: /\bstopcontinue\b/i.test(text) })
   if (/\bsafeguardprompt(switch)?\b/i.test(text)) await safeguardPrompt(/\bsafeguardpromptswitch\b/i.test(text))
   if (/\benvsetup\b/i.test(text)) envSetup()
+  if (/\benvsetupunder\b/i.test(text)) envSetup(ENV_SETUP_TITLE)
+  if (/\bswallow\b/i.test(text)) envSetup(SWALLOW_TITLE)
   // "statusmodel ID": the status line reports the model it runs as ID, as Claude Code's does (HI-1772: a server's model).
   const statusModel = /\bstatusmodel\s+(\S+)/i.exec(text)
   if (statusModel) await statusLine({ model: { id: statusModel[1], display_name: statusModel[1] } })
@@ -780,14 +784,34 @@ async function safeguardPrompt(switchTo) {
  * suite checks Hive never does), anything else is taken by it and lost.
  */
 let envSetupOpen = false
-function envSetup() {
+/** The title of the dialog shown under its input box, while it shows (null: none, or 2.1.312's on a cleared screen). */
+let envSetupUnder = null
+/**
+ * The dialog under its input box and footer, from the box's own row (its cursor there, the box empty) and back to it:
+ * moved back by rows, not saved and restored, as the dialog may scroll the screen (boxBelow's reason).
+ */
+const underDialog = () => `\x1b[2B\r\n${RULE}\r\n  ${envSetupUnder}\r\n\r\n  Auto mode works better when it knows your environment. Takes about a minute.\r\n\r\n  ❯ 1. Yes\r\n    2. Not now\r\n    3. Don't show again\r\n\r\n  Enter to confirm · Esc to cancel\x1b[12A\r\x1b[2C`
+const ENV_SETUP_TITLE = 'Teach auto mode about your environment?'
+/** "swallow" (HI-2191): a dialog of its own Hive doesn't know, drawn as 2.1.314 draws the offer, taking the keys the same way. */
+const SWALLOW_TITLE = 'Choose how long replies are kept?'
+/**
+ * `under`: as Claude Code 2.1.314 draws it (HI-2191, recorded), under its input box and footer, the box (empty) kept above
+ * it; the dialog titled `under`. Otherwise 2.1.312's, on a cleared screen.
+ */
+function envSetup(under = null) {
   envSetupOpen = true
+  envSetupUnder = under
+  if (under) {
+    rawOut(underDialog())
+    return
+  }
   // In place of its input box, which the cleared screen takes with it (HI-1979: not drawn back under the question).
   boxShown = false
   out("\x1b[2J\x1b[H Teach auto mode about your environment?\r\n\r\n Auto mode works better when it knows your environment. Takes about a minute.\r\n\r\n ❯ 1. Yes\r\n   2. Not now\r\n   3. Don't show again\r\n\r\n Enter to select · ↑/↓ to navigate · Esc to cancel\r\n")
 }
 function envSetupAnswered(answer) {
   envSetupOpen = false
+  envSetupUnder = null
   if (home) fs.appendFileSync(path.join(home, 'fake-envsetup.jsonl'), JSON.stringify({ agent: process.env.HIVE_AGENT || 'agent', answer, at: new Date().toISOString() }) + '\n')
   line = ''
   enters = 0
@@ -1058,6 +1082,8 @@ const promptLine = () => {
   takeBox()
   rawOut(inputBox ? `\r\n${RULE}\r\n❯ ${boxBelow(2)}` : '\r\n❯ \r\n  ? for shortcuts\r\n')
   boxShown = inputBox
+  // Its dialog under the box (HI-2191, as 2.1.314 draws it) stays under it.
+  if (inputBox && envSetupUnder) rawOut(underDialog())
 }
 /** While it works: its spinner, then its input (the box, empty: HI-1979) and footer below (BUSY_LINES lines down from where it starts). */
 const BUSY = inputBox ? `\r\n✻ Brewing… (esc to interrupt)\r\n${RULE}\r\n❯ \r\n${RULE}\r\n  ? for shortcuts\r\n` : '\r\n✻ Brewing… (esc to interrupt)\r\n❯ \r\n  ? for shortcuts\r\n'

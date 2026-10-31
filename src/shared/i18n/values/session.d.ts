@@ -132,6 +132,7 @@ interface HiveMessageValues {
   'session.plan.noToggle': { provider: string | number }
   'session.plan.typing': undefined
   'session.prompt.cliAsks': undefined
+  'session.prompt.inputBlocked': undefined
   'session.prompt.inputNotCleared': undefined
   'session.prompt.untaken': undefined
   'session.purge.changed': undefined
@@ -194,6 +195,7 @@ interface HiveMessageValues {
   'session.status.connectionKeepsDropping': undefined
   'session.status.connectionNotBack': undefined
   'session.status.failedTurn': undefined
+  'session.status.inputBlocked': undefined
   'session.status.safeguardAsks': { provider: string | number }
   'session.status.safeguardAsksTools': { provider: string | number; tools: string | number }
   'session.status.safeguardIdle': undefined

@@ -558,6 +558,8 @@ export interface HiveRequests {
   'session:joinResume': (projectPath: string, agentId: string, sessionId: string) => 'running' | 'other'
   /** The user says an agent whose state is unknown (silent, no sign of its turn's end) is idle (#648). */
   'session:markIdle': (projectPath: string, agentId: string) => void
+  /** Try again on a blocked input (HI-2191): one clear of it, for the block `since` names; what came of it. */
+  'session:retryInput': (projectPath: string, agentId: string, since: string) => 'clear' | 'blocked' | 'gone' | 'busy'
   'session:archive': (projectPath: string, sessionId: string, archived: boolean) => void
   'session:rename': (projectPath: string, sessionId: string, name: string) => void
   /** Deletes a session that isn't running from Hive (its record and backups; the CLI's transcript stays). */

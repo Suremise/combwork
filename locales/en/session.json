@@ -523,6 +523,10 @@
     "defaultMessage": "Its CLI shows a question for you: nothing is typed into it until you answer it there.",
     "description": "Typing into an agent is refused: its coding agent shows a question of its own on its screen (such as Claude Code's offer to teach auto mode about your environment), which the keys would answer."
   },
+  "session.prompt.inputBlocked": {
+    "defaultMessage": "Something on its screen is taking its keys: nothing is typed into it until you answer it there.",
+    "description": "Typing into an agent is refused: keys Hive typed into its coding agent's input didn't reach it (a dialog or question of the coding agent's own takes them)."
+  },
   "session.prompt.inputNotCleared": {
     "defaultMessage": "Its input couldn't be seen empty after Hive cleared it: nothing is typed into it until it can be.",
     "description": "Typing into an agent is refused (a message's notice is put off and tried again; Compact fails): Hive pressed keys to clear the draft in its coding agent's input, and didn't see the input empty afterwards."
@@ -770,6 +774,10 @@
   "session.status.failedTurn": {
     "defaultMessage": "The turn ended on an error",
     "description": "An agent's status when its CLI ended its turn on an error (an API connection error, say) without saying what."
+  },
+  "session.status.inputBlocked": {
+    "defaultMessage": "Something on its screen is taking its keys: answer it there, then Try again",
+    "description": "An agent's status: Hive typed into its coding agent's input and nothing reached it (a dialog or question of the coding agent's own, which Hive doesn't recognise, takes the keys). The user answers it in the agent's terminal. Try again is the button beside this status: keep its name as it is translated there."
   },
   "session.status.safeguardAsks": {
     "defaultMessage": "A safety classifier stopped a response: {provider} asks what to do",

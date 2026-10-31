@@ -688,14 +688,16 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   /**
    * Claude Code's question by itself after a turn (HI-1959: 2.1.312's offer to teach auto mode about the environment),
    * which sends no hook: the advanced setting claude-code.screen.idleQuestion (its title, a line of its own), in the lines
-   * written last. Its dialog replaces the input box: with the box drawn, the same words are a prompt's or a reply's
-   * (HR3's round 1), never the dialog.
+   * written last. Its dialog replaces the input box (2.1.312's wizard), or is drawn under it and its footer (2.1.314, as
+   * recorded: the empty box stays above it, HI-2191). So with a box drawn only the title under the last one counts: above
+   * it, the same words are a prompt's or a reply's (HR3's round 1 of HI-1959), never the dialog.
    */
   idleQuestion(screen: string): string | null {
-    const bottom = screen.trimEnd().split('\n').slice(-SAFEGUARD_PROMPT_LINES).join('\n')
+    const box = this.lastBox(screen)
+    const under = box ? screen.slice(box.index! + box[0].length) : screen
+    const bottom = under.trimEnd().split('\n').slice(-SAFEGUARD_PROMPT_LINES).join('\n')
     const asked = advanced.pattern('claude-code.screen.idleQuestion').exec(bottom)
-    if (!asked || this.promptText(screen) !== null) return null
-    return asked[0].trim()
+    return asked ? asked[0].trim() : null
   }
 
   /**
@@ -708,10 +710,16 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 
   /** promptText's box as drawn: the last one's first group, its rows kept (HI-1979). */
   promptBox(screen: string): string | null {
+    const last = this.lastBox(screen)
+    return last ? (last[1] ?? '') : null
+  }
+
+  /** The last input box the advanced setting claude-code.screen.input finds on the screen, or null. */
+  private lastBox(screen: string): RegExpMatchArray | null {
     const re = advanced.pattern('claude-code.screen.input')
     let last: RegExpMatchArray | null = null
     for (const m of screen.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`))) last = m
-    return last ? (last[1] ?? '') : null
+    return last
   }
 
   startHint(text: string): StartHint | null {

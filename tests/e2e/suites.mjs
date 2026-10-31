@@ -167,6 +167,7 @@ export const SUITES = [
   { name: 'image' },
   { name: 'inbox', serial: 'window focus' },
   { name: 'inboxnotices' },
+  { name: 'inputblocked' },
   { name: 'installdir' },
   { name: 'intents' },
   { name: 'isolatedcheck' },

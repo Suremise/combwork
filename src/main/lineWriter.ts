@@ -46,6 +46,25 @@ export const inFlightNow = (): boolean => inFlight.size > 0
 /** Agents Hive is typing a line into now (one at a time each). */
 const writing = new Set<string>()
 
+/**
+ * Told when Hive is done with an agent's line (HI-2191): its typing over, or its check that the CLI took it. Neither
+ * changes the agent's status, so what waits on `whyNoLine` for these (a slot's placement) looks again by it.
+ */
+const freed = new Set<(projectPath: string, agentId: string) => void>()
+export function onLineFreed(fn: (projectPath: string, agentId: string) => void): () => void {
+  freed.add(fn)
+  return () => void freed.delete(fn)
+}
+function tellFreed(projectPath: string, agentId: string): void {
+  for (const fn of [...freed]) {
+    try {
+      fn(projectPath, agentId)
+    } catch (e) {
+      log.warn('a line freed: its listener failed', e)
+    }
+  }
+}
+
 /** Whether an agent has a line of Hive's being made that goes first (watches.ts: a fired watch whose line isn't made yet). */
 let lineComing: (projectPath: string, agentId: string) => boolean = () => false
 export function onLineComing(fn: (projectPath: string, agentId: string) => boolean): void {
@@ -65,6 +84,8 @@ export function whyNoLine(projectPath: string, agentId: string, need: DeliveryNe
   if (!st) return "it isn't running" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
   if (writing.has(agentKey(projectPath, agentId))) return 'Hive is already typing a line into it' // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
   if (st.hooksMissing) return "its CLI's hooks aren't reaching Hive, so Hive can't tell when it is free" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
+  // Something on its screen takes its keys (HI-2191): it waits for the user to answer it there.
+  if (sessions.inputBlocked(projectPath, agentId)) return 'something on its screen is taking its keys, and it waits for the user to answer it there' // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
   if (!readyFor(st, need)) return st.status === 'watching' ? 'it is waiting on cards, and takes no new work until it is woken' : `it is ${st.status}` // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
   if (sessions.userMayBeTyping(projectPath, agentId)) return 'the user has just typed in its terminal and may still be writing there' // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
   if (sessions.lineWaiting(projectPath, agentId)) return "its CLI hasn't taken the line Hive typed before" // i18n-ignore: the reply of an agent's call (deliveries.ts, agent-facing)
@@ -137,6 +158,7 @@ export async function typeLine(projectPath: string, agentId: string, line: strin
     return false
   } finally {
     writing.delete(key)
+    tellFreed(projectPath, agentId)
   }
 }
 
@@ -160,6 +182,7 @@ export async function confirmTaken(projectPath: string, agentId: string, before:
     confirmsRunning--
     follow?.settled?.()
     release?.()
+    tellFreed(projectPath, agentId)
   }
 }
 let confirmsRunning = 0

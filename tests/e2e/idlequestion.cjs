@@ -1,7 +1,8 @@
 // A CLI's question by itself while idle (HI-1959), on a fake Claude Code agent (fake-claude/) with Claude Code 2.1.312's
 // input box: after a turn it offers to teach auto mode about the environment, with no hook, as it did to HB4. The agent
 // waits for the user with the question; a message left meanwhile isn't typed into the question, and no Enter answers it;
-// once the user puts it off (Esc), the agent is idle and the message is delivered. Then a line Hive typed that its CLI
+// once the user puts it off (Esc), the agent is idle and the message is delivered; the same for the offer drawn under its
+// empty input box, as 2.1.314 draws it (HI-2191). Then a line Hive typed that its CLI
 // didn't take (both Enters dropped), taken off its input as that screen took HB4's wake: once its input is empty at its
 // prompt, still so on Hive's second look, the hold goes and the message is typed again, and read once. Dev build,
 // throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -116,6 +117,21 @@ const check = (name, ok, extra = '') => {
     const rung = doorbells()
     check('nothing of Hive\'s was typed while the question showed: its doorbell came after the user\'s Esc', rung.length > 0 && rung.every((r) => r.at >= escAt), JSON.stringify({ escAt, rung: rung.map((r) => r.at) }))
     check('Hive never answered the question (no Enter on it)', JSON.stringify(jsonl('fake-envsetup.jsonl').map((r) => r.answer)) === '["later"]', JSON.stringify(jsonl('fake-envsetup.jsonl')))
+    await until(() => idle(agent.id))
+
+    // ---- The same offer as Claude Code 2.1.314 draws it (HI-2191): under its input box, the empty box kept above it.
+    await lib.typeLine(inv, key, claudeHome, null, 'envsetupunder', { live: () => live(agent.id) })
+    const under = await until(async () => {
+      const s = await live(agent.id)
+      return s?.status === 'waiting' && s
+    })
+    check("2.1.314's offer, under its empty input box: the agent waits for the user with it", !!under && String(under.statusMessage ?? '').includes(QUESTION), JSON.stringify(under && { status: under.status, message: under.statusMessage }))
+    const third = await api('POST', '/v1/projects/alpha/agents/Builder/message', { text: 'The changelog is ready for review.' })
+    const underEsc = new Date().toISOString()
+    await inv('pty:write', key, '\x1b')
+    check('…put off, it is idle again and the message is read', !!(await until(() => idle(agent.id))) && !!(await until(() => read(third.body?.id))), JSON.stringify(await live(agent.id)))
+    check("…and nothing of Hive's was typed into it while it showed", doorbells().filter((r) => r.data.includes(`(${third.body?.id})`)).every((r) => r.at >= underEsc), JSON.stringify(doorbells().slice(-3)))
+    check('…never answered by Hive', JSON.stringify(jsonl('fake-envsetup.jsonl').map((r) => r.answer)) === '["later","later"]', JSON.stringify(jsonl('fake-envsetup.jsonl')))
     await until(() => idle(agent.id))
 
     // ---- A line Hive typed that its CLI didn't take, then taken off its input (as the question took HB4's wake).

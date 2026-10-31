@@ -1055,6 +1055,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'session:carryOn': (p, agentId) => sessions.carryOn(workspace.assertProject(p), agentId),
     'session:joinResume': (p, agentId, sessionId) => sessions.joinResume(p, agentId, sessionId),
     'session:markIdle': (p, agentId) => sessions.markIdle(workspace.assertSessionHost(p), agentId),
+    'session:retryInput': (p, agentId, since) => sessions.retryInput(workspace.assertSessionHost(p), agentId, String(since)),
     'session:archive': (p, id, archived) => sessions.archive(p, id, archived),
     'session:rename': (p, id, name) => sessions.rename(p, id, name),
     'session:delete': (p, id) => sessions.delete(p, id),

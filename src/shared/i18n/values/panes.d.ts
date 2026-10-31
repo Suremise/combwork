@@ -73,6 +73,12 @@ interface HiveMessageValues {
   'panes.header.asksSomething': undefined
   'panes.header.failed': undefined
   'panes.header.failedTip': { why: string | number }
+  'panes.header.inputBlocked': undefined
+  'panes.header.inputBlockedTip': undefined
+  'panes.header.inputRetry': undefined
+  'panes.header.inputRetryFailed': undefined
+  'panes.header.inputStillBlocked': undefined
+  'panes.header.inputStillBlockedBody': undefined
   'panes.header.markIdle': undefined
   'panes.header.markIdleFailed': undefined
   'panes.header.more': undefined
