@@ -153,7 +153,10 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
     lib.trustForCodex(home)
     // In Ask (on-request), not its Approve for me, whose reviewer would decide a tool outside its subset itself: here
     // Codex asks the user, so the subset's tools are seen running unasked and the others asking.
-    await lib.setLaunch(inv, home, 'assistant', { ...small, permissionMode: 'ask' })
+    // On Codex first: its CLI follows its account's (HI-2122), and setLaunch sets values on the account it is on.
+    const { provider, ...launch } = small
+    await inv('agents:update', home, 'assistant', { provider })
+    await lib.setLaunch(inv, home, 'assistant', { ...launch, permissionMode: 'ask' })
     // A native server named hive in the Codex config of the folder the Assistant works in (the workspace's, trusted here),
     // approving every tool and the note's tool by name: Codex merges it into Hive's key by key, and Hive's approvals must
     // still win (#1281).
