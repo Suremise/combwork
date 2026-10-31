@@ -54,6 +54,10 @@ The checks are positive and negative:
 - **Card decisions** (#357): a decision the user records while the agent works on the card is flagged in its next board reply, and the agent reads the card again before moving it to Review; a reviewer fails work that ignores one of the card's decisions, also when woken for round 2 with a decision recorded since round 1 (its first reply flags it, and it reads the card in full before its verdict). An agent that asks the user and ends its turn is told of the decision recorded for it (#401), also when it asked about a card in Todo, which it takes first (#438).
 - **Merging when the base moved** after the checks (another branch merged meanwhile): the agent merges the base into
   its branch again and reruns the checks on that combination before merging (the fakes do it with real git commands).
+  The merge scenarios' checks (`check.js`) record each run in the project's `check-runs.txt` wherever it runs (HI-2233):
+  in the project, a worktree, a clone or a plain scratch copy of the files, with the tree it checked and the folder, so a
+  run in a scratch copy counts for what it checked; a check acted out another way (its test copied into `node -e`) is no
+  run. merge-checks-fail's fakes run them in a plain copy.
 - **Handovers**: the latest handover's next step, or the named one's, is done, and the other isn't. A wrap-up writes a
   handover without re-running tests.
 - **Notes**: a lasting rule goes to a shared note, while progress goes on the card.
@@ -229,7 +233,9 @@ its hive tool does, so a model trial gets the same fixture as a fake (#1545).
   checks, skills read, executed hive calls and mentions, the final reply whole up to 6,000 characters, so a check that
   judged it can be audited (HI-2230; `finalReplyLength` when longer), versions, guidance and source, usage) and `summary.md` (a
   table). `results.json` is written as each trial ends (`meta.incomplete` says how many of how many until the run
-  has ended), so a run cut short keeps what it had. `BASELINE.md` here records the latest baseline. Run the trials
+  has ended), so a run cut short keeps what it had. A run holds its folder while it runs (`runner.json`, its process):
+  no other run's start prunes it, however many start meanwhile (HI-2234), and should the folder go all the same, the
+  run makes it again with everything it had written, says so, and carries on. `BASELINE.md` here records the latest baseline. Run the trials
   again after changing Hive's guidance, a skill or a tool's description, and compare.
 - **Progress** (#1457): run in a Hive agent's session, a run shows in that Hive's Progress panel with a step per trial,
   named with the results so far (`review-card · 11 ok, 1 failed`), and an estimate from the trials timed before (by
@@ -307,7 +313,9 @@ spread to judge a change by: use `--repeat N` for model trials.
 - **Baselines**: `--save-baseline NAME` copies the run's `benchmark.json` to `scenarios/baselines/NAME.json`: the new
   one is read first and swapped in atomically, and an existing baseline of that name is archived as
   `NAME.<its time>.json` (`-2`, `-3`… if that name is taken), never overwritten; the 5 newest archives are kept. Each run
-  gets a results folder of its own; the newest 30 are kept. Nothing is invented for a run that wasn't recorded.
+  gets a results folder of its own; the newest 30 fake runs (`fake`, `fake-codex`, `fake-copilot`) and, counted apart,
+  the newest 30 model trials are kept (HI-2236: fake runs never push a paid trial's results out), besides those a card
+  cites and those a run still writes into. Nothing is invented for a run that wasn't recorded.
 - `tests/fixtures/benchmarks` holds a baseline from a real fake run, an intentional reduction of it and the same
   reduction that broke `card-detail`. `tests/benchmark.test.ts` checks that the first is "smaller, still correct" and the
   second "smaller but failing".

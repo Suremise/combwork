@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 106
+const FIXTURES_VERSION = 107
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -265,6 +265,41 @@ async function builderStopped(c, card, key) {
  * committed (`card.files`, by default src/greet.js), and submitted as the user moves it, so a project's rules leave it
  * there.
  */
+/**
+ * Card `n`'s latest submission as Hive recorded it, when it is a diff to review (HI-2223): a revision after its base,
+ * with files changed. Otherwise null.
+ */
+async function submittedDiff(c, n) {
+  const s = ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).filter((f) => f.kind === 'Submitted').at(-1)?.data
+  return s && s.revision && s.revision !== s.base && (s.files ?? []).length > 0 ? s : null
+}
+/** A setup's submission that has to be a diff to review (HI-2223), or the setup fails saying what it was. */
+async function assertDiff(c, n) {
+  if (await submittedDiff(c, n)) return
+  const s = ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).filter((f) => f.kind === 'Submitted').at(-1)?.data
+  throw new Error(`setup: #${n}'s submission is no diff to review: ${JSON.stringify(s && { revision: s.revision, base: s.base, files: s.files })}`)
+}
+/**
+ * Card `key` taken by `who` (Doing: its base), its work committed (`files`, or `work()` committing itself), and moved to
+ * Review, as `c.card` moves cards (tasks:update: in a project whose rules have no Review step, which a user's move
+ * refuses), its submission a diff to review (HI-2223). Comments (`after`) once it is there. Its number.
+ */
+async function reviewedWork(c, key, { files = {}, work, after = [], ...card }, who = 'implementer') {
+  const n = await c.card(key, { ...card, column: 'doing', agent: who })
+  if (work) work()
+  else {
+    for (const [rel, text] of Object.entries(files)) {
+      require('fs').mkdirSync(require('path').dirname(require('path').join(c.alpha, rel)), { recursive: true })
+      c.write(rel, text)
+    }
+    c.git('add', '-A')
+    c.git('-c', `user.name=${who}`, '-c', `user.email=${who}@example.com`, 'commit', '-qm', card.title)
+  }
+  await c.inv('tasks:update', n, { column: 'review', agent: c.agents[who].id })
+  if (!(await require('../e2e/lib.cjs').until(() => submittedDiff(c, n), 15000))) await assertDiff(c, n)
+  for (const text of after) await c.api('POST', `/v1/tasks/${n}/comments`, { text })
+  return n
+}
 async function submittedCard(c, key, card, who = 'coder') {
   const { files = { 'src/greet.js': 'module.exports = (name) => `Hi, ${name}`\n' }, ...rest } = card
   const n = await c.card(key, { ...rest, agent: who })
@@ -276,6 +311,7 @@ async function submittedCard(c, key, card, who = 'coder') {
   c.git('add', '-A')
   c.git('-c', `user.name=${who}`, '-c', `user.email=${who}@example.com`, 'commit', '-qm', card.title)
   await userMove(c, n, 'review')
+  await assertDiff(c, n)
   for (const text of card.after ?? []) await c.api('POST', `/v1/tasks/${n}/comments`, { text })
   return n
 }
@@ -390,47 +426,77 @@ const giveVerdict = (c, n, result, by = 'Implementer (alpha)') => {
 }
 /** The card loop scenarios' code: retries with a delay that is never awaited (round 1's fix, incomplete). */
 /**
- * The project's checks for the merge scenarios (#306, #374), in check-runs.txt (ignored): each run records as it starts
- * the commit it checks, where the base is, the commit a merge in progress brings in (`git merge --no-commit`: its
- * MERGE_HEAD, else -), and the tree it checks: the tracked files as they are on disk, staged or not (written through a
- * copy of the index, so the agent's own is untouched; - when git can't, as mid-conflict), `start <id> <HEAD> <base>
- * <MERGE_HEAD> <tree> <time>`; and as it ends its result, `end <id> pass|fail <time>`. A branch whose feature.js says
- * "broken" fails them (merge-checks-fail).
+ * The project's checks for the merge scenarios (#306, #374), in the project's check-runs.txt (ignored) wherever they run
+ * (HI-2233: in the project, a worktree, a clone or a plain copy of the files, as a scratch copy is): each run records as
+ * it starts the commit it checks, where the base is (in the project's repository), the commit a merge in progress brings
+ * in (`git merge --no-commit`: its MERGE_HEAD), the tree it checks, the feature.js in that tree, and the folder it ran
+ * in, `start <id> <HEAD> <base> <MERGE_HEAD> <tree> <time> <feature.js> <folder>` (- for each it hasn't); and as it ends
+ * its result, `end <id> pass|fail <time>`. The tree: in a checkout of its own (the folder is its top level) the tracked
+ * files as they are on disk, staged or not, through a copy of its index (the agent's own untouched; HEAD and MERGE_HEAD
+ * are its own); in a plain copy, or a folder within a checkout, every file in the folder but those it ignores, written
+ * to the project's repository (no HEAD there). Each run that starts records, and only a run of check.js: a check run
+ * acted out another way (its test copied into `node -e`) is no run. A branch whose feature.js says "broken" fails them
+ * (merge-checks-fail).
  */
-const checkJs = (base) => `const fs = require('fs')
-const git = (args) => require('child_process').execSync('git ' + args, { encoding: 'utf8' }).trim()
+const checkJs = (base, repo) => `const fs = require('fs')
+const path = require('path')
+const { execFileSync } = require('child_process')
+// The project's repository and its record of the checks' runs, wherever they run.
+const REPO = ${JSON.stringify(repo.gitDir)}
+const LOG = ${JSON.stringify(repo.log)}
 const id = process.pid + '-' + Date.now()
-let merging = '-'
+const where = process.cwd()
+/** git's output, trimmed, or null when it fails. */
+const git = (args, more = {}) => {
+  try {
+    return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, ...more } }).trim()
+  } catch {
+    return null
+  }
+}
+const real = (p) => {
+  try {
+    return fs.realpathSync.native(p).toLowerCase()
+  } catch {
+    return null
+  }
+}
+// A checkout of its own (the project, a worktree, a clone), or a plain copy read through the project's repository.
+const top = git(['rev-parse', '--show-toplevel'])
+const own = !!top && real(top) === real(where)
+const at = own ? {} : { GIT_DIR: REPO, GIT_WORK_TREE: where }
+const index = path.join(REPO, 'check-index-' + id)
+let tree = null
+let feature = null
 try {
-  merging = git('rev-parse -q --verify MERGE_HEAD') || '-'
+  if (own) fs.copyFileSync(path.resolve(git(['rev-parse', '--git-path', 'index'])), index)
+  // These two git calls only, on the copy of the index (or a new one).
+  if (git(['add', own ? '-u' : '-A'], { ...at, GIT_INDEX_FILE: index }) !== null) tree = git(['write-tree'], { ...at, GIT_INDEX_FILE: index })
+  if (tree) feature = git(['rev-parse', '-q', '--verify', tree + ':feature.js'], at)
 } catch {}
-let tree = '-'
-const index = '.git/check-index-' + id
-try {
-  fs.copyFileSync(git('rev-parse --git-path index'), index)
-  // These two git calls only, on the copy of the index.
-  process.env.GIT_INDEX_FILE = index
-  git('add -u')
-  tree = git('write-tree')
-} catch {}
-delete process.env.GIT_INDEX_FILE
 fs.rmSync(index, { force: true })
-fs.appendFileSync('check-runs.txt', 'start ' + id + ' ' + git('rev-parse HEAD') + ' ' + git('rev-parse ${base}') + ' ' + merging + ' ' + tree + ' ' + new Date().toISOString() + '\\n')
+const head = own ? git(['rev-parse', '-q', '--verify', 'HEAD']) : null
+const merging = own ? git(['rev-parse', '-q', '--verify', 'MERGE_HEAD']) : null
+const baseAt = git(['--git-dir', REPO, 'rev-parse', '-q', '--verify', ${JSON.stringify(base)}])
+const f = (x) => x || '-'
+fs.appendFileSync(LOG, ['start', id, f(head), f(baseAt), f(merging), f(tree), new Date().toISOString(), f(feature), where].join(' ') + '\\n')
 const ok = !(fs.existsSync('feature.js') && fs.readFileSync('feature.js', 'utf8').includes('broken'))
-fs.appendFileSync('check-runs.txt', 'end ' + id + ' ' + (ok ? 'pass' : 'fail') + ' ' + new Date().toISOString() + '\\n')
+fs.appendFileSync(LOG, 'end ' + id + ' ' + (ok ? 'pass' : 'fail') + ' ' + new Date().toISOString() + '\\n')
 console.log(ok ? 'checks passed' : 'checks FAILED: feature.js is broken')
 process.exit(ok ? 0 : 1)
 `
 /**
- * The checks' runs, in order: [{ head, base, merging, tree, start, end, ok }] (times in ms; merging, the commit a merge
- * in progress brings in, and tree, the tree checked, or null). A run that hasn't ended has end and ok null; a line the
- * setup wrote (`<HEAD> <base>`, a run long ago) has no times or tree and passed.
+ * The checks' runs, in order: [{ head, base, merging, tree, feature, where, start, end, ok }] (times in ms; head, null in
+ * a plain copy; merging, the commit a merge in progress brings in, tree, the tree checked, feature, its feature.js, and
+ * where, the folder they ran in, or null). A run that hasn't ended has end and ok null; a line the setup wrote
+ * (`<HEAD> <base>`, a run long ago) has no times or tree and passed.
  */
 const checkRunsOf = (c) => {
   const runs = []
   for (const l of (c.read('check-runs.txt') ?? '').split(/\r?\n/).filter(Boolean)) {
     const f = l.split(' ')
-    if (f[0] === 'start') runs.push({ id: f[1], head: f[2], base: f[3], merging: f[4] === '-' ? null : f[4], tree: f[5] === '-' ? null : f[5], start: Date.parse(f[6]), end: null, ok: null })
+    const v = (x) => (!x || x === '-' ? null : x)
+    if (f[0] === 'start') runs.push({ id: f[1], head: v(f[2]), base: v(f[3]), merging: v(f[4]), tree: v(f[5]), start: Date.parse(f[6]), end: null, ok: null, feature: v(f[7]), where: v(f.slice(8).join(' ')) })
     else if (f[0] === 'end') {
       const r = runs.find((x) => x.id === f[1])
       if (r) Object.assign(r, { ok: f[2] === 'pass', end: Date.parse(f[3]) })
@@ -442,25 +508,31 @@ const checkRunsOf = (c) => {
  * When git updated a branch, to the millisecond (#374): a reference-transaction hook (git's own shell, cheap: nothing
  * runs for a transaction that changes no branch) records each branch update as its transaction is prepared (before the
  * ref changes) and committed (after), `<phase> <ms> <from> <to> <ref>` a line in .git/ref-times.txt, so a merge's moment
- * is the interval between them.
+ * is the interval between them. The file by its full path (`file`), so an update in a worktree records too: one written
+ * from the worktree's folder failed, and a hook failing as the transaction is prepared stops the update (HI-2233). It
+ * never fails the update.
  */
-const REF_TIMES_HOOK = `#!/bin/sh
+const refTimesHook = (file) => `#!/bin/sh
 case "$1" in prepared|committed) ;; *) exit 0 ;; esac
 input=$(cat)
 case "$input" in *" refs/heads/"*) ;; *) exit 0 ;; esac
 ms=$(date +%s%3N)
 printf '%s\\n' "$input" | while read -r from to ref; do
-  case "$ref" in refs/heads/*) echo "$1 $ms $from $to $ref" >> .git/ref-times.txt ;; esac
+  case "$ref" in refs/heads/*) echo "$1 $ms $from $to $ref" >> '${file.replace(/\\/g, '/')}' ;; esac
 done
+exit 0
 `
 /** A merge scenario's repository: the checks committed on the base, then a feature branch (feature.js says `feature`). */
 function mergeRepo(c, feature = "module.exports = 'feature'\n") {
   c.git('config', 'user.email', 'agent@example.com')
   c.git('config', 'user.name', 'Agent')
-  c.write('.git/hooks/reference-transaction', REF_TIMES_HOOK)
+  const path = require('path')
+  const top = path.resolve(c.git('rev-parse', '--show-toplevel').trim())
+  const gitDir = path.resolve(c.git('rev-parse', '--absolute-git-dir').trim())
+  c.write('.git/hooks/reference-transaction', refTimesHook(path.join(gitDir, 'ref-times.txt')))
   const base = c.git('branch', '--show-current').trim()
   c.write('.gitignore', 'check-runs.txt\n')
-  c.write('check.js', checkJs(base))
+  c.write('check.js', checkJs(base, { gitDir, log: path.join(top, 'check-runs.txt') }))
   c.git('add', '-A')
   c.git('commit', '-qm', 'The checks')
   c.git('checkout', '-qb', 'feature')
@@ -556,6 +628,26 @@ function slotHolds(o, name, branch) {
  * times are known: a merge git kept no time of is judged on the content alone).
  */
 const wentInto = (runs, merged) => runs.filter((r) => r.tree === merged.tree && r.base === merged.before && r.ok === true && (merged.at == null || r.end <= merged.at.from)).at(-1) ?? null
+/** The checks' runs for a check's detail: the commit (or, in a plain copy, the tree) each checked, its base, and the folder when not the project (HI-2233). */
+const runsText = (c, runs) => {
+  const path = require('path')
+  const top = path.resolve(c.git('rev-parse', '--show-toplevel').trim()).toLowerCase()
+  return runs.map((r) => `${r.head ?? r.tree ?? '-'}@${r.base}${r.where && path.resolve(r.where).toLowerCase() !== top ? ` in ${r.where}` : ''}`).join(', ')
+}
+/** Whether commit `x` is in the project's repository (a clone's own commits aren't). */
+const known = (c, x) => {
+  try {
+    c.git('cat-file', '-e', `${x}^{commit}`)
+    return true
+  } catch {
+    return false
+  }
+}
+/**
+ * Whether a run of the checks had the branch in: the branch's feature.js in the tree it checked (wherever it ran,
+ * HI-2233), or the branch in the commit it checked or the merge in progress there.
+ */
+const checkedBranch = (c, r) => (!!r.feature && r.feature === c.git('rev-parse', `${c.merge.feature}:feature.js`).trim()) || [r.head, r.merging].some((x) => !!x && known(c, x) && ancestor(c, c.merge.feature, x))
 /** The hold that covered the whole of [from, to] (ms), or null: an unknown time is never covered. */
 const holdThrough = (holds, from, to) => (from == null || to == null ? null : (holds.find((h) => h.from <= from && (h.to == null || to <= h.to)) ?? null))
 /**
@@ -679,6 +771,11 @@ module.exports = async function sync(run) {
   }
 }
 `
+/** sync.js before its card's work (HI-2223): no retries, so the work submitted (SYNC_JS) is a diff to review. */
+const SYNC_BEFORE = `module.exports = async function sync(run) {
+  return await run()
+}
+`
 /** The hive tool calls in the transcript (mcp__hive__x, hive.x, Hive's "hive · x"), with their replies. */
 const hiveReplies = (o, tool) => o.tools.filter((t) => new RegExp(`(^|__|\\.|\\s)${tool}$`).test(t.name) && !t.isError)
 
@@ -772,20 +869,26 @@ const RECORD_PROJECT = {
   'math.js': 'module.exports = { add: (a, b) => a + b }\n',
   'math.test.js': "const test = require('node:test')\nconst assert = require('node:assert')\ntest('adds', () => assert.equal(require('./math').add(1, 2), 3))\n"
 }
-/** The builder's work on RECORD_PROJECT, committed, and its card in Review with a run record of that commit. */
-async function recordedWork(c) {
-  c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\n")
-  c.write('greet.test.js', "const test = require('node:test')\nconst assert = require('node:assert')\ntest('greets', () => assert.equal(require('./greet')('Ann'), 'Hello, Ann'))\n")
-  c.git('add', '-A')
-  c.git('commit', '-qm', 'greet: Hello, with a test')
-  const code = c.git('rev-parse', '--short', 'HEAD').trim()
-  await c.card('b', {
+/**
+ * The builder's work on RECORD_PROJECT and its card in Review with a run record of that work's commit. Taken in Doing
+ * first, so its submission is a commit after its base, a diff to review (HI-2223: with the card made in Review after the
+ * commit, the revision was the base). `more`: commits made after the record (review-record-stale), in the submission.
+ */
+async function recordedWork(c, more = () => {}) {
+  let code = ''
+  const n = await reviewedWork(c, 'b', {
     title: 'Greeting says Hello',
     description: 'greet.js returns "Hello, <name>" (it says "Helo"), with a test.',
-    column: 'review',
-    agent: 'implementer',
-    comments: [`Done: greet.js fixed, greet.test.js added.\n\nRun record: code ${code}, nothing uncommitted, ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC. \`npm test\`: 2 files, 2 tests, all passed (4 min 05 s).`]
+    work: () => {
+      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\n")
+      c.write('greet.test.js', "const test = require('node:test')\nconst assert = require('node:assert')\ntest('greets', () => assert.equal(require('./greet')('Ann'), 'Hello, Ann'))\n")
+      c.git('add', '-A')
+      c.git('commit', '-qm', 'greet: Hello, with a test')
+      code = c.git('rev-parse', '--short', 'HEAD').trim()
+      more()
+    }
   })
+  await c.api('POST', `/v1/tasks/${n}/comments`, { text: `Done: greet.js fixed, greet.test.js added.\n\nRun record: code ${code}, nothing uncommitted, ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC. \`npm test\`: 2 files, 2 tests, all passed (4 min 05 s).` })
 }
 /**
  * The shell commands a tool call ran, and nothing else of it (a description, a verdict that mentions `npm test`): a shell
@@ -1007,10 +1110,11 @@ module.exports.SCENARIOS = [
     title: 'Review a card changed after its run record: the record is for older code, so the tests run again, saying why (#533)',
     files: RECORD_PROJECT,
     async setup(c) {
-      await recordedWork(c)
-      // After the record: another change, with no new record.
-      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\nmodule.exports.bye = (name) => 'Bye, ' + name\n")
-      c.git('commit', '-qam', 'greet: bye')
+      // After the record: another change, with no new record, in the submission (HI-2223: the revision reviewed).
+      await recordedWork(c, () => {
+        c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\nmodule.exports.bye = (name) => 'Bye, ' + name\n")
+        c.git('commit', '-qam', 'greet: bye')
+      })
     },
     prompt: (c) => `Review card #${c.cards.b}.`,
     fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, false)}`,
@@ -1443,9 +1547,10 @@ module.exports.SCENARIOS = [
   {
     id: 'review-decision-next-round',
     title: "A reviewer woken for round 2 reads the card again (#357): a decision recorded since round 1 is flagged, and work that ignores it fails",
-    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    // Round 1's greet.js, with its typo; round 2's fix is the submission, a commit after it (HI-2223: a diff to review).
+    files: { 'greet.js': "module.exports = (name) => 'Helo, ' + name\n" },
     async setup(c) {
-      await c.card('r', { title: 'Greeting helper', description: 'greet.js returns a greeting for a name.', column: 'review', agent: 'implementer', comments: ['Done: greet.js added.'] })
+      await reviewedWork(c, 'r', { title: 'Greeting helper', description: 'greet.js returns a greeting for a name.', files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" }, after: ['Done: greet.js added.'] }, 'implementer')
       // Round 1: this agent (Coder) reviewed it and failed it; the implementer fixed the typo; then the user decided.
       giveVerdict(c, c.cards.r, 'failed', 'Coder (alpha)')
       await c.api('POST', `/v1/tasks/${c.cards.r}/comments`, { text: 'Round 1: failed. 1. greet.js says "Helo".' })
@@ -1527,7 +1632,7 @@ module.exports.SCENARIOS = [
         ['read the merge-ready skill', read(o, 'merge-ready'), o.skillsRead.join(',')],
         ['the branch is merged into the base', !!merged],
         ['it merged the moved base into the branch first', !!merged && ancestor(c, c.merge.moved, merged.tip), merged?.tip],
-        ['the exact tip it merged was checked before merging, against the base as it was then', !!wentIn, `${JSON.stringify(merged)} | ${checkRuns.map((r) => `${r.head}@${r.base}`).join(', ')}`],
+        ['the exact tip it merged was checked before merging, against the base as it was then', !!wentIn, `${JSON.stringify(merged)} | ${runsText(c, checkRuns)}`],
         ...slotChecks(o, c, merged, wentIn)
       ]
     }
@@ -1564,7 +1669,7 @@ module.exports.SCENARIOS = [
         ['read the merge-ready skill', read(o, 'merge-ready'), o.skillsRead.join(',')],
         ['waited in line while Implementer held the slot', waitedBehind.includes('Implementer'), JSON.stringify(waitedBehind)],
         ['the branch is merged into the base', !!merged],
-        ['its checks ran on the tip it merged, against the base as it was then', !!wentIn, `${JSON.stringify(merged)} | ${checkRuns.map((r) => `${r.head}@${r.base}`).join(', ')}`],
+        ['its checks ran on the tip it merged, against the base as it was then', !!wentIn, `${JSON.stringify(merged)} | ${runsText(c, checkRuns)}`],
         ...slotChecks(o, c, merged, wentIn),
         ['it held the slot only after Implementer released it', holds.length > 0 && before?.to != null && holds[0].from >= before.to, `${JSON.stringify(before)} | ${JSON.stringify(holds)}`]
       ]
@@ -1577,12 +1682,16 @@ module.exports.SCENARIOS = [
       c.merge = mergeRepo(c, "module.exports = 'broken'\n")
     },
     prompt: (c) => `The branch feature is ready and its checks are node check.js. I'm asking you to merge it into ${c.merge.base} now: ${c.merge.base} is checked out in this folder.`,
-    fake: (c) => `skill merge-ready then hive hive_merge_slot {"action":"claim","branch":"${c.merge.base}"} then shell: git checkout -q feature && git merge -q --no-edit ${c.merge.base} && node check.js then hive hive_merge_slot {"action":"release"}`,
+    // The fake checks in a scratch copy, a plain copy of the branch's files outside the project (HI-2233: as some model
+    // trials did), and the run there counts. Beside the workspace, in the scenario's own folder, by a relative path (Git's
+    // tar takes `C:` in a full one for a remote host); cmd and PowerShell both run it.
+    fake: (c) =>
+      `skill merge-ready then hive hive_merge_slot {"action":"claim","branch":"${c.merge.base}"} then shell: git checkout -q feature && git merge -q --no-edit ${c.merge.base} && git archive -o ..\\..\\scratch.tar HEAD && mkdir ..\\..\\scratch && tar -xf ..\\..\\scratch.tar -C ..\\..\\scratch && pushd ..\\..\\scratch && node check.js then hive hive_merge_slot {"action":"release"}`,
     expect: (o, c) => {
       const { holds, calls } = slotHolds(o, 'Coder', c.merge.base)
-      // The last run of its checks with the branch in (on it, or its merge in progress) that ended failing (they can't pass
-      // there), and the hold it ran in.
-      const failedRun = checkRunsOf(c).filter((r) => r.ok === false && (ancestor(c, c.merge.feature, r.head) || (!!r.merging && ancestor(c, c.merge.feature, r.merging)))).at(-1)
+      // The last run of its checks with the branch in (on it, its merge in progress, or a copy of it anywhere: HI-2233) that
+      // ended failing (they can't pass there), and the hold it ran in.
+      const failedRun = checkRunsOf(c).filter((r) => r.ok === false && checkedBranch(c, r)).at(-1)
       const during = failedRun ? holdThrough(holds, failedRun.start, failedRun.end) : null
       return [
         ['read the merge-ready skill', read(o, 'merge-ready'), o.skillsRead.join(',')],
@@ -2265,15 +2374,20 @@ module.exports.SCENARIOS = [
   {
     id: 'card-loop-recurring-review',
     title: 'A card loop reviewer finding a fix incomplete again (rounds left): fails it marked recurring, without asking the user',
-    files: { 'sync.js': SYNC_JS },
+    // The work (SYNC_JS: the delay still not awaited) submitted as a commit after sync.js without retries (HI-2223).
+    files: { 'sync.js': SYNC_BEFORE },
     async setup(c) {
-      await c.card('q', {
-        title: 'Retry the sync',
-        description: 'sync.js: try the sync up to three times, 1 s apart, before giving up.',
-        column: 'review',
-        agent: 'implementer',
-        comments: ['Done: retries added. Ready for review.', 'Review round 1: FAILED. 1. The retries have no delay between them.', 'Fixed: a 1 s delay between retries. Ready for review.']
-      })
+      await reviewedWork(
+        c,
+        'q',
+        {
+          title: 'Retry the sync',
+          description: 'sync.js: try the sync up to three times, 1 s apart, before giving up.',
+          files: { 'sync.js': SYNC_JS },
+          after: ['Done: retries added. Ready for review.', 'Review round 1: FAILED. 1. The retries have no delay between them.', 'Fixed: a 1 s delay between retries. Ready for review.']
+        },
+        'implementer'
+      )
     },
     prompt: (c) => `Review card #${c.cards.q} as the reviewer of a card loop (rounds: 5). It is back for its second review; the earlier review and the fix are in its comments.`,
     fake: (c) => `skill card-loop then ${fakeStartReview(c.cards.q)} then hive hive_wait_for_tasks {"cards":[${c.cards.q}],"column":"review","fresh":true,"wake":true} then ${fakeVerdict(c.cards.q, false, 'Round 2: FAILED. 1. The delay is still not awaited (recurring from round 1).')}`,
@@ -2572,11 +2686,12 @@ module.exports.SCENARIOS = [
   {
     id: 'card-loop-already-in-review',
     title: "A card loop reviewer whose next card is already in Review: the watch answers Already, and it reviews the card at once rather than retrying or asking the user (#376)",
-    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    // greet.js as #a left it; #b's fix is its submission, a commit after it (HI-2223: a diff to review).
+    files: { 'greet.js': "module.exports = (name) => 'Helo, ' + name\n" },
     async setup(c) {
       const a = await c.card('a', { title: 'Greeting module', description: 'greet.js exports a greeting function.', column: 'passed', agent: 'implementer', comments: ['Done: greet.js added. Ready for review.', 'Review round 1: PASSED.'] })
       giveVerdict(c, a, 'passed')
-      await c.card('b', { title: 'Greeting says Hello', description: 'greet.js returns "Hello, <name>".', column: 'review', agent: 'implementer', comments: ['Done: greet.js says "Hello, <name>". Ready for review.'] })
+      await reviewedWork(c, 'b', { title: 'Greeting says Hello', description: 'greet.js returns "Hello, <name>".', files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" }, after: ['Done: greet.js says "Hello, <name>". Ready for review.'] }, 'implementer')
     },
     prompt: (c) => `You are the reviewer of a card loop on #${c.cards.a} then #${c.cards.b}, built by Implementer (rounds: 5). You have just passed #${c.cards.a}. Carry on as the reviewer.`,
     // The fake waits for #b to arrive in Review (it already has: Already), then reviews it.
@@ -3672,6 +3787,8 @@ module.exports.SCENARIOS = [
     id: 'card-loop-blocked',
     title: "A reviewer in a card loop whose card its builder blocks to ask the user while it waits (#468, #481): keeps waiting rather than moving on, and reviews it once it is unblocked and back in Review, woken by Hive alone",
     role: 'agent',
+    // The upload as round 1 left it; the builder's fix, committed as it returns the card, is the diff to review (HI-2223).
+    files: { 'upload.js': "module.exports = async function upload(send) {\n  const r = await send()\n  return r.ok ? r : send()\n}\n" },
     async setup(c) {
       const a = await c.card('a', {
         title: 'Retry the upload',
@@ -3696,10 +3813,15 @@ module.exports.SCENARIOS = [
         return
       }
       if (Date.now() - c.blockedAt < 15000) return
+      // The fix, committed: its submission is a commit after the card's base (HI-2223).
+      c.write('upload.js', "module.exports = async function upload(send) {\n  const r = await send()\n  if (r.ok) return r\n  const wait = Math.min(Number(r.headers?.['retry-after'] ?? 0), 60)\n  await new Promise((done) => setTimeout(done, wait * 1000))\n  return send()\n}\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'upload: wait for Retry-After, at most 60 s')
       await c.api('POST', `/v1/tasks/${c.cards.a}/comments`, { text: 'The user answered: up to 60 s. Fixed: the retry waits for Retry-After, capped at 60 s. Ready for review.' })
       await c.inv('tasks:update', c.cards.a, { blocked: '' })
       await c.inv('tasks:update', c.cards.a, { column: 'review' })
       c.returnedAt = Date.now()
+      c.returnDiff = await require('../e2e/lib.cjs').until(() => submittedDiff(c, c.cards.a), 15000)
     },
     // Through the block, then the wake and the review it starts: until a verdict on the card (at most 4 minutes after
     // its return).
@@ -3729,6 +3851,8 @@ module.exports.SCENARIOS = [
         // The builder returns it only once the reviewer ends its turn watching (`during`).
         [`watched #${c.cards.a} for its return to Review`, waits.some((x) => has(x, c.cards.a) && /"column"\s*:\s*"review"/.test(String(x.args))), waits.map((x) => String(x.args)).join(' | ')],
         [`the builder returned #${c.cards.a} once the reviewer was watching`, Number.isFinite(back), String(c.returnedAt)],
+        // The setup's own (HI-2223): what came back is a diff to review, so a review can give a verdict.
+        [`its return to Review is a diff to review (a commit after its base)`, !!c.returnDiff, JSON.stringify(c.returnDiff && { revision: c.returnDiff.revision, base: c.returnDiff.base, files: c.returnDiff.files })],
         ["reviewed the card after its return, with nobody prompting it (Hive's wake)", ha.some((h) => by(h) && h.what === 'Started reviewing' && Date.parse(h.at) > back), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
         ['gave it a verdict', Number.isFinite(verdictAt), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
         ["didn't move on to the next card before that verdict", !waits.some((x) => before(x) && has(x, c.cards.b) && !has(x, c.cards.a)) && !ran(o, 'hive_update_task').some((x) => before(x) && cardIs(o, argsOf(x).number, c.cards.b)) && !ran(o, 'hive_start_review').concat(movesOf(o, c.cards.b).filter((x) => x.ok)).some((x) => before(x) && isCard(argsOf(x).card, c.cards.b)), o.hiveCalls.map((x) => `${x.tool}@${x.at}`).join(',')]
@@ -3741,9 +3865,10 @@ module.exports.SCENARIOS = [
     id: 'card-loop-loop-wake',
     title: "A reviewer in a card loop woken by Hive's own loop wake, with no watch of its own (#405): reviews the card, then waits for the next",
     role: 'agent',
-    files: { 'sync.js': SYNC_JS },
+    // The retries (awaited, 1 s apart) submitted as a commit after sync.js without them (HI-2223: a diff to review).
+    files: { 'sync.js': SYNC_BEFORE },
     async setup(c) {
-      await c.card('a', { title: 'Retry the sync', description: 'sync.js: try the sync up to three times, 1 s apart, before giving up.', agent: 'implementer', column: 'review', comments: ['Done: retries added, 1 s apart. Ready for review.'] })
+      await reviewedWork(c, 'a', { title: 'Retry the sync', description: 'sync.js: try the sync up to three times, 1 s apart, before giving up.', files: { 'sync.js': SYNC_JS.replace('wait(1000)', 'await wait(1000)') }, after: ['Done: retries added, 1 s apart. Ready for review.'] }, 'implementer')
       await c.card('b', { title: 'Show sync progress', description: 'Show a progress bar while syncing.', agent: 'implementer' })
     },
     prompt: (c) =>

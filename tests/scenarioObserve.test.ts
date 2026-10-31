@@ -10,7 +10,7 @@ import { tempDir } from './tempDir'
 
 const require = createRequire(import.meta.url)
 const { observeTranscript } = require('./scenarios/harness.cjs') as { observeTranscript: (items: unknown[], skills: string[]) => { skillsRead: string[]; hiveMentions: string[]; finalReply: string } }
-const { SCENARIOS, helpers } = require('./scenarios/scenarios.cjs') as { SCENARIOS: { id: string; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }[]; helpers: { LANES_RUNNING_TAIL: string; testRunsIn: (commands: string[]) => unknown[]; checkRunsOf: (c: unknown) => { start: number; end: number | null; ok: boolean | null }[]; mergedInto: (c: unknown) => { at: { from: number; to: number } | null } | null; commandsOf: (t: unknown) => string[] } }
+const { SCENARIOS, helpers } = require('./scenarios/scenarios.cjs') as { SCENARIOS: { id: string; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }[]; helpers: { LANES_RUNNING_TAIL: string; testRunsIn: (commands: string[]) => unknown[]; checkRunsOf: (c: unknown) => { start: number; end: number | null; ok: boolean | null; head: string | null; where: string | null }[]; mergedInto: (c: unknown) => { at: { from: number; to: number } | null } | null; commandsOf: (t: unknown) => string[] } }
 const { withScriptCalls, codexRollout } = require('./scenarios/codexScripts.cjs') as { withScriptCalls: (items: unknown[], rollout: string | null) => { items: unknown[]; scripts: number; calls: number }; codexRollout: (home: string | undefined, id: string) => string | null }
 
 const tool = (name: string, input: unknown, result = '', isError = false) => ({ kind: 'tool', tool: { name, summary: '', input: typeof input === 'string' ? input : JSON.stringify(input), result, isError } })
@@ -801,11 +801,13 @@ describe('the fixtures fail when nothing was done', () => {
         const lines = fs.readFileSync(path.join(repo, 'check-runs.txt'), 'utf8').split(/\r?\n/).filter(Boolean)
         const s = lines.findLastIndex((l) => l.startsWith('start '))
         const runId = lines[s].split(' ')[1]
-        lines[s] = lines[s].split(' ').slice(0, 6).concat(new Date(start).toISOString()).join(' ')
+        const f = lines[s].split(' ')
+        f[6] = new Date(start).toISOString()
+        lines[s] = f.join(' ')
         const out = lines.filter((l) => !l.startsWith(`end ${runId} `)).concat(end === null ? [] : [`end ${runId} ${result} ${new Date(end).toISOString()}`])
         fs.writeFileSync(path.join(repo, 'check-runs.txt'), out.join('\n') + '\n')
       }
-      return { repo, git, into, work, workStaged, timed, setRun, checks: (o: unknown) => failed((scenario(id) as unknown as Sc).expect({ ...base, skillsRead: ['merge-ready'], ...(o as object) }, ctx)) }
+      return { repo, ctx, git, into, work, workStaged, timed, setRun, checks: (o: unknown) => failed((scenario(id) as unknown as Sc).expect({ ...base, skillsRead: ['merge-ready'], ...(o as object) }, ctx)) }
     }
     const CLAIMED = (b: string) => `claimed the merge slot for ${b} and got it (hive_merge_slot claim)`
     const HELD = 'held the slot while the checks that went in ran, start to end'
@@ -919,6 +921,100 @@ describe('the fixtures fail when nothing was done', () => {
       r.setRun(run.start, run.end!, 'fail')
       r.git('merge', '-q', '--no-ff', '--no-edit', 'feature')
       expect(r.checks(hold(r.into, from, to))).toEqual(['merged nothing: the branch is not in the base'])
+    })
+    describe('HI-2233: a run of the checks counts wherever it ran (a worktree, a clone, a plain copy); one acted out another way is no run', () => {
+      type Repo = Awaited<ReturnType<typeof repoFor>>
+      // merge-main-moved's (its base moved since the branch began, so a copy made before the base went in is another tree).
+      const UNCHECKED = [CHECKED, HELD, MERGED_HOLDING]
+      const scratch = (what: string) => {
+        const d = tempDir(`hive-check-${what}-`)
+        repos.push(d)
+        return d
+      }
+      const gitIn = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, encoding: 'utf8', timeout: PROCESS_HUNG_MS })
+      /** The checks run in `cwd`: true when they pass. */
+      const checkIn = (cwd: string) => {
+        try {
+          execFileSync(process.execPath, ['check.js'], { cwd, stdio: 'ignore', timeout: PROCESS_HUNG_MS })
+          return true
+        } catch {
+          return false
+        }
+      }
+      /** The base merged into the branch in the project, as the agent does before checking (the base checked out after). */
+      const remerge = (r: Repo) => {
+        r.git('checkout', '-q', 'feature')
+        r.git('merge', '-q', '--no-edit', r.into)
+        r.git('checkout', '-q', r.into)
+      }
+      /** A plain copy of the branch's files, outside the project and with no git of its own (as git archive makes one). */
+      const copyOf = (r: Repo) => {
+        const d = scratch('copy')
+        for (const f of r.git('ls-tree', '-r', '--name-only', 'feature').split(/\r?\n/).filter(Boolean)) fs.writeFileSync(path.join(d, f), r.git('show', `feature:${f}`))
+        return d
+      }
+      /** What failed, with the slot held from `from` until just after the merge, and released. */
+      const judged = (r: Repo, from: number) => r.checks(hold(r.into, from, r.timed().merge!.to + 5))
+      const same = (a: string | null, b: string) => !!a && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
+      it('in a worktree of the project, outside it', async () => {
+        const r = await repoFor('merge-main-moved')
+        repos.push(r.repo)
+        const from = Date.now() - 5
+        const wt = path.join(scratch('worktree'), 'wt')
+        r.git('worktree', 'add', '-q', wt, 'feature')
+        // A commit in the worktree records its time too (the timing hook used to stop it).
+        gitIn(wt, 'merge', '-q', '--no-edit', r.into)
+        expect(checkIn(wt)).toBe(true)
+        r.git('merge', '-q', '--no-ff', '--no-edit', 'feature')
+        expect(same(r.timed().run.where, wt)).toBe(true)
+        expect(judged(r, from)).toEqual([])
+      })
+      it('in a clone of it, whose commits the project lacks', async () => {
+        const r = await repoFor('merge-main-moved')
+        repos.push(r.repo)
+        const from = Date.now() - 5
+        const cl = path.join(scratch('clone'), 'cl')
+        gitIn(r.repo, 'clone', '-q', r.repo, cl)
+        gitIn(cl, 'checkout', '-q', 'feature')
+        gitIn(cl, '-c', 'user.name=t', '-c', 'user.email=t@t', 'merge', '-q', '--no-edit', `origin/${r.into}`)
+        expect(checkIn(cl)).toBe(true)
+        // The same merge in the project, then into the base: the tree checked in the clone is what went in.
+        remerge(r)
+        r.git('merge', '-q', '--no-ff', '--no-edit', 'feature')
+        expect(same(r.timed().run.where, cl)).toBe(true)
+        expect(judged(r, from)).toEqual([])
+      })
+      it('in a plain copy of the files; a stale copy, or the checks acted out with node -e, is no run of what went in', async () => {
+        const r = await repoFor('merge-main-moved')
+        repos.push(r.repo)
+        const from = Date.now() - 5
+        // Copied before the base went into the branch: what it checked isn't what went in.
+        const stale = copyOf(r)
+        expect(checkIn(stale)).toBe(true)
+        remerge(r)
+        // Its test copied into node -e, in a fresh copy: no run of the checks at all.
+        const acted = copyOf(r)
+        execFileSync(process.execPath, ['-e', "process.exit(require('fs').readFileSync('feature.js', 'utf8').includes('broken') ? 1 : 0)"], { cwd: acted, stdio: 'ignore', timeout: PROCESS_HUNG_MS })
+        r.git('merge', '-q', '--no-ff', '--no-edit', 'feature')
+        expect(helpers.checkRunsOf(r.ctx).length).toBe(2)
+        expect(judged(r, from)).toEqual(UNCHECKED)
+        // Merged again, after the checks ran in a copy of what goes in: that run counts.
+        r.git('reset', '-q', '--hard', `${r.into}~1`)
+        const copy = copyOf(r)
+        expect(checkIn(copy)).toBe(true)
+        r.git('merge', '-q', '--no-ff', '--no-edit', 'feature')
+        const run = r.timed().run
+        expect([run.head, same(run.where, copy)]).toEqual([null, true])
+        expect(judged(r, from)).toEqual([])
+      })
+      it('merge-checks-fail: the checks failing in a plain copy of the branch count as its failed run', async () => {
+        const r = await repoFor('merge-checks-fail')
+        repos.push(r.repo)
+        const from = Date.now() - 5
+        remerge(r)
+        expect(checkIn(copyOf(r))).toBe(false)
+        expect(r.checks(hold(r.into, from, r.timed().run.end! + 5))).toEqual([])
+      })
     })
   })
 

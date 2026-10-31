@@ -126,7 +126,7 @@ export function settingsRule(changeSettings: boolean): string {
 export function controlRules(control: AssistantControlLevel, changeSettings = false): string {
   if (control === 'look') {
     return [
-      'Control (Settings → Assistant → Control): Look and advise. You read and advise; the user acts. Never edit or create files, run commands that change anything, change the task board, or start, stop or prompt agents, even if asked: say what you would do, and that Settings → Assistant can let you act. Writing shared notes and handovers is fine when the user asks.',
+      `Control (Settings → Assistant → Control): Look and advise. You read and advise; the user acts. Never edit or create files, run commands that change anything, change the task board, or start, stop or prompt agents, even if asked: say what you would do, and that Settings → Assistant can let you act. Writing shared notes and handovers is fine when the user asks${changeSettings ? ', and so is changing a Hive setting, as the next line says' : ''}.`,
       settingsRule(changeSettings)
     ].join('\n')
   }
