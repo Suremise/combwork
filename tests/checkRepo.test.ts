@@ -1,9 +1,10 @@
 // `npm run check:repo` (HI-2244): the merge queue's fast check beside typecheck and lint, the repo-wide checks only,
 // which a change anywhere can break and a focused run doesn't pick: the i18n guard over src/ and its allowlists, the unit
 // tests that scan every file (or every file of a kind) rather than test one area, then, by name, the tree-reading tests
-// of files that mostly test tooling's behaviour (e2esuites.test.ts's suite list, areas and run-context rules;
-// folderProcesses.test.ts's rule against ending a remembered pid; i18nCatalogues.test.ts's catalogues and translations
-// being current): whole, those three took 50 s of a minute. The full unit run is for a release's final checks, and on
+// of files that mostly test behaviour (e2esuites.test.ts's suite list, areas and run-context rules; folderProcesses.test.ts's
+// rule against ending a remembered pid; i18nCatalogues.test.ts's catalogues and translations being current; admission's
+// rule that only a window's workspace admits; bundled's recorded versions current, npm run bundled-history): whole,
+// the first three took 50 s of a minute. The full unit run is for a release's final checks, and on
 // request. Vitest takes files and the name pattern as filters, so a file or test renamed would silently drop out: each
 // must still be there.
 import { existsSync, readFileSync } from 'fs'
@@ -38,7 +39,7 @@ function alternatives(pattern: string): string[] {
 }
 
 describe('npm run check:repo', () => {
-  it('runs the i18n guard, the repo-wide test files, then the tree-reading tests of three more by name', () => {
+  it('runs the i18n guard, the repo-wide test files, then the tree-reading tests of more files by name', () => {
     expect(shape, script).not.toBeNull()
   })
 

@@ -735,7 +735,7 @@ export const UNIT_SCANS = [
   // deleted, or a describe or test renamed in a file it runs by name.
   { test: 'tests/checkRepo.test.ts', paths: ['package.json'] },
   { test: 'tests/checkRepo.test.ts', paths: ['tests/'], adds: true },
-  { test: 'tests/checkRepo.test.ts', paths: ['tests/e2esuites.test.ts', 'tests/folderProcesses.test.ts', 'tests/i18nCatalogues.test.ts'], lines: ['\\bdescribe\\(', '\\bit\\('] },
+  { test: 'tests/checkRepo.test.ts', paths: ['tests/admission.test.ts', 'tests/bundled.test.ts', 'tests/e2esuites.test.ts', 'tests/folderProcesses.test.ts', 'tests/i18nCatalogues.test.ts'], lines: ['\\bdescribe\\(', '\\bit\\('] },
   // This table's own check: a test file added, or one starting to scan the repository.
   { test: 'tests/focusedPick.test.ts', paths: ['tests/'], adds: true },
   { test: 'tests/focusedPick.test.ts', paths: ['tests/'], lines: ['ls-files', 'readdir', '\\bglob'] }
