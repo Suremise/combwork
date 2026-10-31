@@ -912,6 +912,11 @@ export interface StartOptions {
   prompt?: string
   allowed?: () => void
   handedOverFrom?: string
+  /**
+   * HI-2197: a new conversation that carries on the agent's own work (its handover to itself) keeps the watch it had. Any
+   * other start that resumes nothing ends that watch first: it was the old conversation's.
+   */
+  keepWatch?: boolean
   /** A new conversation's purpose (#1434): where the agent works for it (agentFolders.ts); its role's own when absent. */
   purpose?: FolderPurpose
   /** Resume All and startup's resume (#1434): a conversation resumes only where it may now, never taking a free slot. */
@@ -1166,6 +1171,8 @@ class SessionManager {
   onAssistantResumed: (projectPath: string, runId: string, sessionId: string, modeId: string) => void = () => undefined
   /** An agent's wake-on-change watch, if it has one (main/watches.ts sets this). */
   watchFor: (projectPath: string, agentId: string) => TaskWatchInfo | null = () => null
+  /** HI-2197: an agent's watch from before ended, as it starts a new conversation (main/watches.ts sets this). */
+  conversationEnds: (projectPath: string, agentId: string) => Promise<void> = async () => undefined
 
   /** The prompts an agent's CLI has taken in this launch, and the launch (#376: was a typed line taken?). Null when not running. */
   promptsTaken(projectPath: string, agentId: string): { runId: string; count: number } | null {
@@ -1745,7 +1752,8 @@ class SessionManager {
     startBegins(projectPath, agentId)
     // A start that takes over a second says where the time went (#1177: a resume waited ~45 s after an upgrade).
     const times = new StepTimes()
-    const run = this.startReserved(projectPath, agentId, id, opts, times)
+    // A new conversation (HI-2197): the agent's watch from before ended first, its wake cancelled, before anything launches.
+    const run = (opts.resumeId || opts.keepWatch ? Promise.resolve() : this.conversationEnds(projectPath, agentId)).then(() => this.startReserved(projectPath, agentId, id, opts, times))
     pending.done = run.catch(() => undefined)
     pending.outcome = run
     try {
@@ -3885,7 +3893,7 @@ class SessionManager {
     if (target) {
       await this.delivery().now(projectPath, { ...nd, need: 'free' })
       if (fromSession) await this.linkHandover(projectPath, toAgentId, target.runId, fromSession)
-    } else await this.delivery().launch(projectPath, nd, (line) => this.start(projectPath, { agentId: toAgentId, prompt: line, ...(fromSession ? { handedOverFrom: fromSession } : {}) }))
+    } else await this.delivery().launch(projectPath, nd, (line) => this.start(projectPath, { agentId: toAgentId, prompt: line, ...(fromSession ? { handedOverFrom: fromSession } : {}), ...(self ? { keepWatch: true } : {}) }))
   }
 
   /**

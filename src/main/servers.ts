@@ -50,7 +50,7 @@ import { buildFactOf } from '../shared/buildFacts'
 import type { JournalSettings } from '../shared/journal'
 import { emit, onHiveEvent, toast } from './events'
 import { msg, tr } from '../shared/i18n'
-import { addUsageToWatch, cancelWatch, encodeSince, registerAgentWatch, registerLaneWatch, registerUsageWatch, registerWatch, scopedCard } from './watches'
+import { addUsageToWatch, cancelWatch, encodeSince, onWatchPlacing, registerAgentWatch, registerLaneWatch, registerUsageWatch, registerWatch, scopedCard } from './watches'
 import { USAGE_WATCH_MAX, type UsageWatch } from '../shared/usageWatch'
 import { readLaneCards, readLaneCondition } from '../shared/laneWatch'
 import { agentBusy, AGENT_WATCH_MAX_AGENTS, type AgentNow, type WatchedAgent } from '../shared/agentWatch'
@@ -69,6 +69,7 @@ import { checkLanePool, launchRecordedLane, recordedLaneNote, resumeLaneBuilder,
 import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber, type LaneChange } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
+import { clashingNumber, watchWhilePlaced } from './watchGuards'
 import { writePty } from './ptyHost'
 import { isResuming } from './restartResume'
 import { sessions, type HookObservation } from './sessions'
@@ -3253,6 +3254,11 @@ function readUsageWatch(v: unknown, ws: WorkspaceService): UsageWatch[] {
 
 route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   const ws = requireWorkspace()
+  // An agent's plain number that reads as another card's key is refused, never remapped (HI-2197).
+  if (agentCaller() && raw && typeof raw === 'object' && (raw as { cancel?: unknown }).cancel !== true) {
+    const clash = await clashingNumber(ws, (raw as { cards?: unknown }).cards, await taskActor())
+    if (clash) throw new HttpError(400, clash)
+  }
   // Its cards named by key or `#12` too (#1219).
   const body = raw && typeof raw === 'object' && !Array.isArray(raw) && (raw as { cards?: unknown }).cards !== undefined ? { ...(raw as object), cards: cardRefsIn((raw as { cards: unknown }).cards) } : raw
   // The workspace as it is now: the call belongs to it, and stops (409) if it closes or the window opens another.
@@ -4590,3 +4596,5 @@ export async function revokeViewer(id: string): Promise<AgentApiInfo> {
 }
 
 onHiveEvent(broadcast)
+// A project agent's watch refused, under the watches' lock, while Hive is giving it a card in a slot (HI-2197).
+onWatchPlacing(watchWhilePlaced)

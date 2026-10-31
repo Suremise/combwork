@@ -81,7 +81,8 @@ const check = (name, ok, extra = '') => {
     if (!typers.has(id)) typers.set(id, lib.fakePrompts(inv, lib.ptyKey(alpha, id), () => live(id), { home: claudeHome }))
     await typers.get(id).type(text)
   }
-  const wait = (n, extra) => `hive hive_wait_for_tasks ${JSON.stringify({ cards: Array.isArray(n) ? n : [n], ...extra, wake: true })}`
+  // Cards as `#N`, their workspace numbers: a plain number reading as another card's key is refused (HI-2197).
+  const wait = (n, extra) => `hive hive_wait_for_tasks ${JSON.stringify({ cards: (Array.isArray(n) ? n : [n]).map((x) => `#${x}`), ...extra, wake: true })}`
 
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })

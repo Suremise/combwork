@@ -20,6 +20,8 @@ import { laneBuilds } from '../shared/lanes'
 import { LANE_BUILDER_SKILL } from '../shared/tasks'
 import { rawLanes } from './lanes'
 import { briefOf } from './laneBriefs'
+import { placementDue } from './slotCards'
+import { endWatchOf } from './watches'
 
 /**
  * Agents act by intent (#1267, SPEC §16.8.1): start, put back, submit, declare paths, start review, verdict, report
@@ -181,6 +183,12 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
   const m = reply as Moved
   // A start: how long a design waits for its check here (Card loops → Design check wait), for a watch set before posting one.
   if (intent.kind === 'start') m.data = { ...m.data, designWaitMinutes: stepWait }
+  // Its own card to be given to it in a slot (HI-2197): a watch it has would hold that placement off ("waiting on cards"),
+  // so it ends here, its wake cancelled, and the reply says so. Only once this start has left its placement due.
+  if (intent.kind === 'start' && self && m.placed && ws.path && card.agent === self.agentId && (await placementDue(ws, join(ws.path, before.project), ref.n))) {
+    const ended = await endWatchOf(join(ws.path, self.project), self.agentId, `Hive gives it ${card.key ?? `#${ref.n}`} in a slot`) // i18n-ignore: for the log and a cancelled wake
+    if (ended) m.warnings = [...(m.warnings ?? []), `Your watch (${ended}) has ended: Hive gives you ${card.key ?? `#${ref.n}`} as a task, and a watch would hold it off.`] // i18n-ignore: agent-facing, the start's reply
+  }
   const lane = intent.kind === 'start' && self && !m.placed && m.from !== m.to ? await laneStartWords(ws, before.project, self.agentId, ref.n, card.key ?? `#${ref.n}`) : null
   // What comes next on it (#1530), from its state and rules, after the intents that change what's next (a submit or a
   // verdict that leaves it where it was too: the agent merges, a quorum); the verdict after a review starts.

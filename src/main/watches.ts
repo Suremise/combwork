@@ -31,6 +31,7 @@ import { readSavedUsage, usageHits, usageLimitLine, usageWakeLine, usageWatchLab
 import { cancelFromSource, createDelivery, deliveryNow, followAgent, inFlightNow as deliveriesInFlight, load as loadDeliveries, offerNow, registerSource, settled as deliveriesSettled } from './deliveries'
 import { inFlightNow as writerInFlight, onLineComing, settled as writerSettled } from './lineWriter'
 import { readyFor } from './readiness'
+import { HiveError } from './hiveError'
 import { cardNamesOf, withCardNames } from './projectKeys'
 import { namedBy } from '../shared/projectKeys'
 import { projectPreferences } from './workflow/preferences'
@@ -252,6 +253,8 @@ export const testHooks: {
   settleMs?: number
   /** Told each time a check reads a card from disk (#321: each card once a check). */
   cardRead?: (n: number) => void
+  /** HI-2197: a pause before a new conversation's end of an old watch cancels that watch's wake. */
+  beforeWakeCancel?: () => Promise<void>
 } = {}
 /** The same seams by their first name (round-one probes use it). */
 export const testPauses = testHooks
@@ -859,6 +862,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
   const scope = scopeFor(ws, projectPath)
   const self = await boardName(ws, projectPath, agentId)
   const result = await locked(store, async (): Promise<WatchResult> => {
+    await assertNotPlacing(ws, projectPath, agentId, scope)
     // Moves into a column are looked for in the history from here: before the cards are read, so none falls between.
     const since = start?.at ?? new Date().toISOString()
     // After a wake, a card that wake told about starts from what it told (#224): what others changed since counts, so a
@@ -929,6 +933,22 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
   return result
 }
 
+/**
+ * HI-2197: why a project agent may take no new watch now, or null: Hive is giving it a card in a slot (its own start, the
+ * placement not made yet), which a watch would hold off. Asked under the watches' lock, as each registration writes its
+ * watch: a start that makes the placement due then ends the agent's watch under the same lock (endWatchOf), so either
+ * the watch is refused or that start ends it. Set by servers.ts (watchGuards.ts); none until then.
+ */
+let placing: (ws: WorkspaceService, projectPath: string, agentId: string) => Promise<string | null> = async () => null
+export function onWatchPlacing(fn: (ws: WorkspaceService, projectPath: string, agentId: string) => Promise<string | null>): void {
+  placing = fn
+}
+const assertNotPlacing = async (ws: WorkspaceService, projectPath: string, agentId: string, scope: string | null): Promise<void> => {
+  if (scope === null) return
+  const why = await placing(ws, projectPath, agentId)
+  if (why) throw new HiveError({ shown: why, english: why }, { kind: 'conflict' })
+}
+
 /** Told when an agent's card watch begins (HI-1721: loopWakes tells a builder of its returned card it waits on). */
 const watchStarted = new Set<(ws: WorkspaceService, projectPath: string, agentId: string, cond: WatchCondition) => Promise<void> | void>()
 export function onWatchStarted(fn: (ws: WorkspaceService, projectPath: string, agentId: string, cond: WatchCondition) => Promise<void> | void): () => void {
@@ -955,6 +975,57 @@ export async function cancelWatch(ws: WorkspaceService, projectPath: string, age
   })
   if (had) sessions.watchChanged(projectPath, agentId)
   return had
+}
+
+/**
+ * HI-2197: an agent starting a new conversation (not resumed, not its own handover) ends its watch from before. That
+ * watch was the old conversation's, which the new one never set (HB3's lane end: its watch on its old card fired, its
+ * wake couldn't be typed, and it showed as waiting on cards, so its new card was never given to it). Awaited before
+ * the launch: the record as it is now removed and saved, and its wake, by that record's own id, cancelled before this
+ * returns (a new conversation's watch has another id, so nothing here can end it). A failure throws: no launch with
+ * the old watch in place.
+ */
+export const endConversationWatch = async (projectPath: string, agentId: string): Promise<void> => void (await endWatchOf(projectPath, agentId, 'its conversation ended'))
+
+/** An agent's watch ended as endConversationWatch ends one, `why` its log's and its wake's: the label of the watch ended, or null. */
+export async function endWatchOf(projectPath: string, agentId: string, why: string): Promise<string | null> {
+  const ws = workspaceFor(projectPath)
+  if (!ws?.path) return null
+  const store = await load(ws)
+  const rec = await locked(store, async () => {
+    const r = recordOf(store, projectPath, agentId)
+    if (!r) return null
+    const before = store.list
+    store.list = store.list.filter((x) => x !== r)
+    try {
+      await save(store)
+    } catch (e) {
+      store.list = before
+      throw new Error(`Could not end the watch (${why}): ${(e as Error).message}`, { cause: e })
+    }
+    const d = store.delivering.get(r.id)
+    if (d) d.cancelled = true
+    return r
+  })
+  if (!rec) return null
+  log.info(`${userText(agentId)}'s watch ended: ${why}`)
+  sessions.watchChanged(projectPath, agentId)
+  if (rec.fired?.delivery) {
+    try {
+      await testHooks.beforeWakeCancel?.()
+      await cancelFromSource(rec.projectPath, 'watch', wakeRef(rec), `cancelled: ${why}`)
+    } catch (e) {
+      // Its wake not cancelled: the watch is put back (unless the agent has another by now), so the next try ends both.
+      await locked(store, async () => {
+        if (recordOf(store, projectPath, agentId)) return
+        store.list = [...store.list, rec]
+        await saveQuietly(store)
+      })
+      sessions.watchChanged(projectPath, agentId)
+      throw new Error(`Could not cancel the wake of the watch (${why}): ${(e as Error).message}`, { cause: e })
+    }
+  }
+  return infoOf(rec).label
 }
 
 /**
@@ -1281,6 +1352,7 @@ export async function registerAgentWatch(ws: WorkspaceService, projectPath: stri
     if (same(a.projectPath, projectPath) && a.agentId === agentId) throw new Error("You can't watch yourself: nothing would wake you")
   }
   const result = await locked(store, async (): Promise<AgentWatchResult> => {
+    await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
     const since = new Date().toISOString()
     const agentMarks: Record<string, AgentMark> = {}
     const already: string[] = []
@@ -1390,6 +1462,7 @@ export async function registerUsageWatch(ws: WorkspaceService, projectPath: stri
   const store = await load(ws)
   if (!hostedIn(ws, store.path, projectPath)) throw new Error(`Not a project of this workspace: ${projectPath}`)
   const result = await locked(store, async (): Promise<UsageWatchResult> => {
+    await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
     const already = usageHits(usage, (a) => config.get().connectionPlanUsage?.[a]?.limits, Date.now())
     const old = recordOf(store, projectPath, agentId)
     const before = store.list
@@ -1770,6 +1843,7 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     if (unknown.length) throw new Error(`No such lane${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')} (hive_lane list gives the lanes and their ids)`)
   }
   const result = await locked(store, async (): Promise<LaneWatchResult> => {
+    await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
     const since = new Date().toISOString()
     const told = store.wokeLanes.get(agentKey(projectPath, agentId))
     // After a wake, what is new is measured from when its line was made: a lane started or a card added since then is
@@ -2773,6 +2847,7 @@ export function initWatches(): void {
   if (started) return
   started = true
   sessions.watchFor = watchFor
+  sessions.conversationEnds = endConversationWatch
   sessions.userReplied = noteUserReply
   config.onSettingsChanged((s, prev) => {
     if (prev.assistant?.tellReplies !== false && s.assistant?.tellReplies === false) inBackground('withdrawing replies', revokeReplies())

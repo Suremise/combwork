@@ -102,7 +102,8 @@ const check = (name, ok, extra = '') => {
       if (await until(async () => (await said(id, text)) > before, 10000)) return
     }
   }
-  const wait = (n, extra) => `hive hive_wait_for_tasks ${JSON.stringify({ cards: [n], ...extra, wake: true })}`
+  // The card as `#N`, its workspace number: a plain number reading as another card's key is refused (HI-2197).
+  const wait = (n, extra) => `hive hive_wait_for_tasks ${JSON.stringify({ cards: [`#${n}`], ...extra, wake: true })}`
   // As its checks read it, the card by number (it names it by key too, #1219: checked below).
   const rawStalled = async (n) => (await api('GET', `/v1/tasks/${n}`)).body?.stalled ?? null
   const stalledOf = async (n) => lib.unkey(await rawStalled(n))

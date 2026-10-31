@@ -315,6 +315,7 @@ export const SUITES = [
   { name: 'slotswitches' },
   { name: 'slotupgrade' },
   { name: 'stagenames' },
+  { name: 'stalewatch' },
   { name: 'stalls' },
   { name: 'startall' },
   { name: 'startbusy' },
