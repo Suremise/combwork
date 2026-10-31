@@ -20,7 +20,11 @@ const alpha = path.join(ws, 'alpha')
 const beta = path.join(ws, 'beta')
 const gamma = path.join(ws, 'gamma')
 const claudeHome = path.join(lib.WORK, 'boardgates-claude-home')
-const alphaWt = path.join(ws, 'alpha-b1')
+// B1's 0.9 worktree where 0.9 kept them, `<workspace>.worktrees/<project>/<agent>`, never in the workspace folder: there
+// it showed as its own project, with a "how do you work?" notice above the board that went when the slot was renamed out,
+// moving the board up under a still pointer (HI-2208), or never went (HI-2212: adopted before card #1 existed, the slot
+// is handed over to #1, and B1's session there keeps it from being renamed after Done).
+const alphaWt = path.join(`${ws}.worktrees`, 'alpha', 'b1')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -28,7 +32,7 @@ const check = (name, ok, extra = '') => {
 }
 
 ;(async () => {
-  for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, `${ws}.worktrees`, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
   lib.gitProject(alpha)
   lib.gitProject(beta)
@@ -113,11 +117,10 @@ const check = (name, ok, extra = '') => {
     await dialog.getByRole('button', { name: 'Move Anyway' }).click()
     check('Move Anyway moves it to Done', !!(await lib.until(async () => (await card(a))?.column === 'done', HUNG_MS)))
     check('…with one Override, and no Integrated faked', (await facts(a)).filter((k) => k === 'Override').length === 1 && !(await facts(a)).includes('Integrated'), JSON.stringify(await facts(a)))
-    // Done ends the lease B1's adopted 0.9 worktree carried for it, so the slot moves out of the workspace folder and the
-    // window drops alpha-b1 as a project, with its "how do you work?" notice above the board. Hovered before that lands,
-    // the board moved up from under a still pointer and the mark's tooltip never showed (HI-2208): waited for first.
+    // Nothing above the board comes or goes while the mark is hovered (HI-2208, HI-2212): B1's worktree is outside the
+    // workspace folder, so no project and no notice for it.
     const notice = page.locator('[data-step-notice]')
-    check("…and B1's adopted worktree leaves the workspace, its notice with it", !!(await lib.until(async () => !fs.existsSync(alphaWt) && (await notice.count()) === 0, HUNG_MS)), `${fs.existsSync(alphaWt) ? 'alpha-b1 still there; ' : ''}${await notice.innerText().catch(() => 'no notice')}`)
+    check('…and no notice above the board', (await notice.count()) === 0, await notice.innerText().catch(() => ''))
     const mark = tile(a).locator('[data-badge="override"]')
     check('the card shows its override mark', !!(await lib.until(async () => (await mark.count()) === 1, HUNG_MS)))
     const label = (await mark.getAttribute('aria-label')) ?? ''
