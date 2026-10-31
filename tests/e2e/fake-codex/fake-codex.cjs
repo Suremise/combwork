@@ -407,7 +407,8 @@ const codeMode = () => !!process.env.CODEX_HOME && fs.existsSync(path.join(proce
 async function inScript(code, run) {
   const id = `call_${randomUUID().slice(0, 8)}`
   record({ type: 'custom_tool_call', name: 'exec', input: code, call_id: id })
-  const done = (item) => fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { id: `exec-${randomUUID()}`, ...item } } }) + '\n')
+  // With its start (started_at_ms), as Codex 0.166 records a call: Hive gives a call to the script it started in (HI-2240).
+  const done = (item) => fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { id: `exec-${randomUUID()}`, ...item }, started_at_ms: Date.now() } }) + '\n')
   const printed = await run(done)
   record({ type: 'custom_tool_call_output', call_id: id, output: [{ type: 'input_text', text: 'Script completed\nWall time 0.1 seconds\nOutput:\n' }, { type: 'input_text', text: printed }] })
 }

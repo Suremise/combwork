@@ -17,12 +17,14 @@ ran:
 - **Hive tool calls** come from the hive MCP server itself. In development builds it logs each call it ran, with
   whether it worked, to the file named by `HIVE_TEST_MCP_LOG`. Tool names in a transcript, or in a Codex script that
   may never have run, are kept apart as *mentions* and are never counted as calls.
-- **Codex's calls in code mode** (HI-2235): Codex runs its tools from a script (its `exec` tool), which Hive's
-  transcript shows as one tool, `Script`. The harness reads the session's rollout, where Codex records each call a script
-  made as it ends (MCP calls, commands, file changes, images viewed) with its arguments and result, and puts those calls in
-  the script's place, named as the same call made directly (`mcp__hive__<tool>`, `Shell`, `Edit`, `view_image`): the
-  checks read what Codex called and got back, as for the other CLIs, and a call written in a script that never ran isn't
-  one (`codexScripts.cjs`). A script whose calls aren't recorded (no rollout, or one that records no calls) is no evidence
+- **Codex's calls in code mode** (HI-2235, HI-2246): Codex runs its tools from a script (its `exec` tool), which Hive's
+  transcript shows as one tool, `Script`. Codex's rollout records each call a script made as it ends (MCP calls, commands,
+  file changes, images viewed) with its arguments and result, and Hive's parser gives each script those calls (`calls`,
+  HI-2240), in the script it started in. The harness reads them from the transcript (a script with a call cut short for
+  display read whole, `transcript:tool`) and puts them in the script's place, named as Hive names the same call made
+  directly (`hive · <tool>`, `Shell`, `Edit`, `view_image`): the checks read what Codex called and got back, as for the
+  other CLIs, and a call written in a script that never ran isn't one (`codexScripts.cjs`). A script whose calls aren't
+  known (its Codex records none: no `calls`) is no evidence
   of any: neither its code nor what it printed counts, and the run notes it as unobservable (`NOTE unobservable`,
   `observed.codeMode.unknown`). The fake Codex works in code mode in the scenarios too (`fake-code-mode.txt` in its home).
 - **The merge slot** comes from Hive's own record: development builds write each change to the slots (who holds one,

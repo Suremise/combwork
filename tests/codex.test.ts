@@ -437,7 +437,8 @@ describe("a Codex code-mode script's calls (HI-2240)", () => {
 
   it('0.159 records them too; a script whose calls none records has none', () => {
     const old = parsed(require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'codex-0.159.jsonl'), 'utf8'))
-    expect(old.filter((t) => t.calls).map((t) => t.calls!.map((c) => c.name))).toEqual([['Shell'], ['Edit']])
+    // Its second script made no calls: known to have made none (an empty list, HI-2246), not unknown.
+    expect(old.filter((t) => t.calls).map((t) => t.calls!.map((c) => c.name))).toEqual([['Shell'], [], ['Edit']])
     const [script] = parsed(line({ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: 's', input: 'text(1)' } }) + '\n')
     expect(script.name).toBe('Script')
     expect(script.calls).toBeUndefined()

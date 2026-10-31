@@ -15,7 +15,7 @@ const { execFileSync } = require('child_process')
 const lib = require('../e2e/lib.cjs')
 const { processes, leftoverIdentities } = require('../e2e/folderProcesses.cjs')
 const { measuresOf, metricsTotals } = require('./benchmark.cjs')
-const { codexRollout, withScriptCalls } = require('./codexScripts.cjs')
+const { readWhole, withScriptCalls } = require('./codexScripts.cjs')
 
 /**
  * The Claude Code home the model trials use: a test home signed in once by hand (never the user's own ~/.claude, and
@@ -844,15 +844,12 @@ async function runScenario(sc, providerKey, opts = {}) {
     // The session under test, for checks of what it was launched with (Codex's rollout carries its instructions, #520).
     ctx.session = { id: sessionId ?? null, codexHome: env.CODEX_HOME }
     const transcript = sessionId ? await inv('transcript:read', host, sessionId).catch(() => null) : null
-    // Tool calls the parser shortened for display are read in full (for the token check and read evidence).
-    const items = transcript?.items ?? []
-    for (const it of items) {
-      if (it.kind === 'tool' && (it.tool.inputLength || it.tool.resultLength)) it.tool = (await inv('transcript:tool', host, sessionId, it.id).catch(() => null)) ?? it.tool
-    }
-    // Codex in code mode (HI-2235): each script's calls as its rollout recorded them, in the script's place. A script
-    // whose calls it didn't record (or no rollout) is no tool: what it ran is unobservable (codeMode.unknown).
-    const rollout = p.provider === 'codex' ? codexRollout(env.CODEX_HOME, sessionId) : null
-    const code = p.provider === 'codex' ? withScriptCalls(items, rollout ? fs.readFileSync(rollout, 'utf8') : null) : { items, scripts: 0, calls: 0, unknown: 0 }
+    // Tool calls the parser shortened for display are read in full (for the token check and read evidence), a Codex
+    // script's calls too (HI-2246).
+    const items = await readWhole(transcript?.items ?? [], (itemId) => inv('transcript:tool', host, sessionId, itemId))
+    // Codex in code mode (HI-2235): each script's calls as Hive's parser gives them (HI-2240, HI-2246), in the script's
+    // place. A script whose calls aren't known is no tool: what it ran is unobservable (codeMode.unknown).
+    const code = p.provider === 'codex' ? withScriptCalls(items) : { items, scripts: 0, calls: 0, unknown: 0 }
     const observed = observeTranscript(code.items, skillNames, skillRefsOf(ctx.skillsDir, skillNames))
     observed.codeMode = { scripts: code.scripts, calls: code.calls, unknown: code.unknown }
     observed.status = s?.status ?? 'stopped'
