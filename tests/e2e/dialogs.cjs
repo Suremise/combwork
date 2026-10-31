@@ -100,8 +100,9 @@ const check = (name, ok, extra = '') => {
   const note = settings.locator('#agent-role')
   const was = await note.inputValue()
   await note.fill('Moved and typed')
-  check('Agent Settings: moved, its fields still work', (await note.inputValue()) === 'Moved and typed')
+  check('Agent Settings: moved, its fields still work', !!(await lib.until(async () => (await note.inputValue()) === 'Moved and typed', HUNG_MS)))
   await note.fill(was)
+  await lib.until(async () => (await note.inputValue()) === was, HUNG_MS)
   // Both themes, moved.
   await page.screenshot({ path: path.join(lib.WORK, 'dialogs-settings-moved.png') })
   await inv('settings:update', { appearance: { theme: 'light' } })
