@@ -4179,6 +4179,10 @@ const names = (text, ...parts) => parts.every((p) => new RegExp(typeof p === 'nu
 /** A card's agent id (the API gives the agent as { id, name, … }). */
 const agentOf = (card) => card?.agent?.id ?? card?.agent ?? null
 const IDLE_PROMISE = /they('ll| will) (tell|let) you|(tell|let) you know when they/i
+/** coordinator-fact-before-asking's doc facts, only in alpha's docs/DEPLOY.md: in what a read gave back, it was read. */
+const DEPLOY_FACTS = /staging\.example\.com|deploy:staging|ALPHA_ENV=staging/
+/** And only its card's description says this: in a listing's reply, the card was in it, in full. */
+const DEPLOY_CARD_FACT = 'docs/DEPLOY.md, its Staging section'
 module.exports.SCENARIOS.push(
   {
     id: 'coordinator-team-lanes',
@@ -4700,10 +4704,15 @@ module.exports.SCENARIOS.push(
     fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.p}} then hive hive_read_section {"project":"alpha","path":"docs/DEPLOY.md","heading":"Staging"}`,
     expect: (o, c) => {
       const p = c.cards.p
-      // The card in full (hive_read_task, or the board's listing with details: HI-2239, Codex read it so), or the doc
-      // (Hive's doc tools, or a tool that worked and read DEPLOY.md: Read, a shell command, Codex's Script; not a write).
-      const cardRead = ran(o, 'hive_read_task').some((x) => cardIs(o, argsOf(x).number, p)) || ran(o, 'hive_list_tasks').some((x) => argsOf(x).details === true)
-      const docRead = ['hive_read_section', 'hive_doc_outline'].some((t) => ran(o, t).some((x) => /DEPLOY\.md/i.test(String(x.args)))) || (o.tools ?? []).some((t) => !t.isError && !/^(Write|Edit|MultiEdit|NotebookEdit)$/.test(t.name) && /DEPLOY\.md/i.test(String(t.input ?? '')))
+      // What it got, not what it named (HR1, HI-2239 round 1): the card in full (hive_read_task of it, or a listing whose
+      // reply has this card, its key and its description: HI-2239, Codex read it so); or the doc's facts in what a tool
+      // that worked gave back (Hive's hive_read_section, Read, a shell command, Codex's Script: its output, so a call made,
+      // not its source naming one). A call that only names the doc (a brief, an echo, a write) gets none of them back.
+      const own = o.cards.p
+      const cardRead =
+        ran(o, 'hive_read_task').some((x) => cardIs(o, argsOf(x).number, p)) ||
+        (o.tools ?? []).some((t) => !t.isError && /hive_list_tasks/.test(`${t.name} ${t.input ?? ''}`) && !!own?.key && new RegExp(`\\b${own.key}\\b`).test(String(t.result ?? '')) && String(t.result ?? '').includes(DEPLOY_CARD_FACT))
+      const docRead = (o.tools ?? []).some((t) => !t.isError && /DEPLOY\.md/i.test(String(t.input ?? '')) && DEPLOY_FACTS.test(String(t.result ?? '')))
       const lookedUp = cardRead || docRead
       return [
         ['looked the card or its doc up (the card in full: hive_read_task or a detailed listing; or the doc, through Hive or read)', lookedUp, o.hiveCalls.map((x) => x.tool).join(',')],

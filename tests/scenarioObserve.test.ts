@@ -702,16 +702,52 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
     expect(two([call('hive_report_merge', { card: 'AL-2' })], 'passed')).toBe(false)
   })
 
-  it('coordinator-fact-before-asking: the card in a detailed listing or the doc read by a tool counts; a write of the doc or a plain listing does not', () => {
+  describe('coordinator-fact-before-asking: what it got back, not what it named (HR1 round 1)', () => {
     const LOOKED = 'looked the card or its doc up (the card in full: hive_read_task or a detailed listing; or the doc, through Hive or read)'
-    const fact = (hiveCalls: unknown[], tools: unknown[] = []) => run('coordinator-fact-before-asking', { hiveCalls, tools }, { cards: { p: 1 } })[LOOKED]
-    expect(fact([call('hive_list_tasks', { project: 'alpha', details: true })])).toBe(true)
-    expect(fact([], [{ name: 'Script', input: 'Get-Content alpha/docs/DEPLOY.md', result: '# Deploying alpha', isError: false }])).toBe(true)
-    expect(fact([], [{ name: 'Read', input: JSON.stringify({ file_path: 'C:/w/alpha/docs/DEPLOY.md' }), result: '# Deploying alpha', isError: false }])).toBe(true)
-    expect(fact([call('hive_list_tasks', { project: 'alpha' })])).toBe(false)
-    expect(fact([call('hive_list_tasks', { project: 'alpha', details: true }, false)])).toBe(false)
-    expect(fact([], [{ name: 'Write', input: JSON.stringify({ file_path: 'docs/DEPLOY.md', content: 'x' }), result: 'ok', isError: false }])).toBe(false)
-    expect(fact([], [{ name: 'Read', input: JSON.stringify({ file_path: 'docs/DEPLOY.md' }), result: 'File does not exist.', isError: true }])).toBe(false)
+    const STARTED = 'started Coder on the card'
+    const DOC = "# Deploying alpha\n\n## Staging\n\nRun `npm run deploy:staging`. The host is staging.example.com; the build needs `ALPHA_ENV=staging`."
+    const CARD = 'AL-1 Publish the greeting page to staging (Todo)\nPublish the current greeting page to staging. How to deploy: docs/DEPLOY.md, its Staging section.'
+    const t = (name: string, input: string, result: string, isError = false) => ({ name, input, result, isError })
+    const fact = (hiveCalls: unknown[], tools: unknown[] = []) => run('coordinator-fact-before-asking', { hiveCalls, tools, cards: { p: { number: 1, key: 'AL-1' } } }, { cards: { p: 1 } })
+    const dispatch = call('hive_start_task', { number: 1, agent: 'Coder', note: 'Read docs/DEPLOY.md and publish to staging.' })
+
+    it('the doc read: its facts in what Read, a shell command, Codex’s Script or hive_read_section gave back', () => {
+      expect(fact([], [t('Read', JSON.stringify({ file_path: 'C:/w/alpha/docs/DEPLOY.md' }), DOC)])[LOOKED]).toBe(true)
+      expect(fact([], [t('Bash', JSON.stringify({ command: 'cat alpha/docs/DEPLOY.md' }), DOC)])[LOOKED]).toBe(true)
+      expect(fact([], [t('Script', 'text(await tools.exec_command({cmd:"Get-Content alpha/docs/DEPLOY.md"}))', `Script completed\nOutput:\n${DOC}`)])[LOOKED]).toBe(true)
+      expect(fact([], [t('mcp__hive__hive_read_section', 'project: alpha\npath: docs/DEPLOY.md\nheading: Staging', 'Run `npm run deploy:staging`. The host is staging.example.com.')])[LOOKED]).toBe(true)
+    })
+
+    it('the card read: hive_read_task of it, or a listing whose reply has it in full', () => {
+      expect(fact([call('hive_read_task', { number: 'AL-1' })])[LOOKED]).toBe(true)
+      expect(fact([call('hive_list_tasks', { project: 'alpha', details: true })], [t('mcp__hive__hive_list_tasks', 'project: alpha\ndetails: true', CARD)])[LOOKED]).toBe(true)
+      // Codex: the listing made inside a Script, its output the listing.
+      expect(fact([], [t('Script', 'text(await tools.mcp__hive__hive_list_tasks({project:"alpha",details:true}))', `Script completed\nOutput:\n${CARD}`)])[LOOKED]).toBe(true)
+    })
+
+    it("HR1's probes: a brief that names the doc, an echo, a shell write, a search or listing of names: none is a read", () => {
+      // The only call: Coder started with a note naming the doc (its transcript too).
+      const brief = fact([dispatch], [t('mcp__hive__hive_start_task', 'number: 1\nagent: Coder\nnote: Read docs/DEPLOY.md and publish to staging.', 'Started.')])
+      expect(brief[LOOKED]).toBe(false)
+      expect(brief[STARTED]).toBe(true)
+      expect(fact([], [t('PowerShell', 'Write-Output docs/DEPLOY.md', 'docs/DEPLOY.md')])[LOOKED]).toBe(false)
+      expect(fact([], [t('PowerShell', 'Set-Content docs/DEPLOY.md hacked', '')])[LOOKED]).toBe(false)
+      expect(fact([], [t('Bash', JSON.stringify({ command: 'ls -R | grep DEPLOY.md' }), 'docs/DEPLOY.md')])[LOOKED]).toBe(false)
+      expect(fact([], [t('Glob', JSON.stringify({ pattern: '**/DEPLOY.md' }), 'C:/w/alpha/docs/DEPLOY.md')])[LOOKED]).toBe(false)
+      expect(fact([], [t('Write', JSON.stringify({ file_path: 'docs/DEPLOY.md', content: 'x' }), 'File created successfully')])[LOOKED]).toBe(false)
+      // A Script whose source names the doc, but which did no read (its output nothing of the doc).
+      expect(fact([], [t('Script', '// later: tools.exec_command({cmd:"Get-Content docs/DEPLOY.md"})\ntext("ok")', 'Script completed\nOutput:\nok')])[LOOKED]).toBe(false)
+      // A failed read, and another project's DEPLOY.md (other facts).
+      expect(fact([], [t('Read', JSON.stringify({ file_path: 'C:/w/alpha/docs/DEPLOY.md' }), 'File does not exist.', true)])[LOOKED]).toBe(false)
+      expect(fact([], [t('Read', JSON.stringify({ file_path: 'C:/w/beta/docs/DEPLOY.md' }), '# Deploying beta\n\nRun `make ship`. The host is beta.example.com.')])[LOOKED]).toBe(false)
+    })
+
+    it("a listing of another project, or one that leaves this card out, or lists names only, isn't reading it", () => {
+      expect(fact([call('hive_list_tasks', { project: 'beta', details: true })], [t('mcp__hive__hive_list_tasks', 'project: beta\ndetails: true', 'BE-1 Ship beta (Todo)\nShip beta to production.')])[LOOKED]).toBe(false)
+      expect(fact([call('hive_list_tasks', { project: 'alpha', details: true, column: 'done' })], [t('mcp__hive__hive_list_tasks', 'project: alpha\ndetails: true\ncolumn: done', 'No cards.')])[LOOKED]).toBe(false)
+      expect(fact([call('hive_list_tasks', { project: 'alpha' })], [t('mcp__hive__hive_list_tasks', 'project: alpha', 'Todo (1):\nAL-1 Publish the greeting page to staging')])[LOOKED]).toBe(false)
+      expect(fact([], [t('mcp__hive__hive_list_tasks', 'project: alpha\ndetails: true', CARD, true)])[LOOKED]).toBe(false)
+    })
   })
 
   it('card-loop-recurring: a design posted for its reviewer first passes; asking the user does not', () => {
