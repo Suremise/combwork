@@ -8,7 +8,7 @@ import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { claudeCode } from '../src/main/providers/claude/adapter'
 import { heldLineLost, type HeldLook } from '../src/main/heldLine'
-import { idleQuestionGone } from '../src/main/hookStatus'
+import { hookStep, idleQuestionGone } from '../src/main/hookStatus'
 import { TerminalScreen } from '../src/main/terminalScreen'
 import { sessions } from '../src/main/sessions'
 import * as pty from '../src/main/ptyHost'
@@ -19,6 +19,8 @@ import { tempDir } from './tempDir'
 
 const fixture = (name: string): string => readFileSync(join(__dirname, 'fixtures', name), 'utf8').replace(/\r\n/g, '\n')
 const QUESTION = 'Teach auto mode about your environment?'
+/** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
+const HUNG_MS = 10_000
 const RULE = '─'.repeat(60)
 
 describe("Claude Code's question by itself and its input box, on its screen (2.1.312)", () => {
@@ -38,6 +40,17 @@ describe("Claude Code's question by itself and its input box, on its screen (2.1
     expect(claudeCode.idleQuestion(`● Claude Code may ask:\n\n  ${QUESTION}\n\n  It reads your project first.\n\n${RULE}\n❯ \n${RULE}\n  ⏵⏵ auto mode on`)).toBeNull()
     // Within a line of a reply: never the dialog's title.
     expect(claudeCode.idleQuestion(`● It asked "${QUESTION}" after the turn.`)).toBeNull()
+  })
+
+  it('reads the question 2.1.314 draws under its input box and footer, the empty box still above it (HI-2191, recorded)', () => {
+    const offer = fixture('advanced/envsetup-offer-claude-2.1.314.txt')
+    expect(claudeCode.promptText(offer)).toBe('')
+    expect(claudeCode.idleQuestion(offer)).toBe(QUESTION)
+    // Its words quoted in a reply above the box, with the dialog under it too: the dialog's.
+    expect(claudeCode.idleQuestion(`● Claude Code may ask:\n\n  ${QUESTION}\n\n${offer}`)).toBe(QUESTION)
+    // The dialog answered (gone from under the box): the quote above the box alone is no question.
+    const answered = offer.slice(0, offer.indexOf(`  ${QUESTION}`))
+    expect(claudeCode.idleQuestion(`● Claude Code may ask:\n\n  ${QUESTION}\n\n${answered}`)).toBeNull()
   })
 
   it("reads what its input holds: the recorded line, an empty box, wrapped rows joined; none under a dialog or a menu's ❯", () => {
@@ -163,6 +176,20 @@ describe('the agent and its question by itself (HI-1959)', () => {
     await draw(e, EMPTY_INPUT)
     look(e)
     expect(e.state.status).toBe('ready')
+  })
+
+  it("2.1.314's offer drawn before its turn's Stop is carried out, nothing drawn since: seen once the Stop makes it idle (HI-2191)", async () => {
+    vi.spyOn(internals, 'notify').mockImplementation(() => undefined)
+    const e = running('working')
+    e.screen.dispose()
+    e.screen = new TerminalScreen(120, 40)
+    await draw(e, fixture('advanced/envsetup-offer-claude-2.1.314.txt'))
+    look(e)
+    expect(e.state.status).toBe('working')
+    const ev = { kind: 'stop', lastMessage: 'ok' }
+    ;(sessions as unknown as { carryOut(id: string, l: Entry, step: unknown, cause: string, ev: unknown): void }).carryOut(liveKey(), e, hookStep(ev as never, (sessions as unknown as { statusInput(l: Entry): unknown }).statusInput(e) as never), 'Stop', ev)
+    await vi.waitFor(() => expect(e.state.status).toBe('waiting'), { timeout: HUNG_MS })
+    expect(String(e.state.statusMessage ?? '')).toBe(`Claude Code asks: ${QUESTION}`)
   })
 
   it('is no question of a working agent: a turn under way is left to its hooks', async () => {

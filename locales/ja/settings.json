@@ -148,7 +148,7 @@
   "settings.advanced.claude-code.safeguard.note.title": "セーフガード停止：トランスクリプトの注記",
   "settings.advanced.claude-code.safeguard.prompt.desc": "セーフガード停止の後にClaude Codeが出す、モデルを切り替えるかどうかの質問です。最後に書いた行にある、開いているダイアログの選択肢で判断します。開いている間、Hiveはエージェントが応答を待っていることとその理由を表示します。誤っていると、エージェントには「Claude needs your permission」としか表示されません。",
   "settings.advanced.claude-code.safeguard.prompt.title": "セーフガード停止：質問",
-  "settings.advanced.claude-code.screen.idleQuestion.desc": "Claude Codeがターンの後に自分から画面に出し、Hiveには何も送らない質問（「Teach auto mode about your environment?」）。入力欄の代わりに出るダイアログの中の独立した1行です（入力欄が表示された状態でプロンプトや返答に同じ言葉があっても、それは該当しません）。表示されている間、Hiveはエージェントをその質問とともに返答待ちとして表示し、何も入力しません。Enterを押すと答えてしまうためです。間違っていると、Hiveは起こすための行を質問に入力してしまいます。",
+  "settings.advanced.claude-code.screen.idleQuestion.desc": "Claude Codeがターンの後に自分から画面に出し、Hiveには何も送らない質問（「Teach auto mode about your environment?」）。入力欄の代わりに、または入力欄の下に出るダイアログの中の独立した1行です（入力欄より上のプロンプトや返答に同じ言葉があっても、それは該当しません）。表示されている間、Hiveはエージェントをその質問とともに返答待ちとして表示し、何も入力しません。Enterを押すと答えてしまうためです。間違っていると、Hiveは起こすための行を質問に入力してしまいます。",
   "settings.advanced.claude-code.screen.idleQuestion.title": "画面：待機中の質問",
   "settings.advanced.claude-code.screen.input.desc": "2本の線に挟まれたClaude Codeの入力欄。最初のグループは、プロンプト記号の後の内容です。Hiveはこれを読み、入力した行が入力欄から消えた（CLIの画面が受け取った）ことを知って、もう一度入力します。間違っていると、その行は保留されたままになり、そこでEnterを押すまで、エージェントには何も入力しません。",
   "settings.advanced.claude-code.screen.input.title": "画面：入力欄",

@@ -60,8 +60,11 @@ const state = vi.hoisted(() => ({
   /** This run's restart record will resume the builder (restartResume.isResuming). */
   resuming: false,
   /** The conversation's lookup fails (its transcript can't be read now: unknown). */
-  convFails: false
+  convFails: false,
+  /** Why its builder can't take a line now (lineWriter.whyNoLine), or null. */
+  busy: null as string | null
 }))
+vi.mock('../src/main/lineWriter', async (orig) => ({ ...(await orig<object>()), whyNoLine: () => state.busy }))
 vi.mock('../src/main/restartResume', async (orig) => ({ ...(await orig<object>()), isResuming: () => state.resuming }))
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: () => [], workflowFor: async () => state.wf }))
@@ -212,7 +215,7 @@ afterEach(() => {
   env?.close()
   env = null
   resetAgentStartsForTests()
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null })
 })
 
 /**
@@ -758,6 +761,29 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
     await place(ws, e.project, e.wf, n, cycleIn(e.store.facts(n))!, lease)
     expect(placed(e, n)).toBe(1)
     expect(state.deliveries).toHaveLength(2)
+  })
+
+  it('HI-2191: its builder unable to take a line (input blocked, typing, watching): no delivery made or called off, said once; given once it can', async () => {
+    const { e, n, slot, cycle, ws } = await prepared()
+    state.live = { cwd: slot, sessionId: 's1' }
+    state.busy = 'something on its screen is taking its keys, and it waits for the user to answer it there'
+    // The placement waits for its builder's next status, however many come while it still can't take one.
+    const placing = place(ws, e.project, e.wf, n, cycle, lease)
+    const looked = (): number => state.logged.filter((m) => /waits for its builder ⁨?B1⁩?, which can't take a line now/.test(m)).length
+    await vi.waitFor(() => expect(looked()).toBe(1), { timeout: HUNG_MS })
+    for (let i = 0; i < 3; i++) tellListeners({ type: 'session-status', state: { projectPath: e.project, agentId: 'B1', status: 'waiting' } } as never)
+    await new Promise((r) => setImmediate(r))
+    expect(state.deliveries).toEqual([])
+    expect(state.calls).toEqual([])
+    expect(placed(e, n)).toBe(0)
+    expect(looked(), 'said once').toBe(1)
+    expect(state.logged.some((m) => /Giving/.test(m))).toBe(false)
+    // Free: its status says so, and it is given, once.
+    state.busy = null
+    tellListeners({ type: 'session-status', state: { projectPath: e.project, agentId: 'B1', status: 'ready' } } as never)
+    await placing
+    expect(state.calls).toEqual(['typed (given)'])
+    expect(placed(e, n)).toBe(1)
   })
 
   it("not running: a launch that couldn't start is nothing given; the next try starts it with the card, once", async () => {

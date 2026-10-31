@@ -287,6 +287,30 @@
     "defaultMessage": "Failed to start: {why}",
     "description": "Tooltip of a pane's state mark (stalled): the agent's last launch failed ({why}: the error)."
   },
+  "panes.header.inputBlocked": {
+    "defaultMessage": "Its input takes no keys",
+    "description": "A pane's status: keys Hive typed into the agent's input didn't reach it (something on its screen takes them). Keep it short."
+  },
+  "panes.header.inputBlockedTip": {
+    "defaultMessage": "Keys Hive typed into this agent's input didn't reach it: something on its screen, such as a question of its CLI's own, is taking them. Hive types nothing more into it and gives it nothing until it takes keys again. Answer it in its terminal, then press Try again.",
+    "description": "Tooltip of a pane's status when the agent's input takes no keys. Try again is the button beside it: keep its name as it is translated there."
+  },
+  "panes.header.inputRetry": {
+    "defaultMessage": "Try again",
+    "description": "Button beside a pane's status when the agent's input takes no keys: Hive checks once that its input takes keys again (after the user answered what took them). Keep it short."
+  },
+  "panes.header.inputRetryFailed": {
+    "defaultMessage": "Could not try the input again",
+    "description": "An error's title: Try again on an agent's blocked input failed."
+  },
+  "panes.header.inputStillBlocked": {
+    "defaultMessage": "Its input still takes no keys",
+    "description": "A notice's title: Try again found the agent's input still taking no keys."
+  },
+  "panes.header.inputStillBlockedBody": {
+    "defaultMessage": "Answer what its terminal shows, such as a question of its CLI's own, then try again.",
+    "description": "A notice's body: Try again found the agent's input still taking no keys; the user answers what its terminal shows first."
+  },
   "panes.header.markIdle": {
     "defaultMessage": "Mark idle",
     "description": "Button beside a pane's unknown state, and an item of its ⋯ menu: tells Hive the agent is idle (its terminal shows it at its prompt). Keep it short."

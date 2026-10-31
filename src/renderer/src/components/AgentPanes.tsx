@@ -693,6 +693,14 @@ function paneItems(project: ProjectInfo, a: AgentInfo, left: AgentLeftovers | un
 
 const markIdle = (project: ProjectInfo, a: AgentInfo): void => void call('session:markIdle', project.path, a.id).catch((e) => notify('error', tr(msg({ id: 'panes.header.markIdleFailed', defaultMessage: 'Could not mark the agent idle', description: "An error's title: Mark idle failed." })), String((e as Error).message ?? e)))
 
+/** Try again on a blocked input (HI-2191): told only when it is still blocked. */
+const retryInput = (project: ProjectInfo, a: AgentInfo, since: string): void =>
+  void call('session:retryInput', project.path, a.id, since)
+    .then((r) => {
+      if (r === 'blocked') notify('info', tr(msg({ id: 'panes.header.inputStillBlocked', defaultMessage: 'Its input still takes no keys', description: "A notice's title: Try again found the agent's input still taking no keys." })), tr(msg({ id: 'panes.header.inputStillBlockedBody', defaultMessage: 'Answer what its terminal shows, such as a question of its CLI\'s own, then try again.', description: "A notice's body: Try again found the agent's input still taking no keys; the user answers what its terminal shows first." })))
+    })
+    .catch((e) => notify('error', tr(msg({ id: 'panes.header.inputRetryFailed', defaultMessage: 'Could not try the input again', description: "An error's title: Try again on an agent's blocked input failed." })), String((e as Error).message ?? e)))
+
 /** Where a menu opens under a button. */
 const below = (el: Element): [number, number] => {
   const r = el.getBoundingClientRect()
@@ -1236,6 +1244,7 @@ export function useWidth<T extends HTMLElement>(): [(el: T | null) => void, numb
   return [ref, w]
 }
 
+const TRY_INPUT = msg({ id: 'panes.header.inputRetry', defaultMessage: 'Try again', description: "Button beside a pane's status when the agent's input takes no keys: Hive checks once that its input takes keys again (after the user answered what took them). Keep it short." })
 const MARK_IDLE = msg({ id: 'panes.header.markIdle', defaultMessage: 'Mark idle', description: "Button beside a pane's unknown state, and an item of its ⋯ menu: tells Hive the agent is idle (its terminal shows it at its prompt). Keep it short." })
 
 /** The header's width from which its card shows (tests/e2e/paneheader.cjs measures every width). */
@@ -1331,6 +1340,18 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
         <Tooltip content={hooksMissingNote(live, tr)}>
           <span className="faint pane-status asks hooks-missing">{hooksMissingText(live, tr)}</span>
         </Tooltip>
+      ) : live?.inputBlocked ? (
+        // Something on its screen takes its keys (HI-2191): the user answers it there; Try again checks its input takes keys.
+        <span className="pane-status input-blocked">
+          <Tooltip content={tr(msg({ id: 'panes.header.inputBlockedTip', defaultMessage: "Keys Hive typed into this agent's input didn't reach it: something on its screen, such as a question of its CLI's own, is taking them. Hive types nothing more into it and gives it nothing until it takes keys again. Answer it in its terminal, then press Try again.", description: "Tooltip of a pane's status when the agent's input takes no keys. Try again is the button beside it: keep its name as it is translated there." }))}>
+            <span className="faint pane-status asks">{tr(msg({ id: 'panes.header.inputBlocked', defaultMessage: 'Its input takes no keys', description: "A pane's status: keys Hive typed into the agent's input didn't reach it (something on its screen takes them). Keep it short." }))}</span>
+          </Tooltip>
+          {!narrow && (
+            <button className="btn small subtle mark-idle" aria-label={tr(TRY_INPUT)} onClick={() => retryInput(project, a, live.inputBlocked!.since)}>
+              {tr(TRY_INPUT)}
+            </button>
+          )}
+        </span>
       ) : live?.untakenLine ? (
         // A line Hive typed that its CLI didn't take (#430): the user sees to it, nothing more is typed meanwhile.
         <Tooltip content={tr(msg({ id: 'panes.header.untakenTip', defaultMessage: "Hive typed this, but its CLI hasn't taken it (it wasn't reading its input): \"{line}\". Click its terminal and press Enter. Hive types nothing more into it until its CLI takes it.", description: "Tooltip of a pane's status when a line Hive typed into the agent's CLI wasn't taken ({line}: the line)." }), { line: live.untakenLine.text })}>

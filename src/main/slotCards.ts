@@ -40,6 +40,7 @@ import { legacyWorktree, rebindSession, slotsMigrated } from './agentFolders'
 import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
+import { whyNoLine } from './lineWriter'
 import { changingFolder } from './folderFence'
 import { samePlace } from './fsutil'
 import { samePath } from '../shared/movePaths'
@@ -1330,6 +1331,17 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       const prompt = brief ? `${cardPrompt}\n\n${brief}` : cardPrompt
       // How it is placed kept with it (HI-2134): a later pass finding it made records the placement as this one made it.
       const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref, meta: { how } } // i18n-ignore: who a delivery is from, as agents read it
+      // Its builder can't take a line now (HI-2191: its input blocked, a line of Hive's being typed, watching, working):
+      // it waits for that builder's next status (place's nextLook), making no delivery. One made and called off each
+      // pass wrote the lane each time, which ran the next pass: HB3's every second. Said once for each reason.
+      const busy = there ? whyNoLine(projectPath, agentId, 'free') : null
+      if (busy) {
+        if (!track.told.has(`busy:${busy}`)) {
+          track.told.add(`busy:${busy}`)
+          log.info(`#${n} waits for its builder ${userText(agent.name)}, which can't take a line now (${busy}): given once it can`)
+        }
+        throw new Waits()
+      }
       log.info(`Giving ${userText(agent.name)} #${n} in ${userText(cycle.started.slot)} (${how})`)
       // A refusal (NotGiven: its agent got busy) or a launch that couldn't start throws: nothing recorded, tried again.
       if (pausedLane()) throw new Waits()

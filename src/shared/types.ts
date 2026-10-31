@@ -2411,6 +2411,12 @@ export interface LiveSessionState {
    */
   untakenLine?: { since: string; text: string }
   /**
+   * Its input takes no keys (HI-2191): keys Hive typed went unanswered while its input box read empty, so something on its
+   * screen takes them. Nothing is typed into it until it is seen to take keys again; its pane offers Try again (`since`
+   * names this block).
+   */
+  inputBlocked?: { since: string }
+  /**
    * Its CLI's hooks aren't reaching Hive (#1336), this launch: none came within a while of its start (a CLI that sends one
    * then), or none after a prompt its CLI went to work on (its screen or its records show it). Hive's status for it may be
    * wrong, so it shows as unknown and nothing is typed into it; any hook clears it. `why` when Hive can tell: Hive

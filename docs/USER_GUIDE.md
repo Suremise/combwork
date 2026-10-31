@@ -1914,12 +1914,18 @@ Hive reads this from Claude Code's and Codex's session records. GitHub Copilot's
 
 ### When Claude Code asks you something by itself <a id="when-claude-code-asks-by-itself"></a>
 
-Now and then, after a turn in **auto mode**, Claude Code 2.1.312 offers to **teach auto mode about your environment**: it would read the project, your recent Claude sessions and, if you choose, your shell history and other repositories. It puts that question on its screen without telling Hive. The choice is yours, so Hive never answers it:
+Now and then, after a turn in **auto mode**, Claude Code (2.1.312 and later) offers to **teach auto mode about your environment**: it would read the project, your recent Claude sessions and, if you choose, your shell history and other repositories. It puts that question on its screen without telling Hive. The choice is yours, so Hive never answers it:
 
 - The agent shows **Needs input** with the question (*Claude Code asks: Teach auto mode about your environment?*), it is in **Agents that need you**, you're notified, and the Hive Assistant is told it waits for you.
 - Hive types nothing into the agent while the question shows, and presses no Enter: Enter would answer it. Wakes and messages wait. Answer it in the agent's pane (Esc puts it off); once it's gone, the agent is idle again and what waited is typed.
 - If the question took a line Hive had already typed, and the agent's input is empty once it's gone, Hive types that line again: it waits **Lost line: wait** (2 seconds, **Settings → Advanced → Hive**) to be sure the line wasn't taken after all. A line that was a message Hive can't send again is shown to you in a notification, with its words. Your own text in the input is never cleared or typed over.
 - Claude Code asks again a week after **Not now**, and never after **Don't show again**. To not be offered it in Hive's sessions at all, turn off **Settings → Advanced → Claude Code → Offer auto mode's environment setup**: Hive's Claude Code agents are then started with the offer off for that launch (nothing is written to Claude Code's own files, and auto mode decides as before). `/auto-mode-setup` in an agent still runs it when you want.
+
+A question or dialog of a CLI's own that Hive doesn't recognise can take an agent's keys the same way. Before Hive types into Claude Code, it checks that the agent's input takes a key. When three tries in a row get no answer, Hive stops typing there:
+
+- The agent shows **Needs input** with *Something on its screen is taking its keys: answer it there, then Try again*, and its pane's header says **Its input takes no keys**. You're notified, and the Hive Assistant is told it waits for you. If the agent already waits for you on something else, that stays its reason.
+- Hive types nothing more into it and presses no key there, however long it waits. Wakes and messages wait, and a card its lane would hand it waits too: nothing is retried in the meantime.
+- Answer what its terminal shows, then press **Try again** beside its status. Hive tries the input once. If it takes the key, the agent is idle again and what waited is typed; if not, Hive says *Its input still takes no keys*. Typing in its pane so your text shows in its input frees it too, as does the agent carrying on by itself. Your own text in the input is never cleared.
 
 ### Agents that need you <a id="agents-that-need-you"></a>
 
