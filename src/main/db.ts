@@ -98,13 +98,16 @@ const OPENABLE_POLL_MS = 100
  * fails with SQLITE_IOERR_TRUNCATE (1546) until that process lets go: seen for 10 s after an e2e kill, longer than
  * openDb's synchronous retries. Tried with a read-only connection of its own, which changes nothing in the files: done
  * at once when there is no `-shm` (a clean close removes it) or another connection has the file (it isn't truncated
- * then). Stops at the first other error, or at `boundMs`, leaving the open to say what is wrong. `onWait` is told once,
- * as it starts waiting. Returns how long it waited.
+ * then). Stops at the first other error, or at `boundMs`, leaving the open to say what is wrong, and at once when `signal`
+ * aborts (whoever waited has gone: the file isn't tried again for it). `onWait` is told once, as it starts waiting.
+ * Returns how long it waited.
  */
-export async function untilOpenable(file: string, onWait?: (error: Error) => void, boundMs = OPENABLE_WAIT_MS): Promise<number> {
+export async function untilOpenable(file: string, o: { onWait?: (error: Error) => void; boundMs?: number; signal?: AbortSignal } = {}): Promise<number> {
+  const { onWait, boundMs = OPENABLE_WAIT_MS, signal } = o
   if (!existsSync(`${file}-shm`)) return 0
   const started = performance.now()
   for (let told = false; ; told = true) {
+    if (signal?.aborted) return performance.now() - started
     try {
       // A busy file isn't waited for here (the open's own busy wait has it).
       const probe = new DatabaseSync(file, { readOnly: true, timeout: 100 })
@@ -118,7 +121,15 @@ export async function untilOpenable(file: string, onWait?: (error: Error) => voi
       const waited = performance.now() - started
       if (!isIoError(e) || waited >= boundMs) return waited
       if (!told) onWait?.(e as Error)
-      await new Promise((r) => setTimeout(r, OPENABLE_POLL_MS))
+      await new Promise<void>((r) => {
+        const done = (): void => {
+          clearTimeout(t)
+          signal?.removeEventListener('abort', done)
+          r()
+        }
+        const t = setTimeout(done, OPENABLE_POLL_MS)
+        signal?.addEventListener('abort', done, { once: true })
+      })
     }
   }
 }

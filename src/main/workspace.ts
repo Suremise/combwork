@@ -481,8 +481,12 @@ export class WorkspaceService {
       // Each project's own folders, all at once (HI-1705).
       await whenAll((await this.listProjectPaths()).map((p) => this.ensureProject(p).catch((e) => log.warn(`ensureProject ${userText(p)}`, e))))
       done('its projects') // i18n-ignore: a part of a log line's timing
-      // Its board openable first (HI-2199: just after a Hive ended without quitting, it may not be for some seconds).
-      await untilBoardOpenable(abs)
+      // Its board openable first (HI-2199: just after a Hive ended without quitting, it may not be for some seconds). A
+      // close or another open meanwhile ends the wait, and this open goes no further: the service is the successor's.
+      const gen = this.generation
+      const life = this.life.signal
+      await untilBoardOpenable(abs, life)
+      if (life.aborted || this.generation !== gen || this.path !== abs) throw hiveError(M.closed, undefined, { kind: 'conflict' })
       done('its board openable') // i18n-ignore: a part of a log line's timing
       // Every project has its id (#508) before the board, lanes and watches are read by it.
       await this.projectIds().catch((e) => log.warn('reading the project ids', e))

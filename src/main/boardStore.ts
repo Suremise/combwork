@@ -718,17 +718,18 @@ function boardOf(path: string, transient = false): Board {
  * Before a workspace's open first uses its board (HI-2199): while its file, as a Hive that ended without quitting left
  * it, can't be opened yet (another process still maps its `-shm`), waits for that, bounded (untilOpenable), so the board
  * opens once it can instead of failing for the rest of the session. At once for a board open already or a file closed
- * cleanly.
+ * cleanly; ended when `signal` (the open's lifetime) aborts.
  */
-export async function untilBoardOpenable(path: string): Promise<void> {
+export async function untilBoardOpenable(path: string, signal: AbortSignal): Promise<void> {
   if (boards.has(keyOf(path))) return
   let waiting = false
-  const waited = await untilOpenable(join(path, HIVE_DIR, DB_FILE), (e) => {
+  const onWait = (e: Error): void => {
     waiting = true
     boardTestHooks.openableWait?.(path)
     log.warn(`the board of ${userText(path)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its ${DB_FILE}-shm, as just after a Hive ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
-  })
-  if (waiting) log.info(`the board of ${userText(path)}: waited ${Math.round(waited)} ms for it to be openable`)
+  }
+  const waited = await untilOpenable(join(path, HIVE_DIR, DB_FILE), { onWait, signal })
+  if (waiting) log.info(`the board of ${userText(path)}: ${signal.aborted ? 'its wait ended with its open' : 'openable'} after ${Math.round(waited)} ms`)
 }
 
 /**

@@ -16,7 +16,7 @@ const base = tempDir('hive-board-store-')
 const HUNG_MS = 10_000
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
+const { createWorkspaceService, disposeWorkspaceService, inWorkspace, WorkspaceService } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { backupTo, OPEN_IO_RETRY_MS, openDb, schemaVersion, untilOpenable } = await import('../src/main/db')
@@ -170,7 +170,7 @@ describe('the database layer (db.ts)', () => {
     openDb(file, { migrations: [{ version: 1, name: 'one', up: (d: DatabaseSync) => d.exec('CREATE TABLE a (x)') }], hiveVersion: '1' }).close()
     const before = readdirSync(join(file, '..')).sort()
     const told: Error[] = []
-    expect(await untilOpenable(file, (e) => told.push(e))).toBe(0)
+    expect(await untilOpenable(file, { onWait: (e) => told.push(e) })).toBe(0)
     expect(told).toEqual([])
     expect(readdirSync(join(file, '..')).sort()).toEqual(before)
   })
@@ -185,12 +185,28 @@ function leftByAKill(file: string): void {
   expect(existsSync(`${file}-shm`)).toBe(true)
 }
 
+/** A workspace whose board has a card ("Kept"), left as a Hive ended from outside leaves it. */
+async function killedWorkspace(): Promise<{ ws: string; file: string }> {
+  const ws = workspaceWith()
+  const first = await open(ws)
+  await inWorkspace(first, () => tasks.createTask({ title: 'Kept', project: 'p' }, user))
+  await disposeWorkspaceService(first)
+  store.closeBoard(ws)
+  const file = join(ws, '.hive', 'hive.db')
+  leftByAKill(file)
+  return { ws, file }
+}
+
 /**
- * Another process mapping `shm` with no handle or lock on it (as a process being torn down, or a scanner, can), until
- * `release` exists: resolves once it is mapped, with the process.
+ * Runs `body` while another process maps `shm` with no handle or lock on it (as a process being torn down, or a scanner,
+ * can). `release()` lets it go. Whatever happens, readiness failing included, the holder is released and waited for, and
+ * ended if it hasn't gone by HUNG_MS.
  */
-async function mapped(shm: string, release: string): Promise<ChildProcess> {
-  const ps1 = join(base, 'map-shm.ps1')
+async function whileMapped(shm: string, body: (release: () => void) => Promise<void>): Promise<void> {
+  const dir = join(base, `holder-${++n}`)
+  mkdirSync(dir, { recursive: true })
+  const ps1 = join(dir, 'map-shm.ps1')
+  const releaseFile = join(dir, 'release')
   writeFileSync(ps1, [
     'param([string]$File, [string]$Release)',
     "$fs = [System.IO.File]::Open($File, 'Open', 'ReadWrite', 'ReadWrite, Delete')",
@@ -201,39 +217,101 @@ async function mapped(shm: string, release: string): Promise<ChildProcess> {
     'while (-not (Test-Path -LiteralPath $Release)) { Start-Sleep -Milliseconds 20 }',
     '$view.Dispose(); $mm.Dispose()'
   ].join('\r\n'))
-  const ps = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, '-File', shm, '-Release', release], { stdio: ['ignore', 'pipe', 'inherit'], windowsHide: true, env: { SystemRoot: process.env.SystemRoot, PATH: process.env.PATH } })
+  const release = (): void => writeFileSync(releaseFile, '')
+  const ps: ChildProcess = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, '-File', shm, '-Release', releaseFile], { stdio: ['ignore', 'pipe', 'inherit'], windowsHide: true, env: { SystemRoot: process.env.SystemRoot, PATH: process.env.PATH } })
+  const exited = new Promise<void>((r) => (ps.exitCode !== null ? r() : ps.once('exit', () => r())))
   let out = ''
   ps.stdout!.on('data', (d) => (out += String(d)))
-  await vi.waitFor(() => expect(out).toContain('mapped'), { timeout: HUNG_MS, interval: 20 })
-  return ps
+  try {
+    await vi.waitFor(() => {
+      if (ps.exitCode !== null) throw new Error(`the holder exited (${ps.exitCode}) before it mapped the file`)
+      expect(out).toContain('mapped')
+    }, { timeout: HUNG_MS, interval: 20 })
+    await body(release)
+  } finally {
+    release()
+    const gone = await Promise.race([exited.then(() => true), new Promise<boolean>((r) => setTimeout(() => r(false), HUNG_MS).unref())])
+    if (!gone) {
+      ps.kill()
+      await exited
+    }
+  }
+}
+
+/** An open of `file` as SQLite 3.53 makes it while the -shm is mapped: its error code, or null when it opened. */
+function refusedNow(file: string): unknown {
+  const d = new DatabaseSync(file, { readOnly: true })
+  try {
+    d.prepare('SELECT 1 FROM sqlite_master').get()
+    return null
+  } catch (e) {
+    return (e as { errcode?: number }).errcode
+  } finally {
+    d.close()
+  }
 }
 
 describe.runIf(process.platform === 'win32')('a board whose -shm another process still maps (HI-2199)', () => {
+  afterEach(() => {
+    store.boardTestHooks.openableWait = null
+  })
+
   it("the workspace's open waits for it to be let go, then opens the board, instead of opening without it", async () => {
-    const ws = workspaceWith()
-    const first = await open(ws)
-    await inWorkspace(first, () => tasks.createTask({ title: 'Kept', project: 'p' }, user))
-    await disposeWorkspaceService(first)
-    store.closeBoard(ws)
-    const file = join(ws, '.hive', 'hive.db')
-    leftByAKill(file)
-    const release = join(base, `release-${++n}`)
-    const holder = await mapped(`${file}-shm`, release)
-    const exited = new Promise((r) => holder.once('exit', r))
+    const { ws, file } = await killedWorkspace()
     const waits: string[] = []
     store.boardTestHooks.openableWait = (p) => waits.push(p)
-    try {
-      // As SQLite 3.53 opens it while the -shm is mapped: the first connection's truncation of it is refused.
-      expect(() => new DatabaseSync(file, { readOnly: true }).prepare('SELECT 1 FROM sqlite_master').get()).toThrow(expect.objectContaining({ errcode: 1546 }))
+    await whileMapped(`${file}-shm`, async (release) => {
+      // The first connection's truncation of the -shm is refused.
+      expect(refusedNow(file)).toBe(1546)
       const opening = open(ws)
       await vi.waitFor(() => expect(waits).toEqual([resolve(ws)]), { timeout: HUNG_MS, interval: 20 })
-      writeFileSync(release, '')
+      release()
       const w = await opening
       expect((await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.title)).toContain('Kept')
+    })
+  })
+
+  it('a close while the open waits ends the wait at once, and the open goes no further', async () => {
+    const { ws, file } = await killedWorkspace()
+    const waits: string[] = []
+    store.boardTestHooks.openableWait = (p) => waits.push(p)
+    const w = createWorkspaceService()
+    opened.push(w)
+    await whileMapped(`${file}-shm`, async () => {
+      const opening = w.open(ws).then(() => 'opened', (e: Error) => e.message)
+      await vi.waitFor(() => expect(waits).toEqual([resolve(ws)]), { timeout: HUNG_MS, interval: 20 })
+      await w.close()
+      // Still mapped: the wait ended for the close, not for the file.
+      expect(await opening).toMatch(/closed/)
+      expect(refusedNow(file)).toBe(1546)
+      expect(w.path).toBeNull()
+    })
+  })
+
+  it("another workspace opened in the same window while the open waits: the old open is refused, and the new one is the window's", async () => {
+    const { ws, file } = await killedWorkspace()
+    const other = workspaceWith()
+    const waits: string[] = []
+    store.boardTestHooks.openableWait = (p) => waits.push(p)
+    const w = createWorkspaceService()
+    opened.push(w)
+    const events: (string | null)[] = []
+    const listener = (s: WS): void => {
+      if (s === w) events.push(s.path)
+    }
+    WorkspaceService.openedListeners.add(listener)
+    try {
+      await whileMapped(`${file}-shm`, async () => {
+        const opening = w.open(ws).then((info) => `opened ${info.path}`, (e: Error) => e.message)
+        await vi.waitFor(() => expect(waits).toEqual([resolve(ws)]), { timeout: HUNG_MS, interval: 20 })
+        const info = await w.open(other)
+        expect(info.path).toBe(resolve(other))
+        expect(await opening).toMatch(/closed/)
+        expect(w.path).toBe(resolve(other))
+        expect(events).toEqual([resolve(other)])
+      })
     } finally {
-      store.boardTestHooks.openableWait = null
-      writeFileSync(release, '')
-      await exited
+      WorkspaceService.openedListeners.delete(listener)
     }
   })
 
@@ -241,18 +319,17 @@ describe.runIf(process.platform === 'win32')('a board whose -shm another process
     const file = join(base, `layer-${++n}`, 'x.db')
     mkdirSync(join(file, '..'), { recursive: true })
     leftByAKill(file)
-    const release = join(base, `release-${++n}`)
-    const holder = await mapped(`${file}-shm`, release)
-    const exited = new Promise((r) => holder.once('exit', r))
-    try {
+    await whileMapped(`${file}-shm`, async () => {
       const told: number[] = []
-      const waited = await untilOpenable(file, (e) => told.push((e as { errcode?: number }).errcode ?? 0), 300)
+      const waited = await untilOpenable(file, { onWait: (e) => told.push((e as { errcode?: number }).errcode ?? 0), boundMs: 300 })
       expect(told).toEqual([1546])
       expect(waited).toBeGreaterThanOrEqual(300)
-    } finally {
-      writeFileSync(release, '')
-      await exited
-    }
+      // An aborted wait tries nothing more.
+      const gone = new AbortController()
+      gone.abort()
+      expect(await untilOpenable(file, { signal: gone.signal, onWait: () => told.push(0) })).toBeLessThan(HUNG_MS)
+      expect(told).toEqual([1546])
+    })
     // Let go: at once, and the file opens.
     expect(await untilOpenable(file)).toBeLessThan(HUNG_MS)
     openDb(file, { migrations: [], hiveVersion: '1' }).close()
