@@ -172,8 +172,10 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('a project agent may not make connections (403)', byAgent.status === 403, JSON.stringify(byAgent))
     await inv('settings:update', { assistant: { changeSettings: false } })
 
-    await inv('session:stop', alpha, 'a-one')
-    await inv('session:stop', assistantHome, 'assistant')
+    // Every session the suite started, Bystart's too (HI-2180): one still in its turn as the copy closes is asked about
+    // (Confirm on quit's default), and that question held app.close() until the runner's 10 minutes.
+    for (const l of await inv('session:live')) await inv('session:stop', l.projectPath, l.agentId)
+    check('every session it started has stopped, so the copy closes without asking', !!(await lib.until(async () => (await inv('session:live')).length === 0, HUNG_MS)), JSON.stringify((await inv('session:live')).map((l) => [l.agentId, l.status])))
   } catch (e) {
     check('the suite ran to its end', false, e.stack)
   } finally {
