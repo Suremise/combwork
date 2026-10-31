@@ -240,6 +240,23 @@ the turn (`GET /v1/metrics` of the run's own workspace), and the difference is t
 - **The provider's usage** of the session (a new one, so its total is the scenario's), compared only when every sample on
   both sides reported it. A fake's tokens mean nothing; a cost is compared only when both sides have one.
 
+**The subject apart from the other agents** (HI-2186): a scenario's measures are every agent's in its workspace together
+(the session under test, a lane's builder and reviewer, agents it or Hive started), and each sample also has them for
+the subject (`measures.subject`: the Assistant, or the agent the scenario tests) and the others (`measures.others`), each
+measured on its own, and each agent's hive calls in the measured window (`measures.agents`, by its fixture name):
+- The Assistant as subject: Hive's metrics by caller role (the Assistant's, project agents'), every measure, only when
+  the coverage is whole (else `split: 'partial'` and neither part).
+- An agent as subject: its tool calls, replies and tool lists from the hive servers' test log (`HIVE_TEST_MCP_LOG`: each
+  call with its reply's size, and a `kind: 'list'` line per server's tool list); its API and launch measures only when
+  no other agent called or launched in the window, else unknown.
+- An older log (no sizes, no list lines): calls are known, sizes unknown, and tool lists one a call for the fake CLIs
+  only, else unknown.
+
+**The fakes count per hive call.** The fake Claude Code and fake Codex start a hive MCP server for every hive call (and
+each lists the tools), where a real CLI starts one a session: with them, tool-list starts and API requests count calls,
+not sessions. HI-2181 read a lane scenario's doubled tool-list starts as twice the fetches per session; it was the lane's
+agents making more calls.
+
 Compare two runs in Hive: **Performance → Compare → Import…** each `benchmark.json` (in the Performance view, with the
 whole workspace selected: a benchmark is its test workspace's, never a project's or the own work's). Each sample keeps
 every check (passed, failed, skipped), the measurement's coverage, and the guidance and skill revisions the session was

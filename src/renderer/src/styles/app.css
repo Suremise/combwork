@@ -12032,6 +12032,14 @@ textarea.input.task-blocked-input {
 .perf-detail-body p {
   margin: 0 0 6px;
 }
+/* A measure's other parts under the subject's row (HI-2186): the other agents' and all agents' together, indented. */
+.perf-detail-body tr.perf-part td:first-child {
+  padding-left: 22px;
+  color: var(--fg-faint);
+}
+.perf-detail-body .perf-agents {
+  margin-top: 6px;
+}
 .perf-kept {
   margin: 16px 0;
 }

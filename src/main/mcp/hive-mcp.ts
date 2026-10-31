@@ -1128,13 +1128,23 @@ async function instructions(): Promise<string> {
 
 /**
  * Tests only (Hive passes HIVE_TEST_MCP_LOG to this server in development builds): each tool call this server ran, with
- * whose it was and whether it worked, so tests (tests/scenarios) see what was executed, not what a transcript mentions.
+ * whose it was, whether it worked and its reply's size as the model got it (HI-2186), so tests (tests/scenarios) see what
+ * was executed, not what a transcript mentions, and whose work it was.
  */
-function testLog(name: string, args: unknown, error: string | null): void {
+function testLog(name: string, args: unknown, error: string | null, size: { mode: CallReport['mode']; chars: number; bytes: number }): void {
+  testLine({ tool: name, ok: error === null, ...(error ? { error } : {}), args: JSON.stringify(args ?? {}).slice(0, 4000), ...size })
+}
+
+/** Tests only: the tool list as this server first sent it (HI-2186), once a server, as `kind: 'list'` (not a call). */
+function testLogList(size: { tools: number; toolsBytes: number; toolsChars: number }): void {
+  testLine({ kind: 'list', tools: size.tools, bytes: size.toolsBytes, chars: size.toolsChars })
+}
+
+function testLine(fields: Record<string, unknown>): void {
   const file = process.env.HIVE_TEST_MCP_LOG
   if (!file) return
   try {
-    const line = { at: new Date().toISOString(), tool: name, role: ASSISTANT ? 'assistant' : 'agent', project: PROJECT, agent: process.env.HIVE_AGENT_ID ?? null, ok: error === null, ...(error ? { error } : {}), args: JSON.stringify(args ?? {}).slice(0, 4000) }
+    const line = { at: new Date().toISOString(), role: ASSISTANT ? 'assistant' : 'agent', project: PROJECT, agent: process.env.HIVE_AGENT_ID ?? null, ...fields }
     appendFileSync(file, JSON.stringify(line) + '\n')
   } catch {
     // A test log that can't be written doesn't change the call.
@@ -1262,6 +1272,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       if (!listed) {
         listed = true
         catalog = { tools: list.length, toolsBytes: Buffer.byteLength(JSON.stringify(list), 'utf8'), ...toolListSize(list) }
+        testLogList(catalog)
         scheduleReports()
       }
       return
@@ -1277,16 +1288,16 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       const said = new Set<string>()
       try {
         const result = await notices.run(said, () => tool.run(args))
-        testLog(tool.name, params?.arguments, null)
         // Compact: indenting JSON makes it about a third bigger for the model, and no easier for it to read.
         text = typeof result === 'string' ? result : JSON.stringify(result)
         // Hive's flag (a new decision on a card the agent works on) goes after the reply, on its own line.
         if (said.size) text += `\n${[...said].join('\n')}`
+        testLog(tool.name, params?.arguments, null, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
         reply(id, { content: [{ type: 'text', text }] })
       } catch (e) {
-        testLog(tool.name, params?.arguments, (e as Error).message)
         ok = false
         text = `Hive error: ${(e as Error).message}`
+        testLog(tool.name, params?.arguments, (e as Error).message, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
         reply(id, { content: [{ type: 'text', text }], isError: true })
       }
       // After the reply: the model's text exactly as sent (characters as UTF-16 code units, and UTF-8 bytes).
