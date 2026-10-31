@@ -90,6 +90,11 @@ export function withoutGitRoute<T>(fn: () => T): T {
   return routes.run(null, fn)
 }
 
+/** HI-2189: a route runs git here now (another process, with its own environment), not the worker. */
+export function gitRouted(): boolean {
+  return !!routes.getStore()?.active
+}
+
 export function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
   // HI-2137: the git Hive starts (Git for Windows' real git rather than its launcher, where it found one).
   return gitAs(opts.exe !== undefined ? { exe: opts.exe } : gitExe(), cwd, args, maxBuffer, input, opts)

@@ -8,7 +8,8 @@ import { AsyncLocalStorage } from 'async_hooks'
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
 import { access } from 'original-fs/promises'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
-import { git } from '../git'
+import { git, gitRouted } from '../git'
+import { gitExe } from '../gitTool'
 import { plainRepo, refSync } from './repoRefs'
 import type { FileChange } from '../../shared/workflow/facts'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
@@ -113,6 +114,43 @@ function onceForever<T>(repo: string, what: string, ids: string[], ask: () => Pr
 /** Tests: forgets the answers kept between steps. */
 export function forgetKeptAnswers(): void {
   kept.clear()
+  notFound.clear()
+}
+
+/** HI-2189: how long a "not found" from contains' replay is kept, from when git computed it (the user's decision: 30 s). */
+export const NOT_FOUND_MS = 30_000
+/** How many such answers are kept at once; the oldest go first. */
+const NOT_FOUND_MAX = 2_000
+/** Key → when it expires (Date.now()), set once when computed and never extended by a hit. */
+const notFound = new Map<string, number>()
+
+/**
+ * HI-2189 (the user's decision, B): the key under which contains' "not found" for these endpoints is kept, or null
+ * where none is: a repository that isn't plain (onceForever's rule), a git run by a route (another process and its own
+ * environment), or ids that aren't full commit ids. The key names the repository and the folder git runs in, the git
+ * started and its launcher's environment, the target, its head and the change's endpoints and key: a new commit on
+ * either side, or another git, is another key, asked at once.
+ */
+function notFoundKey(repo: string, target: string, c: { base: string; revision: string; key?: string | null }, t: string): string | null {
+  if (gitRouted() || ![c.base, c.revision, t].every((id) => SHA.test(id))) return null
+  const common = commonDirSync(repo)
+  const own = gitDirSync(repo)
+  if (!common || !own || !plainRepo(common, own)) return null
+  const exe = gitExe()
+  return [common.toLowerCase(), resolvePath(repo).toLowerCase(), exe.exe, JSON.stringify(exe.launcherEnv ?? null), target, t, c.base, c.revision, c.key === undefined ? '?' : (c.key ?? '-')].join('\0')
+}
+
+/** A "not found" kept for `key` and not expired (an expired one is dropped), checked while the repository is plain. */
+function keptNotFound(repo: string, key: string): boolean {
+  const until = notFound.get(key)
+  if (until === undefined) return false
+  if (Date.now() >= until) {
+    notFound.delete(key)
+    return false
+  }
+  const common = commonDirSync(repo)
+  const own = gitDirSync(repo)
+  return !!common && !!own && plainRepo(common, own)
 }
 
 /** An answer read with another git (lineHeadAndTree), kept as the step's own for those commits. */
@@ -479,7 +517,9 @@ export async function sameChange(repo: string, a: { base: string; revision: stri
  * ancestor, the target's first parents), kept as onceForever's for the revision and the target's head (HI-2182); a
  * squash or the whole target holding it goes through git's diff and merge, which attributes, drivers and config can
  * change (HR2's round 1), so with fixed endpoints it is asked once per step (#1386: the queue's test merge tested again
- * on the same head), never kept beyond it.
+ * on the same head). A found one is never kept beyond it; "not found" is kept for NOT_FOUND_MS from when git computed it
+ * (HI-2189, the user's decision), for the same commits, target head, folder and git (notFoundKey): a change only to
+ * attributes or config can take that long to count, a new commit on either side is asked at once.
  */
 export async function contains(repo: string, target: string, c: { base: string; revision: string; key?: string | null }, at?: string): Promise<Maybe<Containment | null>> {
   let t = at ?? targetHeadSync(repo, target)
@@ -492,7 +532,20 @@ export async function contains(repo: string, target: string, c: { base: string; 
   const th = t
   const merged = await mergedInto(repo, target, c.revision, th)
   if (isUnknown(merged) || merged) return merged
-  return onceInStep(repo, `contains\0${target}\0${c.key === undefined ? '?' : (c.key ?? '-')}`, [c.base, c.revision, th], () => squashedInto(repo, target, c, th))
+  const key = notFoundKey(repo, target, c, th)
+  if (key && keptNotFound(repo, key)) return null
+  // The expiry counts from before git computed it; an answer that took longer than that is given but not kept.
+  const from = Date.now()
+  const v = await onceInStep(repo, `contains\0${target}\0${c.key === undefined ? '?' : (c.key ?? '-')}`, [c.base, c.revision, th], () => squashedInto(repo, target, c, th))
+  if (key && v === null && Date.now() < from + NOT_FOUND_MS && notFoundKey(repo, target, c, th) === key) {
+    // A newer answer kept meanwhile (another pass's) stands.
+    if ((notFound.get(key) ?? 0) < from + NOT_FOUND_MS) {
+      notFound.delete(key)
+      notFound.set(key, from + NOT_FOUND_MS)
+    }
+    if (notFound.size > NOT_FOUND_MAX) notFound.delete(notFound.keys().next().value!)
+  }
+  return v
 }
 
 /** The revision merged or fast-forwarded into the target's head `t` (contains' first test), or null when not its ancestor. */

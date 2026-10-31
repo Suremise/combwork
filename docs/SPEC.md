@@ -1443,7 +1443,14 @@ All Git calls go through the `git()` runner (`src/main/git.ts:47`); the two bypa
   the existing whole-target test (`alreadyMerged`, `worktrees.ts:417`) for a squash split across commits. The first
   that answers yes says how (`method: merge | fast-forward | squash | same-tree`) [P1, extending `branchWatch`'s
   detection]. Containment reads stored endpoints and pinned revisions (§16.9.3), so it still answers after the card's
-  line is deleted.
+  line is deleted. **What is kept between passes** (HI-2182, HI-2189): a merge or fast-forward is the history's alone,
+  kept for the revision and the target's head. A squash or same-tree answer goes through git's diff and merge, which
+  attributes, config and drivers can change: a found one is never kept, and a **not found** is kept for **30 s** from
+  when git computed it (never extended by being used; an answer that took longer isn't kept), for the same repository,
+  folder, git, target, target head, base, revision and key, and never from a git the merge queue's host runs. So a new
+  commit on the target or the card is looked at once, while a change only to attributes or config, with the same
+  commits, can take up to 30 s to count for every caller (an outside merge found, a merged line deleted, a slot
+  released), and for those 30 s a git that would now fail isn't asked. The user's decision (HI-2189, B).
 - **Shared-folder cards** (G11 = the project folder: agents commit on the folder's line, often the target itself)
   [P1, answering HR2's round 1 finding 1, round 2 finding 2 and HB3's findings 5, F, G]:
   - **Attribution is recorded once, when a commit is seen,** and never recomputed: Hive writes `CommitAttributed`

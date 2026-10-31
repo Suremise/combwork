@@ -6,11 +6,12 @@ import { cpSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
-import { B1, commit, gitRepo, moved, setup, sh } from './workflow/harness'
-import { gitTestHooks } from '../src/main/git'
-import { contains, firstParents, forgetKeptAnswers, gitStep, isAncestor, mergeBase } from '../src/main/platform/git'
+import { B1, commit, gitRepo, moved, R1, setup, sh } from './workflow/harness'
+import { gitTestHooks, withGitRoute } from '../src/main/git'
+import { runGit } from '../src/main/gitWorker'
+import { contains, firstParents, forgetKeptAnswers, gitStep, isAncestor, mergeBase, NOT_FOUND_MS } from '../src/main/platform/git'
 import { reconcile } from '../src/main/workflow/reconcile'
-import { preset } from '../src/shared/workflow/options'
+import { allOff, preset } from '../src/shared/workflow/options'
 import { isUnknown } from '../src/main/platform/types'
 
 // Real git work, not a wait: a few dozen git commands per test.
@@ -31,6 +32,7 @@ const rev = (folder: string, what = 'HEAD'): string => sh(folder, 'rev-parse', w
 beforeEach(() => forgetKeptAnswers())
 afterEach(() => {
   gitTestHooks.started = undefined
+  vi.useRealTimers()
 })
 
 describe('answers about fixed commits, kept', () => {
@@ -226,7 +228,7 @@ describe('"is the change in the target?": a merge kept for its commits, a squash
     for (let i = 0; i < 2; i++) expect((await counted(() => contains(repo, 'ff', { base: a, revision: c }))).ran.map((x) => x.join(' '))).toEqual(['rev-parse --verify -q ff^{commit}'])
   })
 
-  it('a squash, or nothing found, is asked again each pass (once per step): attributes and drivers can change the replay (HR2, round 1)', async () => {
+  it('a squash found is asked again each pass (once per step): attributes and drivers can change the replay (HR2, round 1)', async () => {
     const { repo, a, c, s } = squashed()
     const first = await counted(() => gitStep(async () => [await contains(repo, 'main', { base: a, revision: c }), await contains(repo, 'main', { base: a, revision: c })]))
     expect(first.v).toEqual([{ method: 'squash', commit: s }, { method: 'squash', commit: s }])
@@ -238,7 +240,8 @@ describe('"is the change in the target?": a merge kept for its commits, a squash
     expect(again.ran.length).toBeLessThanOrEqual(n)
   })
 
-  it("an answer a merge driver gave follows the attributes as they are now, never one kept (HR2's round 1 regression)", async () => {
+  it("an answer a merge driver gave follows the attributes as they are now: a found one at once, a not found within 30 s (HR2's round 1 regression, the user's HI-2189 decision)", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
     const repo = join(tempDir('contains-driver-'), 'repo')
     gitRepo(repo)
     const a = commit(repo, { 'f.txt': 'base\n' }, 'base')
@@ -250,11 +253,14 @@ describe('"is the change in the target?": a merge kept for its commits, a squash
     const attributes = join(repo, '.git', 'info', 'attributes')
     writeFileSync(attributes, 'f.txt merge=ours\n')
     expect(await contains(repo, 'main', { base: a, revision: c })).toEqual({ method: 'sameTree' })
-    // The attributes gone, the commits and the head the same: the replay conflicts, as git says now.
+    // The attributes gone, the commits and the head the same: the replay conflicts, as git says now (a found answer
+    // isn't kept).
     writeFileSync(attributes, '')
     expect(await contains(repo, 'main', { base: a, revision: c })).toBeNull()
-    // And back: found again.
+    // And back: the "not found" is kept for 30 s from when git said it (no replay), then git says found again.
     writeFileSync(attributes, 'f.txt merge=ours\n')
+    expect(await counted(() => contains(repo, 'main', { base: a, revision: c }))).toEqual({ v: null, ran: [] })
+    vi.setSystemTime(Date.now() + NOT_FOUND_MS)
     expect(await contains(repo, 'main', { base: a, revision: c })).toEqual({ method: 'sameTree' })
   })
 
@@ -325,6 +331,115 @@ describe('"is the change in the target?": a merge kept for its commits, a squash
       expect(reset.ran.length).toBeGreaterThan(0)
       expect(e.wf.state(card).marks.leftTarget).toBeTruthy()
       expect(e.wf.state(card).stage).toBe('done')
+    } finally {
+      e.close()
+    }
+  })
+})
+
+describe('"not found" kept for 30 s from when git said it (HI-2189, the user\'s decision)', () => {
+  /** main (a, then t), a line from a with its change (c) that isn't in main: ids of each. */
+  function waiting(): { repo: string; a: string; c: string; t: string } {
+    const repo = join(tempDir('notfound-'), 'repo')
+    gitRepo(repo)
+    const a = rev(repo)
+    sh(repo, 'switch', '-q', '-c', 'line')
+    const c = commit(repo, { 'c.txt': 'c\n' }, 'c')
+    sh(repo, 'switch', '-q', 'main')
+    const t = commit(repo, { 't.txt': 't\n' }, 't')
+    return { repo, a, c, t }
+  }
+  const replays = (ran: string[][]): number => ran.filter((x) => x[0] === 'merge-tree').length
+
+  it('expires 30 s after git computed it, however often it is used; a new target head or revision is asked at once', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const { repo, a, c } = waiting()
+    const first = await counted(() => contains(repo, 'main', { base: a, revision: c }))
+    expect(first.v).toBeNull()
+    expect(replays(first.ran)).toBe(1)
+    // Used at 10, 20 and 29.9 s: no git, and never extended by the use.
+    const t0 = Date.now()
+    for (const at of [10_000, 20_000, NOT_FOUND_MS - 100]) {
+      vi.setSystemTime(t0 + at)
+      expect(await counted(() => contains(repo, 'main', { base: a, revision: c }))).toEqual({ v: null, ran: [] })
+    }
+    vi.setSystemTime(t0 + NOT_FOUND_MS)
+    const expired = await counted(() => contains(repo, 'main', { base: a, revision: c }))
+    expect(expired.v).toBeNull()
+    expect(replays(expired.ran)).toBe(1)
+    // A new commit on the target: another head, asked at once (and squashed there: found).
+    sh(repo, 'merge', '-q', '--squash', 'line')
+    sh(repo, 'commit', '-q', '-m', 'squash of line')
+    const onto = await counted(() => contains(repo, 'main', { base: a, revision: c }))
+    expect(onto.v).toEqual({ method: 'squash', commit: rev(repo) })
+    // A new revision of the change: other endpoints, asked at once.
+    sh(repo, 'reset', '-q', '--hard', 'HEAD~1')
+    sh(repo, 'switch', '-q', 'line')
+    const c2 = commit(repo, { 'c.txt': 'c, again\n' }, 'c again')
+    sh(repo, 'switch', '-q', 'main')
+    const again = await counted(() => contains(repo, 'main', { base: a, revision: c2 }))
+    expect(again.v).toBeNull()
+    expect(replays(again.ran)).toBe(1)
+  })
+
+  it('an answer that took 30 s or more to compute is given but not kept; one whose repository stopped being plain is not used', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const { repo, a, c, t } = waiting()
+    // The clock passes 30 s while the replay runs.
+    gitTestHooks.started = (_cwd, args) => {
+      if (args[0] === 'merge-tree') vi.setSystemTime(Date.now() + NOT_FOUND_MS)
+    }
+    expect(await contains(repo, 'main', { base: a, revision: c })).toBeNull()
+    gitTestHooks.started = undefined
+    expect(replays((await counted(() => contains(repo, 'main', { base: a, revision: c }))).ran)).toBe(1)
+    // Kept now; a replace ref makes the repository not plain: git is asked.
+    expect((await counted(() => contains(repo, 'main', { base: a, revision: c }))).ran).toEqual([])
+    sh(repo, 'replace', t, a)
+    expect((await counted(() => contains(repo, 'main', { base: a, revision: c }))).ran.length).toBeGreaterThan(0)
+  })
+
+  it("never kept from a routed git (the merge queue's host: another process, its own environment)", async () => {
+    const { repo, a, c } = waiting()
+    let routed = 0
+    const route = (m: Parameters<typeof runGit>[0]) => (routed++, runGit(m))
+    for (let i = 0; i < 2; i++) expect(await withGitRoute(route, () => contains(repo, 'main', { base: a, revision: c }))).toBeNull()
+    const n = routed
+    expect(await withGitRoute(route, () => contains(repo, 'main', { base: a, revision: c }))).toBeNull()
+    expect(routed).toBeGreaterThan(n)
+    // Nor does a routed run use one kept by the worker's.
+    expect(await contains(repo, 'main', { base: a, revision: c })).toBeNull()
+    const m = routed
+    expect(await withGitRoute(route, () => contains(repo, 'main', { base: a, revision: c }))).toBeNull()
+    expect(routed).toBeGreaterThan(m)
+  })
+
+  it.each(['approved', 'review'] as const)('a second reconcile pass over an unchanged %s card not merged yet starts no git (the measurement of HI-2189)', async (stage) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const e = setup({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'main', okBefore: { mode: 'every', labels: [] } })
+    try {
+      const card = e.wf.createCard({ title: 'Waiting' })
+      moved(await e.wf.start(card.key, B1))
+      commit(e.wf.folderOf(e.wf.state(card)), { 'a.txt': 'a\n' }, `${card.key}: work`)
+      // The target moves on, so the card's revision isn't its ancestor: the squash and same-tree tests run.
+      commit(e.project, { 'm.txt': 'm\n' }, 'target moves')
+      moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+      if (stage === 'approved') {
+        moved(await e.wf.startReview(card.key, R1))
+        moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+      }
+      expect(e.wf.state(card).stage).toBe(stage)
+      // Past whatever the moves themselves kept (an approval looks for the change too).
+      vi.setSystemTime(Date.now() + NOT_FOUND_MS)
+      const first = await counted(() => reconcile(e.wf, card))
+      const second = await counted(() => reconcile(e.wf, card))
+      vi.setSystemTime(Date.now() + NOT_FOUND_MS)
+      const later = await counted(() => reconcile(e.wf, card))
+      // The counts, for the card's run record: before HI-2189 every pass was like the first.
+      console.log(`HI-2189 ${stage}: first pass ${first.ran.length} gits (${first.ran.map((x) => x[0]).join(', ')}); second ${second.ran.length}; after 30 s ${later.ran.length}`)
+      expect(replays(first.ran)).toBe(1)
+      expect(second.ran).toEqual([])
+      expect(replays(later.ran)).toBe(1)
+      expect(e.wf.state(card).stage).toBe(stage)
     } finally {
       e.close()
     }
