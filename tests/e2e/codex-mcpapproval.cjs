@@ -19,9 +19,12 @@ const TURN_MS = 180000
 const SHOWN_MS = 30000
 // Codex 0.163 calls MCP tools from one script (Hive's transcript: "Script"), whose result waits for every call in it:
 // its screen says each call done, with its reply ("Called", redrawn over "Calling" as its last letters).
-const LISTED = /ed hive\.hive_list_projects\s*└\s*demo \(on/
+// Codex redraws a line by moving the cursor over letters that didn't change, and plainText makes each move a space: any
+// letter of a reply can read as a space ("DE-1 crea ed in Todo", HI-2210).
+const gappy = (text) => [...text].map((c) => (c === ' ' ? ' ' : `[${c.replace(/[\\\]^-]/g, '\\$&')} ]`)).join('')
+const LISTED = new RegExp(`ed hive\\.hive_list_projects\\s*└\\s*${gappy('demo')} \\(on`)
 // Its reply names the card by its key alone (#1219, HI-1661): "DE-1 created in Todo".
-const CREATED = /ed hive\.hive_create_task\s*└\s*([A-Z]{2,4}-\d+) created in Todo/
+const CREATED = new RegExp(`ed hive\\.hive_create_task\\s*└\\s*([A-Z]{2,4}-\\d+) ${gappy('created in Todo')}`)
 const record = {}
 let failed = 0
 const check = (name, ok, extra = '') => {
