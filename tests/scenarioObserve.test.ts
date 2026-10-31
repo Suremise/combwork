@@ -165,6 +165,67 @@ describe("the override scenarios' checks count every move of the card, by number
   })
 })
 
+describe("the card read and update checks count the card by its number or its own key, never another card's (HI-2221, HR1 round 1)", () => {
+  const { cardIs } = helpers as unknown as { cardIs: (o: unknown, ref: unknown, n: number) => boolean }
+  const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  // AL-1 is #1; BE-1 is #2 (another project's first card); AL-2 is #3: a key's digits aren't its card's number.
+  const board = [
+    { number: 1, key: 'AL-1' },
+    { number: 2, key: 'BE-1' },
+    { number: 3, key: 'AL-2' }
+  ]
+
+  it('takes the number, "#n" or the card\'s own key; not another project\'s key with the same digits, nor another card', () => {
+    const o = { allCards: board }
+    for (const ref of [1, '1', '#1', 'AL-1', 'al-1', ' AL-1 ']) expect(cardIs(o, ref, 1)).toBe(true)
+    for (const ref of ['BE-1', 'AL-2', 'AL-11', 11, '#11', '', undefined]) expect(cardIs(o, ref, 1)).toBe(false)
+    expect(cardIs(o, 'BE-1', 2)).toBe(true)
+    expect(cardIs(o, 'BE-2', 2)).toBe(false)
+    expect(cardIs(o, 'AL-2', 3)).toBe(true)
+    expect(cardIs(o, 'AL-3', 3)).toBe(false)
+    expect(cardIs({ allCards: [] }, 'AL-1', 1)).toBe(false)
+  })
+
+  const READ = 'read the card with hive_read_task'
+  const cardDetail = (n: number, hiveCalls: unknown[]) => {
+    const sc = SCENARIOS.find((s) => s.id === 'card-detail')!
+    const o = { hiveCalls, tools: [], finalReply: '', allCards: board, cards: { q: { ...board.find((x) => x.number === n), column: 'todo' } } }
+    return Object.fromEntries(sc.expect(o, { cards: { q: n } }).map(([name, ok]) => [name, ok]))[READ]
+  }
+
+  it("card-detail: a read by the card's key counts, also where its digits aren't its number; another card's or a refused read doesn't", () => {
+    expect(cardDetail(1, [call('hive_read_task', { number: 'AL-1' })])).toBe(true)
+    expect(cardDetail(1, [call('hive_read_task', { number: 1 })])).toBe(true)
+    expect(cardDetail(2, [call('hive_read_task', { number: 'BE-1' })])).toBe(true)
+    expect(cardDetail(1, [call('hive_read_task', { number: 'BE-1' })])).toBe(false)
+    expect(cardDetail(1, [call('hive_read_task', { number: 'AL-2' })])).toBe(false)
+    expect(cardDetail(1, [call('hive_read_task', { number: 'AL-1' }, false)])).toBe(false)
+  })
+
+  const DUP = 'linked the two duplicates, one marked a duplicate of the other'
+  const hygiene = (comment: string, d1 = { number: 1, key: 'AL-1' }, d2 = { number: 3, key: 'AL-2' }) => {
+    const sc = SCENARIOS.find((s) => s.id === 'board-hygiene')!
+    const allCards = [
+      { ...d1, links: [d2.number], comments: [] },
+      { ...d2, links: [d1.number], comments: [{ text: comment }] },
+      { number: 2, key: 'BE-1', links: [], comments: [] }
+    ]
+    const o = { hiveCalls: [], skillsRead: [], finalReply: '', allCards }
+    return Object.fromEntries(sc.expect(o, { cards: { d1: d1.number, d2: d2.number } }).map(([name, ok]) => [name, ok]))[DUP]
+  }
+
+  it("board-hygiene: the duplicate note names the other card by number or its own key; another project's same digits, or another card, don't count", () => {
+    expect(hygiene('Duplicate of AL-1: the user can archive it.')).toBe(true)
+    expect(hygiene('Duplicate of #1: the user can archive it.')).toBe(true)
+    expect(hygiene('Duplicate of BE-1: archive this duplicate.')).toBe(false)
+    expect(hygiene('Duplicate of AL-11.')).toBe(false)
+    expect(hygiene('Duplicate of #12.')).toBe(false)
+    // A key whose digits aren't its card's number: BE-1 is #2.
+    expect(hygiene('Duplicate of BE-1.', { number: 2, key: 'BE-1' })).toBe(true)
+    expect(hygiene('Duplicate of #1.', { number: 2, key: 'BE-1' })).toBe(false)
+  })
+})
+
 describe('the submit scenarios count a question about committing, never a notice (HI-1618, HR5 round 1)', () => {
   type Obs = { hiveCalls?: unknown[]; tools?: { name: string; input: string }[]; finalReply?: string; status?: string; column?: string; submitted?: boolean }
   const call = (name: string, args: unknown, ok = true, error?: string) => ({ tool: name, args: JSON.stringify(args), ok, ...(error ? { error } : {}) })
