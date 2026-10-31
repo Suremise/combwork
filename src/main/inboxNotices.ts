@@ -4,6 +4,7 @@ import { inboxNotice, unwatchedLanesNotice, type NoticeItem } from '../shared/do
 import { running } from '../shared/lanes'
 import type { LiveSessionState } from '../shared/types'
 import { advanced } from './advanced'
+import { allows } from './assistantControl'
 import { agentReadsInbox, countable, inboxSwitch } from './deliveries'
 import { orphanLinesFor } from './orphanProcesses'
 import { sessions } from './sessions'
@@ -69,13 +70,16 @@ async function inboxNoticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'):
 
 /**
  * The Assistant's line for running lanes no watch of its covers (HI-2069), by their builders: none for a project agent,
- * with no lane running, with a lane watch on all of them (`lanes: ["all"]`, or each by id), or with its switch off
- * (Settings → Advanced, LANES_UNWATCHED_NOTICE). Once a turn, as the drain is.
+ * with no lane running, with a lane watch on all of them (`lanes: ["all"]`, or each by id), with its switch off
+ * (Settings → Advanced, LANES_UNWATCHED_NOTICE), or when its control level doesn't let it control agents (HI-2187: at
+ * Look and advise the lanes are the user's to run, and a watch it starts on its own is still its choice). Once a turn,
+ * as the drain is.
  */
 async function unwatchedLanes(st: LiveSessionState): Promise<string> {
   if (!advanced.get<boolean>(LANES_UNWATCHED_NOTICE)) return ''
   const ws = workspaceFor(st.projectPath)
   if (!ws?.path || !ws.isAssistantHome(st.projectPath)) return ''
+  if (!allows('agents')) return ''
   // Its team paused (HI-2081): nothing is due from the lanes, which wait for the resume.
   if (pausedFor(st.projectPath)) return ''
   // Loaded here, for the Assistant only: the lanes and watches services aren't every notice's to start.

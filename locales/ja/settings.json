@@ -381,7 +381,7 @@
   "settings.advanced.hive.lanes.freshStartWaitMinutes.title": "レーン：作業中のエージェントを新たに開始するまでHiveが待つ最長時間",
   "settings.advanced.hive.lanes.gentleEnd.desc": "レーンの最後のカードがマージされたとき（またはレーンが放棄されたとき）、Hiveはビルダーのターンが終わるのを待ち、各カードのマージコミットとともにレーンの終了を伝え、そのCLI自身の終了コマンドでCLIを終了させます。終了しない場合にだけ強制終了します。それまでスロットはビルダーのものです。オフにすると、これまでどおり、ビルダーのセッションが最初にアイドルになった時点で停止します。",
   "settings.advanced.hive.lanes.gentleEnd.title": "レーン：レーンの終了時にビルダーを最後まで待つ",
-  "settings.advanced.hive.lanes.unwatchedNotice.desc": "レーンが実行中で、それを対象とする監視がないままHive Assistantがターンを終えようとすると、Hiveは一度だけ続けさせてそのことを伝え、レーンのビルダー名を挙げて、終える前に監視するよう促します。オフにすると、ターンはCLIが終えるとおりに終わり、再び監視するまでそれらのレーンについて何もアシスタントを起こしません。",
+  "settings.advanced.hive.lanes.unwatchedNotice.desc": "Hive Assistantがエージェントを操作できる（「設定」→「アシスタント」→「操作範囲」）とき、レーンが実行中で、それを対象とする監視がないままターンを終えようとすると、Hiveは一度だけ続けさせてそのことを伝え、レーンのビルダー名を挙げて、終える前に監視するよう促します。「見て助言する」ではレーンを動かすのはあなたなので、伝えません。オフにすると、ターンはCLIが終えるとおりに終わり、再び監視するまでそれらのレーンについて何もアシスタントを起こしません。",
   "settings.advanced.hive.lanes.unwatchedNotice.title": "レーン：アシスタントに監視を促す",
   "settings.advanced.hive.lanes.waitReviewerMinutes.desc": "誰もレビューしていないカードがレビューで待っているレーンを、進捗パネルの「レーン」で何分後に強調するか。短すぎるとすべてのレビューが強調され、長すぎるとカードがレビューされないまま残ることがあります。",
   "settings.advanced.hive.lanes.waitReviewerMinutes.title": "レーン：レビュアー待ちが長い",
