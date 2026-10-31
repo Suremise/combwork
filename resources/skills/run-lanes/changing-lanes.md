@@ -3,7 +3,7 @@
 ## What Hive does, so you don't ask
 
 - **Hive runs the loop**: a failed review below the lane's round limit is the builder's to fix; at the limit Hive asks the user itself (with workflow rules off there is none); a passed card merges as Who merges says, Hive asking for an OK where the options want one; a lane ends by itself once every card is Done. Never ask the user whether to go on, merge or end a lane: pass on Hive's questions, record the answers as decisions, and step in only when a merge stalls (read why, then prompt the builder or tell the user).
-- **A finding that keeps coming back**: when the reviewer marks a finding recurring, or the rounds keep turning up new edge cases of one mechanism, the loop isn't converging: that is your judgement, not a count of failures. Bring the user a simpler option with your recommendation (the simple version now, the rest on a new card), record their choice as a decision on the card (which wakes the builder and reviewer), and where the new shape needs agreeing first, ask the builder to post it as a design step (`hive_loop_step`) for its reviewer to check before building. The builder and reviewer carry on meanwhile (card-loop); stepping in is yours.
+- **A finding that kept coming back** (SKILL.md: the user chose a simpler option): where the new shape needs agreeing first, ask the builder to post it as a design step (`hive_loop_step`) for its reviewer to check before building. The builder and reviewer carry on meanwhile (card-loop); stepping in is yours.
 
 ## Changing a running lane
 

@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 105
+const FIXTURES_VERSION = 106
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -4640,9 +4640,10 @@ module.exports.SCENARIOS.push(
   }
 )
 
-// A natural break (#1082, #1080 gaps 1 and 3): the Assistant suggests starting fresh once every lane has ended or a solo
-// agent's card is done with nothing else running, never while work, a question or a watch remains, and saves what is
-// open to its journal first. Guidance only: it suggests, and starts nothing fresh itself.
+// A natural break (#1082, #1080 gaps 1 and 3): every lane has ended, or a solo agent's card is done with nothing else
+// running. Since HI-2226 (Darren, 31 Oct) Hive's own nudge (#1437) owns suggesting that the project's agents start fresh,
+// so the Assistant isn't checked for suggesting it; it never suggests it while work, a question or a watch remains, saves
+// what is open to its journal first, and restarts nothing itself.
 /** A reply that suggests starting fresh conversations or sessions. */
 const FRESH = /\b(fresh|new)\b[^.?!\n]{0,40}\b(conversations?|sessions?|start)\b|\bstart(ing)?\s+(over|afresh|fresh)\b|\bfresh start\b/i
 const suggestsFresh = (o) => FRESH.test(o.finalReply ?? '')
@@ -4683,7 +4684,7 @@ const lanesEndedWake = async (c, builders, waits = []) => {
 module.exports.SCENARIOS.push(
   {
     id: 'fresh-start-lanes-ended',
-    title: 'Coordinator mode woken as the last lanes end, nothing else running (#1082): says so and suggests starting fresh, once, and restarts nothing itself',
+    title: 'Coordinator mode woken as the last lanes end, nothing else running (#1082): says so, and restarts nothing itself (HI-2226: Hive nudges a fresh start)',
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
@@ -4697,10 +4698,9 @@ module.exports.SCENARIOS.push(
     fake: 'skill run-lanes then hive hive_lane {"action":"list"}',
     expect: (o) => [
       ['said the lanes are done', /done|finished|ended|complete|merged/i.test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)],
-      ['suggested starting fresh conversations', suggestsFresh(o), (o.finalReply ?? '').slice(0, 300)],
       ['restarted and stopped nothing itself (the user decides)', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]
     ],
-    fakeSkips: ['said the lanes are done', 'suggested starting fresh conversations']
+    fakeSkips: ['said the lanes are done']
   },
   {
     id: 'fresh-start-lane-running',
@@ -4757,7 +4757,7 @@ module.exports.SCENARIOS.push(
   },
   {
     id: 'fresh-start-solo-done',
-    title: "The Assistant, one agent and no lanes, woken as the agent's card reaches Done with nothing else running (#1082, coordinate-agents): suggests starting fresh, once, and restarts nothing",
+    title: "The Assistant, one agent and no lanes, woken as the agent's card reaches Done with nothing else running (#1082, coordinate-agents): restarts nothing (HI-2226: Hive nudges a fresh start)",
     role: 'assistant',
     control: 'agents',
     async setup(c) {
@@ -4766,15 +4766,11 @@ module.exports.SCENARIOS.push(
     },
     prompt: (c) => `[Hive] #${c.cards.a} (Coder's card) is in Done; latest comment by Coder: "Done: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.a},"latestComment":true}`,
-    expect: (o) => [
-      ['suggested starting fresh conversations', suggestsFresh(o), (o.finalReply ?? '').slice(0, 300)],
-      ['restarted and stopped nothing itself', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]
-    ],
-    fakeSkips: ['suggested starting fresh conversations']
+    expect: (o) => [['restarted and stopped nothing itself', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]]
   },
   {
     id: 'fresh-start-saves-first',
-    title: 'Coordinator mode, the lanes done, told of a half-formed idea that is in no card (#1082, journal): writes it to its journal before suggesting a fresh start',
+    title: 'Coordinator mode, the lanes done, told of a half-formed idea that is in no card (#1082, journal): writes it to its journal, the end of a block, and restarts nothing',
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
@@ -4791,11 +4787,9 @@ module.exports.SCENARIOS.push(
       return [
         ['wrote the idea to its journal (hive_journal_write, which worked)', saved, writes.map((x) => String(x.args).slice(0, 200)).join(' | ')],
         ["kept it open: the journal entry says it isn't decided (Windows or its own switch)", writes.some((x) => /dark/i.test(String(x.args)) && /windows|switch|toggle|undecided|open|not decided/i.test(String(x.args)))],
-        ['suggested starting fresh conversations', suggestsFresh(o), (o.finalReply ?? '').slice(0, 300)],
         ['restarted and stopped nothing itself', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]
       ]
-    },
-    fakeSkips: ['suggested starting fresh conversations']
+    }
   }
 )
 
