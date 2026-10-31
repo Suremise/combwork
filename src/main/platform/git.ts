@@ -534,18 +534,30 @@ export async function contains(repo: string, target: string, c: { base: string; 
   if (isUnknown(merged) || merged) return merged
   const key = notFoundKey(repo, target, c, th)
   if (key && keptNotFound(repo, key)) return null
-  // The expiry counts from before git computed it; an answer that took longer than that is given but not kept.
-  const from = Date.now()
-  const v = await onceInStep(repo, `contains\0${target}\0${c.key === undefined ? '?' : (c.key ?? '-')}`, [c.base, c.revision, th], () => squashedInto(repo, target, c, th))
-  if (key && v === null && Date.now() < from + NOT_FOUND_MS && notFoundKey(repo, target, c, th) === key) {
-    // A newer answer kept meanwhile (another pass's) stands.
-    if ((notFound.get(key) ?? 0) < from + NOT_FOUND_MS) {
-      notFound.delete(key)
-      notFound.set(key, from + NOT_FOUND_MS)
+  // Git's own computation, timed and kept where it runs (HR2's round 1: never a step's answer used again). The expiry
+  // counts from before git computed it; an answer that took that long is given but not kept.
+  const computed = async (): Promise<Maybe<{ found: Containment | null; at: number }>> => {
+    const at = Date.now()
+    const v = await squashedInto(repo, target, c, th)
+    if (isUnknown(v)) return v
+    if (key && v === null && Date.now() < at + NOT_FOUND_MS && notFoundKey(repo, target, c, th) === key) {
+      // A newer answer kept meanwhile (another pass's) stands.
+      if ((notFound.get(key) ?? 0) < at + NOT_FOUND_MS) {
+        notFound.delete(key)
+        notFound.set(key, at + NOT_FOUND_MS)
+      }
+      if (notFound.size > NOT_FOUND_MAX) notFound.delete(notFound.keys().next().value!)
     }
-    if (notFound.size > NOT_FOUND_MAX) notFound.delete(notFound.keys().next().value!)
+    return { found: v, at }
   }
-  return v
+  const step = await onceInStep(repo, `contains\0${target}\0${c.key === undefined ? '?' : (c.key ?? '-')}`, [c.base, c.revision, th], computed)
+  if (isUnknown(step)) return step
+  // A step's "not found" 30 s old or more is asked again, as a pass after it would be: a long step never gives it beyond then.
+  if (step.found === null && Date.now() >= step.at + NOT_FOUND_MS) {
+    const again = await computed()
+    return isUnknown(again) ? again : again.found
+  }
+  return step.found
 }
 
 /** The revision merged or fast-forwarded into the target's head `t` (contains' first test), or null when not its ancestor. */

@@ -382,6 +382,33 @@ describe('"not found" kept for 30 s from when git said it (HI-2189, the user\'s 
     expect(replays(again.ran)).toBe(1)
   })
 
+  it("a long step's own answer never outlives 30 s, inside it or in a pass after it (HR2's round 1 finding)", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const repo = join(tempDir('notfound-step-'), 'repo')
+    gitRepo(repo)
+    const a = commit(repo, { 'f.txt': 'base\n' }, 'base')
+    sh(repo, 'switch', '-q', '-c', 'line')
+    const c = commit(repo, { 'f.txt': 'change\n' }, 'change')
+    sh(repo, 'switch', '-q', 'main')
+    commit(repo, { 'f.txt': 'target\n' }, 'target')
+    const zero = Date.now()
+    await gitStep(async () => {
+      expect(await contains(repo, 'main', { base: a, revision: c })).toBeNull()
+      // Past 30 s in the same step: git again, not the step's answer.
+      vi.setSystemTime(zero + NOT_FOUND_MS + 1)
+      const late = await counted(() => contains(repo, 'main', { base: a, revision: c }))
+      expect(late.v).toBeNull()
+      expect(replays(late.ran)).toBe(1)
+    })
+    // The attributes now make it found: a pass after the step is answered by what git computed at 30.001 s, until 60.001 s.
+    sh(repo, 'config', 'merge.ours.driver', 'true')
+    writeFileSync(join(repo, '.git', 'info', 'attributes'), 'f.txt merge=ours\n')
+    vi.setSystemTime(zero + 2 * NOT_FOUND_MS)
+    expect(await counted(() => contains(repo, 'main', { base: a, revision: c }))).toEqual({ v: null, ran: [] })
+    vi.setSystemTime(zero + 2 * NOT_FOUND_MS + 1)
+    expect(await contains(repo, 'main', { base: a, revision: c })).toEqual({ method: 'sameTree' })
+  })
+
   it('an answer that took 30 s or more to compute is given but not kept; one whose repository stopped being plain is not used', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     const { repo, a, c, t } = waiting()
