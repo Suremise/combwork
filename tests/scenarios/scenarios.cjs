@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 102
+const FIXTURES_VERSION = 103
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -239,18 +239,17 @@ async function inReview(c, pool = false, description = 'greet.js returns "Hello,
 const SOLO = { finish: 'committed', folder: 'project', dependenciesDone: true, sharedFolderWarning: true }
 const PAIR = { review: 'agent', noSelfReview: true, preChecks: [], finish: 'hiveMerges', style: 'merge', mergeChecks: [], mergeInstall: 'onManifestChange', folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, reviewerMode: 'lane', commands: {} }
 /**
- * A scenario's `during` where Hive gives Coder its card in a slot (#1444): the slot's new conversation asks first to
- * trust its folder, answered once.
+ * A card of the rules' slots moved into Doing as the user moves it (HI-2225): Hive gives it to its builder (`key`) in its
+ * slot, starting it with the card's line (BuilderPlaced). A scenario whose subject is someone else (the Assistant) waits
+ * for that, then stops the builder, so the card's agent isn't busy on it when the subject starts (as BASELINE's record had).
  */
-async function trustSlot(c, status) {
-  if (status !== 'waiting' || c.trustedSlot) return
+async function builderStopped(c, card, key) {
   const lib = require('../e2e/lib.cjs')
-  const key = lib.ptyKey(c.alpha, c.agents.coder.id)
-  const screen = String((await c.inv('pty:buffer', key).catch(() => '')) ?? '').slice(-2000)
-  if (/Do you trust the files in this folder/i.test(screen)) await c.inv('pty:write', key, '\r')
-  else if (/trust this folder/i.test(screen) && !(await lib.acceptClaudeTrust(c.inv, c.alpha, c.agents.coder.id, 3000))) await c.inv('pty:write', key, '\r')
-  else return
-  c.trustedSlot = true
+  const n = c.cards[card]
+  if (!(await lib.until(async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'BuilderPlaced'), 90000))) throw new Error(`setup: Hive didn't give #${n} to ${key} in its slot`)
+  const id = c.agents[key].id
+  await c.inv('session:stop', c.alpha, id).catch(() => undefined)
+  if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(`setup: ${key} didn't stop after Hive gave it #${n}`)
 }
 /**
  * Card `key` of agent `who` ('coder' or 'implementer') in Review with a real submission (#1537): started, its work
@@ -2680,6 +2679,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairRules(c)
       await c.card('m', { title: 'Retry the upload', description: 'Retry a failed upload three times.', column: 'doing', agent: 'coder' })
+      await builderStopped(c, 'm', 'coder')
       // #1474: the repository shows the hand merge the prompt tells of (a model checks git before taking the user's word).
       c.merged = handMerged(c, c.cards.m)
     },
@@ -2706,6 +2706,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairRules(c)
       await c.card('m', { title: 'Retry the upload', description: 'Retry a failed upload three times.', column: 'doing', agent: 'coder' })
+      await builderStopped(c, 'm', 'coder')
     },
     prompt: (c) => `Move card #${c.cards.m} to Done.`,
     fake: (c) => `hive hive_update_task {"number":${c.cards.m},"column":"done"}`,
@@ -2729,6 +2730,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairRules(c)
       await c.card('m', { title: 'Retry the upload', description: 'Retry a failed upload three times.', column: 'doing', agent: 'coder' })
+      await builderStopped(c, 'm', 'coder')
     },
     // Back to Todo: a move backwards skips no rule.
     prompt: (c) => `Card #${c.cards.m} isn't ready to work on yet: put it back in Todo.`,
@@ -2861,7 +2863,6 @@ module.exports.SCENARIOS = [
       c.head = c.git('rev-parse', 'HEAD').trim()
       c.trees = worktreesOf(c)
     },
-    during: trustSlot,
     prompt: (c) => `Work on card #${c.cards.s}.`,
     fake: (c) => `skill work-on-card then hive hive_start_card {"card":"#${c.cards.s}"}`,
     expect: (o, c) => {
@@ -3025,7 +3026,9 @@ module.exports.SCENARIOS = [
       if (posted.status !== 200) throw new Error(`design: ${JSON.stringify(posted.body)}`)
       c.design = posted.body.data.design
     },
-    beforePrompt: (c) => wakeRead(c, 'd'),
+    // HI-2225: the design's wake rang before the prompt that names card-loop, and a model did the check on the wake alone,
+    // without the skill: the prompt is the launch's, so it comes first and the wake waits for its turn.
+    promptAtLaunch: true,
     prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). On card #${c.cards.d}, Implementer posted a design for your check before building: check it and answer as your loop says.`,
     fake: (c) =>
       `skill card-loop then hive hive_read_task {"number":${c.cards.d},"latestComment":true} then hive hive_wait_for_tasks {"cards":[${c.cards.d}],"changes":["comment"],"wake":true} then hive hive_loop_step ${JSON.stringify({ card: `#${c.cards.d}`, step: 'gaps', text: '1. Add a test for expiry and for invalidation on write.', design: c.design })}`,
@@ -3098,7 +3101,8 @@ module.exports.SCENARIOS = [
       if (posted.status !== 200) throw new Error(`follow-up: ${JSON.stringify(posted.body)}`)
       c.followUp = posted.body.data.design
     },
-    beforePrompt: (c) => wakeRead(c, 'f'),
+    // HI-2225: as card-loop-design-check, the follow-up's wake waits for the prompt's turn.
+    promptAtLaunch: true,
     prompt: (c) => `You are the reviewer in Implementer's card loop (the card-loop skill). On card #${c.cards.f}, in Review, the user asked for a change for you to check, and Implementer has posted it as a follow-up: check it and answer as your loop says.`,
     fake: (c) =>
       `skill card-loop then hive hive_read_task {"number":${c.cards.f},"latestComment":true} then hive hive_wait_for_tasks {"cards":[${c.cards.f}],"changes":["comment","column"],"wake":true} then hive hive_loop_step ${JSON.stringify({ card: `#${c.cards.f}`, step: 'gaps', text: '1. Add a test for the trimmed name.', design: c.followUp })}`,
@@ -3228,7 +3232,6 @@ module.exports.SCENARIOS = [
       c.head = c.git('rev-parse', 'HEAD').trim()
       c.trees = worktreesOf(c)
     },
-    during: trustSlot,
     prompt: (c) => `Use card-loop as the builder. Cards: #${c.cards.p}. Your reviewer is Implementer. Rounds 10, wait 6h.`,
     fake: (c) => `skill card-loop then hive hive_lane {"action":"start","cards":[${c.cards.p}],"reviewer":"Implementer","rounds":10,"waitMinutes":360} then hive hive_start_card {"card":"#${c.cards.p}"}`,
     expect: (o, c) => {

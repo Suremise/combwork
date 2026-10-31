@@ -717,6 +717,35 @@ describe('a trial the environment stops (trialEnvironment)', () => {
     })
   })
 
+  // HI-2225: Hive's relaunch of the session under test in a slot asked to trust that folder, unanswered, and the trial
+  // ended waiting. HR2's round 1: the launch's run is the one session:start replied with, so a relaunch that came before
+  // the prompt was taken is still a later run, whose question is answered.
+  describe("a relaunch's trust question (relaunchTrust)", () => {
+    type Trust = (o: { status: string; runId: string | null; launchRun: string | null; answered: Set<string>; screen?: string; provider: string }) => 'enter' | 'claude' | null
+    const { relaunchTrust } = require('./scenarios/harness.cjs') as { relaunchTrust: Trust }
+    const CLAUDE = 'Quick safety check\r\n ❯ 1. Yes, I trust this folder\r\n   2. No, exit'
+    const ask = (o: Partial<Parameters<Trust>[0]> = {}) => relaunchTrust({ status: 'waiting', runId: 'slot-run', launchRun: 'launch-run', answered: new Set(), screen: CLAUDE, provider: 'claude-code', ...o })
+
+    it("answers a later run's question: Claude Code's menu, Copilot's and Codex's Yes-first", () => {
+      expect(ask()).toBe('claude')
+      expect(ask({ provider: 'codex', screen: 'Do you trust the contents of this directory? › 1. Yes, trust this folder' })).toBe('enter')
+      expect(ask({ provider: 'copilot', screen: 'Do you trust the files in this folder?' })).toBe('enter')
+    })
+
+    it('a relaunch before the prompt was taken is still a later run than the launch session:start replied with', () => {
+      // The relaunch's run is current; the launch's was known before any prompt existed.
+      expect(ask({ runId: 'slot-run', launchRun: 'launch-run' })).toBe('claude')
+    })
+
+    it("leaves the launch's own run (its question answered as it started, maybe still in the buffer), a run answered, and anything not waiting", () => {
+      expect(ask({ runId: 'launch-run' })).toBeNull()
+      expect(ask({ answered: new Set(['slot-run']) })).toBeNull()
+      expect(ask({ status: 'working' })).toBeNull()
+      expect(ask({ runId: null })).toBeNull()
+      expect(ask({ screen: 'Allow this command? 1. Yes 2. No' })).toBeNull()
+    })
+  })
+
   // #577: Claude Code 2.1.296 with an OAuth session it couldn't refresh printed this and exited with 1 at launch.
   describe('a CLI that exits at launch (launchEnded)', () => {
     const { launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus } = require('./scenarios/harness.cjs') as {
