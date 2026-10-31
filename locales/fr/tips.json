@@ -151,6 +151,8 @@
   "tips.closeWindow.title": "Fermer une fenêtre, ou toutes",
   "tips.codexSandboxConnections.text": "Tes connexions Codex redemandent sans cesse l’autorisation d’administrateur ? La configuration du bac à sable administrateur de chacune réinitialise celle des autres. Paramètres → Avancé → Codex → Connexions : utiliser le bac à sable de Codex sans droits d’administrateur les fait toutes tourner sans, au prix des comptes de bac à sable distincts.",
   "tips.codexSandboxConnections.title": "Plusieurs connexions Codex sans demandes d’administrateur",
+  "tips.codexScriptCalls.text": "En mode code, Codex lance ses outils depuis un script. Dans l’onglet Sessions, une ligne Script indique combien d’appels il a faits et lesquels ; ouvrez-la pour lire chaque appel avec son propre résultat.",
+  "tips.codexScriptCalls.title": "Voir ce qu’a fait un script Codex",
   "tips.commandName": "« {command} »",
   "tips.compactFocus.text": "Compacter résume la conversation pour que chaque message suivant coûte moins cher. Donne-lui un objectif (« garde les décisions sur l’API, laisse tomber la sortie des tests ») et l’agent garde ce qui compte. {key}",
   "tips.compactFocus.title": "Compacter avec un objectif",

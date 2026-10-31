@@ -151,6 +151,8 @@
   "tips.closeWindow.title": "Cierra una ventana, o todas",
   "tips.codexSandboxConnections.text": "¿Tus conexiones de Codex piden permiso de administrador una y otra vez? La configuración del sandbox de administrador de cada una restablece la de las demás. Configuración → Avanzado → Codex → Conexiones: usar el sandbox de Codex sin permisos de administrador las ejecuta todas sin él, a costa de las cuentas de sandbox independientes.",
   "tips.codexSandboxConnections.title": "Varias conexiones de Codex sin avisos de administrador",
+  "tips.codexScriptCalls.text": "En modo de código, Codex ejecuta sus herramientas desde un script. En la pestaña Sesiones, una línea Script dice cuántas llamadas hizo y cuáles; ábrela para leer cada llamada con su propio resultado.",
+  "tips.codexScriptCalls.title": "Mira lo que hizo un script de Codex",
   "tips.commandName": "“{command}”",
   "tips.compactFocus.text": "Compactar resume la conversación para que cada mensaje posterior cueste menos. Dale un enfoque (“conserva las decisiones de la API, descarta la salida de las pruebas”) y el agente conserva lo importante. {key}",
   "tips.compactFocus.title": "Compacta con un enfoque",

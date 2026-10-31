@@ -462,6 +462,7 @@ Select a session to read its transcript on the right, including everything befor
 
 - Your messages and Claude's replies are shown in full.
 - Thinking and each tool call are collapsed to one line (for example "Bash · Run the login tests" or "Edit · src/app.ts"). Click one to see its input and result; very long output is shortened, with **Show all**. The expand button in the toolbar opens or closes them all.
+- Codex in code mode runs its tools from a script. A **Script** line says what the script did (*3 hive calls, 1 command, 2 edits*, and how many failed); open it to see each call folded in turn, with its own input and result (and a command's exit code), then the script's code and what it printed. A command the script left running is shown under the script that started it.
 - Each compaction is a divider showing whether it was manual or automatic, the context size before and after, and the size of the first request after it (which also carries Claude Code's instructions and tools). Click it to read the summary the agent continued from.
 - Slash commands such as `/compact` appear with their output, and pasted images as thumbnails; click one to view it.
 

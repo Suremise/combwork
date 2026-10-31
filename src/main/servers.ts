@@ -9,6 +9,7 @@ import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import { LISTEN_RETRY_BOUND_MS, listenWithRetry } from './listenRetry'
 import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
+import { callsMade } from '../shared/activity'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
@@ -1725,7 +1726,8 @@ async function agentActivity(p: string, agentId: string, detail = false) {
       latestReply = clip(reply.text, lim.reply)
       if (reply.text.length > lim.reply) clipped.latestReply = reply.text.length
     }
-    const turn = items.slice(Math.max(0, lastUser)).flatMap((x) => (x.kind === 'tool' ? [{ tool: x.tool.name, summary: clip(x.tool.summary, lim.summary), failed: x.tool.isError }] : []))
+    // A Codex script stands for the calls it made, when its Codex records them (HI-2240): they are what it did.
+    const turn = items.slice(Math.max(0, lastUser)).flatMap((x) => (x.kind === 'tool' ? callsMade(x.tool).map((c) => ({ tool: c.name, summary: clip(c.summary, lim.summary), failed: c.isError })) : []))
     toolCalls = turn.length
     recentTools = turn.slice(-lim.tools)
   }

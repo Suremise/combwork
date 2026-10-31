@@ -607,6 +607,14 @@
     "defaultMessage": "Several Codex connections, no admin prompts",
     "description": "A tip's title. Codex is a product's name."
   },
+  "tips.codexScriptCalls.text": {
+    "defaultMessage": "Codex in code mode runs its tools from a script. In the Sessions tab, a Script line says how many calls it made and which; open it to read each call with its own result.",
+    "description": "A tip (HI-2240). Codex is a product name; Script is the transcript's name for it, kept as Hive shows it. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+  },
+  "tips.codexScriptCalls.title": {
+    "defaultMessage": "See what a Codex script did",
+    "description": "A tip's title (HI-2240). Codex is a product name; a script is the code Codex runs to call its tools."
+  },
   "tips.commandName": {
     "defaultMessage": "“{command}”",
     "description": "A command's name in a tip's text, where its shortcut would be when it has none. Use your language's quotation marks."

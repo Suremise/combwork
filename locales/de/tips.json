@@ -151,6 +151,8 @@
   "tips.closeWindow.title": "Ein Fenster schließen oder alle",
   "tips.codexSandboxConnections.text": "Deine Codex-Verbindungen fragen immer wieder nach Administratorrechten? Die Einrichtung der Admin-Sandbox einer Verbindung setzt die der anderen zurück. Einstellungen → Erweitert → Codex → Verbindungen: Codex-Sandbox ohne Administratorrechte nutzen führt sie alle ohne aus, verzichtet dafür aber auf separate Sandbox-Konten.",
   "tips.codexSandboxConnections.title": "Mehrere Codex-Verbindungen ohne Administratorabfragen",
+  "tips.codexScriptCalls.text": "Codex führt seine Tools im Code-Modus aus einem Skript aus. Im Tab „Sitzungen“ zeigt eine Script-Zeile, wie viele Aufrufe es gemacht hat und welche; öffne sie, um jeden Aufruf mit seinem eigenen Ergebnis zu lesen.",
+  "tips.codexScriptCalls.title": "Was ein Codex-Skript getan hat",
   "tips.commandName": "„{command}“",
   "tips.compactFocus.text": "„Komprimieren“ fasst die Unterhaltung zusammen, sodass jede spätere Nachricht weniger kostet. Gib einen Schwerpunkt vor („behalte die API-Entscheidungen, lass die Testausgabe weg“), und der Agent behält, was wichtig ist. {key}",
   "tips.compactFocus.title": "Mit Schwerpunkt komprimieren",

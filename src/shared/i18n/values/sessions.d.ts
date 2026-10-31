@@ -153,10 +153,14 @@ interface HiveMessageValues {
   'sessions.tool.empty': undefined
   'sessions.tool.error': undefined
   'sessions.tool.errorBadge': undefined
+  'sessions.tool.exitCode': { code: string | number }
   'sessions.tool.input': undefined
   'sessions.tool.loadFailed': undefined
   'sessions.tool.noResult': undefined
   'sessions.tool.result': undefined
+  'sessions.tool.scriptFailedCalls': { n: number }
+  'sessions.tool.scriptKindCalls': { kind: string; n: number }
+  'sessions.tool.scriptMcpCalls': { n: number; server: string | number }
   'sessions.tool.showAll': { n: number }
   'sessions.tree.both': { n: number; subs: number }
   'sessions.tree.none': undefined
