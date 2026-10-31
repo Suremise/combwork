@@ -119,7 +119,7 @@ const waitReplyMs = (seconds: unknown, fallback: number, max: number): number =>
 const projectArg = {
   type: 'string',
   // The Assistant has no project of its own (HI-2229: "Default: this project." left it calling with none).
-  description: PROJECT ? `Default: "${PROJECT}".` : "A project's name, as hive_list_projects lists them."
+  description: PROJECT ? `Default: "${PROJECT}".` : "A project's name."
 }
 /** A card (#1219; HI-1661: named by its key, an old number still taken). */
 /** A reply worded with the card names the API sent with it (#1219: its `names`). */
