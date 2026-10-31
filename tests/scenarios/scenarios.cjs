@@ -3985,13 +3985,13 @@ const briefsTo = (o, name) =>
  * one naming the lane's own builder and reviewer ("Lane started: Coder / Implementer (alpha) …").
  */
 const laneStartsOf = (o) => {
-  const replies = hiveReplies(o, 'hive_lane').map((t) => String(t.result ?? ''))
+  const laneReplies = hiveReplies(o, 'hive_lane').map((t) => String(t.result ?? ''))
   return ran(o, 'hive_lane')
     .map((x) => argsOf(x))
     .filter((a) => a.action === 'start')
     .map((args) => {
       const head = `${args.builder ?? ''} / ${args.reviewer ?? 'no reviewer'} (`.toLowerCase()
-      return { args, reply: replies.find((r) => /^Lane (started|updated): /.test(r) && r.replace(/^Lane (started|updated): /, '').toLowerCase().startsWith(head)) ?? '' }
+      return { args, reply: laneReplies.find((r) => /^Lane (started|updated): /.test(r) && r.replace(/^Lane (started|updated): /, '').toLowerCase().startsWith(head)) ?? '' }
     })
     .filter((s) => s.reply)
 }

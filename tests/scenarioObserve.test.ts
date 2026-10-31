@@ -228,7 +228,7 @@ describe("the card read and update checks count the card by its number or its ow
 
 describe("the checks follow what the current skills say (HI-2222): the right behaviour passes, the old or a wrong one doesn't", () => {
   const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
-  const tool = (name: string, input: unknown, result: string) => ({ name: `mcp__hive__${name}`, input: JSON.stringify(input), result, isError: false })
+  const hiveTool = (name: string, input: unknown, result: string) => ({ name: `mcp__hive__${name}`, input: JSON.stringify(input), result, isError: false })
   const run = (id: string, o: Record<string, unknown>, c: Record<string, unknown>) => {
     const sc = SCENARIOS.find((s) => s.id === id)!
     return Object.fromEntries(sc.expect({ hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', ...o }, c).map(([name, ok]) => [name, ok]))
@@ -268,7 +268,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     type Start = { call: unknown; tool: unknown }
     const start = (builder: string, reviewer: string, laneCards: unknown[], reply: string, brief = 'Use card-loop as the builder.', ok = true): Start => {
       const args = { action: 'start', project: 'alpha', builder, reviewer, cards: laneCards, brief }
-      return { call: call('hive_lane', args, ok), tool: { ...tool('hive_lane', `action: start\nbuilder: ${builder}`, reply), isError: !ok } }
+      return { call: call('hive_lane', args, ok), tool: { ...hiveTool('hive_lane', `action: start\nbuilder: ${builder}`, reply), isError: !ok } }
     }
     const lanes = (starts: Start[], hiveCalls: unknown[] = []) => run('coordinator-team-lanes', { tools: starts.map((s) => s.tool), hiveCalls: [...starts.map((s) => s.call), ...hiveCalls], allCards: board, cards: {} }, { cards, agents })
     const STARTED = (who: string) => `Lane started: ${who} (alpha) L: active. Its brief is delivered to the builder now. Started ${who.replace(' / ', ' and ')} with the lane's brief.`
@@ -309,7 +309,7 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
     const tellIt = 'Lane started: Coder / no reviewer (alpha) L: active. Coder is running, so Hive left it as it is: tell it about the lane.'
     const lane = { builder: { name: 'Coder' }, cards: [{ number: 1 }], rounds: 3, waitMinutes: 60 }
     const newLane = (reply: string, hiveCalls: unknown[] = [], lanes = [lane]) =>
-      run('assistant-new-lane', { tools: [tool('hive_lane', 'action: start\nbuilder: Coder', reply)], hiveCalls: [call('hive_lane', { action: 'start', builder: 'Coder', cards: ['AL-1'], rounds: 3, waitMinutes: 60 }), ...hiveCalls], lanes }, { cards: { n: 1 }, agents })
+      run('assistant-new-lane', { tools: [hiveTool('hive_lane', 'action: start\nbuilder: Coder', reply)], hiveCalls: [call('hive_lane', { action: 'start', builder: 'Coder', cards: ['AL-1'], rounds: 3, waitMinutes: 60 }), ...hiveCalls], lanes }, { cards: { n: 1 }, agents })
     const prompt = call('hive_prompt_agent', { project: 'alpha', agent: 'Coder', text: 'Use card-loop as the builder of lane L.', newConversation: true })
 
     it('passes the lane start with no prompt where Hive gives Coder the card, and the one prompt where its reply says to tell it', () => {
