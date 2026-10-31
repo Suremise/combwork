@@ -316,13 +316,15 @@ same code while every required check still runs:
   them). **Before a card passes**, every suite it names has run on its final code (the builder's last record). How
   narrow a round's tests are, and what never runs on a card unless it asks, is AGENTS.md's **Tests per card**.
 - **A merge** (#1010; into main or an integration branch such as `feature/090-session`) runs **focused checks** on the
-  merged code: typecheck, lint, the unit tests, and the cards' own focused suites (those their reviews ran, plus any
+  merged code: typecheck, lint, `npm run check:repo` (the repo-wide checks: the i18n guard and the unit tests that
+  scan every file, under a minute, HI-2244), and the cards' own focused suites (those their reviews ran, plus any
   suite the merge's conflicts touched), `npm run e2e -- <suites> --build --record`. **Not** the full set and **not**
   `--affected`: merges take turns at one slot, and an hour or more of e2e for each kept every other lane waiting (a
   phase of five merges took hours) and was the load Hive crashed under (#988). Every card has already passed review
   with its focused suites, which its reviewer checked. A pre-merge run still goes first in the slot queue (#558). A
   real suite skipped for the environment doesn't block a merge, but the record says so and the reviewer decides
-  whether it must run again first. CI runs only the unit tests.
+  whether it must run again first. The full unit run (`npm test`, about 7 minutes) is a release's final checks, and
+  on request; CI runs only the unit tests.
 - **The full set runs at checkpoints**: `npm run e2e -- --all --build --record` **on the integration branch when the
   lanes go quiet** (a phase's end, overnight with the load capped, before a long pause; a failure is carded at once and
   bisected over the merge commits since the last full run), for **every RC and release** (RELEASING.md, with the real
