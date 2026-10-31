@@ -143,7 +143,7 @@ Accounts have one **order**, for every CLI, the same in every workspace. A new a
 
 An account can move its agents to another account before its plan runs out. On the account's row in **Settings → Accounts & Connections**, tick **When it reaches [98]% of [its weekly limit], move its agents to [account]**, and choose the share, the limit (its weekly limit, its 5-hour limit, or either) and the account to move to (another of the same CLI's).
 
-- **What moves:** every agent, and the Assistant, running on that account in the workspaces open now. Each moves to the connection with the same name on the other account, or to its first connection if none has that name.
+- **What moves:** every agent on that account in the workspaces open now. The Hive Assistant stays where it is: you choose its connection in **Settings → Assistant**. Each moves to the connection with the same name on the other account, or to its first connection if none has that name.
 - **When:** an agent that isn't running moves at once. A running one moves once its turn is over (never in the middle of one) and resumes its conversation on the new connection.
 - **Once per limit period, never back:** Hive moves them once each time the limit fills, and doesn't move them back after it resets. To move an agent back, choose its connection in **Agent Settings**; Hive leaves it there until the limit's next period. Choosing an agent's connection yourself while it waits to move also keeps it where you put it.
 - **A notice** says who moved and why. If the other account can't take them (it's signed out, has no connections, isn't on in the workspace, or has used as much of its own limit), a notice says so once, and they move as soon as it can.

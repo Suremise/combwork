@@ -2,7 +2,7 @@
 // signed in through the fake, each with a "Main" and a "Builder" connection; Max 1's rule moves its agents to Max 2 at 90%
 // of its weekly limit. One (running, idle, on Max 1's Builder) reports Max 1's limits at 95% weekly ("planusage F W", as
 // Claude Code's status line does): it is switched to Max 2's Builder and resumed, and Two (stopped, on Max 1's Main) is
-// moved to Max 2's Main at once; a notice names who moved. Nothing moves back when Max 1 reads low again. Screenshots of
+// moved to Max 2's Main at once; a notice names who moved. The workspace's Hive Assistant, on Max 1 too, stays there. Nothing moves back when Max 1 reads low again. Screenshots of
 // the rule in Settings → Accounts & Connections, in both themes, and the Assistant's view of it (hive_connection list's
 // usage, through GET /v1/connections).
 const lib = require('./lib.cjs')
@@ -90,6 +90,9 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     await page.keyboard.press('Escape')
 
+    const assistantFile = path.join(ws, '.hive', 'assistant', '.hive', 'project.json')
+    const assistantConnection = () => (fs.existsSync(assistantFile) ? (JSON.parse(fs.readFileSync(assistantFile, 'utf8')).agents ?? []).map((a) => a.connection ?? null) : null)
+    const assistantBefore = assistantConnection()
     // --- One reports Max 1 at 95% of its weekly limit: One switches to Max 2's Builder and resumes; Two moves at once.
     const since = (await live('a-one'))?.statusSince
     await lib.sendPrompt(inv, lib.ptyKey(alpha, 'a-one'), 'planusage 10 95', { submitted: async () => (await live('a-one'))?.statusSince !== since })
@@ -98,8 +101,10 @@ const check = (name, ok, extra = '') => {
     check('…and is resumed on Max 2 once its turn is over', !!(await lib.until(async () => (await live('a-one'))?.launchedConnection?.id === max2.id && (await live('a-one')).status === 'ready', HUNG_MS)), JSON.stringify((await live('a-one'))?.launchedConnection ?? null))
     const notices = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => /move from Max 1 to Max 2/.test(e.title ?? ''))
     const told = await lib.until(async () => (notices().length ? notices() : null), HUNG_MS)
-    // The workspace's Assistant runs on Max 1 too (its CLI's first account here): it moves with them.
-    check('a notice says who moved and why, the Assistant among them', !!told && told.length === 1 && /3 agents move from Max 1 to Max 2/.test(told[0].title) && /Assistant, One, and Two/.test(told[0].body ?? ''), JSON.stringify(told))
+    check('a notice says who moved and why: One and Two', !!told && told.length === 1 && /2 agents move from Max 1 to Max 2/.test(told[0].title) && /One and Two/.test(told[0].body ?? ''), JSON.stringify(told))
+    // The workspace's Assistant runs on Max 1 too (its CLI's first account here), and is never moved: its connection is
+    // the user's (Settings → Assistant).
+    check('the Hive Assistant stays where it was', JSON.stringify(assistantConnection()) === JSON.stringify(assistantBefore), JSON.stringify({ before: assistantBefore, now: assistantConnection() }))
 
     // --- The Assistant's view: GET /v1/connections gives the limits and the rule (hive_connection list's lines).
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token

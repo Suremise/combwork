@@ -82,7 +82,7 @@
   "settings.accounts.usageMove.any": "eines der beiden Limits",
   "settings.accounts.usageMove.failed": "Wechsel bei Nutzung konnte nicht geändert werden",
   "settings.accounts.usageMove.fiveHour": "seines 5-Stunden-Limits",
-  "settings.accounts.usageMove.how": "Jeder Agent wechselt zur gleichnamigen Verbindung dort, sonst zu deren erster, sobald sein Zug zu Ende ist, und setzt seine Unterhaltung fort. Hive verschiebt sie einmal pro Limit-Zeitraum und nie zurück: Hol einen zurück, indem du seine Verbindung wählst.",
+  "settings.accounts.usageMove.how": "Jeder Agent wechselt zur gleichnamigen Verbindung dort, sonst zu deren erster, sobald sein Zug zu Ende ist, und setzt seine Unterhaltung fort. Der Hive Assistant bleibt, wo er ist (Einstellungen → Assistent). Hive verschiebt sie einmal pro Limit-Zeitraum und nie zurück: Hol einen zurück, indem du seine Verbindung wählst.",
   "settings.accounts.usageMove.limitLabel": "Welches Limit",
   "settings.accounts.usageMove.offInAdvanced": "Wechsel bei Nutzung sind unter Einstellungen → Erweitert ausgeschaltet: Dieser bewirkt nichts, bis sie eingeschaltet sind.",
   "settings.accounts.usageMove.percentLabel": "Anteil des Limits",

@@ -82,7 +82,7 @@
   "settings.accounts.usageMove.any": "dowolnego z limitów",
   "settings.accounts.usageMove.failed": "Nie udało się zmienić przenoszenia przy zużyciu",
   "settings.accounts.usageMove.fiveHour": "swojego 5-godzinnego limitu",
-  "settings.accounts.usageMove.how": "Każdy agent przechodzi tam na połączenie o tej samej nazwie albo na pierwsze, gdy skończy się jego tura, i wznawia rozmowę. Hive przenosi ich raz na okres limitu i nigdy z powrotem: cofnij jednego, wybierając jego połączenie.",
+  "settings.accounts.usageMove.how": "Każdy agent przechodzi tam na połączenie o tej samej nazwie albo na pierwsze, gdy skończy się jego tura, i wznawia rozmowę. Hive Assistant zostaje, gdzie jest (Ustawienia → Asystent). Hive przenosi ich raz na okres limitu i nigdy z powrotem: cofnij jednego, wybierając jego połączenie.",
   "settings.accounts.usageMove.limitLabel": "Który limit",
   "settings.accounts.usageMove.offInAdvanced": "Przenoszenie przy zużyciu jest wyłączone w Ustawienia → Zaawansowane: ta reguła nic nie robi, dopóki go nie włączysz.",
   "settings.accounts.usageMove.percentLabel": "Udział w limicie",

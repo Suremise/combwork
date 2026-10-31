@@ -332,7 +332,7 @@
     "description": "An entry of the list in an account's usage move (\"When it reaches 98% of its 5-hour limit…\", HI-2195): its plan's rolling 5-hour usage limit."
   },
   "settings.accounts.usageMove.how": {
-    "defaultMessage": "Each agent moves to the connection with the same name there, or its first one, once its turn is over, and resumes its conversation. Hive moves them once per limit period and never back: move one back by choosing its connection.",
+    "defaultMessage": "Each agent moves to the connection with the same name there, or its first one, once its turn is over, and resumes its conversation. The Hive Assistant stays where it is (Settings → Assistant). Hive moves them once per limit period and never back: move one back by choosing its connection.",
     "description": "Under an account's usage move when it is on (Settings → Accounts & Connections, HI-2195): what happens."
   },
   "settings.accounts.usageMove.limitLabel": {

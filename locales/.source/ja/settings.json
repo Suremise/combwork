@@ -88,7 +88,7 @@
   "settings.accounts.usageMove.any": "either limit",
   "settings.accounts.usageMove.failed": "Couldn't change the usage move",
   "settings.accounts.usageMove.fiveHour": "its 5-hour limit",
-  "settings.accounts.usageMove.how": "Each agent moves to the connection with the same name there, or its first one, once its turn is over, and resumes its conversation. Hive moves them once per limit period and never back: move one back by choosing its connection.",
+  "settings.accounts.usageMove.how": "Each agent moves to the connection with the same name there, or its first one, once its turn is over, and resumes its conversation. The Hive Assistant stays where it is (Settings → Assistant). Hive moves them once per limit period and never back: move one back by choosing its connection.",
   "settings.accounts.usageMove.limitLabel": "Which limit",
   "settings.accounts.usageMove.offInAdvanced": "Usage moves are turned off in Settings → Advanced: this one does nothing until they are on.",
   "settings.accounts.usageMove.percentLabel": "Share of the limit",

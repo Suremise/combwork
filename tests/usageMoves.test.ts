@@ -37,6 +37,8 @@ vi.mock('../src/main/accounts', async () => {
 // A workspace with one project, its agents in memory, and updateAgent's lock and check as the real one's.
 const PROJECT = 'C:\\ws\\proj'
 const pc: ProjectConfig = { id: 'p-1', agents: [] } as unknown as ProjectConfig
+// The workspace's Hive Assistant, on Anthropic-1 too: never moved (the Assistant's check of HI-2195's screenshots).
+const assistantPc: ProjectConfig = { agents: [] } as unknown as ProjectConfig
 let lock: Promise<unknown> = Promise.resolve()
 // A write held at the lock (HR1's round 1): `gate` set, each write waits for it once it has the lock; `atLock` counts them.
 const G: { gate: Promise<void> | null; atLock: number } = { gate: null, atLock: 0 }
@@ -46,7 +48,7 @@ const ws = {
   assistantHome: 'C:\\ws\\.hive\\assistant',
   isAssistantHome: (p: string) => p === 'C:\\ws\\.hive\\assistant',
   listProjectPaths: async () => [PROJECT],
-  projectConfig: async (p: string) => (p === PROJECT ? pc : ({ agents: [] } as unknown as ProjectConfig)),
+  projectConfig: async (p: string) => (p === PROJECT ? pc : p === 'C:\\ws\\.hive\\assistant' ? assistantPc : ({ agents: [] } as unknown as ProjectConfig)),
   projectIdsNow: () => ({ byPath: new Map([[PROJECT.toLowerCase(), 'p-1']]), byId: new Map() }),
   updateAgent: (p: string, id: string, patch: Partial<AgentDef>, check?: (current: AgentDef) => void) => {
     const run = lock.then(async () => {
@@ -271,6 +273,7 @@ describe('usageMoves.ts', () => {
       c.usageMoves = {}
     })
     pc.agents = [agent('idle', 'c1b'), agent('busy', 'c1b'), agent('stopped'), agent('other', 'c3')]
+    assistantPc.agents = [{ ...agent('assistant', 'c1'), name: 'Assistant' }]
     for (const id of ['idle', 'busy']) S.running.add(key(id))
     S.busy.add(key('busy'))
   })
@@ -297,6 +300,17 @@ describe('usageMoves.ts', () => {
     setUsage('a1', [weekly(3, ahead(48 + 168))])
     await settle()
     expect(pc.agents.map((a) => a.connection)).toEqual(['c2b', 'c2b', 'c2', 'c3'])
+  })
+
+  it("never moves the Hive Assistant: its connection is the user's (Settings → Assistant)", async () => {
+    S.running.add(`${ws.assistantHome}#assistant`)
+    setUsage('a1', [weekly(99)])
+    await settle()
+    await vi.waitFor(() => expect(S.resumed).toContain(key('idle')), { timeout: HUNG_MS })
+    expect(assistantPc.agents[0].connection).toBe('c1')
+    expect(S.quits.some((k) => k.includes('assistant'))).toBe(false)
+    expect(usageMovesPending().some((k) => k.startsWith('assistant:'))).toBe(false)
+    expect(H.notices.map((n) => n.api)).toEqual(['3 agents move from Anthropic-1 to Anthropic-2'])
   })
 
   it('a manual choice on the same account while busy wins, through another report and a restart (HR1)', async () => {

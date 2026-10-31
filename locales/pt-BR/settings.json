@@ -82,7 +82,7 @@
   "settings.accounts.usageMove.any": "qualquer um dos limites",
   "settings.accounts.usageMove.failed": "Não foi possível alterar a mudança por uso",
   "settings.accounts.usageMove.fiveHour": "seu limite de 5 horas",
-  "settings.accounts.usageMove.how": "Cada agente passa para a conexão com o mesmo nome lá, ou para a primeira, quando o turno dele acabar, e retoma a conversa. O Hive os move uma vez por período do limite e nunca de volta: traga um de volta escolhendo a conexão dele.",
+  "settings.accounts.usageMove.how": "Cada agente passa para a conexão com o mesmo nome lá, ou para a primeira, quando o turno dele acabar, e retoma a conversa. O Hive Assistant fica onde está (Configurações → Assistente). O Hive os move uma vez por período do limite e nunca de volta: traga um de volta escolhendo a conexão dele.",
   "settings.accounts.usageMove.limitLabel": "Qual limite",
   "settings.accounts.usageMove.offInAdvanced": "As mudanças por uso estão desativadas em Configurações → Avançado: esta não faz nada até que sejam ativadas.",
   "settings.accounts.usageMove.percentLabel": "Porcentagem do limite",

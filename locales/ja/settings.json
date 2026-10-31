@@ -82,7 +82,7 @@
   "settings.accounts.usageMove.any": "いずれかの上限",
   "settings.accounts.usageMove.failed": "使用量による移動を変更できませんでした",
   "settings.accounts.usageMove.fiveHour": "5時間の上限",
-  "settings.accounts.usageMove.how": "各エージェントはターンが終わると、移動先で同じ名前の接続（なければ最初の接続）に移り、会話を再開します。Hiveは上限の期間ごとに一度だけ移動し、元には戻しません。戻すには、その接続を選んでください。",
+  "settings.accounts.usageMove.how": "各エージェントはターンが終わると、移動先で同じ名前の接続（なければ最初の接続）に移り、会話を再開します。Hive Assistantは移動しません（「設定」→「アシスタント」）。Hiveは上限の期間ごとに一度だけ移動し、元には戻しません。戻すには、その接続を選んでください。",
   "settings.accounts.usageMove.limitLabel": "対象の上限",
   "settings.accounts.usageMove.offInAdvanced": "使用量による移動は「設定」→「詳細」でオフになっています。オンにするまで、この設定は何もしません。",
   "settings.accounts.usageMove.percentLabel": "上限に対する割合",

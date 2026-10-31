@@ -26,6 +26,7 @@ import { inWorkspace, openWorkspaces, workspaceOf, type WorkspaceService } from 
  * Usage moves (HI-2195, SPEC §11.2; the design is HI-2195's s7 as revised by s9, s11 and s13): an account's rule moves its
  * agents to another account's connections once one of its limits reaches a share.
  *
+ * - It moves project agents, never the Hive Assistant (its connection is the user's own choice, Settings → Assistant).
  * - It fires once per limit and reset period (`config.usageMoves`, kept until the reset passes): agents it handled (moved,
  *   kept on the user's own choice, or given up after failed writes) aren't looked at again in that period, so a manual
  *   return holds and nothing moves back after a reset.
@@ -225,7 +226,8 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
   const target = accountById(rule.to)!
   const movedNames: string[] = []
   for (const ws of openWorkspaces()) {
-    const hosts = [ws.assistantHome, ...(await ws.listProjectPaths().catch(() => [] as string[]))]
+    // Never the Hive Assistant (Darren, 30 Oct: "Set you manually"): its connection is the user's, in Settings → Assistant.
+    const hosts = await ws.listProjectPaths().catch(() => [] as string[])
     for (const projectPath of hosts) {
       const pc = await ws.projectConfig(projectPath).catch(() => null)
       if (!pc || !ws.path) continue
