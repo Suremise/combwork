@@ -1764,7 +1764,7 @@ GitHub Copilot's modes:
 
 ## Agent API <a id="agent-api"></a>
 
-Hive has a local API that agents, scripts and other apps use to talk to it: it listens on your computer only (`127.0.0.1`), and every call needs a token. **Settings → Agent API** turns it on or off, sets its port and shows its access token, which can do anything you can. Agents get tokens of their own automatically. See the [Agent API reference](AGENT_API.md).
+Hive has a local API that agents, scripts and other apps use to talk to it: it listens on your computer only (`127.0.0.1`), and every call needs a token. **Settings → Agent API** turns it on or off, sets its port and shows its access token, which can do anything you can. Agents get tokens of their own automatically. See the [Agent API reference](AGENT_API.md). If its port is already in use when Hive starts, the API stays off and the status bar's **API** says so; after Hive closed unexpectedly, Hive tries the port again for up to 5 seconds first, so that a copy of Hive that has only just ended doesn't leave you without it.
 
 ### Viewer tokens <a id="viewer-tokens"></a>
 

@@ -335,7 +335,7 @@ export const AREAS = [
   { paths: ['src/shared/windowHealth.ts', 'src/renderer/src/windowHealth.ts', 'src/renderer/src/pageMarks.ts'], suites: ['windowhealth'] },
   // Why Hive stopped (#985): crash dumps and a log line for every way out; the updater and install-folder checks end the app through it.
   // Hive closing unexpectedly (#984): the running marker, the notice, Resume All and the setting; a merge left half done is told in it.
-  { paths: ['src/main/lastRun.ts', 'src/shared/unexpectedClose.ts', 'src/main/mergeSlotHost.ts', 'src/main/mergeSlots.ts', 'tests/e2e/unexpectedclose.cjs', 'tests/e2e/unexpectedclose-leftovers.cjs'], suites: ['unexpectedclose', 'unexpectedclose-leftovers', 'restartresume'] },
+  { paths: ['src/main/lastRun.ts', 'src/main/listenRetry.ts', 'src/shared/unexpectedClose.ts', 'src/main/mergeSlotHost.ts', 'src/main/mergeSlots.ts', 'tests/e2e/unexpectedclose.cjs', 'tests/e2e/unexpectedclose-leftovers.cjs'], suites: ['unexpectedclose', 'unexpectedclose-leftovers', 'restartresume'] },
   { paths: ['src/main/restartResume.ts', 'src/shared/restartResume.ts', 'tests/e2e/restartresume.cjs'], suites: ['restartresume', 'unexpectedclose'] },
   // Resuming after a connection drops (HI-1612): the wait, its status, Progress run and note.
   { paths: ['src/main/outageResume.ts', 'src/main/outageCore.ts', 'src/main/assistantNotes.ts', 'tests/e2e/outage.cjs'], suites: ['outage'] },

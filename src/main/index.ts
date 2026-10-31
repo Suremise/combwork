@@ -121,7 +121,7 @@ import { startHandOverCheck } from './handOverCheck'
 import { startLaunchSides } from './launchSides'
 import { checkInstallDir } from './installDir'
 import { exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
-import { checkLastRun, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
+import { checkLastRun, lastUnexpectedClose, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
 import { initRestartRecovery, loadRestartRecord, recordClosing, startRestartRecovery, stopRestartRecovery, stopWatchingRestartRequests, watchRestartRequests } from './restartResume'
 import type { RestartReason } from '../shared/restartResume'
 import { startOutageResume } from './outageResume'
@@ -1107,7 +1107,9 @@ app.whenReady().then(async () => {
   // A launch's side of the workflow for its metrics (HI-2049): before the Agent API or a window can start an agent.
   startLaunchSides()
   await startHookServer()
-  await startApiServer()
+  // After an unexpected close, its port is tried again for a few seconds (HI-2196): the copy just ended may still hold
+  // it. Awaited, so the agents resumed after it launch with the API's address.
+  await startApiServer({ retryInUse: !!lastUnexpectedClose() })
   wireSettingsEffects()
   startBranchWatch()
   // The platform watcher (#1214): the open workspaces' repositories and folders.

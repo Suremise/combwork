@@ -7,6 +7,7 @@ import { attachableSource, cardAttachments, cardHost, checkBatch, readCardAttach
 import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachments'
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
+import { LISTEN_RETRY_BOUND_MS, listenWithRetry } from './listenRetry'
 import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
@@ -4509,32 +4510,51 @@ const SSE_MAX_BUFFERED = 1024 * 1024
 /** The (re)start in progress: settings changed quickly twice restart the server one after the other. */
 let apiRestart: Promise<unknown> = Promise.resolve()
 
-export function startApiServer(): Promise<AgentApiInfo> {
-  const run = apiRestart.then(startApiServerNow)
+/** The start whose listen is under way (tried again while its port is in use): stopApiServer aborts it. */
+let apiListening: AbortController | null = null
+
+/**
+ * Starts (or restarts) the server. retryInUse: a port in use is tried again for a few seconds (listenRetry.ts) — start-up
+ * passes it after an unexpected close (HI-2196), when the copy just ended may still hold its port; any other start, a
+ * settings change's among them, fails at once as before.
+ */
+export function startApiServer({ retryInUse = false }: { retryInUse?: boolean } = {}): Promise<AgentApiInfo> {
+  const run = apiRestart.then(() => startApiServerNow(retryInUse))
   apiRestart = run.catch(() => undefined)
   return run
 }
 
-async function startApiServerNow(): Promise<AgentApiInfo> {
+async function startApiServerNow(retryInUse: boolean): Promise<AgentApiInfo> {
   await stopApiServer()
   apiError = undefined
   if (!apiToken) apiToken = await loadToken()
   await loadViewerTokens()
-  // Runs with the Agent API off too, for the Hive Assistant's token alone (see handleApi).
-  apiServer = http.createServer((req, res) => void handleApi(req, res))
+  const port = apiPort()
+  const listening = new AbortController()
+  apiListening = listening
   try {
-    await new Promise<void>((resolve, reject) => {
-      apiServer!.once('error', reject)
-      apiServer!.listen(apiPort(), '127.0.0.1', () => {
-        apiServer!.off('error', reject)
-        resolve()
-      })
+    // Runs with the Agent API off too, for the Hive Assistant's token alone (see handleApi).
+    const got = await listenWithRetry(() => http.createServer((req, res) => void handleApi(req, res)), port, '127.0.0.1', {
+      retry: retryInUse,
+      signal: listening.signal,
+      onWait: () => log.info(`Agent API: port ${port} is in use after an unexpected close; trying again for up to ${LISTEN_RETRY_BOUND_MS / 1000} s`)
     })
-    log.info(`Agent API listening on 127.0.0.1:${apiPort()}`)
+    // Stopped just as it listened: never the server of a start that was stopped.
+    if (listening.signal.aborted) {
+      got.server.close()
+      return apiInfo()
+    }
+    apiServer = got.server
+    log.info(`Agent API listening on 127.0.0.1:${port}${got.tries > 1 ? ` after ${got.tries} tries in ${got.waitedMs} ms` : ''}`)
   } catch (e) {
-    apiError = (e as NodeJS.ErrnoException).code === 'EADDRINUSE' ? `Port ${apiPort()} is already in use` : (e as Error).message
-    log.warn(`Agent API failed to start: ${apiError}`)
+    // Stopped while it was being tried again: whatever stopped it has the server and the discovery file now.
+    if ((e as Error).name === 'AbortError') return apiInfo()
+    const tries = (e as { tries?: number }).tries ?? 1
+    apiError = (e as NodeJS.ErrnoException).code === 'EADDRINUSE' ? `Port ${port} is already in use` : (e as Error).message
+    log.warn(`Agent API failed to start: ${apiError}${tries > 1 ? ` (after ${tries} tries)` : ''}`)
     apiServer = null
+  } finally {
+    if (apiListening === listening) apiListening = null
   }
   // Another app finds a running Hive's API by the discovery file (#620): there while the Agent API listens.
   const info = apiInfo()
@@ -4544,6 +4564,8 @@ async function startApiServerNow(): Promise<AgentApiInfo> {
 }
 
 export async function stopApiServer(): Promise<void> {
+  apiListening?.abort()
+  apiListening = null
   for (const c of sseClients.keys()) c.end()
   sseClients.clear()
   if (apiServer) await new Promise<void>((resolve) => apiServer!.close(() => resolve()))
