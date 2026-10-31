@@ -159,6 +159,7 @@ Hive 1.0 adds a workflow layer: your project's options decide how a card goes fr
 - **Choose which skills agents get.** **Delivered to agents** beside each Hive skill says whether agents get it from their next session, and Hive removes the skill copies it made for Codex and Copilot once its last agent there stops (#1431).
 - **Choose how agents hear of their inbox.** Settings → Advanced has a switch for each way Hive gets an agent to read its inbox (at the end of a tool, when it would stop, when it's idle), each on as before; a project can set its own. Nothing is lost with one off: with wakes off, the pane's **Deliver Now** types the line once (#1432).
 - **An agent whose hooks stop arriving says so:** *Status unknown: no hooks from Claude Code*, with a banner saying why and **Restart session**, and its lane pauses until they come back (#1336, #1371).
+- **Claude Code agents call Hive's most used tools without loading them first** (HI-2229): an agent's inbox, card reading and card list (and the Assistant's project status and agent activity) come with their full description, so a model needn't guess their arguments; the rest still load on demand. A hive call refused for an argument its tool doesn't take, or one it left out, now says which arguments the tool takes.
 
 ### Switches for Hive's changes to the CLIs
 

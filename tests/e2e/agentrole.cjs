@@ -215,6 +215,15 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await gSettings.getByRole('button', { name: 'Cancel' }).click()
     const agentTools = mcp('tools/list', {}, 'agent').tools
     check('a project agent has neither hive_update_agent nor hive_add_agent', agentTools.length > 0 && !agentTools.some((t) => t.name === 'hive_update_agent' || t.name === 'hive_add_agent'), JSON.stringify(agentTools.map((t) => t.name)))
+    // HI-2229: each role's most used tools are marked to be sent in full where a CLI defers tools; the rest aren't.
+    const full = (list) => list.filter((t) => t._meta?.['anthropic/alwaysLoad'] === true).map((t) => t.name).sort().join(',')
+    check("a project agent's hive_inbox, hive_list_tasks and hive_read_task are marked to load in full, no other", full(agentTools) === 'hive_inbox,hive_list_tasks,hive_read_task', full(agentTools))
+    const assistantTools = mcp('tools/list', {}, 'assistant').tools
+    check("…the Assistant's, and its hive_agent_activity and hive_project_status", full(assistantTools) === 'hive_agent_activity,hive_inbox,hive_list_tasks,hive_project_status,hive_read_task', full(assistantTools))
+    const guessed = tool('hive_read_task', { key: 'AL-1' }, 'agent')
+    check('a call with a guessed argument is refused as before, and told what the tool takes, naming no value', guessed.isError && /is not a card number/.test(guessed.text) && /hive_read_task takes number \(required\).*; missing: number; not: key\./.test(guessed.text) && !guessed.text.includes('AL-1'), guessed.text)
+    const noProject = tool('hive_project_status', {})
+    check("the Assistant's hive_project_status with no project says what to pass", noProject.isError && /project is required: a project's name, as hive_list_projects lists them/.test(noProject.text), noProject.text)
   } finally {
     await app.close().catch(() => undefined)
   }

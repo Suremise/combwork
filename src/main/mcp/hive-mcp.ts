@@ -28,6 +28,7 @@ import { INBOX_SWITCHES, type InboxSwitch } from '../../shared/inboxSwitches'
 import { ENTRY_LIMITS, JOURNAL_KINDS, LINK_TYPES } from '../../shared/journal'
 import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
 import { toolListSize } from '../../shared/toolListSize'
+import { ALWAYS_LOAD_META, alwaysLoaded, argumentHint } from '../../shared/hiveToolLoad'
 
 const VERSION = '1.0.0'
 const API = (process.env.HIVE_API_URL || 'http://127.0.0.1:47821').replace(/\/$/, '')
@@ -117,7 +118,8 @@ const waitReplyMs = (seconds: unknown, fallback: number, max: number): number =>
 
 const projectArg = {
   type: 'string',
-  description: PROJECT ? `Default: "${PROJECT}".` : 'Default: this project.'
+  // The Assistant has no project of its own (HI-2229: "Default: this project." left it calling with none).
+  description: PROJECT ? `Default: "${PROJECT}".` : "A project's name."
 }
 /** A card (#1219; HI-1661: named by its key, an old number still taken). */
 /** A reply worded with the card names the API sent with it (#1219: its `names`). */
@@ -250,7 +252,7 @@ async function handovers(project?: string): Promise<{ relPath: string }[]> {
 const enc = (s: string): string => encodeURIComponent(s)
 const proj = (a: Record<string, any>): string => {
   const p = a.project || PROJECT
-  if (!p) throw new Error('project is required')
+  if (!p) throw new Error("project is required: a project's name, as hive_list_projects lists them")
   return enc(p)
 }
 /** 0.9's worktree arguments a call still gives (#1451): passed on as given, for the Agent API to refuse. */
@@ -1104,6 +1106,8 @@ const tools: Tool[] = [
 /** Agents get Hive's common tools; the Assistant also those its control level allows. */
 const allowed = new Set(assistantTools(CONTROL, CHANGE_SETTINGS, JOURNAL))
 const offered = tools.filter((t) => (t.name !== 'hive_console' || DEV_CONSOLE) && (ASSISTANT ? (!ASSISTANT_ONLY_TOOLS.includes(t.name) || allowed.has(t.name)) && !AGENT_ONLY_TOOLS.includes(t.name) : !ASSISTANT_ONLY_TOOLS.includes(t.name)))
+/** The offered tools a CLI that defers tools gets in full (HI-2229). */
+const FULL = new Set(alwaysLoaded(ASSISTANT))
 
 // The Assistant's journal rule while its journal is on (#1032): the kinds it may store come from Hive.
 const JOURNAL_SCOPE = ASSISTANT && JOURNAL ? (process.env.HIVE_JOURNAL_SCOPE ?? '').split(',').filter(Boolean) : null
@@ -1285,7 +1289,8 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
     case 'tools/list': {
       // A client that lists the tools without saying it is initialized has connected them all the same.
       sayConnected()
-      const list = offered.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))
+      // The role's most used tools are marked to be sent in full where a CLI defers the rest (HI-2229).
+      const list = offered.map(({ name, description, inputSchema }) => ({ name, description, inputSchema, ...(FULL.has(name) ? { _meta: { [ALWAYS_LOAD_META]: true } } : {}) }))
       reply(id, { tools: list })
       // Its size as the CLI got it (the tools array's JSON: UTF-8 bytes, and characters as UTF-16 code units, with the
       // descriptions' and the parameters' descriptions' parts), once a session.
@@ -1318,7 +1323,9 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         reply(id, { content: [{ type: 'text', text }] })
       } catch (e) {
         ok = false
-        text = `Hive error: ${(e as Error).message}`
+        // A call that gave arguments its tool doesn't take, or left a required one out, is told what it takes (HI-2229).
+        const hint = argumentHint(tool.name, tool.inputSchema, args)
+        text = `Hive error: ${(e as Error).message}${hint ? `\n${hint}` : ''}`
         testId = testLog(tool.name, params?.arguments, (e as Error).message, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
         reply(id, { content: [{ type: 'text', text }], isError: true })
       }

@@ -13,7 +13,7 @@ A handover describes the state when it was written. Others may have committed, t
 
 - A handover the user names: `hive_read_shared_note` with its path (`hive_list_shared_notes` lists them).
 - Otherwise the latest for this project: `hive_read_latest_handover`.
-- Without Hive's tools: look for `HANDOVER.md` in the project root, or ask the user where it is.
+- No hive tool listed: look for `HANDOVER.md` in the project root, or ask the user where it is.
 
 Its header says which project, agent and session wrote it, and when.
 

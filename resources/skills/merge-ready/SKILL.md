@@ -27,7 +27,7 @@ Give the user the summary, saying plainly whether the branch is ready and, if no
 ## Merging, when it is yours
 
 What you merge must be what you checked, so merges into a base take turns through Hive's **merge slot**:
-1. **Claim the slot** for the base with `hive_merge_slot` (`claim`, with the cards you are merging). Still in line: claim again, keeping your place. Without Hive's tools, go on: step 4 still protects the merge.
+1. **Claim the slot** for the base with `hive_merge_slot` (`claim`, with the cards you are merging). Still in line: claim again, keeping your place. No hive tool listed: go on, as step 4 still protects the merge.
 2. **Merge the base into the branch, note its commit** (`git rev-parse <base>`) **and run the checks** the combined change needs. Merge it into the branch, not the branch into the base with `--no-commit`: a failure is then fixed on the branch, and the base's checkout is never left mid-merge where others work. While you hold the slot nobody merges into the base through Hive, so one run is enough. The hold lasts 60 minutes: claim again to extend it.
 3. **If something fails**, release the slot (`release`) before fixing it, and claim it again once ready.
 4. **Just before merging, compare** the base's commit with the one you noted (moved anyway: who-merges.md).
