@@ -52,11 +52,16 @@ describe('npm run check:repo', () => {
     expect(whole.filter((f) => byName.includes(f))).toEqual([])
   })
 
-  it('each part of the name pattern matches a describe or test there is', () => {
-    const titles = byName.flatMap((f) => [...readFileSync(join(root, f), 'utf8').matchAll(/\b(?:describe|it)(?:\.\w+(?:\([^)]*\))?)?\((['"])(.*?)\1/g)].map((m) => m[2]))
+  // Vitest matches the pattern against each level's name on its own (a describe's, a test's), never the two joined, so
+  // a part spanning both matches nothing: each part must match one title, and each file named must have a match.
+  it('each part of the name pattern matches a describe or test there is, and each file named has one', () => {
+    const titles = new Map(byName.map((f) => [f, [...readFileSync(join(root, f), 'utf8').matchAll(/\b(?:describe|it)(?:\.\w+(?:\([^)]*\))?)?\((['"])(.*?)\1/g)].map((m) => m[2])]))
+    const all = [...titles.values()].flat()
     const parts = alternatives(shape?.[3] ?? '')
     expect(parts.length).toBeGreaterThan(1)
-    expect(parts.filter((p) => !titles.some((t) => new RegExp(p).test(t)))).toEqual([])
+    expect(parts.filter((p) => !all.some((t) => new RegExp(p).test(t)))).toEqual([])
+    const pattern = new RegExp(shape?.[3] ?? '^$')
+    expect(byName.filter((f) => !titles.get(f)!.some((t) => pattern.test(t)))).toEqual([])
   })
 
   it('includes each test that scans the whole repository (a UNIT_SCANS entry with no paths)', () => {
