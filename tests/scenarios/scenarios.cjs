@@ -2384,6 +2384,11 @@ module.exports.SCENARIOS = [
     id: 'card-loop-submit-watch',
     title: "A card loop builder submits and ends its turn (#1639): Hive watches the card for it, with no watch call of its own, so its lane isn't stalled, and the verdict wakes it",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    // HI-2215: Hive starts the lane's first card on Coder itself (HI-2029, laneStarts) once builderLane has stopped it, and
+    // starts it with its line: the harness's own start raced that one (on Codex, refused as "already running or
+    // starting"). The prompt below is a model's only as the line says it; the fake is typed its steps after it, the card
+    // already in Doing.
+    startedByHive: true,
     async setup(c) {
       await pairInProject(c)
       const a = await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>" instead of "Hello, <name>".', agent: 'coder' })
@@ -2411,7 +2416,7 @@ module.exports.SCENARIOS = [
     // Its wake comes at once (a watch's settle): at most 40 s, within a fake's minute.
     keepWaiting: async (c) => !!c.verdictAt && !c.woke && Date.now() - c.verdictAt < 40000,
     prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Do the card and hand it to your reviewer as your loop says.`,
-    fake: (c) => `skill card-loop then ${fakeStart(c.cards.a)} then ${fakeSubmit(c.cards.a, 'Ready for review: greet.js says Hi.')}`,
+    fake: (c) => `skill card-loop then ${fakeSubmit(c.cards.a, 'Ready for review: greet.js says Hi.')}`,
     expect: (o, c) => {
       const w = c.watchAtEnd
       return [
