@@ -373,9 +373,18 @@ function resultsHeld(folder, alive = processAlive) {
 }
 
 /**
- * Keeps the newest `keep` run folders in `dir` (named by time), removing older ones. Never one a card cites (spare) or
- * one a runner still writes into (resultsHeld, HI-2234: another lane's fake runs starting every few minutes pushed a
- * two-hour model run's folder out from under it); neither counts towards `keep`.
+ * Which kind of run a results folder (`<time>-<provider>[-n]`) holds: 'fake' for the fake providers (fake, fake-codex,
+ * fake-copilot: free, run every few minutes), else 'model' (a model trial, which costs money).
+ */
+function resultsKind(name) {
+  return /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-fake(?:-|$)/.test(name) ? 'fake' : 'model'
+}
+
+/**
+ * Keeps the newest `keep` run folders of each kind (resultsKind) in `dir` (named by time), removing older ones: fake
+ * runs and model trials are counted apart, so fake runs never push a paid trial's results out (HI-2236). Never one a
+ * card cites (spare) or one a runner still writes into (resultsHeld, HI-2234: another lane's fake runs starting every
+ * few minutes pushed a two-hour model run's folder out from under it); neither counts towards `keep`.
  */
 function pruneResults(dir, keep = LIMITS.resultsKept, spare = () => null, alive = processAlive) {
   if (!fs.existsSync(dir)) return
@@ -384,7 +393,10 @@ function pruneResults(dir, keep = LIMITS.resultsKept, spare = () => null, alive 
     .filter((d) => d.isDirectory() && /^\d{4}-\d\d-\d\dT/.test(d.name) && !spare(path.join(dir, d.name)) && !resultsHeld(path.join(dir, d.name), alive))
     .map((d) => d.name)
     .sort()
-  for (const old of runs.slice(0, Math.max(0, runs.length - keep))) fs.rmSync(path.join(dir, old), { recursive: true, force: true })
+  for (const kind of ['fake', 'model']) {
+    const ofKind = runs.filter((n) => resultsKind(n) === kind)
+    for (const old of ofKind.slice(0, Math.max(0, ofKind.length - keep))) fs.rmSync(path.join(dir, old), { recursive: true, force: true })
+  }
 }
 
 /**
@@ -524,4 +536,4 @@ function spendText(meta) {
   return meta.unknownCostTrials ? `${known} reported, plus ${meta.unknownCostTrials} trial${meta.unknownCostTrials === 1 ? '' : 's'} with no reported cost: the total is unknown` : `${known} (API-equivalent)`
 }
 
-module.exports = { SCHEMA, LIMITS, benchmarkOf, sampleOf, pruneResults, resultsHeld, saveBaseline, resultsFolder, releaseResults, writeResults, WRITE_ATTEMPTS, measuresOf, metricsTotals, parseBudget, budgetGate, spendText }
+module.exports = { SCHEMA, LIMITS, benchmarkOf, sampleOf, pruneResults, resultsHeld, resultsKind, saveBaseline, resultsFolder, releaseResults, writeResults, WRITE_ATTEMPTS, measuresOf, metricsTotals, parseBudget, budgetGate, spendText }

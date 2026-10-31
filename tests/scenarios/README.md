@@ -305,8 +305,9 @@ spread to judge a change by: use `--repeat N` for model trials.
 - **Baselines**: `--save-baseline NAME` copies the run's `benchmark.json` to `scenarios/baselines/NAME.json`: the new
   one is read first and swapped in atomically, and an existing baseline of that name is archived as
   `NAME.<its time>.json` (`-2`, `-3`… if that name is taken), never overwritten; the 5 newest archives are kept. Each run
-  gets a results folder of its own; the newest 30 are kept, besides those a card cites and those a run still writes
-  into. Nothing is invented for a run that wasn't recorded.
+  gets a results folder of its own; the newest 30 fake runs (`fake`, `fake-codex`, `fake-copilot`) and, counted apart,
+  the newest 30 model trials are kept (HI-2236: fake runs never push a paid trial's results out), besides those a card
+  cites and those a run still writes into. Nothing is invented for a run that wasn't recorded.
 - `tests/fixtures/benchmarks` holds a baseline from a real fake run, an intentional reduction of it and the same
   reduction that broke `card-detail`. `tests/benchmark.test.ts` checks that the first is "smaller, still correct" and the
   second "smaller but failing".

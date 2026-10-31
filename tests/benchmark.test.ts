@@ -544,12 +544,41 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
       expect(left).toHaveLength(30)
       expect(left[0]).toBe('2026-10-31T14-27-32-codex')
       expect(left).not.toContain('2026-10-31T14-28-00-fake')
-      // Let go (the run ended), it goes by age like any other.
+      // Let go (the run ended), it counts with the model trials (HI-2236): the only one, so it stays.
       releaseResults(running)
       expect(resultsHeld(running, alive)).toBe(false)
       pruneResults(dir, 29, () => null, alive)
-      expect(readdirSync(dir)).not.toContain('2026-10-31T14-27-32-codex')
-      expect(readdirSync(dir)).toHaveLength(29)
+      expect(readdirSync(dir)).toContain('2026-10-31T14-27-32-codex')
+      expect(readdirSync(dir)).toHaveLength(30)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the newest fake runs and, counted apart, the newest model trials: fake runs never push a paid one out (HI-2236)', () => {
+    const { resultsKind } = require_('./scenarios/benchmark.cjs')
+    expect(['fake', 'fake-codex', 'fake-copilot', 'fake-2', 'fake-codex-3'].map((p) => resultsKind(`2026-10-31T14-27-32-${p}`))).toEqual(['fake', 'fake', 'fake', 'fake', 'fake'])
+    expect(['codex', 'claude-code', 'copilot', 'codex-2'].map((p) => resultsKind(`2026-10-31T14-27-32-${p}`))).toEqual(['model', 'model', 'model', 'model'])
+    const dir = tempDir('hive-results-kinds-')
+    try {
+      const at = (h: number, m: number) => `2026-10-31T${String(h).padStart(2, '0')}-${String(m).padStart(2, '0')}-00`
+      // A finished model trial, then 40 fake runs of each fake provider in turn after it.
+      mkdirSync(join(dir, `${at(14, 27)}-codex`))
+      const fakes = ['fake', 'fake-codex', 'fake-copilot']
+      for (let i = 0; i < 40; i++) mkdirSync(join(dir, `${at(15 + Math.floor(i / 60), i % 60)}-${fakes[i % 3]}`))
+      pruneResults(dir)
+      const left = readdirSync(dir).sort()
+      expect(left).toContain(`${at(14, 27)}-codex`)
+      expect(left.filter((n) => resultsKind(n) === 'fake')).toEqual(left.filter((n) => n.includes('-fake')).slice(-LIMITS.resultsKept))
+      expect(left).toHaveLength(LIMITS.resultsKept + 1)
+      // Model trials beyond their own 30 go oldest first, the fake runs untouched.
+      for (let i = 0; i < 32; i++) mkdirSync(join(dir, `${at(16 + Math.floor(i / 60), i % 60)}-${i % 2 ? 'claude-code' : 'codex'}`))
+      pruneResults(dir)
+      const after = readdirSync(dir).sort()
+      const models = after.filter((n) => resultsKind(n) === 'model')
+      expect(models).toHaveLength(LIMITS.resultsKept)
+      expect(models[0]).toBe(`${at(16, 2)}-codex`)
+      expect(after.filter((n) => resultsKind(n) === 'fake')).toEqual(left.filter((n) => resultsKind(n) === 'fake'))
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
