@@ -151,6 +151,7 @@
   "sessions.tool.empty": "(puste)",
   "sessions.tool.error": "Błąd",
   "sessions.tool.errorBadge": "błąd",
+  "sessions.tool.exitCode": "kod wyjścia {code}",
   "sessions.tool.input": "Wejście",
   "sessions.tool.loadFailed": "Nie udało się wczytać wywołania narzędzia",
   "sessions.tool.noResult": "brak wyniku",

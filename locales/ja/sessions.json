@@ -151,6 +151,7 @@
   "sessions.tool.empty": "（空）",
   "sessions.tool.error": "エラー",
   "sessions.tool.errorBadge": "エラー",
+  "sessions.tool.exitCode": "終了コード {code}",
   "sessions.tool.input": "入力",
   "sessions.tool.loadFailed": "ツール呼び出しを読み込めませんでした",
   "sessions.tool.noResult": "結果なし",

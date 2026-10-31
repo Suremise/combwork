@@ -153,6 +153,7 @@ interface HiveMessageValues {
   'sessions.tool.empty': undefined
   'sessions.tool.error': undefined
   'sessions.tool.errorBadge': undefined
+  'sessions.tool.exitCode': { code: string | number }
   'sessions.tool.input': undefined
   'sessions.tool.loadFailed': undefined
   'sessions.tool.noResult': undefined

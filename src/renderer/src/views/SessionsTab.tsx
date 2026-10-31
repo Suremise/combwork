@@ -1309,6 +1309,9 @@ const TOOL_ICON: Record<string, string> = { Bash: 'terminal', PowerShell: 'termi
 
 const NO_CALLS_OPEN: ReadonlySet<number> = new Set()
 
+/** A command's exit code, as a badge says it (HI-2240: a Codex script's command). */
+const exitCodeText = (code: number): string => tr(msg({ id: 'sessions.tool.exitCode', defaultMessage: 'exit code {code}', description: "A badge on a command a Codex script ran, in a transcript (HI-2240): the exit code it ended with ({code}: a number such as 0 or 1, shown as it is). Lower case; keep it short." }), { code: String(code) })
+
 /** What kind of call a Codex script's call is, as its line counts it (HI-2240): an MCP server's (by server), or Hive's name for it. */
 const callKind = (c: TranscriptTool): string => (c.name.includes(' · ') ? `mcp:${c.name.split(' · ')[0]}` : c.name === 'Shell' ? 'command' : c.name === 'Edit' ? 'edit' : c.name === 'view_image' ? 'image' : 'other')
 
@@ -1358,7 +1361,7 @@ function ToolCall({ id, tool, open, toggle, project, sessionId, onImage, nested 
       icon={TOOL_ICON[tool.name] ?? (tool.name.includes(' · ') ? 'plug' : 'tools')}
       label={tool.name}
       detail={tool.calls?.length ? callsSummary(tool.calls) : tool.summary}
-      badge={tool.isError ? <span className="badge error">{tr(msg({ id: 'sessions.tool.errorBadge', defaultMessage: 'error', description: 'A badge on a tool call in a transcript that failed. Lower case; keep it short.' }))}</span> : tool.result === null ? <span className="badge">{tr(msg({ id: 'sessions.tool.noResult', defaultMessage: 'no result', description: 'A badge on a tool call in a transcript that has no result (yet). Lower case; keep it short.' }))}</span> : null}
+      badge={tool.exitCode !== undefined && tool.exitCode !== 0 ? <span className="badge error">{exitCodeText(tool.exitCode)}</span> : tool.isError ? <span className="badge error">{tr(msg({ id: 'sessions.tool.errorBadge', defaultMessage: 'error', description: 'A badge on a tool call in a transcript that failed. Lower case; keep it short.' }))}</span> : tool.result === null ? <span className="badge">{tr(msg({ id: 'sessions.tool.noResult', defaultMessage: 'no result', description: 'A badge on a tool call in a transcript that has no result (yet). Lower case; keep it short.' }))}</span> : null}
       className="tx-tool"
     >
       {calls.length > 0 && (
@@ -1376,6 +1379,7 @@ function ToolCall({ id, tool, open, toggle, project, sessionId, onImage, nested 
         <>
           <div className="tx-io-label">
             {t.isError ? tr(msg({ id: 'sessions.tool.error', defaultMessage: 'Error', description: "Label above a failed tool call's result in a transcript." })) : tr(msg({ id: 'sessions.tool.result', defaultMessage: 'Result', description: "Label above a tool call's result in a transcript." }))} <CopyButton text={t.result} title={tr(msg({ id: 'sessions.tool.copyResult', defaultMessage: 'Copy Result', description: "Tooltip: copies a tool call's result." }))} />
+            {t.exitCode !== undefined && <span className={cx('badge', t.exitCode !== 0 && 'error')}>{exitCodeText(t.exitCode)}</span>}
           </div>
           <div className={cx('tx-pre', 'tx-result', t.isError && 'error')}>{t.result || <span className="faint">{tr(msg({ id: 'sessions.tool.empty', defaultMessage: '(empty)', description: "A tool call's result when it is empty." }))}</span>}</div>
         </>

@@ -52,7 +52,7 @@ export function scriptCall(item: Record<string, any>, root: string | null): Tran
       const cmd = commandText(item.command)
       const code = typeof item.exit_code === 'number' ? item.exit_code : null
       const done = item.status === 'completed' || item.status === 'failed' || code !== null
-      return { ...base, name: 'Shell', summary: firstLine(cmd).slice(0, 200), input: cmd, result: done ? String(item.aggregated_output ?? '') : null, isError: item.status === 'failed' || (code !== null && code !== 0) } // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+      return { ...base, name: 'Shell', summary: firstLine(cmd).slice(0, 200), input: cmd, result: done ? String(item.aggregated_output ?? '') : null, isError: item.status === 'failed' || (code !== null && code !== 0), ...(code !== null ? { exitCode: code } : {}) } // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
     }
     case 'FileChange': {
       const files = Object.keys(item.changes ?? {}).map((f) => shortPath(f, root))

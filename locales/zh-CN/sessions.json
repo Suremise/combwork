@@ -151,6 +151,7 @@
   "sessions.tool.empty": "（空）",
   "sessions.tool.error": "错误",
   "sessions.tool.errorBadge": "错误",
+  "sessions.tool.exitCode": "退出码 {code}",
   "sessions.tool.input": "输入",
   "sessions.tool.loadFailed": "无法加载工具调用",
   "sessions.tool.noResult": "无结果",

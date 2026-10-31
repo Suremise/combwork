@@ -2,6 +2,7 @@ import { readFileSync as readText } from 'fs'
 import { join as joinPath } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import { codexMcpServer, hookHash, toToml } from '../src/main/providers/codex/adapter'
+import { scriptCall } from '../src/main/providers/codex/scriptCalls'
 import { CodexConversationParser, parseRollout, patchPaths, presetFromSettings, rolloutDetails, rolloutPlanUsage } from '../src/main/providers/codex/rollout'
 import { codexModelLabel } from '../src/shared/codex'
 import { tempDir } from './tempDir'
@@ -372,7 +373,7 @@ describe("a Codex code-mode script's calls (HI-2240)", () => {
       exec('s2', 'text(await tools.mcp__hive__hive_read_task({number: 1}))'),
       done({ type: 'McpToolCall', id: 'exec-2', server: 'hive', tool: 'hive_read_task', arguments: { number: 1 }, status: 'failed', error: { message: 'No such card' } }),
       done({ type: 'AgentMessage', id: 'm1', content: [] }),
-      // A command left running ends after its script, in the next one's place: still the latest script's.
+      // Recorded with no start time, while a script runs (none of these has ended): that script's.
       done({ type: 'CommandExecution', id: 'exec-3', command: ['pwsh', '-Command', 'npm test'], status: 'failed', exit_code: 1, aggregated_output: 'failed' })
     ].join('\n') + '\n'
     const [edit, direct, script] = parsed(text)
@@ -388,6 +389,50 @@ describe("a Codex code-mode script's calls (HI-2240)", () => {
     const plain = { toolUseId: 'x', name: 'Shell', summary: 'ls', input: 'ls', result: '', isError: false, images: [] }
     expect(callsMade(plain)).toEqual([plain])
     expect(callsMade({ ...plain, name: 'Script', calls: [] })).toEqual([{ ...plain, name: 'Script', calls: [] }])
+  })
+
+  it("a command left running is the script's that started it, ending in a later script or turn (HR1's round 1)", () => {
+    // Recorded by Codex 0.166.0 in a scenario run (the Codex test home): script call_da8eb… starts `npm test` through
+    // hive-progress (started_at 15:59:51.791) and returns while it runs; it ends at 16:00:59, during call_a4ddc….
+    const real = parsed(require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'codex-0.166.0-delayed-command.jsonl'), 'utf8'))
+    const byId = (id: string) => real.find((t) => t.toolUseId === id)!
+    const delayed = 'exec-c26e1c16-34dd-4b62-88cc-5917b9fbe5f0'
+    expect(byId('call_da8eb3602bf54aecafa0eaac8888c3d6').calls?.map((c) => c.toolUseId)).toEqual([delayed])
+    expect(byId('call_a4ddc8c7c6f845ce86c5f635d67d63bf').calls?.map((c) => c.toolUseId)).toEqual(['exec-05089406-c6ce-414c-a22c-34b2bf160930'])
+    // Every call is in exactly one script.
+    const ids = real.flatMap((t) => t.calls ?? []).map((c) => c.toolUseId)
+    expect(new Set(ids).size).toBe(ids.length)
+
+    // The same across a turn's end, and a call whose script isn't known is in none (never the latest by default).
+    const at = (ms: number) => new Date(Date.UTC(2026, 9, 31, 12, 0, 0) + ms).toISOString()
+    const rec = (ms: number, payload: Record<string, unknown>, type = 'response_item') => line({ timestamp: at(ms), type, payload })
+    const exec = (ms: number, id: string) => rec(ms, { type: 'custom_tool_call', name: 'exec', call_id: id, input: `text(${id})` })
+    const out = (ms: number, id: string) => rec(ms, { type: 'custom_tool_call_output', call_id: id, output: 'Script completed' })
+    const cmd = (ms: number, startedMs: number | null, id: string) => rec(ms, { type: 'item_completed', item: { type: 'CommandExecution', id, command: ['pwsh', '-Command', id], status: 'completed', exit_code: 0, aggregated_output: '' }, ...(startedMs !== null ? { started_at_ms: Date.parse(at(startedMs)) } : {}) }, 'event_msg')
+    const text = [
+      exec(0, 'a'), out(1000, 'a'),
+      rec(2000, { type: 'task_complete' }, 'event_msg'), rec(3000, { type: 'task_started' }, 'event_msg'),
+      exec(4000, 'b'),
+      cmd(4500, 500, 'started-in-a'),
+      cmd(4600, 4200, 'started-in-b'),
+      cmd(4700, 1500, 'started-between'),
+      out(5000, 'b'),
+      cmd(6000, null, 'no-start-no-script')
+    ].join('\n') + '\n'
+    const [a, b] = parsed(text)
+    expect(a.calls?.map((c) => c.toolUseId)).toEqual(['started-in-a'])
+    expect(b.calls?.map((c) => c.toolUseId)).toEqual(['started-in-b'])
+  })
+
+  it("keeps a command's exit code (0 or not); one still running has none and no result", () => {
+    const cmd = (item: Record<string, unknown>) => scriptCall({ type: 'CommandExecution', id: 'x', command: ['pwsh', '-Command', 'my-checker'], aggregated_output: 'Check failed', ...item }, null)
+    expect(cmd({ status: 'failed', exit_code: 37 })).toMatchObject({ name: 'Shell', input: 'my-checker', result: 'Check failed', isError: true, exitCode: 37 })
+    expect(cmd({ status: 'completed', exit_code: 0, aggregated_output: 'ok' })).toMatchObject({ result: 'ok', isError: false, exitCode: 0 })
+    const running = cmd({ status: 'in_progress' })
+    expect(running).toMatchObject({ result: null, isError: false })
+    expect(running).not.toHaveProperty('exitCode')
+    // The fixture's `echo hello` ended with 0.
+    expect(parsed(fixture())[0].calls?.[0].exitCode).toBe(0)
   })
 
   it('0.159 records them too; a script whose calls none records has none', () => {

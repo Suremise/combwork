@@ -3245,6 +3245,8 @@ export interface TranscriptTool {
    * call made directly is. Absent for any other tool, and for a script whose Codex records none.
    */
   calls?: TranscriptTool[]
+  /** A command's exit code, once it has ended with one (a Codex script's command, HI-2240). */
+  exitCode?: number
 }
 
 export interface TranscriptImageRef {

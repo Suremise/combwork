@@ -151,6 +151,7 @@
   "sessions.tool.empty": "(vide)",
   "sessions.tool.error": "Erreur",
   "sessions.tool.errorBadge": "erreur",
+  "sessions.tool.exitCode": "code de sortie {code}",
   "sessions.tool.input": "Entrée",
   "sessions.tool.loadFailed": "Impossible de charger l’appel d’outil",
   "sessions.tool.noResult": "aucun résultat",

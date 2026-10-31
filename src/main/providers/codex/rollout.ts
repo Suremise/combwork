@@ -341,10 +341,12 @@ export class CodexConversationParser implements ConversationParserLike {
   private tools = new Map<string, TranscriptTool>()
   private root: string | null
   /**
-   * The latest code-mode script (HI-2240): the calls Codex records as they end are its, whether inside its run or later,
-   * from a command it left running. With its code, when it was shown as the Edit of the patch it applies.
+   * The code-mode scripts (HI-2240), in order: each with when it ran (its call's record, then its output's: in epoch
+   * ms; end null while it runs), and its code while it is shown as the Edit of the patch it applies. A call Codex
+   * records as it ends is the script's it started in (HR1's round 1: a command left running ends in a later script).
    */
-  private script: { tool: TranscriptTool; code: string | null } | null = null
+  private scripts: { tool: TranscriptTool; code: string | null; start: number; end: number | null }[] = []
+  private scriptById = new Map<string, (typeof this.scripts)[number]>()
 
   constructor(projectPath: string | null = null) {
     this.root = projectPath
@@ -371,13 +373,32 @@ export class CodexConversationParser implements ConversationParserLike {
   }
 
   /**
-   * A call Codex recorded as it ended (HI-2240), added to the latest script's `calls`. A direct call recorded as an item
-   * too (its id the call's own) is shown already; one before any script has none to go in. A script shown as the Edit of
-   * the patch it applies that did more is shown as the Script it is.
+   * The script a call that started at `startedAt` (epoch ms, Codex's `started_at_ms`) ran in: the last one started by
+   * then, if it hadn't ended (HR1's round 1: never just the latest; a command left running ends in a later script).
+   * Without a start, only a script running now (a call recorded as it ends, inside its run). Null: not known.
    */
-  private scriptCall(item: Record<string, any>): void {
-    const s = this.script
-    if (!s || this.tools.has(String(item.id ?? ''))) return
+  private scriptOf(startedAt: number | null): (typeof this.scripts)[number] | null {
+    if (startedAt === null) {
+      const last = this.scripts.at(-1)
+      return last && last.end === null ? last : null
+    }
+    for (let i = this.scripts.length - 1; i >= 0; i--) {
+      const s = this.scripts[i]
+      if (!(s.start <= startedAt)) continue
+      return s.end === null || startedAt <= s.end ? s : null
+    }
+    return null
+  }
+
+  /**
+   * A call Codex recorded as it ended (HI-2240), added to the `calls` of the script it started in. A direct call recorded
+   * as an item too (its id the call's own) is shown already; one whose script isn't known is in none (never guessed). A
+   * script shown as the Edit of the patch it applies that did more is shown as the Script it is.
+   */
+  private scriptCall(item: Record<string, any>, startedAt: number | null): void {
+    if (this.tools.has(String(item.id ?? ''))) return
+    const s = this.scriptOf(startedAt)
+    if (!s) return
     const call = scriptCall(item, this.root)
     if (!call) return
     const calls = (s.tool.calls ??= [])
@@ -442,13 +463,20 @@ export class CodexConversationParser implements ConversationParserLike {
           if (patch !== null) {
             this.tool(String(p.call_id ?? ''), 'Edit', patch, patchPaths(patch).map((f) => shortPath(f, this.root)).join(', ').slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
           } else this.tool(String(p.call_id ?? ''), name === 'exec' ? 'Script' : name, input, firstLine(input).slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-          if (name === 'exec') this.script = { tool: this.tools.get(String(p.call_id ?? ''))!, code: scripted !== null ? input : null }
+          if (name === 'exec') {
+            const script = { tool: this.tools.get(String(p.call_id ?? ''))!, code: scripted !== null ? input : null, start: ts ? Date.parse(ts) : NaN, end: null }
+            this.scripts.push(script)
+            this.scriptById.set(String(p.call_id ?? ''), script)
+          }
           break
         }
         case 'function_call_output':
         case 'custom_tool_call_output': {
           const tool = this.tools.get(String(p.call_id ?? ''))
           if (!tool) break
+          // A script's run ends with its output (HI-2240): a call started after it is another's.
+          const script = this.scriptById.get(String(p.call_id ?? ''))
+          if (script) script.end = ts ? Date.parse(ts) : script.start
           const out =
             typeof p.output === 'string'
               ? p.output
@@ -471,7 +499,7 @@ export class CodexConversationParser implements ConversationParserLike {
       const summary = typeof p.message === 'string' ? p.message : null
       this.push({ kind: 'compaction', timestamp: ts, trigger: 'auto', preTokens: 0, postTokens: 0, nextRequestTokens: null, summary })
     } else if (r.type === 'event_msg') {
-      if (p.type === 'item_completed' && p.item && typeof p.item === 'object') this.scriptCall(p.item)
+      if (p.type === 'item_completed' && p.item && typeof p.item === 'object') this.scriptCall(p.item, typeof p.started_at_ms === 'number' ? p.started_at_ms : null)
       else if (p.type === 'turn_aborted') this.push({ ...noticeOf(p.reason === 'interrupted' ? NOTICE_TEXT.interrupted : p.reason ? { m: NOTICE_TEXT.turnEnded, values: { reason: String(p.reason) } } : NOTICE_TEXT.aborted, 'info'), timestamp: ts })
       else if (p.type === 'error' && typeof p.message === 'string') this.push({ kind: 'notice', timestamp: ts, text: p.message, level: 'error' })
     }

@@ -607,6 +607,10 @@
     "defaultMessage": "error",
     "description": "A badge on a tool call in a transcript that failed. Lower case; keep it short."
   },
+  "sessions.tool.exitCode": {
+    "defaultMessage": "exit code {code}",
+    "description": "A badge on a command a Codex script ran, in a transcript (HI-2240): the exit code it ended with ({code}: a number such as 0 or 1, shown as it is). Lower case; keep it short."
+  },
   "sessions.tool.input": {
     "defaultMessage": "Input",
     "description": "Label above a tool call's input in a transcript."

@@ -151,6 +151,7 @@
   "sessions.tool.empty": "(leer)",
   "sessions.tool.error": "Fehler",
   "sessions.tool.errorBadge": "Fehler",
+  "sessions.tool.exitCode": "Exitcode {code}",
   "sessions.tool.input": "Eingabe",
   "sessions.tool.loadFailed": "Der Tool-Aufruf konnte nicht geladen werden",
   "sessions.tool.noResult": "kein Ergebnis",
