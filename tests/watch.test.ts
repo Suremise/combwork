@@ -1294,6 +1294,69 @@ describe('watches (main/watches.ts)', async () => {
     }
   })
 
+  it("HI-2197: an old watch that can't be ended stops the start: nothing launched, the watch and its wake kept for the next try, the start's reservation released", async () => {
+    const { w, path, alpha } = await open()
+    const st = fake(alpha)
+    const takes = sessions.sendPrompt
+    // Its wake typed but never taken (HB3's: its input blocked), so the wake stays offered.
+    Object.assign(sessions, {
+      sendPrompt: async (_p: string, _id: string, text: string, guard?: () => void) => {
+        guard?.()
+        st.typed.push(text)
+        st.status = 'finished'
+      }
+    })
+    writer.testHooks.takeMs = 20
+    const s = sessions as unknown as { startReserved: unknown; conversationEnds: (p: string, id: string) => Promise<void> }
+    const was = { startReserved: s.startReserved, conversationEnds: s.conversationEnds }
+    const launched: string[] = []
+    s.conversationEnds = watches.endConversationWatch
+    s.startReserved = async (_p: string, id: string) => (launched.push(id), { agentId: id } as never)
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'Old card', project: 'alpha', column: 'passed' }, user))
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'] })
+    // Its watch can't be saved without it (a full disk, a locked database).
+    storeTestHooks.failSave = (store) => store === 'watches'
+    try {
+      await expect(inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', prompt: 'Your next card' }))).rejects.toThrow(/Could not end the watch \(its conversation ended\)/)
+      expect(launched).toEqual([])
+      expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([c.number])
+      expect(savedOf(path)).toHaveLength(1)
+      expect(sessions.pendingStart(alpha, 'a1')).toBeFalsy()
+      // Its cancel failing too (the inbox's save): the start fails, and nothing launches.
+      storeTestHooks.failSave = null
+      watches.testHooks.beforeWakeCancel = async () => {
+        throw new Error('the inbox could not be saved')
+      }
+      await watches.cancelWatch(w, alpha, 'a1')
+      await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'] })
+      await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'done' }, user))
+      await evaluated(w)
+      const wake = savedOf(path)[0]?.fired?.delivery as string
+      expect(wake).toMatch(/^m\d+$/)
+      await expect(inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', prompt: 'Your next card' }))).rejects.toThrow(/inbox could not be saved/)
+      expect(launched).toEqual([])
+      expect((await deliveries.deliveriesOf(alpha, 'a1')).find((r) => r.id === wake)?.state).toBe('offered')
+      // The watch put back, so the next try ends both.
+      expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([c.number])
+      expect(savedOf(path)[0]?.fired?.delivery).toBe(wake)
+      expect(sessions.pendingStart(alpha, 'a1')).toBeFalsy()
+      // Released: the next start, once nothing fails, ends the watch and cancels its wake, then goes ahead.
+      watches.testHooks.beforeWakeCancel = undefined
+      await inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', prompt: 'Your next card' }))
+      expect(launched).toEqual(['a1'])
+      expect(watches.watchFor(alpha, 'a1')).toBeNull()
+      expect((await deliveries.deliveriesOf(alpha, 'a1')).find((r) => r.id === wake)?.state).toBe('cancelled')
+    } finally {
+      storeTestHooks.failSave = null
+      watches.testHooks.beforeWakeCancel = undefined
+      Object.assign(s, was)
+      Object.assign(sessions, { sendPrompt: takes })
+      writer.testHooks.takeMs = undefined
+      await writer.settled()
+      await disposeWorkspaceService(w)
+    }
+  })
+
   it("HI-2153: Archive All counts a watch on a card in work as someone on it, never a stale one on a card in Done", async () => {
     const { w, alpha } = await open()
     const { cardBusy } = await import('../src/main/cardBusy')

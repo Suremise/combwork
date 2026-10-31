@@ -969,8 +969,19 @@ export async function endWatchOf(projectPath: string, agentId: string, why: stri
   log.info(`${userText(agentId)}'s watch ended: ${why}`)
   sessions.watchChanged(projectPath, agentId)
   if (rec.fired?.delivery) {
-    await testHooks.beforeWakeCancel?.()
-    await cancelFromSource(rec.projectPath, 'watch', wakeRef(rec), `cancelled: ${why}`)
+    try {
+      await testHooks.beforeWakeCancel?.()
+      await cancelFromSource(rec.projectPath, 'watch', wakeRef(rec), `cancelled: ${why}`)
+    } catch (e) {
+      // Its wake not cancelled: the watch is put back (unless the agent has another by now), so the next try ends both.
+      await locked(store, async () => {
+        if (recordOf(store, projectPath, agentId)) return
+        store.list = [...store.list, rec]
+        await saveQuietly(store)
+      })
+      sessions.watchChanged(projectPath, agentId)
+      throw new Error(`Could not cancel the wake of the watch (${why}): ${(e as Error).message}`, { cause: e })
+    }
   }
   return infoOf(rec).label
 }
