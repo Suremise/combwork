@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync, readdirSync, rmSync } from 'original-fs'
+import { existsSync, mkdirSync, readdirSync, rmSync } from 'original-fs'
 import { basename, dirname, join } from 'path'
 import { timedStep } from './stallWork'
 
@@ -86,6 +86,53 @@ export const OPEN_IO_RETRY_MS = [50, 100, 200, 400, 800]
 
 /** SQLite's I/O errors (SQLITE_IOERR, 10, and its extended codes): `errcode` on node:sqlite's errors. */
 export const isIoError = (e: unknown): boolean => ((e as { errcode?: unknown } | null)?.errcode as number) % 256 === 10
+
+/** How long a file left by a Hive that ended without quitting is waited for, before it is opened anyway (HI-2199). */
+export const OPENABLE_WAIT_MS = 20_000
+const OPENABLE_POLL_MS = 100
+
+/**
+ * Waits, without holding main's thread, until a WAL database left as a Hive that ended without quitting left it can be opened
+ * (HI-2199): its `-shm` still there, and another process still mapping it. The first connection to such a file truncates
+ * the `-shm` (SQLite 3.53's winLockSharedMemory), which Windows refuses while any process has it mapped, so every open
+ * fails with SQLITE_IOERR_TRUNCATE (1546) until that process lets go: seen for 10 s after an e2e kill, longer than
+ * openDb's synchronous retries. Tried with a read-only connection of its own, which changes nothing in the files: done
+ * at once when there is no `-shm` (a clean close removes it) or another connection has the file (it isn't truncated
+ * then). Stops at the first other error, or at `boundMs`, leaving the open to say what is wrong, and at once when `signal`
+ * aborts (whoever waited has gone: the file isn't tried again for it). `onWait` is told once, as it starts waiting.
+ * Returns how long it waited.
+ */
+export async function untilOpenable(file: string, o: { onWait?: (error: Error) => void; boundMs?: number; signal?: AbortSignal } = {}): Promise<number> {
+  const { onWait, boundMs = OPENABLE_WAIT_MS, signal } = o
+  if (!existsSync(`${file}-shm`)) return 0
+  const started = performance.now()
+  for (let told = false; ; told = true) {
+    if (signal?.aborted) return performance.now() - started
+    try {
+      // A busy file isn't waited for here (the open's own busy wait has it).
+      const probe = new DatabaseSync(file, { readOnly: true, timeout: 100 })
+      try {
+        probe.prepare('SELECT count(*) FROM sqlite_master').get()
+      } finally {
+        probe.close()
+      }
+      return performance.now() - started
+    } catch (e) {
+      const waited = performance.now() - started
+      if (!isIoError(e) || waited >= boundMs) return waited
+      if (!told) onWait?.(e as Error)
+      await new Promise<void>((r) => {
+        const done = (): void => {
+          clearTimeout(t)
+          signal?.removeEventListener('abort', done)
+          r()
+        }
+        const t = setTimeout(done, OPENABLE_POLL_MS)
+        signal?.addEventListener('abort', done, { once: true })
+      })
+    }
+  }
+}
 
 /** An open database: a writer and a reader connection to one file. */
 export interface Db {

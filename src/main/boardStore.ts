@@ -13,7 +13,7 @@ import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
-import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, schemaVersion, soleCopy, type Db, type Migration, type PendingGroup } from './db'
+import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { beginWrite, countedWrite } from './dbWrites'
 import { timedStep } from './stallWork'
@@ -371,7 +371,9 @@ export const boardTestHooks: {
   upgradeAnswer: 'yes' | 'no' | null
   /** Runs while the upgrade holds the file's exclusive lock, its steps committed. */
   whileUpgrading: (() => void) | null
-} = { failPut: null, refuseRename: null, upgradeAnswer: null, whileUpgrading: null }
+  /** Told as a workspace's open starts waiting for its board to be openable (HI-2199). */
+  openableWait: ((path: string) => void) | null
+} = { failPut: null, refuseRename: null, upgradeAnswer: null, whileUpgrading: null, openableWait: null }
 const keyOf = (path: string): string => path.toLowerCase()
 
 /** What the board tells the user about the import (index.ts shows it as a notice). */
@@ -710,6 +712,24 @@ function boardOf(path: string, transient = false): Board {
     log.error(`opening the board of ${userText(path)}${isIoError(e) ? ` (SQLite code ${(e as { errcode?: number }).errcode})` : ''}`, e)
     throw hiveError(M.unavailable, { error: err.message }, { kind: 'conflict' })
   }
+}
+
+/**
+ * Before a workspace's open first uses its board (HI-2199): while its file, as a Hive that ended without quitting left
+ * it, can't be opened yet (another process still maps its `-shm`), waits for that, bounded (untilOpenable), so the board
+ * opens once it can instead of failing for the rest of the session. At once for a board open already or a file closed
+ * cleanly; ended when `signal` (the open's lifetime) aborts.
+ */
+export async function untilBoardOpenable(path: string, signal: AbortSignal): Promise<void> {
+  if (boards.has(keyOf(path))) return
+  let waiting = false
+  const onWait = (e: Error): void => {
+    waiting = true
+    boardTestHooks.openableWait?.(path)
+    log.warn(`the board of ${userText(path)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its ${DB_FILE}-shm, as just after a Hive ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
+  }
+  const waited = await untilOpenable(join(path, HIVE_DIR, DB_FILE), { onWait, signal })
+  if (waiting) log.info(`the board of ${userText(path)}: ${signal.aborted ? 'its wait ended with its open' : 'openable'} after ${Math.round(waited)} ms`)
 }
 
 /**
