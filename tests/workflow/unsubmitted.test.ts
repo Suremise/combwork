@@ -37,12 +37,16 @@ async function inReview(e: Env) {
 const pair = () => (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }, { hooks }))
 const fact = (e: Env, card: { id: number }, agent = 'B1') => e.wf.unsubmitted(e.store.card(card.id), agent)
 
-/** `n` empty commits on the folder's checked-out line in one git process (fast-import), as a builder's many would be. */
-function manyCommits(folder: string, line: string, n: number): void {
+/**
+ * `n` empty commits on the folder's checked-out line in one git process (fast-import), as a builder's many would be;
+ * `trailer(i)`, the card key the i-th (from 1, oldest first) names, if any.
+ */
+function manyCommits(folder: string, line: string, n: number, trailer?: (i: number) => string | null): void {
   const from = sh(folder, 'rev-parse', 'HEAD')
   let s = ''
   for (let i = 1; i <= n; i++) {
-    const msg = `step ${i}\n`
+    const key = trailer?.(i)
+    const msg = `step ${i}\n${key ? `\nHive-Card: ${key}\n` : ''}`
     s += `commit refs/heads/${line}\ncommitter Hive Test <test@hive.invalid> ${1_800_000_000 + i} +0000\ndata ${Buffer.byteLength(msg)}\n${msg}${i === 1 ? `from ${from}\n` : ''}\n`
   }
   execFileSync('git', ['fast-import', '--quiet'], { cwd: folder, input: s, stdio: ['pipe', 'pipe', 'pipe'] })
@@ -192,6 +196,20 @@ describe('HI-2245: in the shared project folder, only the card attributed commit
     // A's own commit on the line: said, attributed by the read itself.
     commit(e.project, { 'a2.txt': 'a\n' }, 'a2', { trailer: a.key })
     expect(await fact(e, a)).toEqual({ count: 1, atLeast: false, since: a1.slice(0, 7) })
+  })
+
+  it(`past ${UNSUBMITTED_MAX} commits on the line, only the card's among those read, as a lower bound (never the line's count)`, async () => {
+    const e = shared()
+    const a = e.wf.createCard({ title: 'A' })
+    const b = e.wf.createCard({ title: 'B' })
+    moved(await e.wf.start(a.key, B1))
+    moved(await e.wf.start(b.key, B2))
+    const a1 = commit(e.project, { 'a1.txt': 'a\n' }, 'a1', { trailer: a.key })
+    await attributeFolder(e.wf)
+    moved(await e.wf.submit(a.key, B1, { summary: 'A' }))
+    // The newest 2 of 101 are A's, the rest B's.
+    manyCommits(e.project, 'main', UNSUBMITTED_MAX + 1, (i) => (i > UNSUBMITTED_MAX - 1 ? a.key : b.key))
+    expect(await fact(e, a)).toEqual({ count: 2, atLeast: true, since: a1.slice(0, 7) })
   })
 })
 
