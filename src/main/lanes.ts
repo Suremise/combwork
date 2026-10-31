@@ -960,6 +960,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const prefs = projectPreferences(ws, projectPath, ws.path ? await ws.projectConfig(projectPath).catch(() => null) : null)
   const defaults = { rounds: prefs.loopRounds, waitHours: prefs.loopWaitHours }
   const on = await enforced()
+  // The texts for the caller name cards as it may see them (HR3's HI-2169 round 1): a builder's own start is a project
+  // agent's, whose project's cards alone are named by key; another's by number, as for a card that doesn't exist.
+  const scope = s.ownBuilder ? s.project : null
   // A changed list applied now (HI-1995): its card in flight put back first; the edit below then applies the list at
   // once (between cards), bound to that lane.
   const put = s.applyNow && on ? await putBackForReorder(ws, s, builder) : null
@@ -1042,7 +1045,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     carried = just && s.brief === undefined ? just : null
     const board = await cardsNow(ws, cards)
     const done = cards.filter((n) => board.get(n)?.column === 'done')
-    if (done.length && done.length === cards.length) throw new LaneError(409, withCardNames(ws, () => `${done.map(cardRef).join(', ')} ${done.length > 1 ? 'are' : 'is'} already Done: no lane started.`)) // i18n-ignore: hive_lane's refusal (agents)
+    if (done.length && done.length === cards.length) throw new LaneError(409, withCardNames(ws, () => `${done.map(cardRef).join(', ')} ${done.length > 1 ? 'are' : 'is'} already Done: no lane started.`, scope)) // i18n-ignore: hive_lane's refusal (agents)
     leftOut = done
     const rec: LaneRecord = {
       id: newId(),
@@ -1084,13 +1087,13 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (r.replaced) laneFact(ws, r.replaced)
   if (r.did === 'started') laneFact(ws, r.rec)
   tellEnded(ws, ended)
-  const queued = queuedAfter !== null ? withCardNames(ws, () => `The list change is queued: it applies once ${cardRef(queuedAfter!)} is Done, and you are told then.`) : null // i18n-ignore: hive_lane's reply (agents)
+  const queued = queuedAfter !== null ? withCardNames(ws, () => `The list change is queued: it applies once ${cardRef(queuedAfter!)} is Done, and you are told then.`, scope) : null // i18n-ignore: hive_lane's reply (agents)
   // The builder told of a reorder applied now, once its list is saved (HI-1995).
   if (put) await tellReordered(ws, r.rec, put, s.by)
   const applied = put ? `Applied now: ${put.putBack} is back in Todo (its work stays on ${put.line ?? 'its branch'}); the lane's cards are now in this order, and ${builder.name} is told.` : null // i18n-ignore: hive_lane's reply (agents)
   const carriedText = carriedNote(builder.name, carried, s.name != null)
-  const gone = leftOut.length ? withCardNames(ws, () => `${leftOut.map(cardRef).join(', ')} ${leftOut.length > 1 ? 'are' : 'is'} already Done: left out.`) : null // i18n-ignore: hive_lane's reply (agents)
-  const stays = kept.length ? withCardNames(ws, () => `${kept.map(cardRef).join(', ')} ${kept.length > 1 ? 'stay' : 'stays'} on the lane, after the cards you listed: a builder's own hive_lane start adds or reorders cards, never takes one off (the Assistant or the user does).`) : null // i18n-ignore: hive_lane's reply (agents)
+  const gone = leftOut.length ? withCardNames(ws, () => `${leftOut.map(cardRef).join(', ')} ${leftOut.length > 1 ? 'are' : 'is'} already Done: left out.`, scope) : null // i18n-ignore: hive_lane's reply (agents)
+  const stays = kept.length ? withCardNames(ws, () => `${kept.map(cardRef).join(', ')} ${kept.length > 1 ? 'stay' : 'stays'} on the lane, after the cards you listed: a builder's own hive_lane start adds or reorders cards, never takes one off (the Assistant or the user does).`, scope) : null // i18n-ignore: hive_lane's reply (agents)
   const note = [applied, carriedText, gone, stays, queued, shared].filter(Boolean).join(' ') || undefined
   return { lane, did: r.did, replaced: replaced ?? null, ...(note ? { note } : {}) }
 }

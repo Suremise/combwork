@@ -699,4 +699,25 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     expect(r.note).toMatch(new RegExp(`queued: it applies once #${u} is Done`))
     for (const l of [la, lb]) await lanes.endLane(w, l.id, { abandoned: true })
   })
+
+  // Last in this describe: it gives the projects keys, which the tests above match as #n.
+  it("HI-2169 (HR3's round 1): a builder's own start names the cards it keeps as it may see them: its project's by key; another project's, a workspace card, one moved out and a missing one by number alone", async () => {
+    const keys = await import('../src/main/projectKeys')
+    await keys.keyProjects(w)
+    const own = (await run(() => tasks.createTask({ title: 'Keyed own', project: 'alpha' }, user))).number
+    const kept = (await run(() => tasks.createTask({ title: 'Keyed kept', project: 'alpha' }, user))).number
+    const beta = await run(() => tasks.createTask({ title: 'Keyed beta', project: 'beta' }, user))
+    const loose = (await run(() => tasks.createTask({ title: 'Keyed loose' }, user))).number
+    const moved = await run(() => tasks.createTask({ title: 'Keyed moved', project: 'alpha' }, user))
+    const missing = 999_999
+    const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [own, kept, beta.number, loose, moved.number, missing], by: 'Assistant' })).lane
+    await run(() => tasks.updateTask(moved.number, { project: 'beta' }, user))
+    const movedKey = (await run(() => tasks.getTask(moved.number))).key!
+    const r = await keys.withCardNames(w, () => lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [own], ownBuilder: true, by: 'B2 (alpha)' }), 'alpha')
+    const keptKey = (await run(() => tasks.getTask(kept))).key!
+    expect(keptKey).toBeTruthy()
+    expect(r.note).toContain(`${keptKey}, #${beta.number}, #${loose}, #${moved.number}, #${missing} stay on the lane`)
+    for (const k of [beta.key!, movedKey]) expect(r.note).not.toContain(k)
+    await lanes.endLane(w, l.id, { abandoned: true })
+  })
 })
