@@ -41,9 +41,21 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
 
   const { app, page } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const liveNow = () => inv('session:live').catch(() => null)
+  /**
+   * Stops every session still live, each on its own (one that fails leaves the rest to stop), and waits until none is:
+   * the sessions left, [] once all have stopped (HI-2180: one still in its turn as the copy closes is asked about,
+   * Confirm on quit's default, and that question held app.close() until the runner's 10 minutes).
+   */
+  const stopAll = async () => {
+    await Promise.all(((await liveNow()) ?? []).map((l) => inv('session:stop', l.projectPath, l.agentId).catch(() => undefined)))
+    await lib.until(async () => (await liveNow())?.length === 0, HUNG_MS)
+    return ((await liveNow()) ?? [{ agentId: '(the window no longer answers)' }]).map((l) => [l.agentId, l.status])
+  }
+  let stopped = false
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const userToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const api = async (method, route, body, token = userToken) => {
@@ -154,7 +166,6 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const started = await asAssistant('POST', `/v1/tasks/${card}/start`, { name: 'Bystart', connection: 'max 2', reply: 'short' })
     const starter = (await api('GET', '/v1/projects/alpha')).body?.agents?.find((a) => a.name === 'Bystart')
     check('…by connection name: a new agent on Max 2, its CLI Claude Code, the card in Doing', started.status === 200 && started.body?.added === true && starter?.connection?.id === c2 && starter?.provider === 'claude-code' && (await column()) === 'doing', JSON.stringify({ status: started.status, body: started.body?.error ?? starter }))
-
     // --- hive_connection (HI-2108): the Assistant makes and changes a connection, only with Change settings on.
     const before = (await inv('connections:list')).connectionRows.length
     const shut = await asAssistant('POST', '/v1/connections', { account: 'Max 2', name: 'Max 2 · High', effort: 'high' })
@@ -172,14 +183,21 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('a project agent may not make connections (403)', byAgent.status === 403, JSON.stringify(byAgent))
     await inv('settings:update', { assistant: { changeSettings: false } })
 
-    // Every session the suite started, Bystart's too (HI-2180): one still in its turn as the copy closes is asked about
-    // (Confirm on quit's default), and that question held app.close() until the runner's 10 minutes.
-    for (const l of await inv('session:live')) await inv('session:stop', l.projectPath, l.agentId)
-    check('every session it started has stopped, so the copy closes without asking', !!(await lib.until(async () => (await inv('session:live')).length === 0, HUNG_MS)), JSON.stringify((await inv('session:live')).map((l) => [l.agentId, l.status])))
+    // Every session the suite started, Bystart's too.
+    const left = await stopAll()
+    stopped = left.length === 0
+    check('every session it started has stopped, so the copy closes without asking', stopped, JSON.stringify(left))
   } catch (e) {
     check('the suite ran to its end', false, e.stack)
   } finally {
-    await app.close().catch(() => undefined)
+    // On a failure too: what is still running is stopped, and the close never waits on a question nobody answers.
+    if (!stopped) {
+      const left = await stopAll()
+      if (left.length) check('after the failure, every session it started has stopped', false, JSON.stringify(left))
+    }
+    await inv('settings:update', { general: { confirmOnQuit: 'never' } }).catch(() => undefined)
+    const closed = await Promise.race([app.close().then(() => true, () => true), new Promise((r) => setTimeout(() => r(false), HUNG_MS))])
+    if (!closed) check('the copy closes', false, `still open after ${HUNG_MS} ms: the runner ends what is left`)
   }
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

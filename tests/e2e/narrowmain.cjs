@@ -155,20 +155,26 @@ const check = (name, ok, extra = '') => {
       return { buttons, width: Math.round(ab.getBoundingClientRect().width), heights: [...new Set(heights)], misses }
     })
   const whole = (bar) => bar.buttons >= 13 && bar.width === 48 && bar.misses.length === 0
+  /** The activity bar once it is whole, as laid out now (the window and its panels settle after a change): else its last read. */
+  const wholeBar = async () => {
+    let bar = null
+    await lib.until(async () => whole((bar = await activityBar())), HUNG_MS)
+    return bar
+  }
   await lib.fitWindow(app, page, { width: 900, height: 560 })
   for (const z of [1, 1.25]) {
     await zoom(z)
-    // Laid out at the new size and zoom first.
-    await lib.until(() => page.evaluate((f) => Math.abs(innerHeight * f - 560) < 2 && devicePixelRatio > 0, z), 5000)
-    const bar = await activityBar()
-    check(`least window, ${z * 100}%: every activity bar button, scrolled to, is on top at its middle, above the status bar`, whole(bar), JSON.stringify(bar))
+    const zoomed = await lib.until(() => page.evaluate((f) => Math.abs(innerHeight * f - 560) < 2 && devicePixelRatio > 0, z), HUNG_MS)
+    const bar = await wholeBar()
+    check(`least window, ${z * 100}%: every activity bar button, scrolled to, is on top at its middle, above the status bar`, !!zoomed && whole(bar), JSON.stringify({ zoomed, ...bar }))
     await page.screenshot({ path: path.join(lib.WORK, `narrowmain-least-${z * 100}.png`) })
   }
   // The Projects list expanded from its rail there (the user's Expand Sidebar): the work gives way, never the activity bar.
   await page.locator('.sidebar .rail-btn').first().click()
-  await lib.until(() => page.evaluate(() => !!document.querySelector('.sidebar:not(.compact) .sidebar-resizer')), HUNG_MS)
-  const expanded = await activityBar()
-  check('least window, 125%, the Projects list expanded: the activity bar keeps its width, every button on top', whole(expanded), JSON.stringify(expanded))
+  const listed = await lib.until(() => page.evaluate(() => !!document.querySelector('.sidebar:not(.compact) .sidebar-resizer')), HUNG_MS)
+  check('least window, 125%: Expand Sidebar shows the Projects list, not its rail', !!listed)
+  const expanded = await wholeBar()
+  check('…and the activity bar keeps its width, every button on top', !!listed && whole(expanded), JSON.stringify(expanded))
   await page.screenshot({ path: path.join(lib.WORK, 'narrowmain-least-125-expanded.png') })
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
 
