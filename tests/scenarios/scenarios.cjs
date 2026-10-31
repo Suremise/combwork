@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 109
+const FIXTURES_VERSION = 110
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -317,11 +317,6 @@ async function submittedCard(c, key, card, who = 'coder') {
 }
 /** The worktrees alpha has (git's own list), as lower-case paths. */
 const worktreesOf = (c) => c.git('worktree', 'list', '--porcelain').split(/\r?\n/).filter((l) => l.startsWith('worktree ')).map((l) => require('path').resolve(l.slice(9)).toLowerCase())
-/**
- * Whether a call's card reference is card `n`: its number (12, "12", "#12") or its key ("AL-12"), as the tools take it
- * (#1219).
- */
-const isCard = (ref, n) => new RegExp(`^(#|[A-Za-z][A-Za-z0-9]*-)?${n}$`).test(String(ref ?? '').trim())
 /** Card `n`'s key ("AL-1") as the run left it, from the board or the scenario's cards; undefined if unknown. */
 const keyOf = (o, n) => [...(o.allCards ?? []), ...Object.values(o.cards ?? {})].find((x) => x?.number === n)?.key
 /**
@@ -334,10 +329,12 @@ const cardIs = (o, ref, n) => {
   const key = keyOf(o, n)
   return !!key && s.toUpperCase() === String(key).toUpperCase()
 }
+/** A pattern for card `n` as Hive's text names it (HI-2231): its own key, or #n; never another card's key. */
+const refOf = (o, n) => [keyOf(o, n), `#${n}`].filter(Boolean).map((r) => r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
 /** Whether a call's list of cards names card `n`, each by number or key (HI-1950: a model names cards by key). */
-const namesCard = (refs, n) => Array.isArray(refs) && refs.some((r) => isCard(r, n))
+const namesCard = (o, refs, n) => Array.isArray(refs) && refs.some((r) => cardIs(o, r, n))
 /** Whether a call's list of cards is exactly cards `ns`, in that order, each by number or key. */
-const namesCards = (refs, ns) => Array.isArray(refs) && refs.length === ns.length && ns.every((n, i) => isCard(refs[i], n))
+const namesCards = (o, refs, ns) => Array.isArray(refs) && refs.length === ns.length && ns.every((n, i) => cardIs(o, refs[i], n))
 /**
  * The calls that could move card `n` (#1474): hive_update_task and hive_update_tasks with a column or an override, and
  * the intents that move a card.
@@ -347,9 +344,9 @@ const movesOf = (o, n) =>
   o.hiveCalls.filter((x) => {
     const a = argsOf(x)
     const moves = a.column !== undefined || a.override !== undefined
-    if (x.tool === 'hive_update_task') return isCard(a.number, n) && moves
-    if (x.tool === 'hive_update_tasks') return (a.numbers ?? []).some((m) => isCard(m, n)) && moves
-    return MOVING_INTENTS.includes(x.tool) && isCard(a.card, n)
+    if (x.tool === 'hive_update_task') return cardIs(o, a.number, n) && moves
+    if (x.tool === 'hive_update_tasks') return (a.numbers ?? []).some((m) => cardIs(o, m, n)) && moves
+    return MOVING_INTENTS.includes(x.tool) && cardIs(o, a.card, n)
   })
 /** The facts of kind `kind` of the scenario's card `key`. */
 const factsOf = (o, key, kind) => (o.facts?.[key] ?? []).filter((f) => f.kind === kind)
@@ -979,9 +976,9 @@ module.exports.SCENARIOS = [
       const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
-        ['started it with hive_start_card', ran(o, 'hive_start_card').some((x) => isCard(argsOf(x).card, c.cards.a)), calls],
+        ['started it with hive_start_card', ran(o, 'hive_start_card').some((x) => cardIs(o, argsOf(x).card, c.cards.a)), calls],
         ['committed its work before submitting (nothing left uncommitted)', c.git('rev-parse', 'HEAD').trim() !== c.head && o.gitStatus.trim() === '', o.gitStatus],
-        ['submitted it with hive_submit (its submission, with its summary)', ran(o, 'hive_submit').some((x) => isCard(argsOf(x).card, c.cards.a)) && submissionsOf(o, c, 'a').length > 0, calls],
+        ['submitted it with hive_submit (its submission, with its summary)', ran(o, 'hive_submit').some((x) => cardIs(o, argsOf(x).card, c.cards.a)) && submissionsOf(o, c, 'a').length > 0, calls],
         ['it stops in Review, with a comment of the agent', o.cards.a?.column === 'review' && (o.cards.a?.comments ?? []).some((x) => /Coder/.test(x.by)), o.cards.a?.column],
         ['its report leads with a one-line summary (#532)', summaryLine(leadLine(o.cards.a, /Coder/)), JSON.stringify(leadLine(o.cards.a, /Coder/)?.line ?? null)],
         ['never moved it on itself (no move to Passed or Done, no verdict)', !finishedItself(o, c.cards.a), calls],
@@ -1158,10 +1155,10 @@ module.exports.SCENARIOS = [
       const back = c.interruptedAt ?? Infinity
       const calls = o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')
       // Its verdicts once the card was back in Doing: the intent's, or review passed or failed through hive_update_task.
-      const verdicts = o.hiveCalls.filter((x) => Date.parse(x.at) > back && ((x.tool === 'hive_verdict' && isCard(argsOf(x).card, n)) || (x.tool === 'hive_update_task' && isCard(argsOf(x).number, n) && /^(passed|failed)$/.test(String(argsOf(x).review ?? '')))))
+      const verdicts = o.hiveCalls.filter((x) => Date.parse(x.at) > back && ((x.tool === 'hive_verdict' && cardIs(o, argsOf(x).card, n)) || (x.tool === 'hive_update_task' && cardIs(o, argsOf(x).number, n) && /^(passed|failed)$/.test(String(argsOf(x).review ?? '')))))
       const moves = movesOf(o, n).filter((x) => x.tool !== 'hive_verdict' && !(x.tool === 'hive_update_task' && argsOf(x).review))
       return [
-        ['started the review with hive_start_review (a ReviewStarted fact)', ran(o, 'hive_start_review').some((x) => isCard(argsOf(x).card, n)) && factsOf(o, 'r', 'ReviewStarted').length > 0, calls],
+        ['started the review with hive_start_review (a ReviewStarted fact)', ran(o, 'hive_start_review').some((x) => cardIs(o, argsOf(x).card, n)) && factsOf(o, 'r', 'ReviewStarted').length > 0, calls],
         // What Hive keeps safe, whatever the reviewer does.
         ['the newer work stays in Doing with its builder', o.cards.r?.column === 'doing' && o.cards.r?.agentName === 'Implementer', `${o.cards.r?.column}, ${o.cards.r?.agentName}`],
         ['no verdict was recorded once it went back (no Verdict fact after)', !factsOf(o, 'r', 'Verdict').some((f) => Date.parse(f.at) > back), JSON.stringify(factsOf(o, 'r', 'Verdict').map((f) => f.at))],
@@ -1437,8 +1434,8 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const msg = (c.got ?? []).find((d) => d.kind === 'rebrief')
       return [
-        ['the message was left, tied to its round', new RegExp(`for ([A-Z]{2,4}-\\d+|#${c.cards.a}) round 1`).test(c.sent ?? ''), c.sent],
-        ['stale once the card passed, never given', msg?.state === 'stale' && new RegExp(`^([A-Z]{2,4}-\\d+|#${c.cards.a}) passed review$`).test(msg.detail ?? '') && !msg.received, JSON.stringify(msg)],
+        ['the message was left, tied to its round', new RegExp(`for (${refOf(o, c.cards.a)}) round 1`).test(c.sent ?? ''), c.sent],
+        ['stale once the card passed, never given', msg?.state === 'stale' && new RegExp(`^(${refOf(o, c.cards.a)}) passed review$`).test(msg.detail ?? '') && !msg.received, JSON.stringify(msg)],
         ['the greeting is the card\'s, not the stale one', !/Stale!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
         ["didn't reopen the passed card", o.cards.a?.column === 'passed', history(o.cards.a).join(' | ')]
       ]
@@ -2486,7 +2483,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const h = history(o.cards.r)
       const asked = (o.cards.r?.comments ?? []).slice(1).some((x) => /commit/i.test(x.text))
-      const watches = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.r) && a.wake === true)
+      const watches = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(o, a.cards, c.cards.r) && a.wake === true)
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['gave no verdict (not failed on that alone)', !h.some((x) => /^Review (passed|failed)$/.test(x)), h.join(' | ')],
@@ -2517,7 +2514,7 @@ module.exports.SCENARIOS = [
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['registered the lane (hive_lane start)', starts.length >= 1, o.hiveCalls.map((x) => x.tool).join(',')],
-        ['the cards in order, its reviewer, the rounds and the wait', namesCards(first.cards, [c.cards.a, c.cards.b]) &&/implementer/i.test(String(first.reviewer ?? '')) && first.rounds === 10 && first.waitMinutes === 360, JSON.stringify(first)],
+        ['the cards in order, its reviewer, the rounds and the wait', namesCards(o, first.cards, [c.cards.a, c.cards.b]) &&/implementer/i.test(String(first.reviewer ?? '')) && first.rounds === 10 && first.waitMinutes === 360, JSON.stringify(first)],
         ["before its first card's review", !!startedAt && (!review || startedAt <= review.at), `${startedAt} / ${review?.at}`],
         ['one lane, not one a card', starts.length === 1, String(starts.length)],
         ['its first card to Review, the second not begun', o.cards.a?.column === 'review' && o.cards.b?.column === 'todo', `${o.cards.a?.column} / ${o.cards.b?.column}`],
@@ -2550,7 +2547,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       // Its lanes as saved (#1018: the workspace's database).
       const lane = require('../e2e/storeDocs.cjs').storeDocs(c.ws, 'lanes').find((l) => l.cards?.includes(c.cards.a))
-      const waits = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.a))
+      const waits = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(o, a.cards, c.cards.a))
       // Its watch for the verdict, its own or the one Hive arms at its submission (#1639): the lane's wait long.
       const minutes = turnWatch(o) ? Math.round((Date.parse(turnWatch(o).limitAt) - Date.parse(turnWatch(o).since)) / 60000) : null
       return [
@@ -2624,7 +2621,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const lanes = ran(o, 'hive_lane').map((x) => argsOf(x))
       const joins = lanes.filter((a) => a.action === 'join')
-      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.a) && a.column === 'review')
+      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(o, a.cards, c.cards.a) && a.column === 'review')
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ["joined the builder's lane by its name", joins.length >= 1 && /implementer/i.test(String(joins[0].builder ?? '')), JSON.stringify(lanes)],
@@ -2669,7 +2666,7 @@ module.exports.SCENARIOS = [
       const b = o.cards.b
       const started = (b?.history ?? []).find((h) => /^Moved to (the (top|bottom) of )?Doing\b/.test(h.what))
       // Coder's own start of #b, whose reply gives what Hive's would have (HI-2092: Codex starts it rather than end its turn).
-      const own = hiveReplies(o, 'hive_start_card').find((t) => (namesCard([argsOf({ args: t.input }).card], c.cards.b) || (!!b?.key && String(t.result).includes(`${b.key} is a card of your lane`))) && /card-loop skill as this lane's builder/.test(String(t.result)))
+      const own = hiveReplies(o, 'hive_start_card').find((t) => (namesCard(o, [argsOf({ args: t.input }).card], c.cards.b) || (!!b?.key && String(t.result).includes(`${b.key} is a card of your lane`))) && /card-loop skill as this lane's builder/.test(String(t.result)))
       const start = c.start ?? (own ? String(own.result) : null)
       return [
         // In Review once Coder has built it (HI-2047: its project has the first card's work, so it can be).
@@ -2698,7 +2695,7 @@ module.exports.SCENARIOS = [
     fake: (c) => `skill card-loop hive hive_wait_for_tasks {"cards":[${c.cards.b}],"column":"review","wake":true} then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, true)}`,
     expect: (o, c) => {
       // Its waits for #b to arrive in Review (cards [b], no changes): one answered Already, none repeated.
-      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(a.cards, c.cards.b) && a.column === 'review' && !a.changes && !a.cancel)
+      const arrivals = ran(o, 'hive_wait_for_tasks').map((x) => argsOf(x)).filter((a) => namesCard(o, a.cards, c.cards.b) && a.column === 'review' && !a.changes && !a.cancel)
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['reviewed the card already in Review', history(o.cards.b).includes('Started reviewing') && history(o.cards.b).some((h) => /^Review (passed|failed)$/.test(h)), history(o.cards.b).join(' | ')],
@@ -2969,13 +2966,13 @@ module.exports.SCENARIOS = [
     fake: (c) => `skill work-on-card then shell: git add -A then shell: git commit -qm "greet trims the name" then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."}`,
     expect: (o, c) => {
       const n = c.cards.s
-      const calls = called(o, 'hive_submit').filter((x) => isCard(argsOf(x).card, n)).map((x) => `${x.ok ? 'ok' : `refused: ${String(x.error ?? '').split('\n')[0]}`}`).join(' | ')
+      const calls = called(o, 'hive_submit').filter((x) => cardIs(o, argsOf(x).card, n)).map((x) => `${x.ok ? 'ok' : `refused: ${String(x.error ?? '').split('\n')[0]}`}`).join(' | ')
       return [
         ['committed its work', c.git('rev-parse', 'HEAD').trim() !== c.head && o.gitStatus.trim() === '', `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}; ${o.gitStatus}`],
         ['submitted it for review, which worked', submissionsOf(o, c, 's').length === 1 && o.cards.s?.column === 'review', `${o.cards.s?.column}: ${calls}`],
         // A notice of how things stand is no question, nor is a session's state alone: a question it recorded is.
         ['asked the user nothing (it was asked to commit)', !questionsToUser(o).length, `${o.status}; ${questionsToUser(o).join(' | ').slice(0, 300)}`],
-        ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => isCard(argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
+        ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
     }
   },
@@ -2997,7 +2994,7 @@ module.exports.SCENARIOS = [
     fake: (c) => `skill work-on-card then hive hive_submit {"card":"#${c.cards.s}","summary":"greet.js trims the name."} then say Nothing is committed yet: shall I commit the card's work so it can be submitted for review?`,
     expect: (o, c) => {
       const n = c.cards.s
-      const submits = called(o, 'hive_submit').filter((x) => isCard(argsOf(x).card, n))
+      const submits = called(o, 'hive_submit').filter((x) => cardIs(o, argsOf(x).card, n))
       const refused = submits.findIndex((x) => !x.ok && /submit\.(clean|empty)\b/.test(String(x.error ?? '')))
       const calls = submits.map((x) => `${x.ok ? 'ok' : `refused: ${String(x.error ?? '').split('\n')[0]}`}`).join(' | ')
       return [
@@ -3005,7 +3002,7 @@ module.exports.SCENARIOS = [
         ['committed nothing it wasn\'t asked to', c.git('rev-parse', 'HEAD').trim() === c.head, `${c.head} → ${c.git('rev-parse', 'HEAD').trim()}`],
         ['asked the user whether to commit (a question about committing: in its reply, through Hive, or its CLI\'s question)', askedToCommit(o), `${o.status}; ${questionsToUser(o).join(' | ').slice(0, 300) || (o.finalReply ?? '').slice(0, 300)}`],
         ['the card stays in Doing', o.cards.s?.column === 'doing', o.cards.s?.column],
-        ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => isCard(argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
+        ['overrode nothing and moved nothing by hand (no Override, no column move)', !overridesOf(o, 's').length && !called(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).override)), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')]
       ]
     }
   },
@@ -3458,7 +3455,7 @@ module.exports.SCENARIOS = [
         ['read the coordinate-agents skill', read(o, 'coordinate-agents'), o.skillsRead.join(',')],
         ['started the card with hive_start_task, which worked', start >= 0, calls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         // An agent watch or wait, or a card watch on the card it started (#416: coordinate-agents points card work there).
-        ['then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked', start >= 0 && calls.slice(start + 1).some((x) => x.ok && (x.tool === 'hive_wait_for_agents' || (x.tool === 'hive_wait_for_tasks' && new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.i}\\b`).test(String(x.args)))))],
+        ['then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked', start >= 0 && calls.slice(start + 1).some((x) => x.ok && (x.tool === 'hive_wait_for_agents' || (x.tool === 'hive_wait_for_tasks' && namesCard(o, argsOf(x).cards, c.cards.i))))],
         ["didn't type the card into the agent instead", called(o, 'hive_prompt_agent').length === 0],
         ['the agent did it: the card handed on (in Review, or past it by its submission) and the file is there', handedOn(o, c, 'i') && /text=auto/.test(c.read('.gitattributes') ?? ''), `${o.cards.i?.column}`]
       ]
@@ -3782,8 +3779,8 @@ module.exports.SCENARIOS = [
       `You are the reviewer in a card loop (the card-loop skill): cards #${c.cards.a}, then #${c.cards.b}; rounds 3; wait 1h. You were waiting for #${c.cards.a} to arrive in Review when Hive typed this line: [Hive] #${c.cards.a} was reassigned to Other (your watch on it ended). Your card watch has ended: drop it from your list and carry on with your next card.`,
     fake: (c) => `skill card-loop then ${fakeStartReview(c.cards.b)}`,
     expect: (o, c) => {
-      const watchedA = ran(o, 'hive_wait_for_tasks').some((x) => new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.a}\\b`).test(String(x.args)))
-      const onB = ran(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, c.cards.b) && field(x.args, 'review', 'start')) || ran(o, 'hive_start_review').some((x) => isCard(argsOf(x).card, c.cards.b)) || ran(o, 'hive_wait_for_tasks').some((x) => new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.b}\\b`).test(String(x.args)))
+      const watchedA = ran(o, 'hive_wait_for_tasks').some((x) => namesCard(o, argsOf(x).cards, c.cards.a))
+      const onB = ran(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, c.cards.b) && field(x.args, 'review', 'start')) || ran(o, 'hive_start_review').some((x) => cardIs(o, argsOf(x).card, c.cards.b)) || ran(o, 'hive_wait_for_tasks').some((x) => namesCard(o, argsOf(x).cards, c.cards.b))
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         [`went on to #${c.cards.b} (began its review, or watched it)`, onB, o.hiveCalls.map((x) => x.tool).join(',')],
@@ -3852,7 +3849,7 @@ module.exports.SCENARIOS = [
       const ha = o.cards.a?.history ?? []
       const verdictAt = Date.parse(ha.find((h) => by(h) && /^Review (passed|failed)/.test(h.what) && Date.parse(h.at) > back)?.at ?? '') || Infinity
       const waits = ran(o, 'hive_wait_for_tasks')
-      const has = (x, n) => new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${n}\\b`).test(String(x.args))
+      const has = (x, n) => namesCard(o, argsOf(x).cards, n)
       // A call's time (the fake's are reported when its CLI closes input, so only a model's tell order).
       const before = (x) => Date.parse(x.at) < verdictAt
       return [
@@ -3864,7 +3861,7 @@ module.exports.SCENARIOS = [
         [`its return to Review is a diff to review (a commit after its base)`, !!c.returnDiff, JSON.stringify(c.returnDiff && { revision: c.returnDiff.revision, base: c.returnDiff.base, files: c.returnDiff.files })],
         ["reviewed the card after its return, with nobody prompting it (Hive's wake)", ha.some((h) => by(h) && h.what === 'Started reviewing' && Date.parse(h.at) > back), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
         ['gave it a verdict', Number.isFinite(verdictAt), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
-        ["didn't move on to the next card before that verdict", !waits.some((x) => before(x) && has(x, c.cards.b) && !has(x, c.cards.a)) && !ran(o, 'hive_update_task').some((x) => before(x) && cardIs(o, argsOf(x).number, c.cards.b)) && !ran(o, 'hive_start_review').concat(movesOf(o, c.cards.b).filter((x) => x.ok)).some((x) => before(x) && isCard(argsOf(x).card, c.cards.b)), o.hiveCalls.map((x) => `${x.tool}@${x.at}`).join(',')]
+        ["didn't move on to the next card before that verdict", !waits.some((x) => before(x) && has(x, c.cards.b) && !has(x, c.cards.a)) && !ran(o, 'hive_update_task').some((x) => before(x) && cardIs(o, argsOf(x).number, c.cards.b)) && !ran(o, 'hive_start_review').concat(movesOf(o, c.cards.b).filter((x) => x.ok)).some((x) => before(x) && cardIs(o, argsOf(x).card, c.cards.b)), o.hiveCalls.map((x) => `${x.tool}@${x.at}`).join(',')]
       ]
     },
     // Only the fake Claude Code answers a wake (its wake script); the fake Codex can't.
@@ -5138,4 +5135,4 @@ module.exports.SCENARIOS.push({
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
 })
 
-module.exports.helpers = { called, ran, asksTheUser, questionsToUser, askedToCommit, read, moved, history, field, isCard, cardIs, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { called, ran, asksTheUser, questionsToUser, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
