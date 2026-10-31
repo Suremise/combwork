@@ -4184,59 +4184,24 @@ const DEPLOY_FACTS = /staging\.example\.com|deploy:staging|ALPHA_ENV=staging/
 /** And only its card's description says this: in a listing's reply, the card was in it, in full. */
 const DEPLOY_CARD_FACT = 'docs/DEPLOY.md, its Staging section'
 /**
- * HI-2239's read policy (HR1, rounds 2 and 3): a file was read when a recorded call that worked is a known read of
- * exactly that file, and what it gave back has its facts. The facts alone are never a read (an echo or a write can print
- * them), nor is a call's mention of the path. Known reads:
- * - a structured read: Claude Code's `Read`, its `file_path` the file;
- * - a shell command that is, as a whole, one of SHELL_READ's forms on that file: `Get-Content`/`gc` (with -Raw,
- *   -Encoding <name>, -Path or -LiteralPath), `cat` or `type`, its path one literal operand (bare, or quoted with no
- *   $, backtick or other expansion), optionally piped to one read-only filter (`Select-Object -First <n>`, `head -n <n>`
- *   or `head -<n>`). Anything else (several commands, a comment, a redirection, a substitution, a script block, other
- *   flags) isn't a read we can see: unobservable, never credited. The shell tools are a call's own (Bash, PowerShell, a
- *   Codex script's recorded Shell call, HI-2235), never a Script's code.
- * The path is the file when it is absolute and is it, or relative to the call's own working directory as recorded (a
- * Codex script's command: its rollout's cwd; a direct exec_command: its workdir), never a guessed one (HR1 round 3): a
- * relative path with no recorded directory (a Bash or PowerShell call's, whose shell may have changed directory) is
- * unobservable.
+ * HI-2239's read policy (Darren's decision, 31 Oct: simplify). A file was read when Claude Code's `Read` worked on its
+ * exact absolute path and gave back its facts; Hive's own reads are the hive calls' (hive_read_section, hive_list_tasks,
+ * each paired with its own reply: callsWithReplies). A shell command (or a Codex script) that may have read it is
+ * unobservable: never credited, and never blamed (shellLookups: the check is left out, and the run records it).
  */
-const SHELL_TOOLS = /^(Bash|PowerShell|Shell|powershell|bash|shell|local_shell|(functions\.)?exec_command)$/
-const SHELL_PATH = String.raw`(?:"([^"$\`]+)"|'([^']+)'|([^\s"'$\`;|&<>(){}#,]+))`
-const SHELL_READ = new RegExp(
-  String.raw`^\s*(?:(?:Get-Content|gc)(?:\s+-(?:Raw|Encoding\s+[\w-]+))*(?:\s+-(?:Path|LiteralPath))?\s+${SHELL_PATH}(?:\s+-(?:Raw|Encoding\s+[\w-]+))*|(?:cat|type)\s+${SHELL_PATH})` +
-    String.raw`(?:\s*\|\s*(?:Select-Object\s+-First\s+\d+|head\s+-n\s*\d+|head\s+-\d+))?\s*$`,
-  'i'
-)
-/**
- * Whether `p` is the file `target` (case-insensitive, as on Windows): absolute, or relative to `base`, the call's own
- * recorded working directory; relative with none, unknown (false).
- */
-const isFile = (p, target, base) => {
-  const path = require('path')
-  const want = path.resolve(target).toLowerCase()
-  if (path.isAbsolute(p)) return path.resolve(p).toLowerCase() === want
-  return typeof base === 'string' && path.isAbsolute(base) && path.resolve(base, p).toLowerCase() === want
-}
-/** The shell command's path operand when the whole command is one of SHELL_READ's forms, or null. */
-const shellReadPath = (cmd) => {
-  const m = SHELL_READ.exec(String(cmd ?? ''))
-  return m ? (m.slice(1).find((x) => x !== undefined) ?? null) : null
-}
-/** Whether a transcript tool call is a known read of `target` (the read policy above) that worked and gave back `facts`. */
+const SHELL_TOOLS = /^(Bash|PowerShell|Shell|powershell|bash|shell|local_shell|(functions\.)?exec_command|Script)$/
+/** Whether a transcript tool call is a `Read` that worked of exactly `target` (absolute), giving back `facts`. */
 const readOf = (t, target, facts) => {
-  if (!t || t.isError || !facts.test(String(t.result ?? ''))) return false
-  let a = null
+  if (!t || t.isError || t.name !== 'Read' || !facts.test(String(t.result ?? ''))) return false
+  let file = null
   try {
-    a = JSON.parse(t.input)
+    file = JSON.parse(t.input)?.file_path ?? null
   } catch {}
-  if (t.name === 'Read') return typeof a?.file_path === 'string' && isFile(a.file_path, target, null)
-  if (!SHELL_TOOLS.test(t.name)) return false
-  let cmd = a === null ? t.input : typeof a === 'string' ? a : (a?.command ?? a?.cmd)
-  if (Array.isArray(cmd)) cmd = cmd.length === 3 && /^-(Command|c)$/i.test(String(cmd[1])) ? cmd[2] : null
-  const file = typeof cmd === 'string' ? shellReadPath(cmd) : null
-  // Its own recorded directory: the call's (a Codex script's command), or the one it named (exec_command's workdir).
-  const base = t.cwd ?? (typeof a?.workdir === 'string' ? a.workdir : typeof a?.cwd === 'string' ? a.cwd : null)
-  return !!file && isFile(file, target, base)
+  const path = require('path')
+  return typeof file === 'string' && path.isAbsolute(file) && path.resolve(file).toLowerCase() === path.resolve(target).toLowerCase()
 }
+/** The shell commands or scripts that worked and name `name` (a file): what may have read it, unobservably. */
+const shellLookups = (o, name) => (o.tools ?? []).filter((t) => !t.isError && SHELL_TOOLS.test(t.name) && String(t.input ?? '').toLowerCase().includes(name.toLowerCase()))
 /**
  * A hive tool's successful calls with their own replies (HR1, HI-2239 round 2): Hive's log of the calls (exact
  * arguments) and the transcript's replies, in order, paired one to one; when their counts differ the pairing isn't known,
@@ -4768,25 +4733,26 @@ module.exports.SCENARIOS.push(
     fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.p}} then hive hive_read_section {"project":"alpha","path":"docs/DEPLOY.md","heading":"Staging"}`,
     expect: (o, c) => {
       const p = c.cards.p
-      // What it got, not what it named (HR1, HI-2239 round 1): the card in full (hive_read_task of it, or a listing whose
-      // reply has this card, its key and its description: HI-2239, Codex read it so); or the doc's facts in what a tool
-      // that worked gave back (Hive's hive_read_section, Read, a shell command, Codex's Script: its output, so a call made,
-      // not its source naming one). A call that only names the doc (a brief, an echo, a write) gets none of them back.
-      // HR1 round 2: by HI-2239's read policy (readOf, callsWithReplies): recorded calls of a known read kind, on exactly
-      // this card or alpha's doc, each with its own reply; a Script's code or output is never one.
+      // Darren's decision (HI-2239, 31 Oct): only Hive's recorded reads (hive_read_task of the card; hive_read_section of
+      // alpha's docs/DEPLOY.md and alpha's detailed hive_list_tasks, each paired with its own reply) and a Read of the
+      // doc's exact absolute path count. A shell command or Codex script that may have read the doc is unobservable: with
+      // no lookup credited, it leaves the check out (never blamed) and is recorded (observe).
       const own = o.cards.p
-      const listed = callsWithReplies(o, 'hive_list_tasks').some(({ args, reply }) => (args.project === undefined || args.project === 'alpha') && !!own?.key && new RegExp(`\\b${own.key}\\b`).test(reply) && reply.includes(DEPLOY_CARD_FACT))
+      const listed = callsWithReplies(o, 'hive_list_tasks').some(({ args, reply }) => args.project === 'alpha' && args.details === true && !!own?.key && new RegExp(`\\b${own.key}\\b`).test(reply) && reply.includes(DEPLOY_CARD_FACT))
       const cardRead = ran(o, 'hive_read_task').some((x) => cardIs(o, argsOf(x).number, p)) || listed
       const doc = require('path').join(c.alpha, 'docs', 'DEPLOY.md')
       const sectioned = callsWithReplies(o, 'hive_read_section').some(({ args, reply }) => args.project === 'alpha' && String(args.path ?? '').replace(/\\/g, '/') === 'docs/DEPLOY.md' && DEPLOY_FACTS.test(reply))
       const docRead = sectioned || (o.tools ?? []).some((t) => readOf(t, doc, DEPLOY_FACTS))
       const lookedUp = cardRead || docRead
+      const unobservable = !lookedUp && shellLookups(o, 'DEPLOY.md').length > 0
       return [
-        ['looked the card or its doc up (the card in full: hive_read_task or a detailed listing; or the doc, through Hive or read)', lookedUp, o.hiveCalls.map((x) => x.tool).join(',')],
+        ...(unobservable ? [] : [['looked the card or its doc up (hive_read_task, hive_read_section or a detailed listing of alpha, or a Read of the doc)', lookedUp, o.hiveCalls.map((x) => x.tool).join(',')]]),
         ["asked the user nothing: no notification and no question (the deploy details are in the doc, and the request is the OK)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
         ['started Coder on the card', ran(o, 'hive_start_task').some((x) => cardIs(o, argsOf(x).number, p)) || briefsTo(o, 'Coder').some((t) => names(t, p)), o.hiveCalls.map((x) => x.tool).join(',')]
       ]
     },
+    // A lookup by a shell command or script (HI-2239): what it read is unobservable, so the run records it.
+    observe: (o) => [['looked the doc up by a shell command or script (unobservable: neither credited nor blamed)', shellLookups(o, 'DEPLOY.md').length > 0, shellLookups(o, 'DEPLOY.md').map((t) => `${t.name}: ${String(t.input).slice(0, 80)}`).join(' | ')]],
     fakeSkips: ["asked the user nothing: no notification and no question (the deploy details are in the doc, and the request is the OK)", 'started Coder on the card']
   },
   {
@@ -5236,4 +5202,4 @@ module.exports.SCENARIOS.push({
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
 })
 
-module.exports.helpers = { shellReadPath, readOf, called, ran, asksTheUser, questionsToUser, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { readOf, called, ran, asksTheUser, questionsToUser, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
