@@ -347,6 +347,11 @@ export class CodexConversationParser implements ConversationParserLike {
    */
   private scripts: { tool: TranscriptTool; code: string | null; start: number; end: number | null }[] = []
   private scriptById = new Map<string, (typeof this.scripts)[number]>()
+  /**
+   * Whether this Codex records its calls as items (an `item_completed` event seen, HI-2246): then every script's `calls`
+   * is a list, empty when it made none; until then, and for a Codex that never does, absent (its calls aren't known).
+   */
+  private recorded = false
 
   constructor(projectPath: string | null = null) {
     this.root = projectPath
@@ -465,6 +470,7 @@ export class CodexConversationParser implements ConversationParserLike {
           } else this.tool(String(p.call_id ?? ''), name === 'exec' ? 'Script' : name, input, firstLine(input).slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
           if (name === 'exec') {
             const script = { tool: this.tools.get(String(p.call_id ?? ''))!, code: scripted !== null ? input : null, start: ts ? Date.parse(ts) : NaN, end: null }
+            if (this.recorded) script.tool.calls ??= []
             this.scripts.push(script)
             this.scriptById.set(String(p.call_id ?? ''), script)
           }
@@ -499,7 +505,12 @@ export class CodexConversationParser implements ConversationParserLike {
       const summary = typeof p.message === 'string' ? p.message : null
       this.push({ kind: 'compaction', timestamp: ts, trigger: 'auto', preTokens: 0, postTokens: 0, nextRequestTokens: null, summary })
     } else if (r.type === 'event_msg') {
-      if (p.type === 'item_completed' && p.item && typeof p.item === 'object') this.scriptCall(p.item, typeof p.started_at_ms === 'number' ? p.started_at_ms : null)
+      if (p.type === 'item_completed' && p.item && typeof p.item === 'object') {
+        // The first item: this Codex records its calls, so a script with none listed made none (the same Codex wrote the scripts before it).
+        if (!this.recorded) for (const sc of this.scripts) sc.tool.calls ??= []
+        this.recorded = true
+        this.scriptCall(p.item, typeof p.started_at_ms === 'number' ? p.started_at_ms : null)
+      }
       else if (p.type === 'turn_aborted') this.push({ ...noticeOf(p.reason === 'interrupted' ? NOTICE_TEXT.interrupted : p.reason ? { m: NOTICE_TEXT.turnEnded, values: { reason: String(p.reason) } } : NOTICE_TEXT.aborted, 'info'), timestamp: ts })
       else if (p.type === 'error' && typeof p.message === 'string') this.push({ kind: 'notice', timestamp: ts, text: p.message, level: 'error' })
     }

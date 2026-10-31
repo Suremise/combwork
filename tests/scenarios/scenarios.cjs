@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 112
+const FIXTURES_VERSION = 113
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -5087,7 +5087,8 @@ const shotEvents = (o) => {
 const shotsOpened = (o) => [...new Set(shotEvents(o).map((e) => e.name))]
 /** Where the session first read the report ({ tool, pos }, as shotEvents), or null. */
 const reportRead = (o) => {
-  const tool = o.tools.findIndex((t) => !/^mcp__hive__|^hive_/.test(t.name) && /report\.txt/.test(t.input))
+  // Not a hive tool's call, by any of its names (Hive's own "hive · x" for a Codex script's, HI-2246).
+  const tool = o.tools.findIndex((t) => !/^mcp__hive__|^hive_|^hive · /.test(t.name) && /report\.txt/.test(t.input))
   return tool < 0 ? null : { tool, pos: o.tools[tool].input.indexOf('report.txt') }
 }
 const before = (a, b) => a.tool < b.tool || (a.tool === b.tool && a.pos < b.pos)

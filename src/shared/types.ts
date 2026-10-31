@@ -3242,7 +3242,8 @@ export interface TranscriptTool {
   resultLength?: number
   /**
    * The calls a Codex code-mode script made, in the order they ended (HI-2240): each a tool of its own, named as the same
-   * call made directly is. Absent for any other tool, and for a script whose Codex records none.
+   * call made directly is. Empty for a script that made none (its Codex records calls); absent for any other tool, and
+   * for a script whose calls aren't known (its Codex records none, HI-2246: the scenario checks credit it nothing).
    */
   calls?: TranscriptTool[]
   /** A command's exit code, once it has ended with one (a Codex script's command, HI-2240). */
