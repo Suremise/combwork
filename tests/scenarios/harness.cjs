@@ -15,6 +15,7 @@ const { execFileSync } = require('child_process')
 const lib = require('../e2e/lib.cjs')
 const { processes, leftoverIdentities } = require('../e2e/folderProcesses.cjs')
 const { measuresOf, metricsTotals } = require('./benchmark.cjs')
+const { codexRollout, withScriptCalls } = require('./codexScripts.cjs')
 
 /**
  * The Claude Code home the model trials use: a test home signed in once by hand (never the user's own ~/.claude, and
@@ -95,9 +96,11 @@ function observeTranscript(items, skillNames, skillRefs = new Map()) {
     }
   }
   // Names of hive tools in the transcript: a direct call (mcp__hive__x, hive.x, Hive's "hive · x"), or one written in a
-  // Codex script (tools.mcp__hive__x(...)), which may or may not have run.
+  // Codex script (tools.mcp__hive__x(...)), which may or may not have run: a script whose calls were read from its
+  // rollout (HI-2235) is a `script` item, its calls tools of their own.
   const hiveName = (name) => /(?:^|[_.\s])(hive_[a-z]+(?:_[a-z]+)*)$/.exec(name)?.[1]
-  const hiveMentions = tools.flatMap((t) => (hiveName(t.name) ? [hiveName(t.name)] : [...t.input.matchAll(/\btools\.(?:mcp__hive__)?(hive_[a-z]+(?:_[a-z]+)*)\s*\(/g)].map((m) => m[1])))
+  const scripts = items.filter((x) => x.kind === 'script').map((x) => ({ name: x.tool.name, input: String(x.tool.input ?? '') }))
+  const hiveMentions = [...tools, ...scripts].flatMap((t) => (hiveName(t.name) ? [hiveName(t.name)] : [...t.input.matchAll(/\btools\.(?:mcp__hive__)?(hive_[a-z]+(?:_[a-z]+)*)\s*\(/g)].map((m) => m[1])))
   const replies = items.filter((x) => x.kind === 'assistant').map((x) => x.text)
   return { tools, skillsRead, skillRefsRead, hiveMentions, finalReply: replies.at(-1) ?? '', replies }
 }
@@ -345,6 +348,8 @@ async function runScenario(sc, providerKey, opts = {}) {
   // The fakes follow Hive's notices as a model does (#650): told of something in their inbox, they read it and ack it.
   fs.writeFileSync(path.join(fakeHome, 'fake-follow-notices.txt'), '')
   if (providerKey === 'fake-codex') fs.writeFileSync(path.join(fakeCodexHome, 'fake-follow-notices.txt'), '')
+  // In code mode, as real Codex works (HI-2235): its calls come from scripts, read back from its rollout.
+  if (providerKey === 'fake-codex') fs.writeFileSync(path.join(fakeCodexHome, 'fake-code-mode.txt'), '')
   lib.gitProject(alpha, { 'README.md': '# alpha\n\nA small project for Hive scenarios.\n', 'math.js': 'module.exports = {}\n', ...sc.files })
   for (const other of sc.projects ?? []) lib.gitProject(path.join(ws, other), { 'README.md': `# ${other}\n` })
   // The fake trusts these folders; the real Claude Code asks (answered below); Codex reads its test home's trust list.
@@ -844,7 +849,12 @@ async function runScenario(sc, providerKey, opts = {}) {
     for (const it of items) {
       if (it.kind === 'tool' && (it.tool.inputLength || it.tool.resultLength)) it.tool = (await inv('transcript:tool', host, sessionId, it.id).catch(() => null)) ?? it.tool
     }
-    const observed = observeTranscript(items, skillNames, skillRefsOf(ctx.skillsDir, skillNames))
+    // Codex in code mode (HI-2235): each script's calls as its rollout recorded them, in the script's place. A script
+    // whose calls it didn't record (or no rollout) is no tool: what it ran is unobservable (codeMode.unknown).
+    const rollout = p.provider === 'codex' ? codexRollout(env.CODEX_HOME, sessionId) : null
+    const code = p.provider === 'codex' ? withScriptCalls(items, rollout ? fs.readFileSync(rollout, 'utf8') : null) : { items, scripts: 0, calls: 0, unknown: 0 }
+    const observed = observeTranscript(code.items, skillNames, skillRefsOf(ctx.skillsDir, skillNames))
+    observed.codeMode = { scripts: code.scripts, calls: code.calls, unknown: code.unknown }
     observed.status = s?.status ?? 'stopped'
     // Every status it reported during the turn, in order (HI-2022): `watching` seen even when it came and went between looks.
     observed.statuses = await ctx.statusesSeen().catch(() => [])
@@ -856,13 +866,13 @@ async function runScenario(sc, providerKey, opts = {}) {
     const states = await ctx.statesSeen(statesFrom).catch(() => [])
     observed.turnWatch = states.length ? (states.findLast((x) => x.status === 'watching')?.watch ?? null) : observed.status === 'watching' ? observed.watch : null
     // What Hive woke it with (#402), in order: a line it typed in, or (#650: its doorbell) what the session's next
-    // hive_inbox call read, the inbox's own items after the doorbell. Codex calls hive tools from its code tool (Script),
-    // so its read is the script that calls hive_inbox (#1537).
-    observed.wakeLines = items.flatMap((x, i) => {
+    // hive_inbox call read, the inbox's own items after the doorbell. Codex calls hive tools from its code tool (Script):
+    // its read is the hive_inbox call the script made (HI-2235); with the script's calls unknown, the doorbell's line.
+    observed.wakeLines = code.items.flatMap((x, i) => {
       const line = String(x.kind === 'user' ? (x.text ?? '') : '').trim()
       if (!line.startsWith('[Hive]')) return []
       if (!line.startsWith('[Hive] New in your inbox: ')) return [line.slice(0, 1000)]
-      const read = items.slice(i + 1).find((y) => y.kind === 'tool' && (/hive_inbox/.test(y.tool.name) || (y.tool.name === 'Script' && /hive_inbox/.test(String(y.tool.input ?? '')))))
+      const read = code.items.slice(i + 1).find((y) => y.kind === 'tool' && /hive_inbox/.test(y.tool.name))
       return [String(read?.tool.result ?? line).trim().slice(0, 1000)]
     })
     observed.guidance = result.guidance
@@ -876,7 +886,9 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Any Agent API token (the workspace's, or an agent's for this launch) in what the session printed or said.
     const tokensIn = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).token) : [])
     const tokens = [apiToken, ...tokensIn(path.join(userData, 'agent-api')), ...tokensIn(path.join(userData, 'assistant-api'))].filter((t) => typeof t === 'string' && t.length >= 16)
-    observed.tokenLeak = tokens.some((t) => observed.tools.some((x) => x.result.includes(t)) || observed.replies.some((r) => r.includes(t)))
+    // A script's own output too (what it printed), beside its calls'.
+    const scriptOutputs = code.items.filter((x) => x.kind === 'script').map((x) => String(x.tool.result ?? ''))
+    observed.tokenLeak = tokens.some((t) => observed.tools.some((x) => x.result.includes(t)) || scriptOutputs.some((r) => r.includes(t)) || observed.replies.some((r) => r.includes(t)))
     observed.cards = Object.fromEntries(await Promise.all(Object.entries(ctx.cards).map(async ([k, n]) => [k, (await api('GET', `/v1/tasks/${n}`)).body])))
     // Each card's workflow facts (1.0: Moved, Override, Refused…), for scenarios about what a move recorded (#1319).
     observed.facts = Object.fromEntries(await Promise.all(Object.entries(ctx.cards).map(async ([k, n]) => [k, (await inv('tasks:facts', n).catch(() => null)) ?? []])))

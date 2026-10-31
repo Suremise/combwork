@@ -29,7 +29,7 @@ import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, iso
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
-import { cardRequests, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
+import { cardRequests, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
 import { STOP_ASK_MS } from './mcp/agentApiCall'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
@@ -3100,7 +3100,7 @@ route('POST', '/v1/tasks/batch', async ({ body }) => {
  * why. A short reply reads each column's list once, after every change, so a card's place is where it ends up.
  */
 async function batchReply(items: tasks.BatchItem[], short: boolean, unknown: string[] = []): Promise<unknown> {
-  const refused: { number: number; ref?: string; error: string }[] = [...unknown.map((ref) => ({ number: 0, ref, error: `Unknown card ${ref}` })), ...items.filter((i) => !i.card).map((i) => ({ number: i.number, error: i.error ?? 'refused' }))]
+  const refused: TaskBatch['refused'] = [...unknown.map((ref) => ({ number: 0, ref, error: `Unknown card ${ref}` })), ...items.filter((i) => !i.card).map((i) => ({ number: i.number, error: i.error ?? 'refused', ...i.refused }))]
   const done = items.filter((i): i is tasks.BatchItem & { card: TaskCard } => !!i.card)
   if (!short) {
     const agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()

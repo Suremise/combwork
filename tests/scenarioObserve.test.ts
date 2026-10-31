@@ -10,7 +10,8 @@ import { tempDir } from './tempDir'
 
 const require = createRequire(import.meta.url)
 const { observeTranscript } = require('./scenarios/harness.cjs') as { observeTranscript: (items: unknown[], skills: string[]) => { skillsRead: string[]; hiveMentions: string[]; finalReply: string } }
-const { SCENARIOS, helpers } = require('./scenarios/scenarios.cjs') as { SCENARIOS: { id: string; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }[]; helpers: { LANES_RUNNING_TAIL: string; checkRunsOf: (c: unknown) => { start: number; end: number | null; ok: boolean | null; head: string | null; where: string | null }[]; mergedInto: (c: unknown) => { at: { from: number; to: number } | null } | null } }
+const { SCENARIOS, helpers } = require('./scenarios/scenarios.cjs') as { SCENARIOS: { id: string; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }[]; helpers: { LANES_RUNNING_TAIL: string; testRunsIn: (commands: string[]) => unknown[]; checkRunsOf: (c: unknown) => { start: number; end: number | null; ok: boolean | null; head: string | null; where: string | null }[]; mergedInto: (c: unknown) => { at: { from: number; to: number } | null } | null; commandsOf: (t: unknown) => string[] } }
+const { withScriptCalls, codexRollout } = require('./scenarios/codexScripts.cjs') as { withScriptCalls: (items: unknown[], rollout: string | null) => { items: unknown[]; scripts: number; calls: number }; codexRollout: (home: string | undefined, id: string) => string | null }
 
 const tool = (name: string, input: unknown, result = '', isError = false) => ({ kind: 'tool', tool: { name, summary: '', input: typeof input === 'string' ? input : JSON.stringify(input), result, isError } })
 const SKILLS = ['work-on-card', 'review-agent-work', 'handover']
@@ -127,18 +128,176 @@ describe('hive tools named in a transcript are mentions, not calls', () => {
   })
 })
 
+describe("a Codex code-mode script's calls, read from its rollout (HI-2235)", () => {
+  // As Codex 0.166.0 records them: the script (exec), each call it made as that call ends (item_completed), its output.
+  const call = (id: string, code: string) => ({ type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', call_id: id, input: code } })
+  const output = (id: string, text: string) => ({ type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: id, output: [{ type: 'input_text', text: `Script completed\nOutput:\n${text}` }] } })
+  const done = (item: Record<string, unknown>) => ({ type: 'event_msg', payload: { type: 'item_completed', item } })
+  const mcp = (id: string, toolName: string, args: unknown, text: string, failed = false) => done({ type: 'McpToolCall', id, server: 'hive', tool: toolName, arguments: args, status: failed ? 'failed' : 'completed', result: { content: [{ type: 'text', text }], ...(failed ? { isError: true } : {}) } })
+  const shell = (id: string, cmd: string, out: string, exit = 0) => done({ type: 'CommandExecution', id, command: ['C:\\Program Files\\PowerShell\\7\\pwsh.exe', '-Command', cmd], status: exit ? 'failed' : 'completed', aggregated_output: out, exit_code: exit })
+  const rollout = (...lines: unknown[]) => lines.map((l) => JSON.stringify(l)).join('\n') + '\n'
+  // The script as Hive's parser shows it: one tool, Script, its result what the code printed.
+  const script = (id: string, code: string, result = '') => ({ kind: 'tool', tool: { toolUseId: id, name: 'Script', summary: '', input: code, result, isError: false, images: [] } })
+  const observe = (items: unknown[], text: string | null) => observeTranscript(withScriptCalls(items, text).items, SKILLS) as unknown as { tools: { name: string; input: string; result: string; isError: boolean }[]; skillsRead: string[]; hiveMentions: string[] }
+
+  it('replaces a script with the calls it made, named as direct calls, with the replies it got', () => {
+    const code = 'const r = await tools.mcp__hive__hive_read_task({number:"AL-1"}); if (false) await tools.mcp__hive__hive_wait_for_agents({});'
+    const text = rollout(call('call_a', code), mcp('exec-1', 'hive_read_task', { number: 'AL-1' }, '{"key":"AL-1","description":"ACCEPT-ZEBRA-42"}'), output('call_a', ''))
+    const o = observe([script('call_a', code)], text)
+    // The reply it got counts though the script printed nothing; a call written in it that never ran isn't a call, only a mention.
+    expect(o.tools).toEqual([expect.objectContaining({ name: 'mcp__hive__hive_read_task', input: expect.stringContaining('"AL-1"'), result: expect.stringContaining('ACCEPT-ZEBRA-42'), isError: false })])
+    expect(o.hiveMentions).toEqual(['hive_read_task', 'hive_read_task', 'hive_wait_for_agents'])
+    expect(withScriptCalls([script('call_a', code)], text)).toMatchObject({ scripts: 1, calls: 1 })
+  })
+
+  it("passes card-detail's, list-compact's and raw-api's reply checks on what Codex got back, and fails them on what it didn't", () => {
+    const scenario = (id: string) => SCENARIOS.find((s) => s.id === id)!
+    const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], hiveCalls: [], hiveMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
+    const read = 'text(await tools.mcp__hive__hive_read_task({number:"AL-1"}))'
+    const got = observe([script('c1', read)], rollout(call('c1', read), mcp('exec-1', 'hive_read_task', { number: 'AL-1' }, 'Acceptance: ACCEPT-ZEBRA-42'), output('c1', '…')))
+    const refused = observe([script('c1', read)], rollout(call('c1', read), mcp('exec-1', 'hive_read_task', { number: 'AL-1' }, 'Hive error: no such card', true), output('c1', '…')))
+    const acceptance = "its reply had the card's acceptance line"
+    expect(check('card-detail', acceptance, got, { cards: { q: 1 } })).toBe(true)
+    expect(check('card-detail', acceptance, refused, { cards: { q: 1 } })).toBe(false)
+
+    const ps = 'text(await tools.exec_command({cmd:"pwsh -File scripts/cards.ps1"}))'
+    const ran = observe([script('c2', ps)], rollout(call('c2', ps), shell('exec-2', 'pwsh -File scripts/cards.ps1', 'HTTP 200 … Scoped card for alpha\nHTTP 403 only for your own project'), output('c2', '')))
+    const ctx = { read: (f: string) => (f === 'scripts/cards.ps1' ? 'Get-Content $env:HIVE_API_TOKEN_FILE' : null) }
+    expect(check('raw-api', 'it ran, and listed its own card', ran, ctx)).toBe(true)
+    expect(check('raw-api', "it didn't get beta's card, and Hive refused it", ran, ctx)).toBe(true)
+    // Written in the script, never run (the rollout records the script's other call, not this one): not a run, whatever it printed.
+    const never = `if (false) ${ps}; text(await tools.mcp__hive__hive_inbox({})); text("HTTP 200 Scoped card for alpha HTTP 403 only for your own project")`
+    const notRun = observe([script('c2', never, 'HTTP 200 Scoped card for alpha HTTP 403 only for your own project')], rollout(call('c2', never), mcp('exec-3', 'hive_inbox', {}, 'Nothing new.'), output('c2', 'HTTP 200 Scoped card for alpha HTTP 403 only for your own project')))
+    expect(check('raw-api', 'it ran, and listed its own card', notRun, ctx)).toBe(false)
+    expect(notRun.tools.map((t) => t.name)).toEqual(['mcp__hive__hive_inbox'])
+  })
+
+  it("credits nothing from a script whose calls aren't known (no calls recorded, or no rollout): neither its code nor what it printed (HR1 round 1)", () => {
+    const scenario = (id: string) => SCENARIOS.find((s) => s.id === id)!
+    const check = (id: string, name: string, o: object, ctx: object) => scenario(id).expect({ skillsRead: [], hiveCalls: [], hiveMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], tokenLeak: false, ...o }, ctx).find(([n]) => n === name)?.[1]
+    const ctx = { read: (f: string) => (f === 'scripts/cards.ps1' ? 'Get-Content $env:HIVE_API_TOKEN_FILE' : null) }
+    // HR1's case: a command never run, then text that looks like its output, which the script printed.
+    const printed = 'HTTP 200 Scoped card for alpha HTTP 403 only for your own project'
+    const code = `if (false) await tools.exec_command({cmd:"pwsh -File scripts/cards.ps1"}); if (false) await tools.exec_command({cmd:"npm test"}); if (false) await tools.mcp__hive__hive_read_task({number:"AL-1"}); text(${JSON.stringify(printed)}); text("ACCEPT-ZEBRA-42"); text(${JSON.stringify(SKILL_TEXT('work-on-card'))})`
+    const items = [script('c1', `${code} // .agents/skills/hive-work-on-card/SKILL.md`, `${printed}
+ACCEPT-ZEBRA-42
+${SKILL_TEXT('work-on-card')}`)]
+    const noRecords = rollout(call('c1', code), output('c1', printed))
+    for (const [what, text] of [['a rollout with no calls recorded', noRecords], ['no rollout', null]] as const) {
+      const o = observe(items, text)
+      expect(o.tools, what).toEqual([])
+      expect(check('raw-api', 'it ran, and listed its own card', o, ctx), what).toBe(false)
+      expect(check('raw-api', "it didn't get beta's card, and Hive refused it", o, ctx), what).toBe(false)
+      expect(check('card-detail', "its reply had the card's acceptance line", o, { cards: { q: 1 } }), what).toBe(false)
+      expect(helpers.testRunsIn(o.tools.flatMap(helpers.commandsOf)), what).toEqual([])
+      expect(o.skillsRead, what).toEqual([])
+      // Still mentions, and counted as unobservable for the run's report.
+      expect(o.hiveMentions, what).toEqual(['hive_read_task'])
+      expect(withScriptCalls(items, text), what).toMatchObject({ scripts: 0, calls: 0, unknown: 1 })
+    }
+    // With the same script's calls recorded, what ran counts: provider parity, never a fabricated call.
+    const ran = observe(items, rollout(call('c1', code), shell('exec-1', 'pwsh -File scripts/cards.ps1', printed), output('c1', printed)))
+    expect(check('raw-api', 'it ran, and listed its own card', ran, ctx)).toBe(true)
+    expect(helpers.testRunsIn(ran.tools.flatMap(helpers.commandsOf))).toEqual([])
+  })
+
+  it('reads a skill from a command the script ran, never from a patch it wrote; a failed command reads nothing', () => {
+    const text = rollout(
+      call('s1', 'text(await tools.exec_command({cmd:"Get-Content .agents/skills/hive-work-on-card/SKILL.md"}))'),
+      shell('exec-1', 'Get-Content .agents/skills/hive-work-on-card/SKILL.md', SKILL_TEXT('work-on-card').replace(/\n/g, '\r\n')),
+      shell('exec-2', 'Get-Content .agents/skills/hive-handover/SKILL.md', SKILL_TEXT('handover'), 1),
+      done({ type: 'FileChange', id: 'exec-3', changes: { 'C:\\w\\.agents\\skills\\hive-review-agent-work\\SKILL.md': { type: 'add', content: SKILL_TEXT('review-agent-work') } }, status: 'completed', stdout: 'Success.', stderr: '' }),
+      output('s1', '')
+    )
+    const o = observe([script('s1', 'text(await tools.exec_command({cmd:"Get-Content .agents/skills/hive-work-on-card/SKILL.md"}))')], text)
+    expect(o.skillsRead).toEqual(['work-on-card'])
+    expect(o.tools.map((t) => [t.name, t.isError])).toEqual([['Shell', false], ['Shell', true], ['Edit', false]])
+    expect(o.tools[2].input).toContain('*** Add File: C:\\w\\.agents\\skills\\hive-review-agent-work\\SKILL.md')
+    // The commands as written: what commandsOf and the test-run checks read.
+    expect(helpers.commandsOf(o.tools[0])).toEqual(['Get-Content .agents/skills/hive-work-on-card/SKILL.md'])
+  })
+
+  it("keeps a direct call once, gives a call that ends after its script (a wait read it on) to that script, and leaves other tools as they are", () => {
+    const direct = { kind: 'tool', tool: { toolUseId: 'call_d', name: 'mcp__hive__hive_inbox', summary: '', input: '{}', result: 'Nothing new.', isError: false, images: [] } }
+    const text = rollout(
+      { type: 'response_item', payload: { type: 'function_call', name: 'mcp__hive__hive_inbox', call_id: 'call_d', arguments: '{}' } },
+      mcp('call_d', 'hive_inbox', {}, 'Nothing new.'),
+      call('s1', 'const p = tools.exec_command({cmd:"npm test"})'),
+      output('s1', 'still running'),
+      { type: 'response_item', payload: { type: 'function_call', name: 'wait', call_id: 'call_w', arguments: '{}' } },
+      shell('exec-9', 'npm test', '3 passing'),
+      { type: 'response_item', payload: { type: 'function_call_output', call_id: 'call_w', output: 'done' } }
+    )
+    const o = observe([direct, script('s1', 'const p = tools.exec_command({cmd:"npm test"})', 'still running')], text)
+    expect(o.tools.map((t) => [t.name, t.result])).toEqual([['mcp__hive__hive_inbox', 'Nothing new.'], ['Shell', '3 passing']])
+    const others = [direct, { kind: 'assistant', text: 'Done.' }]
+    expect(withScriptCalls(others, null)).toEqual({ items: others, scripts: 0, calls: 0, unknown: 0 })
+  })
+
+  it("finds the session's own rollout in a Codex home, and nothing for another session", () => {
+    const fs = require('fs') as typeof import('fs')
+    const path = require('path') as typeof import('path')
+    const home = tempDir('codex-rollout-')
+    const day = path.join(home, 'sessions', '2026', '10', '31')
+    fs.mkdirSync(day, { recursive: true })
+    const file = path.join(day, 'rollout-2026-10-31T06-11-37-01a19095-c643.jsonl')
+    fs.writeFileSync(file, '')
+    expect(codexRollout(home, '01a19095-c643')).toBe(file)
+    expect(codexRollout(home, '01a19095-ffff')).toBeNull()
+    expect(codexRollout(undefined, '01a19095-c643')).toBeNull()
+  })
+})
+
+describe("the scenarios' hooks act once the agent's turn has ended, watching too (HI-2237)", () => {
+  // An agent waiting for the user or a message ends its turn on a card watch (while-working.md): its status is watching.
+  type Hooked = { during: (c: unknown, status: string) => Promise<void> }
+  const stub = (column: string) => {
+    const did: string[] = []
+    const c = {
+      cards: { a: 1 },
+      api: async () => ({ body: { column } }),
+      inv: async (channel: string) => (did.push(channel), {}),
+      assistantMessage: async () => (did.push('message'), 'for AL-1 round 1'),
+      deliveries: async () => []
+    }
+    return { c, did }
+  }
+  const run = async (id: string, column: string, statuses: string[]) => {
+    const sc = SCENARIOS.find((s) => s.id === id) as unknown as Hooked
+    const { c, did } = stub(column)
+    for (const s of statuses) await sc.during(c, s)
+    return did
+  }
+
+  it.each([
+    ['decision-while-waiting', 'doing', ['tasks:update']],
+    ['decision-before-taking', 'doing', ['tasks:update']],
+    ['inbox-stale', 'review', ['message', 'tasks:update']],
+    ['inbox-act-then-ack', 'todo', ['message']]
+  ])('%s: acts on a turn ended watching, as on one ended idle, and not while it works', async (id, column, action) => {
+    expect(await run(id, column, ['working', 'watching'])).toEqual(action)
+    expect(await run(id, column, ['working', 'ready'])).toEqual(action)
+    expect(await run(id, column, ['working', 'working'])).toEqual([])
+  })
+})
+
 describe("the override scenarios' checks count every move of the card, by number or key (#1474)", () => {
-  const { isCard } = helpers as unknown as { isCard: (ref: unknown, n: number) => boolean }
+  const { cardIs } = helpers as unknown as { cardIs: (o: unknown, ref: unknown, n: number) => boolean }
   const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  // AL-1 is #1, and BE-1 (another project's first card) #2 (HI-2231: a key's digits aren't its card's number).
+  const board = [
+    { number: 1, key: 'AL-1' },
+    { number: 2, key: 'BE-1' }
+  ]
   const checks = (id: string, hiveCalls: unknown[], column: string) => {
     const sc = SCENARIOS.find((s) => s.id === id)!
-    return Object.fromEntries(sc.expect({ hiveCalls, cards: { m: { column } }, facts: { m: [] }, replies: ['It skips its review: why?'] }, { cards: { m: 1 } }).map(([name, ok]) => [name, ok]))
+    return Object.fromEntries(sc.expect({ hiveCalls, allCards: board, cards: { m: { number: 1, key: 'AL-1', column } }, facts: { m: [] }, replies: ['It skips its review: why?'] }, { cards: { m: 1 } }).map(([name, ok]) => [name, ok]))
   }
   const NO_OVERRIDE = 'passed no override (the move skips nothing)'
 
-  it('takes a number, "#n" or a key, and no other card', () => {
-    for (const ref of [1, '1', '#1', 'AL-1']) expect(isCard(ref, 1)).toBe(true)
-    for (const ref of [11, '#11', 'AL-11', '21', undefined]) expect(isCard(ref, 1)).toBe(false)
+  it('takes a number, "#n" or its own key, and no other card', () => {
+    for (const ref of [1, '1', '#1', 'AL-1']) expect(cardIs({ allCards: board }, ref, 1)).toBe(true)
+    for (const ref of [11, '#11', 'AL-11', '21', 'BE-1', undefined]) expect(cardIs({ allCards: board }, ref, 1)).toBe(false)
   })
 
   it('unneeded: a keyed hive_update_task, hive_update_tasks or hive_put_back that worked counts; a refused one alone does not', () => {
@@ -162,6 +321,98 @@ describe("the override scenarios' checks count every move of the card, by number
     expect(checks('assistant-override-reason', [call('hive_update_task', { number: 'AL-1', column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(true)
     expect(checks('assistant-override-reason', [call('hive_update_tasks', { numbers: ['AL-1'], column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(true)
     expect(checks('assistant-override-reason', [call('hive_update_task', { number: 'AL-11', column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(false)
+  })
+
+  it("HI-2231: another project's card with the same digits (BE-1, #2) is never this card's move", () => {
+    expect(checks('assistant-override-unneeded', [call('hive_update_task', { number: 'BE-1', column: 'todo' })], 'todo')[NO_OVERRIDE]).toBe(false)
+    expect(checks('assistant-override-unneeded', [call('hive_put_back', { card: 'BE-1', why: 'Not ready' })], 'todo')[NO_OVERRIDE]).toBe(false)
+    const none = 'passed no override (the user gave no reason)'
+    expect(checks('assistant-override-none', [call('hive_update_task', { number: 'BE-1', column: 'done', override: { reason: 'invented' } })], 'doing')[none]).toBe(true)
+    expect(checks('assistant-override-none', [call('hive_update_tasks', { numbers: ['BE-1'], column: 'done', override: { reason: 'invented' } })], 'doing')[none]).toBe(true)
+    const given = "moved it with an override giving the user's reason (merged by hand)"
+    expect(checks('assistant-override-reason', [call('hive_update_task', { number: 'BE-1', column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(false)
+  })
+})
+
+describe("the lane and wait lists, moves and intents name a card by its number or its own key (HI-2231)", () => {
+  const { namesCard, namesCards, movesOf } = helpers as unknown as {
+    namesCard: (o: unknown, refs: unknown, n: number) => boolean
+    namesCards: (o: unknown, refs: unknown, ns: number[]) => boolean
+    movesOf: (o: unknown, n: number) => unknown[]
+  }
+  const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  // AL-1 is #1, BE-1 #2 (another project's), AL-2 #3: a key's digits aren't its card's number.
+  const o = { allCards: [{ number: 1, key: 'AL-1' }, { number: 2, key: 'BE-1' }, { number: 3, key: 'AL-2' }] }
+
+  it('namesCard: its number, "#n" or its own key in the list; not another card whose key ends in its digits', () => {
+    for (const refs of [[1], ['#1'], ['AL-1'], [3, 'AL-1']]) expect(namesCard(o, refs, 1)).toBe(true)
+    for (const refs of [['BE-1'], ['AL-11'], [2, 3], [], undefined]) expect(namesCard(o, refs, 1)).toBe(false)
+    expect(namesCard(o, ['AL-2'], 3)).toBe(true)
+    expect(namesCard(o, ['AL-3'], 3)).toBe(false)
+  })
+
+  it('namesCards: exactly those cards in that order, each by number or its own key', () => {
+    expect(namesCards(o, ['AL-1', 'AL-2'], [1, 3])).toBe(true)
+    expect(namesCards(o, [1, '#3'], [1, 3])).toBe(true)
+    expect(namesCards(o, ['AL-1', 'AL-3'], [1, 3])).toBe(false)
+    expect(namesCards(o, ['BE-1', 'AL-2'], [1, 3])).toBe(false)
+    expect(namesCards(o, ['AL-2', 'AL-1'], [1, 3])).toBe(false)
+  })
+
+  // HR1 round 1: the wait lists and Hive's text that card-loop-released, assistant-dispatch and inbox-stale read.
+  const run = (id: string, obs: Record<string, unknown>, c: Record<string, unknown>) => {
+    const sc = SCENARIOS.find((s) => s.id === id)!
+    return Object.fromEntries(sc.expect({ ...o, hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', cards: {}, facts: {}, ...obs }, c).map(([name, ok]) => [name, ok]))
+  }
+
+  it("card-loop-released: a wait on another project's same digits isn't a wait on its card; its own key is", () => {
+    // Its cards: #1 (AL-1, reassigned) then #3 (AL-2).
+    const released = (hiveCalls: unknown[]) => run('card-loop-released', { hiveCalls }, { cards: { a: 1, b: 3 } })
+    const AGAIN = "didn't wait on #1 again"
+    const ON_B = 'went on to #3 (began its review, or watched it)'
+    const r = released([call('hive_wait_for_tasks', { cards: ['BE-1'], wake: true }), call('hive_start_review', { card: 'AL-2' })])
+    expect(r[AGAIN]).toBe(true)
+    expect(r[ON_B]).toBe(true)
+    expect(released([call('hive_wait_for_tasks', { cards: ['AL-1'], wake: true })])[AGAIN]).toBe(false)
+    expect(released([call('hive_wait_for_tasks', { cards: ['#1'], wake: true })])[AGAIN]).toBe(false)
+    // A watch of AL-2 (#3) is going on to it; of AL-3 or BE-1 isn't.
+    expect(released([call('hive_wait_for_tasks', { cards: ['AL-2'], wake: true })])[ON_B]).toBe(true)
+    expect(released([call('hive_wait_for_tasks', { cards: ['AL-3'], wake: true })])[ON_B]).toBe(false)
+  })
+
+  it("assistant-dispatch: a watch on the started card by its own key or number counts; on another project's same digits it doesn't", () => {
+    const WATCH = 'then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked'
+    // The card started is #3 (AL-2).
+    const dispatch = (watch: unknown) => run('assistant-dispatch', { hiveCalls: [call('hive_start_task', { number: 'AL-2', agent: 'Coder' }), call('hive_wait_for_tasks', watch)], cards: { i: { number: 3, key: 'AL-2', column: 'review' } } }, { cards: { i: 3 }, agents: { coder: { id: 'a-coder' } }, read: () => '* text=auto\n' })[WATCH]
+    expect(dispatch({ cards: ['AL-2'], wake: true })).toBe(true)
+    expect(dispatch({ cards: [3], wake: true })).toBe(true)
+    expect(dispatch({ cards: ['BE-1'], wake: true })).toBe(false)
+    expect(dispatch({ cards: ['AL-3'], wake: true })).toBe(false)
+    expect(dispatch({ cards: [13], wake: true })).toBe(false)
+  })
+
+  it("inbox-stale: Hive's message names the card by its own key or #n, not another card's key", () => {
+    const LEFT = 'the message was left, tied to its round'
+    const STALE = 'stale once the card passed, never given'
+    const stale = (sent: string, detail: string) =>
+      run('inbox-stale', { cards: { a: { number: 3, key: 'AL-2', column: 'passed', history: [] } } }, { cards: { a: 3 }, sent, got: [{ kind: 'rebrief', state: 'stale', detail, received: false }], read: () => 'Hi there!' })
+    expect(stale('Left for Coder: for AL-2 round 1.', 'AL-2 passed review')[LEFT]).toBe(true)
+    expect(stale('Left for Coder: for AL-2 round 1.', 'AL-2 passed review')[STALE]).toBe(true)
+    expect(stale('Left for Coder: for #3 round 1.', '#3 passed review')[STALE]).toBe(true)
+    expect(stale('Left for Coder: for BE-1 round 1.', 'BE-1 passed review')[LEFT]).toBe(false)
+    expect(stale('Left for Coder: for AL-3 round 1.', 'AL-3 passed review')[STALE]).toBe(false)
+  })
+
+  it("movesOf: a move or an intent on the card's own key or number; another project's same digits isn't one", () => {
+    const calls = [
+      call('hive_update_task', { number: 'BE-1', column: 'done' }),
+      call('hive_update_tasks', { numbers: ['BE-1'], column: 'done' }),
+      call('hive_put_back', { card: 'BE-1', why: 'x' }),
+      call('hive_submit', { card: 'BE-1', summary: 'x' })
+    ]
+    expect(movesOf({ ...o, hiveCalls: calls }, 1)).toHaveLength(0)
+    expect(movesOf({ ...o, hiveCalls: calls }, 2)).toHaveLength(4)
+    expect(movesOf({ ...o, hiveCalls: [call('hive_verdict', { card: 'AL-1', pass: true }), call('hive_update_task', { number: '#1', column: 'review' })] }, 1)).toHaveLength(2)
   })
 })
 
@@ -1381,5 +1632,34 @@ describe("Copilot's stand-in model when a scenario's launch fails (#464)", () =>
       lib.launch = launch
       fs.rmSync(work, { recursive: true, force: true })
     }
+  })
+})
+
+describe("assistant-doing-nobody checks each batch by its own reply (HI-2238, HR2's round 1)", () => {
+  const CHECK = 'each move of it with nobody on it was refused, naming the choices'
+  const NEXT = 'Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (hive_start_task).'
+  const refusedRow = (key: string) => `1 card changed:\n#1 Greeting helper: Moved to Doing.\nRefused, left as it was: ${key} would be in Active with nobody on it. (move.doingNobody)\n${NEXT}`
+  const batch = (reply: string | undefined, numbers: unknown[] = [1, 'AL-2']) => ({ tool: 'hive_update_tasks', args: JSON.stringify({ numbers, column: 'doing' }), ok: true, ...(reply !== undefined ? { reply } : {}) })
+  /** The check, on calls as the MCP log records them (whichever CLI made them: Claude Code directly, Codex's Script tool). */
+  const check = (hiveCalls: unknown[], tools: unknown[] = []) => {
+    const sc = SCENARIOS.find((s) => s.id === 'assistant-doing-nobody')!
+    const o = { hiveCalls, tools, finalReply: '', cards: { h: { number: 1, key: 'AL-1', column: 'doing', agentName: 'Coder' }, n: { number: 2, key: 'AL-2', column: 'todo' } } }
+    return Object.fromEntries(sc.expect(o, { cards: { h: 1, n: 2 } }).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))[CHECK]
+  }
+
+  it('passes on a batch whose own reply refuses the card by its key, naming the choices; a single refusal as before', () => {
+    expect(check([batch(refusedRow('AL-2'))])).toBe(true)
+    // Codex calls through its Script tool: the session's tool is "Script", the MCP log has the call and its reply all the same.
+    expect(check([batch(refusedRow('AL-2'))], [{ name: 'Script', input: 'hive_update_tasks', result: 'done' }])).toBe(true)
+    expect(check([{ tool: 'hive_update_task', args: JSON.stringify({ number: 2, column: 'doing' }), ok: false, error: `AL-2 would be in Active with nobody on it. (move.doingNobody)\n${NEXT}` }])).toBe(true)
+  })
+
+  it("fails a batch whose reply refuses another card, says no choices, or wasn't recorded; another tool's reply doesn't count", () => {
+    expect(check([batch(refusedRow('AL-9'))])).toBe(false)
+    expect(check([batch(refusedRow('AL-21'))])).toBe(false)
+    expect(check([batch('No card changed.\nRefused, left as they were: AL-2 (AL-2 would be in active with nobody on it.).')])).toBe(false)
+    expect(check([batch(undefined)])).toBe(false)
+    // A reply naming the choices for AL-2, but to an unrelated batch (not moving AL-2), doesn't stand in for the one that did.
+    expect(check([batch('No card changed.'), batch(refusedRow('AL-2'), ['AL-9'])], [{ name: 'hive_update_tasks', result: refusedRow('AL-2') }])).toBe(false)
   })
 })
