@@ -483,6 +483,11 @@ interface LiveSession {
    */
   typed?: { at: number; prompts: number; from: number }
   /**
+   * When Hive last pressed Enter for a line of its own (HI-2218), at the key press: a prompt its CLI takes after it, the
+   * user's Enter before it, is Hive's, even while sendPrompt still waits for it to be taken (`typed` is recorded after).
+   */
+  hiveEnterAt?: number
+  /**
    * A line of Hive's the user typed into before its CLI took it (#652 round 1 finding 2): the prompt is their draft now, so
    * nothing more is typed into the agent until a prompt is submitted (the CLI's count passes this).
    */
@@ -1306,6 +1311,7 @@ class SessionManager {
     if (this.cliAsks(projectPath, agentId)) return false
     // Nor while something on its screen takes its keys (HI-2191).
     if (this.inputBlocked(projectPath, agentId)) return false
+    l.hiveEnterAt = Date.now()
     writePty(key, '\r')
     return true
   }
@@ -3529,8 +3535,12 @@ class SessionManager {
   private noteUserReply(l: LiveSession, text: string | null | undefined): void {
     const st = l.state
     if (!text?.trim() || text.trim().startsWith('/') || workspace.isAssistantHome(st.projectPath)) return
+    // A launch's task on its command line is its CLI's first prompt (HI-2218, #712), Hive's whatever Enter the user
+    // pressed on its start screen; `prompted` has counted it already.
+    if (l.launchTask && (l.prompts ?? 0) <= 1) return
     const enterAt = this.userEnter.get(this.key(st.projectPath, st.agentId)) ?? 0
-    if (enterAt <= (l.typed?.at ?? 0) || Date.now() - enterAt > USER_REPLY_MS) return
+    // Not when Hive's own Enter came after the user's (HI-2218): its line, reported taken while its typing still waits.
+    if (enterAt <= Math.max(l.typed?.at ?? 0, l.hiveEnterAt ?? 0) || Date.now() - enterAt > USER_REPLY_MS) return
     this.userReplied(st.projectPath, st.agentId, st.agentName ?? st.agentId, text)
   }
 
@@ -3858,6 +3868,8 @@ class SessionManager {
         if (!drawn()) log.info(`${userText(this.label(l!.state))}: the line Hive typed wasn't drawn within ${most} ms: Enter anyway`)
       }
       const before = l?.prompts ?? 0
+      // Hive's line from its Enter (HI-2218): the CLI reports it taken while the confirm below still waits, before `typed`.
+      if (l) l.hiveEnterAt = Date.now()
       writePty(key, '\r')
       // Waiting to be taken from here (#430), for whatever Hive types next: recorded once this call is done with it (its
       // own Enter again below is no line over it; nothing else types meanwhile, it holds `delivering`).
@@ -3885,6 +3897,7 @@ class SessionManager {
         } catch {
           break
         }
+        if (l) l.hiveEnterAt = Date.now()
         writePty(key, '\r')
       }
     } catch (e) {
