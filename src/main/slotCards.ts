@@ -753,11 +753,12 @@ export async function finishedSlots(ws: WorkspaceService, projectPath: string, w
 const quietWaits = new Set<string>()
 
 /**
- * HI-2115: finished cards whose slot git found on another line (finishedSlot), each with the slot and the refs' token
- * then. While lanes run, the slots' settling looked at every finished card of the last DELETE_WITHIN_MS at each board
- * change, a git each: most of Hive's git starts. Bounded: the oldest go first.
+ * HI-2115: the line git last found each slot on (finishedSlot), with the refs' token then. While lanes run, the slots'
+ * settling looked at every finished card of the last DELETE_WITHIN_MS at each board change, a git each: most of Hive's
+ * git starts. HI-2183: the slot's, not each card's, so one refs move asks git once per slot, not once per finished card
+ * it had (57 in 30 s after one merge). Bounded: the oldest go first.
  */
-const offLine = new Map<string, string>()
+const offLine = new Map<string, { refs: string; line: string | null }>()
 const OFF_LINE_MAX = 5000
 
 /** Tests: forgets the slots found on another line. */
@@ -819,28 +820,29 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
     async () => {
       const now = slotNow()
       if (!own() || !now || now.busy) return
-      // HI-2115: a slot git last found on another line stays there until its repository's refs move (the watcher's
-      // token, taken before git reads, so a move during the read is seen next time): not asked again meanwhile. Git is
-      // still what says where it is (HI-2050's decision); the watcher only says nothing moved.
-      const key = [projectPath.toLowerCase(), lease, n, finish, line].join('\0')
+      // HI-2115: a slot git last found on another line than this card's stays there until its repository's refs move (the
+      // watcher's token, taken before git reads, so a move during the read is seen next time): not asked again meanwhile,
+      // for this card or any other finished there (HI-2183). Git is still what says where it is (HI-2050's decision); the
+      // watcher only says nothing moved. Found on this card's line, git is asked each time.
+      const key = [projectPath.toLowerCase(), now.name, now.folder.toLowerCase(), target].join('\0')
       const refs = await observer.refsNow(projectPath, now.folder)
-      const seen = refs ? [now.name, now.folder.toLowerCase(), target, refs].join('\0') : null
-      if (seen && offLine.get(key) === seen) {
+      const was = refs ? offLine.get(key) : undefined
+      if (was && was.refs === refs && was.line !== line) {
         if (asked() && own()) await wf.closeSlotDirty(card, finish)
         return
       }
       const h = await G.heads(now.folder, target)
-      if (isUnknown(h.line) || !own()) return
+      if (isUnknown(h.line)) return
+      offLine.delete(key)
+      if (refs) {
+        offLine.set(key, { refs, line: h.line })
+        if (offLine.size > OFF_LINE_MAX) offLine.delete(offLine.keys().next().value!)
+      }
+      if (!own()) return
       if (h.line !== line) {
-        if (seen) {
-          offLine.delete(key)
-          offLine.set(key, seen)
-          if (offLine.size > OFF_LINE_MAX) offLine.delete(offLine.keys().next().value!)
-        }
         if (asked()) await wf.closeSlotDirty(card, finish)
         return
       }
-      offLine.delete(key)
       const d = await G.dirty(now.folder)
       if (isUnknown(d) || !own()) return
       if (d.length) {
