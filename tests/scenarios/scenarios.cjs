@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 104
+const FIXTURES_VERSION = 105
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -181,6 +181,11 @@ async function wakeRead(c, key) {
   }
   if (!(await require('../e2e/lib.cjs').until(wakeIsRead, 120000))) throw new Error(`setup: Coder's wake for #${c.cards[key]} wasn't read: ${JSON.stringify(await c.deliveries('coder'))}, ${await c.subjectStatus()}`)
 }
+/**
+ * The card loop lanes' first card (card-loop-lane, -defaults, -override, -submit-watch): a change asked for plainly, as
+ * greet.js says "Hello" (HI-2224: "returns Hi instead of Hello" read as a report on code that was already right).
+ */
+const CARD_LOOP_GREETING = 'Change greet.js so it returns "Hi, <name>" instead of "Hello, <name>".'
 /**
  * The fake builder's work on greet.js, committed before its card goes to Review (#1486: a submit needs a change). A step
  * a command, since the fakes' shells differ: cmd (Claude Code's, Codex's) and PowerShell (Copilot's).
@@ -2385,8 +2390,8 @@ module.exports.SCENARIOS = [
     async setup(c) {
       // A reviewer agent reviews before Done (#1486: with no review, a submit went straight to Done).
       await pairInProject(c)
-      await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>" instead of "Hello, <name>".', agent: 'coder' })
-      await c.card('b', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'coder' })
+      await c.card('a', { title: 'Make the greeting say Hi', description: CARD_LOOP_GREETING, agent: 'coder' })
+      await c.card('b', { title: 'Trim the name in the greeting', description: 'Change greet.js so it trims spaces around the name before greeting.', agent: 'coder' })
     },
     prompt: (c) => `Work through cards #${c.cards.a} then #${c.cards.b} as their builder; Implementer reviews them. Rounds: 10. Wait: 6h.`,
     fake: (c) => `skill card-loop then hive hive_lane {"action":"start","cards":[${c.cards.a},${c.cards.b}],"reviewer":"Implementer","rounds":10,"waitMinutes":360} then ${fakeStart(c.cards.a)} then ${LOOP_COMMIT} then ${verdictWatch(c.cards.a)} then hive hive_submit ${JSON.stringify({ card: `#${c.cards.a}`, summary: 'Ready for review: greet.js says Hi.' })}`,
@@ -2422,8 +2427,8 @@ module.exports.SCENARIOS = [
         const form = await c.inv('workflow:levelForm', 'workspace', platform)
         await c.inv('workflow:setLevel', 'workspace', platform, { preset: null, options: { ...form.own, loopRounds: 7, loopWaitHours: 3 }, base: { preset: null, options: form.own } })
       }
-      await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>" instead of "Hello, <name>".', agent: 'coder' })
-      await c.card('b', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'coder' })
+      await c.card('a', { title: 'Make the greeting say Hi', description: CARD_LOOP_GREETING, agent: 'coder' })
+      await c.card('b', { title: 'Trim the name in the greeting', description: 'Change greet.js so it trims spaces around the name before greeting.', agent: 'coder' })
     },
     prompt: (c) => `Work through cards #${c.cards.a} then #${c.cards.b} as their builder; Implementer reviews them.${v.said}`,
     fake: (c) =>
@@ -2455,7 +2460,7 @@ module.exports.SCENARIOS = [
     startedByHive: true,
     async setup(c) {
       await pairInProject(c)
-      const a = await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>" instead of "Hello, <name>".', agent: 'coder' })
+      const a = await c.card('a', { title: 'Make the greeting say Hi', description: CARD_LOOP_GREETING, agent: 'coder' })
       await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
       // Implementer reviews with its own token: started, so it has one.
       await c.startAgent('implementer')
