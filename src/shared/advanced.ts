@@ -1008,7 +1008,7 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.hive.lanes.unwatchedNotice.title', defaultMessage: 'Lanes: remind the Assistant to watch them', description: "An advanced setting's title (Settings → Advanced), listed under Hive. A lane is a card loop: a builder and a reviewer taking cards in turn; the Assistant is the Hive Assistant." }),
     desc: msg({
       id: 'settings.advanced.hive.lanes.unwatchedNotice.desc',
-      defaultMessage: "When the Hive Assistant is about to end its turn while lanes are running and no watch of its covers them, Hive keeps it going once to say so, naming the lanes' builders, so it watches them before it finishes. Turned off, its turn ends as its CLI ends it, and nothing wakes it about those lanes until it watches them again.",
+      defaultMessage: "When the Hive Assistant may control agents (Settings → Assistant → Control) and is about to end its turn while lanes are running and no watch of its covers them, Hive keeps it going once to say so, naming the lanes' builders, so it watches them before it finishes. At Look and advise the lanes are yours to run, and it isn't told. Turned off, its turn ends as its CLI ends it, and nothing wakes it about those lanes until it watches them again.",
       description: 'What the advanced setting "Lanes: remind the Assistant to watch them" does (Settings → Advanced, under Hive). A lane is a card loop; a watch is what wakes an agent when the cards or lanes it follows change.'
     }),
     kind: 'boolean',

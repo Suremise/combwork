@@ -1,6 +1,7 @@
 // The Assistant told of running lanes no watch of its covers, as its turn ends (HI-2069): one line with the drain
 // (inboxNotices.ts), by the uncovered lanes' builders; none with a lane watch on them all, with no lane running, for a
-// project agent, or with its switch off. The drain's own rules (once a turn, each CLI's Stop reply) are
+// project agent, with its switch off, or when the Assistant's control level doesn't let it control agents (HI-2187: Look
+// and advise). The drain's own rules (once a turn, each CLI's Stop reply) are
 // inboxNotices.test.ts's.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { unwatchedLanesNotice } from '../src/shared/doorbell'
@@ -9,6 +10,7 @@ const HOME = 'C:\\ws\\.hive\\assistant'
 const state = vi.hoisted(() => ({
   on: true,
   continuation: true,
+  control: 'agents' as 'look' | 'agents' | 'projects',
   lanes: [] as { id: string; state: string; builder: { id: string; name: string } }[],
   watch: null as null | { lanes?: string[] },
   unread: [] as { id: string; kind: string; state: string; expires: string }[]
@@ -19,6 +21,7 @@ vi.mock('../src/main/workspace', () => ({ workspaceFor: () => ({ path: 'C:\\ws',
 vi.mock('../src/main/lanes', () => ({ rawLanes: async () => state.lanes }))
 vi.mock('../src/main/watches', () => ({ loadedWatchFor: async () => state.watch }))
 vi.mock('../src/main/sessions', () => ({ sessions: {} }))
+vi.mock('../src/main/assistantControl', () => ({ allows: (need: string) => need === 'look' || state.control !== 'look' }))
 vi.mock('../src/main/deliveries', () => ({
   agentReadsInbox: () => true,
   inboxSwitch: async (_h: string, which: string) => (which === 'stopContinuation' ? state.continuation : true),
@@ -27,7 +30,7 @@ vi.mock('../src/main/deliveries', () => ({
 
 const { noticeFor } = await import('../src/main/inboxNotices')
 
-afterEach(() => Object.assign(state, { on: true, continuation: true, lanes: [], watch: null, unread: [] }))
+afterEach(() => Object.assign(state, { on: true, continuation: true, control: 'agents', lanes: [], watch: null, unread: [] }))
 
 const lane = (id: string, builder: string, st = 'active') => ({ id, state: st, builder: { id: builder.toLowerCase(), name: builder } })
 const assistant = { projectPath: HOME, agentId: 'assistant', sessionId: 's1' } as never
@@ -66,6 +69,27 @@ describe('the Assistant ending a turn with lanes running and no watch (HI-2069)'
     state.on = true
     state.continuation = false
     expect(await noticeFor(assistant, 'drain')).toBeNull()
+  })
+
+  // HI-2187: at Look and advise the lanes are the user's to run: no line, and no turn carried on for it.
+  it('only when the Assistant may control agents: none at Look and advise; Control agents (and create projects) gets it', async () => {
+    state.lanes = [lane('l1', 'HB1'), lane('l2', 'HB2')]
+    state.control = 'look'
+    expect(await noticeFor(assistant, 'drain')).toBeNull()
+    state.control = 'agents'
+    expect(await noticeFor(assistant, 'drain')).toBe(LINE)
+    state.control = 'projects'
+    expect(await noticeFor(assistant, 'drain')).toBe(LINE)
+    // Its switch (Settings → Advanced) turns it off at any level.
+    state.on = false
+    expect(await noticeFor(assistant, 'drain')).toBeNull()
+  })
+
+  it('at Look and advise, its unread inbox is still said at the drain, without the lanes line', async () => {
+    state.lanes = [lane('l1', 'HB1')]
+    state.control = 'look'
+    state.unread = [{ id: 'm7', kind: 'rebrief', state: 'offered', expires: new Date(Date.now() + 3600_000).toISOString() }]
+    expect(await noticeFor(assistant, 'drain')).toBe("[Hive] Before you finish: your inbox has 1 message (m7) you haven't read. Call hive_inbox, act on it and ack it before you end your turn.")
   })
 
   // HR1's round 1: agent names aren't limited to what the line keeps of them.
