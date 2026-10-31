@@ -8,6 +8,8 @@ const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
+const HUNG_MS = 10000
 
 const userData = path.join(lib.WORK, 'narrowmain-profile')
 const ws = path.join(lib.WORK, 'narrowmain-ws')
@@ -135,12 +137,9 @@ const check = (name, ok, extra = '') => {
   // The window at its least (900 × 560, WINDOW_MIN), at 100% and 125%: every activity bar button, Settings last, scrolled
   // into view, is what is under the pointer at its middle (elementFromPoint, no click) and ends above the status bar
   // (HI-1957: thirteen buttons since HI-1664 put Settings under it in a 650 px window; termsize clicks Settings there).
-  await lib.fitWindow(app, page, { width: 900, height: 560 })
-  for (const z of [1, 1.25]) {
-    await zoom(z)
-    // Laid out at the new size and zoom first.
-    await lib.until(() => page.evaluate((f) => Math.abs(innerHeight * f - 560) < 2 && devicePixelRatio > 0, z), 5000)
-    const bar = await page.evaluate(() => {
+  // Its width is checked too (HI-2180): squeezed for the room, the sidebar's resizer lay over the buttons' middles.
+  const activityBar = () =>
+    page.evaluate(() => {
       const ab = document.querySelector('.activitybar')
       const status = document.querySelector('.statusbar').getBoundingClientRect()
       const misses = []
@@ -153,11 +152,30 @@ const check = (name, ok, extra = '') => {
       const buttons = ab.querySelectorAll('.activity-btn').length
       const heights = [...ab.querySelectorAll('.activity-btn')].map((b) => Math.round(b.getBoundingClientRect().height))
       ab.scrollTop = 0
-      return { buttons, heights: [...new Set(heights)], misses }
+      return { buttons, width: Math.round(ab.getBoundingClientRect().width), heights: [...new Set(heights)], misses }
     })
-    check(`least window, ${z * 100}%: every activity bar button, scrolled to, is on top at its middle, above the status bar`, bar.buttons >= 13 && bar.misses.length === 0, JSON.stringify(bar))
+  const whole = (bar) => bar.buttons >= 13 && bar.width === 48 && bar.misses.length === 0
+  /** The activity bar once it is whole, as laid out now (the window and its panels settle after a change): else its last read. */
+  const wholeBar = async () => {
+    let bar = null
+    await lib.until(async () => whole((bar = await activityBar())), HUNG_MS)
+    return bar
+  }
+  await lib.fitWindow(app, page, { width: 900, height: 560 })
+  for (const z of [1, 1.25]) {
+    await zoom(z)
+    const zoomed = await lib.until(() => page.evaluate((f) => Math.abs(innerHeight * f - 560) < 2 && devicePixelRatio > 0, z), HUNG_MS)
+    const bar = await wholeBar()
+    check(`least window, ${z * 100}%: every activity bar button, scrolled to, is on top at its middle, above the status bar`, !!zoomed && whole(bar), JSON.stringify({ zoomed, ...bar }))
     await page.screenshot({ path: path.join(lib.WORK, `narrowmain-least-${z * 100}.png`) })
   }
+  // The Projects list expanded from its rail there (the user's Expand Sidebar): the work gives way, never the activity bar.
+  await page.locator('.sidebar .rail-btn').first().click()
+  const listed = await lib.until(() => page.evaluate(() => !!document.querySelector('.sidebar:not(.compact) .sidebar-resizer')), HUNG_MS)
+  check('least window, 125%: Expand Sidebar shows the Projects list, not its rail', !!listed)
+  const expanded = await wholeBar()
+  check('…and the activity bar keeps its width, every button on top', !!listed && whole(expanded), JSON.stringify(expanded))
+  await page.screenshot({ path: path.join(lib.WORK, 'narrowmain-least-125-expanded.png') })
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
 
   // A roomy window: the empty state is as before, centred and whole, with no scrolling.
