@@ -127,8 +127,20 @@ function allCallsReported(logged, metrics) {
   return !!metrics && metricsTotals(metrics).toolCalls >= logged.filter((c) => !c.direct).length
 }
 
-/** The calls the hive MCP servers ran, from their test log: [{ tool, role, project, agent, ok, error, args }]. */
+/**
+ * The calls the hive MCP servers ran, from their test log: [{ tool, role, project, agent, ok, error, args, mode, chars,
+ * bytes }]. Its other lines (HI-2186: `kind: 'list'`, a server's tool list) are left out: readMcpLists has those.
+ */
 function readMcpLog(file) {
+  return readJsonLines(file).filter((l) => l.kind === undefined)
+}
+
+/** The tool lists the hive MCP servers sent (HI-2186), one a server: [{ at, role, project, agent, tools, bytes, chars }]. */
+function readMcpLists(file) {
+  return readJsonLines(file).filter((l) => l.kind === 'list')
+}
+
+function readJsonLines(file) {
   if (!fs.existsSync(file)) return []
   return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
 }
@@ -537,13 +549,19 @@ async function runScenario(sc, providerKey, opts = {}) {
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === host.toLowerCase() && s.agentId === agentId)
     // Hive's performance metrics before the launch (the run's own workspace: everything in it is this run's).
     const metricsFrom = new Date(started - 2 * 3600_000).toISOString()
-    const snapshot = async () => {
+    // Each snapshot's request, from just before it was sent to just after its answer (HI-2186): a hive call is in the
+    // measured window when its report reached Hive after the first and before the last (benchmark.cjs splitOf).
+    const snapshots = { before: null, after: null }
+    const snapshot = async (side) => {
       const t = Date.now()
+      const start = new Date().toISOString()
       const r = await api('GET', `/v1/metrics?scope=workspace&from=${encodeURIComponent(metricsFrom)}`)
       result.metricsOverheadMs += Date.now() - t
-      return r.status === 200 ? r.body : null
+      if (r.status !== 200) return null
+      snapshots[side] = { start, end: new Date().toISOString() }
+      return r.body
     }
-    const metricsBefore = await snapshot()
+    const metricsBefore = await snapshot('before')
     // A change made inside the measured window (a skill edited after the snapshot, before the launch), for scenarios
     // that compare the skill service's work on unchanged and changed revisions.
     if (sc.beforeLaunch) await sc.beforeLaunch(ctx)
@@ -753,11 +771,11 @@ async function runScenario(sc, providerKey, opts = {}) {
     // The bridges report their calls to Hive a batch at a time (every 2 s, or as their CLI closes input): read the
     // metrics once they count every call the bridges logged (allCallsReported). Not all within the bound (a report
     // dropped): the last read, shown as partial.
-    let metricsAfter = await snapshot()
+    let metricsAfter = await snapshot('after')
     let allReported = !metricsBefore || !metricsAfter || allCallsReported(readMcpLog(mcpLog), metricsAfter)
     if (!allReported)
       allReported = !!(await lib.until(async () => {
-        metricsAfter = (await snapshot()) ?? metricsAfter
+        metricsAfter = (await snapshot('after')) ?? metricsAfter
         return allCallsReported(readMcpLog(mcpLog), metricsAfter)
       }, HUNG_MS))
     const sessionId = s?.sessionId ?? (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha')?.agents.find((a) => a.id === coder.id)?.lastSessionId
@@ -793,6 +811,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     observed.guidance = result.guidance
     // What the hive servers ran: the subject's own calls, and everyone's (an agent the Assistant started).
     observed.allHiveCalls = readMcpLog(mcpLog)
+    observed.mcpLists = readMcpLists(mcpLog)
+    observed.mcpReports = readJsonLines(mcpLog).filter((l) => l.kind === 'reported')
     observed.hiveCalls = observed.allHiveCalls.filter((c) => (sc.role === 'assistant' ? c.role === 'assistant' : c.agent === coder.id))
     // Each change to the merge slots (JSON lines, as the MCP log): { at, slots: [{ project, branch, holder, waiting }] }.
     observed.slotLog = readMcpLog(slotLog)
@@ -815,7 +835,6 @@ async function runScenario(sc, providerKey, opts = {}) {
     observed.settings = await inv('settings:get')
     result.usage = sessionId ? await inv('session:usage', host, sessionId).catch(() => null) : null
     // A fake acts a scenario out with scripted board moves: checks only a model's own work can meet are skipped there.
-    result.measures = metricsBefore && metricsAfter ? measuresOf(metricsBefore, metricsAfter, observed, result.usage) : null
     result.metricsRecording = metricsAfter?.recording ?? null
     // How complete the measurement was: both reads, recording on, nothing dropped or evicted in between.
     const partial = []
@@ -826,6 +845,11 @@ async function runScenario(sc, providerKey, opts = {}) {
     if (dropped) partial.push(`${dropped} measurements dropped`)
     if (metricsAfter?.coverage?.evictedThrough) partial.push('history removed for space')
     result.coverage = { recording: metricsAfter?.recording ?? null, dropped, partial }
+    // The subject apart from the other agents (HI-2186): who is who by the fixture's roster (the project's agents, by
+    // their fixture names) and the run's lanes.
+    const roster = (((await api('GET', '/v1/projects/alpha')).body?.agents ?? []) || []).map((a) => ({ id: a.id, name: a.name, workflowRole: a.workflowRole ?? null }))
+    const parts = { kind: sc.role === 'assistant' ? 'assistant' : 'agent', agentId, snapshots, complete: partial.length === 0, roster, lanes: observed.lanes }
+    result.measures = metricsBefore && metricsAfter ? measuresOf(metricsBefore, metricsAfter, observed, result.usage, parts) : null
     // Every scenario starts a new session (session:start with no resumeId): its usage is the scenario's own.
     result.resumed = false
     observed.measures = result.measures

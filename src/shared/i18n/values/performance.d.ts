@@ -40,9 +40,16 @@ interface HiveMessageValues {
   'performance.compare.about.export': { from: string | number; to: string | number; filters: string | number }
   'performance.compare.about.exportPart': { from: string | number; to: string | number; filters: string | number; part: string | number }
   'performance.compare.about.scenarios': { real: string; provider: string | number; model: string | number; effort: string | number; mode: string | number; fixtures: string | number; scenarios: number; repeats: number; head: string | number; spent: string | number; unpriced: number }
+  'performance.compare.agent.assistant': undefined
+  'performance.compare.agent.overflow': { n: number }
+  'performance.compare.agent.unattributed': undefined
+  'performance.compare.agentCalls': { agent: string | number; role: string; base: string | number; run: string | number }
   'performance.compare.baseline': undefined
+  'performance.compare.callsByAgent': { agents: string | number }
   'performance.compare.cantCompare': undefined
+  'performance.compare.col.allAgentsTip': undefined
   'performance.compare.col.calls': undefined
+  'performance.compare.col.callsTip': undefined
   'performance.compare.col.change': undefined
   'performance.compare.col.checks': undefined
   'performance.compare.col.checksTip': undefined
@@ -191,9 +198,11 @@ interface HiveMessageValues {
   'performance.compare.notComparable': { reasons: string | number }
   'performance.compare.note.cliVersions': { base: string | number; run: string | number }
   'performance.compare.note.estimates': undefined
+  'performance.compare.note.fakePerCall': undefined
   'performance.compare.note.fakeUsage': undefined
   'performance.compare.note.leftOut': { n: number; why: string | number }
   'performance.compare.note.measuredPartly': { n: number }
+  'performance.compare.note.noSplit': { side: string }
   'performance.compare.note.notJudged': undefined
   'performance.compare.note.oneSample': undefined
   'performance.compare.note.partial': { side: string; what: string | number }
@@ -203,6 +212,7 @@ interface HiveMessageValues {
   'performance.compare.note.sameGuidance': undefined
   'performance.compare.note.skillRevisions': undefined
   'performance.compare.note.skillRevisionsOf': { names: string | number }
+  'performance.compare.note.splitPartial': undefined
   'performance.compare.note.stale': { n: number }
   'performance.compare.note.usageNotEvery': undefined
   'performance.compare.note.withinSpread': undefined
@@ -243,6 +253,7 @@ interface HiveMessageValues {
   'performance.compare.scopeName': { kind: string; project: string | number }
   'performance.compare.sideMeasure': { measure: string | number; side: string }
   'performance.compare.sizesHint': undefined
+  'performance.compare.splitMeasure': { measure: string | number; part: string; assistant: string }
   'performance.compare.status.better': undefined
   'performance.compare.status.betterTip': undefined
   'performance.compare.status.failing': undefined

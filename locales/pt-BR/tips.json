@@ -352,6 +352,8 @@
   "tips.pauseTeam.title": "Pause a equipe antes de uma atualização",
   "tips.perfCompare.text": "Desempenho → Comparar: guarde a visualização atual antes de uma alteração e de novo depois dela, e veja se o tráfego do Hive caiu enquanto o trabalho continuou sendo feito.",
   "tips.perfCompare.title": "Antes e depois de uma alteração",
+  "tips.perfCompareAgents.text": "Comparando dois benchmarks de cenários? Abra um cenário em Desempenho → Comparar: as medidas mostram primeiro a sessão testada, depois os outros agentes (o executor e o revisor de uma raia) e todos juntos, com as chamadas hive de cada agente.",
+  "tips.perfCompareAgents.title": "De qual agente veio uma mudança",
   "tips.performance.text": "Desempenho, na barra de atividades, mostra quanto a API, as ferramentas e as orientações do Hive custaram no último dia, semana ou mês: no espaço de trabalho inteiro ou em um projeto. Cada projeto também tem a própria aba Desempenho.",
   "tips.performance.title": "Quanto o próprio Hive custa",
   "tips.permissionMode.text": "Clique no modo, no rodapé de um agente, ou pressione {key}, para alternar entre perguntar antes, aceitar edições e planejar.",

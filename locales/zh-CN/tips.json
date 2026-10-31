@@ -352,6 +352,8 @@
   "tips.pauseTeam.title": "更新前暂停团队",
   "tips.perfCompare.text": "“性能”→“比较”：在更改前保存当前视图，更改后再保存一次，看看 Hive 的流量是否减少了，同时工作照样完成。",
   "tips.perfCompare.title": "更改前后对比",
+  "tips.perfCompareAgents.text": "在比较两次场景基准测试？在“性能”→“比较”中打开一个场景：其度量先显示被测会话，再显示其他智能体（通道的构建者和评审者），以及所有智能体的合计，并列出每个智能体的 hive 调用。",
+  "tips.perfCompareAgents.title": "变化来自哪个智能体",
   "tips.performance.text": "活动栏中的“性能”显示 Hive 的 API、工具和指引在最近一天、一周或一个月内的开销：可以看整个工作区，也可以看单个项目。每个项目也有自己的“性能”标签页。",
   "tips.performance.title": "Hive 本身的开销",
   "tips.permissionMode.text": "点击智能体底部栏中的模式，或按 {key}，即可在先询问、接受编辑和计划之间切换。",

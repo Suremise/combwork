@@ -1,5 +1,5 @@
 import { Children, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { BENCHMARK_LIMITS, SCENARIO_MEASURES, USAGE_MEASURES, compareArtifacts, exportMeasure, sideMeasureLabel, compareScopeKey, keptAbout, keptLabel, type CompareScope, type Comparison, type KeptEntry, type MeasureDef, type MeasureDelta, type ScenarioComparison, type ScenarioStatus } from '@shared/benchmark'
+import { BENCHMARK_LIMITS, SCENARIO_MEASURES, USAGE_MEASURES, compareArtifacts, exportMeasure, sideMeasureLabel, compareScopeKey, keptAbout, keptLabel, type CompareScope, type Comparison, type KeptEntry, type MeasureDef, type MeasureDelta, type ScenarioComparison, type ScenarioStatus, type AgentCallsDelta } from '@shared/benchmark'
 import type { MetricsQuery } from '@shared/metrics'
 import { shownText, type Text } from '@shared/advanced'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
@@ -80,6 +80,14 @@ const M = {
   context: msg({ id: 'performance.compare.col.context', defaultMessage: 'Hive context', description: "Column header in Performance → Compare: the size of what Hive put in a session's context." }),
   toolReplies: msg({ id: 'performance.compare.col.toolReplies', defaultMessage: 'Tool replies', description: "Column header in Performance → Compare: the size of the replies of Hive's tools." }),
   calls: msg({ id: 'performance.compare.col.calls', defaultMessage: 'Calls (repeated)', description: "Column header in Performance → Compare: calls of Hive's tools, and how many repeated an earlier one." }),
+  allAgentsTip: msg({ id: 'performance.compare.col.allAgentsTip', defaultMessage: 'Every agent’s in the scenario together, as the result judges them; a scenario’s details show the session under test apart.', description: "Tooltip of the Tool replies column in Performance → Compare (HI-2186): the figure is all agents' together (the session the scenario tests, and any agents it or Hive started), which is what the Result column judges." }),
+  callsTip: msg({ id: 'performance.compare.col.callsTip', defaultMessage: 'The hive tool calls of the session under test (the Assistant, or the agent the scenario tests), and how many repeated an earlier one.', description: "Tooltip of the Calls (repeated) column in Performance → Compare (HI-2186). Keep hive (Hive's tools)." }),
+  splitMeasure: msg({ id: 'performance.compare.splitMeasure', defaultMessage: '{measure} · {part, select, subject {{assistant, select, yes {the Assistant} other {the agent under test}}} others {other agents} other {all agents (judged)}}', description: "A row of a scenario's measures in Performance → Compare (HI-2186): {measure} is the measure's name (\"Tool calls\"); then whose: the session the scenario tests (the Assistant, or the agent under test), the other agents, or all of them together, which is what the result judges." }),
+  callsByAgent: msg({ id: 'performance.compare.callsByAgent', defaultMessage: 'Hive calls by agent in the measured window, baseline → run: {agents}', description: "A line under a scenario's measures in Performance → Compare (HI-2186): each agent's hive tool calls, on average a sample. {agents} is a list of entries like \"Coder (builder): 1 → 4\"." }),
+  agentCalls: msg({ id: 'performance.compare.agentCalls', defaultMessage: '{agent}{role, select, builder { (builder)} reviewer { (reviewer)} other {}}: {base} → {run}', description: "An entry of the Hive calls by agent line in Performance → Compare (HI-2186): an agent's name (a test fixture's, such as Coder, or the Assistant), its role in a lane, and its calls in the baseline and in the run ({base} and {run} are numbers already formatted, or – when unknown). Glossary: builder, reviewer." }),
+  agentAssistant: msg({ id: 'performance.compare.agent.assistant', defaultMessage: 'the Assistant', description: 'An agent in the Hive calls by agent line of Performance → Compare (HI-2186): the Hive Assistant.' }),
+  agentUnattributed: msg({ id: 'performance.compare.agent.unattributed', defaultMessage: 'an agent not in the fixture', description: "An agent in the Hive calls by agent line of Performance → Compare (HI-2186): calls of an agent the scenario's fixture didn't make." }),
+  agentOverflow: msg({ id: 'performance.compare.agent.overflow', defaultMessage: '{n, plural, one {# other agent} other {# other agents}}', description: 'An entry in the Hive calls by agent line of Performance → Compare (HI-2186): the agents past the list’s limit, their calls summed.' }),
   measure: msg({ id: 'performance.compare.col.measure', defaultMessage: 'Measure', description: 'Column header in Performance → Compare.' }),
   change: msg({ id: 'performance.compare.col.change', defaultMessage: 'Change', description: 'Column header in Performance → Compare: from the baseline to the run.' }),
   samples: msg({ id: 'performance.compare.samples', defaultMessage: '<b>{title}</b> · samples {base, number} → {run, number}', description: "The head of a scenario's details in Performance → Compare: its title, and how many samples the baseline and the run have." }),
@@ -436,6 +444,7 @@ function scenarioColumns(open: string | null): DataColumn<ScenarioComparison>[] 
     {
       key: 'tool',
       header: tr(M.toolReplies),
+      headerTip: tr(M.allAgentsTip),
       num: true,
       descFirst: true,
       cell: (s) => {
@@ -447,6 +456,7 @@ function scenarioColumns(open: string | null): DataColumn<ScenarioComparison>[] 
     {
       key: 'calls',
       header: tr(M.calls),
+      headerTip: tr(M.callsTip),
       num: true,
       descFirst: true,
       cell: (s) => {
@@ -492,8 +502,32 @@ const counts = (c: { passed: number; failed: number; skipped: number }): string 
   return `${n(c.passed)}✓${c.failed ? ` ${n(c.failed)}✗` : ''}${c.skipped ? ` ${n(c.skipped)}–` : ''}`
 }
 
+/** A measure row of a scenario's details: its name (and whose, for a part), baseline, run and change. */
+type DetailRow = { d: MeasureDelta; part?: 'subject' | 'others' | 'all' }
+
+/**
+ * A scenario's rows: each measure split by agent (HI-2186) as the subject's first, then the other agents', then all of
+ * theirs (what the result judges); every other measure, and every measure without a split, as before.
+ */
+function detailRows(s: ScenarioComparison): DetailRow[] {
+  const out: DetailRow[] = []
+  for (const d of s.measures) {
+    const own = s.split?.subject.find((x) => x.key === d.key)
+    const others = s.split?.others.find((x) => x.key === d.key)
+    // Split only where a part has something (a measure that is 0 for every agent stays one row).
+    const some = (x: MeasureDelta): boolean => !!(x.base?.mean || x.run?.mean)
+    if (own && others && (some(own) || some(others))) out.push({ d: own, part: 'subject' }, { d: others, part: 'others' }, { d, part: 'all' })
+    else out.push({ d })
+  }
+  return [...out, ...(s.usage ?? []).map((d) => ({ d }))]
+}
+
+/** An agent in the calls-by-agent line: its fixture name, or what stands for it. */
+const agentName = (a: AgentCallsDelta): string => (a.agent === 'Assistant' && a.role === 'assistant' ? tr(M.agentAssistant) : a.agent === 'unattributed' ? tr(M.agentUnattributed) : a.agent === 'overflow' ? tr(M.agentOverflow, { n: a.agents ?? 0 }) : a.agent)
+const callCount = (v: number | null): string => (v === null ? '–' : value(undefined, v))
+
 function ScenarioDetail({ s }: { s: ScenarioComparison }) {
-  const rows = [...s.measures, ...(s.usage ?? [])]
+  const rows = detailRows(s)
   const notes = s.notesText
   return (
     <div className="perf-detail-body">
@@ -529,13 +563,14 @@ function ScenarioDetail({ s }: { s: ScenarioComparison }) {
         </thead>
         <tbody>
           {rows
-            .filter((d) => d.base || d.run)
-            .map((d) => {
+            .filter(({ d }) => d.base || d.run)
+            .map(({ d, part }) => {
               const def = SCENARIO_DEFS.get(d.key)
+              const name = def ? tr(def.label) : d.key
               return (
-                <tr key={d.key}>
+                <tr key={`${d.key}.${part ?? ''}`} className={cx(part && part !== 'subject' && 'perf-part')}>
                   <td>
-                    {def ? tr(def.label) : d.key} <InfoTip text={def ? tr(def.tip) : ''} />
+                    {part ? tr(M.splitMeasure, { measure: name, part, assistant: s.subject === 'assistant' ? 'yes' : 'no' }) : name} <InfoTip text={def ? tr(def.tip) : ''} />
                   </td>
                   <td className="num">{range(d, 'base', SCENARIO_DEFS)}</td>
                   <td className="num">{range(d, 'run', SCENARIO_DEFS)}</td>
@@ -547,6 +582,7 @@ function ScenarioDetail({ s }: { s: ScenarioComparison }) {
             })}
         </tbody>
       </table>
+      {s.agents && s.agents.length > 0 && <p className="hint perf-agents">{tr(M.callsByAgent, { agents: fmt.list(s.agents.map((a) => tr(M.agentCalls, { agent: agentName(a), role: a.role, base: callCount(a.base), run: callCount(a.run) })), 'unit') })}</p>}
       {!s.usage && <p className="hint">{tr(M.usageNotCompared)}</p>}
     </div>
   )
