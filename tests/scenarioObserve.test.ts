@@ -191,10 +191,10 @@ describe("a Codex code-mode script's calls, as Hive's parser gives them (HI-2235
     const shown = `${code} // .agents/skills/hive-work-on-card/SKILL.md`
     const result = `${printed}\nACCEPT-ZEBRA-42\n${SKILL_TEXT('work-on-card')}`
     // Parsed from a rollout that records no calls, and a Script as Hive gives one whose calls aren't known.
-    const unknowns = [
+    const unknowns: [string, unknown[]][] = [
       ['a rollout with no calls recorded', parsed(rollout(call('c1', shown), output('c1', result)))],
       ['a Script with no calls known', [script('c1', shown, result)]]
-    ] as const
+    ]
     for (const [what, seen] of unknowns) {
       const o = observeItems(seen)
       expect(o.tools, what).toEqual([])
@@ -257,11 +257,11 @@ describe("a Codex code-mode script's calls, as Hive's parser gives them (HI-2235
   })
 
   it("reads a clipped script's calls whole: clipped() says so for the script or any of its calls", () => {
-    const tool = { toolUseId: 's', name: 'Script', summary: '', input: '', result: '', isError: false, images: [] }
-    expect(clipped(tool)).toBe(false)
-    expect(clipped({ ...tool, calls: [{ ...tool, name: 'Shell' }] })).toBe(false)
-    expect(clipped({ ...tool, calls: [{ ...tool, name: 'Shell', resultLength: 9000 }] })).toBe(true)
-    expect(clipped({ ...tool, inputLength: 5000 })).toBe(true)
+    const s = { toolUseId: 's', name: 'Script', summary: '', input: '', result: '', isError: false, images: [] }
+    expect(clipped(s)).toBe(false)
+    expect(clipped({ ...s, calls: [{ ...s, name: 'Shell' }] })).toBe(false)
+    expect(clipped({ ...s, calls: [{ ...s, name: 'Shell', resultLength: 9000 }] })).toBe(true)
+    expect(clipped({ ...s, inputLength: 5000 })).toBe(true)
   })
 })
 
