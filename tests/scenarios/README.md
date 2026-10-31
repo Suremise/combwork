@@ -70,8 +70,9 @@ The checks are positive and negative:
   waiting reviewer is woken. A builder woken by one card passing while the other failed at the same moment acts on the
   failed one too. A builder starting a loop registers its lane (the cards in order, its reviewer, rounds and wait) before
   its first card's review; a reviewer joins its builder's lane by name, starting none of its own (#483).
-  A builder at the lane's end whose commit needs the user's OK (a hook refuses it until they allow it) blocks the last
-  card and tells the user, bypasses nothing, and once allowed clears the block, commits and moves the cards to Done (#869).
+  A builder at the lane's end whose commit needs the user's OK (a hook refuses it until they allow it) asks the user on
+  the card (`hive_cannot_within_rules`, under For you), bypasses nothing, and once allowed commits and moves the cards to
+  Done (#869, HI-2222).
   A reviewer whose card its builder blocks while it waits (to ask the user) keeps watching it rather than moving on, and
   reviews it when Hive wakes it once the card is unblocked and back in Review (#481).
   A reviewer woken by Hive's own loop wake, with no watch of its own, reviews the card and waits for the next (#405).
@@ -110,8 +111,9 @@ The checks are positive and negative:
   - at Look and advise, changes nothing;
   - at Control agents, starts a card (which worked), waits for it, and the card gets done;
   - with full control, plans as cards without starting them.
-  - in Coordinator mode with a team (#402): reads run-lanes, briefs each builder and reviewer with the card-loop skill,
-    their cards and partner, and ends its turn with one live watch on every lane's last card (scored on the watch it
+  - in Coordinator mode with a team (#402): reads run-lanes, starts each lane with `hive_lane start` (its builder,
+    reviewer and cards, the builder's card-loop brief in `brief`; HI-2222), its reviewer briefed by Hive's start of it or
+    a prompt, and ends its turn with one live watch on every lane's last card (scored on the watch it
     ends with, which replaces any before it, and on any move of those cards); woken by a failed review or an agent's
     question, it reads the card, sweeps the board, watches every lane again (not only the card that woke it) and leaves
     the fix (or the answer) to the loop (or the user); moves a card between running lanes; places a follow-up in the lane
