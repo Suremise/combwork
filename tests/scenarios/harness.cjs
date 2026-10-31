@@ -45,6 +45,8 @@ const sleep = lib.sleep
 // The longest the harness waits for something it is waiting on (a file, a session, a report): a bound for a hung run,
 // never how long the step should take.
 const HUNG_MS = 30000
+/** The most of a trial's final reply its results keep (HI-2230): whole for any usual reply, bounded for a runaway one. */
+const REPLY_KEPT = 6000
 const plain = (text) => String(text).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, ' ').replace(/\x1b\][^\x07]*\x07/g, ' ').replace(/\s+/g, ' ')
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 /** Tools that write or edit files: what they're given is never evidence of a read. */
@@ -200,6 +202,16 @@ function relaunchTrust({ status, runId, launchRun, answered, screen = '', provid
   if (/Do you trust the files in this folder/i.test(screen)) return 'enter'
   if (/trust this folder/i.test(screen)) return provider === 'codex' ? 'enter' : 'claude'
   return null
+}
+
+/**
+ * The final reply as a trial's results keep it (HI-2230: checks judge it, and one cut at 400 characters couldn't be
+ * audited): whole up to REPLY_KEPT characters, with its whole length when longer (a trial's results are about 40 KB;
+ * a reply about 1 KB). `text` is already masked of tokens.
+ */
+function keptReply(text) {
+  const reply = String(text ?? '')
+  return { finalReply: reply.slice(0, REPLY_KEPT), ...(reply.length > REPLY_KEPT ? { finalReplyLength: reply.length } : {}) }
 }
 
 /**
@@ -916,8 +928,9 @@ async function runScenario(sc, providerKey, opts = {}) {
     // behaviour is what's checked): in the results and the benchmark, never a pass or a failure.
     if (sc.observe) result.observations = sc.observe(observed, ctx).map(([name, value, detail]) => ({ name, value: !!value, ...(detail === undefined ? {} : { detail: String(detail).slice(0, 300) }) }))
     // Kept short in the results (whole tool calls can be large, and must not carry a token).
-    const short = (v) => tokens.reduce((x, t) => x.split(t).join('<token>'), String(v)).slice(0, 400)
-    result.observed = { ...observed, tools: observed.tools.map((t) => ({ ...t, input: short(t.input), result: short(t.result) })), replies: undefined, settings: undefined, finalReply: short(observed.finalReply) }
+    const masked = (v) => tokens.reduce((x, t) => x.split(t).join('<token>'), String(v))
+    const short = (v) => masked(v).slice(0, 400)
+    result.observed = { ...observed, tools: observed.tools.map((t) => ({ ...t, input: short(t.input), result: short(t.result) })), replies: undefined, settings: undefined, ...keptReply(masked(observed.finalReply ?? '')) }
     // What each of the project's agents showed at the end, for a check that failed on an agent's work (#498).
     if (sc.waitForAgents) result.observed.panes = Object.fromEntries(await Promise.all(Object.entries(ctx.agents).map(async ([k, a]) => [k, tokens.reduce((x, t) => x.split(t).join('<token>'), plain(await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => ''))).slice(-1200)])))
   } catch (e) {
@@ -959,4 +972,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, observeTranscript, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, observeTranscript, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
