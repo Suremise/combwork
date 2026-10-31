@@ -1017,8 +1017,8 @@ function checkHold(column: TaskColumn, actor: TaskActor, n?: number): void {
   if (column !== 'hold' || actor.kind !== 'agent' || !actor.self) return
   throw new TaskPermissionError(
     n
-      ? withValues(msg({ id: 'tasks.error.holdCard', defaultMessage: 'Only the user or the Assistant puts cards On Hold: ask the user to park {card}.', description: 'An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do.' }), { card: cardRef(n) })
-      : msg({ id: 'tasks.error.holdNew', defaultMessage: 'Only the user or the Assistant puts cards On Hold: ask the user to park it.', description: 'An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do.' })
+      ? withValues(msg({ id: 'tasks.error.holdCard', defaultMessage: 'Only the user or the Assistant puts cards On Hold. Where the user has decided to park {card}, ask the Assistant (hive_ask_assistant); otherwise ask the user.', description: 'An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do (HI-2227): a decision already made goes to the Assistant, hive_ask_assistant (a tool name: keep it as it is), else the user is asked.' }), { card: cardRef(n) })
+      : msg({ id: 'tasks.error.holdNew', defaultMessage: 'Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (hive_ask_assistant), otherwise ask the user.', description: 'An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do (HI-2227): add it to Todo, then a decision already made goes to the Assistant, hive_ask_assistant (a tool name: keep it as it is), else the user is asked.' })
   )
 }
 
@@ -2359,6 +2359,8 @@ export interface BatchItem {
   card: TaskCard | null
   said: string[]
   error: string | null
+  /** A refusal by the card's rules: its rule, next step and who can change it, as a single change's refusal gives them (HI-2238). */
+  refused?: Pick<Refusal, 'rule' | 'next' | 'change'>
 }
 
 /** The card numbers of a batch: at least one, at most MAX_CHANGE_BATCH, each once. Checked before anything changes or is counted. */
@@ -2407,7 +2409,10 @@ async function updateTasksUnbatched(numbers: number[], patch: BatchPatch, actor:
     } catch (e) {
       // The board's storage failing (a card's facts, SQLite) fails the batch whole: part of the card may be written.
       if (isStorageError(e)) throw e
-      items.push({ number: n, card: null, said: [], error: (e as Error).message })
+      // A refusal by the card's rules keeps its English lines, as hive_update_task's reply has them (HI-2238): the message
+      // with its stage's name, and the next step an agent would otherwise never see.
+      const r = e instanceof WorkflowRefusedError ? e.refusal : null
+      items.push({ number: n, card: null, said: [], error: r ? r.message : (e as Error).message, ...(r ? { refused: { rule: r.rule, next: r.next, ...(r.change ? { change: r.change } : {}) } } : {}) })
     }
   }
   return items

@@ -36,7 +36,8 @@ export const wrapsLongCommands = (general: { progressPanel?: boolean; progressCo
 export function boardSkillsLine(off: ReadonlySet<string> = new Set()): string {
   const on = (skill: string): boolean => !off.has(skill)
   const routes = [
-    on('work-on-card') && 'Given a card to work on, fix or continue, use the work-on-card skill',
+    // HI-2226: running a card's checks is work on it (work-on-card has --check and --isolated), not a review.
+    on('work-on-card') && 'Given a card to work on, fix or continue (running its checks too), use the work-on-card skill',
     on('review-agent-work') && `asked to review or check ${on('work-on-card') ? 'one' : 'a card'}, use review-agent-work`,
     on('card-loop') && "as a loop's builder or reviewer (one card or several, with rounds), use card-loop",
     // HI-686: work outside a card loop, a generalist's (Role in the workflow) above all.
@@ -126,7 +127,7 @@ export function settingsRule(changeSettings: boolean): string {
 export function controlRules(control: AssistantControlLevel, changeSettings = false): string {
   if (control === 'look') {
     return [
-      'Control (Settings → Assistant → Control): Look and advise. You read and advise; the user acts. Never edit or create files, run commands that change anything, change the task board, or start, stop or prompt agents, even if asked: say what you would do, and that Settings → Assistant can let you act. Writing shared notes and handovers is fine when the user asks.',
+      `Control (Settings → Assistant → Control): Look and advise. You read and advise; the user acts. Never edit or create files, run commands that change anything, change the task board, or start, stop or prompt agents, even if asked: say what you would do, and that Settings → Assistant can let you act. Writing shared notes and handovers is fine when the user asks${changeSettings ? ', and so is changing a Hive setting, as the next line says' : ''}.`,
       settingsRule(changeSettings)
     ].join('\n')
   }

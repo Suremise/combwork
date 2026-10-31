@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 107
+const FIXTURES_VERSION = 110
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -1246,10 +1246,10 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await c.card('a', { title: 'Friendlier greeting', column: 'doing', agent: 'coder', description: 'Change greeting.txt to a friendlier greeting. The user picks it: before changing anything, ask them in your reply whether they want "Hi there!" or "Welcome back!", then end your turn and wait for their answer. Don\'t choose yourself.' })
     },
-    // Once its turn has ended (it asked) with the card still in Doing, the user answers through the Assistant: a decision.
+    // Once its turn has ended (it asked; idle, or watching the card as while-working.md says, HI-2237) with the card still in Doing, the user answers through the Assistant: a decision.
     async during(c, status) {
       if (status === 'working') c.worked = true
-      if (c.decidedAt || !c.worked || !['finished', 'ready'].includes(status)) return
+      if (c.decidedAt || !c.worked || !['finished', 'ready', 'watching'].includes(status)) return
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
       if (card?.column !== 'doing') return
       await c.inv('tasks:update', c.cards.a, { decision: 'Use "Welcome back!" as the greeting.' })
@@ -1289,7 +1289,7 @@ module.exports.SCENARIOS = [
     // Once its turn has ended (it asked), wherever the card is, the user answers through the Assistant: a decision.
     async during(c, status) {
       if (status === 'working') c.worked = true
-      if (c.decidedAt || !c.worked || !['finished', 'ready'].includes(status)) return
+      if (c.decidedAt || !c.worked || !['finished', 'ready', 'watching'].includes(status)) return
       const card = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body
       if (!card || ['review', 'passed', 'done'].includes(card.column)) return
       await c.inv('tasks:update', c.cards.a, { decision: 'Use "Welcome back!" as the greeting.' })
@@ -1420,7 +1420,7 @@ module.exports.SCENARIOS = [
     // Once the card is in Review and the agent's turn has ended, a re-brief for its round is left for it, and the reviewer
     // passes the card at once (as HR6 passed #699 a second before the Assistant's message reached HB6).
     async during(c, status) {
-      if (!c.sentAt && ['ready', 'finished'].includes(status) && (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column === 'review') {
+      if (!c.sentAt && ['ready', 'finished', 'watching'].includes(status) && (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column === 'review') {
         c.sentAt = Date.now()
         c.sent = await c.assistantMessage('coder', `Darren decided on #${c.cards.a}: the greeting is "Stale!", not "Hi there!". Change it.`, { card: c.cards.a })
         c.passed = await c.inv('tasks:update', c.cards.a, { column: 'passed' })
@@ -1452,7 +1452,7 @@ module.exports.SCENARIOS = [
     },
     // Once its first turn has ended, the Assistant leaves it the work: typed to it as the doorbell.
     async during(c, status) {
-      if (!c.sentAt && ['ready', 'finished'].includes(status)) {
+      if (!c.sentAt && ['ready', 'finished', 'watching'].includes(status)) {
         c.sentAt = Date.now()
         c.sent = await c.assistantMessage('coder', `Please work on card #${c.cards.a} now.`)
       }
@@ -3550,14 +3550,23 @@ module.exports.SCENARIOS = [
       await c.card('n', { title: 'Farewell helper', description: 'bye.js returns "Bye, <name>".' })
     },
     prompt: (c) => `Move #${c.cards.h} and #${c.cards.n} to Doing.`,
-    fake: (c) => `skill coordinate-agents then hive hive_update_task {"number":${c.cards.h},"column":"doing"} then hive hive_update_task {"number":${c.cards.n},"column":"doing"}`,
+    // Both in one batch (HI-2238): its reply carries the refusal's next step, as a single move's does.
+    fake: (c) => `skill coordinate-agents then hive hive_update_tasks {"numbers":[${c.cards.h},${c.cards.n}],"column":"doing"}`,
     expect: (o, c) => {
-      // Its moves to Doing naming no agent and no reason of the user's (a model may rightly ask before trying any).
+      // Its moves to Doing naming no agent and no reason of the user's (a model may rightly ask before trying any), one
+      // card at a time or in a batch (HI-2238). A batch's refusal is in its reply, the call itself succeeding: each such
+      // batch's own reply (the MCP log's, by call, whichever CLI or script made it) refuses this card, by its key, naming
+      // the choices on the next line.
       const untold = called(o, 'hive_update_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.n) && argsOf(x).column === 'doing' && !argsOf(x).agent && !argsOf(x).override)
+      const batches = called(o, 'hive_update_tasks').filter((x) => (argsOf(x).numbers ?? []).some((r) => cardIs(o, r, c.cards.n)) && argsOf(x).column === 'doing' && !argsOf(x).agent && !argsOf(x).override)
+      const choices = /nobody on it.*hive_start_task/s
+      const key = String(keyOf(o, c.cards.n) ?? `#${c.cards.n}`).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const refusedHere = new RegExp(`^Refused, left as it was: ${key}\\b[^\\n]*\\(move\\.doingNobody\\)\\r?\\n[^\\n]*nobody on it[^\\n]*hive_start_task`, 'm')
+      const batchReplies = batches.map((x) => String(x.reply ?? ''))
       return [
         ["the card with Coder on it went into Doing, still Coder's", o.cards.h?.column === 'doing' && o.cards.h?.agentName === 'Coder', `${o.cards.h?.column}, ${o.cards.h?.agentName}`],
         ['the card with nobody on it is not in Doing with nobody on it', o.cards.n?.column !== 'doing' || !!o.cards.n?.agent, `${o.cards.n?.column}, ${o.cards.n?.agentName ?? 'nobody'}`],
-        ['each move of it with nobody on it was refused, naming the choices', untold.every((x) => !x.ok && /nobody on it.*hive_start_task/s.test(String(x.error ?? ''))), untold.map((x) => (x.ok ? 'ok' : String(x.error).slice(0, 120))).join(' | ')],
+        ['each move of it with nobody on it was refused, naming the choices (one card or a batch)', untold.every((x) => !x.ok && choices.test(String(x.error ?? ''))) && batches.every((x) => x.ok) && batchReplies.every((r) => refusedHere.test(r)),[...untold.map((x) => (x.ok ? 'ok' : String(x.error).slice(0, 120))), ...batchReplies.map((r) => `batch: ${r.slice(0, 200)}`)].join(' | ')],
         ['asked the user which they meant', asksTheUser(o.finalReply), String(o.finalReply ?? '').slice(0, 200)]
       ]
     },
@@ -4702,9 +4711,10 @@ module.exports.SCENARIOS.push(
   }
 )
 
-// A natural break (#1082, #1080 gaps 1 and 3): the Assistant suggests starting fresh once every lane has ended or a solo
-// agent's card is done with nothing else running, never while work, a question or a watch remains, and saves what is
-// open to its journal first. Guidance only: it suggests, and starts nothing fresh itself.
+// A natural break (#1082, #1080 gaps 1 and 3): every lane has ended, or a solo agent's card is done with nothing else
+// running. Since HI-2226 (Darren, 31 Oct) Hive's own nudge (#1437) owns suggesting that the project's agents start fresh,
+// so the Assistant isn't checked for suggesting it; it never suggests it while work, a question or a watch remains, saves
+// what is open to its journal first, and restarts nothing itself.
 /** A reply that suggests starting fresh conversations or sessions. */
 const FRESH = /\b(fresh|new)\b[^.?!\n]{0,40}\b(conversations?|sessions?|start)\b|\bstart(ing)?\s+(over|afresh|fresh)\b|\bfresh start\b/i
 const suggestsFresh = (o) => FRESH.test(o.finalReply ?? '')
@@ -4745,7 +4755,7 @@ const lanesEndedWake = async (c, builders, waits = []) => {
 module.exports.SCENARIOS.push(
   {
     id: 'fresh-start-lanes-ended',
-    title: 'Coordinator mode woken as the last lanes end, nothing else running (#1082): says so and suggests starting fresh, once, and restarts nothing itself',
+    title: 'Coordinator mode woken as the last lanes end, nothing else running (#1082): says so, and restarts nothing itself (HI-2226: Hive nudges a fresh start)',
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
@@ -4759,10 +4769,9 @@ module.exports.SCENARIOS.push(
     fake: 'skill run-lanes then hive hive_lane {"action":"list"}',
     expect: (o) => [
       ['said the lanes are done', /done|finished|ended|complete|merged/i.test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)],
-      ['suggested starting fresh conversations', suggestsFresh(o), (o.finalReply ?? '').slice(0, 300)],
       ['restarted and stopped nothing itself (the user decides)', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]
     ],
-    fakeSkips: ['said the lanes are done', 'suggested starting fresh conversations']
+    fakeSkips: ['said the lanes are done']
   },
   {
     id: 'fresh-start-lane-running',
@@ -4819,7 +4828,7 @@ module.exports.SCENARIOS.push(
   },
   {
     id: 'fresh-start-solo-done',
-    title: "The Assistant, one agent and no lanes, woken as the agent's card reaches Done with nothing else running (#1082, coordinate-agents): suggests starting fresh, once, and restarts nothing",
+    title: "The Assistant, one agent and no lanes, woken as the agent's card reaches Done with nothing else running (#1082, coordinate-agents): restarts nothing (HI-2226: Hive nudges a fresh start)",
     role: 'assistant',
     control: 'agents',
     async setup(c) {
@@ -4828,15 +4837,11 @@ module.exports.SCENARIOS.push(
     },
     prompt: (c) => `[Hive] #${c.cards.a} (Coder's card) is in Done; latest comment by Coder: "Done: greet() returns "Hi, <name>", with a test. Committed." Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`,
     fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.a},"latestComment":true}`,
-    expect: (o) => [
-      ['suggested starting fresh conversations', suggestsFresh(o), (o.finalReply ?? '').slice(0, 300)],
-      ['restarted and stopped nothing itself', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]
-    ],
-    fakeSkips: ['suggested starting fresh conversations']
+    expect: (o) => [['restarted and stopped nothing itself', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]]
   },
   {
     id: 'fresh-start-saves-first',
-    title: 'Coordinator mode, the lanes done, told of a half-formed idea that is in no card (#1082, journal): writes it to its journal before suggesting a fresh start',
+    title: 'Coordinator mode, the lanes done, told of a half-formed idea that is in no card (#1082, journal): writes it to its journal, the end of a block, and restarts nothing',
     role: 'assistant',
     control: 'agents',
     mode: 'coordinator',
@@ -4853,11 +4858,9 @@ module.exports.SCENARIOS.push(
       return [
         ['wrote the idea to its journal (hive_journal_write, which worked)', saved, writes.map((x) => String(x.args).slice(0, 200)).join(' | ')],
         ["kept it open: the journal entry says it isn't decided (Windows or its own switch)", writes.some((x) => /dark/i.test(String(x.args)) && /windows|switch|toggle|undecided|open|not decided/i.test(String(x.args)))],
-        ['suggested starting fresh conversations', suggestsFresh(o), (o.finalReply ?? '').slice(0, 300)],
         ['restarted and stopped nothing itself', restartedNothing(o), o.hiveCalls.map((x) => x.tool).join(',')]
       ]
-    },
-    fakeSkips: ['suggested starting fresh conversations']
+    }
   }
 )
 

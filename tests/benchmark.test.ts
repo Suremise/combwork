@@ -526,6 +526,148 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it("never prunes a results folder a live runner holds, nor counts it; a dead runner's goes by age (HI-2234)", () => {
+    const { resultsHeld, releaseResults } = require_('./scenarios/benchmark.cjs')
+    const dir = tempDir('hive-results-held-')
+    try {
+      // The oldest run is still going (pid 101, alive), as HI-2190's two-hour Codex trials were; then 40 short runs.
+      const running = resultsFolder(dir, '2026-10-31T14-27-32-codex', 101)
+      const finished = resultsFolder(dir, '2026-10-31T14-28-00-fake', 202)
+      for (let i = 0; i < 40; i++) mkdirSync(join(dir, `2026-10-31T15-${String(i).padStart(2, '0')}-00-fake`))
+      const alive = (pid: number) => pid === 101
+      expect(resultsHeld(running, alive)).toBe(true)
+      expect(resultsHeld(finished, alive)).toBe(false)
+      pruneResults(dir, 29, () => null, alive)
+      const left = readdirSync(dir).sort()
+      // The held folder stays besides the newest 29; the dead runner's folder went with the other older ones.
+      expect(left).toHaveLength(30)
+      expect(left[0]).toBe('2026-10-31T14-27-32-codex')
+      expect(left).not.toContain('2026-10-31T14-28-00-fake')
+      // Let go (the run ended), it counts with the model trials (HI-2236): the only one, so it stays.
+      releaseResults(running)
+      expect(resultsHeld(running, alive)).toBe(false)
+      pruneResults(dir, 29, () => null, alive)
+      expect(readdirSync(dir)).toContain('2026-10-31T14-27-32-codex')
+      expect(readdirSync(dir)).toHaveLength(30)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the newest fake runs and, counted apart, the newest model trials: fake runs never push a paid one out (HI-2236)', () => {
+    const { resultsKind } = require_('./scenarios/benchmark.cjs')
+    expect(['fake', 'fake-codex', 'fake-copilot', 'fake-2', 'fake-codex-3'].map((p) => resultsKind(`2026-10-31T14-27-32-${p}`))).toEqual(['fake', 'fake', 'fake', 'fake', 'fake'])
+    expect(['codex', 'claude-code', 'copilot', 'codex-2'].map((p) => resultsKind(`2026-10-31T14-27-32-${p}`))).toEqual(['model', 'model', 'model', 'model'])
+    const dir = tempDir('hive-results-kinds-')
+    try {
+      const at = (h: number, m: number) => `2026-10-31T${String(h).padStart(2, '0')}-${String(m).padStart(2, '0')}-00`
+      // A finished model trial, then 40 fake runs of each fake provider in turn after it.
+      mkdirSync(join(dir, `${at(14, 27)}-codex`))
+      const fakes = ['fake', 'fake-codex', 'fake-copilot']
+      for (let i = 0; i < 40; i++) mkdirSync(join(dir, `${at(15 + Math.floor(i / 60), i % 60)}-${fakes[i % 3]}`))
+      pruneResults(dir)
+      const left = readdirSync(dir).sort()
+      expect(left).toContain(`${at(14, 27)}-codex`)
+      expect(left.filter((n) => resultsKind(n) === 'fake')).toEqual(left.filter((n) => n.includes('-fake')).slice(-LIMITS.resultsKept))
+      expect(left).toHaveLength(LIMITS.resultsKept + 1)
+      // Model trials beyond their own 30 go oldest first, the fake runs untouched.
+      for (let i = 0; i < 32; i++) mkdirSync(join(dir, `${at(16 + Math.floor(i / 60), i % 60)}-${i % 2 ? 'claude-code' : 'codex'}`))
+      pruneResults(dir)
+      const after = readdirSync(dir).sort()
+      const models = after.filter((n) => resultsKind(n) === 'model')
+      expect(models).toHaveLength(LIMITS.resultsKept)
+      expect(models[0]).toBe(`${at(16, 2)}-codex`)
+      expect(after.filter((n) => resultsKind(n) === 'fake')).toEqual(left.filter((n) => resultsKind(n) === 'fake'))
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a run whose results folder is removed under it makes it again with everything it had written (HI-2234)', () => {
+    const { writeResults, resultsHeld } = require_('./scenarios/benchmark.cjs')
+    const dir = tempDir('hive-results-gone-')
+    try {
+      const out = resultsFolder(dir, '2026-10-31T14-27-32-codex')
+      const written = new Map<string, string>()
+      let said = 0
+      const save = (name: string, data: string) => {
+        writeResults(out, name, data, {
+          rewrite: () => {
+            for (const [n, d] of written) writeFileSync(join(out, n), d)
+          },
+          onRecreated: () => said++
+        })
+        written.set(name, data)
+      }
+      save('results.json', '{"results":[1]}')
+      save('notes.md', 'kept')
+      rmSync(out, { recursive: true, force: true })
+      save('results.json', '{"results":[1,2]}')
+      expect(said).toBe(1)
+      expect(readFileSync(join(out, 'results.json'), 'utf8')).toBe('{"results":[1,2]}')
+      expect(readFileSync(join(out, 'notes.md'), 'utf8')).toBe('kept')
+      // Held again, so no other run's prune takes it.
+      expect(resultsHeld(out)).toBe(true)
+      save('summary.md', 'done')
+      expect(said).toBe(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a results folder removed as the write is made, or during the recovery, is made again; only ENOENT is retried, a bounded number of times (HI-2234)', () => {
+    const { writeResults, resultsHeld, WRITE_ATTEMPTS } = require_('./scenarios/benchmark.cjs')
+    const dir = tempDir('hive-results-race-')
+    try {
+      const out = resultsFolder(dir, '2026-10-31T14-27-32-codex')
+      writeFileSync(join(out, 'results.json'), 'old')
+      const files = () => readdirSync(out).sort()
+      // Removed between the folder being there and the write landing: the first write meets ENOENT.
+      let removals = 1
+      let said = 0
+      const racing = (p: string, d: string) => {
+        if (removals-- > 0) rmSync(out, { recursive: true, force: true })
+        writeFileSync(p, d)
+      }
+      const rewrite = () => writeFileSync(join(out, 'results.json'), 'old')
+      writeResults(out, 'summary.md', 'new', { rewrite, onRecreated: () => said++, write: racing })
+      expect([files(), said, resultsHeld(out)]).toEqual([['results.json', 'runner.json', 'summary.md'], 1, true])
+      expect(readFileSync(join(out, 'summary.md'), 'utf8')).toBe('new')
+
+      // Removed again while the recovery puts the earlier files back: it starts over, and writes only once all are back.
+      rmSync(out, { recursive: true, force: true })
+      let duringRewrite = 1
+      said = 0
+      const interrupted = () => {
+        if (duringRewrite-- > 0) rmSync(out, { recursive: true, force: true })
+        rewrite()
+      }
+      writeResults(out, 'summary.md', 'newer', { rewrite: interrupted, onRecreated: () => said++ })
+      expect([files(), said]).toEqual([['results.json', 'runner.json', 'summary.md'], 2])
+      expect(readFileSync(join(out, 'results.json'), 'utf8')).toBe('old')
+
+      // Any other error is thrown at once, with no recovery.
+      said = 0
+      const denied = () => {
+        throw Object.assign(new Error('denied'), { code: 'EPERM' })
+      }
+      expect(() => writeResults(out, 'summary.md', 'x', { rewrite, onRecreated: () => said++, write: denied })).toThrow(/denied/)
+      expect(said).toBe(0)
+
+      // A folder that keeps going is given up on after WRITE_ATTEMPTS writes, with the ENOENT.
+      let writes = 0
+      const alwaysGone = (p: string, d: string) => {
+        writes++
+        rmSync(out, { recursive: true, force: true })
+        writeFileSync(p, d)
+      }
+      expect(() => writeResults(out, 'summary.md', 'x', { rewrite, write: alwaysGone })).toThrow(expect.objectContaining({ code: 'ENOENT' }))
+      expect(writes).toBe(WRITE_ATTEMPTS)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('kept comparisons (main/benchmarks.ts)', async () => {

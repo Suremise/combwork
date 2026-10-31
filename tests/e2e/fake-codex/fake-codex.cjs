@@ -35,6 +35,8 @@
 //   doorbell's line as it was sent (`doorbell`, HI-1974).
 // - Each prompt is a turn with its own id, which its hooks carry (turn_id) and its rollout records (task_started,
 //   task_complete after Stop), as Codex 0.162.1 does.
+// - With fake-code-mode.txt in CODEX_HOME (the scenarios', HI-2235) it works in code mode, as Codex 0.166.0 does: its
+//   hive calls and skill reads are each made from a script (exec), its rollout recording each call the script made.
 // - It connects the launch's hive MCP server as it starts (#865: the real server, which tells Hive it has connected).
 // - A first prompt as its last plain argument (after "resume <id>" too) is its first turn, as Codex starts on one.
 // - Ctrl+C twice ends it with SessionEnd.
@@ -396,11 +398,50 @@ function hiveServer() {
   }
 }
 
+/**
+ * Code mode (HI-2235), with fake-code-mode.txt in CODEX_HOME, as Codex 0.166.0 works: each call is made from a script
+ * (its exec tool, `code`), which the rollout records, then each call the script made as it ends (an item_completed
+ * event, from `run`'s `done`), then what the script printed (what `run` returns).
+ */
+const codeMode = () => !!process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, 'fake-code-mode.txt'))
+async function inScript(code, run) {
+  const id = `call_${randomUUID().slice(0, 8)}`
+  record({ type: 'custom_tool_call', name: 'exec', input: code, call_id: id })
+  const done = (item) => fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { id: `exec-${randomUUID()}`, ...item } } }) + '\n')
+  const printed = await run(done)
+  record({ type: 'custom_tool_call_output', call_id: id, output: [{ type: 'input_text', text: 'Script completed\nWall time 0.1 seconds\nOutput:\n' }, { type: 'input_text', text: printed }] })
+}
+
+/** A shell command that reads a file, recorded as Codex records it: a shell call, or in code mode a script's exec_command. */
+function readFile(file) {
+  const cmd = `Get-Content -Raw '${file}'`
+  const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null
+  if (codeMode()) {
+    return inScript(`text(await tools.exec_command({cmd:${JSON.stringify(cmd)}}));`, (done) => {
+      done({ type: 'CommandExecution', command: ['powershell', '-Command', cmd], status: text === null ? 'failed' : 'completed', aggregated_output: text ?? 'Get-Content: no such file', exit_code: text === null ? 1 : 0 })
+      return JSON.stringify({ exit_code: text === null ? 1 : 0, output: text ?? 'Get-Content: no such file' })
+    })
+  }
+  const id = `call_${randomUUID().slice(0, 8)}`
+  record({ type: 'function_call', name: 'shell', arguments: JSON.stringify({ command: ['powershell', '-Command', cmd] }), call_id: id })
+  record({ type: 'function_call_output', call_id: id, output: text ?? 'Process exited with code 1: no such file' })
+}
+
 /** A hive tool call through the launch's own hive MCP server, recorded as Codex records an MCP call and its output. */
 async function hiveCall(tool, input) {
+  const server = hiveServer()
+  if (codeMode()) {
+    let r = null
+    await inScript(`text(await tools.mcp__hive__${tool}(${JSON.stringify(input)}));`, async (done) => {
+      r = server ? await callHiveTool(server, tool, input) : { text: 'error: no hive server', isError: true }
+      const result = { content: [{ type: 'text', text: r.text }], ...(r.isError ? { isError: true } : {}) }
+      done({ type: 'McpToolCall', server: 'hive', tool, arguments: input, status: r.isError ? 'failed' : 'completed', result })
+      return JSON.stringify(result)
+    })
+    return r
+  }
   const id = `call_${randomUUID().slice(0, 8)}`
   record({ type: 'function_call', name: `mcp__hive__${tool}`, arguments: JSON.stringify(input), call_id: id })
-  const server = hiveServer()
   const r = server ? await callHiveTool(server, tool, input) : { text: 'error: no hive server', isError: true }
   record({ type: 'function_call_output', call_id: id, output: r.isError && !/^error/i.test(r.text) ? `error: ${r.text}` : r.text })
   return r
@@ -410,10 +451,7 @@ async function hiveCall(tool, input) {
 function readSkill(name) {
   const dir = path.join(process.cwd(), '.agents', 'skills')
   const folder = [name, `hive-${name}`].map((d) => path.join(dir, d, 'SKILL.md')).find((f) => fs.existsSync(f)) ?? path.join(dir, name, 'SKILL.md')
-  const id = `call_${randomUUID().slice(0, 8)}`
-  record({ type: 'function_call', name: 'shell', arguments: JSON.stringify({ command: ['powershell', '-Command', `Get-Content -Raw '${folder}'`] }), call_id: id })
-  const text = fs.existsSync(folder) ? fs.readFileSync(folder, 'utf8') : null
-  record({ type: 'function_call_output', call_id: id, output: text ?? 'Process exited with code 1: no such file' })
+  return readFile(folder)
 }
 
 /**
@@ -424,10 +462,7 @@ function readSkillRef(name, file) {
   const dir = [name, `hive-${name}`].map((d) => path.join(process.cwd(), '.agents', 'skills', d)).find((d) => fs.existsSync(path.join(d, 'SKILL.md'))) ?? path.join(process.cwd(), '.agents', 'skills', name)
   const skill = fs.existsSync(path.join(dir, 'SKILL.md')) ? fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8') : ''
   const target = skill.includes(`](${file})`) || skill.includes(`](./${file})`) ? path.resolve(dir, file) : path.join(dir, `no-link-to-${file}`)
-  const id = `call_${randomUUID().slice(0, 8)}`
-  record({ type: 'function_call', name: 'shell', arguments: JSON.stringify({ command: ['powershell', '-Command', `Get-Content -Raw '${target}'`] }), call_id: id })
-  const text = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null
-  record({ type: 'function_call_output', call_id: id, output: text ?? 'Process exited with code 1: no such file' })
+  return readFile(target)
 }
 
 /**
@@ -438,11 +473,11 @@ function readSkillRef(name, file) {
 async function scripted(step) {
   let any = false
   for (const m of step.matchAll(/\bskill\s+([a-z0-9][\w-]*)/gi)) {
-    readSkill(m[1])
+    await readSkill(m[1])
     any = true
   }
   for (const m of step.matchAll(/\bskillref\s+([a-z0-9][\w-]*)\s+([\w.-]+\.md)/gi)) {
-    readSkillRef(m[1], m[2])
+    await readSkillRef(m[1], m[2])
     any = true
   }
   const move = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step)

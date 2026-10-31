@@ -172,7 +172,7 @@ describe('who moves cards to On Hold and Passed', () => {
 
   it('only the user and the Assistant (and the workspace token) park a card: a project agent is refused, moving or creating it there', async () => {
     const c = await run(() => tasks.createTask({ title: 'Park me', project: 'alpha' }, user))
-    await expect(run(() => tasks.updateTask(c.number, { column: 'hold' }, coder))).rejects.toThrow(/Only the user or the Assistant puts cards On Hold: ask the user to park #\d+/)
+    await expect(run(() => tasks.updateTask(c.number, { column: 'hold' }, coder))).rejects.toThrow(/Only the user or the Assistant puts cards On Hold\. Where the user has decided to park #\d+, ask the Assistant \(hive_ask_assistant\); otherwise ask the user\./)
     await expect(run(() => tasks.updateTask(c.number, { column: 'hold' }, coder))).rejects.toBeInstanceOf(tasks.TaskPermissionError)
     await expect(run(() => tasks.createTask({ title: 'Parked', project: 'alpha', column: 'hold' }, coder))).rejects.toBeInstanceOf(tasks.TaskPermissionError)
     expect((await run(() => tasks.getTask(c.number))).column).toBe('todo')

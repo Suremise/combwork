@@ -814,7 +814,7 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        title: { type: 'string', description: "About 70 characters: the outcome or problem in words; no people's names." },
+        title: { type: 'string', description: 'About 70 characters: the outcome or problem in words. Names, numbers, files and paths go in the description.' },
         description: { type: 'string', description: 'What to do and how to tell it is done, in full: whoever starts it reads only the card.' },
         project: projectArg,
         agent: { type: 'string', description: 'Give it to this agent (name or id).' },
@@ -1134,10 +1134,11 @@ async function instructions(): Promise<string> {
 /**
  * Tests only (Hive passes HIVE_TEST_MCP_LOG to this server in development builds): each tool call this server ran, with
  * whose it was, whether it worked and its reply's size as the model got it (HI-2186), so tests (tests/scenarios) see what
- * was executed, not what a transcript mentions, and whose work it was.
+ * was executed, not what a transcript mentions, and whose work it was. A call that worked keeps the start of its reply
+ * (HI-2238): what it said, such as a batch's refusals, read with the call it answered, whichever CLI or script made it.
  */
-function testLog(name: string, args: unknown, error: string | null, size: { mode: CallReport['mode']; chars: number; bytes: number }): string | undefined {
-  return testLine({ tool: name, ok: error === null, ...(error ? { error } : {}), args: JSON.stringify(args ?? {}).slice(0, 4000), ...size })
+function testLog(name: string, args: unknown, error: string | null, size: { mode: CallReport['mode']; chars: number; bytes: number }, text?: string): string | undefined {
+  return testLine({ tool: name, ok: error === null, ...(error ? { error } : {}), ...(error === null && text !== undefined ? { reply: text.slice(0, 4000) } : {}), args: JSON.stringify(args ?? {}).slice(0, 4000), ...size })
 }
 
 /** Tests only: the tool list as this server first sent it (HI-2186), once a server, as `kind: 'list'` (not a call). */
@@ -1319,7 +1320,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         text = typeof result === 'string' ? result : JSON.stringify(result)
         // Hive's flag (a new decision on a card the agent works on) goes after the reply, on its own line.
         if (said.size) text += `\n${[...said].join('\n')}`
-        testId = testLog(tool.name, params?.arguments, null, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') })
+        testId = testLog(tool.name, params?.arguments, null, { mode: modeOf(args), chars: text.length, bytes: Buffer.byteLength(text, 'utf8') }, text)
         reply(id, { content: [{ type: 'text', text }] })
       } catch (e) {
         ok = false

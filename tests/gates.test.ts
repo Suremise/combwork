@@ -193,7 +193,12 @@ describe('the Assistant moves cards across rules only with a reason (#1265, SPEC
     // (in Doing already) is left as it is; with it, started in the project folder, the rule recorded. a's to Done skips rules.
     const items = await inWorkspace(w, () => tasks.updateTasks([a, b], { column: 'doing' }, assistant))
     expect(items[0].error).toBeNull()
-    expect(items[1].error).toMatch(/nobody on it/)
+    // As a single change's refusal reads (HI-2238): the stage by its name, and the rule, next step and who can change it.
+    expect(items[1].error).toMatch(/would be in Active with nobody on it\.$/)
+    const one = apiErrorReply(await update(w, b, { column: 'doing' }, assistant).catch((e) => e)).body
+    expect(items[1].refused).toEqual({ rule: 'move.doingNobody', next: one.next, ...(one.change ? { change: one.change } : {}) })
+    expect(items[1].refused?.next).toMatch(/override.*\(agent\).*hive_start_task/)
+    expect(items[0].refused).toBeUndefined()
     expect((await inWorkspace(w, () => tasks.getTask(b, w))).column).toBe('todo')
     const nobody = await inWorkspace(w, () => tasks.updateTasks([b], { column: 'doing', override: { reason: 'The user takes it' } }, assistant))
     expect(nobody[0].card?.column).toBe('doing')
