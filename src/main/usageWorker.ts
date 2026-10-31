@@ -153,7 +153,7 @@ async function whenOpenable(file: string): Promise<void> {
     w = entry
   }
   await w.wait
-  if ((closes.get(key) ?? 0) !== closed) throw new Error('The usage history was closed while it waited to be opened.')
+  if ((closes.get(key) ?? 0) !== closed) throw new Error('The usage history was closed while it waited to be opened.') // i18n-ignore: an internal error, for the log
 }
 
 /** A close received: what waits for the file to be openable stops (HI-2200). */
