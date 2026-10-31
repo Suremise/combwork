@@ -128,17 +128,22 @@ describe('hive tools named in a transcript are mentions, not calls', () => {
 })
 
 describe("the override scenarios' checks count every move of the card, by number or key (#1474)", () => {
-  const { isCard } = helpers as unknown as { isCard: (ref: unknown, n: number) => boolean }
+  const { cardIs } = helpers as unknown as { cardIs: (o: unknown, ref: unknown, n: number) => boolean }
   const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  // AL-1 is #1, and BE-1 (another project's first card) #2 (HI-2231: a key's digits aren't its card's number).
+  const board = [
+    { number: 1, key: 'AL-1' },
+    { number: 2, key: 'BE-1' }
+  ]
   const checks = (id: string, hiveCalls: unknown[], column: string) => {
     const sc = SCENARIOS.find((s) => s.id === id)!
-    return Object.fromEntries(sc.expect({ hiveCalls, cards: { m: { column } }, facts: { m: [] }, replies: ['It skips its review: why?'] }, { cards: { m: 1 } }).map(([name, ok]) => [name, ok]))
+    return Object.fromEntries(sc.expect({ hiveCalls, allCards: board, cards: { m: { number: 1, key: 'AL-1', column } }, facts: { m: [] }, replies: ['It skips its review: why?'] }, { cards: { m: 1 } }).map(([name, ok]) => [name, ok]))
   }
   const NO_OVERRIDE = 'passed no override (the move skips nothing)'
 
-  it('takes a number, "#n" or a key, and no other card', () => {
-    for (const ref of [1, '1', '#1', 'AL-1']) expect(isCard(ref, 1)).toBe(true)
-    for (const ref of [11, '#11', 'AL-11', '21', undefined]) expect(isCard(ref, 1)).toBe(false)
+  it('takes a number, "#n" or its own key, and no other card', () => {
+    for (const ref of [1, '1', '#1', 'AL-1']) expect(cardIs({ allCards: board }, ref, 1)).toBe(true)
+    for (const ref of [11, '#11', 'AL-11', '21', 'BE-1', undefined]) expect(cardIs({ allCards: board }, ref, 1)).toBe(false)
   })
 
   it('unneeded: a keyed hive_update_task, hive_update_tasks or hive_put_back that worked counts; a refused one alone does not', () => {
@@ -162,6 +167,54 @@ describe("the override scenarios' checks count every move of the card, by number
     expect(checks('assistant-override-reason', [call('hive_update_task', { number: 'AL-1', column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(true)
     expect(checks('assistant-override-reason', [call('hive_update_tasks', { numbers: ['AL-1'], column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(true)
     expect(checks('assistant-override-reason', [call('hive_update_task', { number: 'AL-11', column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(false)
+  })
+
+  it("HI-2231: another project's card with the same digits (BE-1, #2) is never this card's move", () => {
+    expect(checks('assistant-override-unneeded', [call('hive_update_task', { number: 'BE-1', column: 'todo' })], 'todo')[NO_OVERRIDE]).toBe(false)
+    expect(checks('assistant-override-unneeded', [call('hive_put_back', { card: 'BE-1', why: 'Not ready' })], 'todo')[NO_OVERRIDE]).toBe(false)
+    const none = 'passed no override (the user gave no reason)'
+    expect(checks('assistant-override-none', [call('hive_update_task', { number: 'BE-1', column: 'done', override: { reason: 'invented' } })], 'doing')[none]).toBe(true)
+    expect(checks('assistant-override-none', [call('hive_update_tasks', { numbers: ['BE-1'], column: 'done', override: { reason: 'invented' } })], 'doing')[none]).toBe(true)
+    const given = "moved it with an override giving the user's reason (merged by hand)"
+    expect(checks('assistant-override-reason', [call('hive_update_task', { number: 'BE-1', column: 'done', override: { reason: 'Merged by hand' } })], 'done')[given]).toBe(false)
+  })
+})
+
+describe("the lane and wait lists, moves and intents name a card by its number or its own key (HI-2231)", () => {
+  const { namesCard, namesCards, movesOf } = helpers as unknown as {
+    namesCard: (o: unknown, refs: unknown, n: number) => boolean
+    namesCards: (o: unknown, refs: unknown, ns: number[]) => boolean
+    movesOf: (o: unknown, n: number) => unknown[]
+  }
+  const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  // AL-1 is #1, BE-1 #2 (another project's), AL-2 #3: a key's digits aren't its card's number.
+  const o = { allCards: [{ number: 1, key: 'AL-1' }, { number: 2, key: 'BE-1' }, { number: 3, key: 'AL-2' }] }
+
+  it('namesCard: its number, "#n" or its own key in the list; not another card whose key ends in its digits', () => {
+    for (const refs of [[1], ['#1'], ['AL-1'], [3, 'AL-1']]) expect(namesCard(o, refs, 1)).toBe(true)
+    for (const refs of [['BE-1'], ['AL-11'], [2, 3], [], undefined]) expect(namesCard(o, refs, 1)).toBe(false)
+    expect(namesCard(o, ['AL-2'], 3)).toBe(true)
+    expect(namesCard(o, ['AL-3'], 3)).toBe(false)
+  })
+
+  it('namesCards: exactly those cards in that order, each by number or its own key', () => {
+    expect(namesCards(o, ['AL-1', 'AL-2'], [1, 3])).toBe(true)
+    expect(namesCards(o, [1, '#3'], [1, 3])).toBe(true)
+    expect(namesCards(o, ['AL-1', 'AL-3'], [1, 3])).toBe(false)
+    expect(namesCards(o, ['BE-1', 'AL-2'], [1, 3])).toBe(false)
+    expect(namesCards(o, ['AL-2', 'AL-1'], [1, 3])).toBe(false)
+  })
+
+  it("movesOf: a move or an intent on the card's own key or number; another project's same digits isn't one", () => {
+    const calls = [
+      call('hive_update_task', { number: 'BE-1', column: 'done' }),
+      call('hive_update_tasks', { numbers: ['BE-1'], column: 'done' }),
+      call('hive_put_back', { card: 'BE-1', why: 'x' }),
+      call('hive_submit', { card: 'BE-1', summary: 'x' })
+    ]
+    expect(movesOf({ ...o, hiveCalls: calls }, 1)).toHaveLength(0)
+    expect(movesOf({ ...o, hiveCalls: calls }, 2)).toHaveLength(4)
+    expect(movesOf({ ...o, hiveCalls: [call('hive_verdict', { card: 'AL-1', pass: true }), call('hive_update_task', { number: '#1', column: 'review' })] }, 1)).toHaveLength(2)
   })
 })
 
