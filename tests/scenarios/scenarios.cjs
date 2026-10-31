@@ -277,6 +277,18 @@ const worktreesOf = (c) => c.git('worktree', 'list', '--porcelain').split(/\r?\n
  * (#1219).
  */
 const isCard = (ref, n) => new RegExp(`^(#|[A-Za-z][A-Za-z0-9]*-)?${n}$`).test(String(ref ?? '').trim())
+/** Card `n`'s key ("AL-1") as the run left it, from the board or the scenario's cards; undefined if unknown. */
+const keyOf = (o, n) => [...(o.allCards ?? []), ...Object.values(o.cards ?? {})].find((x) => x?.number === n)?.key
+/**
+ * Whether a call's card reference is exactly card `n` (HI-2221): its number (12, "12", "#12"), or its own key as the board
+ * has it, never another project's card whose key ends in the same digits (BE-12 is not #12).
+ */
+const cardIs = (o, ref, n) => {
+  const s = String(ref ?? '').trim()
+  if (/^#?\d+$/.test(s)) return Number(s.replace('#', '')) === n
+  const key = keyOf(o, n)
+  return !!key && s.toUpperCase() === String(key).toUpperCase()
+}
 /** Whether a call's list of cards names card `n`, each by number or key (HI-1950: a model names cards by key). */
 const namesCard = (refs, n) => Array.isArray(refs) && refs.some((r) => isCard(r, n))
 /** Whether a call's list of cards is exactly cards `ns`, in that order, each by number or key. */
@@ -300,7 +312,7 @@ const factsOf = (o, key, kind) => (o.facts?.[key] ?? []).filter((f) => f.kind ==
 const overridesOf = (o, key) => (o.facts?.[key] ?? []).filter((f) => f.kind === 'Override')
 /** A call's arguments (JSON) have key: value. */
 const field = (args, key, value) => new RegExp(`"?${key}"?\\s*:\\s*"?${value}\\b`).test(String(args))
-const moved = (o, n, column) => ran(o, 'hive_update_task').some((c) => field(c.args, 'number', n) && field(c.args, 'column', column))
+const moved = (o, n, column) => ran(o, 'hive_update_task').some((c) => cardIs(o, argsOf(c).number, n) && field(c.args, 'column', column))
 const history = (card) => (card?.history ?? []).map((h) => h.what)
 /** Where in a card's history it moved into a column ("Moved to Doing", "Moved to the top of Doing", "Moved to Review, before #3"); -1 if never. */
 const movedInto = (card, column, last = false) => {
@@ -344,7 +356,7 @@ const verdictLeftCheck = (o, c, key, pass) => [
 /** When a card's history says something happened (ms), the latest such entry; 0 if never. */
 const historyAt = (card, re) => Date.parse((card?.history ?? []).findLast((h) => re.test(h.what))?.at ?? '') || 0
 /** Full reads of card n (hive_read_task without latestComment) that the server ran, with their times (ms). */
-const cardReads = (o, n) => ran(o, 'hive_read_task').filter((x) => field(x.args, 'number', n) && !/latestComment"?\s*:\s*true/.test(String(x.args))).map((x) => Date.parse(x.at))
+const cardReads = (o, n) => ran(o, 'hive_read_task').filter((x) => cardIs(o, argsOf(x).number, n) && !/latestComment"?\s*:\s*true/.test(String(x.args))).map((x) => Date.parse(x.at))
 /**
  * A reviewer's verdict in a card's history, as its review leaves it (the card stays in Review): the setups have no
  * reviewer session to give one.
@@ -1413,7 +1425,7 @@ module.exports.SCENARIOS = [
       const decided = historyAt(o.cards.r, /^Recorded a decision/)
       // Its latest-comment reads before it read the card in full: their replies carry the flag.
       const full = cardReads(o, c.cards.r)
-      const latest = ran(o, 'hive_read_task').filter((x) => field(x.args, 'number', c.cards.r) && /latestComment"?\s*:\s*true/.test(String(x.args)) && Date.parse(x.at) < (full[0] ?? Infinity))
+      const latest = ran(o, 'hive_read_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.r) && /latestComment"?\s*:\s*true/.test(String(x.args)) && Date.parse(x.at) < (full[0] ?? Infinity))
       return [
         ['read the card-loop or review-agent-work skill', read(o, 'card-loop') || read(o, 'review-agent-work'), o.skillsRead.join(',')],
         ['a latest-comment read before reading the card flagged the new decision', !latest.length || /has 1 new decision/.test(replies(o, 'hive_read_task')), `${latest.length} latest-comment read(s) first`],
@@ -1907,9 +1919,10 @@ module.exports.SCENARIOS = [
       })
     },
     prompt: (c) => `What exactly does card #${c.cards.q} require for acceptance? Quote its acceptance line. Don't change the card.`,
-    fake: (c) => `hive hive_read_task {"number":${c.cards.q},"detail":true}`,
+    // By key, as the guidance names cards (HI-2221: the checks count a key as well as a number).
+    fake: (c) => `hive hive_read_task {"number":"AL-${c.cards.q}","detail":true}`,
     expect: (o, c) => [
-      ['read the card with hive_read_task', ran(o, 'hive_read_task').some((x) => field(x.args, 'number', c.cards.q)), o.hiveCalls.map((x) => x.tool).join(',')],
+      ['read the card with hive_read_task', ran(o, 'hive_read_task').some((x) => cardIs(o, argsOf(x).number, c.cards.q)), o.hiveCalls.map((x) => x.tool).join(',')],
       ["its reply had the card's acceptance line", hiveReplies(o, 'hive_read_task').some((t) => t.result.includes('ACCEPT-ZEBRA-42')), hiveReplies(o, 'hive_read_task').map((t) => t.result.slice(0, 120)).join(' | ')],
       ['quoted it', /ACCEPT-ZEBRA-42/.test(o.finalReply), o.finalReply.slice(0, 200)],
       ['read it once (no repeated identical calls)', (o.measures?.repeatedCalls ?? 0) === 0, String(o.measures?.repeatedCalls)],
@@ -3345,7 +3358,7 @@ module.exports.SCENARIOS = [
     prompt: (c) => `[Hive] Darren replied to Coder on #${c.cards.r}: "C, the hive cell". Your card watch has ended: carry on (hive_read_task for the card, hive_agent_activity for the agent).`,
     fake: (c) => `skill coordinate-agents then hive hive_update_task {"number":${c.cards.r},"decision":"The app icon is C, the hive cell."}`,
     expect: (o, c) => {
-      const decided = ran(o, 'hive_update_task').some((x) => field(x.args, 'number', c.cards.r) && /hive cell|\bC\b/i.test(String(argsOf(x).decision ?? '')))
+      const decided = ran(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, c.cards.r) && /hive cell|\bC\b/i.test(String(argsOf(x).decision ?? '')))
       const decisions = (o.cards.r?.decisions ?? []).map((d) => d.text)
       return [
         ["recorded the answer as the card's decision", decided && decisions.some((t) => /hive cell|\bC\b/i.test(t)), decisions.join(' | ')],
@@ -3370,7 +3383,7 @@ module.exports.SCENARIOS = [
     fake: (c) => `skill coordinate-agents then hive hive_update_task {"number":${c.cards.h},"column":"doing"} then hive hive_update_task {"number":${c.cards.n},"column":"doing"}`,
     expect: (o, c) => {
       // Its moves to Doing naming no agent and no reason of the user's (a model may rightly ask before trying any).
-      const untold = called(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.n) && argsOf(x).column === 'doing' && !argsOf(x).agent && !argsOf(x).override)
+      const untold = called(o, 'hive_update_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.n) && argsOf(x).column === 'doing' && !argsOf(x).agent && !argsOf(x).override)
       return [
         ["the card with Coder on it went into Doing, still Coder's", o.cards.h?.column === 'doing' && o.cards.h?.agentName === 'Coder', `${o.cards.h?.column}, ${o.cards.h?.agentName}`],
         ['the card with nobody on it is not in Doing with nobody on it', o.cards.n?.column !== 'doing' || !!o.cards.n?.agent, `${o.cards.n?.column}, ${o.cards.n?.agentName ?? 'nobody'}`],
@@ -3408,7 +3421,7 @@ module.exports.SCENARIOS = [
     prompt: v.prompt,
     fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.s}} then hive hive_update_task ${JSON.stringify({ number: c.cards.s, decision: v.both ? 'The bee icon, in amber.' : 'Use the bee icon.', answers: v.both ? c.asked : [c.asked[0]] })}`,
     expect: (o, c) => {
-      const updates = ran(o, 'hive_update_task').filter((x) => field(x.args, 'number', c.cards.s))
+      const updates = ran(o, 'hive_update_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.s))
       const named = updates.flatMap((x) => (Array.isArray(argsOf(x).answers) ? argsOf(x).answers : []))
       const want = v.both ? c.asked : [c.asked[0]]
       const decisions = (o.cards.s?.decisions ?? []).map((d) => d.text)
@@ -3440,7 +3453,7 @@ module.exports.SCENARIOS = [
     prompt: (c) => `Coder has stopped on card #${c.cards.q} and isn't doing anything. Is that a Hive bug, or is it waiting for something? Don't change anything.`,
     fake: (c) => `hive hive_read_task {"number":${c.cards.q},"latestComment":true}`,
     expect: (o, c) => {
-      const reads = ran(o, 'hive_read_task').filter((x) => field(x.args, 'number', c.cards.q))
+      const reads = ran(o, 'hive_read_task').filter((x) => cardIs(o, argsOf(x).number, c.cards.q))
       return [
         ['read the card (hive_read_task)', reads.length > 0, o.hiveCalls.map((x) => x.tool).join(',')],
         ["its reply had Coder's question", hiveReplies(o, 'hive_read_task').some((t) => t.result.includes('Hello, friend')), hiveReplies(o, 'hive_read_task').map((t) => t.result.slice(0, 160)).join(' | ')],
@@ -3577,7 +3590,7 @@ module.exports.SCENARIOS = [
     fake: (c) => `skill card-loop then ${fakeStartReview(c.cards.b)}`,
     expect: (o, c) => {
       const watchedA = ran(o, 'hive_wait_for_tasks').some((x) => new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.a}\\b`).test(String(x.args)))
-      const onB = ran(o, 'hive_update_task').some((x) => field(x.args, 'number', c.cards.b) && field(x.args, 'review', 'start')) || ran(o, 'hive_start_review').some((x) => isCard(argsOf(x).card, c.cards.b)) || ran(o, 'hive_wait_for_tasks').some((x) => new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.b}\\b`).test(String(x.args)))
+      const onB = ran(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, c.cards.b) && field(x.args, 'review', 'start')) || ran(o, 'hive_start_review').some((x) => isCard(argsOf(x).card, c.cards.b)) || ran(o, 'hive_wait_for_tasks').some((x) => new RegExp(`"cards"\\s*:\\s*\\[[^\\]]*\\b${c.cards.b}\\b`).test(String(x.args)))
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         [`went on to #${c.cards.b} (began its review, or watched it)`, onB, o.hiveCalls.map((x) => x.tool).join(',')],
@@ -3649,7 +3662,7 @@ module.exports.SCENARIOS = [
         [`the builder returned #${c.cards.a} once the reviewer was watching`, Number.isFinite(back), String(c.returnedAt)],
         ["reviewed the card after its return, with nobody prompting it (Hive's wake)", ha.some((h) => by(h) && h.what === 'Started reviewing' && Date.parse(h.at) > back), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
         ['gave it a verdict', Number.isFinite(verdictAt), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
-        ["didn't move on to the next card before that verdict", !waits.some((x) => before(x) && has(x, c.cards.b) && !has(x, c.cards.a)) && !ran(o, 'hive_update_task').some((x) => before(x) && field(x.args, 'number', c.cards.b)) && !ran(o, 'hive_start_review').concat(movesOf(o, c.cards.b).filter((x) => x.ok)).some((x) => before(x) && isCard(argsOf(x).card, c.cards.b)), o.hiveCalls.map((x) => `${x.tool}@${x.at}`).join(',')]
+        ["didn't move on to the next card before that verdict", !waits.some((x) => before(x) && has(x, c.cards.b) && !has(x, c.cards.a)) && !ran(o, 'hive_update_task').some((x) => before(x) && cardIs(o, argsOf(x).number, c.cards.b)) && !ran(o, 'hive_start_review').concat(movesOf(o, c.cards.b).filter((x) => x.ok)).some((x) => before(x) && isCard(argsOf(x).card, c.cards.b)), o.hiveCalls.map((x) => `${x.tool}@${x.at}`).join(',')]
       ]
     },
     // Only the fake Claude Code answers a wake (its wake script); the fake Codex can't.
@@ -3839,7 +3852,7 @@ module.exports.SCENARIOS.push({
     const batches = ran(o, 'hive_update_tasks')
     return [
       ['moved all five with one hive_update_tasks call', batches.length === 1 && keys.every((n) => String(batches[0].args).includes(String(n))), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
-      ["didn't move them one at a time", !ran(o, 'hive_update_task').some((x) => keys.some((n) => field(x.args, 'number', n)))],
+      ["didn't move them one at a time", !ran(o, 'hive_update_task').some((x) => keys.some((n) => cardIs(o, argsOf(x).number, n)))],
       ['the five cards are in Todo', keys.every((n) => o.allCards.some((x) => x.number === n && x.column === 'todo'))]
     ]
   }
@@ -3981,11 +3994,11 @@ module.exports.SCENARIOS.push(
       const { a, b } = c.cards
       const cc = c.cards.c
       return [
-        ['read the card', ran(o, 'hive_read_task').some((x) => field(x.args, 'number', a)), o.hiveCalls.map((x) => x.tool).join(',')],
+        ['read the card', ran(o, 'hive_read_task').some((x) => cardIs(o, argsOf(x).number, a)), o.hiveCalls.map((x) => x.tool).join(',')],
         ['swept the board (the cards, the lanes or the agents)', ['hive_list_tasks', 'hive_lane', 'hive_project_status', 'hive_list_projects'].some((t) => ran(o, t).length > 0), o.hiveCalls.map((x) => x.tool).join(',')],
         ["ended its turn watching again: both lanes' last cards (its live watch, waking on moves, comments and verdicts)", liveWatchCovers(o, [b, cc]), liveWatch(o)],
         // Its builder isn't running (a stopped lane): starting it on the fix is fine; reviewing it or a review card isn't.
-        ['left the review to the loop: no verdict of its own and no separate review card', !called(o, 'hive_update_task').some((x) => field(x.args, 'number', a) && argsOf(x).review) && !ran(o, 'hive_create_task').some((x) => /review/i.test(String(argsOf(x).title ?? ''))), o.hiveCalls.map((x) => x.tool).join(',')],
+        ['left the review to the loop: no verdict of its own and no separate review card', !called(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, a) && argsOf(x).review) && !ran(o, 'hive_create_task').some((x) => /review/i.test(String(argsOf(x).title ?? ''))), o.hiveCalls.map((x) => x.tool).join(',')],
         ['told the user about the failed card', new RegExp(`#?${a}\\b`).test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)]
       ]
     },
@@ -4014,7 +4027,7 @@ module.exports.SCENARIOS.push(
       const { a, b } = c.cards
       const told = `${o.finalReply ?? ''} ${ran(o, 'hive_notify').map((x) => `${argsOf(x).title ?? ''} ${argsOf(x).message ?? ''}`).join(' ')}`
       return [
-        ['read the card', ran(o, 'hive_read_task').some((x) => field(x.args, 'number', a)), o.hiveCalls.map((x) => x.tool).join(',')],
+        ['read the card', ran(o, 'hive_read_task').some((x) => cardIs(o, argsOf(x).number, a)), o.hiveCalls.map((x) => x.tool).join(',')],
         ['brought the user a simpler option with a recommendation', /simpl|smaller|narrow|reduce|scope/i.test(told) && /recommend|suggest|I'd|I would|propose/i.test(told), told.slice(0, 400)],
         ["left the choice to the user: no decision recorded, nothing sent to Coder or Implementer", !(o.cards.a?.decisions ?? []).length && !called(o, 'hive_message_agent').length && !called(o, 'hive_prompt_agent').length, JSON.stringify(o.cards.a?.decisions ?? [])],
         ["ended its turn watching again (its live watch)", liveWatchCovers(o, [b, c.cards.c]), liveWatch(o)]
@@ -4290,7 +4303,7 @@ module.exports.SCENARIOS.push(
         ['Hive gave it to Implementer (a ReviewerAssigned fact)', factsOf(o, 'r', 'ReviewerAssigned').some((f) => f.data?.reviewer === c.agents.implementer.id), JSON.stringify(factsOf(o, 'r', 'ReviewerAssigned').map((f) => f.data))],
         ['started no reviewer itself (no brief to Implementer, no lane)', reviewers.length === 0, reviewers.join(' | ').slice(0, 300)],
         ["didn't ask the user whether it should be reviewed", called(o, 'hive_notify').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
-        ['moved the card nowhere and gave no verdict of its own', !called(o, 'hive_update_task').some((x) => field(x.args, 'number', n) && (argsOf(x).column || argsOf(x).review)) && called(o, 'hive_verdict').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
+        ['moved the card nowhere and gave no verdict of its own', !called(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).review)) && called(o, 'hive_verdict').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
       ]
     },
     fakeSkips: ["didn't ask the user whether it should be reviewed"]
@@ -4429,11 +4442,11 @@ module.exports.SCENARIOS.push(
     fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.p}} then hive hive_read_section {"project":"alpha","path":"docs/DEPLOY.md","heading":"Staging"}`,
     expect: (o, c) => {
       const p = c.cards.p
-      const lookedUp = ran(o, 'hive_read_task').some((x) => field(x.args, 'number', p)) || ['hive_read_section', 'hive_doc_outline'].some((t) => ran(o, t).some((x) => /DEPLOY\.md/i.test(String(x.args))))
+      const lookedUp = ran(o, 'hive_read_task').some((x) => cardIs(o, argsOf(x).number, p)) || ['hive_read_section', 'hive_doc_outline'].some((t) => ran(o, t).some((x) => /DEPLOY\.md/i.test(String(x.args))))
       return [
         ['looked the card or its doc up (hive_read_task, or the doc through hive_doc_outline / hive_read_section)', lookedUp, o.hiveCalls.map((x) => x.tool).join(',')],
         ["asked the user nothing: no notification and no question (the deploy details are in the doc, and the request is the OK)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
-        ['started Coder on the card', ran(o, 'hive_start_task').some((x) => field(x.args, 'number', p)) || briefsTo(o, 'Coder').some((t) => names(t, p)), o.hiveCalls.map((x) => x.tool).join(',')]
+        ['started Coder on the card', ran(o, 'hive_start_task').some((x) => cardIs(o, argsOf(x).number, p)) || briefsTo(o, 'Coder').some((t) => names(t, p)), o.hiveCalls.map((x) => x.tool).join(',')]
       ]
     },
     fakeSkips: ["asked the user nothing: no notification and no question (the deploy details are in the doc, and the request is the OK)", 'started Coder on the card']
@@ -4703,10 +4716,10 @@ module.exports.SCENARIOS.push(
       await c.card('p', { title: 'Save banner: plural for 0 cards', description: 'banner.js: plural() gives "card" for 0; use "cards" for every n but 1.', column: 'passed', agent: 'coder', comments: ['Done: plural() is n === 1 ? "" : "s" now, on branch hive/coder (not merged yet). Ready for review.', 'Review round 1: PASSED.'] })
     },
     prompt: `In alpha: ${BANNER_REPORT}`,
-    fake: (c) => `skill triage-report then hive hive_update_task {"number":${c.cards.p},"comment":"Reported again by the user: \\"Saved 0 card\\" after saving an empty board (a screenshot of the banner). This card's fix covers it once merged."}`,
+    fake: (c) => `skill triage-report then hive hive_update_task {"number":"AL-${c.cards.p}","comment":"Reported again by the user: \\"Saved 0 card\\" after saving an empty board (a screenshot of the banner). This card's fix covers it once merged."}`,
     expect: (o, c) => {
       const p = c.cards.p
-      const noted = ran(o, 'hive_update_task').some((x) => field(x.args, 'number', p) && /comment|links/.test(String(x.args)))
+      const noted = ran(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, p) && /comment|links/.test(String(x.args)))
       return [
         ['read the triage-report skill', read(o, 'triage-report'), o.skillsRead.join(',')],
         ['filed no new card for it', ran(o, 'hive_create_task').length === 0, ran(o, 'hive_create_task').map((x) => argsOf(x).title).join(' | ')],
@@ -4785,14 +4798,16 @@ module.exports.SCENARIOS.push({
     [
       `skill board-hygiene`,
       `hive hive_update_task {"number":${c.cards.d1},"links":[${c.cards.d2}]}`,
-      `hive hive_update_task {"number":${c.cards.d2},"links":[${c.cards.d1}],"comment":"Duplicate of #${c.cards.d1}: the user can archive it."}`,
+      `hive hive_update_task {"number":${c.cards.d2},"links":[${c.cards.d1}],"comment":"Duplicate of AL-${c.cards.d1}: the user can archive it."}`,
       `hive hive_update_task {"number":${c.cards.q},"decision":"CSV, not JSON."}`,
       `hive hive_update_task {"number":${c.cards.s},"blocked":"#${c.cards.r} is Done: ready to unblock?"}`
     ].join(' then '),
   expect: (o, c) => {
     const card = (k) => o.allCards.find((x) => x.number === c.cards[k])
     const linked = (a, b) => (card(a)?.links ?? []).includes(c.cards[b]) || (card(b)?.links ?? []).includes(c.cards[a])
-    const dupNote = ['d1', 'd2'].some((k) => (card(k)?.comments ?? []).some((x) => new RegExp(`duplicate of #?${c.cards[k === 'd1' ? 'd2' : 'd1']}`, 'i').test(x.text)))
+    // The other card by its number or its own key (HI-2221), never another project's card ending in the same digits.
+    const dupOf = (other) => new RegExp(`duplicate of (#?${c.cards[other]}|${card(other)?.key ?? '(?!)'})(?![\\w-])`, 'i')
+    const dupNote = ['d1', 'd2'].some((k) => (card(k)?.comments ?? []).some((x) => dupOf(k === 'd1' ? 'd2' : 'd1').test(x.text)))
     const decisions = (card('q')?.decisions ?? []).map((d) => d.text)
     const s = card('s')
     const raised = (s?.blocked && s.blocked !== `Waits for #${c.cards.r} (the export API).`) || new RegExp(`#?${c.cards.s}\\b`).test(o.finalReply ?? '')
@@ -4887,4 +4902,4 @@ module.exports.SCENARIOS.push({
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
 })
 
-module.exports.helpers = { called, ran, asksTheUser, questionsToUser, askedToCommit, read, moved, history, field, isCard, movesOf, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { called, ran, asksTheUser, questionsToUser, askedToCommit, read, moved, history, field, isCard, cardIs, movesOf, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
