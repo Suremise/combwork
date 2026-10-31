@@ -54,7 +54,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   ),
   'submit.clean': r(
     msg({ id: 'workflow.refused.submit.clean.message', defaultMessage: "{card} can't go to review: {folder} has uncommitted changes ({files}).", description: 'A refused submit: the working folder has uncommitted changes. {folder} is a folder path, {files} a list of file paths.' }),
-    msg({ id: 'workflow.refused.submit.clean.next', defaultMessage: "Commit your changes (or remove them), then submit for review again. If the user didn't ask you to commit, ask them.", description: "The next step after a refused submit for review with uncommitted changes, addressed to the agent: committing is the user's call (HI-1618)." }),
+    msg({ id: 'workflow.refused.submit.clean.next', defaultMessage: "Commit the card's changes (committing is part of doing the card), then submit for review again. Changes that aren't the card's: ask before removing them.", description: "The next step after a refused submit for review with uncommitted changes (HI-1618, HI-2227): the agent given the card commits its work as part of doing it; changes that aren't the card's are removed only once asked about." }),
     msg({ id: 'workflow.refused.submit.clean.change', defaultMessage: 'This rule comes with review and merging in Version Control.', description: 'Where the rule that refused a submit with uncommitted changes comes from.' })
   ),
   'submit.trailer': r(
@@ -231,7 +231,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   // decision): what is missing is said in git's words, and committing stays the user's call.
   'submit.empty': r(
     msg({ id: 'workflow.refused.submit.empty.message', defaultMessage: '{card}: nothing committed to review.', description: "A refused submit for review: the card's line has no commit since it started (git's words: nothing committed). {card} is a card key." }),
-    msg({ id: 'workflow.refused.submit.empty.next', defaultMessage: "Commit the card's work, then submit for review. If the user didn't ask you to commit, ask them.", description: "The next step after a refused submit for review with nothing committed, addressed to the agent: committing is the user's call." })
+    msg({ id: 'workflow.refused.submit.empty.next', defaultMessage: "{changes, select, yes {Commit the card's work (committing is part of doing the card), then submit for review again.} none {Its folder has no changes either. A card that needs none (it only runs or checks something, or its work is already there) is no-code: ask for that with hive_ask_user (action noCode), or hive_ask_assistant where it's already decided. Otherwise make its change, commit it and submit again.} other {Commit the card's work (committing is part of doing the card), then submit for review again. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).}}", description: "The next step after a refused submit for review with nothing committed (HI-2227). {changes} (select): yes when the card's folder has uncommitted changes (commit them: part of doing the card), none when it has none (a card needing no change is made no-code by the user, asked with the tools named), other when unknown. hive_ask_user, hive_ask_assistant and noCode are names of tools and an option: keep them as they are; translate each branch's whole sentences." })
   ),
   // A project with no version control: nothing is committed there, only the card's files changed or not.
   'submit.unchanged': r(
@@ -297,6 +297,13 @@ export const PAUSED_NEXT = {
 export const REPOSITORY_GONE_NEXT = msg({ id: 'workflow.refused.platform.unknown.nextGone', defaultMessage: "{reader, select, you {The project's Git repository is gone: restore it, or switch the project to None in its Version Control tab (from the next card).} other {The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its Version Control tab (from the next card).}}", description: 'The next step when a card was refused because its Git repository was removed or moved: the user restores it, or switches the project to None (no version control) in the Version Control tab, which applies to cards started after. Read by agents and shown in the window. {reader} (select): you is the window\'s wording, other the agent\'s (the user named as the user); translate both whole sentences.' })
 
 /** The next step of `move.notFromHere` when nothing can be done from the stage (a request answered meanwhile). */
+/**
+ * The next step after a start or submit refused on a card in Done (HI-2227): more work on it the user asked for takes it
+ * back to Doing (work-on-card's after-review.md), and a separate follow-up is a new card. Other moves refused there (an
+ * answer to a request no longer open) keep NOTHING_FROM_HERE.
+ */
+export const DONE_NEXT = msg({ id: 'workflow.refused.move.notFromHere.nextDone', defaultMessage: "{reader, select, you {It's finished. More work on it that you ask for takes it back to Doing; separate follow-up work goes on a new card.} other {It's finished. More work on it that the user asked for: move it back with hive_update_task (column: doing), then work on it as usual. Separate follow-up work goes on a new card (hive_create_task).}}", description: "The next step after an agent's start or submit was refused on a card in Done (HI-2227): more work on that card the user asked for moves it back to Doing; separate follow-up work is a new card. hive_update_task, hive_create_task and column: doing are a tool, its argument and value: keep them as they are. Doing is a column name: use it as Hive shows it. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences." })
+
 export const NOTHING_FROM_HERE = msg({ id: 'workflow.refused.move.notFromHere.nextNone', defaultMessage: 'Nothing waits to be done there now.', description: "The next step after a refused move when nothing is possible from the card's stage (the request it answered is no longer open)." })
 
 /**
@@ -364,7 +371,8 @@ const IN_ENGLISH: RefusalFormat = { one: (m, values) => englishText(values ? { m
  */
 const VALUES_BEFORE: Partial<Record<RuleId, Record<string, string>>> = {
   'submit.checksPassed': { why: 'none', files: 'none', copy: 'no' }, // i18n-ignore: select keys, never shown
-  'move.doingNobody': { also: 'no' } // i18n-ignore: select keys, never shown
+  'move.doingNobody': { also: 'no' }, // i18n-ignore: select keys, never shown
+  'submit.empty': { changes: 'unknown' } // i18n-ignore: select keys, never shown
 }
 
 /** The three sentences of a refusal, formatted by `f`: `change` null when the rule has none. */
@@ -397,7 +405,8 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   const queued = rule === 'merge.hiveMerges' && typeof values.queue === 'string' && Object.hasOwn(QUEUE_NEXT, values.queue) ? (paused ?? QUEUE_NEXT[values.queue as keyof typeof QUEUE_NEXT]) : null
   const side = rule === 'move.notFromHere' && typeof values.whose === 'string' && Object.hasOwn(SIDE_NEXT, values.whose) ? SIDE_NEXT[values.whose as keyof typeof SIDE_NEXT] : null
   const user = f.forUser ? FOR_USER[rule] : undefined
-  const next = user?.next ?? side ?? (rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : rule === 'platform.unknown' && values.offer === 'repositoryGone' ? REPOSITORY_GONE_NEXT : (queued ?? t.next))
+  const done = rule === 'move.notFromHere' && values.stage === 'done' && (values.move === 'start' || values.move === 'submit') ? DONE_NEXT : null
+  const next = user?.next ?? side ?? done ?? (rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : rule === 'platform.unknown' && values.offer === 'repositoryGone' ? REPOSITORY_GONE_NEXT : (queued ?? t.next))
   return { message: f.one(user?.message ?? t.message, vals), next: f.one(next, vals), change: t.change ? f.one(t.change, vals) : null }
 }
 

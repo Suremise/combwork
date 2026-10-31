@@ -334,7 +334,15 @@ export class GitPlatform implements PlatformAdapter {
       files = c.files
       key = c.key
     }
-    if (!revision || revision === base || !files.length) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key } } }
+    if (!revision || revision === base || !files.length) {
+      // Whether its folder has changes says which next step fits (HI-2227): commit them, or a card needing none is no-code.
+      // In a shared folder, other agents' recorded changes aren't this card's.
+      if (args.predicted) return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key } } }
+      const all = dirty ?? (await G.dirty(folder))
+      const notMine = this.wf.ownLine(s) || isUnknown(all) ? [] : await this.inRepo(this.notMine(card, s))
+      const mine = isUnknown(all) ? null : all.filter((f) => !notMine.some((x) => under(f, x.path)))
+      return { ok: false, refusal: { rule: 'submit.empty', values: { card: card.key, ...(mine ? { changes: mine.length ? 'yes' : 'none' } : {}) } } }
+    }
     // The guards' platform inputs, gathered only for the guards the ruleset holds.
     const inputs: Partial<GuardInputs> = {}
     const shared = !this.wf.ownLine(s)

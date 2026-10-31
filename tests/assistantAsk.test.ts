@@ -111,7 +111,7 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     // In Done, and archived.
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'done' }, user))
     const done = await read(w, card)
-    await expect(ask(w, card, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && /is in Done/.test(e.message))
+    await expect(ask(w, card, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && /is in Done/.test(e.message) && /More work on it that the user asked for: move it back with hive_update_task \(column: doing\)\. Separate follow-up work goes on a new card/.test(e.message))
     expect((await read(w, card)).comments).toEqual(done.comments)
     const second = (await inWorkspace(w, () => tasks.createTask({ title: 'Old', project: 'alpha' }, user))).number
     await inWorkspace(w, () => tasks.archiveTask(second, true))

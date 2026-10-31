@@ -152,6 +152,9 @@ describe('control', () => {
     for (const level of ['look', 'agents', 'projects'] as const) expect(controlRules(level)).toMatch(/Settings → Assistant → Control/)
     expect(controlRules('look')).toMatch(/Look and advise/)
     expect(controlRules('look')).toMatch(/Never edit or create files[^.]*change the task board[^.]*start, stop or prompt agents, even if asked/)
+    // With Change settings on, the ban leaves the settings line its say (HI-2227: Codex took the ban for settings too).
+    expect(controlRules('look')).not.toMatch(/changing a Hive setting/)
+    expect(controlRules('look', true)).toMatch(/handovers is fine when the user asks, and so is changing a Hive setting, as the next line says\.\n- Hive's settings: change one \(hive_update_setting\)/)
     expect(controlRules('agents')).not.toMatch(/create projects/)
     expect(controlRules('projects')).toMatch(/create projects when the user asks/)
     for (const level of ['agents', 'projects'] as const) {
