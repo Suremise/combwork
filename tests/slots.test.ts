@@ -428,6 +428,74 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     expect(sh(r.slot.folder, 'log', '-1', '--format=%s', 'hive/AM-1-work').trim()).toBe('work')
   })
 
+  /** A 1.0.0 line in the project, a commit ahead of main. */
+  const line100 = (w: World): void => {
+    sh(w.project, 'branch', '1.0.0', 'main')
+    sh(w.project, 'switch', '-q', '1.0.0')
+    commit(w.project, { 'line.txt': 'on 1.0.0\n' }, 'on 1.0.0')
+    sh(w.project, 'switch', '-q', 'main')
+  }
+
+  it("made from main, serving a start for another line: it records that target and, released, waits detached at its head (HI-2185)", async () => {
+    const w = world({ builders: 1 })
+    const first = await lent(w, { agent: 'a1', card: 1 })
+    expect(first.slot.target).toBe('main')
+    await w.pool.release(first.lease.id, 'done')
+    line100(w)
+    const r = await w.pool.lend({ agent: 'a1', card: 2 }, { target: '1.0.0' })
+    if (!r.ok) throw new Error(`refused: ${JSON.stringify(r.refusal)}`)
+    expect(r.slot.name).toBe('slot-a')
+    expect(await w.pool.serves(r.lease.id, 'a1', '1.0.0')).toBe(true)
+    expect(w.store.slot('slot-a')?.target).toBe('1.0.0')
+    sh(r.slot.folder, 'switch', '-q', '-c', 'hive/AM-2-work', '1.0.0')
+    commit(r.slot.folder, { 'work.txt': 'work\n' }, 'work')
+    await w.pool.release(r.lease.id, 'done')
+    expect(w.store.slot('slot-a')?.state).toBe('ready')
+    expect(sh(r.slot.folder, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('HEAD')
+    expect(sh(r.slot.folder, 'rev-parse', 'HEAD').trim()).toBe(sh(w.project, 'rev-parse', '1.0.0').trim())
+    // A lend that nothing serves leaves the one recorded.
+    const again = await lent(w, { agent: 'a1', card: 3 })
+    expect(again.slot.target).toBe('1.0.0')
+  })
+
+  it("a carried slot made from main, handed off to a card for another line and serving it: released, it waits detached at that line's head (HI-2185)", async () => {
+    const w = world({ builders: 3 })
+    const folder = join(w.root, 'hb3')
+    sh(w.project, 'worktree', 'add', '-q', '-b', 'hive/hb3', folder, 'main')
+    const carried = (await w.pool.carry('a3', { name: 'hb3', folder, target: 'main' }))!
+    line100(w)
+    // Handed off later than it was carried, so the card's lease is the slot's newest.
+    w.clock.now += 1000
+    const lease = (await w.pool.handOff(carried.id, { card: 7, agent: 'a3' }))!
+    expect(lease).toMatchObject({ kind: 'card', card: 7, slot: 'hb3' })
+    expect(await w.pool.serves(lease.id, 'a3', '1.0.0')).toBe(true)
+    sh(folder, 'switch', '-q', '-c', 'hive/AM-7-work', '1.0.0')
+    commit(folder, { 'work.txt': 'work\n' }, 'work')
+    await w.pool.release(lease.id, 'done')
+    expect(w.store.slot('hb3')?.state).toBe('ready')
+    expect(sh(folder, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('HEAD')
+    expect(sh(folder, 'rev-parse', 'HEAD').trim()).toBe(sh(w.project, 'rev-parse', '1.0.0').trim())
+  })
+
+  it("serves only by the lease chosen, still open and its agent's: ended, or the slot lent to another lease meanwhile, nothing is recorded (HI-2185)", async () => {
+    const w = world({ builders: 1 })
+    const chosen = await lent(w, { agent: 'a1', lane: 'lane-a' })
+    // Ended before its start records: nothing.
+    await w.pool.release(chosen.lease.id, 'done')
+    expect(await w.pool.serves(chosen.lease.id, 'a1', '1.0.0')).toBe(false)
+    expect(w.store.slot('slot-a')?.target).toBe('main')
+    // Replaced between the choice and the record: the same lane lent the same slot again, under another lease.
+    const next = await lent(w, { agent: 'a1', lane: 'lane-a' })
+    expect(next.slot.name).toBe('slot-a')
+    expect(next.lease.id).not.toBe(chosen.lease.id)
+    expect(await w.pool.serves(chosen.lease.id, 'a1', '1.0.0')).toBe(false)
+    // Another agent's claim on the open lease: nothing either.
+    expect(await w.pool.serves(next.lease.id, 'a2', '1.0.0')).toBe(false)
+    expect(w.store.slot('slot-a')?.target).toBe('main')
+    expect(await w.pool.serves(next.lease.id, 'a1', '1.0.0')).toBe(true)
+    expect(w.store.slot('slot-a')?.target).toBe('1.0.0')
+  })
+
   it("a detach git refuses (an index lock): not ready, still on its line; the next look detaches it (HI-2014)", async () => {
     const w = world({ builders: 1 })
     const r = await lent(w, { agent: 'a1', card: 1 })

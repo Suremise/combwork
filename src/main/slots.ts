@@ -91,7 +91,10 @@ export interface Slot {
   folder: string
   state: SlotState
   portBase: number
-  /** The branch it was made from (its clean-up checks its head is in it). */
+  /**
+   * The branch its last card's or lane's start named (SlotPool.serves, HI-2185), else the one it was made from: where its
+   * lines merge, so a clean one waits detached at its head, and its clean-up checks its head is in it.
+   */
   target: string | null
   /** Its last install's revision and lock files' hash (null: no lock file then). */
   installRev: string | null
@@ -566,6 +569,20 @@ export class SlotStore {
       if (constraintOf(e)) return null
       throw e
     }
+  }
+
+  /**
+   * A start's target recorded on the slot its lease holds (HI-2185, SlotPool.serves): only while that lease is open and
+   * its agent's, so a lease ended or replaced meanwhile changes nothing (the slot's open lease is unique: an open one is
+   * its holder). Whether it was recorded.
+   */
+  async serves(lease: string, agent: string, target: string): Promise<boolean> {
+    return this.conn.write((db) => {
+      const r = db.prepare('SELECT slot FROM slot_leases WHERE id = ? AND project = ? AND agent = ? AND ended_at IS NULL').get(lease, this.project, agent) as { slot: string } | undefined
+      if (!r) return false
+      db.prepare('UPDATE slots SET target = ? WHERE project = ? AND name = ?').run(target, this.project, r.slot)
+      return true
+    })
   }
 
   /**
@@ -1259,6 +1276,16 @@ export class SlotPool {
       })
       if (out !== 'skip') return out
     }
+  }
+
+  /**
+   * The slot a card's or lane's start chose now serves its target (HI-2185): recorded on the slot while `lease`, the one
+   * chosen, is still open and `agent`'s, so a released slot waits detached at that line's head and its clean-up checks
+   * against it. One place for every way a start gets its slot (lent, handed over, taken over, already held). False: the
+   * lease ended or isn't the agent's, nothing written.
+   */
+  serves(lease: string, agent: string, target: string): Promise<boolean> {
+    return this.store.serves(lease, agent, target)
   }
 
   /** A carried lease handed off to a card or lane of its agent's (#1441), `also` in the same write (SlotStore.handOff). */

@@ -196,9 +196,31 @@ function current(wf: Workflow, n: number, seq: number, lease: string): { card: C
  * The lease a card's start uses (#1438, SPEC §16.10.2), for its builder: a lane's card, the lane's (lent now if the lane
  * has none yet, and kept for the whole lane); any other card, its own (the one it has, or lent now). None free: why it
  * waits, in English. `dry`: only whether one could be (nothing lent). Null where slots don't apply: the rules off, or
- * the builder a reviewer (a carried slot, #1441, extends this).
+ * the builder a reviewer (a carried slot, #1441, extends this). However it got its slot, a real start records its
+ * target on it then, by the lease chosen (startServes).
  */
 export async function leaseForStart(ws: WorkspaceService, projectPath: string, card: Pick<CardRecord, 'id' | 'lane'>, builder: string, o: { dry: boolean; target: string | null }): Promise<SlotForStart> {
+  const r = await slotForStart(ws, projectPath, card, builder, o)
+  if (o.dry || !r || !('lease' in r)) return r
+  const lost = await startServes(ws, projectPath, r.lease, builder, o.target)
+  return lost ? { wait: lost } : r
+}
+
+/**
+ * The slot a start chose serves its target (HI-2185, SlotPool.serves): every way a card's or lane's start gets its slot
+ * (lent, lent again, handed over, taken over, already held) passes here, with the lease it chose, so a released slot
+ * waits detached at the head of the line its last card worked to. No target: the slot keeps its own. Null when
+ * recorded; why the start waits when that lease ended or changed hands meanwhile (agent-facing).
+ */
+async function startServes(ws: WorkspaceService, projectPath: string, lease: string, builder: string, target: string | null): Promise<string | null> {
+  if (!target) return null
+  const pool = await poolFor(ws, projectPath)
+  if (await pool.serves(lease, builder, target)) return null
+  log.info(`lease ${lease} ended before its start recorded its target ${userText(target)}`)
+  return `its slot's lease ${lease} ended while the start took it: the start tries again` // i18n-ignore: agent-facing, a start's wait
+}
+
+async function slotForStart(ws: WorkspaceService, projectPath: string, card: Pick<CardRecord, 'id' | 'lane'>, builder: string, o: { dry: boolean; target: string | null }): Promise<SlotForStart> {
   if (!workflowEnforced()) return null
   const agents = projectAgents(await ws.projectConfig(projectPath))
   const agent = agents.find((a) => a.id === builder)
@@ -787,7 +809,7 @@ export interface FinishedSlotView {
  * each read there, before anything changes (HR2's HI-2014 round 1, finding 1): a card reopened, finished again or
  * started elsewhere meanwhile, or a workspace closed, leaves the slot as it is. The slot read again too: another
  * lease's now, or on another line, its question closes; dirty, asked once; clean, an open lease's slot detached at the
- * target's head (a released one is the pool's), its question closed.
+ * card's target's head (a released one is the pool's), its question closed.
  */
 export async function finishedSlot(projectPath: string, wf: Workflow, n: number, lease: string, slotNow: () => FinishedSlotView | null, lane: string | null = null, alive: () => boolean = () => true): Promise<boolean> {
   const card = cardOf(wf, n)
@@ -812,7 +834,9 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
     if (asked()) await wf.closeSlotDirty(card, finish)
     return false
   }
-  const target = slot.target ?? s.started.target
+  // The card's own target (HI-2185): where its line merged, so the slot waits at that line's head, not the branch it was
+  // made from; the slot's only when the card has none.
+  const target = s.integrated?.target || s.started.target || slot.target
   if (!target) return false
   let detached = false
   await withRepoLock(
@@ -1493,26 +1517,34 @@ export async function settleRenames(pool: SlotPool): Promise<void> {
 /**
  * A lane's slot (#1438, §16.10.2), lent to its builder as Start Lane… starts it, before its agents start, and kept for the
  * whole lane: the slot, or why none is free (English). With none free the caller records the lane's wait (`slotWait`).
+ * However it got its slot, it records the lane's target on it then, by the lease chosen (startServes).
  */
 export async function lendLane(ws: WorkspaceService, projectPath: string, lane: string, builder: string, target: string | null): Promise<{ slot: string } | { waiting: string }> {
+  const r = await lendLaneSlot(ws, projectPath, lane, builder, target)
+  if (!('lease' in r)) return r
+  const lost = await startServes(ws, projectPath, r.lease, builder, target)
+  return lost ? { waiting: lost } : { slot: r.slot }
+}
+
+async function lendLaneSlot(ws: WorkspaceService, projectPath: string, lane: string, builder: string, target: string | null): Promise<{ slot: string; lease: string } | { waiting: string }> {
   const pool = await poolFor(ws, projectPath)
   const agents = projectAgents(await ws.projectConfig(projectPath))
   const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
   // The builder's own slot, taken over by the lane when it can be (#1441), as a card's start does.
   const own = await carriedToHand(ws, projectPath, pool, builder, target)
   const handed = own ? await handOffCarried(ws, projectPath, pool, own, { lane, agent: builder }, name(builder)) : null
-  if (handed) return { slot: handed.slot }
+  if (handed) return { slot: handed.slot, lease: handed.id }
   // The slot its own run still writes in, its last lease ended (HI-1762), as a card's start does: taken, or waited for.
   const written = await startOnWritten(ws, projectPath, pool, builder, { lane, agent: builder }, name(builder))
   if ('wait' in written) return { waiting: written.wait }
-  if ('lease' in written) return { slot: written.lease.slot }
+  if ('lease' in written) return { slot: written.lease.slot, lease: written.lease.id }
   // Lent with the lane's target (#1627), so the slot records where its lines merge.
   const r = await pool.lend({ lane, agent: builder }, { ...(target ? { target } : {}), install: false })
   if (r.ok) {
     log.info(`Lent ${userText(r.slot.name)} to lane ${lane} (lease ${r.lease.id})`)
     // Its carried lease kept for a card it has left ends now that the lane holds its own (HI-1731).
     await endLeftCarriedNow(ws, projectPath, pool, builder, { lane }, r.lease.id)
-    return { slot: r.slot.name }
+    return { slot: r.slot.name, lease: r.lease.id }
   }
   return { waiting: refusalText(r.refusal, name) }
 }

@@ -11,7 +11,7 @@ import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { commit, gitRepo } from './workflow/harness'
+import { commit, gitRepo, sh } from './workflow/harness'
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => true }))
 // The lanes running (the slot pass ends a lane's lease once its lane isn't): the next ones, never the one that ended.
@@ -151,6 +151,67 @@ describe("B1's next start takes over the slot its own run still writes in (HI-17
     // The old lease's stop looks at B1's idle moment (on its status, at once): its writer is the new lease's, so no stop.
     t.idle()
     expect(t.stops).toEqual([])
+  })
+
+  it("taken over by a card for another line than the slot was made from: the slot records that card's target (HI-2185)", async () => {
+    const t = await setup('target')
+    const x = await t.start(await t.card('X', 'b1'), 'b1')
+    if (!x || !('lease' in x)) throw new Error(JSON.stringify(x))
+    expect(t.pool.slots().find((s) => s.name === x.slot)?.target).toBe('main')
+    await t.setWriter(x.slot, x.lease)
+    expect(await t.pool.release(x.lease, 'done')).toBe(true)
+    const next = await t.card('Y', 'b1')
+    const y = await t.run(() => leaseForStart(t.ws, t.project, { id: next }, 'b1', { dry: false, target: '1.0.0' }))
+    expect(y && 'lease' in y ? y.slot : y).toBe(x.slot)
+    expect(t.pool.slots().find((s) => s.name === x.slot)?.target).toBe('1.0.0')
+    t.idle()
+  })
+
+  it("a lane lent before its target was known (a waiting lane's): its card's start records the card's target, and released, the slot waits detached at that line's head (HI-2185)", async () => {
+    const t = await setup('held')
+    sh(t.project, 'branch', '1.0.0', 'main')
+    sh(t.project, 'switch', '-q', '1.0.0')
+    commit(t.project, { 'line.txt': 'on 1.0.0\n' }, 'on 1.0.0')
+    sh(t.project, 'switch', '-q', 'main')
+    // As startWaitingLanes lends it: no target.
+    running.add('lane-w')
+    const pre = await t.pool.lend({ lane: 'lane-w', agent: 'b1' }, { install: false })
+    if (!pre.ok) throw new Error(JSON.stringify(pre.refusal))
+    const slotOf = () => t.pool.slots().find((s) => s.name === pre.slot.name)!
+    expect(slotOf().target).toBe('main')
+    const n = await t.card('Lane card', 'b1')
+    // A dry start writes nothing.
+    expect(await t.run(() => leaseForStart(t.ws, t.project, { id: n, lane: 'lane-w' }, 'b1', { dry: true, target: '1.0.0' }))).toMatchObject({ slot: pre.slot.name })
+    expect(slotOf().target).toBe('main')
+    const r = await t.run(() => leaseForStart(t.ws, t.project, { id: n, lane: 'lane-w' }, 'b1', { dry: false, target: '1.0.0' }))
+    expect(r && 'lease' in r ? r.lease : r).toBe(pre.lease.id)
+    expect(slotOf().target).toBe('1.0.0')
+    // Its card's line from 1.0.0, then the lane's lease released: the pool's settle detaches it at 1.0.0's head.
+    sh(pre.slot.folder, 'switch', '-q', '-c', 'hive/AM-1-lane-card', '1.0.0')
+    commit(pre.slot.folder, { 'work.txt': 'work\n' }, 'work')
+    running.delete('lane-w')
+    expect(await t.pool.release(pre.lease.id, 'laneEnded')).toBe(true)
+    expect(slotOf().state).toBe('ready')
+    expect(sh(pre.slot.folder, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('HEAD')
+    expect(sh(pre.slot.folder, 'rev-parse', 'HEAD').trim()).toBe(sh(t.project, 'rev-parse', '1.0.0').trim())
+  })
+
+  it("a start whose chosen lease ended before it recorded its target: it waits, and the slot's target is left as it was (HI-2185)", async () => {
+    const t = await setup('lost')
+    sh(t.project, 'branch', '1.0.0', 'main')
+    // The slot made from main by an earlier card (a new one records the target it is made from).
+    const x = await t.start(await t.card('Earlier', 'b1'), 'b1')
+    if (!x || !('lease' in x)) throw new Error(JSON.stringify(x))
+    expect(await t.pool.release(x.lease, 'done')).toBe(true)
+    const n = await t.card('X', 'b1')
+    const spy = vi.spyOn(t.pool, 'serves').mockImplementation(async (lease: string) => (await t.pool.release(lease, 'done'), false))
+    try {
+      const r = await t.run(() => leaseForStart(t.ws, t.project, { id: n }, 'b1', { dry: false, target: '1.0.0' }))
+      expect(r).toMatchObject({ wait: expect.stringMatching(/ended while the start took it/) })
+    } finally {
+      spy.mockRestore()
+    }
+    expect(t.pool.slots().every((s) => s.target === 'main')).toBe(true)
   })
 
   it("its own slot busy just then (a job on it), another slot free: the start waits (a dry start too), never a second slot; once settled, it takes its own", async () => {
