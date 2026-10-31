@@ -409,12 +409,14 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     check("…another card's run of the same command passing doesn't resolve it, nor fold with it", !!(await until(async () => /custom verification/.test(await text()), HUNG_MS)) && (await badgeNow()) === before + 1 && !/custom verification ×2/.test(await text()), `${await badgeNow()} ${await text()}`)
 
     // --- HR6's round 1: the lane filter reads the lane as it is now. Chosen with [A, B, C]; A Done and the list
-    // changed between cards to [A, C]: B's runs leave the filtered list, the choice stays the lane.
+    // changed between cards to [A, C]: B's runs leave the filtered list, the choice stays the lane. A script changes it
+    // (the workspace token): a builder's own start never takes a card off its lane (HI-2169), the Assistant, the user
+    // and scripts do.
     await panel.locator('.progress-runs-choices select[aria-label="Lane"]').selectOption({ label: 'B1 / R1 · tabs' })
     check("the lane's filter shows B's unit run while B is in the lane", !!(await until(async () => /unit/.test(await text()), HUNG_MS)), await text())
     await inv('tasks:move', a.number, 'done', { confirm: true, reason: 'Merged by hand' })
     await until(async () => (await inv('tasks:list')).find((x) => x.number === a.number)?.column === 'done', HUNG_MS)
-    const changed = await api(t1, 'POST', '/v1/lanes', { cards: [a.number, c.number], reviewer: 'R1', name: 'tabs' })
+    const changed = await api(workspaceToken, 'POST', '/v1/lanes', { project: 'alpha', builder: 'B1', cards: [a.number, c.number], reviewer: 'R1', name: 'tabs' })
     check('between cards, the lane becomes [A, C]', changed.status === 200 && JSON.stringify(changed.body?.lane?.cards?.map((x) => x.number)) === JSON.stringify([a.number, c.number]), JSON.stringify(changed.body?.lane?.cards))
     check("…the filter follows it: B's runs leave, A's stay, the lane still chosen", !!(await until(async () => !/unit/.test(await text()) && /e2e/.test(await text()), HUNG_MS)) && (await panel.locator('.progress-runs-choices select[aria-label="Lane"]').inputValue()) !== '', await text())
     await panel.locator('.progress-runs-clear').click()
