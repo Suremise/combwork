@@ -571,10 +571,17 @@ async function runScenario(sc, providerKey, opts = {}) {
     // A subject Hive starts itself (HI-2046: a reviewer given a card that reached Review outside a lane): its launch is
     // the session under test, and Hive's line its prompt.
     const byHive = !!sc.startedByHive
+    // A prompt given at launch (HI-2225), on the CLI's command line: the session's first input, before anything setup left
+    // for it (Hive types nothing into a launch whose CLI hasn't taken its task yet, #712, and a wake waits for the turn
+    // after), so a wake can't come first and do the prompt's work without it. Never with beforePrompt, which waits for
+    // that wake's turn.
+    const atLaunch = !byHive && !!sc.promptAtLaunch
+    if (atLaunch && sc.beforePrompt) throw new Error(`${sc.id}: promptAtLaunch and beforePrompt don't go together`)
+    const launchPrompt = !atLaunch ? null : p.fake ? (typeof sc.fake === 'function' ? sc.fake(ctx) : sc.fake) : typeof sc.prompt === 'function' ? sc.prompt(ctx) : sc.prompt
     if (!byHive) {
       // Refused as already running or starting (HI-2215): Hive started it itself after setup (a lane's card, a review),
       // which a scenario says with startedByHive; never taken as Hive's start here, whose line would then race the prompt.
-      const refused = await inv('session:start', host, { agentId }).then(() => null, (e) => e)
+      const refused = await inv('session:start', host, { agentId, ...(atLaunch ? { prompt: launchPrompt } : {}) }).then(() => null, (e) => e)
       if (refused && /already running or starting/i.test(String(refused.message))) {
         result.error = `setup: Hive started the session under test itself (${String(refused.message).replace(/^.*Error: /, '')}): mark the scenario startedByHive, or have its setup leave it unstarted`
         return result
@@ -637,8 +644,8 @@ async function runScenario(sc, providerKey, opts = {}) {
     while (Date.now() < readyBy) {
       const s = await live()
       if (s?.status === 'ready' || s?.status === 'finished') break
-      // Hive's line already at work: a model's turn on it is the trial.
-      if (byHive && !p.fake && ['working', 'background'].includes(s?.status)) break
+      // Hive's line already at work: a model's turn on it is the trial. The prompt given at launch, the same.
+      if (((byHive && !p.fake) || atLaunch) && ['working', 'background'].includes(s?.status)) break
       const screen = plain(await inv('pty:buffer', key).catch(() => ''))
       if (screen) lastScreen = screen
       // Exited before its session started (an OAuth session it couldn't refresh, #577): no prompt can reach it.
@@ -697,7 +704,7 @@ async function runScenario(sc, providerKey, opts = {}) {
         return result
       }
     }
-    const text = p.fake ? fakePrompt : (hiveLine ?? prompt)
+    const text = launchPrompt ?? (p.fake ? fakePrompt : (hiveLine ?? prompt))
     // The prompt is sent, then checked: a CLI still drawing its first screen can drop an Enter (sent again) or the
     // whole line (typed again).
     const submitted = async () => {
@@ -708,9 +715,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     }
     let notTaken = null
     // Where the prompt's states begin (HI-2086): a watch a turn before it left (a setup wake's, beforePrompt) isn't the
-    // prompt's. A model started by Hive's line has no prompt typed: its turn is the line's, all of them.
-    const statesFrom = hiveLine && !p.fake ? 0 : ((await page.evaluate(() => (window.__subjectStatuses ?? []).length).catch(() => 0)) ?? 0)
-    if (!endedAtLaunch && !(hiveLine && !p.fake)) {
+    // prompt's. A model started by Hive's line has no prompt typed: its turn is the line's, all of them; a prompt given at
+    // launch was the first input, so the same.
+    const statesFrom = (hiveLine && !p.fake) || atLaunch ? 0 : ((await page.evaluate(() => (window.__subjectStatuses ?? []).length).catch(() => 0)) ?? 0)
+    if (!endedAtLaunch && !(hiveLine && !p.fake) && !atLaunch) {
       turnBefore.set(text, (await live())?.turn?.id ?? null)
       const mark = String((await inv('pty:buffer', key).catch(() => '')) ?? '').length
       // Real Claude Code: its first prompt waits for its hive tools, as Hive's own first line does (HI-1148).
@@ -724,6 +732,9 @@ async function runScenario(sc, providerKey, opts = {}) {
       }
     }
     const sentAt = Date.now()
+    // The run the session under test launched as (its trust answered as it started), and later runs whose was (below).
+    const firstRun = (await live())?.runId ?? null
+    const subjectTrusted = new Set()
 
     // Wait for the turn to end: working (or background) first, then finished/ready for a few seconds. `during` sees the
     // board while it works, for scenarios that change things under it. A quick turn can start and end between two looks
@@ -748,6 +759,17 @@ async function runScenario(sc, providerKey, opts = {}) {
       } else if (sawWork || (sawWork = await ctx.answered(text)) || Date.now() - sentAt > 60000) {
         quietSince ||= Date.now()
         if (Date.now() - quietSince > (status === 'waiting' ? 3000 : 6000)) break
+      }
+      // The session under test asking to trust a folder again (HI-2225): Hive gave it its card in a slot, a new run there
+      // (preset-pair-lane), whose question (waiting) ended the trial 3 s later, unanswered. Answered once in each run but
+      // its first (answered above, its question maybe still in the buffer); until then the run is still starting.
+      if (status === 'waiting' && s?.runId && s.runId !== firstRun && !subjectTrusted.has(s.runId)) {
+        const tail = plain(await inv('pty:buffer', key).catch(() => '')).slice(-2000)
+        if (/Do you trust the files in this folder/i.test(tail) || (/trust this folder/i.test(tail) && p.provider === 'codex')) {
+          await inv('pty:write', key, '\r')
+          subjectTrusted.add(s.runId)
+        } else if (/trust this folder/i.test(tail) && (await lib.acceptClaudeTrust(inv, host, agentId, 10000))) subjectTrusted.add(s.runId)
+        if (subjectTrusted.has(s.runId)) quietSince = 0
       }
       if (sc.during) await sc.during(ctx, status)
       // Other agents of the project started during the run (the Assistant dispatching one) ask to trust its folder, once
