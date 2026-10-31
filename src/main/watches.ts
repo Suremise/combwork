@@ -2707,6 +2707,9 @@ async function evaluate(ws: WorkspaceService): Promise<void> {
   for (const rec of store.list.filter((r) => r.fired)) await deliver(store, rec)
   // Lane watches follow the same board (#531).
   await evaluateLanes(store).catch((e) => log.warn('checking lane watches', e))
+  // Usage watches (HI-2195), alone or beside cards or lanes: one read back as the workspace opens is checked against the
+  // usage kept now (another workspace's sessions may have reported it while this one was closed).
+  await evaluateUsage(store).catch((e) => log.warn('checking usage watches', e))
 }
 
 /** Told when watched cards move or change hands (after the watches have seen it): a pending quit checks again. */
@@ -2729,6 +2732,8 @@ export async function tick(now = Date.now()): Promise<void> {
       }
       if (changed) await saveQuietly(store)
     }).catch((e) => log.warn('watch limits', e))
+    // Usage watches (HI-2195) are checked on every usage report; also here, for one that reached its share unseen.
+    await evaluateUsage(store).catch((e) => log.warn('checking usage watches', e))
     // Agent watches are checked on every status change; also here, for what no status change tells (a typed prompt
     // its CLI never took).
     await evaluateAgents(store).catch((e) => log.warn('checking agent watches', e))

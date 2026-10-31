@@ -38,6 +38,8 @@ vi.mock('../src/main/accounts', async () => {
 const PROJECT = 'C:\\ws\\proj'
 const pc: ProjectConfig = { id: 'p-1', agents: [] } as unknown as ProjectConfig
 let lock: Promise<unknown> = Promise.resolve()
+// A write held at the lock (HR1's round 1): `gate` set, each write waits for it once it has the lock; `atLock` counts them.
+const G: { gate: Promise<void> | null; atLock: number } = { gate: null, atLock: 0 }
 const ws = {
   path: 'C:\\ws',
   config: { connections: { 'claude-code': { on: ['a1', 'a2', 'a3'], default: 'a1' } } },
@@ -48,6 +50,8 @@ const ws = {
   projectIdsNow: () => ({ byPath: new Map([[PROJECT.toLowerCase(), 'p-1']]), byId: new Map() }),
   updateAgent: (p: string, id: string, patch: Partial<AgentDef>, check?: (current: AgentDef) => void) => {
     const run = lock.then(async () => {
+      G.atLock++
+      if (G.gate) await G.gate
       const current = pc.agents.find((a) => a.id === id)!
       check?.(current)
       Object.assign(current, patch)
@@ -251,6 +255,8 @@ describe('usageMoves.ts', () => {
 
   beforeEach(() => {
     resetUsageMovesForTests()
+    G.gate = null
+    G.atLock = 0
     H.advanced = true
     H.notices.length = 0
     for (const s of [S.running, S.busy]) s.clear()
@@ -360,6 +366,87 @@ describe('usageMoves.ts', () => {
     await settle()
     expect(connectionOf('stopped')).toBe('c2')
     expect(H.notices).toHaveLength(2)
+  })
+
+  /** Holds writes at the lock; returns its release. */
+  const hold = (): (() => void) => {
+    let release!: () => void
+    G.gate = new Promise<void>((r) => (release = r))
+    return () => {
+      G.gate = null
+      release()
+    }
+  }
+  /** The busy agent's turn ends while writes are held: its commit reaches the lock and waits there. */
+  const safePointAtLock = async (): Promise<() => void> => {
+    setUsage('a1', [weekly(98)])
+    await settle()
+    const release = hold()
+    const at = G.atLock
+    S.busy.delete(key('busy'))
+    S.looks.get(key('busy'))?.()
+    await vi.waitFor(() => expect(G.atLock).toBeGreaterThan(at), { timeout: HUNG_MS })
+    return release
+  }
+
+  it('the Advanced switch turned off while the write waits for the lock: nothing written, nothing typed (HR1 round 1)', async () => {
+    const release = await safePointAtLock()
+    H.advanced = false
+    const { emit } = await import('../src/main/events')
+    emit({ type: 'advanced-changed' })
+    release()
+    await vi.waitFor(() => expect(S.ops.has(key('busy'))).toBe(false), { timeout: HUNG_MS })
+    await lock
+    expect(connectionOf('busy')).toBe('c1b')
+    expect(S.quits).not.toContain(key('busy'))
+    expect(config.get().usageMoves?.a1?.seven_day?.handled['p-1/busy']).toBeUndefined()
+  })
+
+  it('a manual stop while the write waits for the lock: nothing written, and it stays to be tried again', async () => {
+    const release = await safePointAtLock()
+    S.ops.get(key('busy'))!.op.cancel('stopped')
+    release()
+    await vi.waitFor(() => expect(S.ops.has(key('busy'))).toBe(false), { timeout: HUNG_MS })
+    await lock
+    expect(connectionOf('busy')).toBe('c1b')
+    expect(S.quits).not.toContain(key('busy'))
+    expect(config.get().usageMoves?.a1?.seven_day?.handled['p-1/busy']).toBeUndefined()
+  })
+
+  it('the target signed out while the write waits: no write, and a base switch sharing it still goes on', async () => {
+    setUsage('a1', [weekly(98)])
+    await settle()
+    // HI-1755's own switch joins the waiting usage move.
+    const { sessions } = await import('../src/main/sessions')
+    expect(sessions.switchAtSafePoint(PROJECT, 'busy')).toBe('waiting')
+    const release = hold()
+    const at = G.atLock
+    S.busy.delete(key('busy'))
+    S.looks.get(key('busy'))?.()
+    await vi.waitFor(() => expect(G.atLock).toBeGreaterThan(at), { timeout: HUNG_MS })
+    config.update((c) => (c.accounts = c.accounts!.map((a) => (a.id === 'a2' ? { ...a, observed: { at: '', loggedIn: false } } : a))))
+    release()
+    await vi.waitFor(() => expect(S.resumed).toContain(key('busy')), { timeout: HUNG_MS })
+    expect(connectionOf('busy')).toBe('c1b')
+    expect(S.quits).toContain(key('busy'))
+    expect(config.get().usageMoves?.a1?.seven_day?.handled['p-1/busy']).toBeUndefined()
+  })
+
+  it('a period that ends while the agent works moves nothing at its safe point, with no new report (HR1 round 1)', async () => {
+    const resetsAt = ahead(1)
+    setUsage('a1', [weekly(98, resetsAt)])
+    await settle()
+    expect(usageMovesPending()).toContain('p-1/busy')
+    // The weekly limit resets while it works: no report, no event; then its turn ends.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.parse(resetsAt) + 60_000)
+    S.busy.delete(key('busy'))
+    S.looks.get(key('busy'))?.()
+    await vi.waitFor(() => expect(S.ops.has(key('busy'))).toBe(false), { timeout: HUNG_MS })
+    await lock
+    expect(connectionOf('busy')).toBe('c1b')
+    expect(S.quits).not.toContain(key('busy'))
+    expect(config.get().usageMoves?.a1?.seven_day?.handled['p-1/busy']).toBeUndefined()
   })
 
   it('reciprocal rules never bounce agents between two full accounts', async () => {

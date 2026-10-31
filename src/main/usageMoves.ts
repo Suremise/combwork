@@ -7,7 +7,7 @@ import { accountOnIn, resolveAgentConnection } from '../shared/accounts'
 import { projectAgents } from '../shared/defaults'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { agentProvider } from '../shared/providers'
-import { limitDue, limitKind, liveRecords, matchConnection, movedOffWithinPeriod, periodRecord, ruleLimits, sameRule, targetProblem, USAGE_MOVE_TRIES, type UsageMoveProblem } from '../shared/usageMoves'
+import { limitDue, limitKind, liveRecords, matchConnection, movedOffWithinPeriod, periodRecord, ruleLimits, samePeriod, sameRule, targetProblem, USAGE_MOVE_TRIES, type UsageMoveProblem } from '../shared/usageMoves'
 import { advanced } from './advanced'
 import { accountById, allAccounts, allConnections, getConnection, onConnectionSignedIn } from './accounts'
 import { choiceCount, onManualChoice } from './agentChoice'
@@ -54,6 +54,8 @@ interface Pending {
   to: string
   saved: string | undefined
   count: number
+  /** Its switch ended or it was dropped (HR1's round 1): never written after, however long its write waited for the lock. */
+  over?: boolean
 }
 const pending = new Map<string, Pending>()
 
@@ -132,13 +134,21 @@ function blocked(from: Account, l: PlanLimit, rec: UsageMoveRecord, reason: Usag
   notify('warning', BLOCKED_TITLE, BLOCKED_BODY, { reason, from: from.name, to: to?.name ?? rec.rule.to, workspace: extra.workspace ?? '', agents: fmt.list(extra.agents ?? []), share, window: windowOf(l) })
 }
 
-/** Whether a waiting move still holds as queued (HR1): the switch on, the same rule and firing, the target usable. */
+/**
+ * Whether a waiting move still holds as queued (HR1): not ended or dropped, the switch on, the same rule and firing, its
+ * source's reading still at the share in that firing's period (HR1's round 1: a period that ended while the agent worked
+ * moves nothing), the target usable. Checked as it is queued, before its write and again under the agent's lock.
+ */
 function stillHolds(m: Pending): boolean {
-  if (!enabled()) return false
+  if (m.over || !enabled()) return false
+  const now = Date.now()
   const acc = accountById(m.account)
   const rec = records()[m.account]?.[m.limit]
-  if (!acc || !sameRule(acc.usageMove, m.rule) || rec?.firing !== m.firing || rec.handled[keyOf(m)]) return false
-  if (targetProblem(acc, m.rule, allAccounts(), allConnections(), config.get().connectionPlanUsage?.[m.rule.to], Date.now())) return false
+  if (!acc || !sameRule(acc.usageMove, m.rule) || rec?.firing !== m.firing || rec.handled[keyOf(m)] || Date.parse(rec.resetsAt) <= now) return false
+  const usage = config.get().connectionPlanUsage?.[m.account]
+  const l = usage?.limits.find((x) => x.id === m.limit)
+  if (!usage || (usage.login && usage.login !== connectionLoginNow(m.account)) || !l || !limitDue(l, m.rule.percent, now) || !samePeriod(l.resetsAt, rec.resetsAt)) return false
+  if (targetProblem(acc, m.rule, allAccounts(), allConnections(), config.get().connectionPlanUsage?.[m.rule.to], now)) return false
   const target = accountById(m.rule.to)
   const to = getConnection(m.to)
   return !!target && !!to && to.account === target.id && accountOnIn(m.ws.config, target, allAccounts())
@@ -149,6 +159,8 @@ const keyOf = (m: Pending): string => keys.get(m)!
 
 /** An agent no longer on the source as the user chose (a manual choice, or its connection changed meanwhile): kept for the period. */
 class KeptByUser extends Error {}
+/** The move no longer holds (stillHolds), found under the lock: nothing written, nothing marked. */
+class NoLongerHolds extends Error {}
 
 /**
  * Writes a move (HR1: under the agent's lock, its choice checked then): true once its connection is the target's. A
@@ -165,11 +177,15 @@ async function commit(m: Pending): Promise<boolean> {
   }
   try {
     await m.ws.updateAgent(m.projectPath, m.agentId, { connection: m.to }, (current) => {
+      // Everything again under the lock (HR1's round 1): a stop, a drop, the switch off or the rule or target changed
+      // while this write waited for the lock writes nothing.
+      if (!stillHolds(m)) throw new NoLongerHolds()
       if (choiceCount(m.projectPath, m.agentId) !== m.count || current.connection !== m.saved) throw new KeptByUser()
       const now = resolveAgentConnection(m.ws.config, acc.provider, current.connection, allAccounts(), allConnections())
       if (!now.ok || now.account.id !== acc.id) throw new KeptByUser()
     })
   } catch (e) {
+    if (e instanceof NoLongerHolds) return false
     if (e instanceof KeptByUser) {
       changeRecord(m.account, m.limit, m.firing, (r) => (r.handled[key] = 'kept'))
       return false
@@ -234,6 +250,7 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
           sessions.switchAtSafePoint(projectPath, a.id, {
             commit: () => commit(m),
             ended: () => {
+              m.over = true
               if (pending.get(key) === m) pending.delete(key)
             }
           })
@@ -273,6 +290,7 @@ export const lookAtUsageMoves = (): Promise<void> => coalesced('usage-moves', ru
 function revalidate(): void {
   for (const [key, m] of pending) {
     if (stillHolds(m)) continue
+    m.over = true
     pending.delete(key)
     sessions.dropUsageMove(m.projectPath, m.agentId, 'its usage move no longer holds') // i18n-ignore: for the log
   }
@@ -286,6 +304,7 @@ function manualChoice(projectPath: string, before: AgentDef): void {
   const ws = workspaceOf(projectPath)
   for (const [key, m] of pending) {
     if (m.projectPath.toLowerCase() !== projectPath.toLowerCase() || m.agentId !== before.id) continue
+    m.over = true
     pending.delete(key)
     changeRecord(m.account, m.limit, m.firing, (r) => (r.handled[key] = 'kept'))
     sessions.dropUsageMove(m.projectPath, m.agentId, 'the user chose its connection') // i18n-ignore: for the log
