@@ -567,6 +567,50 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     }
   })
 
+  it('HI-2183: two finished cards of one slot, the slot elsewhere: one refs move asks git once for the slot, not once per card', async () => {
+    const { e, n, slot } = await doneInSlot('First in the slot')
+    // A second card in the same slot under another lease, on its own line from main, merged and Done.
+    const second = e.wf.createCard({ title: 'Second in the slot' })
+    const line2 = lineName('AM', second)
+    sh(slot, 'switch', '-q', '-c', line2, 'main')
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-2', fresh: true })
+    moved(await e.wf.start(second.key, B1))
+    commit(slot, { 'second.txt': 'second\n' }, 'second')
+    moved(await e.wf.submit(second.key, B1, { summary: 'done' }))
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', `Merge ${line2}`, line2)
+    moved(await e.wf.reportMerge(second.key, B1))
+    sh(slot, 'switch', '-q', '--detach')
+    const asks = async (fn: () => Promise<unknown>): Promise<number> => {
+      let k = 0
+      gitTestHooks.started = (_cwd, args) => void (args[0] === 'rev-parse' && args.includes('--symbolic-full-name') && k++)
+      try {
+        await fn()
+      } finally {
+        gitTestHooks.started = undefined
+      }
+      return k
+    }
+    const both = () => Promise.all([finishedSlot(e.project, e.wf, n, 'l-1', view(slot)), finishedSlot(e.project, e.wf, second.id, 'l-2', view(slot))])
+    observer.follow([{ path: e.project, platform: 'git', root: e.project }])
+    try {
+      expect(await asks(both)).toBe(1)
+      expect(await asks(both)).toBe(0)
+      commit(e.project, { 'other.txt': 'o\n' }, 'other')
+      expect(await asks(both)).toBe(1)
+      expect(await asks(both)).toBe(0)
+      // On the second card's line: the first card's look isn't asked again, the second's is (its own line, each time).
+      sh(slot, 'switch', '-q', line2)
+      writeFileSync(join(slot, 'wip.txt'), 'uncommitted')
+      expect(await asks(() => finishedSlot(e.project, e.wf, second.id, 'l-2', view(slot)))).toBe(1)
+      expect(await asks(() => finishedSlot(e.project, e.wf, n, 'l-1', view(slot)))).toBe(0)
+      expect(await asks(() => finishedSlot(e.project, e.wf, second.id, 'l-2', view(slot)))).toBe(1)
+      expect(asked(e, second.id)).toBe(1)
+      expect(asked(e, n)).toBe(0)
+    } finally {
+      observer.follow([])
+    }
+  })
+
   it("HI-2115 (HR3's round 1, finding 1): back on its line at the same commit with no reflog: asked again, and detached", async () => {
     const { e, n, line, slot } = await doneInSlot('No reflog')
     const asks = async (fn: () => Promise<unknown>): Promise<number> => {
