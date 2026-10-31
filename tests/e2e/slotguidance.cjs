@@ -147,7 +147,8 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
     check("B1 submits its card from the slot", !submitted.isError && !!(await until(async () => (await inv('tasks:list')).find((c) => c.number === n1)?.column === 'review', HUNG_MS)), submitted.text)
 
     // --- 2. R1, a reviewer in the project folder: the review-copy lines, and a start review naming the copy's folder.
-    await inv('session:start', alpha, { agentId: r1.id })
+    // The card is in Review outside a lane, so Hive starts R1, the stopped reviewer, for it (HI-2046): waited for, never
+    // started here too, which raced Hive's own start ("already running or starting", HI-2207).
     const rs = await ready(r1.id)
     check('R1 runs in the project folder', same(rs?.cwd, alpha), JSON.stringify(rs))
     const review1 = pluginSkill(r1.id, 'review-agent-work')
