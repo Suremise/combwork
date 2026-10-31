@@ -46,6 +46,10 @@ The checks are positive and negative:
 - **Card decisions** (#357): a decision the user records while the agent works on the card is flagged in its next board reply, and the agent reads the card again before moving it to Review; a reviewer fails work that ignores one of the card's decisions, also when woken for round 2 with a decision recorded since round 1 (its first reply flags it, and it reads the card in full before its verdict). An agent that asks the user and ends its turn is told of the decision recorded for it (#401), also when it asked about a card in Todo, which it takes first (#438).
 - **Merging when the base moved** after the checks (another branch merged meanwhile): the agent merges the base into
   its branch again and reruns the checks on that combination before merging (the fakes do it with real git commands).
+  The merge scenarios' checks (`check.js`) record each run in the project's `check-runs.txt` wherever it runs (HI-2233):
+  in the project, a worktree, a clone or a plain scratch copy of the files, with the tree it checked and the folder, so a
+  run in a scratch copy counts for what it checked; a check acted out another way (its test copied into `node -e`) is no
+  run. merge-checks-fail's fakes run them in a plain copy.
 - **Handovers**: the latest handover's next step, or the named one's, is done, and the other isn't. A wrap-up writes a
   handover without re-running tests.
 - **Notes**: a lasting rule goes to a shared note, while progress goes on the card.
