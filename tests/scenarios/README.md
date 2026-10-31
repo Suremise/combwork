@@ -17,6 +17,13 @@ ran:
 - **Hive tool calls** come from the hive MCP server itself. In development builds it logs each call it ran, with
   whether it worked, to the file named by `HIVE_TEST_MCP_LOG`. Tool names in a transcript, or in a Codex script that
   may never have run, are kept apart as *mentions* and are never counted as calls.
+- **Codex's calls in code mode** (HI-2235): Codex runs its tools from a script (its `exec` tool), which Hive's
+  transcript shows as one tool, `Script`. The harness reads the session's rollout, where Codex records each call a script
+  made as it ends (MCP calls, commands, file changes, images viewed) with its arguments and result, and puts those calls in
+  the script's place, named as the same call made directly (`mcp__hive__<tool>`, `Shell`, `Edit`, `view_image`): the
+  checks read what Codex called and got back, as for the other CLIs, and a call written in a script that never ran isn't
+  one (`codexScripts.cjs`). A rollout that records no calls leaves the transcript as it was. The fake Codex works in code
+  mode in the scenarios too (`fake-code-mode.txt` in its home).
 - **The merge slot** comes from Hive's own record: development builds write each change to the slots (who holds one,
   told so or not, and who waits in line) and each claim or release as Hive resolved it (the branch, and what it did:
   held or in line; released, left the line or nothing), with its time, to the file named by `HIVE_TEST_MERGE_SLOT_LOG`.
