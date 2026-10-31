@@ -67,6 +67,7 @@ import { checkLanePool, launchRecordedLane, recordedLaneNote, resumeLaneBuilder,
 import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber, type LaneChange } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
+import { clashingNumber, watchWhilePlaced } from './watchGuards'
 import { writePty } from './ptyHost'
 import { isResuming } from './restartResume'
 import { sessions, type HookObservation } from './sessions'
@@ -1795,6 +1796,9 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
     const had = await cancelWatch(requireWorkspace(), who.projectPath, who.agentId)
     return { done: had ? `Cancelled your ${kind} watch.` : 'You had no watch.' }
   }
+  // Hive giving it a card in a slot (HI-2197): a watch now would hold that off; cancel still goes.
+  const placing = me && body?.wake === true ? await watchWhilePlaced(requireWorkspace(), me.projectPath, me.agentId) : null
+  if (placing) throw new HttpError(409, placing)
   const list: { project: string; agent?: string }[] = Array.isArray(body?.agents) ? body.agents : []
   let targets: { p: string; id: string }[] = []
   for (const x of list) {
@@ -3208,6 +3212,11 @@ const WAITS_PER_CALLER = 2
  */
 route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   const ws = requireWorkspace()
+  // An agent's plain number that reads as another card's key is refused, never remapped (HI-2197).
+  if (agentCaller() && raw && typeof raw === 'object' && (raw as { cancel?: unknown }).cancel !== true) {
+    const clash = await clashingNumber(ws, (raw as { cards?: unknown }).cards, await taskActor())
+    if (clash) throw new HttpError(400, clash)
+  }
   // Its cards named by key or `#12` too (#1219).
   const body = raw && typeof raw === 'object' && !Array.isArray(raw) && (raw as { cards?: unknown }).cards !== undefined ? { ...(raw as object), cards: cardRefsIn((raw as { cards: unknown }).cards) } : raw
   // The workspace as it is now: the call belongs to it, and stops (409) if it closes or the window opens another.
@@ -3227,6 +3236,9 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const had = await cancelWatch(ws, who.projectPath, who.agentId)
     return { done: had ? `Cancelled your ${w?.lanes ? 'lane' : w?.agents ? 'agent' : 'card'} watch.` : 'You had no card watch.' }
   }
+  // Hive giving it a card in a slot (HI-2197): a watch now would hold that off; cancel still goes.
+  const placing = me && (body?.wake === true || body?.lanes !== undefined) ? await watchWhilePlaced(ws, me.projectPath, me.agentId) : null
+  if (placing) throw new HttpError(409, placing)
   // A lane watch (#531): whole lanes; always one that wakes. With cards beside them (#726): `cards` and their `changes`.
   if (body?.lanes !== undefined) {
     if (body.column !== undefined || body.fresh !== undefined) throw new HttpError(400, 'lanes goes without column or fresh: events says what counts on the lanes, changes on the cards beside them')

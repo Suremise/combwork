@@ -246,6 +246,8 @@ export const testHooks: {
   settleMs?: number
   /** Told each time a check reads a card from disk (#321: each card once a check). */
   cardRead?: (n: number) => void
+  /** HI-2197: a pause before a new conversation's end of an old watch cancels that watch's wake. */
+  beforeWakeCancel?: () => Promise<void>
 } = {}
 /** The same seams by their first name (round-one probes use it). */
 export const testPauses = testHooks
@@ -931,6 +933,46 @@ export async function cancelWatch(ws: WorkspaceService, projectPath: string, age
   })
   if (had) sessions.watchChanged(projectPath, agentId)
   return had
+}
+
+/**
+ * HI-2197: an agent starting a new conversation (not resumed, not its own handover) ends its watch from before. That
+ * watch was the old conversation's, which the new one never set (HB3's lane end: its watch on its old card fired, its
+ * wake couldn't be typed, and it showed as waiting on cards, so its new card was never given to it). Awaited before
+ * the launch: the record as it is now removed and saved, and its wake, by that record's own id, cancelled before this
+ * returns (a new conversation's watch has another id, so nothing here can end it). A failure throws: no launch with
+ * the old watch in place.
+ */
+export const endConversationWatch = async (projectPath: string, agentId: string): Promise<void> => void (await endWatchOf(projectPath, agentId, 'its conversation ended'))
+
+/** An agent's watch ended as endConversationWatch ends one, `why` its log's and its wake's: the label of the watch ended, or null. */
+export async function endWatchOf(projectPath: string, agentId: string, why: string): Promise<string | null> {
+  const ws = workspaceFor(projectPath)
+  if (!ws?.path) return null
+  const store = await load(ws)
+  const rec = await locked(store, async () => {
+    const r = recordOf(store, projectPath, agentId)
+    if (!r) return null
+    const before = store.list
+    store.list = store.list.filter((x) => x !== r)
+    try {
+      await save(store)
+    } catch (e) {
+      store.list = before
+      throw new Error(`Could not end the watch (${why}): ${(e as Error).message}`, { cause: e })
+    }
+    const d = store.delivering.get(r.id)
+    if (d) d.cancelled = true
+    return r
+  })
+  if (!rec) return null
+  log.info(`${userText(agentId)}'s watch ended: ${why}`)
+  sessions.watchChanged(projectPath, agentId)
+  if (rec.fired?.delivery) {
+    await testHooks.beforeWakeCancel?.()
+    await cancelFromSource(rec.projectPath, 'watch', wakeRef(rec), `cancelled: ${why}`)
+  }
+  return infoOf(rec).label
 }
 
 /**
@@ -2665,6 +2707,7 @@ export function initWatches(): void {
   if (started) return
   started = true
   sessions.watchFor = watchFor
+  sessions.conversationEnds = endConversationWatch
   sessions.userReplied = noteUserReply
   config.onSettingsChanged((s, prev) => {
     if (prev.assistant?.tellReplies !== false && s.assistant?.tellReplies === false) inBackground('withdrawing replies', revokeReplies())

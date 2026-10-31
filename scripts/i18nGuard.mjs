@@ -49,7 +49,7 @@ export const ALLOW_DIR = 'i18n/allow'
 export const EXCLUDED = [
   [/^src\/main\/mcp\//, 'agent-facing: the hive MCP server'],
   [/^src\/main\/progressReporters\//, 'agent-facing: hive-progress output'],
-  [/^src\/main\/(agentMessages|agentTokens|apiDiscovery|buildFacts|cardBusy|decisionNotices|decisionWakes|deliveries|guidance|hookTokens|inboxNotices|journal|journalService|loopWakes|mergeSlots|servers|settingsTools|slotRelease|startView|taskBatch|teamParked|templateApi|viewerTokens|watches)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
+  [/^src\/main\/(agentMessages|agentTokens|apiDiscovery|buildFacts|cardBusy|decisionNotices|decisionWakes|deliveries|guidance|hookTokens|inboxNotices|journal|journalService|loopWakes|mergeSlots|servers|settingsTools|slotRelease|startView|taskBatch|teamParked|templateApi|viewerTokens|watchGuards|watches)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
   [/^src\/shared\/(agentMcp|assistant|assistantActivity|assistantTools|buildFacts|deliveries|doorbell|hiveGuidance|instructions|journal|laneBrief|lanes|laneWatch|mergeSlot|startView|toolReplies|watch)\.ts$/, 'agent-facing: tool replies, guidance, wakes, inbox and the Agent API'],
   [/^src\/main\/(launchGate|screenRecognition|terminalScreen)\.ts$/, "CLI-facing: a CLI's screen and text (#367)"],
   [/^src\/shared\/windowHealth\.ts$/, "hive.log's lines of a window's long tasks and hangs (HI-1775): English, as main's stall warnings are"],

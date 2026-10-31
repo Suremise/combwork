@@ -31,7 +31,7 @@ const argsOf = (x) => {
   }
 }
 /** A fake builder's watch for its card's verdict, as card-loop starts it (a hive tool call through the real server). */
-const verdictWatch = (n) => `hive hive_wait_for_tasks {"cards":[${n}],"changes":["verdict","column","comment"],"column":"passed","wake":true}`
+const verdictWatch = (n) => `hive hive_wait_for_tasks {"cards":["#${n}"],"changes":["verdict","column","comment"],"column":"passed","wake":true}`
 const ran = (o, tool) => called(o, tool).filter((c) => c.ok)
 /**
  * Whether a reply or card puts a decision to the user: a question, or a request without a "?" ("Please choose the export

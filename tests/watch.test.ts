@@ -1207,6 +1207,93 @@ describe('watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("HI-2197: a new conversation ends the agent's watch from before, its wake cancelled before it returns; the next conversation's watch stays", async () => {
+    const { w, path, alpha } = await open()
+    const st = fake(alpha)
+    // Not fired: removed and saved without it.
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'Old card', project: 'alpha', column: 'passed' }, user))
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'] })
+    await watches.endConversationWatch(alpha, 'a1')
+    expect(watches.watchFor(alpha, 'a1')).toBeNull()
+    expect(savedOf(path)).toEqual([])
+    // Fired and handed over, its line typed but never taken (HB3's: its input blocked): the old conversation's watch.
+    const takes = sessions.sendPrompt
+    Object.assign(sessions, {
+      sendPrompt: async (_p: string, _id: string, text: string, guard?: () => void) => {
+        guard?.()
+        st.typed.push(text)
+        st.status = 'finished'
+      }
+    })
+    writer.testHooks.takeMs = 20
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['column'] })
+    await inWorkspace(w, () => tasks.updateTask(c.number, { column: 'done' }, user))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    const wake = savedOf(path)[0].fired.delivery as string
+    expect((await deliveries.deliveriesOf(alpha, 'a1')).find((r) => r.id === wake)?.state).toBe('offered')
+    // Its wake's cancel held: the end isn't over until it is done.
+    let release = (): void => undefined
+    let holding = false
+    watches.testHooks.beforeWakeCancel = () => {
+      holding = true
+      return new Promise<void>((r) => (release = r))
+    }
+    try {
+      let over = false
+      const ending = watches.endConversationWatch(alpha, 'a1').then(() => (over = true))
+      await vi.waitFor(() => expect(holding).toBe(true), { timeout: HUNG_MS })
+      expect(over).toBe(false)
+      expect(watches.watchFor(alpha, 'a1')).toBeNull()
+      expect((await deliveries.deliveriesOf(alpha, 'a1')).find((r) => r.id === wake)?.state).not.toBe('cancelled')
+      // The new conversation's own watch, set while the old wake's cancel is still under way, isn't the one it ends.
+      const mine = await inWorkspace(w, () => tasks.createTask({ title: 'New card', project: 'alpha', column: 'doing' }, user))
+      await watches.registerWatch(w, alpha, 'a1', { cards: [mine.number], changes: ['comment'] })
+      release()
+      await ending
+      expect((await deliveries.deliveriesOf(alpha, 'a1')).find((r) => r.id === wake)?.state).toBe('cancelled')
+      expect(watches.watchFor(alpha, 'a1')?.cards).toEqual([mine.number])
+    } finally {
+      watches.testHooks.beforeWakeCancel = undefined
+      Object.assign(sessions, { sendPrompt: takes })
+      writer.testHooks.takeMs = undefined
+      await writer.settled()
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it('HI-2197: a start resumes or carries on its own work and keeps its watch; any other start ends it before it launches', async () => {
+    const { w, alpha } = await open()
+    const s = sessions as unknown as { startReserved: unknown; conversationEnds: (p: string, id: string) => Promise<void> }
+    const was = { startReserved: s.startReserved, conversationEnds: s.conversationEnds }
+    const order: string[] = []
+    let release = (): void => undefined
+    s.conversationEnds = async (_p, id) => {
+      order.push(`ends ${id}`)
+      await new Promise<void>((r) => (release = r))
+    }
+    s.startReserved = async (_p: string, id: string, _l: string, opts: { resumeId?: string }) => {
+      order.push(`launch ${id}${opts.resumeId ? ' resumed' : ''}`)
+      return { agentId: id } as never
+    }
+    try {
+      // A new conversation (a lane's brief, a placement's, a handover from another agent): its old watch ended first.
+      const fresh = inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', prompt: 'Your next card', handedOverFrom: 'other-agents-session' }))
+      await vi.waitFor(() => expect(order).toEqual(['ends a1']), { timeout: HUNG_MS })
+      release()
+      await fresh
+      expect(order).toEqual(['ends a1', 'launch a1'])
+      // A resume, and an agent's handover to itself: the same work goes on, its watch kept.
+      order.length = 0
+      await inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', resumeId: '3554f946-b2e3-4971-8ecf-732c805ef95a' }))
+      await inWorkspace(w, () => sessions.start(alpha, { agentId: 'a1', prompt: 'Read the handover', handedOverFrom: 'its-own-session', keepWatch: true }))
+      expect(order).toEqual(['launch a1 resumed', 'launch a1'])
+    } finally {
+      Object.assign(s, was)
+      await disposeWorkspaceService(w)
+    }
+  })
+
   it("HI-2153: Archive All counts a watch on a card in work as someone on it, never a stale one on a card in Done", async () => {
     const { w, alpha } = await open()
     const { cardBusy } = await import('../src/main/cardBusy')
