@@ -1910,9 +1910,12 @@ action, and everything that follows a Done hangs off that action, never off the 
     (where it merged, else where it started to), so a waiting slot sits at the head of the line its last card worked to,
     not the branch the slot was first made from (a slot made from main for a lane working to 1.0.0 waits at 1.0.0's
     head, and the next card's line starts from there). The pool, which doesn't read cards, uses the target the slot
-    records: the one its last lend or take-over named (a card's start or a lane's, with its target, whether it lends a
-    slot, hands over an adopted one or takes over the one its builder's run still writes in), else the one it was made from;
-    its clean-up checks the slot's head is in that same target. Committed work that isn't merged stays
+    records: the target its last card's or lane's start named, else the one it was made from. A start records it once it
+    has its slot, however it got it (lent, lent again, an adopted slot handed over, the one its builder's run still
+    writes in taken over, or a lease its lane already held, as a lane lent while it waited for a slot, with no target
+    known then), only while the lease it chose is still open and its builder's: one ended or replaced meanwhile records
+    nothing and the start waits. A dry start records nothing, and a start with no target leaves the slot's. Its clean-up
+    checks the slot's head is in that same target. Committed work that isn't merged stays
     on its line, which is kept. **Uncommitted changes** keep the slot on its line: the user is asked once on the card
     (For you, Hive's own gate `slotDirty`), and the question closes once the slot is clean (then detached) or another
     lease's. A lane's next card waits while its finished card's slot is in that state. It is asked only of changes

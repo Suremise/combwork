@@ -92,8 +92,8 @@ export interface Slot {
   state: SlotState
   portBase: number
   /**
-   * The branch its last lend named, else the one it was made from (HI-2185): where its lines merge, so a clean one waits
-   * detached at its head, and its clean-up checks its head is in it.
+   * The branch its last card's or lane's start named (SlotPool.serves, HI-2185), else the one it was made from: where its
+   * lines merge, so a clean one waits detached at its head, and its clean-up checks its head is in it.
    */
   target: string | null
   /** Its last install's revision and lock files' hash (null: no lock file then). */
@@ -515,13 +515,13 @@ export class SlotStore {
   /**
    * A carried lease handed off to a card or lane of its agent's on the same slot (#1441, SPEC §16.10.8), in one write:
    * the carried lease ended (`handedOff`), a dispatch lease begun on the slot, the slot's writer (the agent's running
-   * session there) moved to it, the request's target recorded on the slot (HI-2185, as a lend's), and `also` (the caller's rebinding of the carried lease's sessions, #1434's
+   * session there) moved to it, and `also` (the caller's rebinding of the carried lease's sessions, #1434's
    * `rebindSession`) in the same write, so all of it lands or none. Null when it can't be now: the carried lease not open
    * or another agent's, the slot under an operation or a job, or another agent writing there; an index refusing it (the
    * agent leased meanwhile) too. `check` (the caller's, HI-1741: the slot's checkout as it decided on it) runs in the
    * write once the rest holds, given the slot as it is then: false refuses it, nothing written.
    */
-  async handOff(carried: string, req: { card?: number; lane?: string; agent: string; target?: string }, also?: (db: DatabaseSync, lease: SlotLease) => void, check?: (slot: Slot) => boolean): Promise<SlotLease | null> {
+  async handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void, check?: (slot: Slot) => boolean): Promise<SlotLease | null> {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane')
     try {
       return await this.conn.write((db) => {
@@ -535,7 +535,6 @@ export class SlotStore {
         const lease = this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, s.name, req.card !== undefined ? 'card' : 'lane', req, at)
         if (s.writer) db.prepare('UPDATE slots SET writer_lease = ? WHERE project = ? AND name = ? AND writer_run = ?').run(lease.id, this.project, s.name, s.writer.run)
         db.prepare('UPDATE slots SET used_at = ? WHERE project = ? AND name = ?').run(at, this.project, s.name)
-        this.targetIn(db, s.name, req.target)
         also?.(db, lease)
         return lease
       })
@@ -549,11 +548,11 @@ export class SlotStore {
    * The slot an agent's own run still writes in, its lease ended (HI-1762: HB5's lane ended, its session still in its
    * turn in slot-a, and its next lane's start found no slot free), taken over by its next card or lane in one write: only
    * while the slot has no open lease, operation or job, is lent with no warm error, its writer is that agent's run `run`
-   * held by this Hive (`holder`), and the agent holds no other dispatch lease. The lease begins on the slot (the request's
-   * target recorded on it, HI-2185), the writer moves to it (the old lease's end then no longer owns the run: it stops nothing), and `also` (the caller's rebinding of
+   * held by this Hive (`holder`), and the agent holds no other dispatch lease. The lease begins on the slot, the writer
+   * moves to it (the old lease's end then no longer owns the run: it stops nothing), and `also` (the caller's rebinding of
    * the run's conversations) runs in the same write. Null when it can't be now; nothing written.
    */
-  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; target?: string }, run: string, holder: { pid: number; started: number }, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
+  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string }, run: string, holder: { pid: number; started: number }, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane')
     try {
       return await this.conn.write((db) => {
@@ -563,7 +562,6 @@ export class SlotStore {
         const at = this.iso()
         const lease = this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, s.name, req.card !== undefined ? 'card' : 'lane', req, at)
         db.prepare('UPDATE slots SET writer_lease = ?, used_at = ? WHERE project = ? AND name = ? AND writer_run = ?').run(lease.id, at, this.project, s.name, run)
-        this.targetIn(db, s.name, req.target)
         also?.(db, lease, w.lease)
         return lease
       })
@@ -573,9 +571,18 @@ export class SlotStore {
     }
   }
 
-  /** The target a start taking a slot over named (HI-2185), recorded on it as a lend's is (SlotPool.warm); none: kept. */
-  private targetIn(db: DatabaseSync, slot: string, target: string | undefined): void {
-    if (target) db.prepare('UPDATE slots SET target = ? WHERE project = ? AND name = ?').run(target, this.project, slot)
+  /**
+   * A start's target recorded on the slot its lease holds (HI-2185, SlotPool.serves): only while that lease is open and
+   * its agent's, so a lease ended or replaced meanwhile changes nothing (the slot's open lease is unique: an open one is
+   * its holder). Whether it was recorded.
+   */
+  async serves(lease: string, agent: string, target: string): Promise<boolean> {
+    return this.conn.write((db) => {
+      const r = db.prepare('SELECT slot FROM slot_leases WHERE id = ? AND project = ? AND agent = ? AND ended_at IS NULL').get(lease, this.project, agent) as { slot: string } | undefined
+      if (!r) return false
+      db.prepare('UPDATE slots SET target = ? WHERE project = ? AND name = ?').run(target, this.project, r.slot)
+      return true
+    })
   }
 
   /**
@@ -1260,7 +1267,7 @@ export class SlotPool {
           if (s.state !== 'lent' || s.job || s.warmError) return { ok: false, refusal: { why: 'notReady', slot: s.name, state: s.state, error: s.warmError } }
           return { ok: true, lease: taken.lease, slot: s }
         }
-        const done = await this.warm(taken.slot, taken.lease, token, taken.fresh, target, o.install !== false, o.target ?? null)
+        const done = await this.warm(taken.slot, taken.lease, token, taken.fresh, target, o.install !== false)
         if (done === 'ready') return { ok: true, lease: this.store.lease(taken.lease.id)!, slot: this.store.slot(taken.slot.name)! }
         if (done !== 'skip') return { ok: false, refusal: done }
         skip.add(taken.slot.name)
@@ -1271,13 +1278,23 @@ export class SlotPool {
     }
   }
 
+  /**
+   * The slot a card's or lane's start chose now serves its target (HI-2185): recorded on the slot while `lease`, the one
+   * chosen, is still open and `agent`'s, so a released slot waits detached at that line's head and its clean-up checks
+   * against it. One place for every way a start gets its slot (lent, handed over, taken over, already held). False: the
+   * lease ended or isn't the agent's, nothing written.
+   */
+  serves(lease: string, agent: string, target: string): Promise<boolean> {
+    return this.store.serves(lease, agent, target)
+  }
+
   /** A carried lease handed off to a card or lane of its agent's (#1441), `also` in the same write (SlotStore.handOff). */
-  handOff(carried: string, req: { card?: number; lane?: string; agent: string; target?: string }, also?: (db: DatabaseSync, lease: SlotLease) => void, check?: (slot: Slot) => boolean): Promise<SlotLease | null> {
+  handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void, check?: (slot: Slot) => boolean): Promise<SlotLease | null> {
     return this.store.handOff(carried, req, also, check)
   }
 
   /** The slot an agent's own run still writes in, taken over by its next card or lane (HI-1762, SlotStore.takeWrittenSlot), held by this Hive. */
-  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; target?: string }, run: string, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
+  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string }, run: string, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
     return this.store.takeWrittenSlot(slot, req, run, await this.deps.holder.self(), also)
   }
 
@@ -1597,10 +1614,9 @@ export class SlotPool {
    * The warming operation of a lease (`token` holds the slot): a free slot looked at again (dirty, a session or a process
    * in it: marked and `skip`ped, its lease ended), made if new or gone, installed again if its lock files changed; then
    * `ready` (the slot `lent`, or looked at if the lease ended meanwhile). A failure leaves the slot not ready with why,
-   * its lease ended `setupFailed`; an operation taken over meanwhile stops (`warming`). The slot records `asked`, the
-   * target the lend named (HI-2185: a slot made from main, lent to a lane working to another line), or a new one's own.
+   * its lease ended `setupFailed`; an operation taken over meanwhile stops (`warming`).
    */
-  private async warm(slot: Slot, lease: SlotLease, token: string, fresh: boolean, target: string | null, install = true, asked: string | null = null): Promise<'ready' | 'skip' | SlotRefusal> {
+  private async warm(slot: Slot, lease: SlotLease, token: string, fresh: boolean, target: string | null, install = true): Promise<'ready' | 'skip' | SlotRefusal> {
     const name = slot.name
     const fail = async (error: string, logPath: string | null = null): Promise<SlotRefusal> => {
       log.warn(`Slot ${userText(name)} of ${userText(this.deps.project)} isn't ready: ${userText(error)}`)
@@ -1657,8 +1673,7 @@ export class SlotPool {
         if (failed) return await fail(failed.error, failed.logPath)
       }
       const rev = await G.head(slot.folder)
-      const recorded = asked ?? (made ? target : null)
-      const fields: SlotFields = { warmError: null, warmLog: null, ...(needed ? { installRev: isUnknown(rev) ? null : rev, installHash: hash } : {}), ...(recorded && recorded !== slot.target ? { target: recorded } : {}) }
+      const fields: SlotFields = { warmError: null, warmLog: null, ...(needed ? { installRev: isUnknown(rev) ? null : rev, installHash: hash } : {}), ...(made && target ? { target } : {}) }
       // Released meanwhile: the slot as it is now, not lent.
       const after = this.store.lease(lease.id)?.to ? await this.look(slot) : 'lent'
       await this.store.fenced(name, token, (db) => this.store.setIn(db, name, this.store.openIn(db, lease.id) ? 'lent' : after === 'lent' ? 'ready' : after, fields, { op: null }))
