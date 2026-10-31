@@ -586,6 +586,59 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('a results folder removed as the write is made, or during the recovery, is made again; only ENOENT is retried, a bounded number of times (HI-2234)', () => {
+    const { writeResults, resultsHeld, WRITE_ATTEMPTS } = require_('./scenarios/benchmark.cjs')
+    const dir = tempDir('hive-results-race-')
+    try {
+      const out = resultsFolder(dir, '2026-10-31T14-27-32-codex')
+      writeFileSync(join(out, 'results.json'), 'old')
+      const files = () => readdirSync(out).sort()
+      // Removed between the folder being there and the write landing: the first write meets ENOENT.
+      let removals = 1
+      let said = 0
+      const racing = (p: string, d: string) => {
+        if (removals-- > 0) rmSync(out, { recursive: true, force: true })
+        writeFileSync(p, d)
+      }
+      const rewrite = () => writeFileSync(join(out, 'results.json'), 'old')
+      writeResults(out, 'summary.md', 'new', { rewrite, onRecreated: () => said++, write: racing })
+      expect([files(), said, resultsHeld(out)]).toEqual([['results.json', 'runner.json', 'summary.md'], 1, true])
+      expect(readFileSync(join(out, 'summary.md'), 'utf8')).toBe('new')
+
+      // Removed again while the recovery puts the earlier files back: it starts over, and writes only once all are back.
+      rmSync(out, { recursive: true, force: true })
+      let duringRewrite = 1
+      said = 0
+      const interrupted = () => {
+        if (duringRewrite-- > 0) rmSync(out, { recursive: true, force: true })
+        rewrite()
+      }
+      writeResults(out, 'summary.md', 'newer', { rewrite: interrupted, onRecreated: () => said++ })
+      expect([files(), said]).toEqual([['results.json', 'runner.json', 'summary.md'], 2])
+      expect(readFileSync(join(out, 'results.json'), 'utf8')).toBe('old')
+
+      // Any other error is thrown at once, with no recovery.
+      said = 0
+      const denied = () => {
+        throw Object.assign(new Error('denied'), { code: 'EPERM' })
+      }
+      expect(() => writeResults(out, 'summary.md', 'x', { rewrite, onRecreated: () => said++, write: denied })).toThrow(/denied/)
+      expect(said).toBe(0)
+
+      // A folder that keeps going is given up on after WRITE_ATTEMPTS writes, with the ENOENT.
+      let writes = 0
+      const alwaysGone = (p: string, d: string) => {
+        writes++
+        rmSync(out, { recursive: true, force: true })
+        writeFileSync(p, d)
+      }
+      expect(() => writeResults(out, 'summary.md', 'x', { rewrite, write: alwaysGone })).toThrow(expect.objectContaining({ code: 'ENOENT' }))
+      expect(writes).toBe(WRITE_ATTEMPTS)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('kept comparisons (main/benchmarks.ts)', async () => {

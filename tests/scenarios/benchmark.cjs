@@ -461,19 +461,36 @@ function releaseResults(folder) {
   }
 }
 
+/** How many times writeResults makes a vanished folder again before it gives up. */
+const WRITE_ATTEMPTS = 3
+
 /**
- * Writes `name` in the run's results folder `folder`, which this process holds. Should the folder be gone (something
- * outside the prune removed it, HI-2234), it is made again and held, and `rewrite()` (each file the run had written,
- * from what it holds in memory) runs first, so the run carries on and loses nothing it had: onRecreated says so once.
+ * Writes `name` in the run's results folder `folder`, which this process holds. Should the folder be gone when the
+ * write is made (something outside the prune removed it, HI-2234), it is made again and held, `rewrite()` puts back
+ * each file the run had written (from what it holds in memory), onRecreated says so, and the write is tried again:
+ * whenever the folder goes, before the write or during the recovery. Only a missing folder (ENOENT) is retried, at most
+ * WRITE_ATTEMPTS times in all; any other error, or the folder still going after that, is thrown.
  */
-function writeResults(folder, name, data, { rewrite = () => {}, onRecreated = () => {} } = {}) {
-  if (!fs.existsSync(folder)) {
-    fs.mkdirSync(folder, { recursive: true })
-    holdResults(folder)
-    onRecreated()
-    rewrite()
+function writeResults(folder, name, data, { rewrite = () => {}, onRecreated = () => {}, write = fs.writeFileSync } = {}) {
+  let restore = false
+  for (let attempt = 1; ; attempt++) {
+    try {
+      if (restore) {
+        fs.mkdirSync(folder, { recursive: true })
+        holdResults(folder)
+        onRecreated()
+        rewrite()
+        restore = false
+      }
+      write(path.join(folder, name), data)
+      return
+    } catch (e) {
+      // Gone (again, during the recovery too): the next attempt starts the recovery over, so the write is only made
+      // once every earlier file is back.
+      if (e.code !== 'ENOENT' || attempt >= WRITE_ATTEMPTS) throw e
+      restore = true
+    }
   }
-  fs.writeFileSync(path.join(folder, name), data)
 }
 
 /** A --budget value: a finite number of US dollars above 0, or an error saying what it must be. */
@@ -507,4 +524,4 @@ function spendText(meta) {
   return meta.unknownCostTrials ? `${known} reported, plus ${meta.unknownCostTrials} trial${meta.unknownCostTrials === 1 ? '' : 's'} with no reported cost: the total is unknown` : `${known} (API-equivalent)`
 }
 
-module.exports = { SCHEMA, LIMITS, benchmarkOf, sampleOf, pruneResults, resultsHeld, saveBaseline, resultsFolder, releaseResults, writeResults, measuresOf, metricsTotals, parseBudget, budgetGate, spendText }
+module.exports = { SCHEMA, LIMITS, benchmarkOf, sampleOf, pruneResults, resultsHeld, saveBaseline, resultsFolder, releaseResults, writeResults, WRITE_ATTEMPTS, measuresOf, metricsTotals, parseBudget, budgetGate, spendText }

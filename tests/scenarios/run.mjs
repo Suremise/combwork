@@ -274,7 +274,15 @@ const metaNow = (complete) => ({
   guidance: results.find((r) => r.guidance?.atStart)?.guidance.atStart.revision ?? null,
   provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
 // Each trial's result written as it ends (#1457): a run cut short keeps what it had.
-const keepSoFar = () => save('results.json', JSON.stringify({ meta: metaNow(false), results }, null, 2))
+// Should even that fail (the folder kept going, or another error), the run goes on: what it has stays in memory and the
+// next trial's write tries again; the writes at the end fail the run.
+const keepSoFar = () => {
+  try {
+    save('results.json', JSON.stringify({ meta: metaNow(false), results }, null, 2))
+  } catch (e) {
+    console.warn(`\nCouldn't write results.json so far (${e.code ?? e.message}): the run goes on, and writes it again after the next trial.`)
+  }
+}
 // The Progress panel (#1457): a step per trial, named with the results so far, so a long run shows it moving.
 const trials = Array.from({ length: repeats }, (_, k) => chosen.map((sc) => ({ sc, sample: k + 1, name: repeats > 1 ? `${sc.id} (${k + 1}/${repeats})` : sc.id }))).flat()
 const progress = scenariosProgress(trials.map((t) => t.name), provider, argv)
