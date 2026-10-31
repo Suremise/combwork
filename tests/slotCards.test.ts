@@ -215,18 +215,24 @@ afterEach(() => {
   Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false })
 })
 
-/** A card started in a slot (a worktree on its line, under lease l-1), its change merged into main and reported: Done. */
-async function doneInSlot(title: string): Promise<{ e: Env; n: number; line: string; slot: string }> {
-  const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+/**
+ * A card started in a slot (a worktree on its line, under lease l-1), its change merged into its target (main unless
+ * given: a line made from main first) and reported: Done.
+ */
+async function doneInSlot(title: string, target = 'main'): Promise<{ e: Env; n: number; line: string; slot: string }> {
+  const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target }, { autoRun: false }))
+  if (target !== 'main') sh(e.project, 'branch', target, 'main')
   const card = e.wf.createCard({ title })
   const line = lineName('AM', card)
   const slot = join(tempDir('slot-'), 'slot-a')
-  sh(e.project, 'worktree', 'add', '-q', '-b', line, slot, 'main')
+  sh(e.project, 'worktree', 'add', '-q', '-b', line, slot, target)
   e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
   moved(await e.wf.start(card.key, B1))
   commit(slot, { 'work.txt': `${title}\n` }, title)
   moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+  if (target !== 'main') sh(e.project, 'switch', '-q', target)
   sh(e.project, 'merge', '-q', '--no-ff', '-m', `Merge ${line}`, line)
+  if (target !== 'main') sh(e.project, 'switch', '-q', 'main')
   moved(await e.wf.reportMerge(card.key, B1))
   expect(e.wf.state(card).stage).toBe('done')
   return { e, n: card.id, line, slot }
@@ -349,6 +355,17 @@ describe("a finished card's slot (HI-2014, HI-1986)", { timeout: 60_000 }, () =>
     expect(branch(slot)).toBe('HEAD')
     expect(sh(slot, 'rev-parse', 'HEAD').trim()).toBe(sh(e.project, 'rev-parse', 'main').trim())
     expect(asked(e, n)).toBe(0)
+    expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(true)
+    expect(hasLine(e, line)).toBe(false)
+  })
+
+  it("a slot made from main whose card targeted another line: detached at that line's head, not main's (HI-2185)", async () => {
+    const { e, n, line, slot } = await doneInSlot('Card for 1.0.0', '1.0.0')
+    expect(sh(e.project, 'rev-parse', '1.0.0').trim()).not.toBe(sh(e.project, 'rev-parse', 'main').trim())
+    // The slot's own target (view's) is the branch it was made from, main; its card's is 1.0.0.
+    expect(await finishedSlot(e.project, e.wf, n, 'l-1', view(slot))).toBe(true)
+    expect(branch(slot)).toBe('HEAD')
+    expect(sh(slot, 'rev-parse', 'HEAD').trim()).toBe(sh(e.project, 'rev-parse', '1.0.0').trim())
     expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(true)
     expect(hasLine(e, line)).toBe(false)
   })

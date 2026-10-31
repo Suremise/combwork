@@ -91,7 +91,10 @@ export interface Slot {
   folder: string
   state: SlotState
   portBase: number
-  /** The branch it was made from (its clean-up checks its head is in it). */
+  /**
+   * The branch its last lend named, else the one it was made from (HI-2185): where its lines merge, so a clean one waits
+   * detached at its head, and its clean-up checks its head is in it.
+   */
   target: string | null
   /** Its last install's revision and lock files' hash (null: no lock file then). */
   installRev: string | null
@@ -1250,7 +1253,7 @@ export class SlotPool {
           if (s.state !== 'lent' || s.job || s.warmError) return { ok: false, refusal: { why: 'notReady', slot: s.name, state: s.state, error: s.warmError } }
           return { ok: true, lease: taken.lease, slot: s }
         }
-        const done = await this.warm(taken.slot, taken.lease, token, taken.fresh, target, o.install !== false)
+        const done = await this.warm(taken.slot, taken.lease, token, taken.fresh, target, o.install !== false, o.target ?? null)
         if (done === 'ready') return { ok: true, lease: this.store.lease(taken.lease.id)!, slot: this.store.slot(taken.slot.name)! }
         if (done !== 'skip') return { ok: false, refusal: done }
         skip.add(taken.slot.name)
@@ -1587,9 +1590,10 @@ export class SlotPool {
    * The warming operation of a lease (`token` holds the slot): a free slot looked at again (dirty, a session or a process
    * in it: marked and `skip`ped, its lease ended), made if new or gone, installed again if its lock files changed; then
    * `ready` (the slot `lent`, or looked at if the lease ended meanwhile). A failure leaves the slot not ready with why,
-   * its lease ended `setupFailed`; an operation taken over meanwhile stops (`warming`).
+   * its lease ended `setupFailed`; an operation taken over meanwhile stops (`warming`). The slot records `asked`, the
+   * target the lend named (HI-2185: a slot made from main, lent to a lane working to another line), or a new one's own.
    */
-  private async warm(slot: Slot, lease: SlotLease, token: string, fresh: boolean, target: string | null, install = true): Promise<'ready' | 'skip' | SlotRefusal> {
+  private async warm(slot: Slot, lease: SlotLease, token: string, fresh: boolean, target: string | null, install = true, asked: string | null = null): Promise<'ready' | 'skip' | SlotRefusal> {
     const name = slot.name
     const fail = async (error: string, logPath: string | null = null): Promise<SlotRefusal> => {
       log.warn(`Slot ${userText(name)} of ${userText(this.deps.project)} isn't ready: ${userText(error)}`)
@@ -1646,7 +1650,8 @@ export class SlotPool {
         if (failed) return await fail(failed.error, failed.logPath)
       }
       const rev = await G.head(slot.folder)
-      const fields: SlotFields = { warmError: null, warmLog: null, ...(needed ? { installRev: isUnknown(rev) ? null : rev, installHash: hash } : {}), ...(made && target ? { target } : {}) }
+      const recorded = asked ?? (made ? target : null)
+      const fields: SlotFields = { warmError: null, warmLog: null, ...(needed ? { installRev: isUnknown(rev) ? null : rev, installHash: hash } : {}), ...(recorded && recorded !== slot.target ? { target: recorded } : {}) }
       // Released meanwhile: the slot as it is now, not lent.
       const after = this.store.lease(lease.id)?.to ? await this.look(slot) : 'lent'
       await this.store.fenced(name, token, (db) => this.store.setIn(db, name, this.store.openIn(db, lease.id) ? 'lent' : after === 'lent' ? 'ready' : after, fields, { op: null }))

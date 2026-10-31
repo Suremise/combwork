@@ -428,6 +428,30 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     expect(sh(r.slot.folder, 'log', '-1', '--format=%s', 'hive/AM-1-work').trim()).toBe('work')
   })
 
+  it("made from main, lent for another line: it records that target and waits detached at its head (HI-2185)", async () => {
+    const w = world({ builders: 1 })
+    const first = await lent(w, { agent: 'a1', card: 1 })
+    expect(first.slot.target).toBe('main')
+    await w.pool.release(first.lease.id, 'done')
+    sh(w.project, 'branch', '1.0.0', 'main')
+    sh(w.project, 'switch', '-q', '1.0.0')
+    commit(w.project, { 'line.txt': 'on 1.0.0\n' }, 'on 1.0.0')
+    sh(w.project, 'switch', '-q', 'main')
+    const r = await w.pool.lend({ agent: 'a1', card: 2 }, { target: '1.0.0' })
+    if (!r.ok) throw new Error(`refused: ${JSON.stringify(r.refusal)}`)
+    expect(r.slot.name).toBe('slot-a')
+    expect(w.store.slot('slot-a')?.target).toBe('1.0.0')
+    sh(r.slot.folder, 'switch', '-q', '-c', 'hive/AM-2-work', '1.0.0')
+    commit(r.slot.folder, { 'work.txt': 'work\n' }, 'work')
+    await w.pool.release(r.lease.id, 'done')
+    expect(w.store.slot('slot-a')?.state).toBe('ready')
+    expect(sh(r.slot.folder, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('HEAD')
+    expect(sh(r.slot.folder, 'rev-parse', 'HEAD').trim()).toBe(sh(w.project, 'rev-parse', '1.0.0').trim())
+    // A lend naming no target leaves the one recorded.
+    const again = await lent(w, { agent: 'a1', card: 3 })
+    expect(again.slot.target).toBe('1.0.0')
+  })
+
   it("a detach git refuses (an index lock): not ready, still on its line; the next look detaches it (HI-2014)", async () => {
     const w = world({ builders: 1 })
     const r = await lent(w, { agent: 'a1', card: 1 })

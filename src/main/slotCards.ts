@@ -787,7 +787,7 @@ export interface FinishedSlotView {
  * each read there, before anything changes (HR2's HI-2014 round 1, finding 1): a card reopened, finished again or
  * started elsewhere meanwhile, or a workspace closed, leaves the slot as it is. The slot read again too: another
  * lease's now, or on another line, its question closes; dirty, asked once; clean, an open lease's slot detached at the
- * target's head (a released one is the pool's), its question closed.
+ * card's target's head (a released one is the pool's), its question closed.
  */
 export async function finishedSlot(projectPath: string, wf: Workflow, n: number, lease: string, slotNow: () => FinishedSlotView | null, lane: string | null = null, alive: () => boolean = () => true): Promise<boolean> {
   const card = cardOf(wf, n)
@@ -812,7 +812,9 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
     if (asked()) await wf.closeSlotDirty(card, finish)
     return false
   }
-  const target = slot.target ?? s.started.target
+  // The card's own target (HI-2185): where its line merged, so the slot waits at that line's head, not the branch it was
+  // made from; the slot's only when the card has none.
+  const target = s.integrated?.target || s.started.target || slot.target
   if (!target) return false
   let detached = false
   await withRepoLock(
