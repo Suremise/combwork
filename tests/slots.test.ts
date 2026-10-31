@@ -512,6 +512,64 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
       expect(w.store.slot('slot-a')).toMatchObject({ op: null, state: 'ready' })
     })
 
+    /** Holds the pool's next lookup of its holder (a settle's first wait): resolves once it has started; `open()` lets it go. */
+    const holdSelf = (w: World): { started: Promise<void>; open: () => void } => {
+      const holder = w.pool.deps.holder
+      const original = holder.self
+      let entered!: () => void
+      let open!: () => void
+      const started = new Promise<void>((r) => (entered = r))
+      const go = new Promise<void>((r) => (open = r))
+      holder.self = async () => {
+        holder.self = original
+        entered()
+        await go
+        return original()
+      }
+      return { started, open: () => open() }
+    }
+
+    it("HR2's round 1, finding 1: a close while a settle looks up its holder waits for it, and nothing is settled after the close", async () => {
+      const w = world({ builders: 1 })
+      const r = await onLine(w)
+      const held = holdSelf(w)
+      const release = w.pool.release(r.lease.id, 'done')
+      await held.started
+      let closed = false
+      const closing = w.pool.close().then(() => (closed = true))
+      // Its close waits: not finished after the microtasks a close with nothing running takes.
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(closed).toBe(false)
+      held.open()
+      await closing
+      await release
+      // Closed before it began: no operation taken, the slot left on its line for the next start's look.
+      expect(w.store.slot('slot-a')).toMatchObject({ op: null, state: 'lent' })
+      expect(branch(r.slot.folder)).toBe('hive/AM-1-work')
+    })
+
+    it("HR2's round 1, finding 2: a slot Repair relocates while a settle looks up its holder isn't settled from the old folder", async () => {
+      const w = world({ builders: 1 })
+      const r = await onLine(w)
+      const held = holdSelf(w)
+      const release = w.pool.release(r.lease.id, 'done')
+      await held.started
+      const relocated = `${r.slot.folder}-relocated`
+      try {
+        sh(w.project, 'worktree', 'move', r.slot.folder, relocated)
+        expect(await w.store.relocate('slot-a', relocated)).toBe(true)
+      } finally {
+        held.open()
+        await release
+      }
+      expect(w.store.slot('slot-a')).toMatchObject({ folder: relocated, state: 'lent', op: null })
+      // The next look is of the slot where it is now.
+      await w.pool.refresh()
+      expect(w.store.slot('slot-a')).toMatchObject({ folder: relocated, state: 'ready' })
+      expect(branch(relocated)).toBe('HEAD')
+    })
+
     it('a look that throws ends its operation, the slot as it was; the next look settles it', async () => {
       const w = world({ builders: 1 })
       const r = await onLine(w)
@@ -530,9 +588,9 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
       const r = await onLine(w)
       await w.store.end(r.lease.id, 'done')
       const gone = w.another(5)
-      expect(await gone.store.beginSettle('slot-a', 'lent', 'o-gone', { pid: 5, started: 1005 })).toBe(true)
+      expect(await gone.store.beginSettle('slot-a', 'lent', r.slot.folder, 'o-gone', { pid: 5, started: 1005 })).toBe(true)
       // While it holds the slot, another settle can't begin.
-      expect(await w.store.beginSettle('slot-a', 'lent', 'o-mine', { pid: 1, started: 1001 })).toBe(false)
+      expect(await w.store.beginSettle('slot-a', 'lent', r.slot.folder, 'o-mine', { pid: 1, started: 1001 })).toBe(false)
       w.dead.add(5)
       await w.pool.refresh()
       expect(w.store.slot('slot-a')).toMatchObject({ op: null, state: 'lent', warmError: null })

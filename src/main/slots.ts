@@ -811,10 +811,10 @@ export class SlotStore {
 
   /**
    * A free slot's settle begun (HI-2170): a warm-kind operation with no lease (no lend's warming has none), taken only
-   * while the slot is free and still in state `from`. Whether it was.
+   * while the slot is free and still in state `from` at `folder`. Whether it was.
    */
-  async beginSettle(name: string, from: SlotState, token: string, holder: Holder): Promise<boolean> {
-    return this.conn.write((db) => Number(db.prepare(`UPDATE slots SET op = ?, op_kind = 'warm', op_lease = NULL, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND state = ? AND ${FREE}`).run(token, holder.pid, holder.started, this.project, name, from).changes) === 1)
+  async beginSettle(name: string, from: SlotState, folder: string, token: string, holder: Holder): Promise<boolean> {
+    return this.conn.write((db) => Number(db.prepare(`UPDATE slots SET op = ?, op_kind = 'warm', op_lease = NULL, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND state = ? AND folder = ? AND ${FREE}`).run(token, holder.pid, holder.started, this.project, name, from, folder).changes) === 1)
   }
 
   /**
@@ -1340,18 +1340,24 @@ export class SlotPool {
    * sees it busy while its files may change, and one settle runs at a time. `looked` is told when its state changed.
    */
   private async settle(name: string): Promise<void> {
-    const s = this.store.slot(name)
-    if (!s || s.op || s.writer || this.store.openLease(name)) return
-    if (s.state === 'creating' || s.state === 'removing') return
+    const seen = this.store.slot(name)
+    if (this.closed || !seen || seen.op || seen.writer || this.store.openLease(name)) return
+    if (seen.state === 'creating' || seen.state === 'removing') return
     const token = newToken()
-    const holder = await this.deps.holder.self()
-    let to: SlotState = s.state
+    let s: Slot = seen
+    let to: SlotState = seen.state
     let began = false
     try {
-      // Live (and awaited by close) before its row is written, so no look of a pool takes it for an abandoned one.
+      // Tracked (awaited by close, its token live) from before its first wait, so a close never misses it and no look of
+      // a pool takes its row, once written, for an abandoned one (HR2's HI-2170 round 1, finding 1).
       await this.op(token, async () => {
-        if (!(await this.store.beginSettle(name, s.state, token, holder))) return
+        const holder = await this.deps.holder.self()
+        if (this.closed) return
+        // Taken only of the slot as it was read, at the same folder (a Repair's relocation meanwhile: not this one's, the
+        // next look's; finding 2), and used as the reservation has it from then on.
+        if (!(await this.store.beginSettle(name, seen.state, seen.folder, token, holder))) return
         began = true
+        s = this.store.slot(name) ?? seen
         try {
           const now = await this.look(s)
           // Clean, it waits for its next card detached at the target's head (HI-2014, HI-1986), before it is ready to lend:
