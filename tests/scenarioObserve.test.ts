@@ -719,7 +719,7 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
       const hit = sc.expect(obs(tools, hiveCalls), ctx).find(([name]) => name === LOOKED)
       return hit ? hit[1] : 'left out'
     }
-    const list = (project: string, reply: string, extra: Record<string, unknown> = {}) => [[t('mcp__hive__hive_list_tasks', `project: ${project}\ndetails: true`, reply)], [call('hive_list_tasks', { project, details: true, ...extra })]] as const
+    const list = (project: string, reply: string, extra: Record<string, unknown> = {}): [unknown[], unknown[]] => [[t('mcp__hive__hive_list_tasks', `project: ${project}\ndetails: true`, reply)], [call('hive_list_tasks', { project, details: true, ...extra })]]
 
     it("credited: hive_read_task of the card, alpha's detailed listing or section read (each with its own reply), and a Read of the exact absolute path", () => {
       expect(looked([], [call('hive_read_task', { number: 'AL-1' })])).toBe(true)
@@ -732,7 +732,7 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
     })
 
     it('a shell command or script that may have read the doc is unobservable: the check is left out, and the run records it', () => {
-      for (const tool of [
+      for (const lookup of [
         sh('PowerShell', 'Get-Content alpha/docs/DEPLOY.md', DOC),
         sh('Bash', 'cat ../../alpha/docs/DEPLOY.md', DOC),
         t('Shell', 'Get-Content alpha/docs/DEPLOY.md', DOC),
@@ -740,8 +740,8 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
         sh('PowerShell', 'Write-Output "alpha/docs/DEPLOY.md ALPHA_ENV=staging"', 'alpha/docs/DEPLOY.md ALPHA_ENV=staging'),
         t('Script', 'text(await tools.exec_command({cmd:"Get-Content alpha/docs/DEPLOY.md"}))', `Script completed\nOutput:\n${DOC}`)
       ]) {
-        expect(looked([tool])).toBe('left out')
-        expect(sc.observe(obs([tool]))[0][1]).toBe(true)
+        expect(looked([lookup])).toBe('left out')
+        expect(sc.observe(obs([lookup]))[0][1]).toBe(true)
       }
       // The other checks still stand.
       expect(sc.expect(obs([sh('PowerShell', 'Get-Content alpha/docs/DEPLOY.md', DOC)]), ctx).find(([name]) => name === STARTED)?.[1]).toBe(true)
