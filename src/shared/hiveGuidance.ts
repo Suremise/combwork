@@ -36,7 +36,8 @@ export const wrapsLongCommands = (general: { progressPanel?: boolean; progressCo
 export function boardSkillsLine(off: ReadonlySet<string> = new Set()): string {
   const on = (skill: string): boolean => !off.has(skill)
   const routes = [
-    on('work-on-card') && 'Given a card to work on, fix or continue, use the work-on-card skill',
+    // HI-2226: running a card's checks is work on it (work-on-card has --check and --isolated), not a review.
+    on('work-on-card') && 'Given a card to work on, fix or continue (running its checks too), use the work-on-card skill',
     on('review-agent-work') && `asked to review or check ${on('work-on-card') ? 'one' : 'a card'}, use review-agent-work`,
     on('card-loop') && "as a loop's builder or reviewer (one card or several, with rounds), use card-loop",
     // HI-686: work outside a card loop, a generalist's (Role in the workflow) above all.
