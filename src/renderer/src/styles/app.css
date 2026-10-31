@@ -12498,6 +12498,24 @@ button.progress-run-show:focus-visible {
   font-weight: 600;
   opacity: 1;
 }
+/* A lane's queued list change (HI-2151), under its bar in the Lanes tab: wrapped, so a narrow panel shows all of it. */
+.progress-lane-queued {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 16px;
+}
+.progress-lane-queued > .codicon {
+  flex-shrink: 0;
+  line-height: 16px;
+}
+.progress-lane-queued-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 /* A lane's cards in order (HI-1926): a line each, its state's icon, key, title, round, time and a Done card's commit. */
 .progress-lane-queue {
   list-style: none;

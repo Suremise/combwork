@@ -5262,6 +5262,13 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
     `endedAt`, the Integrated or Accepted time, and `merged`) how long it took and its merge commit (copied with a
     click) or how long so far. An ended lane shows only what happened before it ended: a cycle started or finished
     after it shows no time or commit, and an unfinished card's time doesn't run on. Nothing is shown that isn't known.
+  - **A lane's queued list change** (HI-2151, Darren 30 Oct: "I didn't see it on the lane"): a running lane with one
+    (`LaneInfo.queued`, §16.11.1, the data `hive_lane list` gives) shows it in the Lanes tab under its bar, read-only, in
+    a line (`queuedChange`, `queuedChangeText` in `laneBar.ts`): after which card (its status's `listChanges` card, else
+    its own card in flight), the cards added, those taken off, each one another running lane's list will have (its
+    queued list when it has one, else its cards) as moving to that lane's builder's lane, and the whole new list when the cards it keeps change order: *Next, once
+    HI-12 is Done: HI-14 added, HI-9 moves to HB6’s lane*. None when nothing is queued (it goes once it applies) or the
+    queued list is the same; Pulse keeps its one-height row and its *list changes after* header. Editing it is HI-1927's.
   - **A lane's wait time** (HI-1926): main stamps each running lane's status when its key (reason, card, ask) first
     appears (`stampWait`, kept per workspace in memory, one for every window, bounded, a lane leaving it when it stops
     running) as `status.since`; a wait already under way at the first listing (Hive started, the workspace opened) is
