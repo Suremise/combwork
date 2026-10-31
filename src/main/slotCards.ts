@@ -40,8 +40,8 @@ import { legacyWorktree, rebindSession, slotsMigrated } from './agentFolders'
 import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
-import { whyNoLine } from './lineWriter'
-import { changingFolder } from './folderFence'
+import { onLineFreed, whyNoLine } from './lineWriter'
+import { changingFolder, folderChanging, folderSteady } from './folderFence'
 import { samePlace } from './fsutil'
 import { samePath } from '../shared/movePaths'
 import { git } from './git'
@@ -1187,7 +1187,9 @@ const slotFreed = new Set<(projectPath: string) => void>()
 
 /**
  * Resolves at the next change that may matter to a waiting placement: its builder's status, a run, its restart resume, a
- * slot of its project freed, or within 30 s; false once `over`.
+ * slot of its project freed, or within 30 s; false once `over`. For a builder that can't take a line (HI-2191: whyNoLine),
+ * also what ends each reason that changes no status: Hive's line there done with (typed, or its take checked), the pause
+ * after the user typed there over (one timer, at its end), its folder steady again, its hive tools connected.
  */
 function nextLook(projectPath: string, agentId: string, over: () => boolean): Promise<boolean> {
   return new Promise((resolve) => {
@@ -1196,11 +1198,25 @@ function nextLook(projectPath: string, agentId: string, over: () => boolean): Pr
       if (p.toLowerCase() === projectPath.toLowerCase()) finish()
     }
     slotFreed.add(freed)
+    let done = false
+    const offLineFreed = onLineFreed((p, a) => {
+      if (same(p, a)) finish()
+    })
+    const quietAt = sessions.userQuietAt(projectPath, agentId)
+    const quietTimer = quietAt === null ? undefined : setTimeout(() => finish(), Math.max(0, quietAt - Date.now()) + 50)
+    quietTimer?.unref?.()
+    const cwd = sessions.liveFor(projectPath, agentId)?.cwd
+    if (folderChanging(cwd)) void folderSteady(cwd).then(() => finish())
+    if (sessions.hiveToolsWaiting(projectPath, agentId)) void sessions.hiveToolsSettled(projectPath, agentId).then(() => finish())
     const finish = (): void => {
+      if (done) return
+      done = true
       off()
       offEntry()
+      offLineFreed()
       slotFreed.delete(freed)
       clearTimeout(timer)
+      clearTimeout(quietTimer)
       resolve(!over())
     }
     const off = onHiveEvent((e) => {

@@ -3503,6 +3503,12 @@ class SessionManager {
     return Date.now() - u.at < (s?.typingPause ?? 15) * 1000
   }
 
+  /** When userMayBeTyping ends for an agent (ms since the epoch), while it holds; null when it doesn't (HI-2191: a wait for it). */
+  userQuietAt(projectPath: string, agentId: string): number | null {
+    if (!this.userMayBeTyping(projectPath, agentId)) return null
+    return this.userInput.get(this.key(projectPath, agentId))!.at + (config.settings.assistant?.typingPause ?? 15) * 1000
+  }
+
   /**
    * The run `runId` of the Hive Assistant was told its mode `modeId`: its conversation records it, so a resume
    * tells it again only after another switch (#334).

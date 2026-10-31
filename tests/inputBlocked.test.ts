@@ -123,6 +123,28 @@ describe('an input that takes no keys (HI-2191)', () => {
     expect(e.state.statusMessage).toBe(OTHER.message)
   })
 
+  it("Hive done with a line it typed says so (lineWriter.onLineFreed): what waits on 'already typing' looks again by it", async () => {
+    running()
+    const told: string[] = []
+    const off = writer.onLineFreed((p, a) => void told.push(`${p}#${a}`))
+    try {
+      // Its typing begun (the line writer's own lock held), however it ends (here put off part-way): done with, and said.
+      expect(writer.whyNoLine(project, id)).toBeNull()
+      let held = false
+      await writer.typeLine(project, id, '[Hive] New in your inbox: 1 task', () => (held ||= writer.lineBusy(project, id), true))
+      expect(held, 'its lock was held while it typed').toBe(true)
+      expect(writer.lineBusy(project, id)).toBe(false)
+      expect(told).toEqual([`${project}#${id}`])
+      // Refused before any key (its input blocked): nothing was held, nothing to say.
+      told.length = 0
+      ;(s.live.get(key) as Entry).inputBlocked = { runId: 'run1', ask: {}, box: '', since: Date.now() } as never
+      expect(await writer.typeLine(project, id, 'more', () => true)).toBe(false)
+      expect(told).toEqual([])
+    } finally {
+      off()
+    }
+  })
+
   describe('seen to take keys again', () => {
     const blocked = async (): Promise<Entry> => {
       shortWait()

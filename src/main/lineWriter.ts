@@ -46,6 +46,25 @@ export const inFlightNow = (): boolean => inFlight.size > 0
 /** Agents Hive is typing a line into now (one at a time each). */
 const writing = new Set<string>()
 
+/**
+ * Told when Hive is done with an agent's line (HI-2191): its typing over, or its check that the CLI took it. Neither
+ * changes the agent's status, so what waits on `whyNoLine` for these (a slot's placement) looks again by it.
+ */
+const freed = new Set<(projectPath: string, agentId: string) => void>()
+export function onLineFreed(fn: (projectPath: string, agentId: string) => void): () => void {
+  freed.add(fn)
+  return () => void freed.delete(fn)
+}
+function tellFreed(projectPath: string, agentId: string): void {
+  for (const fn of [...freed]) {
+    try {
+      fn(projectPath, agentId)
+    } catch (e) {
+      log.warn('a line freed: its listener failed', e)
+    }
+  }
+}
+
 /** Whether an agent has a line of Hive's being made that goes first (watches.ts: a fired watch whose line isn't made yet). */
 let lineComing: (projectPath: string, agentId: string) => boolean = () => false
 export function onLineComing(fn: (projectPath: string, agentId: string) => boolean): void {
@@ -139,6 +158,7 @@ export async function typeLine(projectPath: string, agentId: string, line: strin
     return false
   } finally {
     writing.delete(key)
+    tellFreed(projectPath, agentId)
   }
 }
 
@@ -162,6 +182,7 @@ export async function confirmTaken(projectPath: string, agentId: string, before:
     confirmsRunning--
     follow?.settled?.()
     release?.()
+    tellFreed(projectPath, agentId)
   }
 }
 let confirmsRunning = 0

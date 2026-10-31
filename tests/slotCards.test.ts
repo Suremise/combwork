@@ -62,9 +62,17 @@ const state = vi.hoisted(() => ({
   /** The conversation's lookup fails (its transcript can't be read now: unknown). */
   convFails: false,
   /** Why its builder can't take a line now (lineWriter.whyNoLine), or null. */
-  busy: null as string | null
+  busy: null as string | null,
+  /** When the pause after the user typed in its builder's pane ends (sessions.userQuietAt), or null. */
+  quietAt: null as number | null,
+  /** What listens for Hive being done with an agent's line (lineWriter.onLineFreed). */
+  lineFreed: new Set<(projectPath: string, agentId: string) => void>()
 }))
-vi.mock('../src/main/lineWriter', async (orig) => ({ ...(await orig<object>()), whyNoLine: () => state.busy }))
+vi.mock('../src/main/lineWriter', async (orig) => ({
+  ...(await orig<object>()),
+  whyNoLine: () => state.busy,
+  onLineFreed: (fn: (projectPath: string, agentId: string) => void) => (state.lineFreed.add(fn), () => void state.lineFreed.delete(fn))
+}))
 vi.mock('../src/main/restartResume', async (orig) => ({ ...(await orig<object>()), isResuming: () => state.resuming }))
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: () => [], workflowFor: async () => state.wf }))
@@ -136,6 +144,9 @@ vi.mock('../src/main/sessions', async (orig) => {
   const actual = await orig<typeof import('../src/main/sessions')>()
   const stub = {
     liveFor: () => (state.live ? { ...state.live, status: 'ready' } : null),
+    // The pause after the user typed in its builder's pane, while it holds (HI-2191): when it ends.
+    userQuietAt: () => state.quietAt,
+    hiveToolsWaiting: () => false,
     agentNow: () => (state.live ? { status: 'ready', pending: false, backgroundTasks: 0 } : null),
     // No run writes in a slot here (HI-1762's takeover of the slot an agent's own run still writes in finds none).
     runNow: () => null,
@@ -215,7 +226,7 @@ afterEach(() => {
   env?.close()
   env = null
   resetAgentStartsForTests()
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null })
 })
 
 /**
@@ -763,27 +774,75 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
     expect(state.deliveries).toHaveLength(2)
   })
 
-  it('HI-2191: its builder unable to take a line (input blocked, typing, watching): no delivery made or called off, said once; given once it can', async () => {
-    const { e, n, slot, cycle, ws } = await prepared()
-    state.live = { cwd: slot, sessionId: 's1' }
-    state.busy = 'something on its screen is taking its keys, and it waits for the user to answer it there'
-    // The placement waits for its builder's next status, however many come while it still can't take one.
-    const placing = place(ws, e.project, e.wf, n, cycle, lease)
-    const looked = (): number => state.logged.filter((m) => /waits for its builder ⁨?B1⁩?, which can't take a line now/.test(m)).length
-    await vi.waitFor(() => expect(looked()).toBe(1), { timeout: HUNG_MS })
-    for (let i = 0; i < 3; i++) tellListeners({ type: 'session-status', state: { projectPath: e.project, agentId: 'B1', status: 'waiting' } } as never)
-    await new Promise((r) => setImmediate(r))
-    expect(state.deliveries).toEqual([])
-    expect(state.calls).toEqual([])
-    expect(placed(e, n)).toBe(0)
-    expect(looked(), 'said once').toBe(1)
-    expect(state.logged.some((m) => /Giving/.test(m))).toBe(false)
-    // Free: its status says so, and it is given, once.
-    state.busy = null
-    tellListeners({ type: 'session-status', state: { projectPath: e.project, agentId: 'B1', status: 'ready' } } as never)
-    await placing
-    expect(state.calls).toEqual(['typed (given)'])
-    expect(placed(e, n)).toBe(1)
+  describe("HI-2191: its builder unable to take a line: no delivery made or called off, said once; given once it can, woken by what ends each reason", () => {
+    /** A placement waiting for B1, which can't take a line for `why`: the pass that waits, and how often it said so. */
+    async function waiting(why: string) {
+      const { e, n, slot, cycle, ws } = await prepared()
+      state.live = { cwd: slot, sessionId: 's1' }
+      state.busy = why
+      const placing = place(ws, e.project, e.wf, n, cycle, lease)
+      const said = (): number => state.logged.filter((m) => /waits for its builder ⁨?B1⁩?, which can't take a line now/.test(m)).length
+      await vi.waitFor(() => expect(said()).toBe(1), { timeout: HUNG_MS })
+      return { e, n, placing, said }
+    }
+    /** Nothing given while it waits, through unrelated events and its own that leave it busy. */
+    const nothingYet = async (e: Env, n: number, said: () => number): Promise<void> => {
+      for (let i = 0; i < 3; i++) {
+        tellListeners({ type: 'session-status', state: { projectPath: e.project, agentId: 'B1', status: 'watching' } } as never)
+        tellListeners({ type: 'session-status', state: { projectPath: e.project, agentId: 'R1', status: 'ready' } } as never)
+        for (const fn of [...state.lineFreed]) fn(e.project, 'R1')
+        tellListeners({ type: 'progress-changed' } as never)
+      }
+      await new Promise((r) => setImmediate(r))
+      expect(state.deliveries).toEqual([])
+      expect(state.calls).toEqual([])
+      expect(placed(e, n)).toBe(0)
+      expect(said(), 'said once').toBe(1)
+      expect(state.logged.some((m) => /Giving/.test(m))).toBe(false)
+    }
+    /** Given once, well before nextLook's 30 s fallback would have looked again. */
+    const givenOnce = async (e: Env, n: number, placing: Promise<void>): Promise<void> => {
+      let bound: NodeJS.Timeout | undefined
+      await Promise.race([placing, new Promise((_, no) => (bound = setTimeout(() => no(new Error('not woken: only the 30 s fallback would have looked')), 10_000)))])
+      clearTimeout(bound)
+      expect(state.calls).toEqual(['typed (given)'])
+      expect(placed(e, n)).toBe(1)
+    }
+
+    it('waiting on cards (its builder watching), then its status frees it', async () => {
+      const { e, n, placing, said } = await waiting('it is waiting on cards, and takes no new work until it is woken')
+      await nothingYet(e, n, said)
+      state.busy = null
+      tellListeners({ type: 'session-status', state: { projectPath: e.project, agentId: 'B1', status: 'ready' } } as never)
+      await givenOnce(e, n, placing)
+    })
+
+    it('its input blocked, then freed (its status back to idle)', async () => {
+      const { e, n, placing, said } = await waiting('something on its screen is taking its keys, and it waits for the user to answer it there')
+      await nothingYet(e, n, said)
+      state.busy = null
+      tellListeners({ type: 'session-status', state: { projectPath: e.project, agentId: 'B1', status: 'ready' } } as never)
+      await givenOnce(e, n, placing)
+    })
+
+    it("Hive already typing a line into it: woken when that line is done with, with no status change", async () => {
+      const { e, n, placing, said } = await waiting('Hive is already typing a line into it')
+      await nothingYet(e, n, said)
+      state.busy = null
+      for (const fn of [...state.lineFreed]) fn(e.project, 'B1')
+      await givenOnce(e, n, placing)
+    })
+
+    it('the user typing in its pane: woken once, at the end of the pause after they typed, with no status change', async () => {
+      state.quietAt = Date.now() + 1500
+      const { e, n, placing, said } = await waiting('the user has just typed in its terminal and may still be writing there')
+      await nothingYet(e, n, said)
+      // The pause ends: nothing else happens, and its own timer looks again.
+      const busyUntil = state.quietAt
+      state.busy = null
+      expect(Date.now()).toBeLessThan(busyUntil)
+      await givenOnce(e, n, placing)
+    })
   })
 
   it("not running: a launch that couldn't start is nothing given; the next try starts it with the card, once", async () => {

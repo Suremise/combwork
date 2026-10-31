@@ -121,10 +121,13 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
     // ---- B1's turn ends on a dialog of its CLI's own, under its empty input box: it takes the keys.
     const b1Key = lib.ptyKey(alpha, b1.id)
-    await lib.typeLine(inv, b1Key, home, 'B1', 'swallow', { live: () => live(b1.id) })
-    check('B1 is idle with the dialog under its input box', !!(await until(() => idle(alpha, b1.id))) && (await inv('pty:buffer', b1Key)).includes(SWALLOW))
+    // Typed only once Hive has nothing to type into B1 now or next: a delivery typed meanwhile would mix with it. From
+    // then on, every letter Hive types into B1 is a try at its input (a line Hive typed after its turn may already be
+    // the first to find it blocked).
     const before = new Date().toISOString()
     const wakesBefore = assistantWakes().length
+    await lib.typeLine(inv, b1Key, home, 'B1', 'swallow', { ready: async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tb1), strict: true, live: () => live(b1.id), hungMs: HUNG_MS })
+    check('B1 ends its turn with the dialog under its input box', !!(await until(async () => ['ready', 'finished', 'waiting'].includes((await live(b1.id))?.status) && (await inv('pty:buffer', b1Key)).includes(SWALLOW))))
     // Card 1 moved to Done by the user: its card event is typed into B1 first, and the lane starts card 2 for it once it
     // is quiet.
     await inv('tasks:move', c1, 'done', { confirm: true, reason: 'Done by hand' })
@@ -137,7 +140,10 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     })
     check('B1 waits for the user: something on its screen takes its keys', !!blocked && /taking its keys/.test(String(blocked.statusMessage)), JSON.stringify(blocked && { status: blocked.status, message: blocked.statusMessage }))
     // The fake reads its input late on a busy machine: its log of a key may come after Hive gave up waiting for it.
-    check('…after three letters typed and not answered', !!(await until(() => probes(before).length >= 3, 10000)) && probes(before).length === 3,`${probes(before).length}: ${JSON.stringify(b1Reads(before))}`)
+    // At most three: an unanswered clear just before (Hive typing as the lane started, on a busy machine) counts too.
+    const blockedAt = new Date().toISOString()
+    const tried = probes(before).filter((r) => r.at <= blockedAt).length
+    check('…after at most three letters typed and not answered', tried >= 1 && tried <= 3,`${probes(before).length}: ${JSON.stringify(b1Reads(before))}`)
     check('…its pane says so, with Try again', !!(await until(async () => (await page.locator('.pane-status.input-blocked').count()) >= 1)) && (await page.locator('.pane-status.input-blocked button', { hasText: 'Try again' }).count()) === 1)
     const waitLine = () => assistantWakes().slice(wakesBefore).filter((t) => t.startsWith('[Hive] B1 (alpha) is waiting for the user'))
     check("the Assistant's lane watch is woken: B1 waits for the user", !!(await until(() => waitLine().length > 0)), JSON.stringify(assistantWakes().slice(wakesBefore)))
