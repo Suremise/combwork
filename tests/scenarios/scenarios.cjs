@@ -4241,8 +4241,8 @@ const readOf = (t, target, dirs, facts) => {
  */
 const callsWithReplies = (o, tool) => {
   const calls = ran(o, tool)
-  const replies = hiveReplies(o, tool)
-  return calls.length === replies.length ? calls.map((x, i) => ({ args: argsOf(x), reply: String(replies[i].result ?? '') })) : []
+  const own = hiveReplies(o, tool)
+  return calls.length === own.length ? calls.map((x, i) => ({ args: argsOf(x), reply: String(own[i].result ?? '') })) : []
 }
 module.exports.SCENARIOS.push(
   {
