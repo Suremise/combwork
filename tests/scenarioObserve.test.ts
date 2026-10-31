@@ -248,6 +248,39 @@ ${SKILL_TEXT('work-on-card')}`)]
   })
 })
 
+describe("the scenarios' hooks act once the agent's turn has ended, watching too (HI-2237)", () => {
+  // An agent waiting for the user or a message ends its turn on a card watch (while-working.md): its status is watching.
+  type Hooked = { during: (c: unknown, status: string) => Promise<void> }
+  const stub = (column: string) => {
+    const did: string[] = []
+    const c = {
+      cards: { a: 1 },
+      api: async () => ({ body: { column } }),
+      inv: async (channel: string) => (did.push(channel), {}),
+      assistantMessage: async () => (did.push('message'), 'for AL-1 round 1'),
+      deliveries: async () => []
+    }
+    return { c, did }
+  }
+  const run = async (id: string, column: string, statuses: string[]) => {
+    const sc = SCENARIOS.find((s) => s.id === id) as unknown as Hooked
+    const { c, did } = stub(column)
+    for (const s of statuses) await sc.during(c, s)
+    return did
+  }
+
+  it.each([
+    ['decision-while-waiting', 'doing', ['tasks:update']],
+    ['decision-before-taking', 'doing', ['tasks:update']],
+    ['inbox-stale', 'review', ['message', 'tasks:update']],
+    ['inbox-act-then-ack', 'todo', ['message']]
+  ])('%s: acts on a turn ended watching, as on one ended idle, and not while it works', async (id, column, action) => {
+    expect(await run(id, column, ['working', 'watching'])).toEqual(action)
+    expect(await run(id, column, ['working', 'ready'])).toEqual(action)
+    expect(await run(id, column, ['working', 'working'])).toEqual([])
+  })
+})
+
 describe("the override scenarios' checks count every move of the card, by number or key (#1474)", () => {
   const { isCard } = helpers as unknown as { isCard: (ref: unknown, n: number) => boolean }
   const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
