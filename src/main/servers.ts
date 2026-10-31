@@ -49,7 +49,7 @@ import { buildFactOf } from '../shared/buildFacts'
 import type { JournalSettings } from '../shared/journal'
 import { emit, onHiveEvent, toast } from './events'
 import { msg, tr } from '../shared/i18n'
-import { cancelWatch, encodeSince, registerAgentWatch, registerLaneWatch, registerWatch, scopedCard } from './watches'
+import { cancelWatch, encodeSince, onWatchPlacing, registerAgentWatch, registerLaneWatch, registerWatch, scopedCard } from './watches'
 import { readLaneCards, readLaneCondition } from '../shared/laneWatch'
 import { agentBusy, AGENT_WATCH_MAX_AGENTS, type AgentNow, type WatchedAgent } from '../shared/agentWatch'
 import { alreadyThere, cardChange, cardOver, changesBetween, decodeSince, handoffsSince, markOf, movedIntoSince, readCondition, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_LIMIT_MINUTES, type CardChange, type CardMark } from '../shared/watch'
@@ -1796,9 +1796,6 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
     const had = await cancelWatch(requireWorkspace(), who.projectPath, who.agentId)
     return { done: had ? `Cancelled your ${kind} watch.` : 'You had no watch.' }
   }
-  // Hive giving it a card in a slot (HI-2197): a watch now would hold that off; cancel still goes.
-  const placing = me && body?.wake === true ? await watchWhilePlaced(requireWorkspace(), me.projectPath, me.agentId) : null
-  if (placing) throw new HttpError(409, placing)
   const list: { project: string; agent?: string }[] = Array.isArray(body?.agents) ? body.agents : []
   let targets: { p: string; id: string }[] = []
   for (const x of list) {
@@ -3236,9 +3233,6 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const had = await cancelWatch(ws, who.projectPath, who.agentId)
     return { done: had ? `Cancelled your ${w?.lanes ? 'lane' : w?.agents ? 'agent' : 'card'} watch.` : 'You had no card watch.' }
   }
-  // Hive giving it a card in a slot (HI-2197): a watch now would hold that off; cancel still goes.
-  const placing = me && (body?.wake === true || body?.lanes !== undefined) ? await watchWhilePlaced(ws, me.projectPath, me.agentId) : null
-  if (placing) throw new HttpError(409, placing)
   // A lane watch (#531): whole lanes; always one that wakes. With cards beside them (#726): `cards` and their `changes`.
   if (body?.lanes !== undefined) {
     if (body.column !== undefined || body.fresh !== undefined) throw new HttpError(400, 'lanes goes without column or fresh: events says what counts on the lanes, changes on the cards beside them')
@@ -4520,3 +4514,5 @@ export async function revokeViewer(id: string): Promise<AgentApiInfo> {
 }
 
 onHiveEvent(broadcast)
+// A project agent's watch refused, under the watches' lock, while Hive is giving it a card in a slot (HI-2197).
+onWatchPlacing(watchWhilePlaced)

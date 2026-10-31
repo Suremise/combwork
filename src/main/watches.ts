@@ -30,6 +30,7 @@ import { isUnread, type DeliveryRecord } from '../shared/deliveries'
 import { cancelFromSource, createDelivery, deliveryNow, followAgent, inFlightNow as deliveriesInFlight, load as loadDeliveries, offerNow, registerSource, settled as deliveriesSettled } from './deliveries'
 import { inFlightNow as writerInFlight, onLineComing, settled as writerSettled } from './lineWriter'
 import { readyFor } from './readiness'
+import { HiveError } from './hiveError'
 import { cardNamesOf, withCardNames } from './projectKeys'
 import { namedBy } from '../shared/projectKeys'
 import { projectPreferences } from './workflow/preferences'
@@ -837,6 +838,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
   const scope = scopeFor(ws, projectPath)
   const self = await boardName(ws, projectPath, agentId)
   const result = await locked(store, async (): Promise<WatchResult> => {
+    await assertNotPlacing(ws, projectPath, agentId, scope)
     // Moves into a column are looked for in the history from here: before the cards are read, so none falls between.
     const since = start?.at ?? new Date().toISOString()
     // After a wake, a card that wake told about starts from what it told (#224): what others changed since counts, so a
@@ -905,6 +907,22 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
     for (const fn of watchStarted) inBackground('telling of a watch begun', Promise.resolve().then(() => fn(ws, projectPath, agentId, cond)))
   }
   return result
+}
+
+/**
+ * HI-2197: why a project agent may take no new watch now, or null: Hive is giving it a card in a slot (its own start, the
+ * placement not made yet), which a watch would hold off. Asked under the watches' lock, as each registration writes its
+ * watch: a start that makes the placement due then ends the agent's watch under the same lock (endWatchOf), so either
+ * the watch is refused or that start ends it. Set by servers.ts (watchGuards.ts); none until then.
+ */
+let placing: (ws: WorkspaceService, projectPath: string, agentId: string) => Promise<string | null> = async () => null
+export function onWatchPlacing(fn: (ws: WorkspaceService, projectPath: string, agentId: string) => Promise<string | null>): void {
+  placing = fn
+}
+const assertNotPlacing = async (ws: WorkspaceService, projectPath: string, agentId: string, scope: string | null): Promise<void> => {
+  if (scope === null) return
+  const why = await placing(ws, projectPath, agentId)
+  if (why) throw new HiveError({ shown: why, english: why }, { kind: 'conflict' })
 }
 
 /** Told when an agent's card watch begins (HI-1721: loopWakes tells a builder of its returned card it waits on). */
@@ -1310,6 +1328,7 @@ export async function registerAgentWatch(ws: WorkspaceService, projectPath: stri
     if (same(a.projectPath, projectPath) && a.agentId === agentId) throw new Error("You can't watch yourself: nothing would wake you")
   }
   const result = await locked(store, async (): Promise<AgentWatchResult> => {
+    await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
     const since = new Date().toISOString()
     const agentMarks: Record<string, AgentMark> = {}
     const already: string[] = []
@@ -1720,6 +1739,7 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     if (unknown.length) throw new Error(`No such lane${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')} (hive_lane list gives the lanes and their ids)`)
   }
   const result = await locked(store, async (): Promise<LaneWatchResult> => {
+    await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
     const since = new Date().toISOString()
     const told = store.wokeLanes.get(agentKey(projectPath, agentId))
     // After a wake, what is new is measured from when its line was made: a lane started or a card added since then is
