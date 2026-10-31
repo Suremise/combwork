@@ -276,8 +276,8 @@ export interface QueuedLane {
 /**
  * A running lane's queued list change (HI-2151, #1270), as Progress → Lanes shows it under its cards: the card in flight
  * it applies after (null: none known), the cards it adds, those it takes off (each with the builder of another running
- * lane that lists it now, or will, else null), and the whole new list when the cards it keeps change order. Null: none
- * queued, or one the same as its cards.
+ * lane whose list will have it, its queued one when it has one, else its cards; else null), and the whole new list when
+ * the cards it keeps change order. Null: none queued, or one the same as its cards.
  */
 export interface QueuedChange {
   after: number | null
@@ -293,7 +293,7 @@ export function queuedChange(lane: QueuedLane, all: readonly QueuedLane[]): Queu
   const next = new Set(q)
   const added = q.filter((n) => !now.has(n))
   const others = all.filter((l) => l.id !== lane.id && (l.state === 'active' || l.state === 'paused'))
-  const removed = lane.cards.filter((n) => !next.has(n)).map((card) => ({ card, to: others.find((l) => l.cards.includes(card) || !!l.queued?.includes(card))?.builder.name ?? null }))
+  const removed = lane.cards.filter((n) => !next.has(n)).map((card) => ({ card, to: others.find((l) => (l.queued ?? l.cards).includes(card))?.builder.name ?? null }))
   const kept = q.filter((n) => now.has(n))
   const was = lane.cards.filter((n) => next.has(n))
   const order = kept.some((n, i) => n !== was[i]) ? [...q] : null

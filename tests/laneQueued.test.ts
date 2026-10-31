@@ -52,6 +52,16 @@ describe('queuedChange', () => {
     expect(text(l, [l, hb6, ended])).toBe('Next, once HI-2148 is Done: HI-2122 taken off, HI-2121 moves to HB6’s lane')
   })
 
+  it("reads another lane's queued list over its cards: one that drops the card isn't where it goes (HR1's round 1)", () => {
+    const a = lane('a', 'HB3', [1, 2], [1], ['doing'])
+    const b = lane('b', 'HB6', [3, 2], [3], ['doing'])
+    expect(queuedChange(a, [a, b])?.removed).toEqual([{ card: 2, to: null }])
+    expect(text(a, [a, b])).toBe('Next, once HI-1 is Done: HI-2 taken off')
+    // B drops it and C will take it: C is where it goes.
+    const c = lane('c', 'HB7', [4], [4, 2], ['doing'])
+    expect(queuedChange(a, [a, b, c])?.removed).toEqual([{ card: 2, to: 'HB7' }])
+  })
+
   it('gives the whole new order when the cards it keeps change places', () => {
     const l = lane('a', 'HB3', [1, 2, 3], [1, 3, 2, 4], ['doing'])
     expect(queuedChange(l, [l])).toEqual({ after: 1, added: [4], removed: [], order: [1, 3, 2, 4] })
