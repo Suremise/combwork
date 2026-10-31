@@ -114,6 +114,12 @@ const namingCopies = () => {
     await lib.openWorkspace(inv, page, ws)
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'project' } })
     await inv('project:updateConfig', alpha, { copies: { size: 3 } })
+    // HI-2211: Hive's reviewer pool gives each card in Review outside a lane to a free reviewer and types it in (HI-2046),
+    // and a real CLI then reviews it on its own (RX approved its card before its start review here). The suite's steps are
+    // each reviewer's, so the team is paused (HI-2081: nothing given out or told) before any agent starts: none is
+    // running to be told of the pause, and the reviews and verdicts below are the agents' own calls, which it doesn't hold.
+    const paused = await inv('team:pause')
+    check('the team is paused before the agents start (the pool gives nothing out)', paused.failed.length === 0 && paused.done.length === 1, JSON.stringify(paused))
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', provider: 'copilot', workflowRole: 'builder', permissionMode: 'accept-edits' })
     const reviewers = [
       ...(parts.claude ? [] : [{ key: 'claude', def: await lib.addAgent(inv, alpha, { name: 'RC', provider: 'claude-code', model: 'haiku', permissionMode: 'acceptEdits', workflowRole: 'reviewer' }) }]),
