@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 105
+const FIXTURES_VERSION = 106
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -265,6 +265,41 @@ async function builderStopped(c, card, key) {
  * committed (`card.files`, by default src/greet.js), and submitted as the user moves it, so a project's rules leave it
  * there.
  */
+/**
+ * Card `n`'s latest submission as Hive recorded it, when it is a diff to review (HI-2223): a revision after its base,
+ * with files changed. Otherwise null.
+ */
+async function submittedDiff(c, n) {
+  const s = ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).filter((f) => f.kind === 'Submitted').at(-1)?.data
+  return s && s.revision && s.revision !== s.base && (s.files ?? []).length > 0 ? s : null
+}
+/** A setup's submission that has to be a diff to review (HI-2223), or the setup fails saying what it was. */
+async function assertDiff(c, n) {
+  if (await submittedDiff(c, n)) return
+  const s = ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).filter((f) => f.kind === 'Submitted').at(-1)?.data
+  throw new Error(`setup: #${n}'s submission is no diff to review: ${JSON.stringify(s && { revision: s.revision, base: s.base, files: s.files })}`)
+}
+/**
+ * Card `key` taken by `who` (Doing: its base), its work committed (`files`, or `work()` committing itself), and moved to
+ * Review, as `c.card` moves cards (tasks:update: in a project whose rules have no Review step, which a user's move
+ * refuses), its submission a diff to review (HI-2223). Comments (`after`) once it is there. Its number.
+ */
+async function reviewedWork(c, key, { files = {}, work, after = [], ...card }, who = 'implementer') {
+  const n = await c.card(key, { ...card, column: 'doing', agent: who })
+  if (work) work()
+  else {
+    for (const [rel, text] of Object.entries(files)) {
+      require('fs').mkdirSync(require('path').dirname(require('path').join(c.alpha, rel)), { recursive: true })
+      c.write(rel, text)
+    }
+    c.git('add', '-A')
+    c.git('-c', `user.name=${who}`, '-c', `user.email=${who}@example.com`, 'commit', '-qm', card.title)
+  }
+  await c.inv('tasks:update', n, { column: 'review', agent: c.agents[who].id })
+  if (!(await require('../e2e/lib.cjs').until(() => submittedDiff(c, n), 15000))) await assertDiff(c, n)
+  for (const text of after) await c.api('POST', `/v1/tasks/${n}/comments`, { text })
+  return n
+}
 async function submittedCard(c, key, card, who = 'coder') {
   const { files = { 'src/greet.js': 'module.exports = (name) => `Hi, ${name}`\n' }, ...rest } = card
   const n = await c.card(key, { ...rest, agent: who })
@@ -276,6 +311,7 @@ async function submittedCard(c, key, card, who = 'coder') {
   c.git('add', '-A')
   c.git('-c', `user.name=${who}`, '-c', `user.email=${who}@example.com`, 'commit', '-qm', card.title)
   await userMove(c, n, 'review')
+  await assertDiff(c, n)
   for (const text of card.after ?? []) await c.api('POST', `/v1/tasks/${n}/comments`, { text })
   return n
 }
@@ -735,6 +771,11 @@ module.exports = async function sync(run) {
   }
 }
 `
+/** sync.js before its card's work (HI-2223): no retries, so the work submitted (SYNC_JS) is a diff to review. */
+const SYNC_BEFORE = `module.exports = async function sync(run) {
+  return await run()
+}
+`
 /** The hive tool calls in the transcript (mcp__hive__x, hive.x, Hive's "hive · x"), with their replies. */
 const hiveReplies = (o, tool) => o.tools.filter((t) => new RegExp(`(^|__|\\.|\\s)${tool}$`).test(t.name) && !t.isError)
 
@@ -828,20 +869,26 @@ const RECORD_PROJECT = {
   'math.js': 'module.exports = { add: (a, b) => a + b }\n',
   'math.test.js': "const test = require('node:test')\nconst assert = require('node:assert')\ntest('adds', () => assert.equal(require('./math').add(1, 2), 3))\n"
 }
-/** The builder's work on RECORD_PROJECT, committed, and its card in Review with a run record of that commit. */
-async function recordedWork(c) {
-  c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\n")
-  c.write('greet.test.js', "const test = require('node:test')\nconst assert = require('node:assert')\ntest('greets', () => assert.equal(require('./greet')('Ann'), 'Hello, Ann'))\n")
-  c.git('add', '-A')
-  c.git('commit', '-qm', 'greet: Hello, with a test')
-  const code = c.git('rev-parse', '--short', 'HEAD').trim()
-  await c.card('b', {
+/**
+ * The builder's work on RECORD_PROJECT and its card in Review with a run record of that work's commit. Taken in Doing
+ * first, so its submission is a commit after its base, a diff to review (HI-2223: with the card made in Review after the
+ * commit, the revision was the base). `more`: commits made after the record (review-record-stale), in the submission.
+ */
+async function recordedWork(c, more = () => {}) {
+  let code = ''
+  const n = await reviewedWork(c, 'b', {
     title: 'Greeting says Hello',
     description: 'greet.js returns "Hello, <name>" (it says "Helo"), with a test.',
-    column: 'review',
-    agent: 'implementer',
-    comments: [`Done: greet.js fixed, greet.test.js added.\n\nRun record: code ${code}, nothing uncommitted, ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC. \`npm test\`: 2 files, 2 tests, all passed (4 min 05 s).`]
+    work: () => {
+      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\n")
+      c.write('greet.test.js', "const test = require('node:test')\nconst assert = require('node:assert')\ntest('greets', () => assert.equal(require('./greet')('Ann'), 'Hello, Ann'))\n")
+      c.git('add', '-A')
+      c.git('commit', '-qm', 'greet: Hello, with a test')
+      code = c.git('rev-parse', '--short', 'HEAD').trim()
+      more()
+    }
   })
+  await c.api('POST', `/v1/tasks/${n}/comments`, { text: `Done: greet.js fixed, greet.test.js added.\n\nRun record: code ${code}, nothing uncommitted, ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC. \`npm test\`: 2 files, 2 tests, all passed (4 min 05 s).` })
 }
 /**
  * The shell commands a tool call ran, and nothing else of it (a description, a verdict that mentions `npm test`): a shell
@@ -1063,10 +1110,11 @@ module.exports.SCENARIOS = [
     title: 'Review a card changed after its run record: the record is for older code, so the tests run again, saying why (#533)',
     files: RECORD_PROJECT,
     async setup(c) {
-      await recordedWork(c)
-      // After the record: another change, with no new record.
-      c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\nmodule.exports.bye = (name) => 'Bye, ' + name\n")
-      c.git('commit', '-qam', 'greet: bye')
+      // After the record: another change, with no new record, in the submission (HI-2223: the revision reviewed).
+      await recordedWork(c, () => {
+        c.write('greet.js', "module.exports = (name) => 'Hello, ' + name\nmodule.exports.bye = (name) => 'Bye, ' + name\n")
+        c.git('commit', '-qam', 'greet: bye')
+      })
     },
     prompt: (c) => `Review card #${c.cards.b}.`,
     fake: (c) => `skill review-agent-work then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, false)}`,
@@ -1499,9 +1547,10 @@ module.exports.SCENARIOS = [
   {
     id: 'review-decision-next-round',
     title: "A reviewer woken for round 2 reads the card again (#357): a decision recorded since round 1 is flagged, and work that ignores it fails",
-    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    // Round 1's greet.js, with its typo; round 2's fix is the submission, a commit after it (HI-2223: a diff to review).
+    files: { 'greet.js': "module.exports = (name) => 'Helo, ' + name\n" },
     async setup(c) {
-      await c.card('r', { title: 'Greeting helper', description: 'greet.js returns a greeting for a name.', column: 'review', agent: 'implementer', comments: ['Done: greet.js added.'] })
+      await reviewedWork(c, 'r', { title: 'Greeting helper', description: 'greet.js returns a greeting for a name.', files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" }, after: ['Done: greet.js added.'] }, 'implementer')
       // Round 1: this agent (Coder) reviewed it and failed it; the implementer fixed the typo; then the user decided.
       giveVerdict(c, c.cards.r, 'failed', 'Coder (alpha)')
       await c.api('POST', `/v1/tasks/${c.cards.r}/comments`, { text: 'Round 1: failed. 1. greet.js says "Helo".' })
@@ -2325,15 +2374,20 @@ module.exports.SCENARIOS = [
   {
     id: 'card-loop-recurring-review',
     title: 'A card loop reviewer finding a fix incomplete again (rounds left): fails it marked recurring, without asking the user',
-    files: { 'sync.js': SYNC_JS },
+    // The work (SYNC_JS: the delay still not awaited) submitted as a commit after sync.js without retries (HI-2223).
+    files: { 'sync.js': SYNC_BEFORE },
     async setup(c) {
-      await c.card('q', {
-        title: 'Retry the sync',
-        description: 'sync.js: try the sync up to three times, 1 s apart, before giving up.',
-        column: 'review',
-        agent: 'implementer',
-        comments: ['Done: retries added. Ready for review.', 'Review round 1: FAILED. 1. The retries have no delay between them.', 'Fixed: a 1 s delay between retries. Ready for review.']
-      })
+      await reviewedWork(
+        c,
+        'q',
+        {
+          title: 'Retry the sync',
+          description: 'sync.js: try the sync up to three times, 1 s apart, before giving up.',
+          files: { 'sync.js': SYNC_JS },
+          after: ['Done: retries added. Ready for review.', 'Review round 1: FAILED. 1. The retries have no delay between them.', 'Fixed: a 1 s delay between retries. Ready for review.']
+        },
+        'implementer'
+      )
     },
     prompt: (c) => `Review card #${c.cards.q} as the reviewer of a card loop (rounds: 5). It is back for its second review; the earlier review and the fix are in its comments.`,
     fake: (c) => `skill card-loop then ${fakeStartReview(c.cards.q)} then hive hive_wait_for_tasks {"cards":[${c.cards.q}],"column":"review","fresh":true,"wake":true} then ${fakeVerdict(c.cards.q, false, 'Round 2: FAILED. 1. The delay is still not awaited (recurring from round 1).')}`,
@@ -2632,11 +2686,12 @@ module.exports.SCENARIOS = [
   {
     id: 'card-loop-already-in-review',
     title: "A card loop reviewer whose next card is already in Review: the watch answers Already, and it reviews the card at once rather than retrying or asking the user (#376)",
-    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    // greet.js as #a left it; #b's fix is its submission, a commit after it (HI-2223: a diff to review).
+    files: { 'greet.js': "module.exports = (name) => 'Helo, ' + name\n" },
     async setup(c) {
       const a = await c.card('a', { title: 'Greeting module', description: 'greet.js exports a greeting function.', column: 'passed', agent: 'implementer', comments: ['Done: greet.js added. Ready for review.', 'Review round 1: PASSED.'] })
       giveVerdict(c, a, 'passed')
-      await c.card('b', { title: 'Greeting says Hello', description: 'greet.js returns "Hello, <name>".', column: 'review', agent: 'implementer', comments: ['Done: greet.js says "Hello, <name>". Ready for review.'] })
+      await reviewedWork(c, 'b', { title: 'Greeting says Hello', description: 'greet.js returns "Hello, <name>".', files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" }, after: ['Done: greet.js says "Hello, <name>". Ready for review.'] }, 'implementer')
     },
     prompt: (c) => `You are the reviewer of a card loop on #${c.cards.a} then #${c.cards.b}, built by Implementer (rounds: 5). You have just passed #${c.cards.a}. Carry on as the reviewer.`,
     // The fake waits for #b to arrive in Review (it already has: Already), then reviews it.
@@ -3732,6 +3787,8 @@ module.exports.SCENARIOS = [
     id: 'card-loop-blocked',
     title: "A reviewer in a card loop whose card its builder blocks to ask the user while it waits (#468, #481): keeps waiting rather than moving on, and reviews it once it is unblocked and back in Review, woken by Hive alone",
     role: 'agent',
+    // The upload as round 1 left it; the builder's fix, committed as it returns the card, is the diff to review (HI-2223).
+    files: { 'upload.js': "module.exports = async function upload(send) {\n  const r = await send()\n  return r.ok ? r : send()\n}\n" },
     async setup(c) {
       const a = await c.card('a', {
         title: 'Retry the upload',
@@ -3756,10 +3813,15 @@ module.exports.SCENARIOS = [
         return
       }
       if (Date.now() - c.blockedAt < 15000) return
+      // The fix, committed: its submission is a commit after the card's base (HI-2223).
+      c.write('upload.js', "module.exports = async function upload(send) {\n  const r = await send()\n  if (r.ok) return r\n  const wait = Math.min(Number(r.headers?.['retry-after'] ?? 0), 60)\n  await new Promise((done) => setTimeout(done, wait * 1000))\n  return send()\n}\n")
+      c.git('add', '-A')
+      c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'upload: wait for Retry-After, at most 60 s')
       await c.api('POST', `/v1/tasks/${c.cards.a}/comments`, { text: 'The user answered: up to 60 s. Fixed: the retry waits for Retry-After, capped at 60 s. Ready for review.' })
       await c.inv('tasks:update', c.cards.a, { blocked: '' })
       await c.inv('tasks:update', c.cards.a, { column: 'review' })
       c.returnedAt = Date.now()
+      c.returnDiff = await require('../e2e/lib.cjs').until(() => submittedDiff(c, c.cards.a), 15000)
     },
     // Through the block, then the wake and the review it starts: until a verdict on the card (at most 4 minutes after
     // its return).
@@ -3789,6 +3851,8 @@ module.exports.SCENARIOS = [
         // The builder returns it only once the reviewer ends its turn watching (`during`).
         [`watched #${c.cards.a} for its return to Review`, waits.some((x) => has(x, c.cards.a) && /"column"\s*:\s*"review"/.test(String(x.args))), waits.map((x) => String(x.args)).join(' | ')],
         [`the builder returned #${c.cards.a} once the reviewer was watching`, Number.isFinite(back), String(c.returnedAt)],
+        // The setup's own (HI-2223): what came back is a diff to review, so a review can give a verdict.
+        [`its return to Review is a diff to review (a commit after its base)`, !!c.returnDiff, JSON.stringify(c.returnDiff && { revision: c.returnDiff.revision, base: c.returnDiff.base, files: c.returnDiff.files })],
         ["reviewed the card after its return, with nobody prompting it (Hive's wake)", ha.some((h) => by(h) && h.what === 'Started reviewing' && Date.parse(h.at) > back), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
         ['gave it a verdict', Number.isFinite(verdictAt), ha.map((h) => `${h.by}: ${h.what}`).join(' | ')],
         ["didn't move on to the next card before that verdict", !waits.some((x) => before(x) && has(x, c.cards.b) && !has(x, c.cards.a)) && !ran(o, 'hive_update_task').some((x) => before(x) && cardIs(o, argsOf(x).number, c.cards.b)) && !ran(o, 'hive_start_review').concat(movesOf(o, c.cards.b).filter((x) => x.ok)).some((x) => before(x) && isCard(argsOf(x).card, c.cards.b)), o.hiveCalls.map((x) => `${x.tool}@${x.at}`).join(',')]
@@ -3801,9 +3865,10 @@ module.exports.SCENARIOS = [
     id: 'card-loop-loop-wake',
     title: "A reviewer in a card loop woken by Hive's own loop wake, with no watch of its own (#405): reviews the card, then waits for the next",
     role: 'agent',
-    files: { 'sync.js': SYNC_JS },
+    // The retries (awaited, 1 s apart) submitted as a commit after sync.js without them (HI-2223: a diff to review).
+    files: { 'sync.js': SYNC_BEFORE },
     async setup(c) {
-      await c.card('a', { title: 'Retry the sync', description: 'sync.js: try the sync up to three times, 1 s apart, before giving up.', agent: 'implementer', column: 'review', comments: ['Done: retries added, 1 s apart. Ready for review.'] })
+      await reviewedWork(c, 'a', { title: 'Retry the sync', description: 'sync.js: try the sync up to three times, 1 s apart, before giving up.', files: { 'sync.js': SYNC_JS.replace('wait(1000)', 'await wait(1000)') }, after: ['Done: retries added, 1 s apart. Ready for review.'] }, 'implementer')
       await c.card('b', { title: 'Show sync progress', description: 'Show a progress bar while syncing.', agent: 'implementer' })
     },
     prompt: (c) =>
