@@ -2,7 +2,7 @@
 // files into it (once, checked, the folder kept as a backup and a stub left for older versions), cards an older Hive saved
 // meanwhile, Export Board to JSON (an export read back is the same board), and the window's board with archived cards in short.
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
-import { spawn, spawnSync, type ChildProcess } from 'child_process'
+import { spawn, type ChildProcess } from 'child_process'
 import { join, resolve, sep } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -179,9 +179,22 @@ describe('the database layer (db.ts)', () => {
 // --- HI-2199: a Hive that ended without quitting leaves the board's -shm, which another process can still have mapped.
 
 /** Leaves `file` as a process that ended without closing it leaves it: written to, its -wal and -shm there. */
-function leftByAKill(file: string): void {
-  const script = "const { DatabaseSync } = require('node:sqlite'); const d = new DatabaseSync(process.argv[1]); d.exec('PRAGMA journal_mode = WAL'); d.exec('PRAGMA wal_autocheckpoint = 0'); d.exec('CREATE TABLE IF NOT EXISTS left (x)'); d.exec('INSERT INTO left VALUES (1)'); process.kill(process.pid, 'SIGKILL')"
-  spawnSync(process.execPath, ['-e', script, file], { stdio: 'ignore', windowsHide: true, env: { SystemRoot: process.env.SystemRoot } })
+async function leftByAKill(file: string): Promise<void> {
+  const script = "const { DatabaseSync } = require('node:sqlite'); const d = new DatabaseSync(process.argv[1]); d.exec('PRAGMA journal_mode = WAL'); d.exec('PRAGMA wal_autocheckpoint = 0'); d.exec('CREATE TABLE IF NOT EXISTS left (x)'); d.exec('INSERT INTO left VALUES (1)'); console.log('written'); setInterval(() => {}, 1000)"
+  const child = spawn(process.execPath, ['-e', script, file], { stdio: ['ignore', 'pipe', 'inherit'], windowsHide: true, env: { SystemRoot: process.env.SystemRoot } })
+  const exited = new Promise<void>((r) => child.once('exit', () => r()))
+  let out = ''
+  child.stdout!.on('data', (d) => (out += String(d)))
+  try {
+    await vi.waitFor(() => {
+      if (child.exitCode !== null) throw new Error(`the writer exited (${child.exitCode}) before it wrote`)
+      expect(out).toContain('written')
+    }, { timeout: HUNG_MS, interval: 20 })
+  } finally {
+    // Ended from outside, its handle held (TerminateProcess): the file isn't closed.
+    child.kill()
+    await exited
+  }
   expect(existsSync(`${file}-shm`)).toBe(true)
 }
 
@@ -193,7 +206,7 @@ async function killedWorkspace(): Promise<{ ws: string; file: string }> {
   await disposeWorkspaceService(first)
   store.closeBoard(ws)
   const file = join(ws, '.hive', 'hive.db')
-  leftByAKill(file)
+  await leftByAKill(file)
   return { ws, file }
 }
 
@@ -318,7 +331,7 @@ describe.runIf(process.platform === 'win32')('a board whose -shm another process
   it('waits only for an I/O error, and as long as its bound', async () => {
     const file = join(base, `layer-${++n}`, 'x.db')
     mkdirSync(join(file, '..'), { recursive: true })
-    leftByAKill(file)
+    await leftByAKill(file)
     await whileMapped(`${file}-shm`, async () => {
       const told: number[] = []
       const waited = await untilOpenable(file, { onWait: (e) => told.push((e as { errcode?: number }).errcode ?? 0), boundMs: 300 })
