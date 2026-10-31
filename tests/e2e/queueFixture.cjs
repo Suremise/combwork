@@ -160,7 +160,13 @@ async function releaseHeld(fx, h) {
   for (const s of await h.inv('slots:list', fx.alpha)) {
     if (!s.writer?.held) continue
     const w = await h.inv('slots:heldWriter', fx.alpha, s.name)
-    if (w) await h.inv('slots:releaseWriter', fx.alpha, s.name, w.run, false)
+    // Refused as changed meanwhile: Hive may have freed it itself since it was read (HI-2055: a gone Hive's writer whose
+    // run left nothing running), which is what the release was for (HI-2177): only once a read shows that run no longer
+    // holds it. Still held by that run: the release's own failure; the read failing: its error (HR2's round 1).
+    if (w) await h.inv('slots:releaseWriter', fx.alpha, s.name, w.run, false).catch(async (e) => {
+      const now = await h.inv('slots:heldWriter', fx.alpha, s.name)
+      if (now?.run === w.run) throw e
+    })
     out.push(s.name)
   }
   return out
@@ -371,4 +377,4 @@ function otherProfile(fx, suffix) {
   return { ...fx, userData }
 }
 
-module.exports = { HUNG_MS, devSeam, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, intent, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }
+module.exports = { HUNG_MS, devSeam, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, releaseHeld, intent, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }
