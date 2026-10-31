@@ -681,6 +681,64 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
   })
 })
 
+describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescribe passes, the wrong move still fails', () => {
+  const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  const board = [
+    { number: 1, key: 'AL-1' },
+    { number: 2, key: 'AL-2' }
+  ]
+  const run = (id: string, obs: Record<string, unknown>, c: Record<string, unknown>) => {
+    const sc = SCENARIOS.find((s) => s.id === id)!
+    return Object.fromEntries(sc.expect({ hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', allCards: board, cards: {}, facts: {}, ...obs }, c).map(([name, ok]) => [name, ok]))
+  }
+
+  it("card-loop-two-cards: the passed card finished by a merge report Hive took passes; its builder's own move or verdict doesn't", () => {
+    const FIN = "finished neither card by a move of its own (the passed one only by a merge report Hive took, its project's finish)"
+    const two = (hiveCalls: unknown[], pColumn: string) => run('card-loop-two-cards', { hiveCalls, cards: { p: { number: 1, key: 'AL-1', column: pColumn, history: [] }, f: { number: 2, key: 'AL-2', column: 'review', history: [] } } }, { cards: { p: 1, f: 2 }, read: () => '' })[FIN]
+    expect(two([call('hive_report_merge', { card: 'AL-1' }), call('hive_submit', { card: 'AL-2', summary: 'Fixed.' })], 'done')).toBe(true)
+    expect(two([call('hive_submit', { card: 'AL-2', summary: 'Fixed.' })], 'passed')).toBe(true)
+    expect(two([call('hive_update_task', { number: 'AL-1', column: 'done' })], 'done')).toBe(false)
+    expect(two([call('hive_report_merge', { card: 'AL-1' }, false)], 'done')).toBe(false)
+    expect(two([call('hive_report_merge', { card: 'AL-2' })], 'passed')).toBe(false)
+  })
+
+  it('coordinator-fact-before-asking: the card in a detailed listing or the doc read by a tool counts; a write of the doc or a plain listing does not', () => {
+    const LOOKED = 'looked the card or its doc up (the card in full: hive_read_task or a detailed listing; or the doc, through Hive or read)'
+    const fact = (hiveCalls: unknown[], tools: unknown[] = []) => run('coordinator-fact-before-asking', { hiveCalls, tools }, { cards: { p: 1 } })[LOOKED]
+    expect(fact([call('hive_list_tasks', { project: 'alpha', details: true })])).toBe(true)
+    expect(fact([], [{ name: 'Script', input: 'Get-Content alpha/docs/DEPLOY.md', result: '# Deploying alpha', isError: false }])).toBe(true)
+    expect(fact([], [{ name: 'Read', input: JSON.stringify({ file_path: 'C:/w/alpha/docs/DEPLOY.md' }), result: '# Deploying alpha', isError: false }])).toBe(true)
+    expect(fact([call('hive_list_tasks', { project: 'alpha' })])).toBe(false)
+    expect(fact([call('hive_list_tasks', { project: 'alpha', details: true }, false)])).toBe(false)
+    expect(fact([], [{ name: 'Write', input: JSON.stringify({ file_path: 'docs/DEPLOY.md', content: 'x' }), result: 'ok', isError: false }])).toBe(false)
+    expect(fact([], [{ name: 'Read', input: JSON.stringify({ file_path: 'docs/DEPLOY.md' }), result: 'File does not exist.', isError: true }])).toBe(false)
+  })
+
+  it('card-loop-recurring: a design posted for its reviewer first passes; asking the user does not', () => {
+    const HANDED = 'handed it on again for round three (back to Review, or its submission), or posted a design for its reviewer first'
+    const FIXED = 'fixed it: the delay is awaited (or a design first, before the fix)'
+    const ASK = "didn't ask the user (no hive_notify or hive_ask_user)"
+    const recurring = (hiveCalls: unknown[], column = 'doing', code = 'wait(1000)') =>
+      run('card-loop-recurring', { hiveCalls, cards: { r: { number: 1, key: 'AL-1', column, agent: { id: 'a-coder' }, history: [] } }, facts: { r: [] }, turnWatch: { cards: [1] } }, { cards: { r: 1 }, agents: { coder: { id: 'a-coder' } }, read: () => code })
+    const design = recurring([call('hive_loop_step', { card: 'AL-1', step: 'design', text: 'Await the delay; a test with fake timers.' })])
+    expect(design[HANDED]).toBe(true)
+    expect(design[FIXED]).toBe(true)
+    expect(design[ASK]).toBe(true)
+    // A design refused (no reviewer, as before), or the card not in Doing, is neither.
+    expect(recurring([call('hive_loop_step', { card: 'AL-1', step: 'design', text: 'x' }, false)])[HANDED]).toBe(false)
+    expect(recurring([call('hive_ask_user', { card: 'AL-1', kind: 'decide', text: 'Who reviews this?' })])[ASK]).toBe(false)
+    expect(recurring([])[HANDED]).toBe(false)
+    expect(recurring([])[FIXED]).toBe(false)
+  })
+
+  it('watcher-stopped: a commit is a file changed, even with nothing left uncommitted', () => {
+    const NONE = 'changed no files (nothing uncommitted, and no commit)'
+    const watched = (head: string) => run('watcher-stopped', { cards: { w: { number: 1, key: 'AL-1', column: 'review', history: [] } }, facts: { w: [] }, leftovers: [] }, { cards: { w: 1 }, agents: { coder: { id: 'a-coder' } }, head: 'h1', git: () => `${head}\n` })[NONE]
+    expect(watched('h1')).toBe(true)
+    expect(watched('h2')).toBe(false)
+  })
+})
+
 describe('the submit scenarios count a question about committing, never a notice (HI-1618, HR5 round 1)', () => {
   type Obs = { hiveCalls?: unknown[]; tools?: { name: string; input: string }[]; finalReply?: string; status?: string; column?: string; submitted?: boolean }
   const call = (name: string, args: unknown, ok = true, error?: string) => ({ tool: name, args: JSON.stringify(args), ok, ...(error ? { error } : {}) })
