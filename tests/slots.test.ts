@@ -452,6 +452,28 @@ describe('lending and releasing (#1429)', { timeout: 60_000 }, () => {
     expect(again.slot.target).toBe('1.0.0')
   })
 
+  it("a carried slot made from main, handed off to a card for another line: it records that target and, released, waits detached at its head (HI-2185)", async () => {
+    const w = world({ builders: 3 })
+    const folder = join(w.root, 'hb3')
+    sh(w.project, 'worktree', 'add', '-q', '-b', 'hive/hb3', folder, 'main')
+    const carried = (await w.pool.carry('a3', { name: 'hb3', folder, target: 'main' }))!
+    sh(w.project, 'branch', '1.0.0', 'main')
+    sh(w.project, 'switch', '-q', '1.0.0')
+    commit(w.project, { 'line.txt': 'on 1.0.0\n' }, 'on 1.0.0')
+    sh(w.project, 'switch', '-q', 'main')
+    // Handed off later than it was carried, so the card's lease is the slot's newest.
+    w.clock.now += 1000
+    const lease = await w.pool.handOff(carried.id, { card: 7, agent: 'a3', target: '1.0.0' })
+    expect(lease).toMatchObject({ kind: 'card', card: 7, slot: 'hb3' })
+    expect(w.store.slot('hb3')?.target).toBe('1.0.0')
+    sh(folder, 'switch', '-q', '-c', 'hive/AM-7-work', '1.0.0')
+    commit(folder, { 'work.txt': 'work\n' }, 'work')
+    await w.pool.release(lease!.id, 'done')
+    expect(w.store.slot('hb3')?.state).toBe('ready')
+    expect(sh(folder, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('HEAD')
+    expect(sh(folder, 'rev-parse', 'HEAD').trim()).toBe(sh(w.project, 'rev-parse', '1.0.0').trim())
+  })
+
   it("a detach git refuses (an index lock): not ready, still on its line; the next look detaches it (HI-2014)", async () => {
     const w = world({ builders: 1 })
     const r = await lent(w, { agent: 'a1', card: 1 })

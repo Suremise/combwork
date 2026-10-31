@@ -217,13 +217,15 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
   // The builder's own slot (#1441: its carried lease, kept for nothing now) taken over when it can be; else the card gets
   // another slot, and the carried one stays protected.
   const own = await carriedToHand(ws, projectPath, pool, builder, o.target)
+  // A slot taken over records the start's target too, as a lend does (HI-2185).
+  const taker = { ...(lane ? { lane, agent: builder } : { card: card.id, agent: builder }), ...(o.target ? { target: o.target } : {}) }
   if (own) {
     if (o.dry) return { slot: own.slot.name, folder: own.slot.folder, lease: '', fresh: false }
-    const handed = await handOffCarried(ws, projectPath, pool, own, lane ? { lane, agent: builder } : { card: card.id, agent: builder }, name(builder))
+    const handed = await handOffCarried(ws, projectPath, pool, own, taker, name(builder))
     if (handed) return leaseAt(pool, handed)
   }
   // The slot its own run still writes in, its lease ended (HI-1762): taken over too, or waited for, never a second slot.
-  const written = await startOnWritten(ws, projectPath, pool, builder, lane ? { lane, agent: builder } : { card: card.id, agent: builder }, name(builder), o.dry)
+  const written = await startOnWritten(ws, projectPath, pool, builder, taker, name(builder), o.dry)
   if ('wait' in written) return { wait: written.wait }
   if ('dry' in written) return { slot: written.dry.name, folder: written.dry.folder, lease: '', fresh: false }
   if ('lease' in written) return leaseAt(pool, written.lease)
@@ -411,7 +413,7 @@ function sameCheckout(folder: string, was: Checkout): boolean {
  * conversation goes on there. Null when it couldn't be (the slot or lease changed meanwhile): the caller lends another.
  * In the write, the slot is still the one decided on (its folder and making) with the same checkout (HI-1741).
  */
-async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, own: { carried: SlotLease; slot: Slot; checkout: Checkout | null }, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
+async function handOffCarried(ws: WorkspaceService, projectPath: string, pool: SlotPool, own: { carried: SlotLease; slot: Slot; checkout: Checkout | null }, req: { card?: number; lane?: string; agent: string; target?: string }, agentName: string): Promise<SlotLease | null> {
   const host = (await ws.sessionScope(projectPath)).scope
   const id = (await ws.projectConfig(projectPath)).id ?? basename(projectPath)
   const still = (s: Slot): boolean => samePlace(s.folder, own.slot.folder) && s.createdAt === own.slot.createdAt && (!own.checkout || sameCheckout(s.folder, own.checkout))
@@ -451,7 +453,7 @@ function writtenSlotOf(projectPath: string, pool: SlotPool, builder: string): Sl
  * it changed while it was taken; looked at again once): the start waits for it, never lent a second slot meanwhile. A
  * dry start and a real one ask the takeover's own conditions (SlotPool.writtenNotTakeable, HI-1787), so they agree.
  */
-async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string, dry = false): Promise<{ none: true } | { lease: SlotLease } | { dry: Slot } | { wait: string }> {
+async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string; target?: string }, agentName: string, dry = false): Promise<{ none: true } | { lease: SlotLease } | { dry: Slot } | { wait: string }> {
   const waitFor = (s: Slot, because: string): { wait: string } => ({ wait: `${agentName}'s own slot ${s.name}, its run still there, ${because}: this start waits for it rather than take a second slot` }) // i18n-ignore: agent-facing, a start's wait
   for (let tries = 0; tries < 2; tries++) {
     const slot = writtenSlotOf(projectPath, pool, builder)
@@ -467,7 +469,7 @@ async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: S
   return still ? waitFor(still, 'changed while it was taken over') : { none: true } // i18n-ignore: agent-facing, a start's wait
 }
 
-async function takeWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
+async function takeWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string; target?: string }, agentName: string): Promise<SlotLease | null> {
   const slot = writtenSlotOf(projectPath, pool, builder)
   const run = slot?.writer?.run
   if (!slot || !run) return null
@@ -1502,10 +1504,11 @@ export async function lendLane(ws: WorkspaceService, projectPath: string, lane: 
   const name = (id: string): string => agents.find((a) => a.id === id)?.name ?? id
   // The builder's own slot, taken over by the lane when it can be (#1441), as a card's start does.
   const own = await carriedToHand(ws, projectPath, pool, builder, target)
-  const handed = own ? await handOffCarried(ws, projectPath, pool, own, { lane, agent: builder }, name(builder)) : null
+  const taker = { lane, agent: builder, ...(target ? { target } : {}) }
+  const handed = own ? await handOffCarried(ws, projectPath, pool, own, taker, name(builder)) : null
   if (handed) return { slot: handed.slot }
   // The slot its own run still writes in, its last lease ended (HI-1762), as a card's start does: taken, or waited for.
-  const written = await startOnWritten(ws, projectPath, pool, builder, { lane, agent: builder }, name(builder))
+  const written = await startOnWritten(ws, projectPath, pool, builder, taker, name(builder))
   if ('wait' in written) return { waiting: written.wait }
   if ('lease' in written) return { slot: written.lease.slot }
   // Lent with the lane's target (#1627), so the slot records where its lines merge.

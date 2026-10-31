@@ -515,13 +515,13 @@ export class SlotStore {
   /**
    * A carried lease handed off to a card or lane of its agent's on the same slot (#1441, SPEC §16.10.8), in one write:
    * the carried lease ended (`handedOff`), a dispatch lease begun on the slot, the slot's writer (the agent's running
-   * session there) moved to it, and `also` (the caller's rebinding of the carried lease's sessions, #1434's
+   * session there) moved to it, the request's target recorded on the slot (HI-2185, as a lend's), and `also` (the caller's rebinding of the carried lease's sessions, #1434's
    * `rebindSession`) in the same write, so all of it lands or none. Null when it can't be now: the carried lease not open
    * or another agent's, the slot under an operation or a job, or another agent writing there; an index refusing it (the
    * agent leased meanwhile) too. `check` (the caller's, HI-1741: the slot's checkout as it decided on it) runs in the
    * write once the rest holds, given the slot as it is then: false refuses it, nothing written.
    */
-  async handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void, check?: (slot: Slot) => boolean): Promise<SlotLease | null> {
+  async handOff(carried: string, req: { card?: number; lane?: string; agent: string; target?: string }, also?: (db: DatabaseSync, lease: SlotLease) => void, check?: (slot: Slot) => boolean): Promise<SlotLease | null> {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane')
     try {
       return await this.conn.write((db) => {
@@ -535,6 +535,7 @@ export class SlotStore {
         const lease = this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, s.name, req.card !== undefined ? 'card' : 'lane', req, at)
         if (s.writer) db.prepare('UPDATE slots SET writer_lease = ? WHERE project = ? AND name = ? AND writer_run = ?').run(lease.id, this.project, s.name, s.writer.run)
         db.prepare('UPDATE slots SET used_at = ? WHERE project = ? AND name = ?').run(at, this.project, s.name)
+        this.targetIn(db, s.name, req.target)
         also?.(db, lease)
         return lease
       })
@@ -548,11 +549,11 @@ export class SlotStore {
    * The slot an agent's own run still writes in, its lease ended (HI-1762: HB5's lane ended, its session still in its
    * turn in slot-a, and its next lane's start found no slot free), taken over by its next card or lane in one write: only
    * while the slot has no open lease, operation or job, is lent with no warm error, its writer is that agent's run `run`
-   * held by this Hive (`holder`), and the agent holds no other dispatch lease. The lease begins on the slot, the writer
-   * moves to it (the old lease's end then no longer owns the run: it stops nothing), and `also` (the caller's rebinding of
+   * held by this Hive (`holder`), and the agent holds no other dispatch lease. The lease begins on the slot (the request's
+   * target recorded on it, HI-2185), the writer moves to it (the old lease's end then no longer owns the run: it stops nothing), and `also` (the caller's rebinding of
    * the run's conversations) runs in the same write. Null when it can't be now; nothing written.
    */
-  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string }, run: string, holder: { pid: number; started: number }, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
+  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; target?: string }, run: string, holder: { pid: number; started: number }, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane')
     try {
       return await this.conn.write((db) => {
@@ -562,6 +563,7 @@ export class SlotStore {
         const at = this.iso()
         const lease = this.insertLease(db, `l-${randomBytes(6).toString('hex')}`, s.name, req.card !== undefined ? 'card' : 'lane', req, at)
         db.prepare('UPDATE slots SET writer_lease = ?, used_at = ? WHERE project = ? AND name = ? AND writer_run = ?').run(lease.id, at, this.project, s.name, run)
+        this.targetIn(db, s.name, req.target)
         also?.(db, lease, w.lease)
         return lease
       })
@@ -569,6 +571,11 @@ export class SlotStore {
       if (constraintOf(e)) return null
       throw e
     }
+  }
+
+  /** The target a start taking a slot over named (HI-2185), recorded on it as a lend's is (SlotPool.warm); none: kept. */
+  private targetIn(db: DatabaseSync, slot: string, target: string | undefined): void {
+    if (target) db.prepare('UPDATE slots SET target = ? WHERE project = ? AND name = ?').run(target, this.project, slot)
   }
 
   /**
@@ -1265,12 +1272,12 @@ export class SlotPool {
   }
 
   /** A carried lease handed off to a card or lane of its agent's (#1441), `also` in the same write (SlotStore.handOff). */
-  handOff(carried: string, req: { card?: number; lane?: string; agent: string }, also?: (db: DatabaseSync, lease: SlotLease) => void, check?: (slot: Slot) => boolean): Promise<SlotLease | null> {
+  handOff(carried: string, req: { card?: number; lane?: string; agent: string; target?: string }, also?: (db: DatabaseSync, lease: SlotLease) => void, check?: (slot: Slot) => boolean): Promise<SlotLease | null> {
     return this.store.handOff(carried, req, also, check)
   }
 
   /** The slot an agent's own run still writes in, taken over by its next card or lane (HI-1762, SlotStore.takeWrittenSlot), held by this Hive. */
-  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string }, run: string, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
+  async takeWrittenSlot(slot: string, req: { card?: number; lane?: string; agent: string; target?: string }, run: string, also?: (db: DatabaseSync, lease: SlotLease, was: string) => void): Promise<SlotLease | null> {
     return this.store.takeWrittenSlot(slot, req, run, await this.deps.holder.self(), also)
   }
 

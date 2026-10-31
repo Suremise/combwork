@@ -153,6 +153,20 @@ describe("B1's next start takes over the slot its own run still writes in (HI-17
     expect(t.stops).toEqual([])
   })
 
+  it("taken over by a card for another line than the slot was made from: the slot records that card's target (HI-2185)", async () => {
+    const t = await setup('target')
+    const x = await t.start(await t.card('X', 'b1'), 'b1')
+    if (!x || !('lease' in x)) throw new Error(JSON.stringify(x))
+    expect(t.pool.slots().find((s) => s.name === x.slot)?.target).toBe('main')
+    await t.setWriter(x.slot, x.lease)
+    expect(await t.pool.release(x.lease, 'done')).toBe(true)
+    const next = await t.card('Y', 'b1')
+    const y = await t.run(() => leaseForStart(t.ws, t.project, { id: next }, 'b1', { dry: false, target: '1.0.0' }))
+    expect(y && 'lease' in y ? y.slot : y).toBe(x.slot)
+    expect(t.pool.slots().find((s) => s.name === x.slot)?.target).toBe('1.0.0')
+    t.idle()
+  })
+
   it("its own slot busy just then (a job on it), another slot free: the start waits (a dry start too), never a second slot; once settled, it takes its own", async () => {
     const t = await setup('busy', ['b1', 'b2', 'b3'])
     const b1 = await t.laneEndedWithB1There()
