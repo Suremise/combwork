@@ -73,7 +73,19 @@ export interface OpenOptions {
    * them (null: none), so a slow upgrade says which step took it.
    */
   onSteps?: (steps: { version: number; name: string; ms: number }[], copyMs: number | null) => void
+  /** Told of each open tried again after an I/O error (OPEN_IO_RETRY_MS, HI-2179): the error, and the wait before the next. */
+  onIoRetry?: (error: Error, waitMs: number) => void
 }
+
+/**
+ * The waits before an open that failed with an I/O error is tried again (HI-2179): just after a Hive ended without
+ * quitting, the next start's opens of the workspace's files failed so once, and the workspace didn't reopen. SQLite
+ * tries a Windows sharing violation again itself (about 1.4 s), not this. Bounded: a disk that keeps failing still fails.
+ */
+export const OPEN_IO_RETRY_MS = [50, 100, 200, 400, 800]
+
+/** SQLite's I/O errors (SQLITE_IOERR, 10, and its extended codes): `errcode` on node:sqlite's errors. */
+export const isIoError = (e: unknown): boolean => ((e as { errcode?: unknown } | null)?.errcode as number) % 256 === 10
 
 /** An open database: a writer and a reader connection to one file. */
 export interface Db {
@@ -361,7 +373,19 @@ export function soleCopy(file: string, dir: string, family: string, version: num
  */
 export function openDb(file: string, opts: OpenOptions): Db {
   // Marked (HI-1692): an open runs its migrations, and waits for another connection's lock.
-  return timedStep(`db open ${basename(file)}`, () => openDbNow(file, opts))
+  return timedStep(`db open ${basename(file)}`, () => {
+    for (const wait of OPEN_IO_RETRY_MS) {
+      try {
+        return openDbNow(file, opts)
+      } catch (e) {
+        if (!isIoError(e)) throw e
+        opts.onIoRetry?.(e as Error, wait)
+        // Synchronous, as the open is: only on this error, and at most OPEN_IO_RETRY_MS in all.
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait)
+      }
+    }
+    return openDbNow(file, opts)
+  })
 }
 
 function openDbNow(file: string, opts: OpenOptions): Db {
