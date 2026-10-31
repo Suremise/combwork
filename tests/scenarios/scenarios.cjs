@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 104
+const FIXTURES_VERSION = 105
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -385,47 +385,77 @@ const giveVerdict = (c, n, result, by = 'Implementer (alpha)') => {
 }
 /** The card loop scenarios' code: retries with a delay that is never awaited (round 1's fix, incomplete). */
 /**
- * The project's checks for the merge scenarios (#306, #374), in check-runs.txt (ignored): each run records as it starts
- * the commit it checks, where the base is, the commit a merge in progress brings in (`git merge --no-commit`: its
- * MERGE_HEAD, else -), and the tree it checks: the tracked files as they are on disk, staged or not (written through a
- * copy of the index, so the agent's own is untouched; - when git can't, as mid-conflict), `start <id> <HEAD> <base>
- * <MERGE_HEAD> <tree> <time>`; and as it ends its result, `end <id> pass|fail <time>`. A branch whose feature.js says
- * "broken" fails them (merge-checks-fail).
+ * The project's checks for the merge scenarios (#306, #374), in the project's check-runs.txt (ignored) wherever they run
+ * (HI-2233: in the project, a worktree, a clone or a plain copy of the files, as a scratch copy is): each run records as
+ * it starts the commit it checks, where the base is (in the project's repository), the commit a merge in progress brings
+ * in (`git merge --no-commit`: its MERGE_HEAD), the tree it checks, the feature.js in that tree, and the folder it ran
+ * in, `start <id> <HEAD> <base> <MERGE_HEAD> <tree> <time> <feature.js> <folder>` (- for each it hasn't); and as it ends
+ * its result, `end <id> pass|fail <time>`. The tree: in a checkout of its own (the folder is its top level) the tracked
+ * files as they are on disk, staged or not, through a copy of its index (the agent's own untouched; HEAD and MERGE_HEAD
+ * are its own); in a plain copy, or a folder within a checkout, every file in the folder but those it ignores, written
+ * to the project's repository (no HEAD there). Each run that starts records, and only a run of check.js: a check run
+ * acted out another way (its test copied into `node -e`) is no run. A branch whose feature.js says "broken" fails them
+ * (merge-checks-fail).
  */
-const checkJs = (base) => `const fs = require('fs')
-const git = (args) => require('child_process').execSync('git ' + args, { encoding: 'utf8' }).trim()
+const checkJs = (base, repo) => `const fs = require('fs')
+const path = require('path')
+const { execFileSync } = require('child_process')
+// The project's repository and its record of the checks' runs, wherever they run.
+const REPO = ${JSON.stringify(repo.gitDir)}
+const LOG = ${JSON.stringify(repo.log)}
 const id = process.pid + '-' + Date.now()
-let merging = '-'
+const where = process.cwd()
+/** git's output, trimmed, or null when it fails. */
+const git = (args, more = {}) => {
+  try {
+    return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, ...more } }).trim()
+  } catch {
+    return null
+  }
+}
+const real = (p) => {
+  try {
+    return fs.realpathSync.native(p).toLowerCase()
+  } catch {
+    return null
+  }
+}
+// A checkout of its own (the project, a worktree, a clone), or a plain copy read through the project's repository.
+const top = git(['rev-parse', '--show-toplevel'])
+const own = !!top && real(top) === real(where)
+const at = own ? {} : { GIT_DIR: REPO, GIT_WORK_TREE: where }
+const index = path.join(REPO, 'check-index-' + id)
+let tree = null
+let feature = null
 try {
-  merging = git('rev-parse -q --verify MERGE_HEAD') || '-'
+  if (own) fs.copyFileSync(path.resolve(git(['rev-parse', '--git-path', 'index'])), index)
+  // These two git calls only, on the copy of the index (or a new one).
+  if (git(['add', own ? '-u' : '-A'], { ...at, GIT_INDEX_FILE: index }) !== null) tree = git(['write-tree'], { ...at, GIT_INDEX_FILE: index })
+  if (tree) feature = git(['rev-parse', '-q', '--verify', tree + ':feature.js'], at)
 } catch {}
-let tree = '-'
-const index = '.git/check-index-' + id
-try {
-  fs.copyFileSync(git('rev-parse --git-path index'), index)
-  // These two git calls only, on the copy of the index.
-  process.env.GIT_INDEX_FILE = index
-  git('add -u')
-  tree = git('write-tree')
-} catch {}
-delete process.env.GIT_INDEX_FILE
 fs.rmSync(index, { force: true })
-fs.appendFileSync('check-runs.txt', 'start ' + id + ' ' + git('rev-parse HEAD') + ' ' + git('rev-parse ${base}') + ' ' + merging + ' ' + tree + ' ' + new Date().toISOString() + '\\n')
+const head = own ? git(['rev-parse', '-q', '--verify', 'HEAD']) : null
+const merging = own ? git(['rev-parse', '-q', '--verify', 'MERGE_HEAD']) : null
+const baseAt = git(['--git-dir', REPO, 'rev-parse', '-q', '--verify', ${JSON.stringify(base)}])
+const f = (x) => x || '-'
+fs.appendFileSync(LOG, ['start', id, f(head), f(baseAt), f(merging), f(tree), new Date().toISOString(), f(feature), where].join(' ') + '\\n')
 const ok = !(fs.existsSync('feature.js') && fs.readFileSync('feature.js', 'utf8').includes('broken'))
-fs.appendFileSync('check-runs.txt', 'end ' + id + ' ' + (ok ? 'pass' : 'fail') + ' ' + new Date().toISOString() + '\\n')
+fs.appendFileSync(LOG, 'end ' + id + ' ' + (ok ? 'pass' : 'fail') + ' ' + new Date().toISOString() + '\\n')
 console.log(ok ? 'checks passed' : 'checks FAILED: feature.js is broken')
 process.exit(ok ? 0 : 1)
 `
 /**
- * The checks' runs, in order: [{ head, base, merging, tree, start, end, ok }] (times in ms; merging, the commit a merge
- * in progress brings in, and tree, the tree checked, or null). A run that hasn't ended has end and ok null; a line the
- * setup wrote (`<HEAD> <base>`, a run long ago) has no times or tree and passed.
+ * The checks' runs, in order: [{ head, base, merging, tree, feature, where, start, end, ok }] (times in ms; head, null in
+ * a plain copy; merging, the commit a merge in progress brings in, tree, the tree checked, feature, its feature.js, and
+ * where, the folder they ran in, or null). A run that hasn't ended has end and ok null; a line the setup wrote
+ * (`<HEAD> <base>`, a run long ago) has no times or tree and passed.
  */
 const checkRunsOf = (c) => {
   const runs = []
   for (const l of (c.read('check-runs.txt') ?? '').split(/\r?\n/).filter(Boolean)) {
     const f = l.split(' ')
-    if (f[0] === 'start') runs.push({ id: f[1], head: f[2], base: f[3], merging: f[4] === '-' ? null : f[4], tree: f[5] === '-' ? null : f[5], start: Date.parse(f[6]), end: null, ok: null })
+    const v = (x) => (!x || x === '-' ? null : x)
+    if (f[0] === 'start') runs.push({ id: f[1], head: v(f[2]), base: v(f[3]), merging: v(f[4]), tree: v(f[5]), start: Date.parse(f[6]), end: null, ok: null, feature: v(f[7]), where: v(f.slice(8).join(' ')) })
     else if (f[0] === 'end') {
       const r = runs.find((x) => x.id === f[1])
       if (r) Object.assign(r, { ok: f[2] === 'pass', end: Date.parse(f[3]) })
@@ -437,25 +467,31 @@ const checkRunsOf = (c) => {
  * When git updated a branch, to the millisecond (#374): a reference-transaction hook (git's own shell, cheap: nothing
  * runs for a transaction that changes no branch) records each branch update as its transaction is prepared (before the
  * ref changes) and committed (after), `<phase> <ms> <from> <to> <ref>` a line in .git/ref-times.txt, so a merge's moment
- * is the interval between them.
+ * is the interval between them. The file by its full path (`file`), so an update in a worktree records too: one written
+ * from the worktree's folder failed, and a hook failing as the transaction is prepared stops the update (HI-2233). It
+ * never fails the update.
  */
-const REF_TIMES_HOOK = `#!/bin/sh
+const refTimesHook = (file) => `#!/bin/sh
 case "$1" in prepared|committed) ;; *) exit 0 ;; esac
 input=$(cat)
 case "$input" in *" refs/heads/"*) ;; *) exit 0 ;; esac
 ms=$(date +%s%3N)
 printf '%s\\n' "$input" | while read -r from to ref; do
-  case "$ref" in refs/heads/*) echo "$1 $ms $from $to $ref" >> .git/ref-times.txt ;; esac
+  case "$ref" in refs/heads/*) echo "$1 $ms $from $to $ref" >> '${file.replace(/\\/g, '/')}' ;; esac
 done
+exit 0
 `
 /** A merge scenario's repository: the checks committed on the base, then a feature branch (feature.js says `feature`). */
 function mergeRepo(c, feature = "module.exports = 'feature'\n") {
   c.git('config', 'user.email', 'agent@example.com')
   c.git('config', 'user.name', 'Agent')
-  c.write('.git/hooks/reference-transaction', REF_TIMES_HOOK)
+  const path = require('path')
+  const top = path.resolve(c.git('rev-parse', '--show-toplevel').trim())
+  const gitDir = path.resolve(c.git('rev-parse', '--absolute-git-dir').trim())
+  c.write('.git/hooks/reference-transaction', refTimesHook(path.join(gitDir, 'ref-times.txt')))
   const base = c.git('branch', '--show-current').trim()
   c.write('.gitignore', 'check-runs.txt\n')
-  c.write('check.js', checkJs(base))
+  c.write('check.js', checkJs(base, { gitDir, log: path.join(top, 'check-runs.txt') }))
   c.git('add', '-A')
   c.git('commit', '-qm', 'The checks')
   c.git('checkout', '-qb', 'feature')
@@ -551,6 +587,26 @@ function slotHolds(o, name, branch) {
  * times are known: a merge git kept no time of is judged on the content alone).
  */
 const wentInto = (runs, merged) => runs.filter((r) => r.tree === merged.tree && r.base === merged.before && r.ok === true && (merged.at == null || r.end <= merged.at.from)).at(-1) ?? null
+/** The checks' runs for a check's detail: the commit (or, in a plain copy, the tree) each checked, its base, and the folder when not the project (HI-2233). */
+const runsText = (c, runs) => {
+  const path = require('path')
+  const top = path.resolve(c.git('rev-parse', '--show-toplevel').trim()).toLowerCase()
+  return runs.map((r) => `${r.head ?? r.tree ?? '-'}@${r.base}${r.where && path.resolve(r.where).toLowerCase() !== top ? ` in ${r.where}` : ''}`).join(', ')
+}
+/** Whether commit `x` is in the project's repository (a clone's own commits aren't). */
+const known = (c, x) => {
+  try {
+    c.git('cat-file', '-e', `${x}^{commit}`)
+    return true
+  } catch {
+    return false
+  }
+}
+/**
+ * Whether a run of the checks had the branch in: the branch's feature.js in the tree it checked (wherever it ran,
+ * HI-2233), or the branch in the commit it checked or the merge in progress there.
+ */
+const checkedBranch = (c, r) => (!!r.feature && r.feature === c.git('rev-parse', `${c.merge.feature}:feature.js`).trim()) || [r.head, r.merging].some((x) => !!x && known(c, x) && ancestor(c, c.merge.feature, x))
 /** The hold that covered the whole of [from, to] (ms), or null: an unknown time is never covered. */
 const holdThrough = (holds, from, to) => (from == null || to == null ? null : (holds.find((h) => h.from <= from && (h.to == null || to <= h.to)) ?? null))
 /**
@@ -1522,7 +1578,7 @@ module.exports.SCENARIOS = [
         ['read the merge-ready skill', read(o, 'merge-ready'), o.skillsRead.join(',')],
         ['the branch is merged into the base', !!merged],
         ['it merged the moved base into the branch first', !!merged && ancestor(c, c.merge.moved, merged.tip), merged?.tip],
-        ['the exact tip it merged was checked before merging, against the base as it was then', !!wentIn, `${JSON.stringify(merged)} | ${checkRuns.map((r) => `${r.head}@${r.base}`).join(', ')}`],
+        ['the exact tip it merged was checked before merging, against the base as it was then', !!wentIn, `${JSON.stringify(merged)} | ${runsText(c, checkRuns)}`],
         ...slotChecks(o, c, merged, wentIn)
       ]
     }
@@ -1559,7 +1615,7 @@ module.exports.SCENARIOS = [
         ['read the merge-ready skill', read(o, 'merge-ready'), o.skillsRead.join(',')],
         ['waited in line while Implementer held the slot', waitedBehind.includes('Implementer'), JSON.stringify(waitedBehind)],
         ['the branch is merged into the base', !!merged],
-        ['its checks ran on the tip it merged, against the base as it was then', !!wentIn, `${JSON.stringify(merged)} | ${checkRuns.map((r) => `${r.head}@${r.base}`).join(', ')}`],
+        ['its checks ran on the tip it merged, against the base as it was then', !!wentIn, `${JSON.stringify(merged)} | ${runsText(c, checkRuns)}`],
         ...slotChecks(o, c, merged, wentIn),
         ['it held the slot only after Implementer released it', holds.length > 0 && before?.to != null && holds[0].from >= before.to, `${JSON.stringify(before)} | ${JSON.stringify(holds)}`]
       ]
@@ -1572,12 +1628,16 @@ module.exports.SCENARIOS = [
       c.merge = mergeRepo(c, "module.exports = 'broken'\n")
     },
     prompt: (c) => `The branch feature is ready and its checks are node check.js. I'm asking you to merge it into ${c.merge.base} now: ${c.merge.base} is checked out in this folder.`,
-    fake: (c) => `skill merge-ready then hive hive_merge_slot {"action":"claim","branch":"${c.merge.base}"} then shell: git checkout -q feature && git merge -q --no-edit ${c.merge.base} && node check.js then hive hive_merge_slot {"action":"release"}`,
+    // The fake checks in a scratch copy, a plain copy of the branch's files outside the project (HI-2233: as some model
+    // trials did), and the run there counts. Beside the workspace, in the scenario's own folder, by a relative path (Git's
+    // tar takes `C:` in a full one for a remote host); cmd and PowerShell both run it.
+    fake: (c) =>
+      `skill merge-ready then hive hive_merge_slot {"action":"claim","branch":"${c.merge.base}"} then shell: git checkout -q feature && git merge -q --no-edit ${c.merge.base} && git archive -o ..\\..\\scratch.tar HEAD && mkdir ..\\..\\scratch && tar -xf ..\\..\\scratch.tar -C ..\\..\\scratch && pushd ..\\..\\scratch && node check.js then hive hive_merge_slot {"action":"release"}`,
     expect: (o, c) => {
       const { holds, calls } = slotHolds(o, 'Coder', c.merge.base)
-      // The last run of its checks with the branch in (on it, or its merge in progress) that ended failing (they can't pass
-      // there), and the hold it ran in.
-      const failedRun = checkRunsOf(c).filter((r) => r.ok === false && (ancestor(c, c.merge.feature, r.head) || (!!r.merging && ancestor(c, c.merge.feature, r.merging)))).at(-1)
+      // The last run of its checks with the branch in (on it, its merge in progress, or a copy of it anywhere: HI-2233) that
+      // ended failing (they can't pass there), and the hold it ran in.
+      const failedRun = checkRunsOf(c).filter((r) => r.ok === false && checkedBranch(c, r)).at(-1)
       const during = failedRun ? holdThrough(holds, failedRun.start, failedRun.end) : null
       return [
         ['read the merge-ready skill', read(o, 'merge-ready'), o.skillsRead.join(',')],
