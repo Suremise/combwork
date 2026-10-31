@@ -290,6 +290,7 @@
   "workflow.refused.move.notFromHere.nextBuilder": "Czeka na werdykt swojego recenzenta: poczekaj na niego; jeśli jest coś jeszcze do zrobienia, zwróci kartę.",
   "workflow.refused.move.notFromHere.nextBuilderSubmit": "Zmiana, o którą poproszono w trakcie recenzji, już z commitem: prześlij kartę ponownie z followUp: true, co zostawia ją w recenzji, aby recenzent ją sprawdził. Wszystko inne czeka na werdykt recenzenta.",
   "workflow.refused.move.notFromHere.nextNone": "Nic tam teraz nie czeka na wykonanie.",
+  "workflow.refused.move.notFromHere.nextDone": "{reader, select, you {Jest skończona. Dalsza praca nad nią, o którą poprosisz, przenosi ją z powrotem do Aktywnych; osobna praca uzupełniająca trafia na nową kartę.} other {Jest skończona. Dalsza praca nad nią, o którą poprosił użytkownik: przenieś ją z powrotem przez hive_update_task (column: doing) i pracuj nad nią jak zwykle. Osobna praca uzupełniająca trafia na nową kartę (hive_create_task).}}",
   "workflow.refused.move.notFromHere.nextReviewer": "{back, select, yes {Jej recenzja się skończyła: karta wróciła do dalszej pracy. Zostaw ją tam, gdzie jest, bez werdyktu, i poczekaj, aż wróci na etap Recenzja.} other {Jej recenzja się skończyła: karta przeszła dalej niż Recenzja. Zostaw ją tam, gdzie jest, bez werdyktu.}}",
   "workflow.refused.move.useIntent.message": "Agenci nie przenoszą kart między kolumnami.",
   "workflow.refused.move.useIntent.next": "Użyj zamiast tego intencji {intent}.",

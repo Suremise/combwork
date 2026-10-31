@@ -290,6 +290,7 @@
   "workflow.refused.move.notFromHere.nextBuilder": "Elle attend le verdict de son relecteur : attends-le ; il la renvoie s’il reste du travail.",
   "workflow.refused.move.notFromHere.nextBuilderSubmit": "Une modification demandée pendant sa relecture, déjà commitée : soumets la carte de nouveau avec followUp: true, ce qui la garde en Relecture pour que son relecteur vérifie la modification. Tout le reste attend le verdict de son relecteur.",
   "workflow.refused.move.notFromHere.nextNone": "Rien n’attend d’être fait là pour l’instant.",
+  "workflow.refused.move.notFromHere.nextDone": "{reader, select, you {Elle est terminée. Du travail en plus que tu demandes la ramène dans En cours ; un travail de suivi distinct va sur une nouvelle carte.} other {Elle est terminée. Du travail en plus demandé par l’utilisateur : ramène-la avec hive_update_task (column: doing), puis travaille dessus comme d’habitude. Un travail de suivi distinct va sur une nouvelle carte (hive_create_task).}}",
   "workflow.refused.move.notFromHere.nextReviewer": "{back, select, yes {Sa relecture est terminée : elle est repartie pour plus de travail. Laisse-la où elle est, sans verdict, et attends qu’elle revienne en Relecture.} other {Sa relecture est terminée : elle a dépassé l’étape Relecture. Laisse-la où elle est, sans verdict.}}",
   "workflow.refused.move.useIntent.message": "Les agents ne déplacent pas les cartes d’une colonne à l’autre.",
   "workflow.refused.move.useIntent.next": "Utilise plutôt l’intention {intent}.",

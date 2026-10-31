@@ -297,6 +297,13 @@ export const PAUSED_NEXT = {
 export const REPOSITORY_GONE_NEXT = msg({ id: 'workflow.refused.platform.unknown.nextGone', defaultMessage: "{reader, select, you {The project's Git repository is gone: restore it, or switch the project to None in its Version Control tab (from the next card).} other {The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its Version Control tab (from the next card).}}", description: 'The next step when a card was refused because its Git repository was removed or moved: the user restores it, or switches the project to None (no version control) in the Version Control tab, which applies to cards started after. Read by agents and shown in the window. {reader} (select): you is the window\'s wording, other the agent\'s (the user named as the user); translate both whole sentences.' })
 
 /** The next step of `move.notFromHere` when nothing can be done from the stage (a request answered meanwhile). */
+/**
+ * The next step after a start or submit refused on a card in Done (HI-2227): more work on it the user asked for takes it
+ * back to Doing (work-on-card's after-review.md), and a separate follow-up is a new card. Other moves refused there (an
+ * answer to a request no longer open) keep NOTHING_FROM_HERE.
+ */
+export const DONE_NEXT = msg({ id: 'workflow.refused.move.notFromHere.nextDone', defaultMessage: "{reader, select, you {It's finished. More work on it that you ask for takes it back to Doing; separate follow-up work goes on a new card.} other {It's finished. More work on it that the user asked for: move it back with hive_update_task (column: doing), then work on it as usual. Separate follow-up work goes on a new card (hive_create_task).}}", description: "The next step after an agent's start or submit was refused on a card in Done (HI-2227): more work on that card the user asked for moves it back to Doing; separate follow-up work is a new card. hive_update_task, hive_create_task and column: doing are a tool, its argument and value: keep them as they are. Doing is a column name: use it as Hive shows it. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences." })
+
 export const NOTHING_FROM_HERE = msg({ id: 'workflow.refused.move.notFromHere.nextNone', defaultMessage: 'Nothing waits to be done there now.', description: "The next step after a refused move when nothing is possible from the card's stage (the request it answered is no longer open)." })
 
 /**
@@ -398,7 +405,8 @@ export function refusalLines(rule: RuleId, values: RefusalValues, f: RefusalForm
   const queued = rule === 'merge.hiveMerges' && typeof values.queue === 'string' && Object.hasOwn(QUEUE_NEXT, values.queue) ? (paused ?? QUEUE_NEXT[values.queue as keyof typeof QUEUE_NEXT]) : null
   const side = rule === 'move.notFromHere' && typeof values.whose === 'string' && Object.hasOwn(SIDE_NEXT, values.whose) ? SIDE_NEXT[values.whose as keyof typeof SIDE_NEXT] : null
   const user = f.forUser ? FOR_USER[rule] : undefined
-  const next = user?.next ?? side ?? (rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : rule === 'platform.unknown' && values.offer === 'repositoryGone' ? REPOSITORY_GONE_NEXT : (queued ?? t.next))
+  const done = rule === 'move.notFromHere' && values.stage === 'done' && (values.move === 'start' || values.move === 'submit') ? DONE_NEXT : null
+  const next = user?.next ?? side ?? done ?? (rule === 'move.notFromHere' && !values.moves ? NOTHING_FROM_HERE : rule === 'platform.unknown' && values.offer === 'repositoryGone' ? REPOSITORY_GONE_NEXT : (queued ?? t.next))
   return { message: f.one(user?.message ?? t.message, vals), next: f.one(next, vals), change: t.change ? f.one(t.change, vals) : null }
 }
 

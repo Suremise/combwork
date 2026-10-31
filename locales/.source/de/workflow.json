@@ -298,6 +298,7 @@
   "workflow.refused.move.notFromHere.next": "From {stage}, use: {moves}.",
   "workflow.refused.move.notFromHere.nextBuilder": "It waits for its reviewer's verdict: wait for that, which brings it back if there is more to do.",
   "workflow.refused.move.notFromHere.nextBuilderSubmit": "A change asked for while it is in Review, committed: submit it again with followUp: true, which keeps it in Review for its reviewer to check. Anything else waits for its reviewer's verdict.",
+  "workflow.refused.move.notFromHere.nextDone": "{reader, select, you {It's finished. More work on it that you ask for takes it back to Doing; separate follow-up work goes on a new card.} other {It's finished. More work on it that the user asked for: move it back with hive_update_task (column: doing), then work on it as usual. Separate follow-up work goes on a new card (hive_create_task).}}",
   "workflow.refused.move.notFromHere.nextNone": "Nothing waits to be done there now.",
   "workflow.refused.move.notFromHere.nextReviewer": "{back, select, yes {Its review is over: it went back for more work. Leave it where it is, with no verdict, and wait for it to come back to Review.} other {Its review is over: it has moved on from Review. Leave it where it is, with no verdict.}}",
   "workflow.refused.move.useIntent.message": "Agents don't move cards between columns.",

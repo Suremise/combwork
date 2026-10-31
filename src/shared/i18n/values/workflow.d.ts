@@ -291,6 +291,7 @@ interface HiveMessageValues {
   'workflow.refused.move.notFromHere.next': { stage: string | number; moves: string | number }
   'workflow.refused.move.notFromHere.nextBuilder': undefined
   'workflow.refused.move.notFromHere.nextBuilderSubmit': undefined
+  'workflow.refused.move.notFromHere.nextDone': { reader: string }
   'workflow.refused.move.notFromHere.nextNone': undefined
   'workflow.refused.move.notFromHere.nextReviewer': { back: string }
   'workflow.refused.move.useIntent.message': undefined

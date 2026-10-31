@@ -290,6 +290,7 @@
   "workflow.refused.move.notFromHere.nextBuilder": "它正在等待评审者的结论：请等待；如果还有工作要做，结论会将它退回。",
   "workflow.refused.move.notFromHere.nextBuilderSubmit": "评审期间要求的修改已提交：请用 followUp: true 重新提交，卡片会留在评审中供评审者检查。其他情况则等待评审者的结论。",
   "workflow.refused.move.notFromHere.nextNone": "那里现在没有待处理的事项。",
+  "workflow.refused.move.notFromHere.nextDone": "{reader, select, you {这张卡片已完成。你要求的后续工作会把它移回“进行中”；独立的后续工作放在新卡片上。} other {这张卡片已完成。用户要求在它上面做更多工作时：用 hive_update_task（column: doing）把它移回，然后照常处理。独立的后续工作放在新卡片上（hive_create_task）。}}",
   "workflow.refused.move.notFromHere.nextReviewer": "{back, select, yes {它的评审已结束：它已退回继续工作。请保持原样，不给出结论，等待它回到“评审”。} other {它的评审已结束：它已越过“评审”。请保持原样，不给出结论。}}",
   "workflow.refused.move.useIntent.message": "智能体不在列之间移动卡片。",
   "workflow.refused.move.useIntent.next": "请改用 {intent} 操作。",

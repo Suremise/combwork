@@ -290,6 +290,7 @@
   "workflow.refused.move.notFromHere.nextBuilder": "レビュアーの判定を待っています。それを待ってください。まだ作業があれば、判定によって戻されます。",
   "workflow.refused.move.notFromHere.nextBuilderSubmit": "レビュー中に依頼された変更をコミットした場合は、followUp: trueを付けて再提出してください。カードはレビューに残り、レビュアーが確認します。それ以外はレビュアーの判定を待ちます。",
   "workflow.refused.move.notFromHere.nextNone": "今そこで行うことはありません。",
+  "workflow.refused.move.notFromHere.nextDone": "{reader, select, you {このカードは完了しています。あなたが頼んだ追加作業があれば「進行中」に戻ります。別の後続作業は新しいカードにします。} other {このカードは完了しています。ユーザーが頼んだ追加作業は、hive_update_task（column: doing）で戻してから、いつもどおり作業してください。別の後続作業は新しいカード（hive_create_task）にします。}}",
   "workflow.refused.move.notFromHere.nextReviewer": "{back, select, yes {そのレビューは終わりました。追加の作業のために戻されています。判定は出さずにそのままにし、「レビュー」に戻るのを待ってください。} other {そのレビューは終わりました。「レビュー」より先に進んでいます。判定は出さずにそのままにしてください。}}",
   "workflow.refused.move.useIntent.message": "エージェントはカードを列の間で移動しません。",
   "workflow.refused.move.useIntent.next": "代わりに{intent}を使ってください。",

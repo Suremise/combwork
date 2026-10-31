@@ -1159,6 +1159,10 @@
     "defaultMessage": "A change asked for while it is in Review, committed: submit it again with followUp: true, which keeps it in Review for its reviewer to check. Anything else waits for its reviewer's verdict.",
     "description": "The next step after a card's builder submitted it again while it waits in Review (HI-1832): the verdict comes first, but a change the reviewer asked for is submitted as a follow-up. followUp is the tool's option, as agents type it: keep it as it is. Read by agents and shown in the window alike: it names no one."
   },
+  "workflow.refused.move.notFromHere.nextDone": {
+    "defaultMessage": "{reader, select, you {It's finished. More work on it that you ask for takes it back to Doing; separate follow-up work goes on a new card.} other {It's finished. More work on it that the user asked for: move it back with hive_update_task (column: doing), then work on it as usual. Separate follow-up work goes on a new card (hive_create_task).}}",
+    "description": "The next step after an agent's start or submit was refused on a card in Done (HI-2227): more work on that card the user asked for moves it back to Doing; separate follow-up work is a new card. hive_update_task, hive_create_task and column: doing are a tool, its argument and value: keep them as they are. Doing is a column name: use it as Hive shows it. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+  },
   "workflow.refused.move.notFromHere.nextNone": {
     "defaultMessage": "Nothing waits to be done there now.",
     "description": "The next step after a refused move when nothing is possible from the card's stage (the request it answered is no longer open)."

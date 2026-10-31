@@ -290,6 +290,7 @@
   "workflow.refused.move.notFromHere.nextBuilder": "Espera el veredicto de su revisor: espéralo; la devolverá si queda trabajo por hacer.",
   "workflow.refused.move.notFromHere.nextBuilderSubmit": "Un cambio pedido mientras está en Revisión, ya con commit: vuelve a enviarla con followUp: true, que la mantiene en Revisión para que su revisor lo compruebe. Todo lo demás espera el veredicto de su revisor.",
   "workflow.refused.move.notFromHere.nextNone": "Ahora no hay nada pendiente de hacer ahí.",
+  "workflow.refused.move.notFromHere.nextDone": "{reader, select, you {Está terminada. Más trabajo en ella que pidas la devuelve a En curso; el trabajo de seguimiento aparte va en una tarjeta nueva.} other {Está terminada. Más trabajo en ella que pidió el usuario: devuélvela con hive_update_task (column: doing) y trabaja en ella como siempre. El trabajo de seguimiento aparte va en una tarjeta nueva (hive_create_task).}}",
   "workflow.refused.move.notFromHere.nextReviewer": "{back, select, yes {Su revisión ha terminado: volvió para más trabajo. Déjala donde está, sin veredicto, y espera a que vuelva a Revisión.} other {Su revisión ha terminado: ya pasó de Revisión. Déjala donde está, sin veredicto.}}",
   "workflow.refused.move.useIntent.message": "Los agentes no mueven tarjetas entre columnas.",
   "workflow.refused.move.useIntent.next": "Usa en su lugar la intención {intent}.",

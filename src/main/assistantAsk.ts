@@ -56,7 +56,7 @@ export async function askAssistant(ws: WorkspaceService, n: number, actor: TaskA
   if (!self) throw new AskRefused(403, "Only a project's agents ask the Hive Assistant on a card.") // i18n-ignore: agent-facing (a refusal of hive_ask_assistant)
   const card = await askAssistantOn(n, text, actor, (c) => {
     if (c.archived) throw new AskRefused(409, `${cardName(c)} is archived: nothing more is asked on it.`) // i18n-ignore: agent-facing (a refusal of hive_ask_assistant)
-    if (c.column === 'done') throw new AskRefused(409, `${cardName(c)} is in Done: nothing more is asked on it. A follow-up goes on a new card (hive_create_task).`) // i18n-ignore: agent-facing (a refusal of hive_ask_assistant)
+    if (c.column === 'done') throw new AskRefused(409, `${cardName(c)} is in Done: nothing more is asked on it. More work on it that the user asked for: move it back with hive_update_task (column: doing). Separate follow-up work goes on a new card (hive_create_task).`) // i18n-ignore: agent-facing (a refusal of hive_ask_assistant)
     if (!assistantCanAct(ws)) throw new AskRefused(409, "The Hive Assistant can't take requests now (its hive tools are off, or Settings → Assistant → Control doesn't let it change cards). Ask the user instead (hive_ask_user).") // i18n-ignore: agent-facing (a refusal of hive_ask_assistant)
   }, ws)
   const key = card.key ?? cardRef(n)

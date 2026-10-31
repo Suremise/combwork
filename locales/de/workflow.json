@@ -290,6 +290,7 @@
   "workflow.refused.move.notFromHere.nextBuilder": "Sie wartet auf das Urteil ihres Reviewers: Warte darauf; es bringt sie zurück, wenn noch etwas zu tun ist.",
   "workflow.refused.move.notFromHere.nextBuilderSubmit": "Eine Änderung, um die im Review gebeten wurde, committet: Reiche sie erneut mit followUp: true ein; so bleibt sie im Review, damit ihr Reviewer sie prüft. Alles andere wartet auf das Urteil ihres Reviewers.",
   "workflow.refused.move.notFromHere.nextNone": "Dort ist gerade nichts zu tun.",
+  "workflow.refused.move.notFromHere.nextDone": "{reader, select, you {Sie ist fertig. Weitere Arbeit daran, um die du bittest, bringt sie zurück nach In Arbeit; getrennte Folgearbeit kommt auf eine neue Karte.} other {Sie ist fertig. Weitere Arbeit daran, um die der Benutzer gebeten hat: verschiebe sie mit hive_update_task (column: doing) zurück und arbeite dann wie gewohnt daran. Getrennte Folgearbeit kommt auf eine neue Karte (hive_create_task).}}",
   "workflow.refused.move.notFromHere.nextReviewer": "{back, select, yes {Ihr Review ist vorbei: Sie ist zur weiteren Arbeit zurückgegangen. Lass sie, wo sie ist, ohne Urteil, und warte, bis sie wieder in Review ist.} other {Ihr Review ist vorbei: Sie ist über Review hinaus weitergegangen. Lass sie, wo sie ist, ohne Urteil.}}",
   "workflow.refused.move.useIntent.message": "Agenten verschieben Karten nicht zwischen Spalten.",
   "workflow.refused.move.useIntent.next": "Verwende stattdessen {intent}.",
