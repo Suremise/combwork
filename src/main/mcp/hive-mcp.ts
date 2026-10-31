@@ -598,7 +598,7 @@ const tools: Tool[] = [
         lanes: { type: 'array', items: { type: 'string' }, description: 'Lane ids, or ["all"] (with wake); cards and agents then follow beside them.' },
         agents: { type: 'array', items: { type: 'object', properties: { project: { type: 'string' }, agent: { type: 'string' } }, required: ['project'] }, description: 'With lanes: agents followed beside them.' },
         events: { type: 'array', items: { type: 'string', enum: [...LANE_EVENTS] }, description: 'What a lane watch counts; the default is in tools.md.' },
-        usage: { type: 'array', items: { type: 'object', properties: { account: { type: 'string', description: 'Its id or name (hive_connection list).' }, percent: { type: 'number' }, limit: { type: 'string', enum: ['weekly', 'fiveHour', 'any'], description: 'Default: any.' } }, required: ['account', 'percent'] }, description: "With wake: also wakes when an account's limit reaches percent; alone, or beside cards or lanes." }
+        usage: { type: 'array', items: { type: 'object', properties: { account: { type: 'string' }, percent: { type: 'number' }, limit: { type: 'string', enum: ['weekly', 'fiveHour', 'any'] } }, required: ['account', 'percent'] }, description: "With wake: an account's limit reaching percent wakes you too." }
       }
     },
     run: async (a) =>
