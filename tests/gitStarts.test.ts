@@ -186,7 +186,7 @@ describe('answers about fixed commits, kept', () => {
   })
 })
 
-describe('"is the change in the target?", kept for its commits (HI-2182)', () => {
+describe('"is the change in the target?": a merge kept for its commits, a squash asked each pass (HI-2182)', () => {
   /** main (a), a line from a with its change (c), squashed onto main as s: ids of each. */
   function squashed(): { repo: string; a: string; c: string; s: string } {
     const repo = join(tempDir('contains-'), 'repo')
@@ -200,26 +200,62 @@ describe('"is the change in the target?", kept for its commits (HI-2182)', () =>
     return { repo, a, c, s: rev(repo) }
   }
 
-  it('a second pass, the target unchanged, starts no git and answers the same; a target that moves is asked again', async () => {
+  it('a merge or fast-forward, the target unchanged: the next pass starts no git; a target that moves is asked again', async () => {
     const { repo, a, c, s } = squashed()
+    sh(repo, 'merge', '-q', '--no-ff', '-m', 'merge line', 'line')
+    const m = rev(repo)
     const first = await counted(() => contains(repo, 'main', { base: a, revision: c }))
-    expect(first.v).toEqual({ method: 'squash', commit: s })
+    expect(first.v).toEqual({ method: 'merge' })
     expect(first.ran.length).toBeGreaterThan(0)
     // The target's head is read from its ref file: none of resolve's rev-parse.
     expect(first.ran.some((x) => x[0] === 'rev-parse' && x.includes('main^{commit}'))).toBe(false)
-    const again = await counted(() => gitStep(() => contains(repo, 'main', { base: a, revision: c })))
-    expect(again).toEqual({ v: first.v, ran: [] })
-    // Reset off the target (the squash undone): the head is another commit, so git is asked, and the change isn't there.
-    sh(repo, 'reset', '-q', '--hard', a)
-    const reset = await counted(() => contains(repo, 'main', { base: a, revision: c }))
-    expect(reset.v).toBeNull()
-    expect(reset.ran.length).toBeGreaterThan(0)
-    // The target moved on with the change merged: asked again, found.
-    sh(repo, 'merge', '-q', '--no-ff', '-m', 'merge line', 'line')
-    expect(await contains(repo, 'main', { base: a, revision: c })).toEqual({ method: 'merge' })
-    // Back at the squash: its answer, kept, with no git.
+    expect(await counted(() => gitStep(() => contains(repo, 'main', { base: a, revision: c })))).toEqual({ v: first.v, ran: [] })
+    // Reset off the merge (back at the squash): another head, asked again: the squash.
     sh(repo, 'reset', '-q', '--hard', s)
+    const reset = await counted(() => contains(repo, 'main', { base: a, revision: c }))
+    expect(reset.v).toEqual({ method: 'squash', commit: s })
+    expect(reset.ran.length).toBeGreaterThan(0)
+    // Back at the merge: kept, no git. A fast-forward line the same.
+    sh(repo, 'reset', '-q', '--hard', m)
     expect(await counted(() => contains(repo, 'main', { base: a, revision: c }))).toEqual({ v: first.v, ran: [] })
+    sh(repo, 'switch', '-q', '-c', 'forward', c)
+    expect(await contains(repo, 'forward', { base: a, revision: c })).toEqual({ method: 'fastForward' })
+    expect(await counted(() => contains(repo, 'forward', { base: a, revision: c }))).toEqual({ v: { method: 'fastForward' }, ran: [] })
+    // A name that could be a commit id is git's to read, every time.
+    sh(repo, 'branch', 'ff', c)
+    for (let i = 0; i < 2; i++) expect((await counted(() => contains(repo, 'ff', { base: a, revision: c }))).ran.map((x) => x.join(' '))).toEqual(['rev-parse --verify -q ff^{commit}'])
+  })
+
+  it('a squash, or nothing found, is asked again each pass (once per step): attributes and drivers can change the replay (HR2, round 1)', async () => {
+    const { repo, a, c, s } = squashed()
+    const first = await counted(() => gitStep(async () => [await contains(repo, 'main', { base: a, revision: c }), await contains(repo, 'main', { base: a, revision: c })]))
+    expect(first.v).toEqual([{ method: 'squash', commit: s }, { method: 'squash', commit: s }])
+    const n = first.ran.length
+    // The next pass asks the replay again, as the first did.
+    const again = await counted(() => contains(repo, 'main', { base: a, revision: c }))
+    expect(again.v).toEqual(first.v[0])
+    expect(again.ran.filter((x) => x[0] === 'merge-tree').length).toBeGreaterThan(0)
+    expect(again.ran.length).toBeLessThanOrEqual(n)
+  })
+
+  it("an answer a merge driver gave follows the attributes as they are now, never one kept (HR2's round 1 regression)", async () => {
+    const repo = join(tempDir('contains-driver-'), 'repo')
+    gitRepo(repo)
+    const a = commit(repo, { 'f.txt': 'base\n' }, 'base')
+    sh(repo, 'switch', '-q', '-c', 'line')
+    const c = commit(repo, { 'f.txt': 'change\n' }, 'change')
+    sh(repo, 'switch', '-q', 'main')
+    commit(repo, { 'f.txt': 'target\n' }, 'target')
+    sh(repo, 'config', 'merge.ours.driver', 'true')
+    const attributes = join(repo, '.git', 'info', 'attributes')
+    writeFileSync(attributes, 'f.txt merge=ours\n')
+    expect(await contains(repo, 'main', { base: a, revision: c })).toEqual({ method: 'sameTree' })
+    // The attributes gone, the commits and the head the same: the replay conflicts, as git says now.
+    writeFileSync(attributes, '')
+    expect(await contains(repo, 'main', { base: a, revision: c })).toBeNull()
+    // And back: found again.
+    writeFileSync(attributes, 'f.txt merge=ours\n')
+    expect(await contains(repo, 'main', { base: a, revision: c })).toEqual({ method: 'sameTree' })
   })
 
   it("a change rewritten is another change: asked again, and a rewrite that isn't in the target is not found", async () => {
@@ -283,6 +319,12 @@ describe('"is the change in the target?", kept for its commits (HI-2182)', () =>
       const again = await counted(() => reconcile(e.wf, card))
       expect(again.ran).toEqual([])
       expect(e.wf.state(card).marks.leftTarget).toBeFalsy()
+      // The target reset off the result: the change is looked for, isn't there, and the card is marked as left.
+      sh(e.project, 'reset', '-q', '--hard', 'HEAD~1')
+      const reset = await counted(() => reconcile(e.wf, card))
+      expect(reset.ran.length).toBeGreaterThan(0)
+      expect(e.wf.state(card).marks.leftTarget).toBeTruthy()
+      expect(e.wf.state(card).stage).toBe('done')
     } finally {
       e.close()
     }

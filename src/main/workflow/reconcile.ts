@@ -389,12 +389,15 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     const th = await G.lineHead(project, i.target)
     if (isUnknown(th)) return hooks.unknown?.(th.what)
     if (!th) return
-    const sub = s.latest
-    const c = await G.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key })
+    // The result still in the target settles it with the history alone (kept between passes: HI-2182); only once it
+    // isn't is the change looked for, in the same head.
     const resultIn = await G.isAncestor(project, i.result, th)
-    if (isUnknown(c)) return hooks.unknown?.(c.what)
     if (isUnknown(resultIn)) return hooks.unknown?.(resultIn.what)
-    if (!c && resultIn === false && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
+    if (resultIn) return
+    const sub = s.latest
+    const c = await G.contains(project, i.target, { base: s.approved?.base ?? sub?.base ?? base ?? i.revision, revision: i.revision, key: sub?.key }, th)
+    if (isUnknown(c)) return hooks.unknown?.(c.what)
+    if (!c && !s.marks.leftTarget) await wf.write(card, null, 'outside', (w) => sameCycle(w, s) && w.tx.appendObserved(card.id, { kind: 'LeftTarget', actor: 'outside', source: 'observed', dedupe: `left:${s.cycle}:${th}`, data: { revision: i.revision, target: i.target } }))
   }
 }
 

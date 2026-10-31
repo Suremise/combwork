@@ -475,10 +475,11 @@ export async function sameChange(repo: string, a: { base: string; revision: stri
  * fast-forward); a target commit since the base whose parent replays the change to its tree (a squash or a cherry-pick
  * of the whole change); else the whole target already holds it (a squash split across commits). Null when not found.
  * `at`: the target's head as the caller read it (asked about that commit, not read again); else the target's head now,
- * from the ref files where they can say (targetHeadSync). With fixed endpoints (base, revision, key, the target's
- * head) the answer is about commits alone, so it is kept as onceForever's (HI-2182: the reconciler asked it again of
- * every Done or Approved card at each pass, about six gits and a `log -p` each); the target moving or the change
- * rewritten asks about other commits.
+ * from the ref files where they can say (targetHeadSync). A merge or a fast-forward is the history's alone (an
+ * ancestor, the target's first parents), kept as onceForever's for the revision and the target's head (HI-2182); a
+ * squash or the whole target holding it goes through git's diff and merge, which attributes, drivers and config can
+ * change (HR2's round 1), so with fixed endpoints it is asked once per step (#1386: the queue's test merge tested again
+ * on the same head), never kept beyond it.
  */
 export async function contains(repo: string, target: string, c: { base: string; revision: string; key?: string | null }, at?: string): Promise<Maybe<Containment | null>> {
   let t = at ?? targetHeadSync(repo, target)
@@ -489,7 +490,21 @@ export async function contains(repo: string, target: string, c: { base: string; 
     t = r
   }
   const th = t
-  return onceForever(repo, `contains\0${c.key === undefined ? '?' : (c.key ?? '-')}`, [c.base, c.revision, th], () => containsAt(repo, target, c, th))
+  const merged = await mergedInto(repo, target, c.revision, th)
+  if (isUnknown(merged) || merged) return merged
+  return onceInStep(repo, `contains\0${target}\0${c.key === undefined ? '?' : (c.key ?? '-')}`, [c.base, c.revision, th], () => squashedInto(repo, target, c, th))
+}
+
+/** The revision merged or fast-forwarded into the target's head `t` (contains' first test), or null when not its ancestor. */
+function mergedInto(repo: string, target: string, revision: string, t: string): Promise<Maybe<Containment | null>> {
+  return onceForever(repo, 'merged-into', [revision, t], async () => {
+    const anc = await isAncestor(repo, revision, t)
+    if (isUnknown(anc)) return anc
+    if (!anc) return null
+    const fp = await git(repo, ['rev-list', '--first-parent', t])
+    if (!fp.ok) return unknown(U.history, { target })
+    return { method: lines(fp.out).includes(revision) ? 'fastForward' : 'merge' }
+  })
 }
 
 /**
@@ -523,14 +538,8 @@ function targetHeadSync(repo: string, target: string): string | null {
   return branchRefSync(common, target)
 }
 
-async function containsAt(repo: string, target: string, c: { base: string; revision: string; key?: string | null }, t: string): Promise<Maybe<Containment | null>> {
-  const anc = await isAncestor(repo, c.revision, t)
-  if (isUnknown(anc)) return anc
-  if (anc) {
-    const fp = await git(repo, ['rev-list', '--first-parent', t])
-    if (!fp.ok) return unknown(U.history, { target })
-    return { method: lines(fp.out).includes(c.revision) ? 'fastForward' : 'merge' }
-  }
+/** contains' other tests, for a revision that isn't the target's ancestor: a squash, or the whole target holding it. */
+async function squashedInto(repo: string, target: string, c: { base: string; revision: string; key?: string | null }, t: string): Promise<Maybe<Containment | null>> {
   const key = c.key !== undefined ? c.key : await candidateKey(repo, c.base, c.revision)
   if (isUnknown(key)) return key
   // The target's commits since the change's base (bounded, merges left out: a merge's change is covered above), keyed in
