@@ -107,6 +107,12 @@ const write = (file, text) => {
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
+  // The open's background work ended first (its "after opening" line): its pass adopting agents' 0.9 worktrees as slots
+  // (#1441) among it. Tree's worktree, made while that pass ran, was adopted as slot "tree" instead of staying Tree's
+  // worktree as this suite counts it (HI-2209). Bounded as a hung run, never how long it takes: it includes the bundled skills.
+  const logFile = path.join(userData, 'logs', 'hive.log')
+  const opened = await until(() => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8') : '').match(/after opening ⁨?storage-ws⁩?: .*adoption, slots/)?.[0], 30000)
+  check("the open's background work has ended, its worktree adoption with it", !!opened)
 
   // A running launch (its early attachments folder must stay) and a worktree agent (its folder is counted).
   const live = await lib.addAgent(inv, alpha, { name: 'Live' })
@@ -166,7 +172,7 @@ const write = (file, text) => {
   check('the link opens Project Settings → Storage', !!(await until(async () => (await group.locator('.storage-table').count()) > 0, HUNG_MS)))
   check('the page shows the backups row', (await group.locator('tr', { hasText: 'Transcript backups' }).count()) === 1)
   check('… with what they hold before compression', /before compression/.test(await group.locator('tr', { hasText: 'Transcript backups' }).innerText()), await group.locator('tr', { hasText: 'Transcript backups' }).innerText())
-  check("… and the worktree's", (await group.locator('tr', { hasText: "Tree's worktree" }).count()) === 1)
+  check("… and the worktree's", (await group.locator('tr', { hasText: "Tree's worktree" }).count()) === 1, (await group.locator('.storage-table tbody tr').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ')).join(' | '))
   // A DataTable (#250): sorted by Size, the biggest first, the total still under it.
   const sizes = { 'Transcript backups': st.sessions, Archive: st.archive, Attachments: st.attachments, "Tree's worktree": st.worktrees[0]?.bytes ?? 0 }
   const biggest = Object.entries(sizes).sort((a, b) => b[1] - a[1])[0][0]
