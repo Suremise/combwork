@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 112
+const FIXTURES_VERSION = 113
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -1981,16 +1981,21 @@ module.exports.SCENARIOS = [
         title: 'Run the checks and report',
         description: "Run this project's checks (`npm test`, about a minute). They write their progress to checks.log as they go: keep an eye on it for FAIL lines while they run, so a failure is seen as soon as it happens. When they end, comment on this card with the result and any failing check, and move it to Review. Change no files."
       })
+      // HI-2239: a card that changes no files is a no-code card (the user's, confirmed), so its submission needs no commit;
+      // as a code card in this Git project its submit was refused with nothing committed (submit.empty).
+      await c.inv('tasks:setKind', c.cards.w, 'no-code', { confirm: true })
+      c.head = c.git('rev-parse', 'HEAD').trim()
     },
     prompt: (c) => `Work on card #${c.cards.w}.`,
-    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.w)} then work 2 then boardcomment ${c.cards.w} then ${fakeSubmit(c.cards.w)}`,
+    // A no-code card: submitted with nothing committed.
+    fake: (c) => `skill work-on-card then ${fakeStart(c.cards.w)} then work 2 then boardcomment ${c.cards.w} then hive hive_submit ${JSON.stringify({ card: `#${c.cards.w}`, summary: 'Ran the checks: the result is in its comment.' })}`,
     expect: (o, c) => [
       ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
       ['ran the checks', testRuns(o).length > 0 || runs(o, 'checks.js').length > 0, o.tools.map((t) => t.name).join(',')],
       handedOnCheck(o, c, 'w'),
       ['said which check failed on the card', (o.cards.w?.comments ?? []).some((x) => /currency/i.test(x.text)), (o.cards.w?.comments ?? []).map((x) => x.text.slice(0, 120)).join(' | ')],
       ['left nothing running once its card was in Review (Hive listed nothing as it stopped)', Array.isArray(o.leftovers) && o.leftovers.every((l) => !l.processes.length && !l.more), JSON.stringify(o.leftovers)],
-      ['changed no files', o.gitStatus.trim() === '', o.gitStatus]
+      ['changed no files (nothing uncommitted, and no commit)', o.gitStatus.trim() === '' && c.git('rev-parse', 'HEAD').trim() === c.head, `${o.gitStatus}; ${c.head} → ${c.git('rev-parse', 'HEAD').trim()}`]
     ],
     fakeSkips: ['ran the checks', 'said which check failed on the card']
   },
@@ -2359,18 +2364,27 @@ module.exports.SCENARIOS = [
           'Review round 2: FAILED. 1. The delay is never awaited: `wait(1000)` needs `await` (recurring from round 1).'
         ]
       })
+      // Its loop's lane, with Implementer its reviewer (HI-2239): a finding that keeps coming back may first be a design
+      // for the reviewer to check (card-loop builder.md, A design first), which a card with no reviewer refuses.
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [c.cards.r], rounds: 5 })
     },
     prompt: (c) => `Work through card #${c.cards.r} as its builder (rounds: 5). Round 1 (the first build and its review) and round 2 (the fix and its review) have both failed review; round 2's review is its last comment.`,
     fake: (c) => `skill card-loop then ${LOOP_COMMIT} then ${verdictWatch(c.cards.r)} then hive hive_submit ${JSON.stringify({ card: `#${c.cards.r}`, summary: 'Fixed: the delay is awaited.' })}`,
-    expect: (o, c) => [
-      ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
-      ["didn't ask the user (no hive_notify)", called(o, 'hive_notify').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
-      ['handed it on again for round three (back to Review, or its submission)', handedOnAt(o, c, 'r') > 0 && handedOn(o, c, 'r'), history(o.cards.r).join(' | ')],
-      ['ended its turn with a live watch for the verdict (#376)', !!turnWatch(o), o.status],
-      ['fixed it: the delay is awaited', /await\s+wait\(/.test(c.read('sync.js') ?? ''), c.read('sync.js')],
-      ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.r)]
-    ],
-    fakeSkips: ['fixed it: the delay is awaited']
+    expect: (o, c) => {
+      // The other course builder.md gives a finding that keeps coming back: a design posted (which worked) for the
+      // reviewer to check, its turn ended watching for the answer, the card still in Doing.
+      const designed = ran(o, 'hive_loop_step').some((x) => argsOf(x).step === 'design' && cardIs(o, argsOf(x).card, c.cards.r)) && o.cards.r?.column === 'doing'
+      const handed = handedOnAt(o, c, 'r') > 0 && handedOn(o, c, 'r')
+      return [
+        ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ["didn't ask the user (no hive_notify or hive_ask_user)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0, o.hiveCalls.map((x) => x.tool).join(',')],
+        ['handed it on again for round three (back to Review, or its submission), or posted a design for its reviewer first', handed || designed, `${designed ? 'design posted; ' : ''}${history(o.cards.r).join(' | ')}`],
+        ['ended its turn with a live watch (for the verdict, #376, or the design answer)', !!turnWatch(o), o.status],
+        ['fixed it: the delay is awaited (or a design first, before the fix)', /await\s+wait\(/.test(c.read('sync.js') ?? '') || (designed && !handed), c.read('sync.js')],
+        ['never finished it itself (no move to Passed or Done)', !finishedItself(o, c.cards.r)]
+      ]
+    },
+    fakeSkips: ['fixed it: the delay is awaited (or a design first, before the fix)']
   },
   {
     id: 'card-loop-recurring-review',
@@ -2731,12 +2745,17 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const h = history(o.cards.f)
       const after = h.slice(h.lastIndexOf('Review failed') + 1)
+      // The passed card's finish as work-on-card's after-review.md gives it (HI-2239): where merges aren't checked, or its
+      // work is in, `hive_report_merge` finishes it, and Hive takes it only then. Its own column moves and verdicts are
+      // never its builder's.
+      const reportedP = ran(o, 'hive_report_merge').some((x) => cardIs(o, argsOf(x).card, c.cards.p))
+      const movedP = movesOf(o, c.cards.p).some((x) => x.ok && x.tool !== 'hive_report_merge' && (/^(passed|done)$/.test(String(argsOf(x).column ?? '')) || x.tool === 'hive_verdict'))
       return [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         // Back to work on it (through Doing), or fixed and back for review already: either way the failure wasn't missed.
         ["acted on the failed card the wake line didn't name", after.some((w) => /^(Moved to (the (top|bottom) of )?(Doing|Review)\b|Returned for review)/.test(w)) || submissionsOf(o, c, 'f').length > 0, h.join(' | ')],
         ['fixed it: the delay is awaited', /await\s+wait\(/.test(c.read('sync.js') ?? ''), c.read('sync.js')],
-        ['finished neither card itself (no move to Passed or Done: the passed one isn\'t merged)', !finishedItself(o, c.cards.f) && !finishedItself(o, c.cards.p) && o.cards.p?.column !== 'done', `${o.cards.p?.column} / ${o.cards.f?.column}`]
+        ["finished neither card by a move of its own (the passed one only by a merge report Hive took, its project's finish)", !finishedItself(o, c.cards.f) && !movedP && (o.cards.p?.column !== 'done' || reportedP), `${o.cards.p?.column} / ${o.cards.f?.column}; ${movesOf(o, c.cards.p).map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')}`]
       ]
     },
     fakeSkips: ['fixed it: the delay is awaited']
@@ -3733,7 +3752,11 @@ module.exports.SCENARIOS = [
         ['Coder runs in a new conversation', !!c.before?.sessionId && !!c.after && c.after.runId !== c.before.runId, JSON.stringify({ before: c.before?.sessionId, after: c.after?.sessionId, seen: c.seen })],
         ['its last conversation stays in the Sessions history', (c.history ?? []).includes(c.before?.sessionId), c.history ? `${c.before?.sessionId} in [${c.history.join(',')}]` : 'not read']
       ]
-    }
+    },
+    // HI-2239: whether Hive gave Coder the lane's card while the run watched (in Doing, Coder's), recorded beside the checks.
+    observe: (o, c) => [
+      ['Hive gave Coder the card within the run (in Doing, its)', o.cards?.n?.column === 'doing' && o.cards?.n?.agent?.id === c.agents.coder.id, `${o.cards?.n?.column} / ${o.cards?.n?.agent?.name ?? 'nobody'}; ${history(o.cards?.n).join(' | ')}`]
+    ]
   },
   {
     id: 'assistant-message-watching',
@@ -4160,6 +4183,42 @@ const names = (text, ...parts) => parts.every((p) => new RegExp(typeof p === 'nu
 /** A card's agent id (the API gives the agent as { id, name, … }). */
 const agentOf = (card) => card?.agent?.id ?? card?.agent ?? null
 const IDLE_PROMISE = /they('ll| will) (tell|let) you|(tell|let) you know when they/i
+/** coordinator-fact-before-asking's doc facts, only in alpha's docs/DEPLOY.md: in what a read gave back, it was read. */
+const DEPLOY_FACTS = /staging\.example\.com|deploy:staging|ALPHA_ENV=staging/
+/** And only its card's description says this: in a listing's reply, the card was in it, in full. */
+const DEPLOY_CARD_FACT = 'docs/DEPLOY.md, its Staging section'
+/**
+ * HI-2239's read policy (Darren's decision, 31 Oct: simplify). A file was read when Claude Code's `Read` worked on its
+ * exact absolute path and gave back its facts; Hive's own reads are the hive calls' (hive_read_section, hive_list_tasks,
+ * each paired with its own reply: callsWithReplies). A shell command (or a Codex script) that may have read it is
+ * unobservable: never credited, and never blamed (shellLookups: the check is left out, and the run records it).
+ */
+const SHELL_TOOLS = /^(Bash|PowerShell|Shell|powershell|bash|shell|local_shell|(functions\.)?exec_command|Script)$/
+/** Whether a transcript tool call is a `Read` that worked of exactly `target` (absolute), giving back `facts`. */
+const readOf = (t, target, facts) => {
+  if (!t || t.isError || t.name !== 'Read' || !facts.test(String(t.result ?? ''))) return false
+  let file = null
+  try {
+    file = JSON.parse(t.input)?.file_path ?? null
+  } catch {}
+  const path = require('path')
+  return typeof file === 'string' && path.isAbsolute(file) && path.resolve(file).toLowerCase() === path.resolve(target).toLowerCase()
+}
+/**
+ * The shell commands or scripts that name `name` (a file): what may have read it, unobservably, whatever their status (HR1,
+ * HI-2239 round 4: a command can read it and then exit nonzero).
+ */
+const shellLookups = (o, name) => (o.tools ?? []).filter((t) => SHELL_TOOLS.test(t.name) && String(t.input ?? '').toLowerCase().includes(name.toLowerCase()))
+/**
+ * A hive tool's successful calls with their own replies (HR1, HI-2239 round 2): Hive's log of the calls (exact
+ * arguments) and the transcript's replies, in order, paired one to one; when their counts differ the pairing isn't known,
+ * and none is given.
+ */
+const callsWithReplies = (o, tool) => {
+  const calls = ran(o, tool)
+  const own = hiveReplies(o, tool)
+  return calls.length === own.length ? calls.map((x, i) => ({ args: argsOf(x), reply: String(own[i].result ?? '') })) : []
+}
 module.exports.SCENARIOS.push(
   {
     id: 'coordinator-team-lanes',
@@ -4681,13 +4740,29 @@ module.exports.SCENARIOS.push(
     fake: (c) => `skill coordinate-agents then hive hive_read_task {"number":${c.cards.p}} then hive hive_read_section {"project":"alpha","path":"docs/DEPLOY.md","heading":"Staging"}`,
     expect: (o, c) => {
       const p = c.cards.p
-      const lookedUp = ran(o, 'hive_read_task').some((x) => cardIs(o, argsOf(x).number, p)) || ['hive_read_section', 'hive_doc_outline'].some((t) => ran(o, t).some((x) => /DEPLOY\.md/i.test(String(x.args))))
+      // Darren's decision (HI-2239, 31 Oct): only Hive's recorded reads (hive_read_task of the card; hive_read_section of
+      // alpha's docs/DEPLOY.md and alpha's detailed hive_list_tasks, each paired with its own reply) and a Read of the
+      // doc's exact absolute path count. A shell command or Codex script that may have read the doc is unobservable: with
+      // no lookup credited, it leaves the check out (never blamed) and is recorded (observe).
+      const own = o.cards.p
+      // A reply that is this card in full: its key and its description's own words.
+      const fullCard = (reply) => !!own?.key && new RegExp(`\\b${own.key}\\b`).test(reply) && reply.includes(DEPLOY_CARD_FACT)
+      const listed = callsWithReplies(o, 'hive_list_tasks').some(({ args, reply }) => args.project === 'alpha' && args.details === true && fullCard(reply))
+      // The card's own read, paired with its reply (HR1, HI-2239 round 4), which is the card.
+      const cardRead = callsWithReplies(o, 'hive_read_task').some(({ args, reply }) => cardIs(o, args.number, p) && fullCard(reply)) || listed
+      const doc = require('path').join(c.alpha, 'docs', 'DEPLOY.md')
+      const sectioned = callsWithReplies(o, 'hive_read_section').some(({ args, reply }) => args.project === 'alpha' && String(args.path ?? '').replace(/\\/g, '/') === 'docs/DEPLOY.md' && DEPLOY_FACTS.test(reply))
+      const docRead = sectioned || (o.tools ?? []).some((t) => readOf(t, doc, DEPLOY_FACTS))
+      const lookedUp = cardRead || docRead
+      const unobservable = !lookedUp && shellLookups(o, 'DEPLOY.md').length > 0
       return [
-        ['looked the card or its doc up (hive_read_task, or the doc through hive_doc_outline / hive_read_section)', lookedUp, o.hiveCalls.map((x) => x.tool).join(',')],
+        ...(unobservable ? [] : [['looked the card or its doc up (hive_read_task, hive_read_section or a detailed listing of alpha, or a Read of the doc)', lookedUp, o.hiveCalls.map((x) => x.tool).join(',')]]),
         ["asked the user nothing: no notification and no question (the deploy details are in the doc, and the request is the OK)", called(o, 'hive_notify').length === 0 && called(o, 'hive_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
         ['started Coder on the card', ran(o, 'hive_start_task').some((x) => cardIs(o, argsOf(x).number, p)) || briefsTo(o, 'Coder').some((t) => names(t, p)), o.hiveCalls.map((x) => x.tool).join(',')]
       ]
     },
+    // A lookup by a shell command or script (HI-2239): what it read is unobservable, so the run records it.
+    observe: (o) => [['looked the doc up by a shell command or script (unobservable: neither credited nor blamed)', shellLookups(o, 'DEPLOY.md').length > 0, shellLookups(o, 'DEPLOY.md').map((t) => `${t.name}: ${String(t.input).slice(0, 80)}`).join(' | ')]],
     fakeSkips: ["asked the user nothing: no notification and no question (the deploy details are in the doc, and the request is the OK)", 'started Coder on the card']
   },
   {
@@ -5137,4 +5212,4 @@ module.exports.SCENARIOS.push({
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
 })
 
-module.exports.helpers = { called, ran, asksTheUser, questionsToUser, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { readOf, called, ran, asksTheUser, questionsToUser, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }

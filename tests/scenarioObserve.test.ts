@@ -684,6 +684,134 @@ describe("the checks follow what the current skills say (HI-2222): the right beh
   })
 })
 
+describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescribe passes, the wrong move still fails', () => {
+  const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  const board = [
+    { number: 1, key: 'AL-1' },
+    { number: 2, key: 'AL-2' }
+  ]
+  const run = (id: string, obs: Record<string, unknown>, c: Record<string, unknown>) => {
+    const sc = SCENARIOS.find((s) => s.id === id)!
+    return Object.fromEntries(sc.expect({ hiveCalls: [], tools: [], skillsRead: [], finalReply: '', gitStatus: '', status: 'finished', allCards: board, cards: {}, facts: {}, ...obs }, c).map(([name, ok]) => [name, ok]))
+  }
+
+  it("card-loop-two-cards: the passed card finished by a merge report Hive took passes; its builder's own move or verdict doesn't", () => {
+    const FIN = "finished neither card by a move of its own (the passed one only by a merge report Hive took, its project's finish)"
+    const two = (hiveCalls: unknown[], pColumn: string) => run('card-loop-two-cards', { hiveCalls, cards: { p: { number: 1, key: 'AL-1', column: pColumn, history: [] }, f: { number: 2, key: 'AL-2', column: 'review', history: [] } } }, { cards: { p: 1, f: 2 }, read: () => '' })[FIN]
+    expect(two([call('hive_report_merge', { card: 'AL-1' }), call('hive_submit', { card: 'AL-2', summary: 'Fixed.' })], 'done')).toBe(true)
+    expect(two([call('hive_submit', { card: 'AL-2', summary: 'Fixed.' })], 'passed')).toBe(true)
+    expect(two([call('hive_update_task', { number: 'AL-1', column: 'done' })], 'done')).toBe(false)
+    expect(two([call('hive_report_merge', { card: 'AL-1' }, false)], 'done')).toBe(false)
+    expect(two([call('hive_report_merge', { card: 'AL-2' })], 'passed')).toBe(false)
+  })
+
+  describe("coordinator-fact-before-asking: Hive's recorded reads and an exact Read count; a shell lookup is neither credited nor blamed (Darren's decision)", () => {
+    const LOOKED = 'looked the card or its doc up (hive_read_task, hive_read_section or a detailed listing of alpha, or a Read of the doc)'
+    const STARTED = 'started Coder on the card'
+    const DOC = "# Deploying alpha\n\n## Staging\n\nRun `npm run deploy:staging`. The host is staging.example.com; the build needs `ALPHA_ENV=staging`."
+    const CARD = 'AL-1 Publish the greeting page to staging (Todo)\nPublish the current greeting page to staging. How to deploy: docs/DEPLOY.md, its Staging section.'
+    // This run's alpha: the doc is C:/w/alpha/docs/DEPLOY.md.
+    const ctx = { cards: { p: 1 }, ws: 'C:/w', alpha: 'C:/w/alpha' }
+    const t = (name: string, input: string, result: string, isError = false) => ({ name, input, result, isError })
+    const sh = (name: string, command: string, result: string) => t(name, JSON.stringify({ command }), result)
+    const start = call('hive_start_task', { number: 1, agent: 'Coder', note: 'Publish it to staging.' })
+    const sc = SCENARIOS.find((s) => s.id === 'coordinator-fact-before-asking') as unknown as { expect: (o: unknown, c: unknown) => [string, boolean][]; observe: (o: unknown) => [string, boolean][] }
+    const obs = (tools: unknown[], hiveCalls: unknown[] = []) => ({ hiveCalls: [...hiveCalls, start], tools, skillsRead: [], finalReply: '', allCards: board, cards: { p: { number: 1, key: 'AL-1' } }, facts: {} })
+    // The lookup check: true or false, or 'left out' when the check isn't in the results (unobservable).
+    const looked = (tools: unknown[], hiveCalls: unknown[] = []) => {
+      const hit = sc.expect(obs(tools, hiveCalls), ctx).find(([name]) => name === LOOKED)
+      return hit ? hit[1] : 'left out'
+    }
+    const list = (project: string, reply: string, extra: Record<string, unknown> = {}): [unknown[], unknown[]] => [[t('mcp__hive__hive_list_tasks', `project: ${project}\ndetails: true`, reply)], [call('hive_list_tasks', { project, details: true, ...extra })]]
+
+    // The card's read with its own reply (HR1 round 4): the reply is the card.
+    const readTask = (ref: unknown, reply = CARD, isError = false): [unknown[], unknown[]] => [[t('mcp__hive__hive_read_task', `number: ${ref}`, reply, isError)], [call('hive_read_task', { number: ref })]]
+
+    it("credited: hive_read_task of the card, alpha's detailed listing or section read (each with its own reply), and a Read of the exact absolute path", () => {
+      expect(looked(...readTask('AL-1'))).toBe(true)
+      expect(looked(...readTask(1))).toBe(true)
+      expect(looked(...list('alpha', CARD))).toBe(true)
+      expect(looked([t('mcp__hive__hive_read_section', 'project: alpha\npath: docs/DEPLOY.md\nheading: Staging', 'Run `npm run deploy:staging`. The host is staging.example.com.')], [call('hive_read_section', { project: 'alpha', path: 'docs/DEPLOY.md', heading: 'Staging' })])).toBe(true)
+      expect(looked([t('Read', JSON.stringify({ file_path: 'C:/w/alpha/docs/DEPLOY.md' }), DOC)])).toBe(true)
+      expect(looked([t('Read', JSON.stringify({ file_path: 'C:\\w\\alpha\\docs\\DEPLOY.md' }), DOC)])).toBe(true)
+      // A credited lookup beside a shell one: the check is there, and passes.
+      expect(looked([sh('PowerShell', 'Get-Content alpha/docs/DEPLOY.md', DOC), ...readTask(1)[0]], readTask(1)[1])).toBe(true)
+    })
+
+    it("HR1 round 4: a card read counts only with its own reply, and that reply is the card", () => {
+      // Hive's log of the call alone (no reply in the transcript), a failed reply, another card's reply.
+      expect(looked([], [call('hive_read_task', { number: 'AL-1' })])).toBe(false)
+      expect(looked(...readTask('AL-1', 'Unknown card AL-1.', true))).toBe(false)
+      expect(looked(...readTask('AL-1', 'AL-2 Something else (Todo)\nNothing about deploying.'))).toBe(false)
+      // Another card's read, though its reply had this one in it.
+      expect(looked(...readTask('AL-2', CARD))).toBe(false)
+    })
+
+    it('a shell command or script that may have read the doc is unobservable: the check is left out, and the run records it', () => {
+      for (const lookup of [
+        sh('PowerShell', 'Get-Content alpha/docs/DEPLOY.md', DOC),
+        sh('Bash', 'cat ../../alpha/docs/DEPLOY.md', DOC),
+        t('Shell', 'Get-Content alpha/docs/DEPLOY.md', DOC),
+        t('functions.exec_command', JSON.stringify({ cmd: 'Get-Content docs/DEPLOY.md', workdir: 'C:/w/beta' }), 'ALPHA_ENV=staging'),
+        sh('PowerShell', 'Write-Output "alpha/docs/DEPLOY.md ALPHA_ENV=staging"', 'alpha/docs/DEPLOY.md ALPHA_ENV=staging'),
+        t('Script', 'text(await tools.exec_command({cmd:"Get-Content alpha/docs/DEPLOY.md"}))', `Script completed\nOutput:\n${DOC}`)
+      ]) {
+        expect(looked([lookup])).toBe('left out')
+        expect(sc.observe(obs([lookup]))[0][1]).toBe(true)
+      }
+      // The other checks still stand.
+      expect(sc.expect(obs([sh('PowerShell', 'Get-Content alpha/docs/DEPLOY.md', DOC)]), ctx).find(([name]) => name === STARTED)?.[1]).toBe(true)
+    })
+
+    it("not credited, and not unobservable either: a failed or other Read, another project's or an incomplete listing, a dispatch note", () => {
+      expect(looked([t('Read', JSON.stringify({ file_path: 'C:/w/alpha/docs/DEPLOY.md' }), DOC, true)])).toBe(false)
+      expect(looked([t('Read', JSON.stringify({ file_path: 'C:/other/alpha/docs/DEPLOY.md' }), DOC)])).toBe(false)
+      expect(looked([t('Read', JSON.stringify({ file_path: 'C:/w/beta/docs/DEPLOY.md' }), DOC)])).toBe(false)
+      expect(looked([t('Read', JSON.stringify({ file_path: 'alpha/docs/DEPLOY.md' }), DOC)])).toBe(false)
+      expect(looked([t('Read', JSON.stringify({ file_path: 'C:/w/alpha/docs/DEPLOY.md' }), 'an empty file')])).toBe(false)
+      expect(looked(...list('beta', CARD))).toBe(false)
+      expect(looked(...list('alpha', 'No cards.', { column: 'done' }))).toBe(false)
+      expect(looked([t('mcp__hive__hive_list_tasks', 'project: alpha', 'Todo (1):\nAL-1 Publish the greeting page to staging')], [call('hive_list_tasks', { project: 'alpha' })])).toBe(false)
+      // A reply with no call of Hive's to pair it with gives nothing.
+      expect(looked([t('mcp__hive__hive_list_tasks', 'project: alpha\ndetails: true', CARD)])).toBe(false)
+      expect(looked([t('mcp__hive__hive_read_section', 'project: beta\npath: docs/DEPLOY.md', 'The host is staging.example.com.')], [call('hive_read_section', { project: 'beta', path: 'docs/DEPLOY.md', heading: 'Staging' })])).toBe(false)
+      const brief = sc.expect(obs([t('mcp__hive__hive_start_task', 'number: 1\nagent: Coder\nnote: Read alpha/docs/DEPLOY.md and publish to staging.', 'Started.')]), ctx)
+      expect(brief.find(([name]) => name === LOOKED)?.[1]).toBe(false)
+      expect(brief.find(([name]) => name === STARTED)?.[1]).toBe(true)
+      // HR1 round 4: a shell call's status says nothing of whether it read the doc (it can read it, then exit nonzero):
+      // unobservable whatever its status, the check left out and the run recording it.
+      const failed = { ...sh('Shell', 'Get-Content C:/w/alpha/docs/DEPLOY.md; exit 1', 'ALPHA_ENV=staging'), isError: true }
+      expect(looked([failed])).toBe('left out')
+      expect(sc.observe(obs([failed]))[0][1]).toBe(true)
+      expect(looked([{ ...sh('PowerShell', 'Get-Content alpha/docs/DEPLOY.md', 'not found'), isError: true }])).toBe('left out')
+    })
+  })
+
+  it('card-loop-recurring: a design posted for its reviewer first passes; asking the user does not', () => {
+    const HANDED = 'handed it on again for round three (back to Review, or its submission), or posted a design for its reviewer first'
+    const FIXED = 'fixed it: the delay is awaited (or a design first, before the fix)'
+    const ASK = "didn't ask the user (no hive_notify or hive_ask_user)"
+    const recurring = (hiveCalls: unknown[], column = 'doing', code = 'wait(1000)') =>
+      run('card-loop-recurring', { hiveCalls, cards: { r: { number: 1, key: 'AL-1', column, agent: { id: 'a-coder' }, history: [] } }, facts: { r: [] }, turnWatch: { cards: [1] } }, { cards: { r: 1 }, agents: { coder: { id: 'a-coder' } }, read: () => code })
+    const design = recurring([call('hive_loop_step', { card: 'AL-1', step: 'design', text: 'Await the delay; a test with fake timers.' })])
+    expect(design[HANDED]).toBe(true)
+    expect(design[FIXED]).toBe(true)
+    expect(design[ASK]).toBe(true)
+    // A design refused (no reviewer, as before), or the card not in Doing, is neither.
+    expect(recurring([call('hive_loop_step', { card: 'AL-1', step: 'design', text: 'x' }, false)])[HANDED]).toBe(false)
+    expect(recurring([call('hive_ask_user', { card: 'AL-1', kind: 'decide', text: 'Who reviews this?' })])[ASK]).toBe(false)
+    expect(recurring([])[HANDED]).toBe(false)
+    expect(recurring([])[FIXED]).toBe(false)
+  })
+
+  it('watcher-stopped: a commit is a file changed, even with nothing left uncommitted', () => {
+    const NONE = 'changed no files (nothing uncommitted, and no commit)'
+    const watched = (head: string) => run('watcher-stopped', { cards: { w: { number: 1, key: 'AL-1', column: 'review', history: [] } }, facts: { w: [] }, leftovers: [] }, { cards: { w: 1 }, agents: { coder: { id: 'a-coder' } }, head: 'h1', git: () => `${head}\n` })[NONE]
+    expect(watched('h1')).toBe(true)
+    expect(watched('h2')).toBe(false)
+  })
+})
+
 describe('the submit scenarios count a question about committing, never a notice (HI-1618, HR5 round 1)', () => {
   type Obs = { hiveCalls?: unknown[]; tools?: { name: string; input: string }[]; finalReply?: string; status?: string; column?: string; submitted?: boolean }
   const call = (name: string, args: unknown, ok = true, error?: string) => ({ tool: name, args: JSON.stringify(args), ok, ...(error ? { error } : {}) })
