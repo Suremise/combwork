@@ -21,8 +21,9 @@
 // as soon as a trial reports no cost (the spend can't be checked then; --allow-unknown-cost goes on anyway); --only runs
 // some; --keep leaves each scenario's profile and workspace; --repeat N runs each N times (samples, for spread);
 // --save-baseline NAME keeps this run's benchmark as a named baseline (an older one of that name is kept, not
-// overwritten). Results go to %LOCALAPPDATA%\hive-test\scenarios\results (the newest 30 runs are kept, besides those a
-// card cites and those a run still writes into: runner.json, HI-2234): results.json
+// overwritten). Results go to %LOCALAPPDATA%\hive-test\scenarios\results (the newest 30 fake runs and, counted apart,
+// the newest 30 model trials are kept, besides those a card cites and those a run still writes into: runner.json,
+// HI-2234, HI-2236): results.json
 // (every scenario's checks, skills read, hive calls, versions, usage, measures), benchmark.json (hive-benchmark/1: the
 // Performance page compares two) and summary.md; results.json is written as each trial ends (#1457: a run cut short keeps
 // what it had). Run in a Hive agent's session it shows in the Progress panel, a step per trial (--no-progress: not).
@@ -242,8 +243,9 @@ const codexLease = !fake && PROVIDERS[provider].provider === 'codex' ? await wai
 const sourceAtStart = sourceFingerprint()
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
 const resultsDir = join(lib.WORK, '..', 'scenarios', 'results')
-pruneResults(resultsDir, 29, spare)
 const out = resultsFolder(resultsDir, `${stamp}-${provider}`)
+// After making its own folder (held, so not counted): the newest 30 of each kind stay besides it (HI-2236).
+pruneResults(resultsDir, undefined, spare)
 // Held while this process runs (runner.json: no other run's prune takes it, HI-2234), let go as it exits.
 process.on('exit', () => releaseResults(out))
 // What the run has written to its folder, by name, so a folder removed under it is made again with all of it.

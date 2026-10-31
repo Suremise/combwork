@@ -659,7 +659,7 @@ kept and why, without removing anything; `--days N` sets the age, default 3).
   Never its sign-in (`auth.json`), config, sandbox setup (`.sandbox`, `.sandbox-bin`, `cap_sid`), databases (Codex
   prunes its own logs), plugins, skills or history. What stays is about 0.8 GB, most of it the copy of Codex it runs
   (430 MB) and the sandbox's (320 MB). The Claude Code test home is small (about 80 MB) and isn't opened.
-- **Stays:** the CLI test homes' sign-ins, config and sandbox setup (`codex`, but for the above; `claude`, never opened), scenario results and baselines (a scenario run's own start keeps the newest 30 results, those cited and those a run still writes into: tests/scenarios/README.md), the
+- **Stays:** the CLI test homes' sign-ins, config and sandbox setup (`codex`, but for the above; `claude`, never opened), scenario results and baselines (a scenario run's own start keeps the newest 30 fake runs' results and the newest 30 model trials', those cited and those a run still writes into: tests/scenarios/README.md), the
   claims and locks, the concurrency checker's folders (it removes its own), the Progress panel's timings, the machine's test settings (`config.json`: `heavySlots`, #589); logs (the
   runner keeps the newest ten runs); a lane a runner holds.
 - **Evidence stays, whoever deletes** (`evidence.cjs`): anything a card that isn't Done cites is kept by the clean-up,
