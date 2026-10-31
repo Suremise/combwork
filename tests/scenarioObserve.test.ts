@@ -721,14 +721,27 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
     }
     const list = (project: string, reply: string, extra: Record<string, unknown> = {}): [unknown[], unknown[]] => [[t('mcp__hive__hive_list_tasks', `project: ${project}\ndetails: true`, reply)], [call('hive_list_tasks', { project, details: true, ...extra })]]
 
+    // The card's read with its own reply (HR1 round 4): the reply is the card.
+    const readTask = (ref: unknown, reply = CARD, isError = false): [unknown[], unknown[]] => [[t('mcp__hive__hive_read_task', `number: ${ref}`, reply, isError)], [call('hive_read_task', { number: ref })]]
+
     it("credited: hive_read_task of the card, alpha's detailed listing or section read (each with its own reply), and a Read of the exact absolute path", () => {
-      expect(looked([], [call('hive_read_task', { number: 'AL-1' })])).toBe(true)
+      expect(looked(...readTask('AL-1'))).toBe(true)
+      expect(looked(...readTask(1))).toBe(true)
       expect(looked(...list('alpha', CARD))).toBe(true)
       expect(looked([t('mcp__hive__hive_read_section', 'project: alpha\npath: docs/DEPLOY.md\nheading: Staging', 'Run `npm run deploy:staging`. The host is staging.example.com.')], [call('hive_read_section', { project: 'alpha', path: 'docs/DEPLOY.md', heading: 'Staging' })])).toBe(true)
       expect(looked([t('Read', JSON.stringify({ file_path: 'C:/w/alpha/docs/DEPLOY.md' }), DOC)])).toBe(true)
       expect(looked([t('Read', JSON.stringify({ file_path: 'C:\\w\\alpha\\docs\\DEPLOY.md' }), DOC)])).toBe(true)
       // A credited lookup beside a shell one: the check is there, and passes.
-      expect(looked([sh('PowerShell', 'Get-Content alpha/docs/DEPLOY.md', DOC)], [call('hive_read_task', { number: 1 })])).toBe(true)
+      expect(looked([sh('PowerShell', 'Get-Content alpha/docs/DEPLOY.md', DOC), ...readTask(1)[0]], readTask(1)[1])).toBe(true)
+    })
+
+    it("HR1 round 4: a card read counts only with its own reply, and that reply is the card", () => {
+      // Hive's log of the call alone (no reply in the transcript), a failed reply, another card's reply.
+      expect(looked([], [call('hive_read_task', { number: 'AL-1' })])).toBe(false)
+      expect(looked(...readTask('AL-1', 'Unknown card AL-1.', true))).toBe(false)
+      expect(looked(...readTask('AL-1', 'AL-2 Something else (Todo)\nNothing about deploying.'))).toBe(false)
+      // Another card's read, though its reply had this one in it.
+      expect(looked(...readTask('AL-2', CARD))).toBe(false)
     })
 
     it('a shell command or script that may have read the doc is unobservable: the check is left out, and the run records it', () => {
@@ -762,8 +775,12 @@ describe('more checks follow the 1.0 workflow (HI-2239): what the skills prescri
       const brief = sc.expect(obs([t('mcp__hive__hive_start_task', 'number: 1\nagent: Coder\nnote: Read alpha/docs/DEPLOY.md and publish to staging.', 'Started.')]), ctx)
       expect(brief.find(([name]) => name === LOOKED)?.[1]).toBe(false)
       expect(brief.find(([name]) => name === STARTED)?.[1]).toBe(true)
-      // A shell call that failed isn't a lookup of any kind: the check stands, and fails.
-      expect(looked([{ ...sh('PowerShell', 'Get-Content alpha/docs/DEPLOY.md', 'not found'), isError: true }])).toBe(false)
+      // HR1 round 4: a shell call's status says nothing of whether it read the doc (it can read it, then exit nonzero):
+      // unobservable whatever its status, the check left out and the run recording it.
+      const failed = { ...sh('Shell', 'Get-Content C:/w/alpha/docs/DEPLOY.md; exit 1', 'ALPHA_ENV=staging'), isError: true }
+      expect(looked([failed])).toBe('left out')
+      expect(sc.observe(obs([failed]))[0][1]).toBe(true)
+      expect(looked([{ ...sh('PowerShell', 'Get-Content alpha/docs/DEPLOY.md', 'not found'), isError: true }])).toBe('left out')
     })
   })
 

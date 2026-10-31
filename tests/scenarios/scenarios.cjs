@@ -4200,8 +4200,11 @@ const readOf = (t, target, facts) => {
   const path = require('path')
   return typeof file === 'string' && path.isAbsolute(file) && path.resolve(file).toLowerCase() === path.resolve(target).toLowerCase()
 }
-/** The shell commands or scripts that worked and name `name` (a file): what may have read it, unobservably. */
-const shellLookups = (o, name) => (o.tools ?? []).filter((t) => !t.isError && SHELL_TOOLS.test(t.name) && String(t.input ?? '').toLowerCase().includes(name.toLowerCase()))
+/**
+ * The shell commands or scripts that name `name` (a file): what may have read it, unobservably, whatever their status (HR1,
+ * HI-2239 round 4: a command can read it and then exit nonzero).
+ */
+const shellLookups = (o, name) => (o.tools ?? []).filter((t) => SHELL_TOOLS.test(t.name) && String(t.input ?? '').toLowerCase().includes(name.toLowerCase()))
 /**
  * A hive tool's successful calls with their own replies (HR1, HI-2239 round 2): Hive's log of the calls (exact
  * arguments) and the transcript's replies, in order, paired one to one; when their counts differ the pairing isn't known,
@@ -4738,8 +4741,11 @@ module.exports.SCENARIOS.push(
       // doc's exact absolute path count. A shell command or Codex script that may have read the doc is unobservable: with
       // no lookup credited, it leaves the check out (never blamed) and is recorded (observe).
       const own = o.cards.p
-      const listed = callsWithReplies(o, 'hive_list_tasks').some(({ args, reply }) => args.project === 'alpha' && args.details === true && !!own?.key && new RegExp(`\\b${own.key}\\b`).test(reply) && reply.includes(DEPLOY_CARD_FACT))
-      const cardRead = ran(o, 'hive_read_task').some((x) => cardIs(o, argsOf(x).number, p)) || listed
+      // A reply that is this card in full: its key and its description's own words.
+      const fullCard = (reply) => !!own?.key && new RegExp(`\\b${own.key}\\b`).test(reply) && reply.includes(DEPLOY_CARD_FACT)
+      const listed = callsWithReplies(o, 'hive_list_tasks').some(({ args, reply }) => args.project === 'alpha' && args.details === true && fullCard(reply))
+      // The card's own read, paired with its reply (HR1, HI-2239 round 4), which is the card.
+      const cardRead = callsWithReplies(o, 'hive_read_task').some(({ args, reply }) => cardIs(o, args.number, p) && fullCard(reply)) || listed
       const doc = require('path').join(c.alpha, 'docs', 'DEPLOY.md')
       const sectioned = callsWithReplies(o, 'hive_read_section').some(({ args, reply }) => args.project === 'alpha' && String(args.path ?? '').replace(/\\/g, '/') === 'docs/DEPLOY.md' && DEPLOY_FACTS.test(reply))
       const docRead = sectioned || (o.tools ?? []).some((t) => readOf(t, doc, DEPLOY_FACTS))
