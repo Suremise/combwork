@@ -20,7 +20,7 @@ import { EMPTY_TIPS_STATE, applyTipsChange, tipsChange, tipsState } from '../sha
 import { allProviders } from './providers'
 import { providerService } from './providerService'
 import { connectionInput, type ConnectionPatch } from '../shared/accounts'
-import { accountsView, addAccount, addConnection, connectionHomes, duplicateConnection, moveConnectionInAccount, removeConnection, updateConnection, dismissConnectionsIntro, keepNewLogin, removeAccount, renameAccount, moveConnection, setAccountOn, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
+import { accountsView, addAccount, addConnection, connectionHomes, duplicateConnection, moveConnectionInAccount, removeConnection, updateConnection, dismissConnectionsIntro, keepNewLogin, removeAccount, renameAccount, setUsageMove, moveConnection, setAccountOn, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
 import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
@@ -1710,6 +1710,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'connections:keepLogin': (id) => keepNewLogin(id),
     'connections:setOn': (id, on) => setAccountOn(id, on),
+    'connections:setUsageMove': (id, rule) => setUsageMove(String(id), rule ?? null),
     'connections:move': (id, index) => moveConnection(id, Number(index)),
     'connection:add': (account, input) => addConnection(String(account), connectionInput(input) as ConnectionPatch & { name: string }),
     'connection:update': (id, patch) => updateConnection(String(id), connectionInput(patch)),

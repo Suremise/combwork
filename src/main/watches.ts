@@ -27,6 +27,7 @@ import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace
 import { queueReturnOf, resubmittedOf } from './queueReturn'
 import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
 import { isUnread, type DeliveryRecord } from '../shared/deliveries'
+import { readSavedUsage, usageHits, usageLimitLine, usageWakeLine, usageWatchLabel, type UsageWatch } from '../shared/usageWatch'
 import { cancelFromSource, createDelivery, deliveryNow, followAgent, inFlightNow as deliveriesInFlight, load as loadDeliveries, offerNow, registerSource, settled as deliveriesSettled } from './deliveries'
 import { inFlightNow as writerInFlight, onLineComing, settled as writerSettled } from './lineWriter'
 import { readyFor } from './readiness'
@@ -90,6 +91,11 @@ interface WatchRecord {
    */
   lanes?: LaneWatchCondition
   laneMarks?: Record<string, LaneMark>
+  /**
+   * A usage watch (HI-2195): accounts whose limit reaching a share fires it, alone (no cards: `cond` is NO_CARDS) or
+   * beside a card or lane watch's cards and lanes.
+   */
+  usage?: UsageWatch[]
   /**
    * A lane watch's: the latest of agents' waits for the user it knows (#726, a `seq` of waitStarts): one after it, by an
    * agent of the projects it follows and still going on, fires it. Moves on while nothing that counts happens.
@@ -533,9 +539,17 @@ function readRecord(v: unknown): WatchRecord | null {
     if (r.laneSince !== undefined && !time(r.laneSince)) return null
     if (r.waitSeq !== undefined && (typeof r.waitSeq !== 'number' || !Number.isInteger(r.waitSeq) || r.waitSeq < 0)) return null
   }
-  // A lane watch's cards beside its lanes (#726), if any (one from before has none).
-  const laneCards = lanes && Array.isArray((r.cond as { cards?: unknown } | undefined)?.cards) && (r.cond as { cards: unknown[] }).cards.length > 0
-  const cond = (agents && !lanes) || (lanes && !laneCards) ? NO_CARDS : readSavedCondition(r.cond)
+  // A usage watch's accounts (HI-2195), if any.
+  let usage: UsageWatch[] | undefined
+  if (r.usage !== undefined) {
+    const u = readSavedUsage(r.usage)
+    if (!u) return null
+    usage = u
+  }
+  // A lane watch's cards beside its lanes (#726), if any (one from before has none); a usage watch alone has none.
+  const someCards = Array.isArray((r.cond as { cards?: unknown } | undefined)?.cards) && (r.cond as { cards: unknown[] }).cards.length > 0
+  const laneCards = lanes && someCards
+  const cond = (agents && !lanes) || (lanes && !laneCards) || (usage && !agents && !lanes && !someCards) ? NO_CARDS : readSavedCondition(r.cond)
   if (!cond || !r.marks || typeof r.marks !== 'object') return null
   const marks: Record<string, CardMark> = {}
   for (const n of cond.cards) {
@@ -601,7 +615,7 @@ function readRecord(v: unknown): WatchRecord | null {
   }
   const from = { ...(seen ? { seen } : {}), ...(r.self ? { self: r.self as string } : {}) }
   // The scope is set by the workspace that loads it (from the agent's folder), whatever the file says.
-  return { id: r.id, projectPath: r.projectPath, ...(isProjectId(r.projectId) ? { projectId: r.projectId } : {}), agentId: r.agentId, scope: '', cond, ...(agents ? { agents, agentMarks } : {}), ...(lanes ? { lanes, laneMarks, ...(r.laneSince ? { laneSince: r.laneSince as string } : {}), ...(typeof r.waitSeq === 'number' ? { waitSeq: r.waitSeq } : {}) } : {}), marks, current: { ...marks }, since: r.since, ...from, limitMinutes: minutes, limitAt: r.limitAt, ...(typeof r.replySeq === 'number' ? { replySeq: r.replySeq } : {}), ...(on ? { on } : {}), ...(r.watcherName ? { watcherName: r.watcherName as string } : {}), ...(released ? { released } : {}), ...(fired ? { fired } : {}) }
+  return { id: r.id, projectPath: r.projectPath, ...(isProjectId(r.projectId) ? { projectId: r.projectId } : {}), agentId: r.agentId, scope: '', cond, ...(agents ? { agents, agentMarks } : {}), ...(usage ? { usage } : {}), ...(lanes ? { lanes, laneMarks, ...(r.laneSince ? { laneSince: r.laneSince as string } : {}), ...(typeof r.waitSeq === 'number' ? { waitSeq: r.waitSeq } : {}) } : {}), marks, current: { ...marks }, since: r.since, ...from, limitMinutes: minutes, limitAt: r.limitAt, ...(typeof r.replySeq === 'number' ? { replySeq: r.replySeq } : {}), ...(on ? { on } : {}), ...(r.watcherName ? { watcherName: r.watcherName as string } : {}), ...(released ? { released } : {}), ...(fired ? { fired } : {}) }
 }
 
 /** An agent watch's condition on cards: none. */
@@ -696,6 +710,16 @@ const saveQuietly = (store: Store): Promise<void> =>
  * another project's card by its number, as everything that agent reads does (#1219).
  */
 function infoOf(r: WatchRecord): TaskWatchInfo {
+  const info = kindInfoOf(r)
+  // A usage watch (HI-2195): alone, its accounts are its label; beside cards or lanes, they follow theirs.
+  if (!r.usage) return info
+  return usageOnly(r) ? { ...info, label: `Waiting for usage: ${usageWatchLabel(r.usage)}` } : { ...info, label: `${info.label}, and usage: ${usageWatchLabel(r.usage)}` }
+}
+
+/** A usage watch alone (HI-2195): no cards, agents or lanes. */
+const usageOnly = (r: WatchRecord): boolean => !!r.usage && !r.agents && !r.lanes && !r.cond.cards.length
+
+function kindInfoOf(r: WatchRecord): TaskWatchInfo {
   const ws = workspaceFor(r.projectPath)
   const names = ws?.path ? cardNamesOf(ws, ws.isAssistantHome(r.projectPath) ? null : basename(r.projectPath)) : null
   return namedBy(names, () =>
@@ -1404,6 +1428,86 @@ async function evaluateAgents(store: Store): Promise<void> {
     if (changed) await saveQuietly(store)
   })
   for (const rec of store.list.filter((r) => r.agents && r.fired)) await deliver(store, rec)
+}
+
+/** A usage watch's hits now (HI-2195): each account whose limit reached its share, in its current period. */
+const usageHitsOf = (rec: WatchRecord): string[] => usageHits(rec.usage ?? [], (a) => config.get().connectionPlanUsage?.[a]?.limits, Date.now())
+
+/** Checks a workspace's usage watches (HI-2195): one whose account reached its share fires, then is delivered. */
+async function evaluateUsage(store: Store): Promise<void> {
+  if (!store.list.some((r) => r.usage && !r.fired)) return
+  await locked(store, async () => {
+    let changed = false
+    for (const rec of store.list) {
+      if (!rec.usage || rec.fired) continue
+      const hits = usageHitsOf(rec)
+      if (!hits.length) continue
+      rec.fired = { line: lineFor(store, rec, () => usageWakeLine(hits)), at: new Date().toISOString(), cards: [] }
+      changed = true
+    }
+    if (changed) await saveQuietly(store)
+  })
+  for (const rec of store.list.filter((r) => r.usage && r.fired)) await deliver(store, rec)
+}
+
+export type UsageWatchResult = ({ watching: TaskWatchInfo } | { already: string[] }) & { replaced?: string; lanesLeft?: string[] }
+
+/**
+ * Starts (or replaces) an agent's usage watch alone (HI-2195): Hive types one line into it once one of the accounts'
+ * limits reaches its share. One there already is the answer at once (its earlier watch ends, as for a card already in
+ * its column).
+ */
+export async function registerUsageWatch(ws: WorkspaceService, projectPath: string, agentId: string, usage: UsageWatch[], limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES): Promise<UsageWatchResult> {
+  await followAgent(projectPath, agentId)
+  const store = await load(ws)
+  if (!hostedIn(ws, store.path, projectPath)) throw new Error(`Not a project of this workspace: ${projectPath}`)
+  const result = await locked(store, async (): Promise<UsageWatchResult> => {
+    await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
+    const already = usageHits(usage, (a) => config.get().connectionPlanUsage?.[a]?.limits, Date.now())
+    const old = recordOf(store, projectPath, agentId)
+    const before = store.list
+    if (!already.length && !old && store.list.length >= MAX_WATCHES) throw new Error(`This workspace already has ${MAX_WATCHES} watches, the most Hive keeps: wait for some to end`)
+    const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
+    const rec: WatchRecord | null = already.length ? null : { id: randomBytes(6).toString('hex'), projectPath, ...projectIdOf(ws, projectPath), agentId, scope: scopeFor(ws, projectPath), cond: NO_CARDS, usage, marks: {}, current: {}, since: new Date().toISOString(), limitMinutes: minutes, limitAt: new Date(Date.now() + minutes * 60_000).toISOString() }
+    store.list = [...store.list.filter((x) => x !== old), ...(rec ? [rec] : [])]
+    if (old || rec) {
+      try {
+        await save(store)
+      } catch (e) {
+        store.list = before
+        throw new Error(`Could not save the watch: ${(e as Error).message}`, { cause: e })
+      }
+    }
+    stopDelivery(store, old)
+    const left = await lanesLeft(store, old, projectPath, agentId)
+    const ended = { ...(old ? { replaced: infoOf(old).label } : {}), ...(left.length ? { lanesLeft: left } : {}) }
+    if (!rec) return { already, ...ended }
+    log.info(`${userText(agentId)} watches usage: ${userText(usageWatchLabel(usage))}`)
+    return { watching: infoOf(rec), ...ended }
+  })
+  sessions.watchChanged(projectPath, agentId)
+  if ('watching' in result) inBackground('checking usage watches', evaluateUsage(store))
+  return result
+}
+
+/**
+ * Adds a usage watch beside the card or lane watch just started (HI-2195): the same watch, fired by either. One whose
+ * account is already there fires it at once.
+ */
+export async function addUsageToWatch(ws: WorkspaceService, projectPath: string, agentId: string, usage: UsageWatch[]): Promise<TaskWatchInfo | null> {
+  const store = await load(ws)
+  const info = await locked(store, async () => {
+    const rec = recordOf(store, projectPath, agentId)
+    if (!rec || rec.fired) return null
+    rec.usage = usage
+    await save(store)
+    return infoOf(rec)
+  })
+  if (info) {
+    sessions.watchChanged(projectPath, agentId)
+    inBackground('checking usage watches', evaluateUsage(store))
+  }
+  return info
 }
 
 /** How often the tick checks lane watches (a stall that comes with time, a card waiting in Review, #521). */
@@ -2645,7 +2749,7 @@ async function evaluate(ws: WorkspaceService): Promise<void> {
     const reads: CardReads = new Map()
     const contextOf = await releaseContexts(store, store.list.filter((r) => !r.fired))
     for (const rec of [...store.list]) {
-      if (rec.fired || rec.agents || rec.lanes) continue
+      if (rec.fired || rec.agents || rec.lanes || usageOnly(rec)) continue
       // One watch that can't be checked doesn't stop the others.
       try {
         const r = await check(store, rec, reads, await contextOf(rec))
@@ -2677,6 +2781,9 @@ async function evaluate(ws: WorkspaceService): Promise<void> {
   for (const rec of store.list.filter((r) => r.fired)) await deliver(store, rec)
   // Lane watches follow the same board (#531).
   await evaluateLanes(store).catch((e) => log.warn('checking lane watches', e))
+  // Usage watches (HI-2195), alone or beside cards or lanes: one read back as the workspace opens is checked against the
+  // usage kept now (another workspace's sessions may have reported it while this one was closed).
+  await evaluateUsage(store).catch((e) => log.warn('checking usage watches', e))
 }
 
 /** Told when watched cards move or change hands (after the watches have seen it): a pending quit checks again. */
@@ -2693,12 +2800,14 @@ export async function tick(now = Date.now()): Promise<void> {
       let changed = store.dirty
       for (const rec of store.list) {
         if (!rec.fired && Date.parse(rec.limitAt) <= now) {
-          rec.fired = { line: lineFor(store, rec, () => (rec.lanes ? laneLimitLine(rec.lanes, rec.limitMinutes, rec.cond.cards, rec.agents?.agents) : rec.agents ? agentLimitLine(rec.agents, rec.limitMinutes) : limitLine(rec.cond, rec.limitMinutes, rec.released ?? []))), at: new Date(now).toISOString(), cards: [] }
+          rec.fired = { line: lineFor(store, rec, () => (rec.lanes ? laneLimitLine(rec.lanes, rec.limitMinutes, rec.cond.cards, rec.agents?.agents) : rec.agents ? agentLimitLine(rec.agents, rec.limitMinutes) : usageOnly(rec) ? usageLimitLine(rec.usage!, rec.limitMinutes) : limitLine(rec.cond, rec.limitMinutes, rec.released ?? []))), at: new Date(now).toISOString(), cards: [] }
           changed = true
         }
       }
       if (changed) await saveQuietly(store)
     }).catch((e) => log.warn('watch limits', e))
+    // Usage watches (HI-2195) are checked on every usage report; also here, for one that reached its share unseen.
+    await evaluateUsage(store).catch((e) => log.warn('checking usage watches', e))
     // Agent watches are checked on every status change; also here, for what no status change tells (a typed prompt
     // its CLI never took).
     await evaluateAgents(store).catch((e) => log.warn('checking agent watches', e))
@@ -2753,6 +2862,9 @@ export function initWatches(): void {
       if (store) laneCheckSoon(store)
       // A lane's end writes no card (an abandoned one): card watches on its cards look again (#1475).
       if (store && store.list.some((r) => !r.fired && r.on)) inBackground('checking watches', coalesced(`watches:${e.workspacePath.toLowerCase()}`, () => evaluate(store.ws).catch((err) => log.warn('checking watches', err))))
+    } else if (e.type === 'plan-usage' && e.connection) {
+      // An account's usage changed (HI-2195): usage watches on it look.
+      for (const store of [...stores.values()]) if (store.list.some((r) => r.usage && !r.fired && r.usage.some((u) => u.account === e.connection))) inBackground('checking usage watches', evaluateUsage(store))
     } else if (e.type === 'session-status') {
       noteAgentStatus(e.state)
       const store = storeFor(e.state.projectPath)

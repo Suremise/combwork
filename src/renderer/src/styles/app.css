@@ -495,6 +495,9 @@ kbd {
 /* ---------- Activity bar ---------- */
 .activitybar {
   width: 48px;
+  /* Never narrowed for the room (HI-2180): squeezed, the sidebar and its resizer lay over its buttons (the Projects list
+     expanded in a narrow window, or the moment before it folds to its rail). The sidebar and panels give way instead. */
+  flex-shrink: 0;
   background: var(--bg-activity);
   display: flex;
   flex-direction: column;
@@ -4885,6 +4888,33 @@ h2.section#unused-worktrees {
   gap: 4px;
   align-items: center;
   margin-top: 4px;
+}
+/* An account's usage move (HI-2195): one sentence with its controls in it, wrapping on a narrow window. */
+.usage-move {
+  margin-top: 6px;
+}
+.usage-move-line {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+/* The sentence flows as text, its controls in it (translations put them in their own order). */
+.usage-move-line > span {
+  line-height: 30px;
+}
+.usage-move-line > span > .input,
+.usage-move-line > span > .select {
+  display: inline-block;
+  width: auto;
+  margin: 0 3px;
+  vertical-align: middle;
+}
+.usage-move-line > span > .usage-move-percent {
+  width: 4.5em;
+}
+.usage-move-note {
+  margin: 2px 0 0 22px;
+  font-size: 12px;
 }
 /* On the right of the account's own line (HI-2107): what it needs now, On here and its ⋯, in the same place on every row. */
 .account-actions {
@@ -9489,7 +9519,10 @@ body.pane-resizing-v .monaco-editor {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Centred while it fits; in a short panel it starts at the top and scrolls, never spilling over the
+     workspace above or the footer below (HI-2198). */
+  justify-content: safe center;
+  overflow-y: auto;
   gap: 6px;
   padding: 20px;
   text-align: center;

@@ -65,7 +65,7 @@ import type {
   ToastAction
 } from '../shared/types'
 import { provider as providerAdapter, allProviders } from './providers'
-import { runSwitch, type SwitchOp } from './connectionSwitch'
+import { runSwitch, SwitchIntents, type SwitchOp, type UsageIntent } from './connectionSwitch'
 import { agentLaunchView, allAccounts, allConnections, checkAccount, firstUsableAccount, getConnection, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
 import { effortUsable, ensureMigrated, migrationDue } from './connectionMoves'
 import { resolveAgentConnection } from '../shared/accounts'
@@ -2209,18 +2209,32 @@ class SessionManager {
   private switches = new Map<string, SwitchOp>()
   /** Agents whose switch is resuming them now: that start is the switch's, not the user's. */
   private switchResuming = new Set<string>()
+  /**
+   * What each waiting switch is for (HI-2195, by liveId): `base`, HI-1755's own (a manual or fallback switch), and/or a
+   * usage move, committed at the safe point. A usage move dropped leaves a base switch to go on; one alone ends it.
+   */
+  private switchIntents = new Map<string, SwitchIntents>()
 
   /**
    * Switches an agent to the connection it would launch on now, at its next safe point (HI-1755, connectionSwitch.ts):
    * once its turn is over its CLI is ended with its own exit, and once that run has exited its last session is resumed,
    * once. 'waiting': one already waits (it resumes on the choice as it is then); 'notRunning': nothing to switch.
+   * `usage` (HI-2195): a usage move, whose commit writes the agent's connection at the safe point; without, the switch is
+   * HI-1755's own. Either joins a switch already waiting (one quit), each kept apart (dropUsageMove).
    */
-  switchAtSafePoint(projectPath: string, agentId: string): 'queued' | 'waiting' | 'notRunning' {
+  switchAtSafePoint(projectPath: string, agentId: string, usage?: UsageIntent): 'queued' | 'waiting' | 'notRunning' {
     projectPath = workspace.assertSessionHost(projectPath)
     const id = liveId(projectPath, agentId)
+    const waiting = this.switchIntents.get(id)
+    if (this.switches.has(id) && waiting) {
+      if (waiting.join(usage) && usage) void this.switches.get(id)!.done.then((e) => usage.ended(e))
+      return 'waiting'
+    }
     if (this.switches.has(id)) return 'waiting'
     const l = this.live.get(id)
     if (!l || l.state.status === 'stopped') return 'notRunning'
+    const intents = new SwitchIntents(usage)
+    this.switchIntents.set(id, intents)
     const { runId, sessionId } = l.state
     const label = userText(this.label(l.state))
     const hostOpen = (): boolean => !this.shuttingDown && !!workspaceFor(projectPath) && !workspaceFor(projectPath)?.closing
@@ -2230,6 +2244,8 @@ class SessionManager {
     const op = runSwitch({
       running,
       heldNow: () => this.safePointHeld(projectPath, agentId, runId),
+      // A usage move's write, once (HR1: checked under the agent's lock then); rejected, it is dropped alone.
+      commit: () => intents.commit(),
       quit: () => this.quit(projectPath, agentId, runId, { fenced: hostOpen, why: 'a switch of connection', ready: () => this.safePointHeld(projectPath, agentId, runId) }), // i18n-ignore: for the log
       resume: async () => {
         if (!hostOpen()) throw new Error('its workspace closed') // i18n-ignore: for the log
@@ -2248,8 +2264,10 @@ class SessionManager {
     this.switches.set(id, op)
     l.state.switchPending = true
     this.emitState(l.state)
+    if (usage) void op.done.then((e) => usage.ended(e))
     void op.done.then(() => {
       if (this.switches.get(id) === op) this.switches.delete(id)
+      if (this.switchIntents.get(id) === intents) this.switchIntents.delete(id)
       const st = this.live.get(id)?.state
       if (st?.switchPending) {
         st.switchPending = undefined
@@ -2257,6 +2275,20 @@ class SessionManager {
       }
     })
     return 'queued'
+  }
+
+  /**
+   * Drops an agent's usage move waiting for its safe point (HI-2195: the rule changed, the Advanced switch off, the user's
+   * own choice), never one already committed: a base switch it joined goes on; one alone is cancelled, nothing typed.
+   */
+  dropUsageMove(projectPath: string, agentId: string, why: string): void {
+    const id = liveId(projectPath, agentId)
+    if (this.switchIntents.get(id)?.drop() === 'cancel') this.switches.get(id)?.cancel(why)
+  }
+
+  /** Whether an agent's usage move waits for its safe point (HI-2195). */
+  usageMovePending(projectPath: string, agentId: string): boolean {
+    return !!this.switchIntents.get(liveId(projectPath, agentId))?.usagePending
   }
 
   /**

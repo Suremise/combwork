@@ -7,6 +7,7 @@ import { attachableSource, cardAttachments, cardHost, checkBatch, readCardAttach
 import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachments'
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
+import { LISTEN_RETRY_BOUND_MS, listenWithRetry } from './listenRetry'
 import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
@@ -28,7 +29,7 @@ import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, iso
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
-import { cardRequests, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView } from '../shared/toolReplies'
+import { cardRequests, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
 import { STOP_ASK_MS } from './mcp/agentApiCall'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
@@ -49,7 +50,8 @@ import { buildFactOf } from '../shared/buildFacts'
 import type { JournalSettings } from '../shared/journal'
 import { emit, onHiveEvent, toast } from './events'
 import { msg, tr } from '../shared/i18n'
-import { cancelWatch, encodeSince, onWatchPlacing, registerAgentWatch, registerLaneWatch, registerWatch, scopedCard } from './watches'
+import { addUsageToWatch, cancelWatch, encodeSince, onWatchPlacing, registerAgentWatch, registerLaneWatch, registerUsageWatch, registerWatch, scopedCard } from './watches'
+import { USAGE_WATCH_MAX, type UsageWatch } from '../shared/usageWatch'
 import { readLaneCards, readLaneCondition } from '../shared/laneWatch'
 import { agentBusy, AGENT_WATCH_MAX_AGENTS, type AgentNow, type WatchedAgent } from '../shared/agentWatch'
 import { alreadyThere, cardChange, cardOver, changesBetween, decodeSince, handoffsSince, markOf, movedIntoSince, readCondition, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_LIMIT_MINUTES, type CardChange, type CardMark } from '../shared/watch'
@@ -91,7 +93,7 @@ import { startTask } from './taskStart'
 import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
 import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
-import { connectionRef, connectionsFor, connectionsOn, usableConnections, workspaceAccounts, type ConnectionPatch } from '../shared/accounts'
+import { accountOnIn, connectionRef, connectionsFor, connectionsOn, usableConnections, workspaceAccounts, type ConnectionPatch } from '../shared/accounts'
 import { accountById, addConnection, allAccounts, allConnections, connectionProblem, firstUsableAccount, getConnection, hiveAccounts, updateConnection } from './accounts'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
@@ -1209,8 +1211,27 @@ route('GET', '/v1/connections', async () => {
   const ws = requireWorkspace()
   const wide = !agentCaller()
   const here = new Set(connectionsHere(ws).map((c) => c.id))
-  return { connections: allConnections().filter((c) => wide || here.has(c.id)).map((c) => connectionRow(c, here.has(c.id), wide)), accounts: connectionsFor(hiveAccounts(), workspaceConnections(ws), wide) }
+  const accounts = connectionsFor(hiveAccounts(), workspaceConnections(ws), wide)
+  return { connections: allConnections().filter((c) => wide || here.has(c.id)).map((c) => connectionRow(c, here.has(c.id), wide)), accounts, usage: accountUsageRows(accounts.map((a) => a.id)) }
 })
+
+/**
+ * Each account's plan usage as kept now (HI-2195): its weekly and 5-hour limits' shares and resets (those still in their
+ * period), and its usage move. Accounts with neither are left out.
+ */
+function accountUsageRows(ids: readonly string[]): AccountUsagePublic[] {
+  const now = Date.now()
+  const rows: AccountUsagePublic[] = []
+  for (const id of ids) {
+    const a = accountById(id)
+    if (!a) continue
+    const limits = (config.get().connectionPlanUsage?.[id]?.limits ?? []).filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now).map((l) => ({ label: l.label, usedPercent: Math.round(l.usedPercent * 10) / 10, resetsAt: l.resetsAt }))
+    const m = a.usageMove
+    const move = m ? { percent: m.percent, limit: m.limit, to: accountById(m.to)?.name ?? m.to } : undefined
+    if (limits.length || move) rows.push({ account: a.name, limits, ...(move ? { move } : {}) })
+  }
+  return rows
+}
 
 route('GET', '/v1/connections/:ref', async ({ params }) => {
   const ws = requireWorkspace()
@@ -3207,6 +3228,30 @@ const WAITS_PER_CALLER = 2
  * call waits itself, up to its longest (Settings → Advanced, #367), for a change since `since` (or since the call), driven by the board's
  * change events (no polling). A project agent waits only on its own project's cards.
  */
+/**
+ * A usage watch's accounts (HI-2195): each { account (its id or name), percent (1 to 100), limit (weekly, fiveHour or any,
+ * the default) }. A project agent names only accounts on in its workspace.
+ */
+function readUsageWatch(v: unknown, ws: WorkspaceService): UsageWatch[] {
+  const shape = 'usage must be a list of { account, percent, limit? }, limit weekly, fiveHour or any'
+  if (!Array.isArray(v) || !v.length) throw new HttpError(400, shape)
+  if (v.length > USAGE_WATCH_MAX) throw new HttpError(400, `at most ${USAGE_WATCH_MAX} accounts in one usage watch`)
+  const seen = agentCaller() ? hiveAccounts().filter((a) => accountOnIn(ws.config, a, allAccounts())) : hiveAccounts()
+  return v.map((x: { account?: unknown; percent?: unknown; limit?: unknown }) => {
+    if (!x || typeof x !== 'object' || typeof x.account !== 'string') throw new HttpError(400, shape)
+    const percent = Number(x.percent)
+    const limit = x.limit === undefined ? 'any' : x.limit
+    if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new HttpError(400, 'percent must be a whole number from 1 to 100')
+    if (limit !== 'weekly' && limit !== 'fiveHour' && limit !== 'any') throw new HttpError(400, shape)
+    const byId = seen.find((a) => a.id === x.account)
+    const byName = seen.filter((a) => a.name.toLowerCase() === String(x.account).toLowerCase())
+    if (!byId && byName.length > 1) throw new HttpError(409, `Several accounts are named "${x.account}": use its id (${byName.map((a) => a.id).join(', ')}).`)
+    const a = byId ?? byName[0]
+    if (!a) throw new HttpError(404, `No account named "${x.account}": hive_connection list names them.`)
+    return { account: a.id, name: a.name, percent, limit }
+  })
+}
+
 route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   const ws = requireWorkspace()
   // An agent's plain number that reads as another card's key is refused, never remapped (HI-2197).
@@ -3233,6 +3278,22 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const had = await cancelWatch(ws, who.projectPath, who.agentId)
     return { done: had ? `Cancelled your ${w?.lanes ? 'lane' : w?.agents ? 'agent' : 'card'} watch.` : 'You had no card watch.' }
   }
+  // A usage watch (HI-2195): accounts' limits reaching a share, alone or beside the cards or lanes; always one that wakes.
+  const usage = body?.usage !== undefined ? readUsageWatch(body.usage, ws) : undefined
+  if (usage !== undefined && (body.wake !== true || !who)) throw new HttpError(400, 'A usage watch wakes you (wake: true), for an agent or the Assistant.')
+  if (usage && body.lanes === undefined && body.cards === undefined) {
+    if (body.agents !== undefined || body.column !== undefined) throw new HttpError(400, 'usage goes alone, or beside cards or lanes')
+    const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
+    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, `limitMinutes must be from 1 to ${WATCH_MAX_LIMIT_MINUTES}`)
+    const r = await registerUsageWatch(ws, who!.projectPath, who!.agentId, usage, limit).catch((e: Error) => {
+      throw new HttpError(e.message.startsWith('Not a project') ? 400 : 409, e.message)
+    })
+    const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
+    if ('already' in r) return { usageAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}), ...left }
+    return { watching: r.watching.label, limitAt: r.watching.limitAt, ...(r.replaced ? { replaced: r.replaced } : {}), ...left }
+  }
+  // Beside cards or lanes: added to the watch they start (one already answered starts none).
+  const withUsage = async (label: string): Promise<string> => (usage ? ((await addUsageToWatch(ws, who!.projectPath, who!.agentId, usage))?.label ?? label) : label)
   // A lane watch (#531): whole lanes; always one that wakes. With cards beside them (#726): `cards` and their `changes`.
   if (body?.lanes !== undefined) {
     if (body.column !== undefined || body.fresh !== undefined) throw new HttpError(400, 'lanes goes without column or fresh: events says what counts on the lanes, changes on the cards beside them')
@@ -3266,7 +3327,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const r = await registerLaneWatch(ws, who.projectPath, who.agentId, lc, limit, { ...extra, ...(laneAgents ? { agents: { agents: laneAgents, ignoreBackground: false } } : {}) }).catch((e: Error) => {
       throw e instanceof HttpError ? e : new HttpError(/^(No such lane|Unknown task)/.test(e.message) ? 404 : /^(You can't watch yourself|Not a project)/.test(e.message) ? 400 : 409, e.message)
     })
-    return { watching: r.watching.label, limitAt: r.watching.limitAt, events: lc.events, ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
+    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events, ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
   }
   if (body?.agents !== undefined) throw new HttpError(400, 'agents goes with lanes (a lane watch, HI-1987): to watch agents alone, use hive_wait_for_agents (POST /v1/agents/wait)')
   const cond = readCondition(body ?? {})
@@ -3284,7 +3345,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const r = await registerWatch(ws, who.projectPath, who.agentId, cond, limit)
     const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
     if ('already' in r) return { already: r.already, ...left, ...withNames([r.already.number]) }
-    return { watching: r.watching.label, limitAt: r.watching.limitAt, ...left }
+    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, ...left }
   }
   const seconds = body?.timeoutSeconds === undefined ? 300 : Number(body.timeoutSeconds)
   // The longest is Settings → Advanced's (#367), under Codex's timeout for hive's tools.
@@ -4455,32 +4516,51 @@ const SSE_MAX_BUFFERED = 1024 * 1024
 /** The (re)start in progress: settings changed quickly twice restart the server one after the other. */
 let apiRestart: Promise<unknown> = Promise.resolve()
 
-export function startApiServer(): Promise<AgentApiInfo> {
-  const run = apiRestart.then(startApiServerNow)
+/** The start whose listen is under way (tried again while its port is in use): stopApiServer aborts it. */
+let apiListening: AbortController | null = null
+
+/**
+ * Starts (or restarts) the server. retryInUse: a port in use is tried again for a few seconds (listenRetry.ts) — start-up
+ * passes it after an unexpected close (HI-2196), when the copy just ended may still hold its port; any other start, a
+ * settings change's among them, fails at once as before.
+ */
+export function startApiServer({ retryInUse = false }: { retryInUse?: boolean } = {}): Promise<AgentApiInfo> {
+  const run = apiRestart.then(() => startApiServerNow(retryInUse))
   apiRestart = run.catch(() => undefined)
   return run
 }
 
-async function startApiServerNow(): Promise<AgentApiInfo> {
+async function startApiServerNow(retryInUse: boolean): Promise<AgentApiInfo> {
   await stopApiServer()
   apiError = undefined
   if (!apiToken) apiToken = await loadToken()
   await loadViewerTokens()
-  // Runs with the Agent API off too, for the Hive Assistant's token alone (see handleApi).
-  apiServer = http.createServer((req, res) => void handleApi(req, res))
+  const port = apiPort()
+  const listening = new AbortController()
+  apiListening = listening
   try {
-    await new Promise<void>((resolve, reject) => {
-      apiServer!.once('error', reject)
-      apiServer!.listen(apiPort(), '127.0.0.1', () => {
-        apiServer!.off('error', reject)
-        resolve()
-      })
+    // Runs with the Agent API off too, for the Hive Assistant's token alone (see handleApi).
+    const got = await listenWithRetry(() => http.createServer((req, res) => void handleApi(req, res)), port, '127.0.0.1', {
+      retry: retryInUse,
+      signal: listening.signal,
+      onWait: () => log.info(`Agent API: port ${port} is in use after an unexpected close; trying again for up to ${LISTEN_RETRY_BOUND_MS / 1000} s`)
     })
-    log.info(`Agent API listening on 127.0.0.1:${apiPort()}`)
+    // Stopped just as it listened: never the server of a start that was stopped.
+    if (listening.signal.aborted) {
+      got.server.close()
+      return apiInfo()
+    }
+    apiServer = got.server
+    log.info(`Agent API listening on 127.0.0.1:${port}${got.tries > 1 ? ` after ${got.tries} tries in ${got.waitedMs} ms` : ''}`)
   } catch (e) {
-    apiError = (e as NodeJS.ErrnoException).code === 'EADDRINUSE' ? `Port ${apiPort()} is already in use` : (e as Error).message
-    log.warn(`Agent API failed to start: ${apiError}`)
+    // Stopped while it was being tried again: whatever stopped it has the server and the discovery file now.
+    if ((e as Error).name === 'AbortError') return apiInfo()
+    const tries = (e as { tries?: number }).tries ?? 1
+    apiError = (e as NodeJS.ErrnoException).code === 'EADDRINUSE' ? `Port ${port} is already in use` : (e as Error).message
+    log.warn(`Agent API failed to start: ${apiError}${tries > 1 ? ` (after ${tries} tries)` : ''}`)
     apiServer = null
+  } finally {
+    if (apiListening === listening) apiListening = null
   }
   // Another app finds a running Hive's API by the discovery file (#620): there while the Agent API listens.
   const info = apiInfo()
@@ -4490,6 +4570,8 @@ async function startApiServerNow(): Promise<AgentApiInfo> {
 }
 
 export async function stopApiServer(): Promise<void> {
+  apiListening?.abort()
+  apiListening = null
   for (const c of sseClients.keys()) c.end()
   sseClients.clear()
   if (apiServer) await new Promise<void>((resolve) => apiServer!.close(() => resolve()))

@@ -11,6 +11,7 @@ import { Icon, IconButton, Switch, useContextMenu, type MenuEntry } from './ui'
 import { cx, timeAgo } from '../util'
 import { TerminalView } from './TerminalView'
 import { ProviderIcon } from './ProviderIcon'
+import { UsageMoveRuleRow } from './UsageMoveRule'
 import { AddConnectionDialog, MaskingBanner, ServerConnectionDetail, setUpConnection, setUpHint, setUpLabel } from './ServerConnections'
 
 /**
@@ -424,6 +425,8 @@ export function AccountsSettings() {
                   {state === 'changed' && a.accepted && o?.email && <div className="account-warning" data-warning="changed"><Icon name="warning" /> {tr(M.changedTo, { now: o.email, was: a.accepted.email })}</div>}
                   {same && <div className="account-warning" data-warning="duplicate"><Icon name="warning" /> {tr(M.sameLogin, { names: fmt.list(same.map(nameOf)) })}</div>}
                   {a.leftover && <div className="account-warning" data-warning="leftover"><Icon name="warning" /> {tr(M.leftover, { what: a.leftover })}</div>}
+                  {/* Its usage move (HI-2195): a sign-in's plan limits; to another account of its CLI. */}
+                  {!server && !a.leftover && <UsageMoveRuleRow account={a} others={view.connections.filter((other) => other.id !== a.id && other.provider === a.provider && !other.leftover)} />}
                 </div>
                 <div className="account-actions">
                   {/* What it needs now stays a button; the rest is in its ⋯. */}

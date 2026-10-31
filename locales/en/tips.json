@@ -2007,6 +2007,14 @@
     "defaultMessage": "Bring a branch up to date with its target",
     "description": "A tip's title."
   },
+  "tips.usageMoves.text": {
+    "defaultMessage": "On an account in Settings → Accounts & Connections, tick When it reaches 98% of its weekly limit, move its agents to another account: they move once their turn is over and carry on there.",
+    "description": "A tip (HI-2195). Names of Hive's menus, views, settings and commands: keep them as Hive shows them; the rule is quoted as the setting shows it."
+  },
+  "tips.usageMoves.title": {
+    "defaultMessage": "Move agents before a plan runs out",
+    "description": "A tip's title (HI-2195): an account's agents move to another account when its plan's usage reaches a share."
+  },
   "tips.versionControlSwitch.text": {
     "defaultMessage": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Hive offers the switch there.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: None, Git, Version Control, old rules, workflow). Keep git init as it is (a command)."

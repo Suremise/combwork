@@ -319,6 +319,50 @@
     "defaultMessage": "{window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} {used, number, percent}",
     "description": "An account's plan usage in Settings → Accounts & Connections (HI-2107), once per account: a limit's window (the 5-hour one, the weekly one, or the provider's own name for another) and how much of it is used."
   },
+  "settings.accounts.usageMove.any": {
+    "defaultMessage": "either limit",
+    "description": "An entry of the list in an account's usage move (\"When it reaches 98% of either limit…\", HI-2195): its weekly or its 5-hour limit, whichever gets there first."
+  },
+  "settings.accounts.usageMove.failed": {
+    "defaultMessage": "Couldn't change the usage move",
+    "description": "An error's title: saving an account's usage move failed (Settings → Accounts & Connections, HI-2195)."
+  },
+  "settings.accounts.usageMove.fiveHour": {
+    "defaultMessage": "its 5-hour limit",
+    "description": "An entry of the list in an account's usage move (\"When it reaches 98% of its 5-hour limit…\", HI-2195): its plan's rolling 5-hour usage limit."
+  },
+  "settings.accounts.usageMove.how": {
+    "defaultMessage": "Each agent moves to the connection with the same name there, or its first one, once its turn is over, and resumes its conversation. The Hive Assistant stays where it is (Settings → Assistant). Hive moves them once per limit period and never back: move one back by choosing its connection.",
+    "description": "Under an account's usage move when it is on (Settings → Accounts & Connections, HI-2195): what happens."
+  },
+  "settings.accounts.usageMove.limitLabel": {
+    "defaultMessage": "Which limit",
+    "description": "The label, for screen readers, of the list of limits in an account's usage move (HI-2195)."
+  },
+  "settings.accounts.usageMove.offInAdvanced": {
+    "defaultMessage": "Usage moves are turned off in Settings → Advanced: this one does nothing until they are on.",
+    "description": "Under an account's usage move (HI-2195) while Settings → Advanced → Move agents at a usage threshold is off. Settings → Advanced names a section."
+  },
+  "settings.accounts.usageMove.percentLabel": {
+    "defaultMessage": "Share of the limit",
+    "description": "The label, for screen readers, of the number box in an account's usage move (HI-2195): at how many percent of its limit its agents move."
+  },
+  "settings.accounts.usageMove.rule": {
+    "defaultMessage": "When it reaches {percent}% of {limit}, move its agents to {target}",
+    "description": "An account's usage move in Settings → Accounts & Connections (HI-2195), after a checkbox that turns it on. {percent} is a box for a number (98), {limit} a list (its weekly limit, its 5-hour limit, either limit), {target} a list of the CLI's other accounts. Keep all three; their order may change."
+  },
+  "settings.accounts.usageMove.targetLabel": {
+    "defaultMessage": "Account to move to",
+    "description": "The label, for screen readers, of the list of accounts in an account's usage move (HI-2195)."
+  },
+  "settings.accounts.usageMove.turnOn": {
+    "defaultMessage": "Move this account's agents to another account at a usage threshold",
+    "description": "The checkbox's label for screen readers and its tooltip (Settings → Accounts & Connections, HI-2195): turns the account's usage move on or off."
+  },
+  "settings.accounts.usageMove.weekly": {
+    "defaultMessage": "its weekly limit",
+    "description": "An entry of the list in an account's usage move (\"When it reaches 98% of its weekly limit…\", HI-2195): its plan's weekly usage limit."
+  },
   "settings.accounts.usedBy": {
     "defaultMessage": "{assistant, select, yes {{n, plural, =0 {Assistant} one {Assistant and # agent} other {Assistant and # agents}}} other {{n, plural, =0 {Not used here} one {# agent} other {# agents}}}}",
     "description": "Who uses a connection, on its row (Settings → Accounts & Connections, HI-2107): the Assistant (assistant is yes) and how many agents ({n}) of the open workspaces. Its tooltip names them. \"Not used here\": none in the open workspaces."
@@ -1382,6 +1426,14 @@
   "settings.advanced.error.text": {
     "defaultMessage": "{title} takes text.",
     "description": "Why an advanced setting's new value isn't taken. {title} is the setting's title."
+  },
+  "settings.advanced.hive.accounts.usageMoves.desc": {
+    "defaultMessage": "Move an account's agents to another account when it reaches the share of its limit set on it in Settings → Accounts & Connections. Turned off, no account moves its agents and moves waiting for an agent's turn to end are dropped; the rules are kept.",
+    "description": "What the advanced setting \"Move agents at a usage threshold\" does (Settings → Advanced, under Hive). Settings → Accounts & Connections names a section."
+  },
+  "settings.advanced.hive.accounts.usageMoves.title": {
+    "defaultMessage": "Move agents at a usage threshold",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Hive. An account in Settings → Accounts & Connections can move its agents to another account when it has used a share of its plan's limit."
   },
   "settings.advanced.hive.assistant.startView.desc": {
     "defaultMessage": "While the Hive Assistant's journal is on, Hive gives it a short view of the workspace when it starts and after each compaction: what is under way and waiting, and the journal's recent entries. Turned off, it gets none from its next start or compaction on, a running Assistant too, and reads what it needs with its tools.",

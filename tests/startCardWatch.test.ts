@@ -109,7 +109,7 @@ describe("a builder's own start in a slot ends its watch (HI-2197)", () => {
 })
 
 describe("a watch and a builder's own start at once (HI-2197, HR3's race)", () => {
-  it('the start first: a card, lane or agent watch is refused while its placement is due; cancel still works', async () => {
+  it('the start first: a card, lane, agent or usage watch is refused while its placement is due; cancel still works', async () => {
     const { w, repo } = await workspace()
     const old = await create(w, 'Earlier card', 'passed')
     const next = await create(w, 'Next card')
@@ -120,6 +120,7 @@ describe("a watch and a builder's own start at once (HI-2197, HR3's race)", () =
     await expect(inWorkspace(w, () => watches.registerWatch(w, repo, 'a1', { cards: [old], changes: ['comment'] }))).rejects.toThrow(refused)
     await expect(inWorkspace(w, () => watches.registerLaneWatch(w, repo, 'a1', { ids: 'all', events: ['failed'] }))).rejects.toThrow(refused)
     await expect(inWorkspace(w, () => watches.registerAgentWatch(w, repo, 'a1', { agents: [{ projectPath: repo, agentId: 'a2', name: 'Reviewer', project: 'p' }], ignoreBackground: false }))).rejects.toThrow(refused)
+    await expect(inWorkspace(w, () => watches.registerUsageWatch(w, repo, 'a1', [{ account: 'a-acct1', name: 'Max 1', percent: 98, limit: 'weekly' }]))).rejects.toThrow(refused)
     expect(watches.watchFor(repo, 'a1')).toBeNull()
     expect(await inWorkspace(w, () => watches.cancelWatch(w, repo, 'a1'))).toBe(false)
     // Another agent's watch isn't held: nothing is coming to it.
