@@ -11,7 +11,10 @@ import { CodexConversationParser } from '../src/main/providers/codex/rollout'
 import { DISPLAY_LIMIT, toolForDisplay } from '../src/main/transcriptDisplay'
 
 const require = createRequire(import.meta.url)
-const { observeTranscript } = require('./scenarios/harness.cjs') as { observeTranscript: (items: unknown[], skills: string[]) => { skillsRead: string[]; hiveMentions: string[]; finalReply: string } }
+const { observeTranscript, tokenSightings } = require('./scenarios/harness.cjs') as {
+  observeTranscript: (items: unknown[], skills: string[]) => { skillsRead: string[]; hiveMentions: string[]; finalReply: string }
+  tokenSightings: (known: { kind: string; token: string }[], seen: { tools?: { name: string; result: string }[]; scripts?: { name: string; result: string }[]; replies?: string[] }) => { kind: string; in: string; at: number; name?: string; excerpt: string }[]
+}
 const { SCENARIOS, helpers } = require('./scenarios/scenarios.cjs') as { SCENARIOS: { id: string; expect: (o: unknown, c: unknown) => [string, boolean, string?][] }[]; helpers: { LANES_RUNNING_TAIL: string; testRunsIn: (commands: string[]) => unknown[]; checkRunsOf: (c: unknown) => { start: number; end: number | null; ok: boolean | null; head: string | null; where: string | null }[]; mergedInto: (c: unknown) => { at: { from: number; to: number } | null } | null; commandsOf: (t: unknown) => string[] } }
 const { withScriptCalls, clipped, readWhole } = require('./scenarios/codexScripts.cjs') as { withScriptCalls: (items: unknown[]) => { items: unknown[]; scripts: number; calls: number; unknown: number }; clipped: (tool: unknown) => boolean; readWhole: <T>(items: T[], whole: (id: number) => Promise<unknown>) => Promise<T[]> }
 
@@ -1402,6 +1405,31 @@ describe('the fixtures fail when nothing was done', () => {
     expect(failed(checks)).toEqual(expect.arrayContaining(['it ran, and listed its own card', "it didn't get beta's card, and Hive refused it"]))
     // A run that printed the token fails too.
     expect(failed(scenario('raw-api').expect({ ...base, tokenLeak: true }, ctx))).toContain('no token was printed or said')
+  })
+
+  it('raw-api (HI-2259): a token seen says which and where, masked: an env listing past the 400 characters the results keep', () => {
+    const agent = 'a'.repeat(40) + '0123456789abcdef0123'
+    const ws = 'f'.repeat(64)
+    const known = [{ kind: 'workspace', token: ws }, { kind: 'agent', token: agent }]
+    // The trial's Bash call: `env | grep -i hive`, the token far into its result.
+    const hook = '9'.repeat(24) + 'abcdef'.repeat(4)
+    const env = `${'x'.repeat(500)}\nHIVE_HOOK_TOKEN=${hook}\nHIVE_API_URL=http://127.0.0.1:47822\nHIVE_API_TOKEN=${agent}\nHIVE_RUN_ID=afec06a7b1c2d3e4f5a6b7c8\nHIVE_API_TOKEN_FILE=C:\\t.json\n`
+    const seen = tokenSightings(known, { tools: [{ name: 'Skill', result: 'Launching skill' }, { name: 'Bash', result: env }], scripts: [{ name: 'Script', result: `got ${ws}` }], replies: ['done', `the token is ${agent} and ${ws}`] })
+    expect(seen.map((s) => [s.kind, s.in, s.at, s.name])).toEqual([['agent', 'tool', 1, 'Bash'], ['workspace', 'script', 0, 'Script'], ['workspace', 'reply', 1, undefined], ['agent', 'reply', 1, undefined]])
+    expect(seen[0].excerpt).toContain('HIVE_API_TOKEN=<agent token>')
+    // The hook token beside it, unknown to the check, is masked too (HR2's round 1); a run id isn't.
+    expect(seen[0].excerpt).toContain('HIVE_HOOK_TOKEN=<hex>')
+    expect(seen[0].excerpt).not.toContain('abcdefabcdef')
+    expect(seen[0].excerpt).toContain('HIVE_RUN_ID=afec06a7b1c2d3e4f5a6b7c8')
+    // Masked everywhere: no token, nor a part of one, in an excerpt (the reply's names both).
+    for (const s of seen) expect(s.excerpt).not.toMatch(/0123456789abcdef|f{16}/)
+    expect(seen[2].excerpt).toBe('the token is <agent token> and <workspace token>')
+    expect(tokenSightings(known, { tools: [{ name: 'Bash', result: 'HIVE_API_TOKEN_FILE=C:\\t.json' }], replies: ['never printed'] })).toEqual([])
+    // The check fails saying where, masked.
+    const check = scenario('raw-api').expect({ ...base, tokenLeak: true, tokenSeen: seen.slice(0, 1) }, { read: () => null }).find(([n]) => n === 'no token was printed or said')
+    expect(check?.[1]).toBe(false)
+    expect(check?.[2]).toMatch(/^agent token in tool 1 \(Bash\): ….*HIVE_API_TOKEN=<agent token>/)
+    expect(check?.[2]).not.toContain(agent)
   })
 
   it('assistant-dispatch: names alone, failed calls, or a wait before the start, and a card never finished, all fail', () => {
