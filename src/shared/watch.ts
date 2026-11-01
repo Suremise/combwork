@@ -231,8 +231,15 @@ export function ownCut(card: TaskCard, self: string, after: string, told?: Basel
   // Its column then: the last move in what it had seen (none kept: as it is now).
   const into = history.findLast((e) => intoColumn(e.what))
   const cut = { ...card, history, comments, column: into ? intoColumn(into.what)! : card.column }
-  return { mark: markOf(cut), seen: seenOf(cut) }
+  // Its agent then isn't kept by id (a history line names a board name): given to someone or taken from it by another
+  // since, the agent it had is unknown (HR1's round 1 finding: the agent as it is now swallowed that reassignment), so the
+  // watch counts it; else the card's agent as it is now, unchanged since.
+  const handed = card.history.slice(history.length).some((e) => HANDS.test(e.what) && e.by !== self)
+  return { mark: { ...markOf(cut), ...(handed ? { agent: AGENT_UNKNOWN } : {}) }, seen: seenOf(cut) }
 }
+
+/** A starting mark's agent no card has (ownCut: the card was reassigned since, from an agent not known): any agent differs from it. */
+const AGENT_UNKNOWN = '?'
 
 /**
  * What changed on one card since a watch's starting point (`base`), of the kinds that count (a card gone or archived
