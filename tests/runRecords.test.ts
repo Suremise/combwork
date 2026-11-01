@@ -25,7 +25,11 @@ const jobs = vi.hoisted(() => ({
   /** Told as a helper is made ready (`ensure`), before it answers (HI-2055: a loss then). */
   onEnsure: () => undefined as void,
   /** Told as a launch's job is made (`add`), before it answers (HI-2055: a loss then). */
-  onAdd: () => undefined as void
+  onAdd: () => undefined as void,
+  /** Processes still running, "pid:created" (HI-2303: an earlier Hive's helper, keeping). */
+  alive: new Set<string>(),
+  /** The host can't say which still run. */
+  identifyFails: false
 }))
 vi.mock('../src/main/processSupervisor', async (orig) => {
   const next = (): number => Math.max(2, jobs.last + 1)
@@ -64,6 +68,8 @@ vi.mock('../src/main/processSupervisor', async (orig) => {
       if (cmd === 'kill' || cmd === 'forget') return true
       // Configured as a keeper (HI-2055): each helper its own identity.
       if (cmd === 'keeper') return `${4000 + jobs.instance}:1`
+      // Which processes still run (HI-2303: a binding's helper, "pid:created"): those the test says.
+      if (cmd === 'identify') return jobs.identifyFails ? null : run!.split(',').filter((id) => jobs.alive.has(id))
       if (cmd !== 'list') return null
       jobs.listed.push(run!)
       jobs.onList(run!)
@@ -427,6 +433,69 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       expect(m.keeperStillBound('k-later', '4002:1')).toBe(true)
       await m.leftoversSaved()
       expect((JSON.parse(readFileSync(file, 'utf8')) as { revoked?: string[] }).revoked).toEqual(['4001:1'])
+    })
+
+    /**
+     * HI-2303: bindings are kept by need, not by age. A busy day's launches (160 here, past the old bound of 100) settle
+     * as they go, and the few still holding a slot's writer, bound first, stay through a quit and a restart, where their
+     * keepers' "ended" settles them.
+     */
+    it.runIf(process.platform === 'win32')('kept by need: 160 settled launches after them never push out the oldest still holding a writer, through a quit and a restart', async () => {
+      const m = await tracking()
+      const held = ['u-1', 'u-2', 'u-3']
+      for (const run of held) {
+        m.runTookWriter(run)
+        expect(await track(m, run)).toBe(true)
+      }
+      for (let i = 0; i < 160; i++) {
+        const run = `s-${i}`
+        if (i % 2) m.runTookWriter(run)
+        expect(await track(m, run)).toBe(true)
+        // Ended, or kept running by the user: with a writer, its release written; without one, nothing to free.
+        m.settleRunForTests(run, i % 3 ? 'ended' : 'kept')
+        if (i % 2) m.runWriterReleased(run)
+      }
+      // Their processes not known to have ended (kept, the job lost): their writers stay held, so their bindings do too.
+      for (const run of held) m.settleRunForTests(run, 'unknown')
+      for (const run of held) expect(m.keeperStillBound(run, '4001:1')).toBe(true)
+      expect(m.keeperStillBound('s-0', '4001:1')).toBe(false)
+      expect(m.keeperStillBound('s-159', '4001:1')).toBe(false)
+      // Hive quits.
+      await m.recordEndedLaunches()
+      await m.leftoversSaved()
+      expect(Object.keys((JSON.parse(readFileSync(file, 'utf8')) as { helpers?: Record<string, string> }).helpers ?? {}).sort()).toEqual(held)
+      // The next start: each one's keeper says it ended, and its writer settles by it.
+      const next = await restarted()
+      for (const run of held) plantState(run, state(run))
+      for (const run of held) expect(await next.keeperState(run, HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
+      next.forgetKeeperRun('u-1')
+      expect(next.keeperStillBound('u-1', '4001:1')).toBe(false)
+      await next.leftoversSaved()
+      expect(Object.keys((JSON.parse(readFileSync(file, 'utf8')) as { helpers?: Record<string, string> }).helpers ?? {}).sort()).toEqual(['u-2', 'u-3'])
+      expect(await next.keeperState('u-2', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
+    })
+
+    it.runIf(process.platform === 'win32')("an earlier Hive's binding goes at the start only when its helper has gone and left no state: one keeping, or with a state, stays", async () => {
+      writeFileSync(file, JSON.stringify({ version: 1, launches: [], helpers: { 'o-gone': '4007:1', 'o-state': '4007:1', 'o-keeping': '4008:1' } }))
+      jobs.instance = 1
+      jobs.alive = new Set(['4008:1'])
+      try {
+        const m = await restarted()
+        plantState('o-state', state('o-state', { helper: '4007:1' }))
+        await m.pruneKeeperStates()
+        await m.leftoversSaved()
+        expect((JSON.parse(readFileSync(file, 'utf8')) as { helpers?: Record<string, string> }).helpers).toEqual({ 'o-state': '4007:1', 'o-keeping': '4008:1' })
+        expect(await m.keeperState('o-state', HIVE)).toEqual({ state: 'ended', helper: '4007:1' })
+        // Which still run can't be told (the host doesn't answer): none goes.
+        writeFileSync(file, JSON.stringify({ version: 1, launches: [], helpers: { 'o-gone': '4007:1' } }))
+        jobs.identifyFails = true
+        const unsure = await restarted()
+        await unsure.pruneKeeperStates()
+        expect(unsure.keeperStillBound('o-gone', '4007:1')).toBe(true)
+      } finally {
+        jobs.alive = new Set()
+        jobs.identifyFails = false
+      }
     })
   })
 })

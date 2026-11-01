@@ -1006,6 +1006,8 @@ export interface PoolDeps {
    * (a release that couldn't be written). A writer of a Hive that is gone is cleared only as `writerGone` says.
    */
   writerOver?: (w: SlotWriter) => boolean | Promise<boolean>
+  /** Told once a refresh has cleared such a writer (HI-2303): its run's records go. */
+  overCleared?: (run: string) => void
   /**
    * Whether a writer of a Hive that has gone is settled (HI-1886): its run's processes were seen to end (kept in Hive's
    * profile, or by its keeper, HI-2055). Otherwise it stays held until the user releases the slot. `settles` gives what
@@ -1505,7 +1507,10 @@ export class SlotPool {
       if (this.closed) return
       // A writer whose run is over, its processes known to have ended, but not cleared (its release couldn't be written).
       if (s.writer && (await this.deps.writerOver?.(s.writer))) {
-        if (await this.store.clearWriter(s.name, s.writer.run)) await this.drained(s.name)
+        if (await this.store.clearWriter(s.name, s.writer.run)) {
+          this.deps.overCleared?.(s.writer.run)
+          await this.drained(s.name)
+        }
         continue
       }
       if (await this.settleGone(s)) continue

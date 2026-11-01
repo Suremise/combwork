@@ -535,10 +535,24 @@ export function goneWriterStill(evidence: GoneEvidence): () => void {
   }
 }
 
-/** A gone Hive's writer cleared (HI-1886): its run's kept record is no longer needed, nor its keeper's (HI-2055). */
-export function goneWriterCleared(run: string, evidence?: GoneEvidence): void {
+/**
+ * A writer cleared other than by its own release (HI-2303): by the user (Release Slot…), or by a refresh of this Hive
+ * (`writerOver`). Nothing reads its run's records again: its kept record, its keeper's binding and state go.
+ */
+export function writerCleared(run: string): void {
+  released.delete(run)
+  runWriterReleased(run)
   forgetEarlierRun(run)
-  if (evidence?.helper) forgetKeeperRun(run)
+  forgetKeeperRun(run)
+}
+
+/**
+ * A gone Hive's writer cleared (HI-1886): its run's kept record is no longer needed, nor its keeper's (HI-2055), whichever
+ * proof cleared it (HR1 on HI-2303: a run can have both, and one cleared by its kept record left its binding behind).
+ */
+export function goneWriterCleared(run: string, _evidence?: GoneEvidence): void {
+  forgetEarlierRun(run)
+  forgetKeeperRun(run)
 }
 
 /**
@@ -595,7 +609,7 @@ export async function releaseHeldWriter(projectPath: string, slot: string, run: 
   }
   const { ws, project } = await hostOf(projectPath)
   if (!(await new SlotStore(boardConn(ws), project).clearWriter(slot, run, o.guard))) throw changed()
-  released.delete(run)
+  writerCleared(run)
   log.info(`The slot writer ${run} on ${userText(slot)} released by the user (its Hive ${w.hive.self ? 'this one' : `process ${w.hive.pid}, gone`}${o.end && w.processes ? ', its listed processes ended first' : ''})`)
   await writerHost.drained(projectPath, slot)
 }

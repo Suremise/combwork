@@ -3979,6 +3979,12 @@ Whether a conversation may resume there is its **hold** (none: it may):
     and past 4096 exits kept the jobs concerned can no longer be told complete), then lets it go; it exits once it holds none, and says `keeping` first, so a quit doesn't
     wait for it. It ends nothing. A quit whose agents kept nothing running leaves none behind.
     - Each tracked run is bound to its helper (`leftovers.json`'s `helpers`, "pid:created") as it is given its job.
+      Bindings are kept by need, never by age (HI-2303: kept to the newest 100, a busy day's launches pushed out the
+      binding of a run still holding a slot's writer, so its keeper's `ended` freed nothing): each stays until settled,
+      that is its writer released or cleared (its own release, Release Slot…, a refresh, or settled at a start), its run
+      known to have taken no writer (its outcome known), its helper revoked, or, at a start, an earlier Hive's helper gone
+      with no state written for the run (only that helper writes one, before it exits). What stays is bounded by the
+      running launches and the held slots; past 100 it is logged, and none is ever cut.
       A gone Hive's writer is settled by a state only when it is whole and its own: the run's file, at most 64 KB,
       version 1, its run, its Hive (the writer's "pid:started"), the helper its run is bound to and not revoked,
       `observed: complete`, and `ended` with no member and total 0 (`keeperState`). The clear checks that binding again
