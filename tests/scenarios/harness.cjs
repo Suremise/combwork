@@ -339,6 +339,35 @@ function environmentAdvice(why, providerKey) {
 }
 
 /**
+ * Claude Code's memory of the folders in and under `root` (HI-2260): its auto-memory is kept in its home, in
+ * `projects/<the folder's path, each character but a letter or digit a dash>/memory`, so a later trial in the same
+ * folder (each trial of a scenario has the same one) would start from what an earlier one remembered. Removes those
+ * `memory` folders only, never a transcript. The name can't tell a dash from a path separator, so a sibling named as
+ * `root` and a dash (the same scenario's evidence folder `<id>-2`, run.mjs) is forgotten too, which is as wanted;
+ * `<id>2` or any other name isn't. Returns the folders removed.
+ */
+function forgetClaudeMemory(home, root) {
+  const name = path.resolve(root).replace(/[^A-Za-z0-9]/g, '-').toLowerCase()
+  const projects = path.join(home, 'projects')
+  let entries = []
+  try {
+    entries = fs.readdirSync(projects, { withFileTypes: true })
+  } catch {
+    return []
+  }
+  const removed = []
+  for (const e of entries) {
+    const n = e.name.toLowerCase()
+    if (!e.isDirectory() || (n !== name && !n.startsWith(`${name}-`))) continue
+    const memory = path.join(projects, e.name, 'memory')
+    if (!fs.existsSync(memory)) continue
+    fs.rmSync(memory, { recursive: true, force: true, maxRetries: 3 })
+    removed.push(memory)
+  }
+  return removed
+}
+
+/**
  * Runs `sc` with `providerKey` (fake, claude-code or codex). `opts`: { model, effort, timeoutMs, port, keep, workRoot,
  * signedOut (a fake only: it acts out an expired sign-in, for checking the environment skip; 'launch': one that stops it
  * at launch; 'late': one shown only once the prompt is sent, #1321) }.
@@ -372,6 +401,9 @@ async function runScenario(sc, providerKey, opts = {}) {
       return { scenario: sc.id, title: sc.title, provider: providerKey, model: opts.model ?? '(default)', role: sc.role ?? 'agent', checks: [], observed: null, usage: null, measures: null, seconds: 0, error: `its folder ${root} is still in use from an earlier run (${e.code ?? e.message}): something left running holds it` }
     }
   }
+  // What the real Claude Code remembered in an earlier trial in these folders (its auto-memory, kept in its test home by
+  // folder path, the same path each trial of a scenario) is forgotten, so no trial starts from another's (HI-2260).
+  if (providerKey === 'claude-code') forgetClaudeMemory(CLAUDE_TEST_HOME, root)
   fs.mkdirSync(fakeHome, { recursive: true })
   if (providerKey === 'fake-codex') {
     fs.mkdirSync(fakeCodexHome, { recursive: true })
@@ -1017,4 +1049,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, observeTranscript, tokenSightings, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, forgetClaudeMemory, observeTranscript, tokenSightings, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }

@@ -290,7 +290,7 @@
   "workflow.refused.move.doingNobody.next": "{reader, select, you {Choose nobody on it, an agent on it, or an agent started on it.} other {Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (hive_start_task).}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {These rules are set in Version Control, where you can change them.} other {These rules are set in Version Control, where the user can change them.}}",
   "workflow.refused.move.needsOverride.message": "Moving {card} to {stage} skips: {rules}.",
-  "workflow.refused.move.needsOverride.next": "{reader, select, you {Moving it anyway needs your reason: one you gave for it, or one you give once told which rules this skips.} other {Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.}}",
+  "workflow.refused.move.needsOverride.next": "{reader, select, you {Moving it anyway needs your reason: one you gave for it, or one you give once told which rules this skips.} other {Move it anyway only with the user's reason. One they gave with their request is enough (\"I merged it by hand\", say): move it again with override and that reason, in their words. With none, tell them which rules this skips and ask for theirs.}}",
   "workflow.refused.move.noStage.change": "A project's steps follow its options in Version Control.",
   "workflow.refused.move.noStage.message": "{card} can't go to {stage}: this project's rules have no such step.",
   "workflow.refused.move.noStage.next": "Move it to one of its steps: {stages}.",

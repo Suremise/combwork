@@ -941,6 +941,80 @@ describe('the submit scenarios count a question about committing, never a notice
     expect(checks('intent-submit-commit', { ...done, status: 'waiting' }, 'h1')[NOTHING]).toBe(true)
     expect(checks('intent-submit-commit', { ...done, tools: [{ name: 'AskUserQuestion', input: 'question: Push it as well?' }], status: 'waiting' }, 'h1')[NOTHING]).toBe(false)
   })
+
+  it('a conditional asks only when it offers to do something (HI-2260): a remark on how things stand asks nothing', () => {
+    const done = { hiveCalls: [call('hive_submit', { card: '#1', summary: 's' })], column: 'review', submitted: true }
+    // The Haiku trial's reply (2026-10-31T20-08-55-claude-code, s1): a remark, no offer.
+    expect(checks('intent-submit-commit', { ...done, finalReply: 'name.trim() throws if name is not a string. I noted this in the submission summary. If you want that case handled, it is a small follow-up.' }, 'h1')[NOTHING]).toBe(true)
+    for (const reply of ["If you'd like, I can push it as well.", 'If you want, I will add a test for empty names.', 'If you want it handled, say so.', 'Want me to push it too.']) {
+      expect({ reply, asked: checks('intent-submit-commit', { ...done, finalReply: reply }, 'h1')[NOTHING] }).toEqual({ reply, asked: false })
+    }
+  })
+})
+
+describe('the HI-2260 check fixes', () => {
+  const { asksTheUser } = helpers as unknown as { asksTheUser: (t: string) => boolean }
+  const byName = (id: string, o: object, c: object) => Object.fromEntries(SCENARIOS.find((s) => s.id === id)!.expect(o, c).map(([name, ok]) => [name, ok]))
+
+  it('asksTheUser: a decision put to the user by name asks; saying there is none does not', () => {
+    // The Haiku trials' replies (assistant-doing-nobody s1, s2).
+    expect(asksTheUser('Decision for you on AL-2, with my recommendation:\n- **Assign Coder to AL-2.**')).toBe(true)
+    expect(asksTheUser('I need one decision from you on AL-2:\n- **Assign Implementer.**')).toBe(true)
+    for (const none of ['Nothing needs a decision from you right now.', 'No decision needed from you.', 'Decisions for you: none.', 'Nothing needs your decision right now.']) expect({ none, asks: asksTheUser(none) }).toEqual({ none, asks: false })
+  })
+
+  it("assistant-look-lanes: a hive_lane call naming no action changes no lane; a refused start still counts", () => {
+    const NONE = 'started, joined or ended none'
+    const lane = (args: object, ok: boolean) => ({ tool: 'hive_lane', args: JSON.stringify(args), ok })
+    const o = (calls: object[]) => ({ hiveCalls: calls, finalReply: 'AL-1', cards: {} })
+    expect(byName('assistant-look-lanes', o([lane({}, false), lane({ action: 'list' }, true)]), { cards: { a: 1 } })[NONE]).toBe(true)
+    expect(byName('assistant-look-lanes', o([lane({ action: 'start', cards: [1] }, false), lane({ action: 'list' }, true)]), { cards: { a: 1 } })[NONE]).toBe(false)
+  })
+
+  it("card-loop-uncommitted: a card watch naming no changes wakes on a comment (Hive records it so); one on columns only doesn't", () => {
+    const WATCH = "ended its turn watching for the builder's reply"
+    const o = (changes: string[] | undefined, recorded: string[]) => ({
+      status: 'watching',
+      turnWatch: { cards: [1], changes: recorded },
+      hiveCalls: [{ tool: 'hive_wait_for_tasks', args: JSON.stringify({ cards: ['AL-1'], wake: true, ...(changes ? { changes } : {}) }), ok: true }],
+      cards: { r: { number: 1, key: 'AL-1', column: 'review', comments: [], history: [] } },
+      gitStatus: ' M greet.js',
+      skillsRead: [],
+      allCards: [{ number: 1, key: 'AL-1' }]
+    })
+    const c = { cards: { r: 1 }, head: 'h0', git: () => 'h0\n' }
+    expect(byName('card-loop-uncommitted', o(undefined, ['column', 'comment', 'verdict', 'agent']), c)[WATCH]).toBe(true)
+    expect(byName('card-loop-uncommitted', o(['comment'], ['comment']), c)[WATCH]).toBe(true)
+    expect(byName('card-loop-uncommitted', o(['column'], ['column']), c)[WATCH]).toBe(false)
+  })
+})
+
+describe("forgetting Claude Code's memory of a scenario's folders (HI-2260)", () => {
+  const { forgetClaudeMemory } = require('./scenarios/harness.cjs') as { forgetClaudeMemory: (home: string, root: string) => string[] }
+  it("removes the memory of the folder and those under it, and nothing else: transcripts, other folders' memory", () => {
+    const fs = require('fs') as typeof import('fs')
+    const path = require('path') as typeof import('path')
+    const home = tempDir('hive-forget-memory-')
+    const root = path.join(home, 'lanes', '1', 'lasting-decision-claude-code')
+    const enc = (p: string) => p.replace(/[^A-Za-z0-9]/g, '-')
+    const project = (p: string) => {
+      const d = path.join(home, 'projects', enc(p))
+      fs.mkdirSync(path.join(d, 'memory'), { recursive: true })
+      fs.writeFileSync(path.join(d, 'memory', 'indentation-tabs.md'), 'tabs')
+      fs.writeFileSync(path.join(d, 'session.jsonl'), '{}')
+      return d
+    }
+    const alpha = project(path.join(root, 'ws', 'alpha'))
+    const assistant = project(path.join(root, 'ws', '.hive', 'assistant'))
+    const other = project(`${root}2`)
+    const removed = forgetClaudeMemory(home, root)
+    expect(removed.sort()).toEqual([path.join(alpha, 'memory'), path.join(assistant, 'memory')].sort())
+    expect(fs.existsSync(path.join(alpha, 'memory'))).toBe(false)
+    expect(fs.existsSync(path.join(alpha, 'session.jsonl'))).toBe(true)
+    expect(fs.existsSync(path.join(other, 'memory', 'indentation-tabs.md'))).toBe(true)
+    // A home with no projects yet: nothing to forget.
+    expect(forgetClaudeMemory(tempDir('hive-forget-memory-empty-'), root)).toEqual([])
+  })
 })
 
 describe("a run's source fingerprint", () => {

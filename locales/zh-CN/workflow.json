@@ -281,7 +281,7 @@
   "workflow.refused.move.doingNobody.next": "{reader, select, you {请选择：无人负责、交给一个智能体，或启动一个智能体处理它。} other {请询问用户想要哪种：无人负责（带上 override 和用户的理由再次移动）、交给一个智能体（agent），或启动一个智能体处理它（hive_start_task）。}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {这些规则在“版本控制”中设置，你可以在那里更改。} other {这些规则在“版本控制”中设置，用户可以在那里更改。}}",
   "workflow.refused.move.needsOverride.message": "将 {card} 移到“{stage}”会跳过以下规则：{rules}。",
-  "workflow.refused.move.needsOverride.next": "{reader, select, you {仍要移动它需要你的理由：你已给出的理由，或在得知会跳过哪些规则后给出的理由。} other {只有在有用户理由时才仍然移动：用户已给出的理由，或在得知会跳过哪些规则后给出的理由。}}",
+  "workflow.refused.move.needsOverride.next": "{reader, select, you {仍要移动它需要你的理由：你已给出的理由，或在得知会跳过哪些规则后给出的理由。} other {只有在有用户理由时才仍然移动。用户在请求中给出的理由就够了（例如“我已手动合并”）：用 override 加上这个理由（用用户的原话）再次移动。没有理由时，告诉用户会跳过哪些规则，并询问理由。}}",
   "workflow.refused.move.noStage.change": "项目的步骤取决于其“版本控制”选项。",
   "workflow.refused.move.noStage.message": "{card} 不能移到“{stage}”：此项目的规则没有这一步。",
   "workflow.refused.move.noStage.next": "请移到以下步骤之一：{stages}。",
