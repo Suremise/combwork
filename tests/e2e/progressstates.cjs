@@ -158,10 +158,12 @@ const t = setInterval(() => {
   check('the server run reports its process', !!srv && Number.isInteger(srv.pid) && srv.pid > 0, JSON.stringify(srv))
   // Its identity while it is known to be the server (it runs until ended), for ending it as that process (#603).
   const [serverId] = srv?.pid ? lib.identify([srv.pid]) : []
-  // The whole tree at once, as an agent's stop ends it, which no process of it can see (wrapper.ts, runWrapped). Ended
-  // one by one, children first, the wrapper outlived its command for the moment between the two: it saw the command
-  // killed (exit code 4294967295, Kill's -1), reported a failure and exited before its own turn (HI-2284, under load).
-  // Suspended first (by its identity, #603), it sees nothing until it is ended with the rest.
+  // What this checks is Hive's side of a run whose wrapper never reports its end (wrapper.ts, runWrapped): the wrapper
+  // must not run between its command's ending and its own. Ended one by one, children first, it outlived its command for
+  // the moment between the two: it saw the command killed (exit code 4294967295, Kill's -1), rightly reported a failure
+  // and exited before its own turn (HI-2284, under load). So it is suspended first (by its identity, #603) and sees
+  // nothing until it is ended with the rest: a simulated stop of the whole tree at once, not a claim about every real
+  // stop (one that ends the tree one by one may well be reported failed, correctly).
   // Tracked (suspensions), and released whatever happens: what is still suspended then is resumed, or ended by its
   // identity if it can't be, so the test never leaves its wrapper held.
   const held = suspensions()
