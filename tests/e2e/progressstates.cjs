@@ -6,6 +6,7 @@
 // without a report once its process is gone, never "stopped reporting". Screenshots of the waiting and ended runs in both
 // themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
+const { suspensions } = require('./folderProcesses.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
@@ -157,9 +158,26 @@ const t = setInterval(() => {
   check('the server run reports its process', !!srv && Number.isInteger(srv.pid) && srv.pid > 0, JSON.stringify(srv))
   // Its identity while it is known to be the server (it runs until ended), for ending it as that process (#603).
   const [serverId] = srv?.pid ? lib.identify([srv.pid]) : []
-  // Its tree, each process as it is now (never taskkill /T on a pid, #603).
-  const ended = serverId ? lib.endTreeExactly(serverId) : 0
-  check('its process tree is ended (as an agent stopping it does)', ended >= 1, `${ended} ended`)
+  // What this checks is Hive's side of a run whose wrapper never reports its end (wrapper.ts, runWrapped): the wrapper
+  // must not run between its command's ending and its own. Ended one by one, children first, it outlived its command for
+  // the moment between the two: it saw the command killed (exit code 4294967295, Kill's -1), rightly reported a failure
+  // and exited before its own turn (HI-2284, under load). So it is suspended first (by its identity, #603) and sees
+  // nothing until it is ended with the rest: a simulated stop of the whole tree at once, not a claim about every real
+  // stop (one that ends the tree one by one may well be reported failed, correctly).
+  // Tracked (suspensions), and released whatever happens: what is still suspended then is resumed, or ended by its
+  // identity if it can't be, so the test never leaves its wrapper held.
+  const held = suspensions()
+  let ended = 0
+  try {
+    const frozen = serverId ? held.suspend([serverId]) : { done: [], failed: [] }
+    check('the wrapper is held still first, so it sees nothing of its command ending', frozen.done.length === 1, JSON.stringify(frozen.failed))
+    // Its tree, each process as it is now (never taskkill /T on a pid, #603).
+    ended = serverId ? lib.endTreeExactly(serverId) : 0
+  } finally {
+    const left = held.release()
+    if (left.failed.length || left.ended.length) console.log(`the wrapper's suspension released: ${JSON.stringify(left)}`)
+  }
+  check('its process tree is ended (as an agent stopping it does)', !!serverId && ended >= 1 && lib.stillSame([serverId]).length === 0, `${ended} ended`)
   await server()
   const gone = await until(async () => (await runs()).find((r) => r.id === srv?.id && r.finishedAt !== null), 45000)
   check('Hive sees its process gone: ended without a report', gone?.state === 'stopped' && gone.stopReason === 'gone', JSON.stringify(gone))
