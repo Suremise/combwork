@@ -36,7 +36,8 @@ const { providerService } = await import('../src/main/providerService')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { INTENT_ROUTES } = await import('../src/main/servers')
-const { checksView, intentText } = await import('../src/shared/toolReplies')
+const toolReplies = await import('../src/shared/toolReplies')
+const { checksView, intentText } = toolReplies
 const { armIntentWatch } = await import('../src/main/intentWatch')
 const watches = await import('../src/main/watches')
 const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, HIVE_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
@@ -879,5 +880,33 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(assistantTools('look')).not.toContain('hive_verdict')
     expect(assistantTools('agents')).toEqual(expect.arrayContaining(INTENT_TOOLS))
     expect(assistantTools('projects')).not.toContain('hive_start_card')
+  })
+})
+
+describe("a lane's card put back or reordered on the board says the lane keeps its own order (HI-2267)", () => {
+  const { laneOrderNote, reorderText } = toolReplies
+
+  it('lanesHolding: the running lanes holding any of the cards, with their builder and only those cards', async () => {
+    const { w } = await workspace()
+    const [a, b, loose] = [await create(w, 'A'), await create(w, 'B'), await create(w, 'Loose')]
+    const { lane } = await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [a, b], by: 'Builder (p)' })
+    expect(await lanes.lanesHolding(w, [a, loose])).toEqual([{ id: lane.id, builder: 'Builder', cards: [a] }])
+    expect(await lanes.lanesHolding(w, [loose])).toEqual([])
+    expect(await lanes.lanesHolding(w, [])).toEqual([])
+    await lanes.endLane(w, lane.id, { abandoned: true })
+    expect(await lanes.lanesHolding(w, [a, b])).toEqual([])
+  })
+
+  it("put back's reply on a lane's card carries the note as a line of its own; a loose card's doesn't", () => {
+    const note = laneOrderNote({ id: 'lane-3f2a', builder: 'Coder', cards: [1] })
+    expect(note).toBe("#1 is on Coder's lane (lane-3f2a), which keeps its own order and takes it in that order. To change it: hive_lane start with its cards in the new order (applyNow: true to apply it now).")
+    expect(intentText({ ok: true, card: 'AL-1', from: 'active', to: 'todo', warnings: [note] }).split('\n')).toEqual(['AL-1: active → todo.', `Warning: ${note}`])
+    expect(laneOrderNote({ id: 'lane-3f2a', builder: 'Coder', cards: [1, 2] })).toMatch(/^#1, #2 are on Coder's lane \(lane-3f2a\), which keeps its own order and takes them in that order/)
+  })
+
+  it("reorder's reply names the lane for its cards, by their keys; with none on a lane, one line as before", () => {
+    expect(reorderText({ column: 'todo', top: [2, 1], count: 2, names: { 1: 'AL-1', 2: 'AL-2' } })).toBe('Todo now starts AL-2, AL-1.')
+    const text = reorderText({ column: 'todo', top: [2, 1], count: 2, names: { 1: 'AL-1', 2: 'AL-2' }, lanes: [{ id: 'lane-3f2a', builder: 'Coder', cards: [2, 1] }] })
+    expect(text.split('\n')).toEqual(['Todo now starts AL-2, AL-1.', "AL-2, AL-1 are on Coder's lane (lane-3f2a), which keeps its own order and takes them in that order. To change it: hive_lane start with its cards in the new order (applyNow: true to apply it now)."])
   })
 })

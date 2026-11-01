@@ -1352,6 +1352,18 @@ export async function laneParts(ws: WorkspaceService, project: string, agentId: 
   return [...(lanes.some((l) => l.builder.id === agentId) ? ['builder' as const] : []), ...(lanes.some((l) => l.reviewer?.id === agentId) ? ['reviewer' as const] : [])]
 }
 
+/**
+ * The running lanes holding any of `cards` (their list, or one queued to apply), each with its builder's name and the
+ * cards of `cards` it holds (HI-2267: a reply about a lane's card says whose lane it is, as the lane keeps its own order).
+ */
+export async function lanesHolding(ws: WorkspaceService, cards: readonly number[]): Promise<{ id: string; builder: string; cards: number[] }[]> {
+  if (!ws.path || !cards.length) return []
+  return (await read(ws))
+    .filter(running)
+    .map((l) => ({ id: l.id, builder: l.builder.name, cards: cards.filter((n) => l.cards.includes(n) || !!l.pending?.includes(n)) }))
+    .filter((l) => l.cards.length > 0)
+}
+
 /** A workspace's lanes: those listed (running, or ended lately), or with `all` every one kept; `project` narrows them. */
 export async function listLanes(ws: WorkspaceService, o: { project?: string | null; all?: boolean } = {}): Promise<LaneInfo[]> {
   if (!ws.path) return []

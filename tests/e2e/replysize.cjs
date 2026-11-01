@@ -795,6 +795,58 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
   check('…and its lane ends', !!designLane && tool('hive_lane', { action: 'end', lane: designLane, abandoned: true }).text.startsWith('Lane abandoned: '), designLane)
   const putBack = measure('hive_put_back', intent('hive_put_back', { card: `#${todo[40]}`, why: 'Not yet.' }), 200)
   check('put back names the start as next', putBack.endsWith(' Next on it: hive_start_card.'), putBack)
+  // HI-2267: a card no running lane holds gets no lane line.
+  check("…and a card on no lane: no lane line", !/keeps its own order/.test(putBack) && putBack.split('\n').length === 1, putBack)
+  check("a reorder of cards on no lane: one line, no lane line", !/keeps its own order/.test(texts['hive_reorder_tasks (3 cards)'] ?? '') && (texts['hive_reorder_tasks (3 cards)'] ?? '').split('\n').length === 1, texts['hive_reorder_tasks (3 cards)'])
+  // HI-2267: a lane's card put back (as its builder, and as the Assistant) or reordered on the board: the real reply names
+  // the lane, which keeps its own order, and how to change it. Two cards of its own in alpha, gone again after.
+  {
+    const made = []
+    for (const title of ['Lane order A', 'Lane order B']) made.push((await api('POST', '/v1/tasks', { title, project: 'alpha' })).body.number)
+    const [a, b] = made
+    // Their keys as replies give them (made after the board's names were read).
+    const keys = new Map()
+    for (const n of made) keys.set(n, (await api('GET', `/v1/tasks/${n}`)).body?.key ?? `#${n}`)
+    const Kn = (n) => keys.get(n)
+    const NOTE = new RegExp(`^${Kn(a)} is on Coder's lane \\(lane-[0-9a-f]+\\), which keeps its own order and takes it in that order\\. To change it: hive_lane start with its cards in the new order \\(applyNow: true to apply it now\\)\\.$`)
+    const column = async (n) => (await api('GET', `/v1/tasks/${n}`)).body?.column
+    // Coder held busy on another card (HR1, round 1): a lane starts its first Todo card on an idle builder (laneStarts),
+    // which would take A back between the replies measured here. Watching the untouched card, as the lane above does,
+    // Coder is never idle meanwhile; armed again after each start, cancelled at the end.
+    const hold = async () => {
+      tool('hive_wait_for_tasks', { cards: [`#${untouched}`], wake: true }, 'own')
+      return !!(await until(async () => (await live(alpha, coder.id))?.status === 'watching', HUNG_MS))
+    }
+    // A, in Todo with no lane holding it (so nothing else starts it), started on Coder, then Coder held again.
+    const startA = async () => {
+      const r = intent('hive_start_card', { card: `#${a}` })
+      return !r.isError && !!(await until(async () => (await column(a)) === 'doing', HUNG_MS)) && (await hold())
+    }
+    const laneOver = () => tool('hive_lane', { action: 'start', cards: [a, b], reviewer: 'Tester', name: 'lane order' }, 'own').text.match(/lane-[0-9a-f]+$/)?.[0]
+    const endLane = (id) => !!id && tool('hive_lane', { action: 'end', lane: id, abandoned: true }).text.startsWith('Lane abandoned: ')
+    try {
+      check('Coder held on another card', await hold())
+      check('a lane over two cards of its own, the first started', await startA())
+      const first = laneOver()
+      const agentBack = measure('hive_put_back (a lane\'s card)', intent('hive_put_back', { card: `#${a}`, why: 'Not yet.' }), 400)
+      const agentLines = agentBack.split('\n')
+      check("put back of a lane's card: its usual line, then the lane's as a warning", agentLines.length === 2 && agentLines[0].endsWith(' Next on it: hive_start_card.') && NOTE.test(agentLines[1].replace(/^Warning: /, '')) && agentLines[1].includes(first ?? '?'), agentBack)
+      check('…the card left in Todo while Coder is held', (await column(a)) === 'todo', await column(a))
+      check('…and that lane ends', endLane(first), first)
+      check('…the card started again, on a new lane', await startA())
+      const second = laneOver()
+      const asBack = measure('hive_put_back (a lane\'s card, as Assistant)', tool('hive_put_back', { card: `#${a}`, why: 'The user wants B first.' }, 'assistant'), 600)
+      check("…as the Assistant: the lane's line too", asBack.split('\n').some((l) => NOTE.test(l.replace(/^Warning: /, '')) && l.includes(second ?? '?')), asBack)
+      const reorderedLane = measure("hive_reorder_tasks (a lane's cards)", tool('hive_reorder_tasks', { column: 'todo', cards: [b, a] }), 500)
+      const reorderLines = reorderedLane.split('\n')
+      check("a reorder of a lane's cards: its line, then the lane's, by key", reorderLines.length === 2 && reorderLines[0].startsWith(`Todo now starts ${Kn(b)}, ${Kn(a)}`) && new RegExp(`^${Kn(b)}, ${Kn(a)} are on Coder's lane \\(${second}\\), which keeps its own order and takes them in that order\\. To change it: hive_lane start`).test(reorderLines[1]), reorderedLane)
+      check('…and that lane ends', endLane(second), second)
+    } finally {
+      tool('hive_wait_for_tasks', { cancel: true }, 'own')
+      await until(async () => ['ready', 'finished'].includes((await live(alpha, coder.id))?.status), HUNG_MS)
+      for (const n of made) await inv('tasks:delete', n)
+    }
+  }
   // A request for the Assistant (HI-1866): the card, and its id in the Assistant's inbox.
   const askedAssistant = measure('hive_ask_assistant', intent('hive_ask_assistant', { card: `#${todo[40]}`, text: 'Please put this card On Hold.' }), 120)
   check('asking the Assistant names the card and its inbox id', /^[A-Z]+-\d+: asked the Hive Assistant \(m\d+ in its inbox\)\. Its answer comes to your inbox\.$/.test(askedAssistant), askedAssistant)
