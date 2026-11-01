@@ -18,6 +18,7 @@ import { publicReason, UNDO_FINAL, type ActivityAgent, type ActivityKind, type A
 import { changeGroups, noteAgent, noteChange, recordedHere, recordingChanges } from './assistantChanges'
 import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
+import { routePattern } from './routePattern'
 import { fallbackEfforts, modelGroups } from '../shared/models'
 import { agentRuntime, hooksMissingText, retryWaitText, unknownStateText } from '../shared/runtime'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
@@ -703,8 +704,7 @@ function assistantMay(need: AssistantControl, what: string, act: ActivityTarget)
 
 const routes: { method: string; pattern: RegExp; template: string; handler: Handler }[] = []
 function route(method: string, path: string, handler: Handler): void {
-  const pattern = new RegExp('^' + path.replace(/:[a-zA-Z]+/g, '([^/]+)') + '/?$')
-  routes.push({ method, pattern, template: path, handler })
+  routes.push({ method, pattern: routePattern(path), template: path, handler })
   // The template (/v1/tasks/:n), never the path asked for, is what a request is counted under.
   knownRoute(path)
 }
