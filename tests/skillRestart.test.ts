@@ -2,7 +2,7 @@
 // to apply" banner, the sidebar's dot and the Agent API's status, all `restartNeeded`) with nothing else to set it off:
 // the skills folder's watch schedules the refresh that works it out, as a change made in the window does. A skill left as
 // it was asks for nothing, and a restart (its launch settings taken again) clears it.
-import { cpSync, mkdirSync, rmSync, writeFileSync } from 'fs'
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -59,6 +59,22 @@ async function askedForRestart(): Promise<void> {
   expect(await needsRestart()).toBe(true)
 }
 
+/** One of Hive's skills copied into the workspace's. */
+const addSkill = (name: string): void => cpSync(join(resolve('resources/skills'), name), join(skills, name), { recursive: true })
+
+/** A skill a test added, removed, with the refresh its removal's watch scheduled run (none if it wasn't there). */
+async function removedSkill(name: string): Promise<void> {
+  if (!existsSync(join(skills, name))) return
+  const r = refreshesRun()
+  try {
+    rmSync(join(skills, name), { recursive: true })
+    await vi.waitFor(() => expect(r.count()).toBeGreaterThan(0), { timeout: 15_000, interval: 50 })
+    await w.refreshesSettled()
+  } finally {
+    r.restore()
+  }
+}
+
 beforeAll(async () => {
   for (const name of ['handover', 'work-on-card']) cpSync(join(resolve('resources/skills'), name), join(skills, name), { recursive: true })
   mkdirSync(join(project, '.hive'), { recursive: true })
@@ -101,12 +117,22 @@ describe('a changed workspace skill asks running agents for a restart (HI-2268)'
   })
 
   it('a skill added: asked', async () => {
-    cpSync(join(resolve('resources/skills'), 'pick-up'), join(skills, 'pick-up'), { recursive: true })
-    await askedForRestart()
+    try {
+      addSkill('pick-up')
+      await askedForRestart()
+    } finally {
+      // Its own state gone again, its removal's refresh run, so the next test starts from the skills it started with.
+      await removedSkill('pick-up')
+    }
   })
 
   it('a skill removed: asked', async () => {
-    rmSync(join(skills, 'pick-up'), { recursive: true, force: true })
+    // Its own skill, there when the agent (re)starts: the watch's refresh of its adding has run first.
+    addSkill('split-work')
+    await askedForRestart()
+    await launched()
+    expect(await needsRestart()).toBe(false)
+    rmSync(join(skills, 'split-work'), { recursive: true })
     await askedForRestart()
   })
 })
