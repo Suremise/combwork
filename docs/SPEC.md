@@ -2178,7 +2178,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G9 | **Checks pass on the merged result** | Named commands | `integrate.checksPassed` (Hive merges only) |
 | G10 | **Your OK before merging** | Never · Cards with these labels (e.g. `ui`, `release`) · Every card | `approval.given` on integrate, and on report merge where the agent merges or merges aren't checked (#1592: G10 applies under Not checked too); Darren's UI-screenshot gate is "cards labelled ui" [note §6; OP-23] |
 | G11 | **Where cards are built** | Each card in its own folder (slots) · Everyone in the project folder | Slots (§16.10) |
-| G12 | **Commits use the project's identity** | Off · On (the identity shown, from `git config --local`, else global) | `submit.identity` (#809) |
+| G12 | **Commits use the project's identity** | Off · On (the identity shown, from `git config --local`, else global, read from git at each use: HI-2266, never a saved copy; a saved `{name, email}` only means On) | `submit.identity` (#809) |
 | G13 | **Agents stop what they started before review** | On / Off | `submit.ownRunsStopped` |
 | G14 | **Cards start only when the cards they wait for are merged** | On / Off | `start.dependenciesIntegrated` |
 | G15 | **Slots are brought up to date before each card** | On / Off (and "install when the lock file changed") | `prepareSlot` [note §5] |
@@ -2286,7 +2286,7 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
 - **After a switch:** the project is read again (its offer gone), and `workflow-changed` and `queue-changed` tell the
   windows. A card in flight keeps its own ruleset in the runtime (each card's adapter is its ruleset's platform), and
   the merge queue starts a workspace's queues with open entries for a None project too, so an old Git queue drains
-  after Git → None (its merge commit's identity: the project's options in force, G12, else git's own). The tab's Merge queue section stays while
+  after Git → None (its merge commit's identity: git's own, HI-2266). The tab's Merge queue section stays while
   #1356's actual-state rule shows a queue (§16.6, #1416).
 
 #### 16.6.6 Where options live
@@ -3135,7 +3135,7 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    history; the reviewed revision stays pinned (§16.9.3), and containment finds the change spread over several commits.
    No preset sets it.
    **Hive's commits** [HB3's round 1 finding 11]:
-   - authored and committed with the project's identity (G12's, else git's configured identity for the repository);
+   - authored and committed with the project's identity (git's configured identity for the repository, read each time, G12 on or off: HI-2266);
      with no identity the entry pauses ("set a commit identity for this repository");
    - the repository's hooks run (no `--no-verify`, AGENTS.md); a hook that fails returns the card with the hook's
      output (`IntegrationFailed`, reason `hook`);
@@ -3159,8 +3159,8 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    - with `commit.gpgsign`, signing runs as configured; if it would wait for a passphrase (a pinentry window), the
      entry pauses with "signing waits for you" rather than failing, and a signing error pauses it with git's message.
    **Built [#1350]:**
-   - **Identity:** G12's when on, else the repository's own (`git config user.name` / `user.email`: local, then
-     global), passed to the merge with `-c`. With none, the entry pauses `identity`, naming the project folder: the
+   - **Identity:** the repository's own (`git config user.name` / `user.email`: local, then
+     global), G12 on or off (HI-2266: G12's saved value never stands in for it), passed to the merge with `-c`. With none, the entry pauses `identity`, naming the project folder: the
      window says to set a commit identity for this repository (`git config user.name` / `user.email`).
    - **Hooks:** they run (no `--no-verify`).
    - **Who said what** [HR4's rounds 1 and 2 on #1350]: a failure is told by which part failed, and a decision reads

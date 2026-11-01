@@ -1123,9 +1123,12 @@ export class MergeQueue {
     return { card: card.key, entry: entry.id, outcome: 'skipped', why: cancelled ? 'cancelled' : 'notApproved' } // i18n-ignore: a reason's key, not text
   }
 
-  /** The project's identity: null when git says it isn't set, unknown when git couldn't read it (HI-2019). */
+  /**
+   * The project's identity, read from git each time, G12 on or off (HI-2266: G12's saved value only means "on", never a
+   * copy that goes stale): null when git says it isn't set, unknown when git couldn't read it (HI-2019).
+   */
   private async identity(reads: EntryReads): Promise<Maybe<{ name: string; email: string } | null>> {
-    return this.wf.cfg.options().identity ?? (await (reads.identity ??= G.identity(this.project)))
+    return reads.identity ??= G.identity(this.project)
   }
 
   /**

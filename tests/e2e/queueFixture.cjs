@@ -34,6 +34,9 @@ function prepare(fx) {
   lib.gitProject(fx.alpha, { 'a.txt': 'one\ntwo\nthree\n', '.gitignore': '.hive/\n' })
   lib.git(fx.alpha, ['branch', '-M', 'main'])
   lib.git(fx.alpha, ['branch', 'integration'])
+  // The identity its commits use, in its git config: G12 (on in queueOptions) reads it from git each time (HI-2266).
+  lib.git(fx.alpha, ['config', 'user.name', fx.identity.name])
+  lib.git(fx.alpha, ['config', 'user.email', fx.identity.email])
   const check = path.join(fx.tools, 'check.js')
   fs.writeFileSync(
     check,
