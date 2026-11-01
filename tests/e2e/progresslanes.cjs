@@ -166,6 +166,8 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const showsWhole = (f, n) => f.whole === n && (n >= f.bottoms.length ? f.scroll <= f.client + 1 : Math.abs(f.tops[n] - f.client) <= 1 && f.scroll > f.client + 4)
   // Only as tall as the lane, its margin and the list's padding (6 px each).
   check('one lane: the section is only as tall as it is', !!(await until(async () => (await section.locator('.progress-lane').count()) === 1 && showsWhole(await fit(), 1), HUNG_MS)) && (await fit()).client <= (await fit()).bottoms[0] + 12, JSON.stringify(await fit().catch(() => null)))
+  // B3 quiet too, for the same reason: its 22 cards, made above, send it card events of its own.
+  check('B3 is quiet before its lane starts', !!(await until(async () => lib.agentQuiet(PORT, 'alpha', await live(b3.id), tr), 45000)), JSON.stringify(await live(b3.id)))
   const l2 = await startLane('B3', 'R1', 'a long lane', long)
   // B1 and B3, idle builders outside slots, are given their new lanes in new conversations (HI-2232), so each has a new
   // launch and token: the merge slot's claims below are their new launches'.
