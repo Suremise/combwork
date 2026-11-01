@@ -219,6 +219,19 @@ function childrenFirst(list, targets) {
 }
 
 /**
+ * Ends a test Hive from outside as a crash would (HI-2256): its main process `top` ({ pid, started }) first, then `rest`
+ * (what it started, from `list`), children first. Ended children first, its main process outlived its process
+ * tracker's helper: under load it saw the tracker stop and wrote its running marker again without its agents'
+ * processes, which a crash never gets to do. Each by pid and start time (endExactly). Returns how many were ended, 0
+ * when the main process wasn't (the rest is ended all the same).
+ */
+function endAsCrash(list, top, rest) {
+  const main = endExactly([top])
+  const others = rest.length ? endExactly(childrenFirst(list, rest)) : 0
+  return main ? main + others : 0
+}
+
+/**
  * Stops the processes that are the test's own (above), each with its children: those naming `folder` that started at
  * or after `since`, and those of `tree` (processTree's, taken before its Hive closed) still running. Each is ended as
  * the process it was when listed (endExactly), never by a pid alone, and children before their parents (childrenFirst);
@@ -417,4 +430,4 @@ function endCopies(folders, { before = Infinity, list } = {}) {
   return { ended: pick.size ? endExactly(childrenFirst(list, [...pick].map(([pid, started]) => ({ pid, started })))) : 0, unrecorded }
 }
 
-module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs, leftoverIdentities, processTree, processes, endExactly, suspendExactly, suspensions, childrenFirst, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree, COPIES_FILE, recordCopy, recordMainProcess, launchedCopy, recordedCopies, copiesIn, lookLikeCopies, endCopies }
+module.exports = { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs, leftoverIdentities, processTree, processes, endExactly, suspendExactly, suspensions, childrenFirst, endAsCrash, stopProcessesIn, identify, stillSame, endTreeExactly, endChildTree, COPIES_FILE, recordCopy, recordMainProcess, launchedCopy, recordedCopies, copiesIn, lookLikeCopies, endCopies }

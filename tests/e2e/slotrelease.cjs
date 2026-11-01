@@ -17,7 +17,7 @@
 // Screenshots of both questions, light and dark. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 // Dev build only (#1580): slot-a is lent through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
-const { processes, descendantsIn, endExactly, childrenFirst } = require('./folderProcesses.cjs')
+const { processes, descendantsIn, endAsCrash } = require('./folderProcesses.cjs')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
 }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
 
-/** Ends a test Hive from outside, as a crash would: its main process and all it started, each by pid and start time. */
+/** Ends a test Hive from outside, as a crash would: its main process first, then all it started, each by pid and start time. */
 async function endFromOutside(app, spare = []) {
   const proc = app.process()
   const gone = new Promise((r) => (proc.exitCode !== null ? r(true) : proc.once('exit', () => r(true))))
@@ -48,8 +48,7 @@ async function endFromOutside(app, spare = []) {
   const list = processes()
   const top = id && list.find((p) => p.pid === id.pid && Math.abs(p.started - id.started) <= 1)
   // `spare`: what an agent left running, which outlives the crash (as a detached process would).
-  const tree = top ? [{ pid: top.pid, started: top.started }, ...descendantsIn(list, top.pid).filter((p) => !spare.includes(p.pid))] : []
-  const ended = tree.length ? endExactly(childrenFirst(list, tree)) : 0
+  const ended = top ? endAsCrash(list, { pid: top.pid, started: top.started }, descendantsIn(list, top.pid).filter((p) => !spare.includes(p.pid))) : 0
   return ended > 0 && !!(await lib.until(() => gone, HUNG_MS))
 }
 
