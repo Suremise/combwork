@@ -105,7 +105,8 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   // A decision the builder hasn't read holds its submit with any review or a merge step (SPEC §16.5.3, HI-2275): All off
   // and Solo (committed) stay free.
   if (review || o.finish === 'hiveMerges' || o.finish === 'agentMerges') g.submit.push('submit.decisionsReceived')
-  if (o.finish === 'hiveMerges') g.requeue.push('submit.notDuplicate', 'requeue.allowed', ...(review ? (['integrate.approved'] as const) : []))
+  // The builder's submit after a queue failure holds the same unread decision (HI-2275).
+  if (o.finish === 'hiveMerges') g.requeue.push('submit.notDuplicate', 'requeue.allowed', ...(review ? (['integrate.approved'] as const) : []), 'submit.decisionsReceived')
   if (agent) {
     if (o.noSelfReview) g.startReview.push('review.notAuthor')
     g.startReview.push('review.decisionsReceived')

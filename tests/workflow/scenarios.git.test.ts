@@ -78,6 +78,34 @@ describe('the agent merges with no review and no OK before merging (no Approved 
     moved(await e.wf.submit(c2.key, B1, { summary: 'x' }))
   })
 
+  it('a submit retrying a failed Hive merge also refuses an unread decision, before it or during it, and queues nothing (HI-2275)', async () => {
+    const e = pair({}, { review: 'none', noSelfReview: false, mergeChecks: ['quick'] })
+    let fail = true
+    const q = e.queue({ runCheck: async () => (fail ? { ok: false, transient: true, output: 'network' } : { ok: true, output: '' }) })
+    const { card } = await started(e)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    expect((await q.drain('main'))[0]).toMatchObject({ outcome: 'returned', transient: true })
+    expect(e.wf.state(card).stage).toBe('active')
+    const entries = e.wf.state(card).entries.length
+    // A decision already there after the failure.
+    moved(await e.wf.recordDecision(card.key, 'Change it before merging'))
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'submit.decisionsReceived')
+    expect(e.wf.state(card).entries).toHaveLength(entries)
+    expect(e.wf.state(card).stage).toBe('active')
+    // One that arrives during the retry, after the decision before it was received.
+    await e.wf.received(card.key, 'B1')
+    e.wf.cfg.hooks = { beforeWrite: async () => void (await e.wf.recordDecision(card.key, 'And this too')) }
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'again' }), 'submit.decisionsReceived')
+    e.wf.cfg.hooks = {}
+    expect(e.wf.state(card).entries).toHaveLength(entries)
+    // Received: the retry goes back to the queue.
+    await e.wf.received(card.key, 'B1')
+    const retry = await e.wf.submit(card.key, B1, { summary: 'again' })
+    moved(retry)
+    expect(retry).toMatchObject({ to: 'merging', data: { requeued: true } })
+    fail = false
+  })
+
   it('a merge outside Hive while it waits in Active is found and makes it Done', async () => {
     const e = noReview()
     const { card } = await started(e)
