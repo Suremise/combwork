@@ -64,6 +64,9 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
   lib.gitProject(alpha, { 'a.txt': 'a\n', 'package-lock.json': '{"v":1}\n', '.gitignore': '.hive/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
+  // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
+  lib.git(alpha, ['config', 'user.name', identity.name])
+  lib.git(alpha, ['config', 'user.email', identity.email])
   // The slots' setup: records the slot and the lock file it installed from.
   const setup = path.join(tools, 'setup.js')
   fs.writeFileSync(setup, `require('fs').appendFileSync(${JSON.stringify(setupLog)}, process.env.HIVE_SLOT + ' ' + require('fs').readFileSync('package-lock.json', 'utf8').trim() + '\\n')\n`)
@@ -160,7 +163,8 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check('the lane names its slot', (await lane(started.lane.id))?.slot === 'slot-a')
     const tb1 = await tokenOf(b1.id)
     const s1 = await intent(tb1, c1, 'start')
-    check("card 1's start: built in slot-a, B1 told to end its turn there", s1.status === 200 && same(s1.body?.data?.folder, slotA) && /You'll continue in slot-a/.test(JSON.stringify(s1.body)), JSON.stringify(s1.body))
+    // Its own start, or Hive's for the lane's next card landing first (HI-1990: that start is its reply): slot-a either way.
+    check("card 1's start: built in slot-a, B1 told to end its turn there (or that Hive started it)", s1.status === 200 && same(s1.body?.data?.folder, slotA) && /You'll continue in slot-a|Hive started [A-Z]+-\d+ for you, as your lane's next card/.test(JSON.stringify(s1.body)), JSON.stringify(s1.body))
     const base1 = git(alpha, 'rev-parse', 'integration')
     check(`card 1's line ${line(c1, 'slot-one')} is made in slot-a from the target's head`, !!(await until(() => branchIn(slotA) === line(c1, 'slot-one'), HUNG_MS)) && git(slotA, 'rev-parse', 'HEAD') === base1, branchIn(slotA))
     check('card 1 records its slot and lease', ((await inv('tasks:facts', c1)).find((f) => f.kind === 'Started')?.data?.slot ?? '') === 'slot-a')

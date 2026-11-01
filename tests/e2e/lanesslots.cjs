@@ -49,6 +49,9 @@ const lines = (file) => {
   for (const d of [tools, shots]) fs.mkdirSync(d, { recursive: true })
   lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
+  // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
+  lib.git(alpha, ['config', 'user.name', identity.name])
+  lib.git(alpha, ['config', 'user.email', identity.email])
   // The slots' setup (its run is Hive's), and the check the reviewer runs: each records where it ran.
   const setupLog = path.join(tools, 'setup.log')
   const setup = path.join(tools, 'setup.js')
