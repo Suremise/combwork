@@ -2,6 +2,7 @@ import { randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { mkdir, rm, writeFile } from 'original-fs/promises'
 import { join } from 'path'
+import { recordTestToken } from './testQuiet'
 
 /**
  * Each launch's own hook token and private folder (#345). The hook server takes a hook call only with the token of the
@@ -37,6 +38,7 @@ export function hookAuthFile(runId: string): string {
 /** A new token for the launch `runId`, written to its auth file in its private folder (made here). */
 export async function newHookToken(runId: string): Promise<{ token: string; file: string; dir: string }> {
   const token = randomBytes(24).toString('hex')
+  recordTestToken('hook', token)
   const dir = launchPrivateDir(runId)
   const file = hookAuthFile(runId)
   tokens.set(runId, token)

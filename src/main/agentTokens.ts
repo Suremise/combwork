@@ -3,6 +3,7 @@ import { app } from 'electron'
 import { mkdir } from 'original-fs/promises'
 import { dirname, join } from 'path'
 import { hashText, writeJsonAtomic } from './fsutil'
+import { recordTestToken } from './testQuiet'
 
 /**
  * Each agent launch's own Agent API token. The API knows from it which agent, project and workspace a call comes
@@ -28,6 +29,7 @@ export function agentTokenFile(projectPath: string, agentId: string): string {
 /** A new token for an agent's launch (`runId`); the previous one stops working. */
 export async function newAgentToken(id: AgentIdentity, runId: string): Promise<string> {
   const token = randomBytes(32).toString('hex')
+  recordTestToken('agent', token)
   tokens.set(key(id.projectPath, id.agentId), { ...id, token, runId })
   const file = agentTokenFile(id.projectPath, id.agentId)
   await mkdir(dirname(file), { recursive: true })

@@ -87,62 +87,31 @@ function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
 }
 
 /**
- * Every token a scenario's Hive (profile `userData`) issues while it runs, kept for scoring and masking (HR1's HI-2262
- * round 1): the workspace's (`agent-api.json`), each agent's and the Assistant's (`agent-api/`, `assistant-api/`: a
- * relaunch overwrites its file) and each launch's hook token (`launches/<runId>/hook-auth.txt`, deleted when the launch
- * ends). Hive keeps none of them past their life, rightly, so they are read while they exist: on every change the
- * profile reports, and every `everyMs` beside (a change the watcher missed). Started before any session, stopped after.
- * `known()`: each `{ kind, token }` seen, in the order seen; `sweep()` reads once more now.
+ * Every token a scenario's Hive issued, for scoring and masking (HI-2262, HR1's rounds 1 and 2): the workspace's
+ * (`apiToken`), then each line of its issuance record (`file`, HIVE_TEST_TOKEN_LOG: Hive appends each hook, agent and
+ * Assistant token as it makes it, before any session can hold it), so a token whose launch ended and whose files went
+ * long before the scoring is known. The record is evidence the result needs: missing, unreadable or with a line that
+ * isn't `{ kind, token }` it throws, and the scenario fails rather than scoring with tokens left out.
  */
-function tokenCollector(userData, { everyMs = 200 } = {}) {
-  const seen = new Map()
-  const add = (kind, token) => {
-    if (typeof token === 'string' && token.length >= 16 && !seen.has(token)) seen.set(token, kind)
-  }
-  const jsonToken = (file) => {
-    try {
-      return JSON.parse(fs.readFileSync(file, 'utf8')).token
-    } catch {
-      return null // not there, or still being written: the next sweep reads it
-    }
-  }
-  const files = (dir) => {
-    try {
-      return fs.readdirSync(dir)
-    } catch {
-      return []
-    }
-  }
-  const sweep = () => {
-    add('workspace', jsonToken(path.join(userData, 'agent-api.json')))
-    for (const [sub, kind] of [['agent-api', 'agent'], ['assistant-api', 'assistant']]) for (const f of files(path.join(userData, sub))) add(kind, jsonToken(path.join(userData, sub, f)))
-    for (const run of files(path.join(userData, 'launches'))) {
-      try {
-        const m = /Bearer\s+(\S+)/.exec(fs.readFileSync(path.join(userData, 'launches', run, 'hook-auth.txt'), 'utf8'))
-        if (m) add('hook', m[1])
-      } catch {
-        // gone already, or not written yet
-      }
-    }
-  }
-  let watcher = null
+function knownTokens(file, apiToken) {
+  let text
   try {
-    fs.mkdirSync(userData, { recursive: true })
-    watcher = fs.watch(userData, { recursive: true }, () => sweep())
-    watcher.on('error', () => undefined)
-  } catch {
-    // No watcher: the timer still sweeps.
+    text = fs.readFileSync(file, 'utf8')
+  } catch (e) {
+    throw new Error(`the token record (HIVE_TEST_TOKEN_LOG) can't be read (${e?.code ?? 'error'}): the leak check can't be scored`, { cause: e })
   }
-  const timer = setInterval(sweep, everyMs)
-  sweep()
-  return {
-    sweep,
-    known: () => [...seen].map(([token, kind]) => ({ kind, token })),
-    stop: () => {
-      clearInterval(timer)
-      watcher?.close()
+  const issued = text.split(/\r?\n/).filter((l) => l.trim()).map((line, i) => {
+    let t = null
+    try {
+      t = JSON.parse(line)
+    } catch {
+      // not JSON: said below
     }
-  }
+    if (!t || !['hook', 'agent', 'assistant'].includes(t.kind) || typeof t.token !== 'string' || !/^[0-9a-f]{32,}$/.test(t.token)) throw new Error(`the token record (HIVE_TEST_TOKEN_LOG) has a malformed line ${i + 1}: the leak check can't be scored`)
+    return { kind: t.kind, token: t.token }
+  })
+  if (typeof apiToken !== 'string' || apiToken.length < 16) throw new Error("no workspace token: the leak check can't be scored")
+  return [{ kind: 'workspace', token: apiToken }, ...issued.filter((t, i) => t.token !== apiToken && issued.findIndex((u) => u.token === t.token) === i)]
 }
 
 /** Text with every token in `tokens` as `<token>`: what a result keeps of what the session printed or said. */
@@ -426,6 +395,8 @@ async function runScenario(sc, providerKey, opts = {}) {
   const fakeHome = path.join(root, 'claude-home')
   const fakeCodexHome = path.join(root, 'codex-home')
   const mcpLog = path.join(root, 'mcp-calls.jsonl')
+  // Every token its Hive issues (HIVE_TEST_TOKEN_LOG, HI-2262): in the scenario's own folder, gone with it.
+  const tokenLog = path.join(root, 'tokens.jsonl')
   // Each change to the merge slots, with its time (HIVE_TEST_MERGE_SLOT_LOG, #374): who held one and who waited, when.
   const slotLog = path.join(root, 'merge-slots.jsonl')
   // Each state view Hive gave the Assistant at a session start (#1032), as Hive's development builds record them.
@@ -491,13 +462,14 @@ async function runScenario(sc, providerKey, opts = {}) {
   // The stand-in model for fake-copilot, on a port of its own: closed when the run ends, or at once if Copilot's
   // environment or the launch fails before the run begins (#464), and that failure is the one thrown.
   const standIn = p.standIn ? await startFakeCopilotApi({ log: modelLog }) : null
-  let app, inv, env, page, tokenWatch
+  let app, inv, env, page
   try {
     // Each CLI's home is a test one: the fake's per run, the real Claude Code's and Codex's signed-in test homes.
     env = {
       HIVE_API_PORT: String(port),
       HIVE_TEST_TIPS: 'off',
       HIVE_TEST_MCP_LOG: mcpLog,
+      HIVE_TEST_TOKEN_LOG: tokenLog,
       HIVE_TEST_MERGE_SLOT_LOG: slotLog,
       HIVE_TEST_START_VIEW_LOG: startViewLog,
       CLAUDE_CONFIG_DIR: providerKey === 'claude-code' ? CLAUDE_TEST_HOME : fakeHome,
@@ -507,11 +479,10 @@ async function runScenario(sc, providerKey, opts = {}) {
       // Copilot in the run's own home, its profile folder faked and the GitHub CLI's login hidden (fake-copilot-api.cjs).
       ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {})
     }
-    // Every token this Hive issues, read while it exists (a launch's hook token goes with its launch).
-    tokenWatch = tokenCollector(userData)
+    // Its token record starts empty: a scenario's Hive appends to it (missing at the end, the run is invalid).
+    fs.writeFileSync(tokenLog, '')
     ;({ app, inv, page } = await lib.launch({ userData, env }))
   } catch (e) {
-    tokenWatch?.stop()
     await standIn?.close().catch(() => undefined)
     throw e
   }
@@ -985,11 +956,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Each change to the merge slots (JSON lines, as the MCP log): { at, slots: [{ project, branch, holder, waiting }] }.
     observed.slotLog = readMcpLog(slotLog)
     // Any Agent API token (the workspace's, or an agent's for this launch) in what the session printed or said.
-    // Every one this Hive issued while the scenario ran (tokenCollector), each launch's hook token among them (HI-2262,
-    // Darren's decision: HIVE_HOOK_TOKEN stays in the session's environment, so a listing of it would print that), and
-    // those of launches that have ended since (HR1's round 1: their files are gone by now).
-    tokenWatch.sweep()
-    const known = [{ kind: 'workspace', token: apiToken }, ...tokenWatch.known().filter((t) => t.token !== apiToken)]
+    // Every one this Hive issued (its record, knownTokens), each launch's hook token among them (HI-2262, Darren's
+    // decision: HIVE_HOOK_TOKEN stays in the session's environment, so a listing of it would print that), those of
+    // launches long ended too.
+    const known = knownTokens(tokenLog, apiToken)
     const tokens = known.map((t) => t.token)
     // A script's own output too (what it printed), beside its calls'.
     const scripts = code.items.filter((x) => x.kind === 'script').map((x) => ({ name: x.tool.name, result: String(x.tool.result ?? '') }))
@@ -1070,7 +1040,6 @@ async function runScenario(sc, providerKey, opts = {}) {
       }
     }
     await app.close().catch(() => undefined)
-    tokenWatch?.stop()
     await standIn?.close()
     // A command an agent started can outlive its session (#542): stop it, so it doesn't hold the folder.
     const leftOver = lib.stopProcessesIn(root, started, tree)
@@ -1091,4 +1060,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, observeTranscript, tokenSightings, tokenCollector, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }

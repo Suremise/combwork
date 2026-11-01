@@ -4,7 +4,7 @@
 // - hive tool calls are the ones the server ran (its test log), while names in a transcript or a script (which may
 //   not have run) are only mentions.
 // The fixtures' checks fail when nothing was done, a call failed, or the steps came in the wrong order.
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { createRequire } from 'module'
 import { tempDir } from './tempDir'
 import { CodexConversationParser } from '../src/main/providers/codex/rollout'
@@ -1440,49 +1440,6 @@ describe('the fixtures fail when nothing was done', () => {
     expect(named('$t = (Get-Content $env:HIVE_API_TOKEN_FILE | ConvertFrom-Json).token')).toBe(true)
     // The variable sessions no longer get: fails.
     expect(named('$h = @{ Authorization = "Bearer $env:HIVE_API_TOKEN" }')).toBe(false)
-  })
-
-  it("raw-api (HR1's HI-2262 round 1): a hook token printed, then its launch ended and its agent relaunched, is still found and masked", async () => {
-    const fs = require('fs') as typeof import('fs')
-    const path = require('path') as typeof import('path')
-    const { tokenCollector, retainedObserved } = require('./scenarios/harness.cjs') as {
-      tokenCollector: (userData: string, o?: { everyMs?: number }) => { sweep: () => void; known: () => { kind: string; token: string }[]; stop: () => void }
-      retainedObserved: (observed: { tools: { name: string; input: string; result: string }[]; finalReply?: string }, tokens: string[]) => { tools: { result: string }[]; finalReply?: string }
-    }
-    const profile = tempDir('hive-scenario-tokens-')
-    const [hook1, hook2] = ['1a'.repeat(24), '2b'.repeat(24)]
-    const [agent1, agent2] = ['3c'.repeat(32), '4d'.repeat(32)]
-    const launch = (run: string, hook: string) => {
-      fs.mkdirSync(path.join(profile, 'launches', run), { recursive: true })
-      fs.writeFileSync(path.join(profile, 'launches', run, 'hook-auth.txt'), `Authorization: Bearer ${hook}\n`)
-    }
-    const agentFile = path.join(profile, 'agent-api', 'coder.json')
-    const tokens = tokenCollector(profile, { everyMs: 20 })
-    try {
-      // The first launch, as Hive starts it: its hook auth file and the agent's token file.
-      launch('run1', hook1)
-      fs.mkdirSync(path.dirname(agentFile), { recursive: true })
-      fs.writeFileSync(agentFile, JSON.stringify({ token: agent1 }))
-      await vi.waitFor(() => expect(tokens.known().map((t) => t.token)).toEqual(expect.arrayContaining([hook1, agent1])), { timeout: 10000, interval: 20 })
-      // It ends (Hive deletes its launch folder) and the agent is relaunched: a new hook token, its token file rewritten.
-      fs.rmSync(path.join(profile, 'launches', 'run1'), { recursive: true, force: true })
-      launch('run2', hook2)
-      fs.writeFileSync(agentFile, JSON.stringify({ token: agent2 }))
-      await vi.waitFor(() => expect(tokens.known().map((t) => t.token)).toEqual(expect.arrayContaining([hook2, agent2])), { timeout: 10000, interval: 20 })
-      tokens.sweep()
-      expect(fs.existsSync(path.join(profile, 'launches', 'run1'))).toBe(false)
-      const known = tokens.known()
-      expect(known).toEqual(expect.arrayContaining([{ kind: 'hook', token: hook1 }, { kind: 'agent', token: agent1 }, { kind: 'hook', token: hook2 }, { kind: 'agent', token: agent2 }]))
-      // The first launch's listing, scored now: its hook token is a leak, and the result keeps neither token.
-      const printed = `HIVE_HOOK_TOKEN=${hook1}\nHIVE_PROJECT=alpha`
-      expect(tokenSightings(known, { tools: [{ name: 'Bash', result: printed }] })).toEqual([{ kind: 'hook', in: 'tool', at: 0, name: 'Bash', excerpt: 'HIVE_HOOK_TOKEN=<hook token> HIVE_PROJECT=alpha' }])
-      const kept = JSON.stringify(retainedObserved({ tools: [{ name: 'Bash', input: 'env', result: printed }], finalReply: `It was ${hook1}, then ${agent1}.` }, known.map((t) => t.token)))
-      expect(kept).not.toContain(hook1)
-      expect(kept).not.toContain(agent1)
-      expect(kept).toContain('HIVE_HOOK_TOKEN=<token>')
-    } finally {
-      tokens.stop()
-    }
   })
 
   it('assistant-dispatch: names alone, failed calls, or a wait before the start, and a card never finished, all fail', () => {
