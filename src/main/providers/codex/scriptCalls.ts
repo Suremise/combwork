@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'url'
 import type { TranscriptTool } from '../../../shared/types'
 import { firstLine, shortPath, toolLabel } from '../conversation'
 
@@ -35,6 +36,17 @@ export function changesPatch(changes: Record<string, any> | undefined, root: str
   return lines.join('\n')
 }
 
+/** The folder a command ran in, as Codex records it (a file URL, or a path), or null. */
+export function cwdOf(value: unknown): string | null {
+  if (typeof value !== 'string' || !value) return null
+  if (!/^file:/i.test(value)) return value
+  try {
+    return fileURLToPath(value)
+  } catch {
+    return null
+  }
+}
+
 /** The text of an MCP result's content (its text parts). */
 const contentText = (content: unknown): string => (Array.isArray(content) ? content.map((c: any) => (typeof c?.text === 'string' ? c.text : '')).filter(Boolean).join('\n') : '')
 
@@ -52,7 +64,8 @@ export function scriptCall(item: Record<string, any>, root: string | null): Tran
       const cmd = commandText(item.command)
       const code = typeof item.exit_code === 'number' ? item.exit_code : null
       const done = item.status === 'completed' || item.status === 'failed' || code !== null
-      return { ...base, name: 'Shell', summary: firstLine(cmd).slice(0, 200), input: cmd, result: done ? String(item.aggregated_output ?? '') : null, isError: item.status === 'failed' || (code !== null && code !== 0), ...(code !== null ? { exitCode: code } : {}) } // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+      const cwd = cwdOf(item.cwd)
+      return { ...base, name: 'Shell', summary: firstLine(cmd).slice(0, 200), input: cmd, result: done ? String(item.aggregated_output ?? '') : null, isError: item.status === 'failed' || (code !== null && code !== 0), ...(code !== null ? { exitCode: code } : {}), ...(cwd ? { cwd } : {}) } // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
     }
     case 'FileChange': {
       const files = Object.keys(item.changes ?? {}).map((f) => shortPath(f, root))

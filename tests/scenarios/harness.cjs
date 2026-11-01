@@ -132,7 +132,8 @@ function retainedObserved(observed, tokens) {
  * is also matched with escaped line breaks and quotes turned back into real ones.
  */
 function observeTranscript(items, skillNames, skillRefs = new Map()) {
-  const tools = items.filter((x) => x.kind === 'tool').map((x) => ({ name: x.tool.name, summary: x.tool.summary, input: String(x.tool.input ?? ''), isError: x.tool.isError, result: String(x.tool.result ?? '') }))
+  // `cwd`: the folder a command ran in, where its CLI recorded it apart from the command (a Codex Shell's, HI-2264).
+  const tools = items.filter((x) => x.kind === 'tool').map((x) => ({ name: x.tool.name, summary: x.tool.summary, input: String(x.tool.input ?? ''), isError: x.tool.isError, result: String(x.tool.result ?? ''), ...(x.tool.cwd ? { cwd: String(x.tool.cwd) } : {}) }))
   const unescaped = (text) => text.replace(/\\+r\\+n|\\+[rn]/g, '\n').replace(/\\+"/g, '"')
   const skillsRead = []
   for (const t of tools) {

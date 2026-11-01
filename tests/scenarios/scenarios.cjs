@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 115
+const FIXTURES_VERSION = 116
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -3128,13 +3128,16 @@ module.exports.SCENARIOS = [
       const copy = (copyReply.match(/Review in (.+?) at [0-9a-f]{7,}/) ?? [])[1] ?? [...c.copyLeases][0] ?? ''
       // A path as a tool's input may give it: either slash, escaped or not, any case.
       const norm = (x) => String(x).toLowerCase().replace(/\\+/g, '/')
-      const inCopy = copy ? o.tools.filter((t) => !/^(Write|Edit|MultiEdit)$/i.test(t.name) && norm(t.input).includes(norm(copy))) : []
+      // The copy itself or a folder in it (never copy-10 for copy-1).
+      const within = (dir, top) => { const d = norm(dir).replace(/\/$/, ''); const t = norm(top).replace(/\/$/, ''); return d === t || d.startsWith(`${t}/`) }
+      // A command run in the copy counts by the folder it ran in too (HI-2264: Codex's Shell has its workdir apart from the command).
+      const inCopy = copy ? o.tools.filter((t) => !/^(Write|Edit|MultiEdit)$/i.test(t.name) && (norm(t.input).includes(norm(copy)) || (!!t.cwd && within(t.cwd, copy)))) : []
       return [
         ['read the review-agent-work skill', read(o, 'review-agent-work'), o.skillsRead.join(',')],
         ['started the review with hive_start_review', ran(o, 'hive_start_review').length > 0, o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         ['Hive lent it a review copy at its start', c.copyLeases.size > 0 || !!copyReply, [...c.copyLeases].join(', ')],
         ['the reply it saw named the copy, with its folder', !!copyReply, hiveReplies(o, 'hive_start_review').map((t) => t.result.slice(0, 300)).join(' | ')],
-        ['read or ran its checks in the review copy', inCopy.length > 0, `${copy} | ${o.tools.map((t) => t.input.slice(0, 80)).join(' | ')}`],
+        ['read or ran its checks in the review copy', inCopy.length > 0, `${copy} | ${o.tools.map((t) => `${t.cwd ? `[${t.cwd}] ` : ''}${t.input.slice(0, 80)}`).join(' | ')}`],
         // test.js leaves ran.txt beside itself: one in the project folder is a check run there, not in the copy (#1559).
         ['ran no command in the project folder (no ran.txt there)', !require('fs').existsSync(require('path').join(c.ws, 'alpha', 'ran.txt'))],
         ['gave a verdict (a Verdict fact)', factsOf(o, 'r', 'Verdict').length > 0],
