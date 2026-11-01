@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 120
+const FIXTURES_VERSION = 121
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -4722,7 +4722,9 @@ module.exports.SCENARIOS.push(
       return [
         ['Hive gave it to Implementer (a ReviewerAssigned fact)', factsOf(o, 'r', 'ReviewerAssigned').some((f) => f.data?.reviewer === c.agents.implementer.id), JSON.stringify(factsOf(o, 'r', 'ReviewerAssigned').map((f) => f.data))],
         ['started no reviewer itself (no brief to Implementer, no lane)', reviewers.length === 0, reviewers.join(' | ').slice(0, 300)],
-        ["didn't ask the user whether it should be reviewed", called(o, 'hive_notify').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
+        // A question about its review, as the check says (HI-2265: once the review passed within the trial, a question about
+        // an optional follow-up card isn't one).
+        ["didn't ask the user whether it should be reviewed", called(o, 'hive_notify').length === 0 && !askingSentences(o.finalReply).some((s) => /\breview|\bverdict|Implementer/i.test(s)), (o.finalReply ?? '').slice(0, 300)],
         ['moved the card nowhere and gave no verdict of its own', !called(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).review)) && called(o, 'hive_verdict').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
       ]
     },

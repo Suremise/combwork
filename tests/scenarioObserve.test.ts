@@ -1070,6 +1070,15 @@ describe('the HI-2265 check fix', () => {
     expect(byName('decision-while-waiting', o([{ by: 'Hive', what: 'Told Coder (alpha) of 1 new decision' }], [watchWake]), c)[TOLD]).toBe(false)
     expect(byName('decision-while-waiting', o([], []), c)[TOLD]).toBe(false)
   })
+
+  it('coordinator-start-reviewer: a question about its review fails; one about an optional follow-up after the review does not', () => {
+    const ASKED = "didn't ask the user whether it should be reviewed"
+    const run = (finalReply: string) => byName('coordinator-start-reviewer', { hiveCalls: [], tools: [], finalReply, cards: { r: { number: 1, key: 'AL-1', column: 'done' } }, facts: { r: [] }, allCards: [{ number: 1, key: 'AL-1' }] }, { cards: { r: 1 }, agents: { implementer: { id: 'a-impl' } } })[ASKED]
+    // The Haiku trial's reply (2026-11-01T08-22-24-claude-code s1), once the review had passed.
+    expect(run('AL-1 is in Done. You need to decide one thing: do you want a follow-up card to handle a missing name?')).toBe(true)
+    expect(run('AL-1 is in Review. Should I start Implementer to review it?')).toBe(false)
+    expect(run('Do you want it reviewed before it merges?')).toBe(false)
+  })
 })
 
 describe('the HI-2261 check fixes', () => {
