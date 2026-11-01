@@ -889,9 +889,9 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
       const mark = markOf(card)
       const intent = start?.card.number === n
       const base = intent ? start.card : card
-      const toldOf = told?.get(String(n))
-      const cut = !intent && self && launched ? ownCut(card, self, launched, toldOf) : null
-      const was = cut ?? toldOf
+      const wakeTold = told?.get(String(n))
+      const cut = !intent && self && launched ? ownCut(card, self, launched, wakeTold) : null
+      const was = cut ?? wakeTold
       // HI-2153: a card in Done or archived never changes again: its state is the answer, never a watch. Unless the watch
       // starts from before it got there (a wake that told it elsewhere, an intent's card): that move fires it.
       if (alreadyThere(mark, cond) || (cardOver(mark) && cardOver(was ? was.mark : markOf(base)))) {

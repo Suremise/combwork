@@ -1182,7 +1182,7 @@ async function builderReplies(ws: WorkspaceService, card: TaskCard, patch: TaskP
 }
 
 /** A builder's reply to its reviewer (HI-2302) as its history line, which watches count and the recorder wakes the reviewer with. */
-export const replyNote = (text: string): StoredText => storedText(HISTORY.builderReply, { text: clip(text) })
+export const replyNote = (said: string): StoredText => storedText(HISTORY.builderReply, { text: clip(said) })
 
 /**
  * Whether the acting agent is the reviewer of a card it moves back from Review or Passed (HI-1832): the one reviewing it
