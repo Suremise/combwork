@@ -49,6 +49,9 @@ const commitIn = (dir, files, message, trailer) => {
   for (const p of [alpha, beta, gamma]) {
     lib.gitProject(p, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
     lib.git(p, ['branch', '-M', 'main'])
+    // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
+    lib.git(p, ['config', 'user.name', identity.name])
+    lib.git(p, ['config', 'user.email', identity.email])
   }
   const env = lib.fakeClaude(userData, home, [alpha, beta, gamma, ws, ...['slot-a', 'slot-b', 'slot-c', 'slot-d'].map((s) => path.join(slotsRoot, s))])
   const cfgFile = path.join(userData, 'config.json')

@@ -54,6 +54,9 @@ const isIn = (dir, rev, ref) => {
   lib.gitProject(alpha0, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
   lib.git(alpha0, ['branch', '-M', 'main'])
   lib.git(alpha0, ['branch', 'integration'])
+  // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
+  lib.git(alpha0, ['config', 'user.name', identity.name])
+  lib.git(alpha0, ['config', 'user.email', identity.email])
   lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'hive/hb1', path.join(treesOf(before), 'hb1'), 'integration'])
   lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'hive/hr1', path.join(treesOf(before), 'hr1'), 'main'])
   fs.mkdirSync(path.join(alpha0, '.hive'), { recursive: true })

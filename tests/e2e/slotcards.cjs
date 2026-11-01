@@ -64,6 +64,9 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
   lib.gitProject(alpha, { 'a.txt': 'a\n', 'package-lock.json': '{"v":1}\n', '.gitignore': '.hive/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
+  // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
+  lib.git(alpha, ['config', 'user.name', identity.name])
+  lib.git(alpha, ['config', 'user.email', identity.email])
   // The slots' setup: records the slot and the lock file it installed from.
   const setup = path.join(tools, 'setup.js')
   fs.writeFileSync(setup, `require('fs').appendFileSync(${JSON.stringify(setupLog)}, process.env.HIVE_SLOT + ' ' + require('fs').readFileSync('package-lock.json', 'utf8').trim() + '\\n')\n`)

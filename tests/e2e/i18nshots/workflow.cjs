@@ -122,6 +122,9 @@ async function seedBilling(ctx) {
   lib.gitProject(dir, { 'invoices.txt': 'one\ntwo\nthree\n', '.gitignore': '.hive/\n' })
   lib.git(dir, ['branch', '-M', 'main'])
   lib.git(dir, ['branch', 'integration'])
+  // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
+  lib.git(dir, ['config', 'user.name', IDENTITY.name])
+  lib.git(dir, ['config', 'user.email', IDENTITY.email])
   await inv('workspace:refresh')
   await inv('project:setActive', dir, true)
   await inv('workflow:setOptions', dir, {

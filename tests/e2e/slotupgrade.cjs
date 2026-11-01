@@ -63,6 +63,9 @@ const isIn = (dir, rev, ref) => {
   lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
+  // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
+  lib.git(alpha, ['config', 'user.name', identity.name])
+  lib.git(alpha, ['config', 'user.email', identity.email])
   lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb1', hb1, 'integration'])
   for (const o of others) lib.git(alpha, ['worktree', 'add', '-q', '-b', `hive/hb${o.n}`, o.tree, 'integration'])
   lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hr2', hr2, 'integration'])
