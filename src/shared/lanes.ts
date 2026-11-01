@@ -304,6 +304,8 @@ export interface LaneCardFacts {
   reviewing?: string | null
   /** A Done card whose slot stayed on its line with uncommitted changes (HI-2014): the lane's next card waits for it. */
   slotDirty?: boolean
+  /** A pool lane's card in Doing whose design waits for the pool to give it to a reviewer (HI-2310). */
+  designWaits?: boolean
 }
 
 /** The reasons that pause a lane: it can't go on to its next card until they clear. */
@@ -340,6 +342,8 @@ export function laneStatus(rec: Pick<LaneRecord, 'rounds' | 'pending'>, cards: r
   if (focus.column === 'passed' && open.some((c) => c.column !== 'passed')) return { reason: f?.stage === 'merging' ? 'merging' : 'notMerged', card: focus.number }
   if (f?.stale) return { reason: 'stale', card: focus.number }
   if (focus.column === 'review' && !focus.reviewing) return { reason: 'reviewer', card: focus.number }
+  // A pool lane's design nobody has taken yet (HI-2310): waiting for a reviewer too.
+  if (focus.column === 'doing' && f?.designWaits) return { reason: 'reviewer', card: focus.number }
   // A queued change waits for its own card in flight, through Review and Approved until it is Done (HI-1821), never
   // for the card the lane would be on next.
   const anchor = open.find((c) => c.column === 'doing' || c.column === 'review' || c.column === 'passed')

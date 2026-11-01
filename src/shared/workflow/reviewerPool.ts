@@ -1,14 +1,25 @@
 // The reviewer pool's choice (#1443, SPEC §16.10.5 G17): which free pooled reviewer each submitted card of a pool lane
-// goes to. Pure, so the pass in main (reviewerPool.ts) and the unit tests share it.
+// goes to, and each design step of one (HI-2310). Pure, so the pass in main (reviewerPool.ts) and the unit tests share it.
 
+import { agentOf } from './facts'
 import { reviewsWork, type WorkflowRole } from './roles'
 
-/** A card in Review in one of the project's running lanes, as the pool sees its latest submission. */
+/** A card in Review in one of the project's running lanes, or a pool lane's card in Doing with a design to check (HI-2310), as the pool sees it. */
 export interface PoolCard {
   card: number
-  /** Its latest submission (the `Submitted` fact's seq) and when it was made: the oldest is given first. */
+  /**
+   * Its latest submission (the `Submitted` fact's seq) and when it was made: the oldest is given first. For a design
+   * (`design`), the design step's own `LoopStep` fact and its time: given out the same way, in the same order.
+   */
   submission: number
   submittedAt: string
+  /** What is given out is the builder's design waiting for its check (HI-2310), not a submission: answered, not reviewed. */
+  design?: boolean
+  /**
+   * The card's preferred reviewer (HI-2310: whoever answered its design, else gave its last verdict): given it first when
+   * free and allowed; busy or not allowed, the next free one takes it as usual.
+   */
+  preferred?: string | null
   /** Its lane is reviewed by the pool; a lane's own reviewer's card only counts for who is reviewing. */
   pool: boolean
   /** Every agent recorded building it (`review.notAuthor`'s): never its reviewer. */
@@ -42,21 +53,59 @@ export interface PoolAssignment {
  * The assignments to make now: each pool card waiting for a reviewer (nobody on its latest submission, fewer passes than
  * its quorum), oldest submission first, given to the first free agent that reviews, isn't its builder and hasn't seen
  * this submission. Free: its role reviews (reviewer or either), no open dispatch lease, idle, and not reviewing another
- * card (one of `cards`, or of `reviewing`: whoever reviews any other card of the project, in a lane or not). A card no
- * free agent can take doesn't hold up the cards after it.
+ * card (one of `cards`, or of `reviewing`: whoever reviews any other card of the project, or checks a design of one, in
+ * a lane or not). In its turn a card takes its preferred reviewer (HI-2310) if still free and allowed, else the next
+ * free one; a card no free agent can take doesn't hold up the cards after it.
  */
 export function poolAssignments(cards: readonly PoolCard[], agents: readonly PoolAgent[], reviewing: Iterable<string> = []): PoolAssignment[] {
   const busy = new Set([...reviewing, ...cards.map((c) => c.reviewing).filter((r): r is string => !!r)])
   const free = agents.filter((a) => reviewsWork(a.role) && !a.leased && a.idle && !busy.has(a.id))
   const waiting = cards.filter((c) => c.pool && !c.reviewing && c.passes < c.quorum).sort((a, b) => a.submittedAt.localeCompare(b.submittedAt) || a.card - b.card)
+  const allowed = (c: PoolCard, a: PoolAgent): boolean => !c.builders.includes(a.id) && !c.seen.includes(a.id)
   const out: PoolAssignment[] = []
   for (const c of waiting) {
-    const a = free.find((x) => !c.builders.includes(x.id) && !c.seen.includes(x.id))
+    // In its turn, oldest first: its preferred reviewer (HI-2310: the same eyes on the design and the build) if still
+    // free and allowed, else the next free one. A preference never puts a card ahead of an older one.
+    const a = (c.preferred ? free.find((x) => x.id === c.preferred && allowed(c, x)) : undefined) ?? free.find((x) => allowed(c, x))
     if (!a) continue
     out.push({ card: c.card, submission: c.submission, reviewer: a.id })
     free.splice(free.indexOf(a), 1)
   }
   return out
+}
+
+type FactLike = { kind: string; seq: number; at?: string; actor?: string; data: unknown }
+
+/**
+ * A card's design step waiting for its check (HI-2310), as the card's fold has it (`CardState.step`): the newest
+ * `LoopStep` a design, with no step, move, submission or verdict after it. Null: none waits.
+ */
+export function openDesign(facts: readonly FactLike[]): { seq: number; at: string } | null {
+  let open: { seq: number; at: string } | null = null
+  for (const f of facts) {
+    if (f.kind === 'LoopStep') open = (f.data as { step?: string }).step === 'design' ? { seq: f.seq, at: f.at ?? '' } : null
+    else if (f.kind === 'Moved' || f.kind === 'Submitted' || f.kind === 'Verdict') open = null
+  }
+  return open
+}
+
+/** Who checks a card's open design (HI-2310): its pool assignment not given up, or null (none open, or not given out yet). */
+export function designReviewer(facts: readonly FactLike[], known: (id: string) => boolean): string | null {
+  const d = openDesign(facts)
+  return d ? submissionReviewers(facts, d.seq, known).reviewing : null
+}
+
+/**
+ * A pool card's preferred reviewer (HI-2310): the agent who last answered one of its designs (`ok` or `gaps`), else the
+ * one who gave its last verdict; null when neither is an agent (the user's or the Assistant's answer). It stays with the
+ * card for its review rounds while it is free.
+ */
+export function preferredReviewer(facts: readonly FactLike[]): string | null {
+  const answer = facts.findLast((f) => f.kind === 'LoopStep' && ['ok', 'gaps'].includes((f.data as { step?: string }).step ?? '') && (f.data as { of?: string }).of === 'design')
+  const by = answer?.actor ? agentOf(answer.actor as `agent:${string}`) : null
+  if (by) return by
+  const verdict = facts.findLast((f) => f.kind === 'Verdict')?.data as { reviewer?: string } | undefined
+  return verdict?.reviewer && verdict.reviewer !== 'user' ? verdict.reviewer : null
 }
 
 /**

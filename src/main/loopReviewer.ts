@@ -2,6 +2,7 @@ import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import type { TaskCard } from '../shared/types'
 import type { Fact } from '../shared/workflow/facts'
+import { designReviewer, openDesign } from '../shared/workflow/reviewerPool'
 import { FactStore } from './workflow/factStore'
 import type { WorkspaceService } from './workspace'
 
@@ -15,7 +16,8 @@ const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCas
  * reviewing it. Only while it is one of the project's agents now: a removed one can't be woken. Null: the card has none
  * (a lane whose reviewer was removed has none, never an earlier reviewer instead). A lane reviewed by the pool (#1443):
  * whoever reviews its latest submission, assigned by the pool (`ReviewerAssigned`, the newest) or started on it; none
- * before the pool gives it to one (an earlier round's reviewer isn't this round's).
+ * before the pool gives it to one (an earlier round's reviewer isn't this round's). While its builder's design waits for
+ * a check (HI-2310), whoever the pool gave the design to, none before then.
  */
 export async function loopReviewerOf(ws: WorkspaceService, card: TaskCard): Promise<{ id: string; name: string } | null> {
   if (!ws.path || !card.project) return null
@@ -34,7 +36,11 @@ export async function loopReviewerOf(ws: WorkspaceService, card: TaskCard): Prom
     }
   })()
   if (rec?.reviewer) return named(rec.reviewer)
-  if (rec?.reviewerPool) return named(poolReviewerOf(store.facts(card.number)))
+  if (rec?.reviewerPool) {
+    // Its design waiting for a check (HI-2310): whoever the pool gave it to, none before then.
+    const facts = store.facts(card.number)
+    return named(openDesign(facts) ? designReviewer(facts, () => true) : poolReviewerOf(facts))
+  }
   const last = store.facts(card.number).findLast((f) => f.kind === 'ReviewStarted' || f.kind === 'Verdict')
   if (last) return named((last.data as { reviewer?: string }).reviewer)
   const started = card.history.findLast((h) => h.what === 'Started reviewing')

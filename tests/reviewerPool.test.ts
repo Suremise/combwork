@@ -4,14 +4,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'path'
-import { B1, B2, commit, moved, R1, R2, setup, sh, type Env } from './workflow/harness'
+import { B1, B2, commit, moved, R1, R2, refusedBy, setup, sh, type Env } from './workflow/harness'
 import { tempDir } from './tempDir'
 import { boardFile } from '../src/main/boardStore'
 import { attributeFolder } from '../src/main/workflow/reconcile'
 import { compile, loadRuleset } from '../src/shared/workflow/compile'
 import { agentActor } from '../src/shared/workflow/facts'
 import { allOff, contradictions, preset, reviewerModeOf, takesOption, type WorkflowOptions } from '../src/shared/workflow/options'
-import { poolAssignments, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
+import { designReviewer, openDesign, poolAssignments, preferredReviewer, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
 import type { LaneRecord } from '../src/shared/lanes'
 import type { AgentDef } from '../src/shared/types'
 
@@ -651,5 +651,143 @@ describe('a card in Review outside a lane (HI-2046): given to a free reviewer by
     await pass(e)
     expect(state.calls).toEqual(['typed to R1'])
     expect(state.deliveries.at(-1)?.body).toMatch(/follow-up submitted for review .*Start your review again/)
+  })
+})
+
+describe("a pool lane's design step (HI-2310): given out by the pool, its answerer preferred for the review", { timeout: 60_000 }, () => {
+  const card = (n: number, at: string, o: Partial<PoolCard> = {}): PoolCard => ({ card: n, submission: 1, submittedAt: at, pool: true, builders: ['B1'], seen: [], reviewing: null, quorum: 1, passes: 0, ...o })
+  const agent = (id: string, o: Partial<PoolAgent> = {}): PoolAgent => ({ id, role: 'reviewer', leased: false, idle: true, ...o })
+  const f = (seq: number, kind: string, data: Record<string, unknown>, actor = 'hive') => ({ seq, kind, at: `t${seq}`, actor, data })
+
+  it('in its turn, oldest first, a card takes its preferred reviewer if free and allowed; busy or not allowed, the next free one', () => {
+    // R1 listed last: the younger card still gets it, the older one the first free.
+    expect(poolAssignments([card(1, 'a'), card(2, 'b', { preferred: 'R1' })], [agent('R2'), agent('R3'), agent('R1')])).toEqual([
+      { card: 1, submission: 1, reviewer: 'R2' },
+      { card: 2, submission: 1, reviewer: 'R1' }
+    ])
+    // HR1's round 1: one free reviewer, the younger card's preferred one: the older card is served first, and the younger waits.
+    expect(poolAssignments([card(1, 'a'), card(2, 'b', { preferred: 'R1' })], [agent('R1')])).toEqual([{ card: 1, submission: 1, reviewer: 'R1' }])
+    // The older card prefers R1 too: it takes R1, the younger the next free one.
+    expect(poolAssignments([card(1, 'a', { preferred: 'R1' }), card(2, 'b', { preferred: 'R1' })], [agent('R2'), agent('R1')])).toEqual([
+      { card: 1, submission: 1, reviewer: 'R1' },
+      { card: 2, submission: 1, reviewer: 'R2' }
+    ])
+    expect(poolAssignments([card(2, 'b', { preferred: 'R1' })], [agent('R1', { idle: false }), agent('R2')])).toEqual([{ card: 2, submission: 1, reviewer: 'R2' }])
+    expect(poolAssignments([card(2, 'b', { preferred: 'R1' })], [agent('R1'), agent('R2')], ['R1'])).toEqual([{ card: 2, submission: 1, reviewer: 'R2' }])
+    // G1b = 2: the first reviewer, preferred, isn't the second.
+    expect(poolAssignments([card(2, 'b', { preferred: 'R1', quorum: 2, passes: 1, seen: ['R1'] })], [agent('R1'), agent('R2')])).toEqual([{ card: 2, submission: 1, reviewer: 'R2' }])
+  })
+
+  it("reads a card's open design, its reviewer and the card's preferred reviewer from its facts", () => {
+    const design = f(5, 'LoopStep', { step: 'design', text: 'Plan', design: 'AM-1/s5' }, B1)
+    expect(openDesign([design])).toEqual({ seq: 5, at: 't5' })
+    expect(designReviewer([design], () => true)).toBeNull()
+    const given = [design, f(6, 'ReviewerAssigned', { reviewer: 'R2', submission: 5, design: true })]
+    expect(designReviewer(given, () => true)).toBe('R2')
+    // Answered, moved, submitted or replaced: no longer open.
+    const answered = [...given, f(7, 'LoopStep', { step: 'gaps', text: 'x', design: 'AM-1/s5', of: 'design' }, agentActor('R2'))]
+    expect(openDesign(answered)).toBeNull()
+    expect(openDesign([design, f(6, 'Submitted', {})])).toBeNull()
+    // Its answerer is preferred over the last verdict's reviewer; the user's answer prefers nobody by it.
+    expect(preferredReviewer([...answered, f(9, 'Verdict', { reviewer: 'R1', pass: false })])).toBe('R2')
+    expect(preferredReviewer([f(9, 'Verdict', { reviewer: 'R1', pass: false })])).toBe('R1')
+    expect(preferredReviewer([f(9, 'Verdict', { reviewer: 'user', pass: false })])).toBeNull()
+  })
+
+  /** A pool lane's card started by B1, with its design posted: the step's id. */
+  async function designed(e: Env, c: { id: number; key: string }): Promise<string> {
+    moved(await e.wf.start(c.key, B1))
+    const posted = await e.wf.loopStep(c.key, B1, 'design', 'The plan', { waitMinutes: 30, reviewer: async () => designReviewer(e.store.facts(c.id), () => true) })
+    moved(posted)
+    return (posted as { data?: Record<string, unknown> }).data?.design as string
+  }
+
+  it('posted with no reviewer yet: the pool gives it to a free one and tells it; its answer frees it; at submission it reviews the build', async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1', 'R2'])
+    const a = e.wf.createCard({ title: 'Designed' })
+    lane(e, 'L', [a.id], 'B1', null)
+    // R1 busy: R2 takes the design.
+    state.busy = new Set(['R1'])
+    const id = await designed(e, a)
+    expect(pending(e).filter((x) => x.kind === 'wake')).toEqual([])
+    expect(pending(e).map((x) => x.kind)).toContain('assignReviewer')
+    await pass(e)
+    await pass(e)
+    expect(designReviewer(e.store.facts(a.id), () => true)).toBe('R2')
+    expect(state.calls).toEqual(['typed to R2'])
+    expect(state.deliveries.at(-1)?.body).toMatch(new RegExp(`posted a design for a check \\(${id}\\).*hive_loop_step`))
+    // Checking the design, R2 isn't free for a card in Review meanwhile.
+    const other = e.wf.createCard({ title: 'Other' })
+    lane(e, 'L2', [other.id], 'B2', null)
+    await submitted(e, other, B2)
+    state.busy = new Set()
+    await pass(e)
+    expect(assignedTo(e, other.id)).toEqual(['R1'])
+    // Only the design's reviewer answers it; its answer closes it.
+    refusedBy(await e.wf.loopStep(a.key, R1, 'ok', 'Fine', { waitMinutes: 30, design: id, reviewer: async () => designReviewer(e.store.facts(a.id), () => true) }), 'loop.stepNotYours')
+    moved(await e.wf.loopStep(a.key, R2, 'ok', 'Fine', { waitMinutes: 30, design: id, reviewer: async () => designReviewer(e.store.facts(a.id), () => true) }))
+    expect(openDesign(e.store.facts(a.id))).toBeNull()
+    // Submitted with R1 free too (and first among the agents): R2, its design's reviewer, reviews the build.
+    moved(await e.wf.verdict(other.key, R1, { pass: true, comment: 'ok', startReview: true }))
+    commit(e.project, { [`${a.id}.txt`]: 'built\n' }, 'Built', { trailer: a.key })
+    await attributeFolder(e.wf)
+    moved(await e.wf.submit(a.key, B1, { summary: 'Built' }))
+    await pass(e)
+    expect(assignedTo(e, a.id)).toEqual(['R2', 'R2'])
+    expect(e.store.facts(a.id).filter((x) => x.kind === 'ReviewerAssigned').map((x) => (x.data as { design?: boolean }).design ?? false)).toEqual([true, false])
+  })
+
+  it('its preferred reviewer busy at submission: the next free one takes the build', async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1', 'R2'])
+    const a = e.wf.createCard({ title: 'Designed' })
+    lane(e, 'L', [a.id], 'B1', null)
+    state.busy = new Set(['R1'])
+    const id = await designed(e, a)
+    await pass(e)
+    moved(await e.wf.loopStep(a.key, R2, 'ok', 'Fine', { waitMinutes: 30, design: id, reviewer: async () => designReviewer(e.store.facts(a.id), () => true) }))
+    state.busy = new Set(['R2'])
+    commit(e.project, { [`${a.id}.txt`]: 'built\n' }, 'Built', { trailer: a.key })
+    await attributeFolder(e.wf)
+    moved(await e.wf.submit(a.key, B1, { summary: 'Built' }))
+    await pass(e)
+    expect(assignedTo(e, a.id)).toEqual(['R2', 'R1'])
+  })
+
+  it('nobody free: the design waits for a reviewer; the builder going ahead unchecked wakes nobody and the design is never given', async () => {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1', 'R2'])
+    state.busy = new Set(['R1', 'R2'])
+    const a = e.wf.createCard({ title: 'Designed' })
+    lane(e, 'L', [a.id], 'B1', null)
+    const id = await designed(e, a)
+    await pass(e)
+    expect(assignedTo(e, a.id)).toEqual([])
+    const before = pending(e).length
+    moved(await e.wf.loopStep(a.key, B1, 'proceed', 'Building', { waitMinutes: 30, design: id, now: Date.now() + 31 * 60_000, reviewer: async () => designReviewer(e.store.facts(a.id), () => true) }))
+    expect(pending(e).slice(before).filter((x) => x.kind === 'wake')).toEqual([])
+    state.busy = new Set()
+    await pass(e)
+    expect(assignedTo(e, a.id)).toEqual([])
+    expect(state.calls).toEqual([])
+  })
+
+  it("a lane with its own reviewer is unchanged: the design wakes it, and the pool isn't asked", async () => {
+    const e = (env = setup({ ...optionsFor(1, 'lane', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    const a = e.wf.createCard({ title: 'Own reviewer' })
+    lane(e, 'L', [a.id], 'B1', 'R1')
+    moved(await e.wf.start(a.key, B1))
+    moved(await e.wf.loopStep(a.key, B1, 'design', 'The plan', { waitMinutes: 30, reviewer: async () => 'R1' }))
+    expect(pending(e)).toContainEqual({ kind: 'wake', agent: 'R1' })
+    expect(pending(e).map((x) => x.kind)).not.toContain('assignReviewer')
+    // With no reviewer at all (no lane reviewer, not the pool's), still refused.
+    const b = e.wf.createCard({ title: 'No reviewer' })
+    moved(await e.wf.start(b.key, B1))
+    refusedBy(await e.wf.loopStep(b.key, B1, 'design', 'The plan', { waitMinutes: 30, reviewer: async () => null }), 'loop.noReviewer')
   })
 })

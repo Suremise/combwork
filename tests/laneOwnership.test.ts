@@ -53,6 +53,8 @@ describe('why a lane waits (laneStatus)', () => {
     expect(laneStatus(rec, [lc(1, 'passed'), lc(2, 'todo')], null, false, new Map([[1, ff({ stage: 'merging' })]]))).toEqual({ reason: 'merging', card: 1 })
     expect(laneStatus(rec, [lc(1, 'review', { reviewing: true }), lc(2, 'todo')], 1, false, new Map([[1, ff({ stage: 'review', stale: true })]]))).toEqual({ reason: 'stale', card: 1 })
     expect(laneStatus(rec, [lc(1, 'review'), lc(2, 'todo')], 1, false, new Map([[1, ff({ stage: 'review' })]]))).toEqual({ reason: 'reviewer', card: 1 })
+    // A pool lane's design nobody has taken yet (HI-2310).
+    expect(laneStatus(rec, [lc(1, 'doing'), lc(2, 'todo')], 1, false, new Map([[1, ff({ designWaits: true })]]))).toEqual({ reason: 'reviewer', card: 1 })
     expect(laneStatus({ rounds: 3, pending: [1, 2, 3] }, [lc(1, 'doing'), lc(2, 'todo')], 1, false, new Map([[1, ff()]]))).toEqual({ reason: 'listChanges', card: 1 })
     expect(laneStatus(rec, [lc(1, 'doing'), lc(2, 'todo')], 1, false, new Map([[1, ff()]]))).toBeNull()
     expect(laneStatus(rec, [lc(1, 'done'), lc(2, 'gone')], null, false, new Map())).toBeNull()
