@@ -279,10 +279,15 @@ function setSize(key: string, e: PtyEntry, cols: number, rows: number): void {
   }
 }
 
-/** A terminal's process's size now, for a view that shows it: drawn at any other size, its output lands in the wrong places. */
-export function ptySize(key: string): { cols: number; rows: number } | null {
+/**
+ * A terminal's process's size now, for a view that shows it: drawn at any other size, its output lands in the wrong
+ * places. With no process (yet), the size the next one starts at (startSize): a session's view is made at its start,
+ * before its process is spawned, and asks once, so a hidden one (never fitted) would otherwise keep xterm's 80 × 24
+ * while its process draws at its own size (HI-2250).
+ */
+export function ptySize(key: string): { cols: number; rows: number } {
   const e = entries.get(key)
-  return e ? { cols: e.proc.cols, rows: e.proc.rows } : null
+  return e ? { cols: e.proc.cols, rows: e.proc.rows } : startSize(key)
 }
 
 /**

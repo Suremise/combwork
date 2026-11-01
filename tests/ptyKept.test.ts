@@ -7,7 +7,7 @@ import { createRequire } from 'module'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { agentPtyKey } from '../src/shared/defaults'
-import { forgetPtys, keptPtyCounts, killPty, PTY_COLS, PTY_ROWS, resizePty, setPtyKeptLimitsForTests, spawnPty, startSize } from '../src/main/ptyHost'
+import { forgetPtys, keptPtyCounts, killPty, PTY_COLS, PTY_ROWS, ptySize, resizePty, setPtyKeptLimitsForTests, spawnPty, startSize } from '../src/main/ptyHost'
 import { tempDir } from './tempDir'
 
 vi.mock('../src/main/events', () => ({ emit: () => undefined, sendPty: () => undefined }))
@@ -47,6 +47,23 @@ describe('the sizes kept for terminals', () => {
     for (let i = 0; i < 50; i++) resizePty(agentPtyKey('C:\\other\\p', `a-${i}`), 90, 25)
     expect(startSize(key)).toEqual({ cols: 133, rows: 37 })
   })
+
+  it('are what a view asking before its process exists is told: the size that process then starts at (HI-2250)', () => {
+    // A session's view is made at its start, before its process is spawned, and asks once: hidden, nothing fits it after.
+    const fresh = agentPtyKey('C:\\early\\p', 'a-new')
+    expect(ptySize(fresh)).toEqual(DEFAULT)
+    const sized = agentPtyKey('C:\\early\\p', 'a-sized')
+    resizePty(sized, 111, 33)
+    const asked = ptySize(sized)
+    expect(asked).toEqual({ cols: 111, rows: 33 })
+    // As sessions.ts spawns it: at startSize. Its entry is there once spawnPty returns.
+    spawnPty(sized, { file: process.execPath, args: ['-e', 'setTimeout(() => {}, 60000)'], cwd: process.cwd(), env, ...startSize(sized) })
+    try {
+      expect(ptySize(sized)).toEqual(asked)
+    } finally {
+      killPty(sized)
+    }
+  }, 20000)
 
   it("forget a removed agent's, and all of a removed project's, but no other project's", () => {
     const one = agentPtyKey('C:\\ws\\site', 'a-1')
