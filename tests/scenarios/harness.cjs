@@ -54,6 +54,35 @@ const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const WRITERS = /^(Write|Edit|MultiEdit|NotebookEdit|apply_patch)$/i
 
 /**
+ * Where an Agent API token was seen (HI-2259): `known` the tokens, each `{ kind, token }` (workspace, agent, assistant),
+ * and `seen` what the session printed or said (`tools` and `scripts`, each `{ name, result }`; `replies`, text). Each
+ * sighting `{ kind, in: 'tool' | 'script' | 'reply', at, name?, excerpt }`: `at` its place in that list, `excerpt` up to
+ * 80 characters before it and 40 after, every known token in it as `<kind token>`, never the token.
+ */
+function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
+  const mask = (s) => known.reduce((x, t) => x.split(t.token).join(`<${t.kind} token>`), s)
+  const out = []
+  const look = (where, list, textOf) =>
+    list.forEach((item, at) => {
+      const text = String(textOf(item) ?? '')
+      for (const t of known) {
+        if (!text.includes(t.token)) continue
+        // Masked whole first, then cut: a cut through another token would leave a part of it.
+        const label = `<${t.kind} token>`
+        const sentinel = '\u0000'
+        const whole = mask(text.replace(t.token, sentinel))
+        const i = whole.indexOf(sentinel)
+        const excerpt = (whole.slice(Math.max(0, i - 80), i) + label + whole.slice(i + 1, i + 1 + 40)).replace(/\s+/g, ' ').trim()
+        out.push({ kind: t.kind, in: where, at, ...(typeof item === 'object' && item?.name ? { name: item.name } : {}), excerpt })
+      }
+    })
+  look('tool', tools, (x) => x.result)
+  look('script', scripts, (x) => x.result)
+  look('reply', replies, (x) => x)
+  return out
+}
+
+/**
  * What a session's transcript shows: every tool call (name, summary, input, result, error), the Hive skills it read,
  * the hive tools it names (mentions: a transcript isn't proof a call ran; the server's log is), and its last reply.
  * A skill counts as read only when the read worked and shows the skill: a Skill call for it that didn't fail, or a
@@ -881,11 +910,15 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Each change to the merge slots (JSON lines, as the MCP log): { at, slots: [{ project, branch, holder, waiting }] }.
     observed.slotLog = readMcpLog(slotLog)
     // Any Agent API token (the workspace's, or an agent's for this launch) in what the session printed or said.
-    const tokensIn = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).token) : [])
-    const tokens = [apiToken, ...tokensIn(path.join(userData, 'agent-api')), ...tokensIn(path.join(userData, 'assistant-api'))].filter((t) => typeof t === 'string' && t.length >= 16)
+    const tokensIn = (dir, kind) => (fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => ({ kind, token: JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).token })) : [])
+    const known = [{ kind: 'workspace', token: apiToken }, ...tokensIn(path.join(userData, 'agent-api'), 'agent'), ...tokensIn(path.join(userData, 'assistant-api'), 'assistant')].filter((t) => typeof t.token === 'string' && t.token.length >= 16)
+    const tokens = known.map((t) => t.token)
     // A script's own output too (what it printed), beside its calls'.
-    const scriptOutputs = code.items.filter((x) => x.kind === 'script').map((x) => String(x.tool.result ?? ''))
-    observed.tokenLeak = tokens.some((t) => observed.tools.some((x) => x.result.includes(t)) || scriptOutputs.some((r) => r.includes(t)) || observed.replies.some((r) => r.includes(t)))
+    const scripts = code.items.filter((x) => x.kind === 'script').map((x) => ({ name: x.tool.name, result: String(x.tool.result ?? '') }))
+    // Where each was seen, masked (HI-2259: the results keep 400 characters of a result, so a leak further on was found
+    // but not where).
+    observed.tokenSeen = tokenSightings(known, { tools: observed.tools, scripts, replies: observed.replies })
+    observed.tokenLeak = observed.tokenSeen.length > 0
     observed.cards = Object.fromEntries(await Promise.all(Object.entries(ctx.cards).map(async ([k, n]) => [k, (await api('GET', `/v1/tasks/${n}`)).body])))
     // Each card's workflow facts (1.0: Moved, Override, Refused…), for scenarios about what a move recorded (#1319).
     observed.facts = Object.fromEntries(await Promise.all(Object.entries(ctx.cards).map(async ([k, n]) => [k, (await inv('tasks:facts', n).catch(() => null)) ?? []])))
@@ -981,4 +1014,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, observeTranscript, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, observeTranscript, tokenSightings, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
