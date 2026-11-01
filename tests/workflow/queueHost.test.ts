@@ -227,8 +227,10 @@ function deferred<T>() {
   return { p, settle }
 }
 
-// Bounds for a hung run only (#570): each wait waits for what it says.
-const HUNG = { timeout: 30_000, interval: 20 }
+// Bounds for a hung run only (#570): each wait waits for what it says. Under the test's own limit (testTimeout, 20 s in
+// vitest.config.ts) with room for its setup's git, so a run too slow or hung fails naming the wait and its last state,
+// not as a bare "Test timed out" (HI-2292: a 30 s bound could never report, and the failure's check was unknown).
+const HUNG = { timeout: 15_000, interval: 20 }
 
 describe("another Hive's runner, watched (#1455, S50; HR4's #1358 round 1)", () => {
   it('watched while it lives, never run here; once its process is gone, this Hive runs the queue and merges', async () => {
