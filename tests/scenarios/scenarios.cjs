@@ -3002,7 +3002,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'intent-submit-refused',
-    title: "A builder's submission refused by a gate (#1536): its work isn't committed, so Hive refuses it, saying in git's words what is missing; asked only to submit for review, it asks the user before committing (HI-1618: submitting never commits), overriding nothing and moving nothing by hand",
+    title: "A builder's submission refused by a gate (#1536): its work isn't committed, so Hive refuses it, saying in git's words what is missing; asked only to submit for review, not to do the card, it asks the user before committing, as the refusal's next step says (HI-1618: submitting never commits; HI-2257: an agent doing the card commits, one asked only to submit asks first), overriding nothing and moving nothing by hand",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       c.git('config', 'user.email', 'agent@example.com')
