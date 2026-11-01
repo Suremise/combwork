@@ -16,6 +16,7 @@ import type { NextStep } from './workflow/nextStep'
 import type { QueuePublic } from './workflow/queue'
 import { INBOX_SWITCHES, type InboxSwitch } from './inboxSwitches'
 import { unsubmittedText, type UnsubmittedCard } from './unsubmitted'
+import { idleWatchText } from './idleWatch'
 
 /** A running agent's CLI's own default, where its launch gave none and it hasn't said (HI-1996). */
 export const CLI_DEFAULT = 'default'
@@ -650,7 +651,7 @@ export interface WaitChange {
  * card, where it is now, who changed it, the latest comment's author and first line), or no change; with `since` for the
  * next wait. Short: the full comment is hive_read_task with latestComment.
  */
-type WaitReply = { done?: string; unsubmitted?: UnsubmittedCard[]; watching?: string; limitAt?: string; already?: WaitChange; usageAlready?: string[]; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
+type WaitReply = { done?: string; unsubmitted?: UnsubmittedCard[]; idle?: number; watching?: string; limitAt?: string; already?: WaitChange; usageAlready?: string[]; changes?: WaitChange[]; timedOut?: boolean; since?: string; events?: string[]; replaced?: string; cards?: LaneWatchCards; agents?: LaneWatchAgents; lanesLeft?: string[]; names?: Record<string, string> }
 
 /**
  * HI-1987: a card or agent watch that replaces a lane watch while its lanes run says what it drops, and how to keep them
@@ -681,6 +682,8 @@ function waitText(r: WaitReply): string {
     `${cardRef(c.number)} ${c.changes === 'gone' ? (c.archived ? 'was archived' : 'was archived or deleted') : `is in ${c.column[0].toUpperCase()}${c.column.slice(1)} (${c.changes.join(', ')}${c.by ? `, by ${c.by}` : ''})`}${c.comment ? `; latest comment by ${c.comment.by}: "${c.comment.firstLine}"` : ''}`
   // HI-2245: the builder's own card in Review with commits past its submission: handed over first, then the turn ends.
   const first = unsubmittedText(r.unsubmitted, `end your turn: Hive types a line into this session when it changes, or at ${r.limitAt ?? 'the limit'} if nothing does.`)
+  // HI-2285: a lane's builder watching only its own card with nothing waiting on it: carry on rather than end the turn.
+  if (r.watching && r.idle !== undefined && !first) return `${r.watching}. ${idleWatchText({ number: r.idle })} Hive types a line into this session when it changes, or at ${r.limitAt ?? 'the limit'} if nothing does.${lanesLeftText(r.lanesLeft)}`
   if (r.watching) return `${r.watching}. ${first ?? `End your turn now: Hive types a line into this session when it changes, or at ${r.limitAt ?? 'the limit'} if nothing does.`} Nothing runs meanwhile.${lanesLeftText(r.lanesLeft)}`
   if (r.already) return `Already: ${line(r.already)}.${r.unsubmitted?.length ? ` ${unsubmittedText(r.unsubmitted)}` : ''}${lanesLeftText(r.lanesLeft)}`
   // A usage watch whose account is there already (HI-2195): no watch started, the one before it ended.

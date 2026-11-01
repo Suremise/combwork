@@ -13,6 +13,7 @@ import { sessions } from './sessions'
 import { workspaceOf, type WorkspaceService } from './workspace'
 import { config } from './config'
 import { pausedFor, resumedAt } from './teamPause'
+import { IDLE_WATCH_STALL_MS, idleWatchReason, nothingWaitsOn } from '../shared/idleWatch'
 
 /**
  * Why a card is stalled, in one place (the Agent API's `stalled`, and lane watches, #531): a Doing card nobody works on
@@ -195,7 +196,27 @@ export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: stri
     const why = waited(REVIEW_WAIT_STALL_MS) ? reviewVerdictWaitReason(c, watchers, Date.now(), undefined, job) : null
     return why && wsPath && c.review && ownQuestionOpen(wsPath, c, c.review.agent) ? null : why
   }
-  return startFailedReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? (waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers) : null) ?? verdictWait() ?? (waited(REVIEW_WAIT_STALL_MS) ? laneOrderWaitReason(c, lane, watchers) : null) ?? (waited(REVIEW_WAIT_STALL_MS) ? loopStepWaitReason(c, watchers, stepWaitMs) : null) ?? (waited(LANE_NEXT_STALL_MS) ? laneNext(c, lane, live, agentNow) : null) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
+  return startFailedReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? (waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers) : null) ?? verdictWait() ?? (waited(REVIEW_WAIT_STALL_MS) ? laneOrderWaitReason(c, lane, watchers) : null) ?? (waited(REVIEW_WAIT_STALL_MS) ? loopStepWaitReason(c, watchers, stepWaitMs) : null) ?? (waited(IDLE_WATCH_STALL_MS) ? idleWatch(c, lane, live, wsPath) : null) ?? (waited(LANE_NEXT_STALL_MS) ? laneNext(c, lane, live, agentNow) : null) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
+}
+
+/**
+ * HI-2285: a running lane's builder only watching its own card while nothing on it waits on anyone (idleWatchReason); the
+ * board's For you items are read only for a card that would be stalled.
+ */
+function idleWatch(c: TaskCard, lane: LaneOrderView | null | undefined, live: ReturnType<typeof liveOf>, wsPath: string | null): string | null {
+  if (!lane || !wsPath || !c.project || !nothingWaitsOn(c, lane.builder, false)) return null
+  const watcher = live.find((a) => a.agentId === lane.builder && a.project.toLowerCase() === c.project.toLowerCase())
+  const why = idleWatchReason(c, lane, watcher)
+  return why && !forYouOpen(wsPath, c) ? why : null
+}
+
+/** Whether the card has any open For you request (HI-2285): the user's answer is what it waits on. Unreadable: none. */
+function forYouOpen(wsPath: string, c: TaskCard): boolean {
+  try {
+    return (forYouOfCards(workspaceOf(join(wsPath, c.project)), [c.number]).get(c.number) ?? []).length > 0
+  } catch {
+    return false
+  }
 }
 
 /**

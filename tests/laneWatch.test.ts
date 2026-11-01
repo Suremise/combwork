@@ -11,6 +11,7 @@ import { LANE_CARD_CHANGES, LANE_DEFAULT_EVENTS, MERGE_STALL_MS, blockNewsAt, ke
 import { WAKE_MAX_BYTES, type CardChange } from '../src/shared/watch'
 import { taskWaitText } from '../src/shared/toolReplies'
 import { REVIEW_WAIT_STALL_MS } from '../src/shared/tasks'
+import { IDLE_WATCH_STALL_MS } from '../src/shared/idleWatch'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
 import { LANE_NEXT_STALL_MS, laneNextWaitReason, RETURN_STALL_MS, returnedWaitReason, setStallRuns, STALE_STALL_MS, staleWaitReason } from '../src/main/cardStall'
@@ -1081,6 +1082,37 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     } finally {
       stales.delete(a)
     }
+    await disposeWorkspaceService(w)
+  })
+
+  it("a lane's builder only watching its own card in Doing, nothing waiting on it, is stalled 5 min after its watch began; not while it works (HI-2285)", async () => {
+    const { w, alpha, home } = await open()
+    const st = fake(alpha, home)
+    const [a] = await newCards(w, 'b1', 1)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
+    const since = new Date().toISOString()
+    // CB1's case (CL-5, 1 Nov): it committed its plan, watched its card for a comment and ended its turn. First it works
+    // with that watch kept: no stall however long.
+    let b1Status = 'working'
+    Object.assign(sessions, { liveStates: () => [{ projectPath: alpha, agentId: 'b1', agentName: 'B1', status: b1Status, watch: { cards: [a], changes: ['comment'], label: '', since, limitAt: '' } }] })
+    await watchAll(w, home, st)
+    await watches.evaluateWatches(w)
+    await watches.settled()
+    expect(st.typed).toEqual([])
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(Date.parse(since) + IDLE_WATCH_STALL_MS + 60_000)
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(st.typed).toEqual([])
+      // Its turn over, it only watches: stalled.
+      b1Status = 'watching'
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(st.told[0]).toContain(`#${a} is stalled: "B1 only watches #${a} (6 min), and nothing waits on it: no question for the user, no design step, not submitted."`)
     await disposeWorkspaceService(w)
   })
 
