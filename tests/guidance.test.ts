@@ -102,6 +102,10 @@ describe('the session contract', () => {
     }
   })
 
+  it("says a missing skill isn't needed, before the board rules it points to (HI-2265)", () => {
+    expect(agent).toMatch(/A missing skill isn't needed: do the work by the board rules below\.[\s\S]*Board rules/)
+  })
+
   it('names only hive tools that exist', () => {
     for (const text of [agent, assistant, controlRules('look'), controlRules('agents'), controlRules('projects')]) for (const t of toolsNamed(text)) expect(TOOLS, t).toContain(t)
   })

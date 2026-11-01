@@ -1057,6 +1057,21 @@ describe('the HI-2260 check fixes', () => {
   })
 })
 
+describe('the HI-2265 check fix', () => {
+  const byName = (id: string, o: object, c: object) => Object.fromEntries(SCENARIOS.find((s) => s.id === id)!.expect(o, c).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))
+  const TOLD = 'Hive told it once'
+  const o = (history: { by: string; what: string }[], wakeLines: string[]) => ({ hiveCalls: [], tools: [], skillsRead: [], wakeLines, cards: { a: { number: 1, key: 'AL-1', column: 'done', history: [{ at: '2026-11-01T00:00:00Z', by: 'You', what: 'Recorded a decision: "Use "Welcome back!" as the greeting."' }, ...history.map((h) => ({ at: '2026-11-01T00:00:05Z', ...h }))] } }, facts: { a: [] }, allCards: [{ number: 1, key: 'AL-1' }] })
+  const c = { cards: { a: 1 }, read: () => 'Welcome back!\n' }
+  const watchWake = '1 new:\nm1 · Hive · AL-1: [Hive] AL-1 is in Doing (a new decision from the user: read its decisions). Your card watch has ended: carry on.'
+
+  it("decision-while-waiting: the card watch's wake tells the decision once, as a decision line does; both, or neither, isn't once", () => {
+    expect(byName('decision-while-waiting', o([], [watchWake]), c)[TOLD]).toBe(true)
+    expect(byName('decision-while-waiting', o([{ by: 'Hive', what: 'Told Coder (alpha) of 1 new decision' }], []), c)[TOLD]).toBe(true)
+    expect(byName('decision-while-waiting', o([{ by: 'Hive', what: 'Told Coder (alpha) of 1 new decision' }], [watchWake]), c)[TOLD]).toBe(false)
+    expect(byName('decision-while-waiting', o([], []), c)[TOLD]).toBe(false)
+  })
+})
+
 describe('the HI-2261 check fixes', () => {
   const h = helpers as unknown as {
     readOf: (t: unknown, target: string, facts: RegExp) => boolean
