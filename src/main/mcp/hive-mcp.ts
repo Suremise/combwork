@@ -564,7 +564,7 @@ const tools: Tool[] = [
   },
   {
     name: 'hive_list_tasks',
-    description: `${ASSISTANT ? "The task board's cards" : "Your project's cards"} in board order (a column's order is its priority), a line each. details=true: every card as JSON (large; one card: hive_read_task). At most ${MAX_ROWS} lines a reply: offset carries on.`,
+    description: `${ASSISTANT ? "The task board's cards" : "Your project's cards"} in board order (a column's order is its priority), a line each. details=true: every card as JSON (large). At most ${MAX_ROWS} lines a reply: offset carries on.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -770,7 +770,7 @@ const tools: Tool[] = [
   {
     name: 'hive_read_task',
     description:
-      "One card as JSON: decisions first (the user's: they win over the description), then forYou (what waits for the user), description, comments, links. comments, latestComment and summary read less; history=true adds who changed what, when (what waits is in forYou).",
+      "One card as JSON: decisions first (the user's: they win over the description), then forYou (what waits for the user), description, comments, links. comments, latestComment and summary read less; history=true adds history.",
     inputSchema: {
       type: 'object',
       properties: {
