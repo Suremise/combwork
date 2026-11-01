@@ -175,7 +175,7 @@ const t = setInterval(() => {
     const left = held.release()
     if (left.failed.length || left.ended.length) console.log(`the wrapper's suspension released: ${JSON.stringify(left)}`)
   }
-  check('its process tree is ended (as an agent stopping it does)', ended >= 1 && lib.stillSame([serverId]).length === 0, `${ended} ended`)
+  check('its process tree is ended (as an agent stopping it does)', !!serverId && ended >= 1 && lib.stillSame([serverId]).length === 0, `${ended} ended`)
   await server()
   const gone = await until(async () => (await runs()).find((r) => r.id === srv?.id && r.finishedAt !== null), 45000)
   check('Hive sees its process gone: ended without a report', gone?.state === 'stopped' && gone.stopReason === 'gone', JSON.stringify(gone))
