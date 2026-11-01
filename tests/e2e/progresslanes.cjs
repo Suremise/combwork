@@ -12,7 +12,8 @@
 // merging and short states in both themes. The lanes are #483's, started through the Agent API. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
 // Dev build only (#1580): it starts this checkout's Electron itself, and B1 and B3 are 0.9 worktree agents
-// (agents:testLegacy, refused by a packaged build).
+// (agents:testLegacy, refused by a packaged build). Idle and outside slots, each gets its lane in a new conversation
+// (HI-2232), so a new token: the suite reads it again from that launch (HI-2254).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -66,15 +67,19 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   for (const a of [b1, r1, b3]) await inv('session:start', alpha, { agentId: a.id })
   const statuses = async () => (await Promise.all([b1, r1, b3].map((a) => live(a.id)))).map((s) => s?.status)
   check('the agents start', !!(await until(async () => (await statuses()).every((s) => s === 'ready'), 45000)), JSON.stringify(await statuses()))
-  const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-  // Each agent's token, by the folder it runs in (B1 and B3 in their worktrees).
-  const tokenOf = (a) => launches.filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase()).at(-1)?.token
+  // The fake CLI's launches as now (each launch has its own token): read again where an agent is relaunched.
+  const launchesNow = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+  const launchesOf = (a) => launchesNow().filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase())
+  // Each agent's token, by the folder it runs in (B1 and B3 in their worktrees): its latest launch's.
+  const tokenOf = (a) => launchesOf(a).at(-1)?.token
   const api = async (token, method, route, body) => {
     const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: r.status, body: await r.json().catch(() => null) }
   }
-  const [t1, tr, t3] = [tokenOf(b1), tokenOf(r1), tokenOf(b3)]
-  check('each agent has its own token', !!t1 && !!tr && !!t3 && new Set([t1, tr, t3]).size === 3, JSON.stringify(launches.map((l) => l.cwd)))
+  const tr = tokenOf(r1)
+  // B1's and B3's change once their lanes give them new conversations (HI-2232, below).
+  let [t1, t3] = [tokenOf(b1), tokenOf(b3)]
+  check('each agent has its own token', !!t1 && !!tr && !!t3 && new Set([t1, tr, t3]).size === 3, JSON.stringify(launchesNow().map((l) => l.cwd)))
 
   // --- The board a lane reads: B1's eight cards, each somewhere else.
   // Each card's name as the window gives it (#1221): its key.
@@ -143,6 +148,9 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     if (r.status !== 200) check(`lane of ${builder} starts`, false, JSON.stringify(r))
     return r.body?.lane?.id
   }
+  // B1 quiet first (idle, nothing of Hive's being typed into it or waiting to be): the board set-up above sends it card
+  // events, and taking them as its lane starts would make its new conversation owed (or leave it as it is, mid-turn).
+  check('B1 is quiet before its lane starts', !!(await until(async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tr), 45000)), JSON.stringify(await live(b1.id)))
   const l1 = await startLane('B1', 'R1', 'lanes and loops', lane1)
   const section = panel.locator('.progress-lanes')
   const list = section.locator('.progress-lanes-list')
@@ -158,7 +166,16 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const showsWhole = (f, n) => f.whole === n && (n >= f.bottoms.length ? f.scroll <= f.client + 1 : Math.abs(f.tops[n] - f.client) <= 1 && f.scroll > f.client + 4)
   // Only as tall as the lane, its margin and the list's padding (6 px each).
   check('one lane: the section is only as tall as it is', !!(await until(async () => (await section.locator('.progress-lane').count()) === 1 && showsWhole(await fit(), 1), HUNG_MS)) && (await fit()).client <= (await fit()).bottoms[0] + 12, JSON.stringify(await fit().catch(() => null)))
+  // B3 quiet too, for the same reason: its 22 cards, made above, send it card events of its own.
+  check('B3 is quiet before its lane starts', !!(await until(async () => lib.agentQuiet(PORT, 'alpha', await live(b3.id), tr), 45000)), JSON.stringify(await live(b3.id)))
   const l2 = await startLane('B3', 'R1', 'a long lane', long)
+  // B1 and B3, idle builders outside slots, are given their new lanes in new conversations (HI-2232), so each has a new
+  // launch and token: the merge slot's claims below are their new launches'.
+  const renewedNow = async (a) => launchesOf(a).length === 2 && ['ready', 'finished'].includes((await live(a.id))?.status)
+  const renewal = async (a) => JSON.stringify({ launches: launchesOf(a).length, status: (await live(a.id))?.status })
+  check('B1 and B3, idle outside slots, get their lanes in new conversations', !!(await until(async () => (await renewedNow(b1)) && (await renewedNow(b3)), HUNG_MS)), `${await renewal(b1)} ${await renewal(b3)}`)
+  t1 = tokenOf(b1)
+  t3 = tokenOf(b3)
   const l3 = await startLane('R1', null, null, short)
   const l4 = await startLane('B5', 'R1', 'merged earlier', [n1, n2])
   const l5 = await startLane('B6', null, 'given up', [n5, n8])
@@ -440,8 +457,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   // B3's token works while its launch runs; a 401 here means it ended (#601): say whether it still runs, and its launches.
   const b3Now = async () => {
     const now = await live(b3.id)
-    const all = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-    return { status: now?.status ?? 'not running', runId: now?.runId ?? null, launches: all.filter((l) => l.cwd.toLowerCase() === (b3.worktree?.path ?? alpha).toLowerCase()).length }
+    return { status: now?.status ?? 'not running', runId: now?.runId ?? null, launches: launchesOf(b3).length }
   }
   check('B1 holds the slot and B3 waits', run.status === 200 && claim.body?.held === true && wait.body?.held === false, JSON.stringify([run, claim, wait, ...(wait.status === 401 ? [{ b3: await b3Now() }] : [])]))
   const mergeCard = panel.locator('.progress-merge-card')

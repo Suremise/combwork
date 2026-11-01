@@ -9,7 +9,7 @@
 // title, and Stop Them ends its whole tree; the Agent API says whether the launch it was started in still runs (a test
 // run waiting for a slot asks it). Fake Claude Code; dev build, throwaway profile and workspace, quiet.
 const lib = require('./lib.cjs')
-const { processes, descendantsIn, endExactly, childrenFirst } = require('./folderProcesses.cjs')
+const { processes, descendantsIn, endAsCrash } = require('./folderProcesses.cjs')
 const { _electron } = require('playwright-core')
 const { spawn, execFileSync } = require('child_process')
 const { baseEnv } = require('./runContext.cjs')
@@ -86,8 +86,7 @@ async function endFromOutside(app, outlives) {
   let top = byPid.get(outlives)
   for (let up = top && byPid.get(top.parent); up && up.started <= top.started && /hive-progress/i.test(up.commandLine); up = byPid.get(up.parent)) top = up
   const kept = new Set(top ? [top.pid, ...descendantsIn(list, top.pid).map((d) => d.pid)] : [])
-  const tree = root ? [{ pid: root.pid, started: root.started }, ...descendantsIn(list, root.pid)].filter((p) => !kept.has(p.pid)) : []
-  const ended = tree.length ? endExactly(childrenFirst(list, tree)) : 0
+  const ended = root && !kept.has(root.pid) ? endAsCrash(list, { pid: root.pid, started: root.started }, descendantsIn(list, root.pid).filter((p) => !kept.has(p.pid))) : 0
   const exited = await Promise.race([gone, new Promise((r) => setTimeout(() => r(false), HUNG_MS))])
   return ended > 0 && exited
 }

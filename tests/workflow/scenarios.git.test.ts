@@ -88,7 +88,7 @@ describe('workflow scenarios, Git', () => {
     writeFileSync(join(folder, 'src/fix.txt'), 'more, uncommitted\n')
     const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'done' }), 'submit.clean')
     expect(r.message).toContain('uncommitted changes (src/fix.txt)')
-    expect(r.next).toBe("Commit the card's changes (committing is part of doing the card), then submit for review again. Changes that aren't the card's: ask before removing them.")
+    expect(r.next).toBe("Commit the card's changes, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. Changes that aren't the card's: ask before removing them.")
     expect(r.override).toBe('the user')
     expect(e.wf.state(card).stage).toBe('active')
     expect(e.kinds(card.id)).toContain('Refused')

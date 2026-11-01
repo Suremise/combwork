@@ -1312,8 +1312,8 @@
     "description": "A refused submit: the working folder has uncommitted changes. {folder} is a folder path, {files} a list of file paths."
   },
   "workflow.refused.submit.clean.next": {
-    "defaultMessage": "Commit the card's changes (committing is part of doing the card), then submit for review again. Changes that aren't the card's: ask before removing them.",
-    "description": "The next step after a refused submit for review with uncommitted changes (HI-1618, HI-2227): the agent given the card commits its work as part of doing it; changes that aren't the card's are removed only once asked about."
+    "defaultMessage": "Commit the card's changes, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. Changes that aren't the card's: ask before removing them.",
+    "description": "The next step after a refused submit for review with uncommitted changes (HI-1618, HI-2227, HI-2257): an agent doing the card commits its work; one asked only to submit it asks the user before committing; changes that aren't the card's are removed only once asked about."
   },
   "workflow.refused.submit.decisionsReceived.message": {
     "defaultMessage": "{card} has a decision you haven't read.",
@@ -1332,8 +1332,8 @@
     "description": "A refused move of a card to Review by the user (a drag on the board): the card's line has no commit since it started. Shown under a title that names the card and the column, so it doesn't name them."
   },
   "workflow.refused.submit.empty.next": {
-    "defaultMessage": "{changes, select, yes {Commit the card's work (committing is part of doing the card), then submit for review again.} none {Its folder has no changes either. A card that needs none (it only runs or checks something, or its work is already there) is no-code: ask for that with hive_ask_user (action noCode), or hive_ask_assistant where it's already decided. Otherwise make its change, commit it and submit again.} other {Commit the card's work (committing is part of doing the card), then submit for review again. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).}}",
-    "description": "The next step after a refused submit for review with nothing committed (HI-2227). {changes} (select): yes when the card's folder has uncommitted changes (commit them: part of doing the card), none when it has none (a card needing no change is made no-code by the user, asked with the tools named), other when unknown. hive_ask_user, hive_ask_assistant and noCode are names of tools and an option: keep them as they are; translate each branch's whole sentences."
+    "defaultMessage": "{changes, select, yes {Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing.} none {Its folder has no changes either. A card that needs none (it only runs or checks something, or its work is already there) is no-code: ask for that with hive_ask_user (action noCode), or hive_ask_assistant where it's already decided. Otherwise make its change, commit it and submit again.} other {Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).}}",
+    "description": "The next step after a refused submit for review with nothing committed (HI-2227, HI-2257). {changes} (select): yes when the card's folder has uncommitted changes (an agent doing the card commits them; one asked only to submit it asks the user first), none when it has none (a card needing no change is made no-code by the user, asked with the tools named), other when unknown. hive_ask_user, hive_ask_assistant and noCode are names of tools and an option: keep them as they are; translate each branch's whole sentences."
   },
   "workflow.refused.submit.empty.nextForUser": {
     "defaultMessage": "Commit the card's work, then move it again.",

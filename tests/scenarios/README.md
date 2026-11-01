@@ -112,8 +112,10 @@ The checks are positive and negative:
   - **prioritise**: an order within Todo, not a move between stages.
 - **A gate's refusal and its next step** (#1536):
   - **intent-submit-refused**: a submission of uncommitted work is refused, saying in git's words that nothing is
-    committed (HI-1618: submitting for review never commits). Asked only to submit, the builder asks the user before
-    committing, committing nothing, overriding nothing and moving nothing by hand; the card stays in Doing.
+    committed (HI-1618: submitting for review never commits). Asked only to submit, not to do the card, the builder asks
+    the user before committing, as the refusal's next step says (HI-2257: an agent doing the card commits, one asked
+    only to submit asks first), committing nothing, overriding nothing and moving nothing by hand; the card stays in
+    Doing.
   - **intent-submit-commit**: asked to commit and submit for review, the builder does both with no question.
   - **review-interrupted**: a review started with the intent loses its card to its builder, so the verdict is refused.
     The reviewer doesn't retry it and moves nothing.
