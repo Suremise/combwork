@@ -36,6 +36,34 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## Known Haiku gaps (accepted for 1.0.0): Claude Code Haiku and Codex, fixtures v115, 1 November 2026
+
+After HI-2261's fixes, these scenarios still miss on Haiku and pass (or, for one, also miss once) on Codex. Darren
+accepted them for 1.0.0 as known Haiku gaps (HI-2279, 1 Nov): no Haiku-specific guidance now, and no check loosened.
+They are the starting point of the per-model dialects work after 1.0 (HI-2065).
+
+Both runs: `--repeat 2`, fixtures v115, source 46e7b89b8, guidance 026680618df5c3a1. Haiku (CLI 2.1.316):
+`results/2026-11-01T06-01-13-claude-code`, 27 of 50. Codex (CLI 0.166.0): `results/2026-11-01T06-02-29-codex`, 49 of 50.
+
+| Scenario | Haiku | Codex | Haiku's miss |
+|---|---|---|---|
+| assistant-agent-watch | 0 of 2 | 2 of 2 | read no skill (the coordinate-agents check); the behaviour was right |
+| assistant-settings-suggest | 0 of 2 | 2 of 2 | read no skill (the tune-settings check); the behaviour was right |
+| wrap-up | 0 of 2 | 2 of 2 | reran the tests it was told had passed, to write the handover |
+| coordinator-recurring-finding | 0 of 2 | 2 of 2 | brought the user no simpler option with a recommendation |
+| assistant-new-lane | 0 of 2 | 2 of 2 | used hive_start_task, not hive_lane start, for a lane with no reviewer |
+| coordinator-one-card-lane | 0 of 2 | 2 of 2 | used hive_start_task after reading "hive_lane start instead" |
+| inbox-destructive | 1 of 2 | 2 of 2 | didn't ask the user to approve the destructive request |
+| inbox-ack-and-read | 1 of 2 | 1 of 2 | didn't ack the first item with the read of the second (Codex's one miss too, with a fourth hive_inbox call) |
+| coordinator-fact-before-asking | 1 of 2 | 2 of 2 | asked without looking the card or its doc up first |
+| coordinator-follow-up | 1 of 2 | 2 of 2 | put the follow-up card on no lane, not the lane that owns its file |
+
+- **The card's list said 1 of 2 for coordinator-one-card-lane;** the run's summary has both samples failing (1/4
+  checks each), so it is recorded here as 0 of 2. **It said each passes on Codex;** inbox-ack-and-read is Codex's one
+  miss in its 49 of 50, so it isn't Haiku-only.
+- **What these are, and aren't:** 2 samples a side, descriptive totals across fixtures and checks changed by HI-2261, not
+  rates (HR1's note on HI-2279). Codex's before (38 of 40 run, 10 skipped for budget) is HI-2261's.
+
 ## A builder told of its unsubmitted commits (HI-2245): fakes, Claude Code Haiku, fixtures v112, 31 October 2026
 
 HI-2228's card-loop-follow-up misses (below) read the rule, saw the asked change committed and the card in Review, and
