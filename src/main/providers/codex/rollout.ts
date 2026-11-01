@@ -8,7 +8,7 @@ import type { ConversationParserLike, ImageLocation, LiveDetails } from '../type
 import { advancedValues as advanced } from '../../advancedValues'
 import { countSafeguards, SAFEGUARD_DEFAULTS } from '../../../shared/safeguards'
 import { codexSafeguards, errorKind } from './safeguards'
-import { scriptCall } from './scriptCalls'
+import { cwdOf, scriptCall } from './scriptCalls'
 
 /**
  * Codex's rollout files (~/.codex/sessions/YYYY/MM/DD/rollout-<time>-<id>.jsonl): one JSON record per
@@ -371,8 +371,8 @@ export class CodexConversationParser implements ConversationParserLike {
     this.items.push({ ...item, id: this.items.length } as TranscriptItem)
   }
 
-  private tool(callId: string, name: string, input: string, summary: string, ts: string | null): void {
-    const tool: TranscriptTool = { toolUseId: callId, name: toolLabel(name), summary, input, result: null, isError: false, images: [] }
+  private tool(callId: string, name: string, input: string, summary: string, ts: string | null, cwd: string | null = null): void {
+    const tool: TranscriptTool = { toolUseId: callId, name: toolLabel(name), summary, input, result: null, isError: false, images: [], ...(cwd ? { cwd } : {}) }
     this.tools.set(callId, tool)
     this.push({ kind: 'tool', timestamp: ts, tool })
   }
@@ -456,7 +456,7 @@ export class CodexConversationParser implements ConversationParserLike {
           const cmd = Array.isArray(args.command) ? (args.command as string[]).join(' ') : ((args.cmd ?? args.command) as string | undefined)
           const input = shell && typeof cmd === 'string' ? cmd : JSON.stringify(args, null, 2)
           const summary = shell ? firstLine(cmd) : firstLine(Object.values(args).find((v) => typeof v === 'string'))
-          this.tool(String(p.call_id ?? ''), shell ? 'Shell' : name, input, summary.slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+          this.tool(String(p.call_id ?? ''), shell ? 'Shell' : name, input, summary.slice(0, 200), ts, shell ? cwdOf(args.workdir) : null) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
           break
         }
         case 'custom_tool_call': {
