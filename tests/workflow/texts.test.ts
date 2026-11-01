@@ -43,6 +43,8 @@ const SAMPLE: RefusalValues = {
   command: 'npm test',
   check: 'unit',
   email: 'team@example.com',
+  // submit.identity (HI-2266): a commit with another identity; 'yes' (git has none) is rendered on its own below.
+  missing: 'no',
   runs: 'unit tests',
   submission: 3,
   latest: 4,
@@ -110,6 +112,25 @@ describe('the workflow text in every locale', () => {
       expect(shown.next, code).toContain('hive-progress --check lint --card AM-12')
       // A value it has is kept: the new reason shows.
       expect(refusalLines('submit.checksPassed', { ...before, why: 'changed', files: 'src/a.ts', copy: 'yes' }, WINDOW).message, code).toContain('src/a.ts')
+    }
+  })
+
+  it("renders both branches of submit.identity's {missing} select in every locale, as its guard gives them (HI-2281)", async () => {
+    // guards.ts: no identity in git is missing 'yes' with no commit or email; another identity is 'no' with both.
+    const none = { card: 'AM-12', missing: 'yes', commit: '', email: '', command: 'git config user.email' }
+    const other = { card: 'AM-12', missing: 'no', commit: 'b4c5d6e', email: 'team@example.com', command: 'git commit --amend --no-edit --reset-author' }
+    expect(refusal('submit.identity', none)).toMatchObject({ message: "AM-12 can't be submitted: its commits must use the project's identity, and git has none set for the project.", next: "Set the project's identity in Version Control → Branches & remotes → Commit identity (or with git config user.email), then submit again." })
+    expect(refusal('submit.identity', other)).toMatchObject({ message: "AM-12: commit b4c5d6e isn't authored with the project's identity (team@example.com).", next: 'Set the identity, run git commit --amend --no-edit --reset-author, then submit again.' })
+    for (const code of LOCALES) {
+      setLanguage(code, await loadCatalogue(code), code)
+      const [a, b] = [refusalLines('submit.identity', none, WINDOW), refusalLines('submit.identity', other, WINDOW)]
+      for (const line of [a.message, a.next, b.message, b.next]) expect(line, code).not.toMatch(/[{}]/)
+      expect(a.message, code).toContain('AM-12')
+      expect(a.message, code).not.toBe(b.message)
+      expect(a.next, code).toContain('git config user.email')
+      expect(b.message, code).toContain('b4c5d6e')
+      expect(b.message, code).toContain('team@example.com')
+      expect(b.next, code).toContain('git commit --amend --no-edit --reset-author')
     }
   })
 
