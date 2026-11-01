@@ -379,6 +379,43 @@ describe('the lanes service', () => {
     await expect(lanes.joinLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', by: 'R1 (alpha)' })).rejects.toThrow(/no lane running yet/)
   })
 
+  it("HI-2273: a running lane's start naming a reviewer that is no agent is refused, naming its reviewer, and changes nothing; a new lane starts without one", async () => {
+    const [c1, c2, c3] = [await make('U1'), await make('U2'), await make('U3')]
+    const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number, c2.number], by: 'B2 (alpha)' })).lane
+    const guess = { project: 'alpha', builder: 'b2', reviewer: null, unknownReviewer: 'Reviewer', cards: [c1.number, c2.number, c3.number], by: 'B2 (alpha)', ownBuilder: true }
+    await expect(lanes.startLane(w, guess)).rejects.toMatchObject({ status: 404, message: `No agent "Reviewer" in alpha; this lane's reviewer is R1: leave reviewer out to keep it.` })
+    // Its reviewer and list as they were.
+    const after = (await lanes.rawLanes(w)).find((l) => l.id === lane.id)!
+    expect([after.state, after.reviewer?.id, after.cards, after.pending]).toEqual(['active', 'r1', [c1.number, c2.number], undefined])
+    // Applied now too: refused before its card in flight could be put back.
+    await expect(lanes.startLane(w, { ...guess, applyNow: true })).rejects.toThrow(/this lane's reviewer is R1/)
+    // Leaving reviewer out keeps it.
+    expect((await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [c1.number, c2.number, c3.number], by: 'B2 (alpha)', ownBuilder: true })).lane.reviewer?.id).toBe('r1')
+    await lanes.endLane(w, lane.id, { abandoned: true })
+    // A lane reviewed by the pool, and one with no reviewer yet, say so.
+    const pool = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: null, pool: true, cards: [c1.number], by: 'the user' })).lane
+    await expect(lanes.startLane(w, guess)).rejects.toThrow(`No agent "Reviewer" in alpha; this lane is reviewed by the project's reviewer pool: leave reviewer out.`)
+    expect((await lanes.rawLanes(w)).find((l) => l.id === pool.id)?.pool).toBe(true)
+    await lanes.endLane(w, pool.id, { abandoned: true })
+    // No running lane: it starts without a reviewer, as before (one can join it); started again, refused as one with none.
+    const fresh = await lanes.startLane(w, guess)
+    expect([fresh.did, fresh.lane.reviewer]).toEqual(['started', null])
+    await expect(lanes.startLane(w, guess)).rejects.toThrow(`No agent "Reviewer" in alpha; this lane has no reviewer yet: leave reviewer out, or name an agent of alpha.`)
+    await lanes.endLane(w, fresh.lane.id, { abandoned: true })
+  })
+
+  it("HI-2273: next with no running lane says its lane just ended or was abandoned, never to start one; with none lately, to start one", async () => {
+    const [c1] = [await make('N1')]
+    const ended = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'B2 (alpha)' })).lane
+    await lanes.endLane(w, ended.id, {})
+    for (const agent of ['b2', 'r1']) await expect(lanes.laneNext(w, 'alpha', agent)).rejects.toThrow(`Your lane ${ended.id} has ended: all its cards are Done. Nothing more on it: don't start it again; end your turn unless you have other work.`)
+    const abandoned = (await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'B2 (alpha)' })).lane
+    await lanes.endLane(w, abandoned.id, { abandoned: true })
+    await expect(lanes.laneNext(w, 'alpha', 'b2')).rejects.toThrow(`Your lane ${abandoned.id} was abandoned: don't start it again; ask the user if there is more to do.`)
+    // An agent that had no lane: as before.
+    await expect(lanes.laneNext(w, 'alpha', 'g1')).rejects.toThrow('No running lane of yours: start one with hive_lane start, or ask the user')
+  })
+
   it('a lane reviewed by the pool (#1443): kept with its row, nobody joins it, its builder keeps it; a reviewer named makes it one per lane', async () => {
     const [c1, c2] = [await make('Q1'), await make('Q2')]
     const started = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: null, pool: true, cards: [c1.number, c2.number], by: 'the user' })
