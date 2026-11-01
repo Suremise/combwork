@@ -36,7 +36,7 @@ const { providerService } = await import('../src/main/providerService')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { INTENT_ROUTES } = await import('../src/main/servers')
-const { intentText } = await import('../src/shared/toolReplies')
+const { checksLine, intentText } = await import('../src/shared/toolReplies')
 const { armIntentWatch } = await import('../src/main/intentWatch')
 const watches = await import('../src/main/watches')
 const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, HIVE_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
@@ -331,6 +331,36 @@ describe('a card by intent (#1267)', () => {
       watches.testHooks.settleMs = settle
       for (const a of ['a1', 'a2']) await watches.cancelWatch(w, repo, a)
     }
+  })
+
+  it("a code card's read names its checks before review and how to run one, until it is past review (HI-2276)", async () => {
+    const { w, repo, wt } = await workspace({ ...PAIR, preChecks: ['typecheck', 'lint'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint' } })
+    const wf = (await service.workflowFor(w, repo))!
+    const card = await create(w)
+    const key = wf.store.card(card).key
+    const line = `typecheck, lint: before review. Run each as hive-progress --check <name> --card "${key}" (--isolated: in a check copy at the card's revision)`
+    expect(wf.checksLineOf(`#${card}`)).toBe(line)
+    await act(w, card, builder, { kind: 'start' })
+    expect(wf.checksLineOf(`#${card}`)).toBe(line)
+    // A no-code card has nothing to check.
+    const note = await create(w, 'A design note')
+    await store.boardWrite(w, async () => void FactStore.forBoard(w, { project: 'p', key: 'p' }).updateCard(note, { kind: 'no-code' }))
+    expect(wf.checksLineOf(`#${note}`)).toBeNull()
+    // Past review (approved), nothing is left to run before it.
+    const { runCheck } = await import('../src/main/workflow/checks')
+    const rev = commit(wt, 'c.txt')
+    for (const name of ['typecheck', 'lint']) await inWorkspace(w, () => runCheck(wf, { card: wf.store.card(card), name, by: 'a1', revision: rev, exec: async () => ({ ok: true }) }))
+    await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+    expect(wf.checksLineOf(`#${card}`)).toBe(line)
+    await act(w, card, reviewer, { kind: 'startReview' })
+    await act(w, card, reviewer, { kind: 'verdict', pass: true, comment: 'Passed.' })
+    expect(wf.checksLineOf(`#${card}`)).toBeNull()
+  })
+
+  it('rules that name no checks before review: no checks line (HI-2276)', async () => {
+    const { w, repo } = await workspace()
+    const wf = (await service.workflowFor(w, repo))!
+    expect(wf.checksLineOf(`#${await create(w)}`)).toBeNull()
   })
 
   it('no lane, or not its part in it: nothing armed (#1639)', async () => {
@@ -828,6 +858,12 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(intentText({ ok: true, card: '#3', from: 'review', to: 'review', data: { files: [{ path: 'greet.js', status: 'M' }, { path: 'test.js', status: 'A' }] } })).toBe('#3: still review. files: M greet.js, A test.js')
     // What's next, as the hive tools (#1530).
     expect(intentText({ ok: true, card: 'HI-12', from: 'review', to: 'review', next: { step: 'intents', intents: ['verdict'] } })).toBe('HI-12: still review. Next on it: hive_verdict.')
+  })
+
+  it("a card's checks line (HI-2276): one check by its name, several by <name>; --isolated only where a check copy can be made", () => {
+    expect(checksLine(['quick'], 'AL-1', true)).toBe(`quick: before review. Run it as hive-progress --check quick --card "AL-1" (--isolated: in a check copy at the card's revision)`)
+    expect(checksLine(['quick', 'tests'], 'AL-1', false)).toBe('quick, tests: before review. Run each as hive-progress --check <name> --card "AL-1"')
+    expect(checksLine([], 'AL-1', true)).toBeNull()
   })
 
   it('every agent has the intent tools, Codex too (#913: enabled_tools is HIVE_TOOLS); the Assistant at Control agents, never start_card', () => {

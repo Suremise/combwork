@@ -2629,6 +2629,16 @@ async function queueLineFor(project: string, n: number): Promise<string | null> 
   }
 }
 
+/** A code card's checks line (HI-2276, toolReplies' checksLine), when its project has a workflow whose rules name checks. */
+async function checksLineFor(project: string, n: number): Promise<string | null> {
+  try {
+    const wf = await workflowFor(workspace, projectByName(project))
+    return wf?.checksLineOf(`#${n}`) ?? null
+  } catch {
+    return null
+  }
+}
+
 /**
  * A card's open requests as agents read them (HI-1992): each asker by its name in the card's project, as For you shows it
  * (its id once the agent is gone). `agents` as taskView's, so a listing reads each project.json once.
@@ -2718,8 +2728,10 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   const rs = cardReviewSkip(workspace, c.number)
   // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Hive merges it.
   const merge = c.project && !c.archived ? await queueLineFor(c.project, c.number) : null
+  // A code card's checks before review and how to run one (HI-2276): additive, only when its rules name some.
+  const checks = c.project && !c.archived ? await checksLineFor(c.project, c.number) : null
   const attachments = files.length ? files.map((a) => attachmentForAgents(a, c)) : null
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}) }
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}), ...(checks ? { checks } : {}) }
 }
 
 /** A card attachment as agents read it (HI-1700): its path, name and size, who added it and when, and where it came. */

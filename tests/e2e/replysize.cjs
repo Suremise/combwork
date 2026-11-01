@@ -268,6 +268,19 @@ const prose = (seed, n) => {
   const read = JSON.parse(measure('hive_read_task', tool('hive_read_task', { number: target })))
   check('a read has the description and comments, not the history', read.description.length > 1000 && read.comments.length === 3 && !('history' in read) && read.historyEntries >= 1, Object.keys(read).join(','))
   check('history=true adds it', JSON.parse(tool('hive_read_task', { number: target, history: true }).text).history.length >= 1)
+  // HI-2276: a code card whose rules name checks before review says them and how to run one, in a short field; none without.
+  check('no checks line where the rules name none', !('checks' in read), read.checks)
+  {
+    const rules = await inv('workflow:form', alpha)
+    await inv('workflow:setOptions', alpha, { preset: rules.preset, options: { ...rules.own, preChecks: ['quick'], commands: { ...rules.own.commands, quick: 'node check.js' } } })
+    try {
+      const checked = JSON.parse(tool('hive_read_task', { number: todo[0] }).text)
+      measure('hive_read_task (checks field)', JSON.stringify(checked.checks ?? ''), 200)
+      check('…and its checks line where they name one: the check and its hive-progress command', /^quick: before review\. Run it as hive-progress --check quick --card "[A-Z]+-\d+"/.test(checked.checks ?? ''), checked.checks)
+    } finally {
+      await inv('workflow:setOptions', alpha, { preset: rules.preset, options: rules.own })
+    }
+  }
   const latest = JSON.parse(measure('hive_read_task (latestComment)', tool('hive_read_task', { number: target, latestComment: true }), 1500))
   check('latestComment=true: the newest comment only', latest.number === target && latest.comment?.text === read.comments.at(-1).text && JSON.stringify(Object.keys(latest)) === '["number","comment"]', JSON.stringify(latest).slice(0, 200))
   // Summaries (#532): each comment as its first line, with the whole comment's length when there is more.
