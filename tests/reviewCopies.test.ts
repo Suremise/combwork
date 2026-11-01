@@ -100,6 +100,23 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
     expect(args({ extraDirs: [] })).not.toContain('--add-dir')
   })
 
+  it("Claude Code: a session outside its project folder (a slot's) may read its launch plugin, in the project's .hive (HI-2274)", () => {
+    const args = (o: Partial<LaunchContext>): string[] => claudeCode.buildCommand('C:\\bin\\claude.exe', context(o)).args
+    const project = join(base, 'proj')
+    const plugin = join(claudeCode.launchDir(project, 'a-1'), 'plugin')
+    const slot = join(base, 'proj.worktrees', 'slot-a')
+    mkdirSync(slot, { recursive: true })
+    // In a slot: the plugin is outside its folder, so it is added (before any review copies granted, each followed by an option).
+    const inSlot = args({ cwd: slot })
+    expect(valuesOf(inSlot, '--plugin-dir')).toEqual([plugin])
+    expect(valuesOf(inSlot, '--add-dir')).toEqual([plugin])
+    expect(inSlot[inSlot.indexOf('--add-dir') + 2]).toMatch(/^--/)
+    expect(valuesOf(args({ cwd: slot, extraDirs: [POOL] }), '--add-dir')).toEqual([POOL, plugin])
+    // In the project folder the plugin is inside it: nothing added, as before.
+    expect(args({})).not.toContain('--add-dir')
+    expect(valuesOf(args({ extraDirs: [POOL] }), '--add-dir')).toEqual([POOL])
+  })
+
   it("Codex: --add-dir after resume <id>, never a -c override of the writable roots (it would replace the user's own: the fixture)", () => {
     const args = (o: Partial<LaunchContext>): string[] => codex.buildCommand('C:\\bin\\codex.exe', context(o)).args
     const resumed = args({ extraDirs: [POOL], resume: true })

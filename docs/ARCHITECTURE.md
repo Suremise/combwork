@@ -139,7 +139,7 @@ Adding a provider: a descriptor added to `PROVIDERS`, an adapter added to the re
 1. Resolves effective settings (`effective()`, run in the project's workspace): every Hive skill in the workspace, the workspace-enabled MCP servers minus the project's opt-outs, narrowed to the agent's own choice when it has one (`agentGetsMcp` in `shared/agentMcp.ts`, #537: every adapter then passes only those, and turns off the user's same-named servers like any other), plus model, effort, permission mode and args. Bypass is downgraded unless the global opt-in is on.
 2. Restores the transcript from `.hive/sessions` if resuming and Claude Code no longer has it (a compressed backup, `<id>.jsonl.gz`, decompressed: `transcriptFiles.ts`, #1110).
 3. `adapter.prepareLaunch()` — for Claude Code, rebuilds `Project/.hive/launch/` from scratch:
-   - `plugin/` — a session-only Claude Code plugin containing copies of the Hive skills (`--plugin-dir`)
+   - `plugin/` — a session-only Claude Code plugin containing copies of the Hive skills (`--plugin-dir`; also `--add-dir` when the agent's folder is outside the project, a slot's or worktree's, so it may read a skill's files without asking, HI-2274)
    - `mcp.json` — enabled servers plus the built-in `hive` server (`--mcp-config … --strict-mcp-config`)
    - `settings.json` — HTTP hooks pointing at Hive's hook server (`--settings`); `SessionStart`, which can't be an HTTP hook, is a `curl.exe` command posting to the same server
 4. Spawns `claude` in a pty with `--session-id` (new) or `--resume` (existing), so Hive always knows the session ID and therefore the transcript path.
