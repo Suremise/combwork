@@ -273,30 +273,76 @@ describe('a group of finishes, when it is shown', () => {
     expect(titles()).toEqual(['beta · Two needs your input', 'alpha · One finished'])
   })
 
-  it('HI-2312: a finish whose agent works again (or waits for you) by the time the group is told is left out; its next need is told at once', async () => {
-    const { sessions } = await import('../src/main/sessions')
-    const s = sessions as unknown as { notify: (...a: unknown[]) => void; live: Map<string, unknown> }
-    const key = `${alpha.toLowerCase()}#two`
-    const st = { status: 'finished' }
-    s.live.set(key, { state: st })
-    try {
-      for (const busy of ['working', 'waiting']) {
-        s.notify(alpha, 'alpha · Two finished', 'Started OV-246.', 'finished', 'Two', 'two')
-        s.notify(beta, 'beta · Three finished', 'Three is done.', 'finished', 'Three', 'three')
-        // Hive's delivery at the turn's end started its next turn, inside the group's few seconds.
-        st.status = busy
-        if (busy === 'waiting') s.notify(alpha, 'alpha · Two needs your input', 'Allow Bash?', 'waiting', undefined, 'two')
-        await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
-        st.status = 'finished'
-      }
-      expect(titles()).toEqual(['beta · Three finished', 'alpha · Two needs your input', 'beta · Three finished'])
-      // Finished still when the group is told: told, with that turn's message.
-      s.notify(alpha, 'alpha · Two finished', 'Merged it.', 'finished', 'Two', 'two')
-      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
-      expect(shown.at(-1)).toMatchObject({ title: 'alpha · Two finished', body: 'Merged it.' })
-    } finally {
-      s.live.delete(key)
+  // HI-2312: an agent whose next turn starts (its status leaves its turn's end for working, starting or waiting) while its
+  // finish waits to be told: that finish isn't told, whatever the new turn ends as.
+  describe('a finish whose agent starts its next turn before it is told', () => {
+    type S = { notify: (...a: unknown[]) => void; emitState: (st: unknown) => void; settleBackground: (l: unknown, woke: boolean) => void }
+    const manager = async () => (await import('../src/main/sessions')).sessions as unknown as S
+    const agent = () => ({ projectPath: alpha, agentId: 'two', agentName: 'Two', status: 'working' as string })
+    /** Its status, as a hook step sets it and reports it. */
+    const goes = async (st: ReturnType<typeof agent>, status: string) => {
+      st.status = status
+      ;(await manager()).emitState(st)
     }
+    const finish = async (body: string) => (await manager()).notify(alpha, 'alpha · Two finished', body, 'finished', 'Two', 'two')
+
+    it('working again: left out of the group, which is told without it', async () => {
+      const st = agent()
+      await finish('Started OV-246.')
+      await goes(st, 'finished')
+      await finished(beta, 'Three')
+      await goes(st, 'working')
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(titles()).toEqual(['beta · Three finished'])
+    })
+
+    it('a second turn ended within the group: only its own finish is told, once', async () => {
+      const st = agent()
+      await finish('Started OV-246.')
+      await goes(st, 'finished')
+      await goes(st, 'working')
+      await finish('Merged it.')
+      await goes(st, 'finished')
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(shown.map((n) => [n.title, n.body])).toEqual([['alpha · Two finished', 'Merged it.']])
+    })
+
+    it('a second turn ending into a card watch: nothing told (its own end is a watch, the first is over)', async () => {
+      const st = agent()
+      await finish('Started OV-246.')
+      await goes(st, 'finished')
+      await goes(st, 'working')
+      await goes(st, 'watching')
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(shown).toEqual([])
+    })
+
+    it('waiting for you in its next turn: that is told at once, and the finish before it never', async () => {
+      const s = await manager()
+      const st = agent()
+      await finish('Started OV-246.')
+      await goes(st, 'finished')
+      await goes(st, 'waiting')
+      s.notify(alpha, 'alpha · Two needs your input', 'Allow Bash?', 'waiting', undefined, 'two')
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(titles()).toEqual(['alpha · Two needs your input'])
+    })
+
+    it('its background tasks ended (a finish of its own), then a new turn: not told either', async () => {
+      const s = await manager()
+      const st = { ...agent(), status: 'background' }
+      s.emitState(st)
+      s.settleBackground({ state: st, tasks: new Map(), adapter: { descriptor: { capabilities: { backgroundWakes: true } } } }, false)
+      expect(st.status).toBe('finished')
+      await goes(st, 'working')
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(shown).toEqual([])
+      // Without a new turn, the same finish is told.
+      await goes(st, 'background')
+      s.settleBackground({ state: st, tasks: new Map(), adapter: { descriptor: { capabilities: { backgroundWakes: true } } } }, false)
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(shown.map((n) => n.body)).toEqual(['Its background tasks have ended.'])
+    })
   })
 })
 

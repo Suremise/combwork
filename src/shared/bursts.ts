@@ -140,6 +140,18 @@ export class FinishBatcher {
     this.timer = setTimeout(() => this.send(), wait)
   }
 
+  /** Takes out the finishes not told yet that `match` picks (HI-2312: their agent started its next turn), and returns them. */
+  drop(match: (item: Finish) => boolean): Finish[] {
+    const dropped = this.items.filter(match)
+    if (!dropped.length) return dropped
+    this.items = this.items.filter((i) => !match(i))
+    if (!this.items.length && this.timer) {
+      clearTimeout(this.timer)
+      this.timer = null
+    }
+    return dropped
+  }
+
   private send(): void {
     this.timer = null
     const items = this.items

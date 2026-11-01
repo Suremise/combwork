@@ -145,6 +145,8 @@ const log = createLogger('sessions')
 
 /** The statuses in which a CLI's exit key cancels a turn (or its dialog) rather than arming its exit (HI-2272). */
 const EXIT_IN_TURN: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
+/** The statuses of an agent in a turn (or starting one): reached from any other, its next turn has begun (HI-2312). */
+const BUSY: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
 
 /**
  * Hive's own words for sessions (#847, E10c of #677): errors (HiveErrors, in the window's language through IPC and in
@@ -5051,7 +5053,7 @@ class SessionManager {
           const stopped = dropped ? withValues(msg({ id: 'session.status.tasksDropped', defaultMessage: '{minutes, plural, one {Stopped counting its background tasks after # minute} other {Stopped counting its background tasks after # minutes}}', description: "An agent's status: Hive stopped counting the background tasks it started after the time limit in Settings. {minutes} is that limit." }), { minutes: taskMinutes() }) : null
           setStatus(st, stopped)
           st.unseen = true
-          this.notify(st.projectPath, withValues(M.finished, { agent: this.label(st) }), stopped ?? msg({ id: 'session.notice.tasksEnded', defaultMessage: 'Its background tasks have ended.', description: "The notification that an agent finished once the background tasks it started ended." }), 'finished', st.agentName)
+          this.notify(st.projectPath, withValues(M.finished, { agent: this.label(st) }), stopped ?? msg({ id: 'session.notice.tasksEnded', defaultMessage: 'Its background tasks have ended.', description: "The notification that an agent finished once the background tasks it started ended." }), 'finished', st.agentName, st.agentId)
         }
         changed = true
       } else if (st.status === 'finished' && l.tasks?.size) {
@@ -5165,7 +5167,11 @@ class SessionManager {
     } else if (!watch && state.status === 'watching') state.status = 'finished'
     // Working or watching again, or a background task of its own will wake it (#521): no longer waiting with no watch (#376).
     if ((state.status !== 'ready' && state.status !== 'finished') || tasksWillWake(state)) state.notWatching = undefined
-    if (this.statusSent.get(state) !== state.status) {
+    const was = this.statusSent.get(state)
+    if (was !== state.status) {
+      // HI-2312: its next turn has started (working, starting or waiting again after its turn's end): a finish of its not
+      // told yet is about a turn that's over, so it isn't told, whatever the new turn ends as (finished, watching).
+      if (was && !BUSY.has(was) && BUSY.has(state.status)) this.dropFinishes(state, state.status)
       this.statusSent.set(state, state.status)
       state.statusSince = new Date().toISOString()
     }
@@ -6579,15 +6585,6 @@ class SessionManager {
    */
   private readonly finishes = new FinishBatcher((all) => {
     const items = all.filter((i) => {
-      // HI-2312: an agent that started its next turn while its finish waited to be told (a Hive delivery typed at its
-      // turn's end, a wake, the user typing) didn't finish: told now, the notice would arrive as it works again, with the
-      // last turn's message, and stand where its next need (a permission prompt) should. Its next end is told.
-      const busy = i.agentId ? this.live.get(liveId(i.projectPath, i.agentId))?.state.status : undefined
-      if (busy === 'starting' || busy === 'working' || busy === 'waiting') {
-        // i18n-ignore: the log (English)
-        log.info(`Notice finished not told: ${userText(i.agent)} started its next turn first (${busy}) (${userText(i.title)})`)
-        return false
-      }
       const { route, why } = this.routeWhy(i.projectPath, 'finished')
       // i18n-ignore: the log (English)
       if (route === 'none') log.info(`Notice finished not told: ${why} (${userText(i.title)})`)
@@ -6597,6 +6594,19 @@ class SessionManager {
     const { title, body } = finishedNotice(items)
     this.deliver(items[0].projectPath, title, body, 'finished', undefined, finishedApiTitle(items))
   })
+
+  /**
+   * An agent started its next turn while its finish waited to be told (HI-2312: a Hive delivery typed at its turn's end,
+   * a wake, the user typing): it isn't told. Told then, the notice would arrive as the agent works again, with the last
+   * turn's message, and stand where its next need (a permission prompt) should; its next end is told as any is.
+   */
+  private dropFinishes(st: LiveSessionState, now: SessionStatus): void {
+    const pathKey = st.projectPath.toLowerCase()
+    for (const f of this.finishes.drop((i) => i.agentId === st.agentId && i.projectPath.toLowerCase() === pathKey)) {
+      // i18n-ignore: the log (English)
+      log.info(`Notice finished not told: ${userText(f.agent)} started its next turn first (${now}) (${userText(f.title)})`)
+    }
+  }
 
   /** A Windows notification; clicking it shows the project (the first one's, for finishes in several). */
   private showNotification(projectPath: string, title: string, body: string): void {
