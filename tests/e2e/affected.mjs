@@ -727,6 +727,11 @@ export const UNIT_SCANS = [
   { test: 'tests/laneBar.test.ts', paths: ['locales/'] },
   // Every workflow refusal rendered in each locale (HI-2281): a translation changed alone imports nothing it sees.
   { test: 'tests/workflow/texts.test.ts', paths: ['locales/'] },
+  // What the Sandbox checks' window driver relies on (HI-2298): Hive's English text, the selectors, IPC channels and
+  // Agent API routes it uses, and the e2e fake Claude Code its stand-in installer copies.
+  { test: 'tests/sandboxChecks.test.ts', paths: ['locales/en/', 'src/shared/api.ts', 'src/main/servers.ts'] },
+  { test: 'tests/sandboxChecks.test.ts', paths: ['src/renderer/src/'], lines: ['providers-banner', 'setup-tab', 'welcome', 'workbench', 'statusbar', 'status-item', 'data-git'] },
+  { test: 'tests/sandboxChecks.test.ts', paths: ['tests/e2e/fake-claude/', 'tests/e2e/fake-bridge.cjs'], adds: true },
   // The bundled skills and modes (resources/), and the guidance that names them.
   { test: 'tests/assistant.test.ts', paths: ['resources/modes/'] },
   { test: 'tests/modeDescriptions.test.ts', paths: ['resources/modes/'] },

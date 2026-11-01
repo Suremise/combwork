@@ -54,7 +54,7 @@ This document explains how Hive is put together, for anyone changing the code. P
 | `src/renderer/src/commands.ts` | Every command + keybinding (menus, palette, shortcuts) |
 | `src/renderer/src/views/` | Project view and tabs (`FilesTab.tsx` has Files and Images, `SessionsTab.tsx` the transcript viewer), the Workspace Overview (`WorkspaceOverview.tsx`), settings, notes, skills, MCP, docs |
 | `src/renderer/src/components/FileView.tsx` | Files tab editor + previewer registry (markdown, CSV, HTML, SVG, images, PDF) |
-| `tests/`, `tests/e2e/` | Unit tests (Vitest, fixtures in `tests/fixtures`); end-to-end suites (`lib.cjs`, `run.mjs`, and a fake Claude Code in `fake-claude/` for suites that run agents without signing in) |
+| `tests/`, `tests/e2e/`, `tests/sandbox/` | Unit tests (Vitest, fixtures in `tests/fixtures`); end-to-end suites (`lib.cjs`, `run.mjs`, and a fake Claude Code in `fake-claude/` for suites that run agents without signing in); the installer's Sandbox checks (`checks.cjs`, `npm run sandbox-checks`, and the scripts it runs inside Windows Sandbox in `inside/`) |
 | `src/renderer/src/components/AgentPanes.tsx`, `AgentDialogs.tsx` | Session tab agent strip, layouts and panes; Add Agent, Agent Settings, Continue with… and Merge dialogs |
 | `src/renderer/src/agentPlace.ts` | Where an agent works, as the window shows it (#1442): `AgentInfo.place` (main's `shownPlace` over the folder contract) read as the agent's folder, its 0.9 worktree (`legacyOf`), "in slot-b" / "carried: hb2" / "home: hr4" (`placeText`), and the project's slots and homes by name (`ProjectInfo.folders`) |
 
