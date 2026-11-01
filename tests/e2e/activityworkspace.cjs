@@ -252,7 +252,7 @@ const AGENTS = [
     check("a lane's Show in Activity: the workspace level on its builder", !!(await fresh(async () => JSON.stringify(await groups()) === JSON.stringify(['beta:hb1']) && /1 agent/.test(await head.locator('.activity-pick').first().innerText().catch(() => '')))), JSON.stringify(await groups()))
     // A run of beta's HB1 (its own token, as hive-progress sends it), its details' Show in Activity.
     const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-    const token = launches.filter((l) => same(l.env?.HIVE_PROJECT ?? '', beta) || same(l.cwd, slotA)).at(-1)?.env?.HIVE_API_TOKEN
+    const token = launches.filter((l) => same(l.env?.HIVE_PROJECT ?? '', beta) || same(l.cwd, slotA)).at(-1)?.token
     const res = await fetch(`http://127.0.0.1:${PORT}/v1/progress`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'e2e: activity run' }) })
     const runId = (await res.json().catch(() => null))?.id
     check("beta's HB1 reports a run", !!runId, String(res.status))

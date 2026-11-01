@@ -59,6 +59,9 @@ let finishReply: Record<string, unknown> = {}
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
 const seenFile = join(dir, 'seen.json')
+/** The agent's token in its file, as a session has it (HI-2262: never HIVE_API_TOKEN). */
+const agentTokenFile = join(dir, 'agent-token.json')
+writeFileSync(agentTokenFile, JSON.stringify({ token: 'agent-token' }))
 let refuse = false
 let server: Server
 let url = ''
@@ -110,7 +113,7 @@ beforeEach(() => {
 })
 
 const node = process.execPath
-const env = (extra: Record<string, string | undefined> = {}) => ({ ...process.env, HIVE_API_URL: url, HIVE_API_TOKEN: 'agent-token', HIVE_PROGRESS_DATA: join(dir, 'data'), HIVE_PROGRESS: undefined, HIVE_API_TOKEN_FILE: undefined, HIVE_WORKSPACE: undefined, HIVE_PROGRESS_WRAPPED: undefined, HIVE_TEST_SEEN: seenFile, ...extra })
+const env = (extra: Record<string, string | undefined> = {}) => ({ ...process.env, HIVE_API_URL: url, HIVE_API_TOKEN: undefined, HIVE_PROGRESS_DATA: join(dir, 'data'), HIVE_PROGRESS: undefined, HIVE_API_TOKEN_FILE: agentTokenFile,HIVE_WORKSPACE: undefined, HIVE_PROGRESS_WRAPPED: undefined, HIVE_TEST_SEEN: seenFile, ...extra })
 /**
  * Runs the wrapper, collecting what it writes. By default the run is reported only at a step line with the total, or at
  * the end, however long the command takes to start; `startWaitMs` 0 reports it at once, before the command's output.
@@ -597,7 +600,9 @@ describe('reporting a run', () => {
     // Not reporting, the command has the console itself (nothing to collect here): only its exit code is checked.
     const quiet = ['--', node, '-e', 'process.exit(5)']
     expect((await wrap(quiet, env({ HIVE_API_URL: undefined }))).code).toBe(5)
-    expect((await wrap(quiet, env({ HIVE_API_TOKEN: undefined }))).code).toBe(5)
+    expect((await wrap(quiet, env({ HIVE_API_TOKEN_FILE: undefined }))).code).toBe(5)
+    // HI-2262: a token in HIVE_API_TOKEN alone is no target (sessions get only the file).
+    expect((await wrap(quiet, env({ HIVE_API_TOKEN_FILE: undefined, HIVE_API_TOKEN: 'agent-token' }))).code).toBe(5)
     expect((await wrap(quiet, env({ HIVE_PROGRESS: '0' }))).code).toBe(5)
     expect(calls).toEqual([])
   })
@@ -666,15 +671,17 @@ describe('reporting a run', () => {
 })
 
 describe('the shared reporter and timings', () => {
-  it('finds its target: the agent token, or the file Hive keeps it in; HIVE_PROGRESS=0 turns it off', () => {
+  it('finds its target: the agent token from the file Hive keeps it in, never HIVE_API_TOKEN (HI-2262); HIVE_PROGRESS=0 turns it off', () => {
     const file = join(dir, 'token.json')
     writeFileSync(file, JSON.stringify({ token: 'from-file' }))
-    expect(progressTarget({ HIVE_API_URL: 'http://h/', HIVE_API_TOKEN: 't', HIVE_WORKSPACE: 'W' })).toEqual({ url: 'http://h', token: 't', workspace: 'W' })
-    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN_FILE: file })?.token).toBe('from-file')
-    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN: '${HIVE_API_TOKEN}', HIVE_API_TOKEN_FILE: file })?.token).toBe('from-file')
+    expect(progressTarget({ HIVE_API_URL: 'http://h/', HIVE_API_TOKEN_FILE: file, HIVE_WORKSPACE: 'W' })).toEqual({ url: 'http://h', token: 'from-file', workspace: 'W' })
+    // The file's, whatever HIVE_API_TOKEN says; with it alone, no target.
+    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN: 't', HIVE_API_TOKEN_FILE: file })?.token).toBe('from-file')
+    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN: 't' })).toBeNull()
+    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN_FILE: join(dir, 'no-such-token.json') })).toBeNull()
     expect(progressTarget({ HIVE_API_URL: 'http://h' })).toBeNull()
-    expect(progressTarget({ HIVE_API_TOKEN: 't' })).toBeNull()
-    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN: 't', HIVE_PROGRESS: '0' })).toBeNull()
+    expect(progressTarget({ HIVE_API_TOKEN_FILE: file })).toBeNull()
+    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN_FILE: file, HIVE_PROGRESS: '0' })).toBeNull()
   })
 
   it('sends the workspace, clips long text, and does nothing at all without a target', async () => {
@@ -872,7 +879,7 @@ describe("the hive-progress command on a session's PATH (main/progressReporters/
 
 describe('a reporter inside a command hive-progress runs: one row, the wrapper\'s (#167)', () => {
   it('the command is told it is wrapped; a reporter in it then has no target and prints step lines instead', () => {
-    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN: 't', HIVE_PROGRESS_WRAPPED: '1' })).toBeNull()
+    expect(progressTarget({ HIVE_API_URL: 'http://h', HIVE_API_TOKEN_FILE: agentTokenFile, HIVE_PROGRESS_WRAPPED: '1' })).toBeNull()
     expect(wrappedLines({ HIVE_PROGRESS_WRAPPED: '1' })).toBeTypeOf('function')
     expect(wrappedLines({ HIVE_PROGRESS_WRAPPED: '1', HIVE_PROGRESS: '0' })).toBeUndefined()
     expect(wrappedLines({})).toBeUndefined()
@@ -928,8 +935,8 @@ describe("agents told to run long commands through hive-progress (Settings → G
 describe("Hive's own test runners (tests/progressReport.mts)", () => {
   const saved = { ...process.env }
   beforeEach(() => {
-    Object.assign(process.env, { HIVE_API_URL: url, HIVE_API_TOKEN: 'agent-token', HIVE_TEST_PROGRESS_TIMINGS: join(dir, 'runner-timings.json') })
-    for (const k of ['HIVE_API_TOKEN_FILE', 'HIVE_WORKSPACE', 'HIVE_PROGRESS', 'HIVE_PROGRESS_WRAPPED']) delete process.env[k]
+    Object.assign(process.env, { HIVE_API_URL: url, HIVE_API_TOKEN_FILE: agentTokenFile, HIVE_TEST_PROGRESS_TIMINGS: join(dir, 'runner-timings.json') })
+    for (const k of ['HIVE_API_TOKEN', 'HIVE_WORKSPACE', 'HIVE_PROGRESS', 'HIVE_PROGRESS_WRAPPED']) delete process.env[k]
   })
   afterAll(() => {
     for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k]

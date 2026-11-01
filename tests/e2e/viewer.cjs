@@ -145,7 +145,7 @@ function stream(token) {
   const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
   const annToken = await lib.until(() => {
     const lines = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8').split('\n').filter((l) => l.trim().endsWith('}')) : []
-    return lines.map((l) => JSON.parse(l)).filter((l) => l.cwd.toLowerCase() === alpha.toLowerCase()).at(-1)?.env?.HIVE_API_TOKEN
+    return lines.map((l) => JSON.parse(l)).filter((l) => l.cwd.toLowerCase() === alpha.toLowerCase()).at(-1)?.token
   }, HUNG_MS)
   check("the agent's own token is known", !!annToken)
   const card = (await api('POST', '/v1/tasks', { title: 'Show the office', project: 'alpha' })).body?.number

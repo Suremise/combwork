@@ -71,7 +71,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   const launchesNow = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
   const launchesOf = (a) => launchesNow().filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase())
   // Each agent's token, by the folder it runs in (B1 and B3 in their worktrees): its latest launch's.
-  const tokenOf = (a) => launchesOf(a).at(-1)?.env?.HIVE_API_TOKEN
+  const tokenOf = (a) => launchesOf(a).at(-1)?.token
   const api = async (token, method, route, body) => {
     const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: r.status, body: await r.json().catch(() => null) }

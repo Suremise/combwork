@@ -284,7 +284,9 @@ const check = (name, ok, extra = '') => {
   await inv('session:start', alpha, { agentId: coder.id })
   check('Coder starts', !!(await until(async () => (await inv('session:live')).some((x) => x.agentId === coder.id && ['ready', 'waiting'].includes(x.status)), 20000)))
   const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1)
-  const coderToken = launch.env.HIVE_API_TOKEN
+  const coderToken = launch.token
+  // HI-2262: its session has the token's file, never the token in its environment (an `env` listing printed it).
+  check("Coder's session has HIVE_API_TOKEN_FILE and its token, never HIVE_API_TOKEN", !!launch.env?.HIVE_API_TOKEN_FILE && /^[0-9a-f]{64}$/.test(coderToken ?? '') && !('HIVE_API_TOKEN' in (launch.env ?? {})), JSON.stringify(Object.keys(launch.env ?? {})))
   const asCoder = async (p, method = 'GET', body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${coderToken}`, 'X-Hive-Workspace': encodeURIComponent(ws), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     const notice = res.headers.get('x-hive-notice')
@@ -303,7 +305,7 @@ const check = (name, ok, extra = '') => {
   const viaMcp = JSON.parse(
     execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_project_status', arguments: {} } }) + '\n',
-      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN: coderToken, HIVE_API_TOKEN_FILE: '', HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }),
+      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN_FILE: lib.tokenFile(coderToken), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }),
       timeout: 60000
     })
       .toString()

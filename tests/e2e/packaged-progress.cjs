@@ -32,7 +32,7 @@ const srv = http.createServer((req, res) => {
 /** Runs the wrapper as its shims do; resolves to its exit code and output. */
 const wrap = (args, apiUrl) =>
   new Promise((resolve) => {
-    const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: data, HIVE_API_URL: apiUrl, HIVE_API_TOKEN: 'agent-token' })
+    const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: data, HIVE_API_URL: apiUrl, HIVE_API_TOKEN_FILE: lib.tokenFile('agent-token') })
     const p = spawn(exe, [script, ...args], { env, cwd: lib.WORK })
     let out = ''
     let err = ''
@@ -92,7 +92,7 @@ const wrap = (args, apiUrl) =>
   for (const [mode, apiUrl, extra] of [['reporting', url, {}], ['Hive unreachable', 'http://127.0.0.1:9', {}], ['HIVE_PROGRESS=0', url, { HIVE_PROGRESS: '0' }]]) {
     const before = calls.length
     const wrapped = await new Promise((resolve) => {
-      const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: data, HIVE_API_URL: apiUrl, HIVE_API_TOKEN: 'agent-token', ...extra })
+      const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: data, HIVE_API_URL: apiUrl, HIVE_API_TOKEN_FILE: lib.tokenFile('agent-token'), ...extra })
       const p = spawn(exe, [script, '--', lib.ELECTRON, app], { env, cwd: lib.WORK })
       let out = ''
       p.stdout.on('data', (d) => (out += d))

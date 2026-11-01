@@ -613,7 +613,7 @@
   "settings.agentApi.status.tip": "Agent API 是否正在监听。",
   "settings.agentApi.status.title": "状态",
   "settings.agentApi.token.desc": "Agent API 所需的 Bearer 令牌。",
-  "settings.agentApi.token.tip": "保存在 %APPDATA%\\Hive\\agent-api.json 中。会话会自动以 HIVE_API_TOKEN 获得它。",
+  "settings.agentApi.token.tip": "保存在 %APPDATA%\\Hive\\agent-api.json 中，供你自己的脚本使用。代理永远不会获得它：每个会话都有自己的令牌，存放在 HIVE_API_TOKEN_FILE 指向的文件中。",
   "settings.agentApi.token.title": "访问令牌",
   "settings.agentApi.viewers.desc": "供展示 Hive 的应用（如 Apiary）使用的只读令牌：它们可以读取所有内容并跟踪事件，但不能更改任何东西。",
   "settings.agentApi.viewers.tip": "按应用为每个令牌命名。保存在 %APPDATA%\\Hive\\agent-api-viewers.json 中。撤销后，对应应用会立即被断开。应用通过 %APPDATA%\\Hive\\agent-api-discovery.json（只有地址，不含令牌）找到正在运行的 Hive。",

@@ -122,7 +122,7 @@ const leaked = (env) => Object.entries(env).filter(([k, v]) => LEAKS[k.toUpperCa
   })
   await new Promise((r) => srv.listen(0, '127.0.0.1', r))
   const wrapped = await new Promise((resolve) => {
-    const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: data, HIVE_API_URL: `http://127.0.0.1:${srv.address().port}`, HIVE_API_TOKEN: 'agent-token' })
+    const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: data, HIVE_API_URL: `http://127.0.0.1:${srv.address().port}`, HIVE_API_TOKEN_FILE: lib.tokenFile('agent-token') })
     const p = spawn(lib.ELECTRON, [path.join(lib.ROOT, 'out', 'main', 'hive-progress.js'), '--', 'node', '-e', "console.log('##hive-progress step=1 total=1 name=one')"], { env, cwd: lib.WORK })
     let out = ''
     p.stdout.on('data', (d) => (out += d))

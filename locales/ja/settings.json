@@ -613,7 +613,7 @@
   "settings.agentApi.status.tip": "Agent APIが待ち受けているかどうかです。",
   "settings.agentApi.status.title": "状態",
   "settings.agentApi.token.desc": "Agent APIに必要なベアラートークンです。",
-  "settings.agentApi.token.tip": "%APPDATA%\\Hive\\agent-api.jsonに保存されます。セッションはHIVE_API_TOKENとして自動的に受け取ります。",
+  "settings.agentApi.token.tip": "%APPDATA%\\Hive\\agent-api.jsonに保存され、ご自身のスクリプト用です。エージェントには渡されません。各セッションには専用のトークンが、HIVE_API_TOKEN_FILEが示すファイルで渡されます。",
   "settings.agentApi.token.title": "アクセストークン",
   "settings.agentApi.viewers.desc": "Apiaryなど、Hiveを表示するアプリ用の読み取り専用トークンです。すべてを読み、イベントを追えますが、何も変更できません。",
   "settings.agentApi.viewers.tip": "アプリごとに名前を付けてください。%APPDATA%\\Hive\\agent-api-viewers.jsonに保存されます。取り消すと、そのアプリはすぐに接続できなくなります。アプリは、%APPDATA%\\Hive\\agent-api-discovery.json（アドレスのみで、トークンは含みません）で実行中のHiveを見つけます。",

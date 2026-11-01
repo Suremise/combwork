@@ -623,7 +623,7 @@
   "settings.agentApi.status.tip": "Whether the Agent API is listening.",
   "settings.agentApi.status.title": "Status",
   "settings.agentApi.token.desc": "Bearer token required by the Agent API.",
-  "settings.agentApi.token.tip": "Stored in %APPDATA%\\Hive\\agent-api.json. Sessions receive it automatically as HIVE_API_TOKEN.",
+  "settings.agentApi.token.tip": "Stored in %APPDATA%\\Hive\\agent-api.json, for your own scripts. Agents never get it: each session gets a token of its own, in the file that HIVE_API_TOKEN_FILE names.",
   "settings.agentApi.token.title": "Access token",
   "settings.agentApi.viewers.desc": "Read-only tokens for apps that show Hive, such as Apiary: they can read everything and follow its events, and change nothing.",
   "settings.agentApi.viewers.tip": "Name each one for its app. Stored in %APPDATA%\\Hive\\agent-api-viewers.json. Revoking one cuts its app off at once. Apps find a running Hive by %APPDATA%\\Hive\\agent-api-discovery.json (the address, no token).",

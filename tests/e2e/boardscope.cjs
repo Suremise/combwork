@@ -88,7 +88,7 @@ const until = async (fn, ms = 10000) => {
   const agentToken = JSON.parse(fs.readFileSync(mcpEnv.HIVE_API_TOKEN_FILE, 'utf8')).token
   const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   check('the agent has a token of its own', !!agentToken && agentToken !== workspaceToken)
-  check("its environment has its token, not the workspace's", launch.env.HIVE_API_TOKEN === agentToken && launch.env.HIVE_API_TOKEN_FILE === mcpEnv.HIVE_API_TOKEN_FILE, JSON.stringify(launch.env))
+  check("its environment names its token's file, not the token (HI-2262)", launch.token === agentToken && !('HIVE_API_TOKEN' in launch.env) && launch.env.HIVE_API_TOKEN_FILE === mcpEnv.HIVE_API_TOKEN_FILE, JSON.stringify(launch.env))
   const call = async (token, method, p, body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: res.status, body: await res.json().catch(() => null) }
