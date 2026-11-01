@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 121
+const FIXTURES_VERSION = 122
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -4209,13 +4209,27 @@ function laneStartLanded({ column, live, deliveries, shown }, n) {
 async function hiveStartedLaneCard(c, key, n) {
   const lib = require('../e2e/lib.cjs')
   const agent = c.agents[key]
-  const landed = async () => laneStartLanded({
-    column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column,
-    live: await coderLive(c, agent),
-    deliveries: await c.deliveries(key),
-    shown: lib.plainText(String(await c.inv('pty:buffer', lib.ptyKey(c.alpha, agent.id)).catch(() => '')))
-  }, n)
-  if (!(await lib.until(landed, 90000))) throw new Error(`setup: Hive's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}`)
+  const ptyKey = lib.ptyKey(c.alpha, agent.id)
+  const screen = async () => lib.plainText(String(await c.inv('pty:buffer', ptyKey).catch(() => '')))
+  // Hive's start is a new launch, which may ask to trust the folder again (HI-2290: Copilot's "Yes" holds for one session,
+  // so its builder sat at the question, the start's task still on its command line): answered once in that launch, as a
+  // user would, before its task can show.
+  const trusted = new Set()
+  const landed = async () => {
+    const live = await coderLive(c, agent)
+    const shown = await screen()
+    if (live?.status === 'waiting' && live.runId && !trusted.has(live.runId)) {
+      const tail = shown.slice(-2000)
+      // Copilot's: "Do you trust the files in this folder?", Yes first. Codex's: Yes first. Claude Code's menu starts on
+      // "No, exit": lib's answer presses Enter only with "Yes" selected (#218).
+      if (/Do you trust the files in this folder/i.test(tail) || (/trust this folder/i.test(tail) && c.provider === 'codex')) {
+        await c.inv('pty:write', ptyKey, '\r')
+        trusted.add(live.runId)
+      } else if (/trust this folder/i.test(tail) && (await lib.acceptClaudeTrust(c.inv, c.alpha, agent.id, 10000))) trusted.add(live.runId)
+    }
+    return laneStartLanded({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, live, deliveries: await c.deliveries(key), shown }, n)
+  }
+  if (!(await lib.until(landed, 90000))) throw new Error(`setup: Hive's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}; its screen ends: ${(await screen()).trim().slice(-400)}`)
 }
 /**
  * Two running lanes: Coder and Implementer on greet.js (#a, #b), Builder2 and Reviewer2 on the README (#c, and #d if
