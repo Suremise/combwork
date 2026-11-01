@@ -28,20 +28,8 @@ const res = { step, prefix, at: new Date().toISOString(), checks: [], facts: {},
 const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.stringify(res, null, 2))
 // Each check has a stable id ("<scenario>.<what>"): the host's report requires the ids each step must produce.
 const check = (id, name, ok, detail) => { res.checks.push({ id, scenario: Number(String(id).split('.')[0]) || 0, name, ok: !!ok, detail: ok ? undefined : String(detail ?? '').slice(0, 1500) }); save() }
-const sleep = ms => new Promise(r => setTimeout(r, ms))
-const until = async (fn, ms, every = 250) => { const t0 = Date.now(); for (;;) { const v = await fn().catch(() => null); if (v) return v; if (Date.now() - t0 > ms) return null; await sleep(every) } }
-/** What read() gives once it has settled: the same (as JSON) on three polls in a row, within ms; else null. */
-const settled = async (read, ms) => {
-  let last
-  let same = 0
-  const got = await until(async () => {
-    const v = JSON.stringify(await read())
-    same = v !== undefined && v === last ? same + 1 : 0
-    last = v
-    return same >= 2 && { value: JSON.parse(v) }
-  }, ms)
-  return got ? got.value : null
-}
+// When what it reads is ready: conditions Hive says are met, each bounded (ready.cjs, unit-tested in hive's npm test).
+const { until, workspaceSetUp, VIEWS, viewReady } = require(path.join(__dirname, 'ready.cjs'))
 const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: 60_000 }).trim()
 const readConfig = () => { try { return JSON.parse(fs.readFileSync(path.join(PROFILE, 'config.json'), 'utf8')) } catch { return null } }
 
@@ -201,35 +189,35 @@ const steps = {
       if (!fs.existsSync(dir)) return null
       return fs.readdirSync(dir, { withFileTypes: true }).map(e => (e.isDirectory() ? { [e.name]: depth > 1 ? tree(path.join(dir, e.name), depth - 1) : '(folder)' } : e.name))
     }
-    // Recorded once Hive has finished setting the workspace up: workspace.json written and the .hive folder unchanged
-    // over three reads (its bundled skills and modes go in after it opens).
-    await until(async () => { try { return !!JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'workspace.json'), 'utf8')) } catch { return false } }, 30_000)
-    res.facts.hive = (await settled(async () => tree(path.join(ws, '.hive'), 3), 30_000)) || tree(path.join(ws, '.hive'), 3)
+    // Recorded once Hive has set the workspace up: its status names it with its Hive skills, which it replies with only
+    // once the open has brought the bundled skills and modes up to date. Not set up within the bound: the check fails,
+    // and what is there is kept apart (hiveNotSetUp), never recorded as the workspace's.
+    const status = await workspaceSetUp(() => api('/v1/status'), ws)
+    const now = tree(path.join(ws, '.hive'), 3)
+    if (status) res.facts.hive = now
+    else res.facts.hiveNotSetUp = now
     res.facts.projectHive = tree(path.join(ws, 'demo', '.hive'), 1)
     try { res.facts.workspaceJson = JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'workspace.json'), 'utf8')) } catch { /* recorded as missing */ }
-    check('6.hive-folder', 'Hive creates the workspace\'s .hive folder', Array.isArray(res.facts.hive), 'no .hive folder')
-    const status = await api('/v1/status').catch(e => ({ error: String(e) }))
-    res.facts.status = { workspace: status.workspace, workspaces: status.workspaces, providers: status.providers && Object.keys(status.providers) }
+    check('6.hive-folder', 'Hive creates the workspace\'s .hive folder and sets it up (its status lists its Hive skills)', status && Array.isArray(res.facts.hive), status ? 'no .hive folder' : `Hive didn't say the workspace was set up within 60 s (GET /v1/status): ${JSON.stringify(now).slice(0, 300)}`)
+    res.facts.status = status && { workspace: status.workspace, workspaces: status.workspaces, providers: status.providers && Object.keys(status.providers) }
     res.facts.projects = await api('/v1/projects').catch(e => ({ error: String(e) }))
     res.facts.views = {}
     await shot('workspace')
-    const views = ['Workspace Overview', 'Task Board', 'Shared Notes', 'Skills', 'MCP Servers', 'Hive Assistant']
     let shown = 0
-    for (const name of views) {
-      const slug = name.toLowerCase().replace(/\s+/g, '-')
+    for (const view of VIEWS) {
+      const { name, slug } = view
       try {
         await page.getByRole('button', { name, exact: true }).first().click({ timeout: 5000 })
-        // Read once the view has loaded: its text the same over three polls.
-        const text = await settled(() => page.evaluate(() => (document.querySelector('.workbench') || document.body).innerText), 15_000)
-        if (text === null) throw new Error(`the ${name} view didn't settle within 15 s`)
-        res.facts.views[name] = text.slice(0, 1500)
+        // Read once the view shows its loaded data (ready.cjs VIEWS); not loaded within the bound, it isn't counted.
+        if (!(await viewReady(view, sel => page.locator(sel).count()))) throw new Error(`the ${name} view didn't show its loaded content within 20 s (${view.ready.join(', ')})`)
+        res.facts.views[name] = (await page.evaluate(() => (document.querySelector('.workbench') || document.body).innerText)).slice(0, 1500)
         await shot(slug)
         shown++
       } catch (e) {
-        res.facts.views[name] = `not shown: ${String(e.message).slice(0, 200)}`
+        res.facts.views[name] = `not shown: ${String(e.message).slice(0, 300)}`
       }
     }
-    check('6.views', `The workspace's views open (${views.join(', ')})`, shown === views.length, JSON.stringify(res.facts.views).slice(0, 600))
+    check('6.views', `The workspace's views open with their content (${VIEWS.map(v => v.name).join(', ')})`, shown === VIEWS.length, JSON.stringify(res.facts.views).slice(0, 600))
   },
 
   async mark() {

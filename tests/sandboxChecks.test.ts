@@ -322,3 +322,70 @@ test('what the Sandbox driver relies on in Hive\'s window, IPC and Agent API is 
   // The stand-in installer copies the e2e fake Claude Code from where the driver's scenario 3 expects it.
   for (const f of ['fake-claude/fake-claude.cjs', 'fake-bridge.cjs']) assert.ok(fs.existsSync(path.join(__dirname, 'e2e', f)), f)
 })
+
+// The driver's readiness (tests/sandbox/inside/ready.cjs): what Hive says is done, never a quiet spell. Each case holds a
+// loading state unchanged for many polls before the ready one: the wait must not end on it (HI-2298 round 2's finding).
+const ready = require('./sandbox/inside/ready.cjs')
+/** A reader that answers `before` for n calls and `after` from then on, counting its calls. */
+const scripted = <T>(n: number, before: T, after: T) => {
+  let calls = 0
+  return { read: async () => (++calls <= n ? before : after), calls: () => calls }
+}
+
+test('the new workspace counts as set up only once Hive\'s status names it with its Hive skills, however long it stays the same before', async () => {
+  const ws = 'C:\\Users\\WDAGUtilityAccount\\Workspaces\\Fresh'
+  const done = { workspace: { path: `${ws}\\` }, guidance: { skills: [{ name: 'handover' }] } }
+  for (const partial of [{ workspace: null, guidance: { skills: null } }, { workspace: { path: ws }, guidance: { skills: [] } }, { workspace: { path: 'C:\\Other' }, guidance: { skills: [{ name: 'handover' }] } }]) {
+    const s = scripted(8, partial, done)
+    assert.strictEqual(await ready.workspaceSetUp(s.read, ws.toLowerCase(), 5000, 1), done, JSON.stringify(partial))
+    assert.strictEqual(s.calls(), 9)
+  }
+  // Never set up within the bound: null (the driver fails the check), not what was read last.
+  assert.strictEqual(await ready.workspaceSetUp(async () => ({ workspace: { path: ws }, guidance: { skills: [] } }), ws, 30, 1), null)
+  // A status that fails (its request timed out while Hive was still setting up) is not yet, not an end.
+  let n = 0
+  assert.strictEqual(await ready.workspaceSetUp(async () => { if (++n < 5) throw new Error('timeout'); return done }, ws, 5000, 1), done)
+})
+
+test('a view counts as loaded only on its own loaded markers, however long its loading state stays the same before', async () => {
+  for (const view of ready.VIEWS) {
+    // Loading for 8 polls: no ready marker, and its loading marker (where it has one) shown.
+    let polls = 0
+    const count = async (sel: string) => {
+      if (sel === view.ready[0]) polls++
+      const loaded = polls > 8
+      return view.ready.includes(sel) ? (loaded ? 1 : 0) : view.loading.includes(sel) ? (loaded ? 0 : 1) : 0
+    }
+    assert.strictEqual(await ready.viewReady(view, count, 5000, 1), true, view.name)
+    assert.strictEqual(polls, 9, view.name)
+    // Its ready marker there while a loading one still shows: not loaded yet.
+    if (view.loading.length) {
+      let m = 0
+      const both = async (sel: string) => (view.ready.includes(sel) ? 1 : view.loading.includes(sel) ? (++m <= 6 ? 1 : 0) : 0)
+      assert.strictEqual(await ready.viewReady(view, both, 5000, 1), true, view.name)
+      assert.ok(m >= 7, `${view.name}: ended while it still showed loading`)
+    }
+    // Never loaded within the bound: null, so the view isn't counted as shown.
+    assert.strictEqual(await ready.viewReady(view, async () => 0, 30, 1), null, view.name)
+  }
+  assert.deepStrictEqual(ready.VIEWS.map((v: Json) => v.slug), ['workspace-overview', 'task-board', 'shared-notes', 'skills', 'mcp-servers', 'hive-assistant'])
+})
+
+test('every view marker the driver waits for is in Hive\'s window: its classes and attributes in the renderer, its text in English', () => {
+  const root = path.resolve(__dirname, '..')
+  const english = fs.readdirSync(path.join(root, 'locales', 'en')).map((f) => fs.readFileSync(path.join(root, 'locales', 'en', f), 'utf8')).join('\n')
+  const renderer = (dir: string): string => fs.readdirSync(dir, { withFileTypes: true }).map((e) => (e.isDirectory() ? renderer(path.join(dir, e.name)) : /\.tsx?$/.test(e.name) ? fs.readFileSync(path.join(dir, e.name), 'utf8') : '')).join('\n')
+  const ui = renderer(path.join(root, 'src', 'renderer', 'src'))
+  const missing: string[] = []
+  for (const view of ready.VIEWS) {
+    for (const sel of [...view.ready, ...view.loading] as string[]) {
+      const bare = sel.replace(/:has-text\("[^"]*"\)/g, '')
+      for (const [, cls] of bare.matchAll(/\.([\w-]+)/g)) if (cls !== 'codicon-loading' && !ui.includes(cls)) missing.push(`${view.name}: class ${cls}`)
+      for (const [, attr] of bare.matchAll(/\[([\w-]+)/g)) if (!ui.includes(attr)) missing.push(`${view.name}: attribute ${attr}`)
+      for (const [, text] of sel.matchAll(/:has-text\("([^"]*)"\)/g)) if (text !== 'demo' && !english.includes(text)) missing.push(`${view.name}: text "${text}"`)
+    }
+  }
+  // The loading spinner is the Icon component's codicon-<name> with "loading".
+  if (!ui.includes("name=\"loading\" spin")) missing.push('the loading spinner (<Icon name="loading" spin />)')
+  assert.deepStrictEqual(missing, [])
+})

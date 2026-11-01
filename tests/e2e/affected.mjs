@@ -730,7 +730,7 @@ export const UNIT_SCANS = [
   // What the Sandbox checks' window driver relies on (HI-2298): Hive's English text, the selectors, IPC channels and
   // Agent API routes it uses, and the e2e fake Claude Code its stand-in installer copies.
   { test: 'tests/sandboxChecks.test.ts', paths: ['locales/en/', 'src/shared/api.ts', 'src/main/servers.ts'] },
-  { test: 'tests/sandboxChecks.test.ts', paths: ['src/renderer/src/'], lines: ['providers-banner', 'setup-tab', 'welcome', 'workbench', 'statusbar', 'status-item', 'data-git'] },
+  { test: 'tests/sandboxChecks.test.ts', paths: ['src/renderer/src/'], lines: ['providers-banner', 'setup-tab', 'welcome', 'workbench', 'statusbar', 'status-item', 'data-git', 'palette', 'data-command', 'help\\.agentSetup', 'overview-page', 'ws-projects', 'board', 'data-note', 'skill-row', 'pane-empty', 'sessions-(list|tree)', 'main-area', 'empty-state', 'name="loading"'] },
   { test: 'tests/sandboxChecks.test.ts', paths: ['tests/e2e/fake-claude/', 'tests/e2e/fake-bridge.cjs'], adds: true },
   // The bundled skills and modes (resources/), and the guidance that names them.
   { test: 'tests/assistant.test.ts', paths: ['resources/modes/'] },
