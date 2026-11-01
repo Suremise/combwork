@@ -33,6 +33,7 @@
     "e2e:concurrency": "node tests/e2e/concurrency.mjs",
     "test:clean": "node tests/e2e/clean.mjs",
     "test:waits": "node scripts/testWaits.mjs",
+    "sandbox-checks": "node tests/sandbox/checks.cjs",
     "i18n:extract": "node scripts/i18nExtract.mjs",
     "i18n:check": "node scripts/i18nCheck.mjs",
     "i18n:coverage": "node scripts/i18nCoverage.mjs",

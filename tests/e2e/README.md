@@ -433,8 +433,8 @@ npm run e2e -- i18nshots                 # as part of a run (the full set, or --
 
 ### The installer on a clean machine: the Sandbox checks
 
-The e2e suites test the app on this machine. The **Sandbox checks** (the mcp repo's
-`servers/windows-sandbox/scenarios/hive-checks.js`, #538) test the **installer** on a clean Windows in Windows Sandbox:
+The e2e suites test the app on this machine. The **Sandbox checks** (`tests/sandbox`, #538; moved from the hive-mcp
+repo in HI-2298) test the **installer** on a clean Windows in Windows Sandbox:
 a fresh install and first launch, the first run with no CLIs (#474), a CLI appearing while Hive runs (#472), an upgrade
 from the previous release with its settings kept, uninstall, and a new workspace. Two throwaway Sandboxes, about 3
 minutes, the network off and Hive's fake CLIs only: no real CLI, sign-in or credential goes in. It writes `report.md`
@@ -442,14 +442,27 @@ minutes, the network off and Hive's fake CLIs only: no real CLI, sign-in or cred
 
 - **When:** on each release candidate, once it is built and before the user installs it (RELEASING.md step 1, the
   release-hive skill), with the verdict and report folder commented on the release card.
-- **How:** `node "<mcp repo>\servers\windows-sandbox\scenarios\hive-checks.js" --installer "<the RC's installer>"
-  --hive "<the main checkout>" --report "$env:LOCALAPPDATA\hive-test\sandbox-reports\<version>-rc<n>"`. It starts its
-  own copy of the Sandbox server, so it needs no MCP registration.
+- **How:** `npm run sandbox-checks -- --installer "<the RC's installer>" --hive "<the main checkout>"
+  --report "$env:LOCALAPPDATA\hive-test\sandbox-reports\<version>-rc<n>"` (`--previous <installer>` for another
+  upgrade start; `--hive` is only where that is looked for, the newest other installer in its `dist`). It drives the
+  hive-mcp project's **windows-sandbox MCP server** over stdio as any MCP client does, starting its own copy of it, so
+  it needs no MCP registration: `--server <its server.js>` (or `WSB_SERVER`), else the copy Hive installed from the MCP
+  catalogue in the workspace holding `--hive` (`<workspace>\.hive\mcp\windows-sandbox`), else a hive-mcp checkout
+  beside it (`<hive>\..\mcp\servers\windows-sandbox`). The server keeps its run folders in
+  `%LOCALAPPDATA%\hive-test\sandbox`.
+- **What's where:** the runner (`checks.cjs`) maps this checkout's `tests` folder and `playwright-core` read-only into
+  the Sandbox, so the scripts that run inside (`tests/sandbox/inside`: the installer runs, the install record and the
+  window driver `drive.cjs`) and the e2e fake CLIs are this checkout's. A change to what `drive.cjs` drives (Provider
+  Setup's text, the banner, the views, `provider:info`, the Agent API routes) changes it in the same card:
+  `tests/sandboxChecks.test.ts` fails when one it relies on is gone. The report is `report.cjs`; the fresh-install
+  comparison against a workspace of yours, `node tests/sandbox/compare-workspace.cjs --report <report folder>
+  --workspace <workspace>`. Their unit tests (`tests/sandbox*.test.ts`) run in `npm test` against a fake server
+  (`tests/sandbox/fake-server.cjs`); the Sandbox runs themselves stay a manual release step.
 - **One Sandbox at a time** on the machine: when another is running it says NOT RUN (exit 2); wait, or pass
   `--wait-min 30`. It never stops a Sandbox it didn't start.
 - **By hand** (an agent working in a Sandbox through the `windows-sandbox` MCP tools): Hive turns MCP servers on per
   project, not per agent, so until it can give a server to chosen agents only (#537), the server is on only in a
-  release-testing project that holds just the release-testing agent (the mcp repo's
+  release-testing project that holds just the release-testing agent (the hive-mcp repo's
   `servers/windows-sandbox/RELEASE-TESTING.md`).
 - **The 1.0 upgrade from installed 0.9** (S53, S60 and restore, #1227): `upgradelane` and `boardupgrade` run inside the
   Sandbox against two installs, with `HIVE_E2E_HIVE09` a copy of the installed 0.9 and `HIVE_EXE` a copy of the new
