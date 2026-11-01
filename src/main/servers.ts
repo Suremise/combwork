@@ -1735,7 +1735,9 @@ async function agentActivity(p: string, agentId: string, detail = false) {
   // Where it is now and where a new conversation would start (#1451), each with why in a word.
   const place = await agentPlace(p, a, st ? { cwd: st.cwd } : null)
   const folder = place.now.path
-  const typed = sessions.userTypedAt(p, agentId)
+  // Only while the user may still be typing there (Settings → Assistant → Pause after you type), as Hive itself holds off
+  // (HI-2261: kept after their Enter, it read as "the user just typed" and the Assistant wouldn't give the agent work).
+  const typed = sessions.userMayBeTyping(p, agentId) ? sessions.userTypedAt(p, agentId) : 0
   const provider = st?.provider ?? agentProvider(a, config.settings)
   // What was left for it (#530, #647): unread and overdue, and its latest deliveries with their states and times.
   const inbox = await deliveryView(p, agentId, detail ? 20 : 5)

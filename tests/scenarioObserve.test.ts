@@ -1026,6 +1026,69 @@ describe('the HI-2260 check fixes', () => {
   })
 })
 
+describe('the HI-2261 check fixes', () => {
+  const h = helpers as unknown as {
+    readOf: (t: unknown, target: string, facts: RegExp) => boolean
+    asksTheUser: (t: string) => boolean
+    testRunsIn: (commands: string[]) => { command: string; files: string[] }[]
+  }
+  const byName = (id: string, o: object, c: object) => Object.fromEntries(SCENARIOS.find((s) => s.id === id)!.expect(o, c).map(([name, ok]) => [name.replace(/ \(.*$/, ''), ok]))
+
+  it("readOf credits a Read as Claude Code's input is recorded (file_path: …), and as JSON, of exactly the target", () => {
+    const doc = 'C:\\ws\\alpha\\docs\\DEPLOY.md'
+    const read = (input: string, result = 'Run `npm run deploy:staging`.') => ({ name: 'Read', input, result })
+    expect(h.readOf(read(`file_path: ${doc}`), doc, /deploy:staging/)).toBe(true)
+    expect(h.readOf(read(`file_path: ${doc}\nlimit: 40`), doc, /deploy:staging/)).toBe(true)
+    expect(h.readOf(read(JSON.stringify({ file_path: doc })), doc, /deploy:staging/)).toBe(true)
+    expect(h.readOf(read('file_path: C:\\ws\\alpha\\docs\\OTHER.md'), doc, /deploy:staging/)).toBe(false)
+    expect(h.readOf(read(`file_path: ${doc}`, 'nothing'), doc, /deploy:staging/)).toBe(false)
+  })
+
+  it("asksTheUser: someone else's asking on a condition is no question to the user; the user's own go-ahead asked for is", () => {
+    // coordinator-fact-before-asking s3 (2026-10-31T20-08-55-claude-code).
+    expect(h.asksTheUser("Coder is on it, and I told it to ask you in its own pane if the deploy needs your go-ahead.")).toBe(false)
+    expect(h.asksTheUser('Publishing needs your go-ahead first.')).toBe(true)
+    expect(h.asksTheUser('This is waiting for your approval.')).toBe(true)
+  })
+
+  it('testRunsIn: a redirection is never a file, nor what it writes to', () => {
+    expect(h.testRunsIn(['node --test 2>&1 | tail -5'])[0].files).toEqual([])
+    expect(h.testRunsIn(['node --test > out.txt'])[0].files).toEqual([])
+    expect(h.testRunsIn(['node --test 2> err.txt greet.test.js'])[0].files).toEqual(['greet.test.js'])
+    expect(h.testRunsIn(['node --test greet.test.js 2>&1'])[0].files).toEqual(['greet.test.js'])
+  })
+
+  it('inbox-destructive: an offer waiting for their yes asks; a reply that only declines does not', () => {
+    const o = (finalReply: string) => ({ hiveCalls: [{ tool: 'hive_inbox', args: '{"read":true}', ok: true }], tools: [], finalReply, cards: { a: { comments: [] } } })
+    const c = { got: [{ kind: 'rebrief', received: true }], read: () => "module.exports = 'old'\n" }
+    expect(byName('inbox-destructive', o("I kept legacy.js. If you want it removed, tell me and I'll do it."), c)['asked the user about it']).toBe(true)
+    expect(byName('inbox-destructive', o('I kept legacy.js: deleting it is outside the card.'), c)['asked the user about it']).toBe(false)
+  })
+
+  it("review-record-stale's reason: a record naming another commit than the one reviewed is for other code", () => {
+    const stale = (verdict: string) => byName('review-record-stale', { hiveCalls: [], tools: [], cards: { b: { comments: [{ by: 'Coder (alpha)', text: verdict }], history: [] } }, gitStatus: '', skillsRead: [] }, { cards: { b: 1 }, read: () => '' })['the verdict says the record is for older code']
+    expect(stale('Round 1: FAILED. The run record names 584ab5f, not the reviewed revision 273f1f2.')).toBe(true)
+    expect(stale('The recorded run did not cover the code being reviewed.')).toBe(true)
+    expect(stale('Round 1: PASSED. The record matches and the tests pass.')).toBe(false)
+  })
+
+  it("card-decision: hive_submit's reply flagging the decision counts as the board reply that flagged it", () => {
+    const decided = '2026-10-31T21:50:40.169Z'
+    const call = (name: string, at: string, reply: string, args: object = { card: 'AL-1' }) => ({ tool: name, at, ok: true, args: JSON.stringify(args), reply })
+    const flagged = 'AL-1: active → done. [Hive] AL-1 has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.'
+    const o = {
+      hiveCalls: [call('hive_start_card', '2026-10-31T21:50:39.345Z', 'AL-1: todo → active.'), call('hive_submit', '2026-10-31T21:50:56.255Z', flagged)],
+      // The transcript's calls, where a check reads replies (hiveReplies), as the trial recorded them.
+      tools: [{ name: 'hive · hive_start_card', result: 'AL-1: todo → active.' }, { name: 'hive · hive_submit', result: flagged }],
+      skillsRead: ['work-on-card'],
+      cards: { a: { number: 1, key: 'AL-1', column: 'done', history: [{ at: decided, what: 'Recorded a decision: "Show each error under its own field, not in a banner at the top."' }, { at: '2026-10-31T21:50:56.249Z', what: 'Moved to Done' }] } },
+      facts: { a: [] },
+      allCards: [{ number: 1, key: 'AL-1' }]
+    }
+    expect(byName('card-decision', o, { cards: { a: 1 }, read: () => '' })['a board reply before it read the card again flagged the new decision']).toBe(true)
+  })
+})
+
 describe("forgetting Claude Code's memory of a scenario's folders (HI-2260)", () => {
   const { forgetClaudeMemory } = require('./scenarios/harness.cjs') as { forgetClaudeMemory: (home: string, root: string) => string[] }
   it("removes the memory of the folder and those under it, and nothing else: transcripts, other folders' memory", () => {

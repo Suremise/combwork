@@ -62,10 +62,11 @@ export function boardSkillsLine(off: ReadonlySet<string> = new Set()): string {
 
 /**
  * The Assistant's skills line. With its journal on (HI-2048, HI-2009's K12) it leaves out handover: the journal replaces
- * handovers, and the journal's rule names the handover skill for one the user still wants.
+ * handovers, and the journal's rule names the handover skill for one the user still wants. run-lanes is named (HI-2261:
+ * Assistants woken about a lane, or asked to follow one, read no skill).
  */
 export const assistantSkillsLine = (journal: boolean): string =>
-  `Hive's skills cover your workflows: coordinate-agents for running agents and cards, split-work for planning, tune-settings for Hive's settings, ${journal ? 'pick-up' : 'handover, pick-up'} and workspace-note.`
+  `Hive's skills cover your workflows: coordinate-agents for running agents and cards, run-lanes for starting and following lanes, split-work for planning, tune-settings for Hive's settings, ${journal ? 'pick-up' : 'handover, pick-up'} and workspace-note.`
 
 /** The inbox: read, act, then ack (#903), for every role and CLI; an item not acked shows as overdue (deliveries.ts). */
 const INBOX_RULE = `Hive tells you when your inbox has something ("[Hive] New in your inbox: …"): read it with hive_inbox, act on it, then ack it (hive_inbox with ack) before you wait or end your turn.`
@@ -148,7 +149,7 @@ export function controlRules(control: AssistantControlLevel, changeSettings = fa
  */
 export function journalRule(scope: readonly string[]): string {
   return [
-    "You keep a journal (the journal skill): recall (hive_journal_recall) before deciding from memory, and write decisions (in the user's words), plans and why as they happen. A decision about a card goes on the card first (hive_update_task with decision), where agents check their work against it; the journal only notes it. It replaces your handovers: one the user still wants (for another agent or a person) is the handover skill's.",
+    "You keep a journal (the journal skill): recall (hive_journal_recall) before deciding from memory, and write decisions (in the user's words), plans, ideas the user leaves open (no card yet), and why, as they happen. A decision about a card goes on the card first (hive_update_task with decision), where agents check their work against it; the journal only notes it. It replaces your handovers: one the user still wants (for another agent or a person) is the handover skill's.",
     `Its scope (what the user lets you store): ${scope.length ? scope.join(', ') : 'nothing'}, and weekly digests.`
   ].join('\n')
 }

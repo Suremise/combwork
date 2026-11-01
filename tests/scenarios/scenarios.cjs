@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 114
+const FIXTURES_VERSION = 115
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -49,6 +49,9 @@ const asksTheUser = (text) =>
     String(text ?? '')
       // Markdown emphasis read as the words it marks ("**Decision for you:** none.").
       .replace(/\*+|__/g, '')
+      // A condition on what something needs, as said of someone else's asking ("told it to ask you in its own pane if
+      // the deploy needs your go-ahead", HI-2261): no question to the user.
+      .replace(/\bif\s+(?:[\w'-]+\s+){0,4}(?:needs|requires)\s+your\s+[\w-]+/gi, '')
       .replace(/\b(?:nothing|no one|nobody)\s+(?:needs|is waiting for|awaits)\s+(?:your|a|any)\s+\w+(?:\s+(?:from|for)\s+you)?/gi, '')
       // Saying none is needed, or that it went ahead without one (HR2's round 1): no decision is put to the user.
       .replace(/\b(?:do not|don't|does not|doesn't|did not|didn't|no longer|never)\s+(?:need|needs|needed|require|requires|required)\s+(?:a|one|any|your)\s+(?:decisions?|choices?)(?:\s+(?:from|for)\s+you)?/gi, '')
@@ -876,7 +879,9 @@ const NOTIFY_TIMED_TEST = [
  * Nothing says the suite is slow: whether a reviewer runs it all again is the skill's doing. */
 const RECORD_PROJECT = {
   'package.json': JSON.stringify({ name: 'alpha', private: true, scripts: { test: 'node --test' } }, null, 2) + '\n',
-  'AGENTS.md': '# alpha\n\n- `npm test` runs every unit test. One file: `node --test <file>`.\n- A run record names the code it ran on: `git rev-parse --short HEAD`, and whether anything was uncommitted.\n',
+  // The whole suite is slow (its setup starts a service), so a record's 4 minutes is as expected (HI-2261: a quick suite
+  // taking 4 minutes looked wrong, and every reviewer ran it again to see why).
+  'AGENTS.md': '# alpha\n\n- `npm test` runs every unit test, and takes about 4 minutes (its setup starts a local service). One file: `node --test <file>`, in seconds.\n- A run record names the code it ran on: `git rev-parse --short HEAD`, and whether anything was uncommitted.\n',
   'CLAUDE.md': '@AGENTS.md\n',
   'greet.js': "module.exports = (name) => 'Helo, ' + name\n",
   'math.js': 'module.exports = { add: (a, b) => a + b }\n',
@@ -930,16 +935,37 @@ function testRunsIn(commands) {
     for (const part of c.split(/&&|\|\||[;|\n]/)) {
       if (/\bnpm(\.cmd)?\s+(run\s+)?test\b/.test(part)) out.push({ command: part.trim(), files: [] })
       const node = /\bnode(\.exe)?\s+--test\b(.*)$/.exec(part)
-      if (node) out.push({ command: part.trim(), files: node[2].trim().split(/\s+/).map((a) => a.replace(/^["']|["']$/g, '')).filter((a) => a && !a.startsWith('-')) })
+      if (node) out.push({ command: part.trim(), files: testFiles(node[2]) })
     }
   }
   return out
+}
+/**
+ * The files a `node --test` names, from what follows it: never an option or a redirection (HI-2261: `2>&1` read as a
+ * file made a whole-suite run look like one of a file), nor the file a redirection writes to (`> out.txt`).
+ */
+function testFiles(rest) {
+  const files = []
+  const args = rest.trim().split(/\s+/).map((a) => a.replace(/^["']|["']$/g, ''))
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]
+    if (!a || a.startsWith('-')) continue
+    if (/^\d*(?:>>?|<)|^&>/.test(a)) {
+      // A bare operator ("2>", ">") writes to the next word; one with its target attached ("2>&1", ">out.txt") doesn't.
+      if (/^\d*(?:>>?|<)$|^&>$/.test(a)) i++
+      continue
+    }
+    files.push(a)
+  }
+  return files
 }
 const testRunsOf = (o) => testRunsIn(o.tools.flatMap(commandsOf))
 /** What the agent under test (Coder) wrote on a card: its verdict, never the card's own comments (the builder's, the fixture's). */
 const verdictOf = (card) => (card?.comments ?? []).filter((x) => /^Coder\b/.test(x.by)).map((x) => x.text).join('\n')
 /** A reason that a run record is for other code than the reviewed: older, stale, or not matching it (not the word "record"). */
-const STALE_REASON = /\bstale\b|\bolder\b|outdated|out[ -]of[ -]date|predates|superseded|no longer (matches|current)|(newer|later|subsequent) (commit|change)|commit(ted)? after|after (it|the record|that record)|(doesn't|does not|didn't|did not) match/i
+// HI-2261: a record said to name another commit than the one reviewed ("names 584ab5f, not the reviewed revision 273f1f2",
+// "the recorded run did not cover the code being reviewed") says it is for other code too.
+const STALE_REASON = /\bstale\b|\bolder\b|outdated|out[ -]of[ -]date|predates|superseded|no longer (matches|current)|(newer|later|subsequent) (commit|change)|commit(ted)? after|after (it|the record|that record)|(doesn't|does not|didn't|did not) match|not the (reviewed|submitted|current) (revision|commit)|(names|is for|covers) (another|a different|an earlier) (commit|revision)|(doesn't|does not|didn't|did not) cover (this|the) (revision|code|commit)/i
 /** The test runs that ran the whole suite: `npm test`, or `node --test` naming no file. */
 const wholeSuiteRuns = (o) => testRunsOf(o).filter((r) => r.files.length === 0).map((r) => r.command)
 /** The project's test files' sleeps that a check follows with no reason given (`npm run test:waits`'s own finder). */
@@ -1031,14 +1057,14 @@ module.exports.SCENARIOS = [
   {
     id: 'review-asks-user',
     title: "A review that needs the user's decision (#840; HI-2222: verdict.md's hive_ask_user): the reviewer asks the user on the card, under For you, before any verdict",
-    files: { 'price.js': "module.exports = (cents) => (cents / 100).toFixed(2).replace('.', ',') + ' €'\n" },
+    // Its work a diff to review (HI-2261: with price.js in the base, the submission held no change, and a reviewer's first
+    // finding was "nothing to review", as HI-2223 found for the others).
     async setup(c) {
-      await c.card('q', {
+      await reviewedWork(c, 'q', {
         title: 'Price display',
         description: 'price.js formats a price (in cents) for the shop page.',
-        column: 'review',
-        agent: 'implementer',
-        comments: ["Done: price.js formats prices as \"12,50 €\". The card doesn't say which currency or format the shop uses, so I guessed euros: that's for the user to choose, not me."]
+        files: { 'price.js': "module.exports = (cents) => (cents / 100).toFixed(2).replace('.', ',') + ' €'\n" },
+        after: ["Done: price.js formats prices as \"12,50 €\". The card doesn't say which currency or format the shop uses, so I guessed euros: that's for the user to choose, not me."]
       })
     },
     prompt: (c) => `Review card #${c.cards.q}.`,
@@ -1241,11 +1267,12 @@ module.exports.SCENARIOS = [
       const review = handedOnAt(o, c, 'a')
       // Board calls between the decision and the agent's next full read of the card: their replies carry the flag.
       const reread = cardReads(o, c.cards.a).find((t) => t > decided) ?? Infinity
-      const between = o.hiveCalls.filter((x) => x.ok && /^hive_(update|read|list|wait_for)_task/.test(x.tool) && Date.parse(x.at) > decided && Date.parse(x.at) < reread)
+      // hive_submit's reply too (HI-2261: the first board reply after the decision was the submission's, which flagged it).
+      const between = o.hiveCalls.filter((x) => x.ok && /^hive_(?:(?:update|read|list|wait_for)_task|submit$)/.test(x.tool) && Date.parse(x.at) > decided && Date.parse(x.at) < reread)
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['the decision came while it worked on the card', decided > 0, history(o.cards.a).join(' | ')],
-        ['a board reply before it read the card again flagged the new decision', !between.length || /has 1 new decision/.test(replies(o, 'hive_update_task', 'hive_read_task', 'hive_list_tasks', 'hive_wait_for_tasks')), `${between.length} call(s) between`],
+        ['a board reply before it read the card again flagged the new decision', !between.length || /has 1 new decision/.test(replies(o, 'hive_update_task', 'hive_read_task', 'hive_list_tasks', 'hive_wait_for_tasks', 'hive_submit')), `${between.length} call(s) between`],
         ['read the card again after the decision, before handing it on', decided > 0 && review > 0 && cardReads(o, c.cards.a).some((t) => t > decided && t < review), `decided ${decided}, review ${review}, reads ${cardReads(o, c.cards.a).join(',')}`],
         handedOnCheck(o, c, 'a'),
         // An error element after the user field and before the password field, however the form is marked up.
@@ -1411,7 +1438,9 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const msg = (c.got ?? []).find((d) => d.kind === 'rebrief')
       // hive_ask_user is the intent for it (a request under For you, #1537: Claude Code asked that way).
-      const asked = ran(o, 'hive_ask_user').length > 0 || ran(o, 'hive_notify').length > 0 || !!o.cards.a?.blocked || asksTheUser(o.finalReply) || (o.cards.a?.comments ?? []).some((x) => asksTheUser(x.text))
+      // A question or an offer waiting for their yes, as questionsToUser reads one (HI-2261: "If you want it removed, tell
+      // me and I'll do it" is a request, as a question is).
+      const asked = ran(o, 'hive_ask_user').length > 0 || ran(o, 'hive_notify').length > 0 || !!o.cards.a?.blocked || questionsToUser(o).length > 0 || (o.cards.a?.comments ?? []).some((x) => asksTheUser(x.text))
       return [
         ['read it with hive_inbox', ran(o, 'hive_inbox').length > 0 && !!msg?.received, JSON.stringify(msg)],
         ['kept legacy.js', c.read('legacy.js') !== null, String(c.read('legacy.js'))],
@@ -1510,7 +1539,9 @@ module.exports.SCENARIOS = [
     async during(c, status) {
       if (status === 'working' && !c.sent) c.sent = await c.assistantMessage('coder', `On #${c.cards.a}: the greeting is "Welcome!", not "Hi there!".`)
       if (c.sent) c.got = await c.deliveries('coder')
-      if (c.sent && !c.sent2 && sentMessage(c)?.received) {
+      // Once it has acted on the first (HI-2261: sent as soon as the first was read, it came before there was anything to
+      // ack, and inbox.md acks only what was acted on); the fakes, which edit nothing, as soon as they have read it.
+      if (c.sent && !c.sent2 && sentMessage(c)?.received && (c.fake || c.read('greeting.txt') !== 'Hello\n')) {
         c.sent2 = await c.assistantMessage('coder', `Also on #${c.cards.a}: add a second line, "Have fun.".`)
         c.sent2At = Date.now()
       }
@@ -2351,7 +2382,9 @@ module.exports.SCENARIOS = [
         ...LANE_END.before(o, c),
         ['the decision closed each question it asked, once', closed.length > 0 && closed.every((n) => n === 1) && Number.isFinite(decided), `${JSON.stringify(c.atAnswer?.asked ?? [])} closed ${JSON.stringify(closed)}`],
         ['Hive told it of the answer, once on each card it asked on', told.length > 0 && told.every((n) => n === 1), `told ${JSON.stringify(told)}; ${keys.map((k) => history(o.cards[k]).join(' | ')).join(' || ')}`],
-        ['read the card after the decision', Number.isFinite(decided) && keys.some((k) => cardReads(o, c.cards[k]).some((t) => t > decided)), `decided ${decided}, reads ${keys.map((k) => cardReads(o, c.cards[k]).join(',')).join(' | ')}`],
+        // Or its inbox, read after it, quoting the decision whole (HI-2261: rounds.md's "their answer comes to your inbox:
+        // carry on from where you asked", and the item gives the decision's own text).
+        ['read the card after the decision', Number.isFinite(decided) && (keys.some((k) => cardReads(o, c.cards[k]).some((t) => t > decided)) || ran(o, 'hive_inbox').some((x) => Date.parse(x.at) > decided && String(x.reply ?? '').includes("The maintainer allowed the lane's commit: the hook lets it through now."))), `decided ${decided}, reads ${keys.map((k) => cardReads(o, c.cards[k]).join(',')).join(' | ')}`],
         ...LANE_END.after(o, c)
       ]
     },
@@ -2973,7 +3006,8 @@ module.exports.SCENARIOS = [
       await pairInProject(c)
       await c.card('k', { title: 'Choose the cache store', description: 'Pick Redis or SQLite for the cache, and wire it in.', agent: 'coder' })
     },
-    prompt: (c) => `Start work on card #${c.cards.k}. Before you change anything: its design isn't decided yet, so put it back in Todo for now, saying why.`,
+    // HI-2261: "Start work… Before you change anything… put it back" read as "don't start" (put back straight from Todo).
+    prompt: (c) => `Start card #${c.cards.k} with hive_start_card. Then, before you change any file, put it back in Todo, saying why: its design isn't decided yet.`,
     fake: (c) => `hive hive_start_card {"card":"#${c.cards.k}"} then hive hive_put_back {"card":"#${c.cards.k}","why":"The design isn't decided yet."}`,
     expect: (o) => {
       const back = factsOf(o, 'k', 'Moved').find((f) => f.data.to === 'todo')
@@ -4216,7 +4250,10 @@ const readOf = (t, target, facts) => {
   let file = null
   try {
     file = JSON.parse(t.input)?.file_path ?? null
-  } catch {}
+  } catch {
+    // As the harness records Claude Code's tool input (HI-2261: "file_path: C:\…", one argument a line, not JSON).
+    file = /^file_path:\s*(.+?)\s*$/m.exec(String(t.input ?? ''))?.[1] ?? null
+  }
   const path = require('path')
   return typeof file === 'string' && path.isAbsolute(file) && path.resolve(file).toLowerCase() === path.resolve(target).toLowerCase()
 }
@@ -4244,6 +4281,10 @@ module.exports.SCENARIOS.push(
     mode: 'coordinator',
     async setup(c) {
       await team(c)
+      // Reviewed by an agent, each pair's reviewer in the reviewer's role, as the prompt asks for (HI-2261: with no review
+      // and Implementer a builder, a model rightly raised the mismatch instead of starting reviewed lanes).
+      await pairInProject(c)
+      for (const [k, workflowRole] of [['coder', 'builder'], ['implementer', 'reviewer'], ['builder2', 'builder'], ['reviewer2', 'reviewer']]) await c.inv('agents:update', c.alpha, c.agents[k].id, { workflowRole })
       await c.card('a', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".' })
       await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.' })
       await c.card('c', { title: 'README: usage', description: 'README.md: a Usage section with one example of greet().' })
