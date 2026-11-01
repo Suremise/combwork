@@ -101,6 +101,7 @@
   "tasks.history.attachmentsCleaned": "{n, plural, one {# Anhang entfernt} other {# Anhänge entfernt}} ({names}): Dieses Projekt entfernt die Anhänge archivierter Karten {days, plural, one {# Tag} other {# Tage}} nach dem Archivieren (Projekteinstellungen → Speicher). {n, plural, one {Er liegt} other {Sie liegen}} im Papierkorb.",
   "tasks.history.backWithBatch": "Mit dem Stapel zurückgeholt ({label})",
   "tasks.history.blocked": "Blockiert: {reason}",
+  "tasks.history.builderReply": "Dem Reviewer geantwortet: „{text}“",
   "tasks.history.closedByDecision": "Eine Frage für dich mit deiner Entscheidung geschlossen: „{question}“",
   "tasks.history.context": "Zuerst lesen: {refs}",
   "tasks.history.contextRemoved": "Zuerst zu lesende Dokumentabschnitte entfernt",

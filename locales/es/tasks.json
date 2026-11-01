@@ -101,6 +101,7 @@
   "tasks.history.attachmentsCleaned": "{n, plural, one {Se quitó # adjunto} many {Se quitaron # adjuntos} other {Se quitaron # adjuntos}} ({names}): este proyecto quita los adjuntos de las tarjetas archivadas {days, plural, one {# día} many {# días} other {# días}} después de archivarlas (Configuración del proyecto → Almacenamiento). {n, plural, one {Está} many {Están} other {Están}} en la Papelera de reciclaje.",
   "tasks.history.backWithBatch": "Devuelta con su lote ({label})",
   "tasks.history.blocked": "Bloqueada: {reason}",
+  "tasks.history.builderReply": "Respondió al revisor: “{text}”",
   "tasks.history.closedByDecision": "Se cerró una pregunta para ti con tu decisión: “{question}”",
   "tasks.history.context": "Leer primero: {refs}",
   "tasks.history.contextRemoved": "Se quitaron las secciones de documentos para leer primero",

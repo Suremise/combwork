@@ -211,6 +211,37 @@ export function carriedOver(card: TaskCard, told: Baseline, self: string): CardM
 }
 
 /**
+ * HI-2302: a card's starting point for a watch from just after the watcher's (`self`, by its board name) own last change
+ * to it, a comment or a history entry made after `after` (ISO: its launch, so a card it touched in an earlier run doesn't
+ * fire a new watch with old news): what others did after that counts, as when PR1 asked PE-39's builder for logs, the
+ * builder answered, and PR1's watch began a minute later from the card as it was then, the answer in it. Entries in the
+ * same millisecond as that change, by others, stay new (a wake too many, never one missed). Null: no such change, or
+ * one a wake had already told it of (`told`: that wake is the later point, carriedOver's).
+ */
+export function ownCut(card: TaskCard, self: string, after: string, told?: Baseline): Baseline | null {
+  const lastOwn = <T extends { at: string; by: string }>(xs: T[]): number => xs.findLastIndex((x) => x.by === self && x.at > after)
+  const hi = lastOwn(card.history)
+  const ci = lastOwn(card.comments)
+  if (hi < 0 && ci < 0) return null
+  if (told && (hi < 0 || entryWithin(card.history, card.history[hi], told.seen.h)) && (ci < 0 || entryWithin(card.comments, card.comments[ci], told.seen.c))) return null
+  const t = [hi >= 0 ? card.history[hi].at : '', ci >= 0 ? card.comments[ci].at : ''].reduce((a, b) => (a > b ? a : b))
+  const upTo = <T extends { at: string }>(xs: T[], own: number): T[] => xs.slice(0, Math.max(own, xs.findLastIndex((x) => x.at < t)) + 1)
+  const history = upTo(card.history, hi)
+  const comments = upTo(card.comments, ci)
+  // Its column then: the last move in what it had seen (none kept: as it is now).
+  const into = history.findLast((e) => intoColumn(e.what))
+  const cut = { ...card, history, comments, column: into ? intoColumn(into.what)! : card.column }
+  // Its agent then isn't kept by id (a history line names a board name): given to someone or taken from it by another
+  // since, the agent it had is unknown (HR1's round 1 finding: the agent as it is now swallowed that reassignment), so the
+  // watch counts it; else the card's agent as it is now, unchanged since.
+  const handed = card.history.slice(history.length).some((e) => HANDS.test(e.what) && e.by !== self)
+  return { mark: { ...markOf(cut), ...(handed ? { agent: AGENT_UNKNOWN } : {}) }, seen: seenOf(cut) }
+}
+
+/** A starting mark's agent no card has (ownCut: the card was reassigned since, from an agent not known): any agent differs from it. */
+const AGENT_UNKNOWN = '?'
+
+/**
  * What changed on one card since a watch's starting point (`base`), of the kinds that count (a card gone or archived
  * always counts): its column and agent against the starting mark; comments, verdicts and moves into a column by the
  * entries after where its view ended, so none is missed for sharing a millisecond with one already seen (#224). What
@@ -248,6 +279,8 @@ export function changesSince(card: TaskCard | null, base: Baseline & { since: st
 const BLOCKED = /^Blocked: /
 /** A reviewer's request to the card's builder (#912), and a decision the user recorded, changed or removed, in a card's history. */
 const REQUEST = /^Asked the builder: /
+/** A builder's reply to its reviewer (HI-2302): counted as a loop step, its wake's kind. */
+const REPLY = /^Replied to the reviewer: /
 const DECISION = /^(Recorded a decision|Changed a decision|Removed a decision)\b/
 /** Whether a history entry is a decision recorded, changed or removed. */
 export const isDecisionEntry = (what: string): boolean => DECISION.test(what)
@@ -264,7 +297,7 @@ export const hearsHandoffs = (cond: Pick<WatchCondition, 'changes' | 'column' | 
 function handoffsIn(h: readonly { by: string; what: string }[], cond: Pick<WatchCondition, 'changes' | 'column' | 'moveInto'>, watcher?: string): WatchChange[] {
   if (!hearsHandoffs(cond)) return []
   const others = watcher ? h.filter((e) => e.by !== watcher) : h
-  return [...(others.some((e) => REQUEST.test(e.what)) ? ['request' as const] : []), ...(others.some((e) => DECISION.test(e.what)) ? ['decision' as const] : []), ...(others.some((e) => isLoopStepEntry(e.what)) ? ['step' as const] : [])]
+  return [...(others.some((e) => REQUEST.test(e.what)) ? ['request' as const] : []), ...(others.some((e) => DECISION.test(e.what)) ? ['decision' as const] : []), ...(others.some((e) => isLoopStepEntry(e.what) || REPLY.test(e.what)) ? ['step' as const] : [])]
 }
 
 /**
@@ -498,12 +531,14 @@ export function loopWakeLine(change: CardChange, kind: LoopWakeKind, text?: stri
         ? "You review this card in its loop: check it and answer with hive_loop_step (ok, or gaps saying what's missing, and its id)"
         : kind === 'stepNotice'
           ? 'Nothing to answer: carry on with your loop'
+          : kind === 'reply'
+            ? 'You review this card in its loop: carry on with your review'
           : kind === 'answer' ? 'The user answered: carry on from where you asked' : 'This is your card in its loop: carry on'
   // A reviewer's request (#912), a card loop's step (#1382) or Hive's own note (stale, an answer, what came back from the
   // merge queue and what to do next: #1354, up to NOTE_MAX): what it says, short, before what to do.
   const said = text ? [...text.replace(/\s+/g, ' ').trim()] : []
-  const max = kind === 'request' || kind === 'step' || kind === 'stepAnswer' || kind === 'stepNotice' ? REQUEST_MAX : kind === 'answer' ? ANSWER_MAX : NOTE_MAX
-  const whose = kind === 'request' ? 'The reviewer asks' : kind === 'step' || kind === 'stepNotice' ? 'The builder' : kind === 'stepAnswer' ? 'The reviewer' : 'Hive'
+  const max = kind === 'request' || kind === 'step' || kind === 'stepAnswer' || kind === 'stepNotice' || kind === 'reply' ? REQUEST_MAX : kind === 'answer' ? ANSWER_MAX : NOTE_MAX
+  const whose = kind === 'request' ? 'The reviewer asks' : kind === 'reply' ? 'The builder replies' : kind === 'step' || kind === 'stepNotice' ? 'The builder' : kind === 'stepAnswer' ? 'The reviewer' : 'Hive'
   const tail = `. ${who} (hive_read_task with latestComment for the comment in full).`
   // HI-2087: Hive's note that the merge queue returned the card leads the line, as a watch's does: its column and the
   // review's pass first made HB2 take HI-2046 for merged.
@@ -539,9 +574,9 @@ export function laneNextWords(next: { card: number; title: string; is: 'hiveStar
  * or Done, a reviewer's request mid-review (#912), a note of Hive's (a pass gone stale), or the user's answer to a request
  * (#1269: the agent waiting on it, whether or not the card is in a loop), a card loop's step (#1382: `step`, a design to
  * check, and `stepNotice`, its builder going ahead unchecked, are its reviewer's; `stepAnswer`, the reviewer's answer, its
- * builder's): the rest are its builder's.
+ * builder's; `reply`, the builder's reply to its reviewer, HI-2302, its reviewer's): the rest are its builder's.
  */
-export const LOOP_WAKE_KINDS = ['review', 'verdict', 'approved', 'done', 'request', 'note', 'answer', 'step', 'stepAnswer', 'stepNotice'] as const
+export const LOOP_WAKE_KINDS = ['review', 'verdict', 'approved', 'done', 'request', 'note', 'answer', 'step', 'stepAnswer', 'stepNotice', 'reply'] as const
 
 /**
  * A card loop's step (#1382, #1467) as its wake quotes it: what the step is, with the design or follow-up it is about

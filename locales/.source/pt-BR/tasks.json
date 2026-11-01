@@ -101,6 +101,7 @@
   "tasks.history.attachmentsCleaned": "{n, plural, one {Removed # attachment} other {Removed # attachments}} ({names}): this project removes archived cards' attachments {days, plural, one {# day} other {# days}} after archiving (Project Settings → Storage). {n, plural, one {It is} other {They are}} in the Recycle Bin.",
   "tasks.history.backWithBatch": "Brought back with its batch ({label})",
   "tasks.history.blocked": "Blocked: {reason}",
+  "tasks.history.builderReply": "Replied to the reviewer: \"{text}\"",
   "tasks.history.closedByDecision": "Closed a question for you with your decision: \"{question}\"",
   "tasks.history.context": "Read first: {refs}",
   "tasks.history.contextRemoved": "Removed the doc sections to read first",

@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { projectAgents } from '../shared/defaults'
-import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type ReviewWhere, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
+import { cardChange, carriedOver, ownCut, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type ReviewWhere, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
 import { loopReviewerOf, poolCard } from './loopReviewer'
 import { agentBusy, agentEvent, agentLimitLine, agentMarkOf, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, readSavedAgentMark, replyFirstLine, replyPart, REPLY_CHARS, type AgentEvent, type AgentMark, type AgentNow, type AgentWatchCondition, type WatchedAgent } from '../shared/agentWatch'
 import { isProjectId, type ProjectIdIndex } from '../shared/projectIds'
@@ -869,6 +869,10 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
     // After a wake, a card that wake told about starts from what it told (#224): what others changed since counts, so a
     // change that landed between the wake and this watch (a second card's verdict a second later) fires it at once.
     const told = self ? store.woke.get(agentKey(projectPath, agentId)) : undefined
+    // HI-2302: else, or when the agent acted on the card since that wake, from just after its own last change to the card
+    // in this launch (ownCut): a builder's answer to a reviewer's question, between the question and the reviewer's watch.
+    const launched = sessions.liveFor(projectPath, agentId)?.startedAt
+    let cutAny = false
     const marks: Record<string, CardMark> = {}
     const seen: Record<string, Seen> = {}
     const now: Record<string, CardMark> = {}
@@ -883,19 +887,23 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
       const role = scope === null ? null : card.agent === agentId ? 'agent' : card.review?.agent === agentId ? 'reviewer' : cond.column === 'review' ? 'awaiting' : null
       if (role) on[n] = { role }
       const mark = markOf(card)
-      const was = told?.get(String(n))
-      const base = start?.card.number === n ? start.card : card
+      const intent = start?.card.number === n
+      const base = intent ? start.card : card
+      const wakeTold = told?.get(String(n))
+      const cut = !intent && self && launched ? ownCut(card, self, launched, wakeTold) : null
+      const was = cut ?? wakeTold
       // HI-2153: a card in Done or archived never changes again: its state is the answer, never a watch. Unless the watch
       // starts from before it got there (a wake that told it elsewhere, an intent's card): that move fires it.
       if (alreadyThere(mark, cond) || (cardOver(mark) && cardOver(was ? was.mark : markOf(base)))) {
         already = cardChange(n, card, mark.archived ? 'gone' : ['column'])
         break
       }
-      marks[n] = was ? carriedOver(card, was, self!) : markOf(base)
+      if (cut) cutAny = true
+      marks[n] = cut ? cut.mark : was ? carriedOver(card, was, self!) : markOf(base)
       seen[n] = was ? was.seen : seenOf(base)
       now[n] = mark
     }
-    const from = { seen, ...(told && cond.cards.some((n) => told.has(String(n))) ? { self: self! } : {}) }
+    const from = { seen, ...((told && cond.cards.some((n) => told.has(String(n)))) || cutAny ? { self: self! } : {}) }
     const old = recordOf(store, projectPath, agentId)
     const before = store.list
     // The limit holds for what Hive writes as for what it reads: replacing an agent's watch is always allowed.

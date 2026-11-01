@@ -20,6 +20,7 @@ import { isProjectId, projectIdNamed, projectNameOf, projectNow, savedProjectNam
 import { actorOf, changeByRuntime, decisionGenerations, gatherReads, isStorageError, recordChange, recording, recordingAs, recordingByRuntime, type Planned } from './workflow/recorder'
 import { noteCard } from './assistantChanges'
 import { FactStore } from './workflow/factStore'
+import { loopReviewerOf } from './loopReviewer'
 import { gitStep } from './platform/git'
 import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
@@ -1157,6 +1158,31 @@ async function laneReviewerAsks(ws: WorkspaceService, card: TaskCard, patch: Tas
   const path = join(ws.path, card.project)
   return projectPreferences(ws, path, await ws.projectConfig(path).catch(() => null)).loopWakes
 }
+
+/** A card's arrival in Review for a round: a submission, a return for review, a follow-up handed over (HI-1832). */
+const ROUND_START = /^(Moved to (the (top|bottom) of )?Review\b|Returned for review\b|Follow-up submitted\b)/
+
+/**
+ * Whether a comment counts as its builder's reply to its reviewer (HI-2302, the other way of #1410): a plain comment (no
+ * move, no verdict) by the card's agent, on its card in Review, after the card's loop reviewer (loopReviewerOf: its
+ * lane's, or the pool's for this round) commented on it in this round, so that reviewer is woken with it (a loop wake);
+ * on PE-39 the builder's answer to a reviewer's question reached nobody. Off with the project's loop wakes. Read in the
+ * change, on the card as it is then.
+ */
+async function builderReplies(ws: WorkspaceService, card: TaskCard, patch: TaskPatch, actor: TaskActor, said: StoredText[]): Promise<boolean> {
+  const self = actor.kind === 'agent' ? actor.self : undefined
+  if (!self || !card.project || !ws.path || said.length || patch.column !== undefined || patch.review !== undefined) return false
+  if (card.archived || card.column !== 'review' || !card.agent || card.agent !== self.agentId) return false
+  const reviewer = await loopReviewerOf(ws, card)
+  if (!reviewer || reviewer.id === self.agentId) return false
+  const start = card.history.findLast((h) => ROUND_START.test(h.what))
+  if (!card.comments.some((c) => c.by.toLowerCase() === reviewer.name.toLowerCase() && (!start || c.at >= start.at))) return false
+  const path = join(ws.path, card.project)
+  return projectPreferences(ws, path, await ws.projectConfig(path).catch(() => null)).loopWakes
+}
+
+/** A builder's reply to its reviewer (HI-2302) as its history line, which watches count and the recorder wakes the reviewer with. */
+export const replyNote = (said: string): StoredText => storedText(HISTORY.builderReply, { text: clip(said) })
 
 /**
  * Whether the acting agent is the reviewer of a card it moves back from Review or Passed (HI-1832): the one reviewing it
@@ -2329,6 +2355,7 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
     // when the history that said so has been trimmed.
     if (opts.note) said.push(...opts.note.map((s) => (s.id === HISTORY.loopStep.id ? { ...s, values: { ...s.values, column: card.column } } : s)))
     else if (comment && (await laneReviewerAsks(ws, card, patch, actor, said))) said.push(requestNote(comment))
+    else if (comment && (await builderReplies(ws, card, patch, actor, said))) said.push(replyNote(comment))
     // What changed, in the history's words (English), for a caller that confirms it (the hive tools' short replies).
     opts.said?.push(...said.map(englishSaid))
     if (!said.length && !reordered && !reviewed && !comment) return card

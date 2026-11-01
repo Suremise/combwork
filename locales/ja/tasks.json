@@ -101,6 +101,7 @@
   "tasks.history.attachmentsCleaned": "{n, plural, other {#件の添付ファイルを削除しました}}（{names}）。このプロジェクトでは、アーカイブしたカードの添付ファイルをアーカイブから{days, plural, other {#日}}後に削除します（「プロジェクト設定」→「ストレージ」）。{n, plural, other {ファイル}}はごみ箱にあります。",
   "tasks.history.backWithBatch": "一括アーカイブの取り消しで復帰（{label}）",
   "tasks.history.blocked": "ブロック：{reason}",
+  "tasks.history.builderReply": "レビュアーに返信：「{text}」",
   "tasks.history.closedByDecision": "自分の決定事項で要対応の質問を閉じました：「{question}」",
   "tasks.history.context": "最初に読む：{refs}",
   "tasks.history.contextRemoved": "最初に読むドキュメントのセクションを削除しました",

@@ -101,6 +101,7 @@
   "tasks.history.attachmentsCleaned": "已删除 {n, plural, other {# 个附件}}（{names}）：本项目会在卡片归档 {days, plural, other {# 天}}后删除已归档卡片的附件（“项目设置”→“存储”）。{n, plural, other {它们}}在回收站中。",
   "tasks.history.backWithBatch": "随所在批次一起恢复（{label}）",
   "tasks.history.blocked": "受阻：{reason}",
+  "tasks.history.builderReply": "回复了评审者：“{text}”",
   "tasks.history.closedByDecision": "已用你的决定关闭一个待你处理的问题：“{question}”",
   "tasks.history.context": "先读：{refs}",
   "tasks.history.contextRemoved": "已移除先读的文档章节",

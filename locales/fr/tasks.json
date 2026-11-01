@@ -101,6 +101,7 @@
   "tasks.history.attachmentsCleaned": "{n, plural, one {# pièce jointe retirée} many {# pièces jointes retirées} other {# pièces jointes retirées}} ({names}) : ce projet retire les pièces jointes des cartes archivées {days, plural, one {# jour} many {# jours} other {# jours}} après leur archivage (Paramètres du projet → Stockage). {n, plural, one {Elle est} many {Elles sont} other {Elles sont}} dans la Corbeille.",
   "tasks.history.backWithBatch": "Restaurée avec son lot ({label})",
   "tasks.history.blocked": "Bloquée : {reason}",
+  "tasks.history.builderReply": "Répondu au relecteur : « {text} »",
   "tasks.history.closedByDecision": "Question pour toi fermée par ta décision : « {question} »",
   "tasks.history.context": "À lire d’abord : {refs}",
   "tasks.history.contextRemoved": "Sections de documents à lire d’abord retirées",

@@ -835,6 +835,90 @@ describe('watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it("started from the watcher's own last change to the card in its launch (HI-2302): a reply between its question and its watch fires it", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    // a1 reviews here; its launch began before the card's story.
+    const live = sessions.liveFor
+    let launched = new Date(Date.now() - 60_000).toISOString()
+    Object.assign(sessions, { liveFor: (p: string, id: string) => (live(p, id) ? ({ ...live(p, id), startedAt: launched } as never) : null) })
+    const asker = { kind: 'agent', name: 'Builder (alpha)' } as const
+    const other = { kind: 'agent', name: 'Reviewer (alpha)' } as const
+    const cond = (): WatchCondition => ({ cards: [c.number], changes: ['comment', 'column'] })
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    // PE-39: the question, the answer, and only then the watch.
+    await inWorkspace(w, () => tasks.commentTask(c.number, 'Please attach the logs.', asker))
+    await inWorkspace(w, () => tasks.commentTask(c.number, 'Logs attached.', other))
+    await watches.registerWatch(w, alpha, 'a1', cond())
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    expect(st.told[0]).toContain('latest comment by Reviewer (alpha): "Logs attached."')
+    // The answer after the watch began fires it, as before.
+    st.status = 'watching'
+    await inWorkspace(w, () => tasks.commentTask(c.number, 'And the screenshots?', asker))
+    await watches.registerWatch(w, alpha, 'a1', cond())
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    await inWorkspace(w, () => tasks.commentTask(c.number, 'Attached too.', other))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(2)
+    expect(st.told[1]).toContain('latest comment by Reviewer (alpha): "Attached too."')
+    // Its own change from before its launch doesn't reach back (a card no wake told it of): the watch starts from now.
+    st.status = 'watching'
+    const d = await inWorkspace(w, () => tasks.createTask({ title: 'B', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    await inWorkspace(w, () => tasks.commentTask(d.number, 'A question from an earlier launch.', asker))
+    await inWorkspace(w, () => tasks.commentTask(d.number, 'An answer from before this launch.', other))
+    launched = new Date(Date.now() + 1000).toISOString()
+    await watches.registerWatch(w, alpha, 'a1', { cards: [d.number], changes: ['comment', 'column'] })
+    await evaluated(w)
+    expect(st.typed).toHaveLength(2)
+    await watches.cancelWatch(w, alpha, 'a1')
+    Object.assign(sessions, { liveFor: live })
+    await disposeWorkspaceService(w)
+  })
+
+  it("started from the watcher's own last change, a reassignment by someone else after it still counts (HI-2302, HR1's round 1 finding)", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const live = sessions.liveFor
+    const launched = new Date(Date.now() - 60_000).toISOString()
+    Object.assign(sessions, { liveFor: (p: string, id: string) => (live(p, id) ? ({ ...live(p, id), startedAt: launched } as never) : null) })
+    const asker = { kind: 'agent', name: 'Builder (alpha)' } as const
+    const other = { kind: 'agent', name: 'Reviewer (alpha)' } as const
+    const agentWatch = (card: number): WatchCondition => ({ cards: [card], changes: ['agent'] })
+    // No wake told it of the card: its own comment, then the user takes the card from a2, then the watch.
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    await inWorkspace(w, () => tasks.commentTask(c.number, 'Please attach the logs.', asker))
+    await inWorkspace(w, () => tasks.updateTask(c.number, { agent: null }, user))
+    await watches.registerWatch(w, alpha, 'a1', agentWatch(c.number))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(1)
+    // After a wake that told it of the card (a2's): its own comment, a reassignment, then the watch.
+    st.status = 'watching'
+    const d = await inWorkspace(w, () => tasks.createTask({ title: 'B', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    await watches.registerWatch(w, alpha, 'a1', { cards: [d.number], changes: ['comment'] })
+    await inWorkspace(w, () => tasks.commentTask(d.number, 'Ready.', other))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(2)
+    st.status = 'watching'
+    await inWorkspace(w, () => tasks.commentTask(d.number, 'Please attach the logs.', asker))
+    await inWorkspace(w, () => tasks.updateTask(d.number, { agent: null }, user))
+    await watches.registerWatch(w, alpha, 'a1', agentWatch(d.number))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(3)
+    // Its own change after the reassignment: nothing new since, so nothing fires.
+    st.status = 'watching'
+    const e = await inWorkspace(w, () => tasks.createTask({ title: 'C', project: 'alpha', agent: 'a2', column: 'review' }, user))
+    await inWorkspace(w, () => tasks.updateTask(e.number, { agent: null }, user))
+    await inWorkspace(w, () => tasks.commentTask(e.number, 'Noted.', asker))
+    await watches.registerWatch(w, alpha, 'a1', agentWatch(e.number))
+    await evaluated(w)
+    expect(st.typed).toHaveLength(3)
+    await watches.cancelWatch(w, alpha, 'a1')
+    Object.assign(sessions, { liveFor: live })
+    await disposeWorkspaceService(w)
+  })
+
   it("a verdict, move and comment in one call are saved together: the builder's wake names the reviewer's comment (#138)", async () => {
     const { onHiveEvent } = await import('../src/main/events')
     const { w, alpha } = await open()
