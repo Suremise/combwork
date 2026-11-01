@@ -465,7 +465,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       }
       let source: string
       try {
-        source = hashes[`skill:${skill.name}`] = await contentHash(skill.sourcePath)
+        // The launch's settings' read of it where they had one (HI-2268: hashed again only when its files changed).
+        source = hashes[`skill:${skill.name}`] = skill.revision || (await contentHash(skill.sourcePath))
       } catch (e) {
         await fail(e)
         return

@@ -342,8 +342,8 @@ interface HiveMessageValues {
   'workflow.refused.submit.followUpNotBuilder.message': { card: string | number }
   'workflow.refused.submit.followUpNotBuilder.next': undefined
   'workflow.refused.submit.identity.change': undefined
-  'workflow.refused.submit.identity.message': { card: string | number; commit: string | number; email: string | number }
-  'workflow.refused.submit.identity.next': { command: string | number }
+  'workflow.refused.submit.identity.message': { missing: string; card: string | number; commit: string | number; email: string | number }
+  'workflow.refused.submit.identity.next': { missing: string; command: string | number }
   'workflow.refused.submit.notDuplicate.message': { card: string | number; revision: string | number }
   'workflow.refused.submit.notDuplicate.next': undefined
   'workflow.refused.submit.ownRunsStopped.change': undefined

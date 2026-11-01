@@ -436,6 +436,44 @@ describe('workflow scenarios, Git', () => {
     expect(r.next).toContain('git commit --amend --no-edit --reset-author')
   })
 
+  it("HI-2266: G12 on, git config corrected after it was turned on: commits with git's identity now pass, the saved copy's are refused naming git's", async () => {
+    // G12's saved copy is the old typo; git config (the Git tab) has the corrected identity, as the commits do.
+    const e = pair({}, { identity: { name: 'Old Typo', email: 'typo@hive.invalid' } })
+    const card = e.wf.createCard({ title: 'Identity' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const folder = s.data!.folder as string
+    commit(folder, { 'x.txt': 'x\n' }, 'old', { email: 'typo@hive.invalid' })
+    const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.identity')
+    expect(r.message).toContain('(test@hive.invalid)')
+    sh(folder, 'commit', '-q', '--amend', '--no-edit', '--reset-author')
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+  })
+
+  it('HI-2266: the guard reads git each time: an identity changed in git config between submissions is the one expected', async () => {
+    const e = pair({}, { identity: { name: 'Hive Test', email: 'test@hive.invalid' } })
+    const card = e.wf.createCard({ title: 'Identity' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    commit(s.data!.folder as string, { 'x.txt': 'x\n' }, 'as configured')
+    sh(e.project, 'config', 'user.email', 'new@hive.invalid')
+    const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.identity')
+    expect(r.message).toContain('(new@hive.invalid)')
+  })
+
+  it('HI-2266: G12 on with a saved copy, git with no identity for the project: refused as missing, never compared with the copy', async () => {
+    const e = pair({}, { identity: { name: 'Hive Test', email: 'test@hive.invalid' } })
+    const card = e.wf.createCard({ title: 'Identity' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    commit(s.data!.folder as string, { 'x.txt': 'x\n' }, 'as the copy')
+    sh(e.project, 'config', '--unset', 'user.name')
+    sh(e.project, 'config', '--unset', 'user.email')
+    const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.identity')
+    expect(r.message).toBe(`${card.key} can't be submitted: its commits must use the project's identity, and git has none set for the project.`)
+    expect(r.next).toBe("Set the project's identity in Version Control → Branches & remotes → Commit identity (or with git config user.email), then submit again.")
+  })
+
   it('S16: an agent moving a card to Done is refused with the intent; the user drags it with no merge → asked, override recorded', async () => {
     const e = pair()
     const { card } = await started(e)

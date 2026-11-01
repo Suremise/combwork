@@ -731,7 +731,13 @@ export class WorkspaceService {
     )
     const told = (rel: string): void => {
       if (rel.startsWith(`${HIVE_DIR}/shared`)) this.emit({ type: 'notes-changed' })
-      else if (rel.startsWith(`${HIVE_DIR}/skills`) || rel.startsWith(`${HIVE_DIR}/mcp`)) this.emit({ type: 'skills-changed' })
+      else if (rel.startsWith(`${HIVE_DIR}/skills`) || rel.startsWith(`${HIVE_DIR}/mcp`)) {
+        this.emit({ type: 'skills-changed' })
+        // HI-2268: running agents' "restart to apply" is worked out by the refresh (sessions' liveInfo), as a change made
+        // in the window asks for one: a skill edited, added or removed anywhere (the Skills view, an editor, an agent,
+        // a git pull) shows it. Unchanged skills cost a stat each there (revisionOf), and the refresh is debounced.
+        this.scheduleRefresh()
+      }
       else if (rel.startsWith(`${HIVE_DIR}/${MODES_DIR}`) || rel.startsWith(`${HIVE_DIR}/${LEGACY_MODES_DIR}`)) this.emit({ type: 'modes-changed' })
       else if (rel === `${HIVE_DIR}/workspace.json`) void this.reloadConfig()
     }

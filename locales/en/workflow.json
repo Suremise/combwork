@@ -1128,8 +1128,8 @@
     "description": "A move that skips rules: {rules} lists the rule names."
   },
   "workflow.refused.move.needsOverride.next": {
-    "defaultMessage": "{reader, select, you {Moving it anyway needs your reason: one you gave for it, or one you give once told which rules this skips.} other {Move it anyway only with the user's reason: one they gave for it, or one they give once told which rules this skips.}}",
-    "description": "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request or after being told which rules the move skips. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+    "defaultMessage": "{reader, select, you {Moving it anyway needs your reason: one you gave for it, or one you give once told which rules this skips.} other {Move it anyway only with the user's reason. One they gave with their request is enough (\"I merged it by hand\", say): move it again with override and that reason, in their words. With none, tell them which rules this skips and ask for theirs.}}",
+    "description": "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request (then the agent moves it at once, HI-2260) or after being told which rules the move skips. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.move.noStage.change": {
     "defaultMessage": "A project's steps follow its options in Version Control.",
@@ -1364,12 +1364,12 @@
     "description": "Where the identity rule is changed."
   },
   "workflow.refused.submit.identity.message": {
-    "defaultMessage": "{card}: commit {commit} isn't authored with the project's identity ({email}).",
-    "description": "A refused submit: a commit's author email isn't the project's. {email} is the project's email address."
+    "defaultMessage": "{missing, select, yes {{card} can't be submitted: its commits must use the project's identity, and git has none set for the project.} other {{card}: commit {commit} isn't authored with the project's identity ({email}).}}",
+    "description": "A refused submit: a commit's author email isn't the project's, as git config has it now. {missing} (select; keep the keys): yes when git has no identity (name and email) for the project at all. {commit} is a short commit id, {email} the project's email address."
   },
   "workflow.refused.submit.identity.next": {
-    "defaultMessage": "Set the identity, run {command}, then submit again.",
-    "description": "The next step after a refused submit for a commit's identity: {command} is the git command to fix it."
+    "defaultMessage": "{missing, select, yes {Set the project's identity in Version Control → Branches & remotes → Commit identity (or with {command}), then submit again.} other {Set the identity, run {command}, then submit again.}}",
+    "description": "The next step after a refused submit for a commit's identity: {command} is the git command to use (kept as typed). {missing} (select; keep the keys): yes when git has no identity for the project; Version Control → Branches & remotes → Commit identity is where Hive's window sets it (use the names Hive shows for the tab, its section and heading)."
   },
   "workflow.refused.submit.notDuplicate.message": {
     "defaultMessage": "{card} is already submitted at {revision} and waits for review or merging.",

@@ -367,11 +367,9 @@ async function setLaunch(inv, proj, agentId, values) {
   const other = Object.keys(values).filter((k) => !LAUNCH_KEYS.includes(k))
   if (other.length) throw new Error(`setLaunch: not launch values: ${other.join(', ')} (change an agent's CLI with agents:update first)`)
   const rows = (await inv('connections:list')).connectionRows
-  const ws = await inv('workspace:refresh')
-  const host = [...ws.projects, ...(ws.assistant ? [ws.assistant] : [])].find((p) => p.path.toLowerCase() === proj.toLowerCase())
-  const agent = host?.agents.find((a) => a.id === agentId)
+  const agent = savedAgents(proj).find((a) => a.id === agentId)
   const current = rows.find((c) => c.id === agent?.connection)
-  if (!current) throw new Error(`setLaunch: ${agentId} has no connection to start from`)
+  if (!current) throw new Error(`setLaunch: ${agentId} has no connection to start from (saved: ${JSON.stringify(agent ?? null)})`)
   const next = Object.fromEntries(LAUNCH_KEYS.filter((k) => current[k] !== undefined).map((k) => [k, current[k]]))
   for (const [k, v] of Object.entries(values)) {
     if (v === '' || v === null || v === undefined || v === false || v === 'inherit') delete next[k]
@@ -394,9 +392,17 @@ async function setLaunch(inv, proj, agentId, values) {
  * no project-wide launch values, only each agent's connection.
  */
 async function setProjectLaunch(inv, proj, provider, values) {
-  const ws = await inv('workspace:refresh')
-  const host = ws.projects.find((p) => p.path.toLowerCase() === proj.toLowerCase())
-  for (const a of host?.agents ?? []) if (a.provider === provider) await setLaunch(inv, proj, a.id, values)
+  for (const a of savedAgents(proj)) if (a.provider === provider) await setLaunch(inv, proj, a.id, values)
+}
+
+/**
+ * A project's agents (or the Assistant home's) as saved in its project.json, which agents:add and agents:update have
+ * written by the time they answer (HI-2249). Never a workspace:refresh: a refresh that read a project before a later
+ * write to it (the accounts migration's at a workspace's open, HI-2106) answers with the refresh before it (#999), from
+ * before an agent just added was there, or with its connection before a change.
+ */
+function savedAgents(proj) {
+  return JSON.parse(fs.readFileSync(path.join(proj, '.hive', 'project.json'), 'utf8')).agents ?? []
 }
 
 /** Makes a project's only agent (removing any others first): for suites that reuse a workspace. */
