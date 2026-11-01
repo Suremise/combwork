@@ -112,7 +112,23 @@ const BOTH = ['handover', 'pick-up', 'split-work', 'workspace-note', 'use-hive-a
   fs.appendFileSync(src, '\nEDITED FOR THIS TEST\n')
   fs.mkdirSync(path.join(ws, '.hive', 'skills', 'work-on-card', 'references'), { recursive: true })
   fs.writeFileSync(path.join(ws, '.hive', 'skills', 'work-on-card', 'references', 'board.md'), 'A reference.\n')
+  // HI-2268: the window shows it by itself (the skills folder's watch refreshes it), before anything here refreshes it.
+  const banner = page.locator('.banner.warn', { hasText: 'changed since' })
+  check("the window's restart banner shows for the edited skill, with no refresh asked for", !!(await until(async () => (await banner.count()) === 1, HUNG_MS)))
+  await page.screenshot({ path: path.join(lib.WORK, 'skilldelivery-restart-banner.png') })
   check('a running agent is marked to restart for it', !!(await until(async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'alpha').agents.find((a) => a.id === codex.id)?.restartNeeded, 10000)))
+  // Its Restart session restarts the agent it is shown for (the focused one), which then has the new version: it's gone.
+  const runs = async () => Object.fromEntries((await inv('session:live')).filter((x) => x.projectPath.toLowerCase() === proj.toLowerCase()).map((x) => [x.agentId, x.runId]))
+  const runsBefore = await runs()
+  await banner.getByRole('button', { name: 'Restart session', exact: true }).click()
+  const restarted = await until(async () => {
+    const now = await runs()
+    return [claude.id, codex.id].find((id) => now[id] && now[id] !== runsBefore[id])
+  }, HUNG_MS)
+  check("…the banner's Restart session restarts the agent it is shown for", !!restarted, JSON.stringify(runsBefore))
+  if (restarted) await ready(proj, restarted)
+  const settledAgent = async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'alpha').agents.find((a) => a.id === restarted)
+  check('…which, restarted with the new version, needs no restart: the banner is gone', !!restarted && !!(await until(async () => (await settledAgent())?.restartNeeded === false && (await banner.count()) === 0, HUNG_MS)), JSON.stringify({ restartNeeded: (await settledAgent())?.restartNeeded, banners: await banner.count() }))
   await inv('session:stop', proj, codex.id)
   await until(async () => !(await live(proj, codex.id)), HUNG_MS)
   await inv('session:start', proj, { agentId: codex.id })

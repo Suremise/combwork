@@ -54,11 +54,12 @@ const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const WRITERS = /^(Write|Edit|MultiEdit|NotebookEdit|apply_patch)$/i
 
 /**
- * Where an Agent API token was seen (HI-2259): `known` the tokens, each `{ kind, token }` (workspace, agent, assistant),
+ * Where a token was seen (HI-2259): `known` the tokens, each `{ kind, token }` (the Agent API's workspace, agent and
+ * assistant ones, and a launch's hook token: HI-2262),
  * and `seen` what the session printed or said (`tools` and `scripts`, each `{ name, result }`; `replies`, text). Each
  * sighting `{ kind, in: 'tool' | 'script' | 'reply', at, name?, excerpt }`: `at` its place in that list, `excerpt` up to
  * 80 characters before it and 40 after, every known token in it as `<kind token>`, never the token, and any other run
- * of 32 hex or more (the hook token) as `<hex>`.
+ * of 32 hex or more (a token it doesn't know) as `<hex>`.
  */
 function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
   const mask = (s) => known.reduce((x, t) => x.split(t.token).join(`<${t.kind} token>`), s)
@@ -86,6 +87,43 @@ function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
 }
 
 /**
+ * Every token a scenario's Hive issued, for scoring and masking (HI-2262, HR1's rounds 1 and 2): the workspace's
+ * (`apiToken`), then each line of its issuance record (`file`, HIVE_TEST_TOKEN_LOG: Hive appends each hook, agent and
+ * Assistant token as it makes it, before any session can hold it), so a token whose launch ended and whose files went
+ * long before the scoring is known. The record is evidence the result needs: missing, unreadable or with a line that
+ * isn't `{ kind, token }` it throws, and the scenario fails rather than scoring with tokens left out.
+ */
+function knownTokens(file, apiToken) {
+  let text
+  try {
+    text = fs.readFileSync(file, 'utf8')
+  } catch (e) {
+    throw new Error(`the token record (HIVE_TEST_TOKEN_LOG) can't be read (${e?.code ?? 'error'}): the leak check can't be scored`, { cause: e })
+  }
+  const issued = text.split(/\r?\n/).filter((l) => l.trim()).map((line, i) => {
+    let t = null
+    try {
+      t = JSON.parse(line)
+    } catch {
+      // not JSON: said below
+    }
+    if (!t || !['hook', 'agent', 'assistant'].includes(t.kind) || typeof t.token !== 'string' || !/^[0-9a-f]{32,}$/.test(t.token)) throw new Error(`the token record (HIVE_TEST_TOKEN_LOG) has a malformed line ${i + 1}: the leak check can't be scored`)
+    return { kind: t.kind, token: t.token }
+  })
+  if (typeof apiToken !== 'string' || apiToken.length < 16) throw new Error("no workspace token: the leak check can't be scored")
+  return [{ kind: 'workspace', token: apiToken }, ...issued.filter((t, i) => t.token !== apiToken && issued.findIndex((u) => u.token === t.token) === i)]
+}
+
+/** Text with every token in `tokens` as `<token>`: what a result keeps of what the session printed or said. */
+const maskTokens = (tokens, v) => tokens.reduce((x, t) => x.split(t).join('<token>'), String(v))
+
+/** What a result keeps of `observed`: each tool call's input and result 400 characters, the final reply bounded, every token in `tokens` masked. */
+function retainedObserved(observed, tokens) {
+  const short = (v) => maskTokens(tokens, v).slice(0, 400)
+  return { ...observed, tools: observed.tools.map((t) => ({ ...t, input: short(t.input), result: short(t.result) })), replies: undefined, settings: undefined, ...keptReply(maskTokens(tokens, observed.finalReply ?? '')) }
+}
+
+/**
  * What a session's transcript shows: every tool call (name, summary, input, result, error), the Hive skills it read,
  * the hive tools it names (mentions: a transcript isn't proof a call ran; the server's log is), and its last reply.
  * A skill counts as read only when the read worked and shows the skill: a Skill call for it that didn't fail, or a
@@ -94,7 +132,8 @@ function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
  * is also matched with escaped line breaks and quotes turned back into real ones.
  */
 function observeTranscript(items, skillNames, skillRefs = new Map()) {
-  const tools = items.filter((x) => x.kind === 'tool').map((x) => ({ name: x.tool.name, summary: x.tool.summary, input: String(x.tool.input ?? ''), isError: x.tool.isError, result: String(x.tool.result ?? '') }))
+  // `cwd`: the folder a command ran in, where its CLI recorded it apart from the command (a Codex Shell's, HI-2264).
+  const tools = items.filter((x) => x.kind === 'tool').map((x) => ({ name: x.tool.name, summary: x.tool.summary, input: String(x.tool.input ?? ''), isError: x.tool.isError, result: String(x.tool.result ?? ''), ...(x.tool.cwd ? { cwd: String(x.tool.cwd) } : {}) }))
   const unescaped = (text) => text.replace(/\\+r\\+n|\\+[rn]/g, '\n').replace(/\\+"/g, '"')
   const skillsRead = []
   for (const t of tools) {
@@ -386,6 +425,8 @@ async function runScenario(sc, providerKey, opts = {}) {
   const fakeHome = path.join(root, 'claude-home')
   const fakeCodexHome = path.join(root, 'codex-home')
   const mcpLog = path.join(root, 'mcp-calls.jsonl')
+  // Every token its Hive issues (HIVE_TEST_TOKEN_LOG, HI-2262): in the scenario's own folder, gone with it.
+  const tokenLog = path.join(root, 'tokens.jsonl')
   // Each change to the merge slots, with its time (HIVE_TEST_MERGE_SLOT_LOG, #374): who held one and who waited, when.
   const slotLog = path.join(root, 'merge-slots.jsonl')
   // Each state view Hive gave the Assistant at a session start (#1032), as Hive's development builds record them.
@@ -461,6 +502,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       HIVE_API_PORT: String(port),
       HIVE_TEST_TIPS: 'off',
       HIVE_TEST_MCP_LOG: mcpLog,
+      HIVE_TEST_TOKEN_LOG: tokenLog,
       HIVE_TEST_MERGE_SLOT_LOG: slotLog,
       HIVE_TEST_START_VIEW_LOG: startViewLog,
       CLAUDE_CONFIG_DIR: providerKey === 'claude-code' ? CLAUDE_TEST_HOME : fakeHome,
@@ -470,6 +512,8 @@ async function runScenario(sc, providerKey, opts = {}) {
       // Copilot in the run's own home, its profile folder faked and the GitHub CLI's login hidden (fake-copilot-api.cjs).
       ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {})
     }
+    // Its token record starts empty: a scenario's Hive appends to it (missing at the end, the run is invalid).
+    fs.writeFileSync(tokenLog, '')
     ;({ app, inv, page } = await lib.launch({ userData, env }))
   } catch (e) {
     await standIn?.close().catch(() => undefined)
@@ -945,8 +989,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Each change to the merge slots (JSON lines, as the MCP log): { at, slots: [{ project, branch, holder, waiting }] }.
     observed.slotLog = readMcpLog(slotLog)
     // Any Agent API token (the workspace's, or an agent's for this launch) in what the session printed or said.
-    const tokensIn = (dir, kind) => (fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => ({ kind, token: JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).token })) : [])
-    const known = [{ kind: 'workspace', token: apiToken }, ...tokensIn(path.join(userData, 'agent-api'), 'agent'), ...tokensIn(path.join(userData, 'assistant-api'), 'assistant')].filter((t) => typeof t.token === 'string' && t.token.length >= 16)
+    // Every one this Hive issued (its record, knownTokens), each launch's hook token among them (HI-2262, Darren's
+    // decision: HIVE_HOOK_TOKEN stays in the session's environment, so a listing of it would print that), those of
+    // launches long ended too.
+    const known = knownTokens(tokenLog, apiToken)
     const tokens = known.map((t) => t.token)
     // A script's own output too (what it printed), beside its calls'.
     const scripts = code.items.filter((x) => x.kind === 'script').map((x) => ({ name: x.tool.name, result: String(x.tool.result ?? '') }))
@@ -1005,11 +1051,9 @@ async function runScenario(sc, providerKey, opts = {}) {
     // behaviour is what's checked): in the results and the benchmark, never a pass or a failure.
     if (sc.observe) result.observations = sc.observe(observed, ctx).map(([name, value, detail]) => ({ name, value: !!value, ...(detail === undefined ? {} : { detail: String(detail).slice(0, 300) }) }))
     // Kept short in the results (whole tool calls can be large, and must not carry a token).
-    const masked = (v) => tokens.reduce((x, t) => x.split(t).join('<token>'), String(v))
-    const short = (v) => masked(v).slice(0, 400)
-    result.observed = { ...observed, tools: observed.tools.map((t) => ({ ...t, input: short(t.input), result: short(t.result) })), replies: undefined, settings: undefined, ...keptReply(masked(observed.finalReply ?? '')) }
+    result.observed = retainedObserved(observed, tokens)
     // What each of the project's agents showed at the end, for a check that failed on an agent's work (#498).
-    if (sc.waitForAgents) result.observed.panes = Object.fromEntries(await Promise.all(Object.entries(ctx.agents).map(async ([k, a]) => [k, tokens.reduce((x, t) => x.split(t).join('<token>'), plain(await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => ''))).slice(-1200)])))
+    if (sc.waitForAgents) result.observed.panes = Object.fromEntries(await Promise.all(Object.entries(ctx.agents).map(async ([k, a]) => [k, maskTokens(tokens, plain(await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => ''))).slice(-1200)])))
   } catch (e) {
     result.error = String(e?.stack ?? e)
   } finally {
@@ -1049,4 +1093,4 @@ async function runScenario(sc, providerKey, opts = {}) {
   return result
 }
 
-module.exports = { runScenario, forgetClaudeMemory, observeTranscript, tokenSightings, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }
+module.exports = { runScenario, forgetClaudeMemory, observeTranscript, tokenSightings, knownTokens, maskTokens, retainedObserved, skillRefsOf, readMcpLog, allCallsReported, sourceFingerprint, metricsTotals, measuresOf, trialEnvironment, promptRefused, promptNotTaken, relaunchTrust, keptReply, REPLY_KEPT, cliNotices, launchEnded, startFailureIn, claudeAuthStatus, parseAuthStatus, environmentAdvice, PROVIDERS, CLAUDE_TEST_HOME, claudeSignedIn }

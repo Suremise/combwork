@@ -100,7 +100,7 @@ import { agentGetsMcp, assistantMcpAdded, serverOnIn } from '../shared/agentMcp'
 import { launchEnded, leftoversOf, noteUntracked, settleLeftovers, STOPPED_BEFORE_START, trackingProblemText, trackingReady, trackLaunch, type TrackResult } from './agentProcesses'
 import type { GateWord } from './launchGate'
 import { leftoversSummary, processCount } from '../shared/agentProcesses'
-import { childEnv, killPty, refreshPty, spawnPty, startSize, writePty } from './ptyHost'
+import { childEnv, hasPty, killPty, refreshPty, spawnPty, startSize, writePty } from './ptyHost'
 import { refreshPathBeforeStart } from './freshPath'
 import { TerminalScreen } from './terminalScreen'
 import { heldLineLost } from './heldLine'
@@ -139,8 +139,12 @@ import { attachmentKind } from '../shared/attachments'
 import { replyStart } from '../shared/tiles'
 import { observer } from './platform/observe'
 import { projectPreferences } from './workflow/preferences'
+import { driveExitKeys, type ExitKeysIO } from './exitKeys'
 
 const log = createLogger('sessions')
+
+/** The statuses in which a CLI's exit key cancels a turn (or its dialog) rather than arming its exit (HI-2272). */
+const EXIT_IN_TURN: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
 
 /**
  * Hive's own words for sessions (#847, E10c of #677): errors (HiveErrors, in the window's language through IPC and in
@@ -1578,8 +1582,8 @@ class SessionManager {
       } else if (!assistant && skillFor(sk.audience, 'agent') && skillOff(sk.name, workspace.config, pc)) {
         skillsOff.push(sk.name)
       } else if (skillFor(sk.audience, assistant ? 'assistant' : 'agent')) {
-        skills.push({ name: sk.name, sourcePath: sk.path })
         skillHashes[sk.name] = await reads.revision(sk.path)
+        skills.push({ name: sk.name, sourcePath: sk.path, ...(skillHashes[sk.name] ? { revision: skillHashes[sk.name] } : {}) })
       }
     }
     // The workspace's servers on in the project (#713); the agent's own choice narrows them (#537): all of them unless
@@ -2862,7 +2866,9 @@ class SessionManager {
    * Ends a session's CLI: as a person ends it first, where the provider says how (exitKeys), so it writes what it
    * owes as it exits (Copilot's token totals, #465), and killed if it is still running after a moment. Killed at once
    * while its worktree setup runs, or when it is stopped again while ending. Keys and the kill reach only this
-   * session's terminal: a restart's new one is left alone.
+   * session's terminal: a restart's new one is left alone. Where the adapter says what its screen shows once the exit
+   * is armed, the keys go on conditions (HI-2272, exitKeys.ts): a turn under way cancelled and its end waited for, the
+   * key that exits typed once the hint shows; the kill only for one that hangs.
    */
   private endProcess(l: LiveSession): void {
     const key = this.key(l.state.projectPath, l.state.agentId)
@@ -2871,8 +2877,18 @@ class SessionManager {
     l.ending = true
     const id = liveId(l.state.projectPath, l.state.agentId)
     const same = (): boolean => this.live.get(id) === l
-    exit.keys.forEach((k, i) => setTimeout(() => same() && writePty(key, k), i * exit.gapMs))
     setTimeout(() => same() && killPty(key), exit.graceMs)
+    const armed = exit.armed
+    if (!armed) return void exit.keys.forEach((k, i) => setTimeout(() => same() && writePty(key, k), i * exit.gapMs))
+    const io: ExitKeysIO = {
+      alive: () => same() && hasPty(key),
+      inTurn: () => l.ledger?.active?.state === 'running' || EXIT_IN_TURN.has(l.state.status),
+      armed: () => armed.test(l.screen?.text() ?? ''),
+      // Checked at the write too, as the fixed beat's keys are: never into a restart's terminal.
+      press: () => void (same() && writePty(key, exit.keys[0])),
+      wait: (ms) => new Promise((r) => setTimeout(r, ms))
+    }
+    driveExitKeys(io, exit.gapMs).catch((e) => log.warn(`${userText(this.label(l.state))}: its exit keys stopped: ${(e as Error).message}`))
   }
 
   /** Stops every running agent of one provider (e.g. when the provider is turned off). */

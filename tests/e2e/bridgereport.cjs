@@ -35,7 +35,7 @@ const check = (name, ok, extra = '') => {
   })
   await new Promise((r) => server.listen(0, '127.0.0.1', r))
   const API = `http://127.0.0.1:${server.address().port}`
-  const env = lib.childEnv({ HIVE_API_URL: API, HIVE_API_TOKEN: 'test-token', HIVE_PROJECT: 'alpha' })
+  const env = lib.childEnv({ HIVE_API_URL: API, HIVE_API_TOKEN_FILE: lib.tokenFile('test-token'), HIVE_PROJECT: 'alpha' })
 
   /** Runs the bridge with `calls` tool calls, closes its input once every reply is in, and times its exit from there. */
   const run = (calls) =>

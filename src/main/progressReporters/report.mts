@@ -17,15 +17,15 @@ export interface ProgressTarget {
 /**
  * The Hive this process can report to, or null: outside Hive, without the Agent API, turned off with HIVE_PROGRESS=0,
  * or inside a command hive-progress runs (HIVE_PROGRESS_WRAPPED=1), whose run is the wrapper's: a report of its own
- * would be a second row (it prints step lines instead, `wrappedLines`). The token is the agent's own (HIVE_API_TOKEN,
- * or the file Hive keeps it in).
+ * would be a second row (it prints step lines instead, `wrappedLines`). The token is the agent's own, from the file Hive
+ * keeps it in (HIVE_API_TOKEN_FILE), never from HIVE_API_TOKEN (HI-2262: sessions no longer get it).
  */
 export function progressTarget(env: Record<string, string | undefined> = process.env): ProgressTarget | null {
   if (env.HIVE_PROGRESS === '0' || env.HIVE_PROGRESS_WRAPPED === '1') return null
   const url = env.HIVE_API_URL?.replace(/\/+$/, '')
   if (!url) return null
-  let token = env.HIVE_API_TOKEN && !env.HIVE_API_TOKEN.includes('${') ? env.HIVE_API_TOKEN : ''
-  if (!token && env.HIVE_API_TOKEN_FILE) {
+  let token = ''
+  if (env.HIVE_API_TOKEN_FILE) {
     try {
       token = String(JSON.parse(readFileSync(env.HIVE_API_TOKEN_FILE, 'utf8')).token ?? '')
     } catch {

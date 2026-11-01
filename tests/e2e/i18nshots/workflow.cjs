@@ -92,7 +92,7 @@ async function showProject(ctx, dir) {
  */
 function runCheck(ctx, agent, key) {
   const { lib } = ctx
-  const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: lib.probeDir('i18nshots-progress'), HIVE_API_URL: `http://127.0.0.1:${lib.port(47834)}`, HIVE_API_TOKEN: agent.token })
+  const env = lib.childEnv({ ELECTRON_RUN_AS_NODE: '1', HIVE_PROGRESS_DATA: lib.probeDir('i18nshots-progress'), HIVE_API_URL: `http://127.0.0.1:${lib.port(47834)}`, HIVE_API_TOKEN_FILE: lib.tokenFile(agent.token) })
   return new Promise((resolve) => {
     const p = spawn(lib.ELECTRON, [path.join(lib.ROOT, 'out', 'main', 'hive-progress.js'), '--check', 'quick', '--card', key], { env, cwd: agent.folder, windowsHide: true })
     let out = ''

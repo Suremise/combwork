@@ -69,6 +69,25 @@ export function testNotifyLog(entry: { kind: 'notification' | 'flash' | 'chime' 
 }
 
 /**
+ * A token this test copy issues (a launch's hook token, an agent's or the Assistant's Agent API token), appended to
+ * HIVE_TEST_TOKEN_LOG as `{ kind, token }` when that is set (unpackaged builds and quiet packaged ones only, as the
+ * other seams): the scenario harness's leak check knows from it every token a session could have printed, however soon
+ * its launch ended and its files went (HI-2262, HR1's rounds 1 and 2). Called where the token is made, before it is kept,
+ * written or returned. A record asked for that can't be written throws (naming no token), so nothing is issued that
+ * the record lacks; without the variable it does nothing.
+ */
+export function recordTestToken(kind: 'hook' | 'agent' | 'assistant', token: string): void {
+  const file = takesTestSeams() ? process.env.HIVE_TEST_TOKEN_LOG : undefined
+  if (!file) return
+  try {
+    appendFileSync(file, `${JSON.stringify({ kind, token })}\n`)
+  } catch (e) {
+    // i18n-ignore: a test seam's diagnostic for the test that set HIVE_TEST_TOKEN_LOG, never shown in normal use
+    throw new Error(`HIVE_TEST_TOKEN_LOG couldn't be written (${(e as NodeJS.ErrnoException)?.code ?? 'error'}): no ${kind} token issued`, { cause: e })
+  }
+}
+
+/**
  * Shows a Windows notification, or in a quiet test copy only records it. Returns whether it was shown (so a caller
  * keeps a reference only to one that was).
  */

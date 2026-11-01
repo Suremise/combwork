@@ -2621,6 +2621,16 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.105', text: '"type": "session.shutdown"', shows: "Copilot stopped by Hive, writing its token totals (session.shutdown) and exiting by itself (exit code 0)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  {
+    id: 'copilot.exit.armed',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.exit.armed.title', defaultMessage: 'Stop: exit hint', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive." }),
+    desc: msg({ id: 'settings.advanced.copilot.exit.armed.desc', defaultMessage: 'What Copilot shows after one Ctrl+C at its prompt, meaning the next one exits. When Hive stops Copilot, it presses Ctrl+C again once this shows. If it no longer matches, Hive keeps pressing Ctrl+C until Copilot exits, which takes longer.', description: 'What the advanced setting "Stop: exit hint" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'pattern',
+    default: String.raw`ctrl\+c again to exit`,
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/exit-armed-copilot-1.0.105.txt`, version: '1.0.105', text: 'ctrl+c again to exit' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   // Terminals behave the same in every pane (#737): right-click is Hive's, and this hands it to Copilot instead.
   {
     id: rightClickToCliId('copilot'),

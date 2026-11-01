@@ -299,6 +299,8 @@ interface HiveMessageValues {
   'settings.advanced.copilot.compaction.systemTokens.title': undefined
   'settings.advanced.copilot.compaction.toolTokens.desc': undefined
   'settings.advanced.copilot.compaction.toolTokens.title': undefined
+  'settings.advanced.copilot.exit.armed.desc': undefined
+  'settings.advanced.copilot.exit.armed.title': undefined
   'settings.advanced.copilot.exit.graceSeconds.desc': { took: number }
   'settings.advanced.copilot.exit.graceSeconds.title': undefined
   'settings.advanced.copilot.hooks.knownEvents.desc': undefined

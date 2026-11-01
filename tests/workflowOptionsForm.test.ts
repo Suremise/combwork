@@ -23,7 +23,7 @@ const form = await import('../src/main/workflow/optionsForm')
 const levels = await import('../src/main/workflow/levels')
 const { workflowFor } = await import('../src/main/workflow/service')
 const { checkOptions } = await import('../src/main/workflow/rulesets')
-const { allOff, contradictions, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, preset, PRESETS, setOption } = await import('../src/shared/workflow/options')
+const { allOff, contradictions, CONTRADICTION_ROWS, CONTRADICTIONS, FORM_GROUPS, FORM_OPTIONS, formShows, liveContradictions, preset, PRESETS, previewRows, setOption } = await import('../src/shared/workflow/options')
 const { settledSlotsUpToDate, settleSlotsUpToDate, SLOTS_UP_TO_DATE_STEP } = await import('../src/main/workflow/slotsUpToDateStep')
 const { boardValue } = await import('../src/main/boardStore')
 const { slotOptionsOf } = await import('../src/main/slots')
@@ -268,6 +268,17 @@ describe('the Workflow section (#1278)', () => {
     expect((await form.setWorkflowOptions(w, repo, { preset: 'pairAgent', options: rest })).origins.target).toBe('platform')
     // project:updateConfig never writes them past the check.
     await expect(form.setWorkflowOptions(w, repo, { preset: 'nope' as never, options: {} })).rejects.toThrow(/preset, options/)
+  })
+
+  it("HI-2269: G12 on with a stale saved copy, saved again with git's identity now (a preset filled from git): no change listed; turned off is one", async () => {
+    const { w, repo } = await workspace({ project: { ...allOff('git'), identity: { name: 'Old Typo', email: 'typo@example.com' } } })
+    const f = await form.workflowForm(w, repo)
+    expect(f.identity).toEqual({ name: 'Pat Builder', email: 'pat@example.com' })
+    const again = await form.checkWorkflowChange(w, repo, { preset: null, options: { ...allOff('git'), identity: f.identity } })
+    expect(again).toMatchObject({ problems: [], changed: [] })
+    expect((await form.checkWorkflowChange(w, repo, { preset: null, options: allOff('git') })).changed).toEqual(['identity'])
+    // A preset's preview filled from git: G12 isn't among what Use would change.
+    expect(previewRows({ ...allOff('git'), identity: f.identity }, f.options).changed).not.toContain('identity')
   })
 
   it("the warning lists what changes, the project's running lanes and its cards in flight; applying it to one records an Override the card then works under", async () => {

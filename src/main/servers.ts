@@ -386,15 +386,16 @@ export function assistantApiUrl(): string | null {
 }
 
 /**
- * Environment passed to an agent's session so it (and its hive tools) can reach the API: with the agent's own token
- * for this launch (agentTokens.ts), never the workspace's, so the API knows which project's agent is calling.
+ * Environment passed to an agent's session so it (and its hive tools) can reach the API: the file holding the agent's
+ * own token for this launch (agentTokens.ts), never the workspace's, so the API knows which project's agent is calling.
+ * Never the token itself (HI-2262, Darren's decision): an agent listing its environment printed it (HI-2259).
  */
 export function apiEnv(projectPath: string, agentId: string): Record<string, string> {
   const info = apiInfo()
   const token = agentToken(projectPath, agentId)
   if (!info.running || !info.url || !token) return {}
   // How long hive-progress waits for the API's answers (HI-1892: Settings → Advanced, its reply time).
-  return { HIVE_API_URL: info.url, HIVE_API_TOKEN: token, HIVE_API_TOKEN_FILE: agentTokenFile(projectPath, agentId), HIVE_PROGRESS_REPLY_SECONDS: String(advanced.number('hive.progress.replySeconds')) }
+  return { HIVE_API_URL: info.url, HIVE_API_TOKEN_FILE: agentTokenFile(projectPath, agentId),HIVE_PROGRESS_REPLY_SECONDS: String(advanced.number('hive.progress.replySeconds')) }
 }
 
 /** An open workspace by its folder path or its name. A name two open workspaces share is refused (409): use the path. */
@@ -2069,13 +2070,18 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   // A project agent registers its own lane: it is the builder.
   const builder = a ? (body?.builder !== undefined && body.builder !== '' && (await agentParam(p, body.builder)) !== a.agentId ? null : a.agentId) : await agentParam(p, body?.builder)
   if (!builder) throw new HttpError(403, "An agent starts its own lane, as its builder: a reviewer joins its builder's lane (join)")
-  // A reviewer Hive doesn't know isn't a reason to refuse: the lane starts without one, and its reviewer can join it.
+  // A reviewer Hive doesn't know isn't a reason to refuse a new lane: it starts without one, and its reviewer can join it.
+  // A running lane's start naming one is refused, naming its reviewer (HI-2273: startLane, under its lock).
   let reviewer: string | null | undefined
+  let unknownReviewer: string | undefined
   let note: string | undefined
   if (body?.reviewer === null || body?.reviewer === '') reviewer = null
   else if (body?.reviewer !== undefined) {
     reviewer = await agentParam(p, body.reviewer).catch(() => null)
-    if (!reviewer) note = `No agent "${String(body.reviewer)}" in ${basename(p)}: the lane has no reviewer until one joins it.`
+    if (!reviewer) {
+      unknownReviewer = String(body.reviewer)
+      note = `No agent "${unknownReviewer}" in ${basename(p)}: the lane has no reviewer until one joins it.`
+    }
   }
   // Reviewed by the project's reviewer pool (HI-1581, G17), the Assistant's and a script's: refused as Start Lane…
   // refuses it (the rules have no pool, nobody but the builder reviews), and with a reviewer of its own.
@@ -2098,7 +2104,7 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     }
   }
   const started = async () => {
-    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}) })
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}) })
     // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
     // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
     const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
@@ -2625,6 +2631,16 @@ async function queueLineFor(project: string, n: number): Promise<string | null> 
   }
 }
 
+/** A code card's checks and their hint (HI-2276, toolReplies' checksView), when its project's workflow rules name checks. */
+async function checksFor(project: string, n: number): Promise<{ checks: string[]; checksHint: string } | null> {
+  try {
+    const wf = await workflowFor(workspace, projectByName(project))
+    return wf?.checksOf(`#${n}`) ?? null
+  } catch {
+    return null
+  }
+}
+
 /**
  * A card's open requests as agents read them (HI-1992): each asker by its name in the card's project, as For you shows it
  * (its id once the agent is gone). `agents` as taskView's, so a listing reads each project.json once.
@@ -2714,8 +2730,10 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   const rs = cardReviewSkip(workspace, c.number)
   // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Hive merges it.
   const merge = c.project && !c.archived ? await queueLineFor(c.project, c.number) : null
+  // A code card's checks before review and how to run one (HI-2276): additive, only when its rules name some.
+  const checks = c.project && !c.archived ? await checksFor(c.project, c.number) : null
   const attachments = files.length ? files.map((a) => attachmentForAgents(a, c)) : null
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}) }
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}), ...checks }
 }
 
 /** A card attachment as agents read it (HI-1700): its path, name and size, who added it and when, and where it came. */

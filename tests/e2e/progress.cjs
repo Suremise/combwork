@@ -94,7 +94,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
 
   // Each agent's own token, from its launch environment.
   const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-  const tokenOf = (dir) => launches.filter((l) => l.cwd.toLowerCase() === dir.toLowerCase()).at(-1)?.env?.HIVE_API_TOKEN
+  const tokenOf = (dir) => launches.filter((l) => l.cwd.toLowerCase() === dir.toLowerCase()).at(-1)?.token
   const alfieToken = tokenOf(alpha)
   const bettyToken = tokenOf(beta)
   const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
@@ -585,7 +585,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   await inv('session:start', beta, { agentId: cara.id })
   await until(async () => (await live(cara.id))?.status === 'ready', 20000)
   const caraSession = (await live(cara.id))?.sessionId
-  const caraToken = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.sessionId === caraSession).at(-1)?.env?.HIVE_API_TOKEN
+  const caraToken = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.sessionId === caraSession).at(-1)?.token
   r = await call(caraToken, 'POST', '/v1/progress', { title: 'cara builds' })
   const caraRun = r.body?.id
   // The run's header (#905): the reporter's name shows whole while there is room, and a narrower panel cuts the project

@@ -3253,6 +3253,11 @@ export interface TranscriptTool {
   script?: true
   /** A command's exit code, once it has ended with one (a Codex script's command, HI-2240). */
   exitCode?: number
+  /**
+   * The folder a command ran in, when its CLI recorded one apart from the command (HI-2264): a Codex script's command's
+   * `cwd`, or the `workdir` of a direct exec_command. Absent when not recorded: it then ran in the session's folder.
+   */
+  cwd?: string
 }
 
 export interface TranscriptImageRef {

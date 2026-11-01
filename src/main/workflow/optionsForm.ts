@@ -24,7 +24,7 @@ import { englishText, linesOf, withValues, type Text } from '../../shared/advanc
 import { msg } from '../../shared/i18n/msg'
 import { tr } from '../../shared/i18n'
 import { MERGE_ANSWER, OPTION_TEXT, VALUE_TEXT } from '../../shared/workflow/optionTexts'
-import { allOff, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import type { PlatformId } from '../../shared/platform/descriptors'
@@ -224,7 +224,8 @@ function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<W
   const was = before.problems.length ? resolveOptions(platform, levelsOf(ws, current)).options : before.resolved.options
   // Every key either has: an optional option (the names, N5) set before and gone now is a change too.
   const keys = [...new Set([...Object.keys(after.resolved.options), ...Object.keys(was)])] as (keyof WorkflowOptions)[]
-  const changed = keys.filter((k) => JSON.stringify(after.resolved.options[k]) !== JSON.stringify(was[k]))
+  // G12 by on or off (HI-2269): its saved copy refreshed from git is no change.
+  const changed = keys.filter((k) => !sameOptionValue(k, after.resolved.options[k], was[k]))
   return { problems: after.problems, changed, options: after.resolved.options }
 }
 

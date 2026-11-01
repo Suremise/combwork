@@ -205,6 +205,9 @@ describe('Copilot launch', () => {
     expect((exit.keys.length - 1) * exit.gapMs).toBeLessThan(exit.graceMs)
     // Killed only if it hangs: it took up to 2.4 s to exit by itself under load, and 2.5 s killed it (#716).
     expect(exit.graceMs).toBeGreaterThanOrEqual(10_000)
+    // Stop types them on conditions (HI-2272): the key that exits once its screen shows the exit armed.
+    expect(exit.armed.test(readFileSync(join(__dirname, 'fixtures', 'advanced', 'exit-armed-copilot-1.0.105.txt'), 'utf8'))).toBe(true)
+    expect(exit.armed.test(readFileSync(join(__dirname, 'fixtures', 'advanced', 'ready-copilot-1.0.95.txt'), 'utf8'))).toBe(false)
     // Quitting Hive or closing a workspace (stopWhereAndWait, 3 s) waits past the grace, for the kill and its exit.
     const { stopWaitMs } = await import('../src/main/sessions')
     expect(stopWaitMs(3000, [exit.graceMs])).toBeGreaterThan(exit.graceMs)

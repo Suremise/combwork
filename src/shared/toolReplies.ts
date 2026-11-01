@@ -105,6 +105,24 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   attachments?: { path: string; name: string; size: number; by: string; at: string; from: string; missing?: true }[]
   /** Its 1.0 stage (#1223): `column` is the stage's category. Last, after the card's own fields. */
   stage: StageId
+  /**
+   * A code card's checks before review, by its own rules (HI-2276): their names, as data. Absent where its rules name
+   * none, or once it is past review; `checksHint` then too.
+   */
+  checks?: string[]
+  /** With `checks`: how to run one as that check of the card, a fixed line with `<name>` (`checksView`). */
+  checksHint?: string
+}
+
+/**
+ * The checks a code card's rules name before review and how to run one (HI-2276): the names as data and a fixed hint
+ * with a `<name>` placeholder, never a shell command built from a configured name (free text: quoting it for every
+ * shell kept failing, HR1's rounds 1 and 2). The rule for running them stays in work-on-card. `card` is its key;
+ * `isolated`: its platform can make a check copy.
+ */
+export function checksView(names: readonly string[], card: string, isolated: boolean): { checks: string[]; checksHint: string } | null {
+  if (!names.length) return null
+  return { checks: [...names], checksHint: `before review: run one with hive-progress --check <name> --card "${card}"${isolated ? " (--isolated: in a check copy at the card's revision; work-on-card)" : ' (work-on-card)'}` }
 }
 
 /** A card in a listing (GET /v1/tasks?view=short): what it is and where it stands, without its text. */

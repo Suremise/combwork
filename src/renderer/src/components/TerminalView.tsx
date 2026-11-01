@@ -605,7 +605,8 @@ export function TerminalView({
     })
     // Until the window fits it, the terminal is its process's size, not xterm's 80 × 24: the process draws at its own
     // size, and output drawn into a smaller terminal (a CLI's first screens, or all of it while hidden) lands in the
-    // wrong places, which its redraw at the fit doesn't always clear (#486).
+    // wrong places, which its redraw at the fit doesn't always clear (#486). Asked as the view is made, which is often
+    // before its process is spawned: then the size that process starts at (HI-2250).
     let fitted = false
     void call('pty:size', ptyKey).then((size) => {
       if (size && !fitted && !signal.aborted && (size.cols !== term.cols || size.rows !== term.rows)) term.resize(size.cols, size.rows)

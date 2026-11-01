@@ -58,11 +58,11 @@ const REPLY_SECONDS = envSeconds('HIVE_REPLY_SECONDS', REPLY_MS / 1000)
 const CARD_WAIT_MAX = envSeconds('HIVE_WAIT_MAX_SECONDS', WAIT_MAX_SECONDS)
 const AGENT_WAIT_MAX = envSeconds('HIVE_AGENT_WAIT_MAX_SECONDS', AGENT_WAIT_MAX_SECONDS)
 
+/**
+ * The token from its file, never from HIVE_API_TOKEN (HI-2262: sessions no longer get it; one a CLI hands on from
+ * elsewhere would be another caller's, and for the Assistant the Agent API's, so Hive would take it for someone else).
+ */
 function token(): string {
-  const t = process.env.HIVE_API_TOKEN
-  // The Assistant uses its own token (from its file): HIVE_API_TOKEN, which a CLI hands on from its own
-  // environment, would be the Agent API's, and Hive would take its calls for an ordinary caller's.
-  if (t && !t.includes('${') && !ASSISTANT) return t
   try {
     const file = process.env.HIVE_API_TOKEN_FILE
     if (file) return JSON.parse(readFileSync(file, 'utf8')).token ?? ''

@@ -313,7 +313,7 @@ const check = (name, ok, extra = '') => {
   // The cards by key, as the window names them (#1221).
   const [cardName, reviewedName] = [await lib.cardLabel(inv, card), await lib.cardLabel(inv, reviewed)]
   const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-  const idleToken = launches().filter((l) => l.sessionId === before.i).at(-1)?.env?.HIVE_API_TOKEN
+  const idleToken = launches().filter((l) => l.sessionId === before.i).at(-1)?.token
   const startReview = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${reviewed}`, { method: 'PATCH', headers: { Authorization: `Bearer ${idleToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ review: 'start' }) })
   check('Idle starts reviewing a card', !!idleToken && startReview.status === 200, `${!!idleToken} ${startReview.status}`)
   await until(async () => (await lib.paneHeader(page, 'Idle').innerText().catch(() => '')).includes(reviewedName), HUNG_MS)

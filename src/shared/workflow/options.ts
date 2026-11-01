@@ -512,10 +512,27 @@ export const PREVIEW_OPTIONS: Record<PlatformId, OptionKey[]> = {
   none: FORM_GROUPS.none.flatMap((g) => g.options).filter((k) => !NOT_CUSTOM.includes(k) || PRESET_PREFERENCES.includes(k))
 }
 
+/**
+ * Whether an option's two values are the same. G12 is on or off (HI-2266: Hive reads the identity from git each time; a
+ * saved `{ name, email }` only means on), so two identities are the same when both are on or both off: a saved copy that
+ * differs from git's now is no change (HI-2269).
+ */
+export function sameOptionValue(key: keyof WorkflowOptions, a: unknown, b: unknown): boolean {
+  return key === 'identity' ? !!a === !!b : JSON.stringify(a) === JSON.stringify(b)
+}
+
+/**
+ * G12's value as the window shows it (HI-2269): off, or on as the project's identity from git now (`live`), never a saved
+ * copy that may be stale; on with none in git, just on (`true`, shown as On).
+ */
+export function identityShown(v: unknown, live: { name: string; email: string } | null | undefined): { name: string; email: string } | true | null {
+  return v ? (live ? { name: live.name, email: live.email } : true) : null
+}
+
 /** A choice's preview (its options) against the options in force: the rows it shows, and those Use would change. */
 export function previewRows(options: WorkflowOptions, effective: WorkflowOptions): { keys: OptionKey[]; changed: OptionKey[] } {
   const keys = PREVIEW_OPTIONS[options.platform].filter((k) => formShows(k, options))
-  return { keys, changed: keys.filter((k) => JSON.stringify(options[k]) !== JSON.stringify(effective[k])) }
+  return { keys, changed: keys.filter((k) => !sameOptionValue(k, options[k], effective[k])) }
 }
 
 /**

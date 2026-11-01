@@ -140,6 +140,22 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     check('…its identity gitb’s own, never gita’s', saved().identity?.email === 'b@example.com', JSON.stringify(saved().identity))
     check('…and the banner goes', !!(await until(async () => (await banner.count()) === 0)))
 
+    // --- HI-2269: gitb's identity corrected in git after G12 was saved on: loading Team A (G12 on) again changes nothing
+    // of G12, and never shows the saved copy as its value now.
+    lib.git(gitb, ['config', 'user.name', 'B Fixed'])
+    lib.git(gitb, ['config', 'user.email', 'b.fixed@example.com'])
+    await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
+    await templatesMenu('Team A')
+    const reload = loadDialog('Team A')
+    const reloadPart = reload.locator('[data-template-workflow="git"]')
+    await until(async () => (await reloadPart.locator('[data-workflow-changes]').count()) === 1)
+    check("HI-2269: G12 on already, its saved copy stale: not among what loading changes, the saved copy's email nowhere", (await reloadPart.locator('li[data-option="identity"]').count()) === 0 && !(await text(reload)).includes('b@example.com'), await text(reload))
+    await shoot('3b-identity-stale', () => reload)
+    await reload.getByRole('button', { name: 'Cancel' }).click()
+    await until(async () => (await reload.count()) === 0)
+    lib.git(gitb, ['config', 'user.name', 'B Person'])
+    lib.git(gitb, ['config', 'user.email', 'b@example.com'])
+
     // --- Saved again from plain (None): its None section added, Git's kept and said so; loaded into plain, None's used.
     await select('plain')
     await saveAs('Team A', { replace: true })

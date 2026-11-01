@@ -250,6 +250,10 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const viaApi = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', builder: 'B1', reviewer: 'R1', cards: [f1] }) })
     const apiLane = await viaApi.json().catch(() => null)
     check('a lane recorded through POST /v1/lanes over B1, running and idle', viaApi.status === 200, JSON.stringify(apiLane))
+    // HI-2273: started again naming a reviewer that is no agent: refused, naming its reviewer, which it keeps.
+    const guessed = await fetch(`http://127.0.0.1:${PORT}/v1/lanes`, { method: 'POST', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ project: 'alpha', builder: 'B1', reviewer: 'Reviewer', cards: [f1] }) })
+    const guessedBody = await guessed.json().catch(() => null)
+    check("HI-2273: its start again naming a reviewer that is no agent is refused, naming R1, which it keeps", guessed.status === 404 && /No agent "Reviewer" in alpha; this lane's reviewer is R1/.test(guessedBody?.error ?? '') && (await lanes()).find((l) => l.id === apiLane?.lane?.id)?.reviewer?.id === r1.id, JSON.stringify({ status: guessed.status, guessedBody }))
     // B1's slot is d2's (in Review): the lane says why its card waits, never "active" with nothing said.
     const apiLaneNow = async () => (await lanes()).find((l) => l.builder.id === b1.id && l.cards.some((x) => x.number === f1))
     const waits = await until(async () => (await apiLaneNow())?.status ?? null, HUNG_MS)

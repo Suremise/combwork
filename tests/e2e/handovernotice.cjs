@@ -90,6 +90,20 @@ const check = (name, ok, extra = '') => {
     const make = async (title, column, agent) => (await inv('tasks:create', { title, project: 'alpha', column, agent })).number
     const lanes = async () => inv('lanes:list')
     /**
+     * A lane started through the Agent API for an idle builder outside slots, which Hive gives it in a new conversation
+     * whose first turn is the lane's brief (HI-2232). Quiet first (idle, nothing of Hive's being typed into it or waiting
+     * to be), so it is renewed at once, never left as it is mid-turn nor owed; then `renewed` once its new conversation is
+     * quiet again, before the suite types into it (HI-2251).
+     */
+    const quiet = async (a) => lib.agentQuiet(PORT, 'alpha', await live(a.id), workspaceToken)
+    const laneOf = async (a, body) => {
+      if (!(await lib.until(() => quiet(a), HUNG_MS, 200))) return { status: 0, body: `${a.name} wasn't quiet before its lane`, renewed: false, now: JSON.stringify(await live(a.id)) }
+      const before = (await live(a.id))?.sessionId
+      const r = await api(workspaceToken, 'POST', '/v1/lanes', body)
+      const renewed = !!(await lib.until(async () => (await live(a.id))?.sessionId !== before && (await quiet(a)), HUNG_MS, 200))
+      return { ...r, renewed, now: JSON.stringify(await live(a.id)) }
+    }
+    /**
      * Crosses the limit while idle (HI-1670): the transcript grows during the fake's turn, and Hive's 5-second look could
      * make the notice then (working: no button). So the limit is off (Never) while it pads, and back at 1 MB once its turn
      * is over: the next look makes the notice, the agent idle.
@@ -146,8 +160,9 @@ const check = (name, ok, extra = '') => {
 
     // --- On a running lane, idle: nothing to click either.
     const n1 = await make('Lane card', 'review', builder.id)
-    const started = await api(workspaceToken, 'POST', '/v1/lanes', { project: 'alpha', builder: 'Builder', reviewer: 'Reviewer', name: 'notice lane', cards: [n1] })
+    const started = await laneOf(builder, { project: 'alpha', builder: 'Builder', reviewer: 'Reviewer', name: 'notice lane', cards: [n1] })
     check('a lane starts', started.status === 200 && !!(await lib.until(async () => (await lanes()).some((l) => l.name === 'notice lane'), HUNG_MS, 200)), JSON.stringify(started))
+    check('…its builder in a new conversation, done with its brief', started.renewed, started.now)
     check('its builder crosses the limit, idle', !!(await pad(builder)))
     const laneToast = toastOf('Builder')
     check('in a lane: the notice says so', !!(await lib.until(async () => (await laneToast.count()) === 1, HUNG_MS, 200)))
@@ -159,8 +174,10 @@ const check = (name, ok, extra = '') => {
     const stale = toastOf('Stale')
     check('…and its notice offers Hand Over to…', !!(await lib.until(async () => (await stale.getByRole('button', { name: 'Hand Over to…' }).count()) === 1, HUNG_MS, 200)))
     const n2 = await make('Stale lane card', 'review', staleAgent.id)
-    const staleLane = await api(workspaceToken, 'POST', '/v1/lanes', { project: 'alpha', builder: 'Stale', reviewer: 'Checker', name: 'stale lane', cards: [n2] })
+    const staleLane = await laneOf(staleAgent, { project: 'alpha', builder: 'Stale', reviewer: 'Checker', name: 'stale lane', cards: [n2] })
     check('Stale joins a lane, its card in Review', staleLane.status === 200 && !!(await lib.until(async () => (await lanes()).some((l) => l.name === 'stale lane'), HUNG_MS, 200)), JSON.stringify(staleLane))
+    // Its old notice is its last conversation's: the new one is the lane's (HI-2232).
+    check('…in a new conversation, done with its brief', staleLane.renewed, staleLane.now)
     const staleSession = (await live(staleAgent.id)).sessionId
     await stale.getByRole('button', { name: 'Hand Over to…' }).click()
     check('the old notice, clicked now: no dialog, a notice that it is busy', !!(await lib.until(async () => (await page.locator('.toast', { hasText: 'Stale is busy' }).count()) === 1, HUNG_MS, 200)) && (await dialog.count()) === 0 && (await live(staleAgent.id))?.sessionId === staleSession)
@@ -178,7 +195,7 @@ const check = (name, ok, extra = '') => {
     // The merge slot taken while it writes its handover: not ended.
     const idleSession = (await live(idle.id)).sessionId
     const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-    const token = launches().find((l) => l.sessionId === idleSession)?.env?.HIVE_API_TOKEN
+    const token = launches().find((l) => l.sessionId === idleSession)?.token
     const slotRun = handOverSelf(idle)
     check('Hive asks Idle for a handover', !!(await asked(idle)) && (await writing('Idle').count()) > 0)
     const claim = await api(token, 'POST', '/v1/projects/alpha/merge-slot/claim', { cards: [], timeoutSeconds: 0 })

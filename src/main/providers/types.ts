@@ -9,6 +9,12 @@ import type { HookListing } from '../../shared/hooks'
 export interface LaunchSkill {
   name: string
   sourcePath: string
+  /**
+   * The source's content hash as the launch's settings read it (HI-2268: revisions.ts's, hashed again only when its
+   * files' sizes or times changed), so agents launched in a row hash an unchanged skill once. Absent (or empty: it
+   * couldn't be read then), the adapter hashes the source itself.
+   */
+  revision?: string
 }
 
 /**
@@ -660,9 +666,11 @@ export interface ProviderAdapter {
   /**
    * How Hive ends the CLI as a person would, for CLIs that write what Hive reads only as they exit (Copilot's token
    * totals, #465): the keys it types, one every gapMs, before killing the CLI if it is still running after graceMs.
-   * Without it, Stop kills the process.
+   * Without it, Stop kills the process. `armed` (HI-2272): what its screen shows once a first key at its prompt has
+   * armed the next to exit. With it, Stop types the first key on conditions rather than at a fixed beat (exitKeys.ts):
+   * a turn under way is cancelled first and its end waited for, and the key that exits is typed once this shows.
    */
-  readonly exitKeys?: { keys: string[]; gapMs: number; graceMs: number }
+  readonly exitKeys?: { keys: string[]; gapMs: number; graceMs: number; armed?: RegExp }
   /**
    * The command a person types to end the CLI (Claude Code's /exit, Codex's /quit), which Hive types, then Enter, at a
    * lane's end once its builder's turn is over (HI-1706, sessions.quit), killing it if it is still running after graceMs.

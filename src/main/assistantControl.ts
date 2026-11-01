@@ -11,6 +11,7 @@ import { config } from './config'
 import { emit } from './events'
 import { hashText, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
+import { recordTestToken } from './testQuiet'
 
 /**
  * What the Hive Assistant may do through the Agent API, and what it did. Each workspace's Assistant gets its own
@@ -64,7 +65,9 @@ export function assistantTokenFile(workspacePath: string): string {
 /** A new token for the Assistant's next launch in this workspace; the previous one stops working. */
 export async function newAssistantToken(workspacePath: string): Promise<void> {
   const s = stateOf(workspacePath)
-  s.token = randomBytes(32).toString('hex')
+  const token = randomBytes(32).toString('hex')
+  recordTestToken('assistant', token)
+  s.token = token
   const file = assistantTokenFile(workspacePath)
   await mkdir(dirname(file), { recursive: true })
   // i18n-ignore: the token file is the Assistant's to read, not the window's

@@ -30,7 +30,7 @@ function fakeBuild(api) {
   const src = `import { recordDist } from ${JSON.stringify(pathToFileURL(path.join(lib.ROOT, 'scripts', 'buildFact.mjs')).href)}
 const line = await recordDist({ root: ${JSON.stringify(repo)}, lines: [${JSON.stringify(`Installer: ${path.join(repo, 'dist', 'Hive-Setup-9.9.9-rc.1.exe')}`)}], kind: 'baseline' })
 console.log(line ?? 'nothing recorded')`
-  const env = { ...lib.baseEnv(), HIVE_WORKSPACE: ws, ...(api ? { HIVE_API_URL: api.url, HIVE_API_TOKEN: api.token } : {}) }
+  const env = { ...lib.baseEnv(), HIVE_WORKSPACE: ws, ...(api ? { HIVE_API_URL: api.url, HIVE_API_TOKEN_FILE: lib.tokenFile(api.token) } : {}) }
   return execFileSync(process.execPath, ['--input-type=module', '-e', src], { cwd: lib.ROOT, env, encoding: 'utf8' }).trim()
 }
 const head = () => lib.git(repo, ['rev-parse', 'HEAD']).trim()

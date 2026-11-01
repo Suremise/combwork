@@ -302,7 +302,16 @@ function runMode() {
 // Agent API token Hive gave it.
 // A server connection's (HI-1772): its ANTHROPIC_* variables too, a dummy key among them (a disposable test log).
 const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('ANTHROPIC_') || k.startsWith('HIVE_API_TOKEN') || k === 'HIVE_AGENT' || k === 'CLAUDE_CONFIG_DIR'))
-fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv }) + '\n')
+// The agent's own token, as its launch's file held it at the start (HI-2262: the session has the file, never the token
+// in its environment; read now, as the file goes when the run ends). Null without one.
+const launchToken = (() => {
+  try {
+    return process.env.HIVE_API_TOKEN_FILE ? (JSON.parse(fs.readFileSync(process.env.HIVE_API_TOKEN_FILE, 'utf8')).token ?? null) : null
+  } catch {
+    return null
+  }
+})()
+fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv, token: launchToken }) + '\n')
 // In a connection's folder (HI-1870: its Set Up, or an agent's first launch there): its first-run screens answered at
 // once, as Claude Code records them in the folder's .claude.json (tests/fixtures/advanced/onboarding-claude-2.1.311.jsonl).
 if (accountFolder) {

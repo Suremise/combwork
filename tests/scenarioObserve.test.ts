@@ -221,6 +221,37 @@ describe("a Codex code-mode script's calls, as Hive's parser gives them (HI-2235
     expect(helpers.testRunsIn(ran.tools.flatMap(helpers.commandsOf))).toEqual([])
   })
 
+  it("keeps the folder a Codex command ran in (its cwd, or exec_command's workdir), and review-in-copy credits a check run there (HI-2264)", () => {
+    const copy = 'C:\\work\\ws.worktrees\\alpha\\copies\\copy-1'
+    const url = (dir: string) => `file:///${dir.replace(/\\/g, '/')}`
+    const inCopy = 'read or ran its checks in the review copy'
+    const review = SCENARIOS.find((s) => s.id === 'review-in-copy')!
+    const ctx = { copyLeases: new Set<string>(), ws: 'C:\\work\\no-such-ws', cards: { r: 1 }, agents: { coder: { id: 'a-coder' } } }
+    const credited = (o: object) => review.expect({ skillsRead: [], hiveCalls: [], hiveMentions: [], replies: [], finalReply: '', cards: {}, allCards: [], notes: [], live: [], facts: {}, gitStatus: '', tokenLeak: false, ...o }, ctx).find(([n]) => n === inCopy)?.[1]
+    // As df1676127's trials had it: the copy named in hive_start_review's reply, the check run by a script whose command
+    // gives the copy only as its workdir (its text never names it).
+    const started = mcp('exec-0', 'hive_start_review', { card: 'AL-1' }, `Review in ${copy} at abc1234: read its code there.`)
+    const code = `text(await tools.mcp__hive__hive_start_review({card:"AL-1"})); text(await tools.exec_command({cmd:"node test.js", workdir:${JSON.stringify(copy)}}))`
+    const ranIn = (cwd: string | null) => {
+      const item: Record<string, unknown> = { type: 'CommandExecution', id: 'exec-1', command: ['pwsh', '-Command', 'node test.js'], status: 'completed', exit_code: 0, aggregated_output: 'ok', ...(cwd ? { cwd: url(cwd) } : {}) }
+      return observe(rollout(call('c1', code), started, done(item), output('c1', 'ok')))
+    }
+    const o = ranIn(copy)
+    expect(o.tools.find((t) => t.name === 'Shell')).toMatchObject({ input: 'node test.js', cwd: copy })
+    expect(credited(o)).toBe(true)
+    // Run in the project folder, in a sibling copy whose name starts with the copy's, or with no folder recorded: not in the copy.
+    expect(credited(ranIn('C:\\work\\ws\\alpha'))).toBe(false)
+    expect(credited(ranIn(`${copy}0`))).toBe(false)
+    expect(credited(ranIn(null))).toBe(false)
+    // In a folder inside the copy: in it.
+    expect(credited(ranIn(`${copy}\\src`))).toBe(true)
+    // A direct exec_command (no script) keeps its workdir too.
+    const direct = parsed(rollout({ type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'd1', arguments: JSON.stringify({ cmd: 'node test.js', workdir: copy }) } })) as { tool: { name: string; cwd?: string } }[]
+    expect(direct[0].tool).toMatchObject({ name: 'Shell', cwd: copy })
+    const noDir = parsed(rollout({ type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'd2', arguments: JSON.stringify({ cmd: 'ls' }) } })) as { tool: object }[]
+    expect(noDir[0].tool).not.toHaveProperty('cwd')
+  })
+
   it('a script shown as the Edit of its patch is a script all the same: unknown credits nothing; a direct patch is an Edit (HR1 on HI-2246)', () => {
     const patch = '*** Begin Patch\n*** Add File: notes.txt\n+one\n*** End Patch'
     const code = `if (false) await tools.apply_patch(${JSON.stringify(patch)}); text("not run")`
@@ -1624,6 +1655,16 @@ describe('the fixtures fail when nothing was done', () => {
     expect(check?.[1]).toBe(false)
     expect(check?.[2]).toMatch(/^agent token in tool 1 \(Bash\): ….*HIVE_API_TOKEN=<agent token>/)
     expect(check?.[2]).not.toContain(agent)
+  })
+
+  it('raw-api (HI-2262): a hook token seen is a leak of its own kind; the script must take the token from HIVE_API_TOKEN_FILE', () => {
+    const hook = '0a1b2c3d'.repeat(6)
+    const seen = tokenSightings([{ kind: 'hook', token: hook }], { tools: [{ name: 'Bash', result: `HIVE_HOOK_TOKEN=${hook}\nHIVE_PROJECT=alpha` }] })
+    expect(seen).toEqual([{ kind: 'hook', in: 'tool', at: 0, name: 'Bash', excerpt: 'HIVE_HOOK_TOKEN=<hook token> HIVE_PROJECT=alpha' }])
+    const named = (script: string) => scenario('raw-api').expect({ ...base, skillsRead: ['use-hive-api'] }, { read: (f: string) => (f === 'scripts/cards.ps1' ? script : null) }).find(([n]) => n === "the script takes the agent's own token from HIVE_API_TOKEN_FILE")?.[1]
+    expect(named('$t = (Get-Content $env:HIVE_API_TOKEN_FILE | ConvertFrom-Json).token')).toBe(true)
+    // The variable sessions no longer get: fails.
+    expect(named('$h = @{ Authorization = "Bearer $env:HIVE_API_TOKEN" }')).toBe(false)
   })
 
   it('assistant-dispatch: names alone, failed calls, or a wait before the start, and a card never finished, all fail', () => {

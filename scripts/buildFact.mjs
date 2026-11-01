@@ -52,14 +52,14 @@ export function workspaceOf(root, env = process.env) {
   }
 }
 
-/** The token a session's hive tools use: its token file's (it changes each launch), else HIVE_API_TOKEN. */
+/** The token a session's hive tools use: its token file's (it changes each launch), never HIVE_API_TOKEN (HI-2262). */
 function tokenOf(env) {
   try {
     if (env.HIVE_API_TOKEN_FILE) return JSON.parse(readFileSync(env.HIVE_API_TOKEN_FILE, 'utf8')).token || null
   } catch {
     // fall through
   }
-  return env.HIVE_API_TOKEN && !env.HIVE_API_TOKEN.includes('${') ? env.HIVE_API_TOKEN : null
+  return null
 }
 
 /**

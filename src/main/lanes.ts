@@ -775,6 +775,11 @@ export interface StartLane {
   /** The builder's and reviewer's agent ids (reviewer null: none yet; undefined: keep a running lane's). */
   builder: string
   reviewer?: string | null
+  /**
+   * The reviewer the caller named that is no agent of the project (`reviewer` null): a new lane starts without one, but a
+   * running lane's start is refused, naming its reviewer, never left without it (HI-2273).
+   */
+  unknownReviewer?: string
   /** Reviewed by the project's reviewer pool (#1443), with `reviewer` null; undefined: a running lane keeps what it has. */
   pool?: boolean
   cards: number[]
@@ -954,6 +959,15 @@ export function refuseWhileTeamPaused(ws: WorkspaceService): void {
   if (teamPauseOf(ws)) throw new LaneError(409, M.teamPaused)
 }
 
+/**
+ * HI-2273: a start for the builder's running lane naming a reviewer that is no agent of the project, refused with the
+ * lane's reviewer (a builder guessing a name dropped its lane's, and its failed round went unwatched).
+ */
+function unknownReviewerRefusal(name: string, project: string, lane: LaneRecord): never {
+  const has = lane.reviewer ? `this lane's reviewer is ${lane.reviewer.name}: leave reviewer out to keep it` : lane.pool ? "this lane is reviewed by the project's reviewer pool: leave reviewer out" : `this lane has no reviewer yet: leave reviewer out, or name an agent of ${project}` // i18n-ignore: hive_lane's refusal (agents)
+  throw new LaneError(404, `No agent "${name}" in ${project}; ${has}.`) // i18n-ignore: hive_lane's refusal (agents)
+}
+
 export async function startLane(ws: WorkspaceService, s: StartLane): Promise<LaneChange> {
   refuseWhileTeamPaused(ws)
   const builder = await agentIn(ws, s.project, s.builder)
@@ -975,7 +989,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const scope = s.ownBuilder ? s.project : null
   // A changed list applied now (HI-1995): its card in flight put back first; the edit below then applies the list at
   // once (between cards), bound to that lane.
-  const put = s.applyNow && on ? await putBackForReorder(ws, s, builder) : null
+  // HI-2273: never with a reviewer that is no agent: a running lane's start is then refused (under the lock below), and a
+  // new lane has nothing to put back, so whatever lane a start meanwhile makes, nothing is put back before the refusal.
+  const put = s.applyNow && on && s.unknownReviewer === undefined ? await putBackForReorder(ws, s, builder) : null
   const ruleset = await rulesetNow(ws, s.project)
   const ended: EndedLane[] = []
   let queuedAfter: number | null = null
@@ -997,6 +1013,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     if (put && (!bound || !running(bound))) throw new LaneError(409, `${put.putBack} was put back in Todo (its work stays on its branch), but the lane was ended meanwhile: its list wasn't changed and nothing was started. hive_lane list shows the lanes.`) // i18n-ignore: hive_lane's refusal (agents)
     if (put && bound && (!sameList(bound.cards, put.cards) || !sameList(bound.pending ?? [], put.pending ?? []))) throw new LaneError(409, `${put.putBack} was put back in Todo (its work stays on its branch), but the lane's list changed meanwhile: this list wasn't applied. hive_lane list shows it now.`) // i18n-ignore: hive_lane's refusal (agents)
     const was = bound ?? lanes.find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
+    if (was && s.unknownReviewer !== undefined) unknownReviewerRefusal(s.unknownReviewer, s.project, was)
     // A new card placed on the lane (HI-2167): its list as it is under this lock, so a change made meanwhile is kept.
     if (s.place?.needsLane && !was) throw new LaneError(409, `${builder.name} has no running lane in ${s.project}: the card was made but not placed. Start one with hive_lane start (its key is in this reply), or pass lane as { builder, reviewer } to start one as you create a card.`) // i18n-ignore: hive_create_task's refusal (agents)
     const given = s.place ? await placed(ws, was, s.place) : s.cards
@@ -1267,7 +1284,16 @@ export async function endLane(ws: WorkspaceService, id: string, o: { abandoned?:
  */
 export async function laneNext(ws: WorkspaceService, project: string, agentId: string): Promise<{ lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneInfo['status'] }> {
   const lane = await laneOf(ws, project, agentId)
-  if (!lane) throw new LaneError(404, 'No running lane of yours: start one with hive_lane start, or ask the user') // i18n-ignore: hive_lane's refusal (agents)
+  if (!lane) {
+    // HI-2273: its lane just ended (all its cards Done) or was abandoned: said so, never "start one", which invited a
+    // builder to start its lane again with a guessed reviewer.
+    const gone = (await read(ws))
+      .filter((l) => !running(l) && same(l.project, project) && (l.builder.id === agentId || l.reviewer?.id === agentId) && !!l.endedAt && Date.parse(l.endedAt) >= Date.now() - LANE_CARRY_MS)
+      .sort((a, b) => Date.parse(b.endedAt!) - Date.parse(a.endedAt!))[0]
+    if (gone?.state === 'ended') throw new LaneError(404, `Your lane ${gone.id} has ended: all its cards are Done. Nothing more on it: don't start it again; end your turn unless you have other work.`) // i18n-ignore: hive_lane's refusal (agents)
+    if (gone) throw new LaneError(404, `Your lane ${gone.id} was abandoned: don't start it again; ask the user if there is more to do.`) // i18n-ignore: hive_lane's refusal (agents)
+    throw new LaneError(404, 'No running lane of yours: start one with hive_lane start, or ask the user') // i18n-ignore: hive_lane's refusal (agents)
+  }
   // Another agent's card is never the lane's next (HI-1821).
   const open = lane.cards.filter(ownOpen)
   const pauses = lane.state === 'paused' ? lane.status : null

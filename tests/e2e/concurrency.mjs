@@ -196,7 +196,10 @@ async function heavyRound(k, worktrees) {
   })
   await new Promise((r) => api.listen(0, '127.0.0.1', r))
   // No side slot (HI-2070): these runs are small (two suites, twice), and queue for the heavy slots as heavy runs do.
-  const env = { HIVE_TEST_HEAVY_DIR: pool, HIVE_TEST_HEAVY_SLOTS: '2', HIVE_TEST_SIDE_SLOTS: '0', HIVE_API_URL: `http://127.0.0.1:${api.address().port}`, HIVE_API_TOKEN: 'agent-token' }
+  // The agent's token in its file, as a session has it (HI-2262: never HIVE_API_TOKEN).
+  const tokenFile = join(RUN, 'agent-token.json')
+  writeFileSync(tokenFile, JSON.stringify({ token: 'agent-token' }))
+  const env = { HIVE_TEST_HEAVY_DIR: pool, HIVE_TEST_HEAVY_SLOTS: '2', HIVE_TEST_SIDE_SLOTS: '0', HIVE_API_URL: `http://127.0.0.1:${api.address().port}`, HIVE_API_TOKEN_FILE: tokenFile }
   const slots = () => (existsSync(pool) ? readdirSync(pool).filter((f) => /^slot-\d+\.json$/.test(f)).length : 0)
   const waiting = () => (existsSync(pool) ? readdirSync(pool).filter((f) => f.startsWith('wait-')).length : 0)
   // Heavy by repeating: two quick suites, twice.

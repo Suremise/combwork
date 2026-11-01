@@ -395,9 +395,10 @@ export async function removeHiveCopies(folder: string, project: string, book: Sk
 async function deliverSkill(s: LaunchContext['skills'][number], dest: string, folder: string, cli: string): Promise<SkillDelivery> {
   // One identity for the source, Hive's copies and their markers: contentHash, which counts links (never following
   // them) and leaves the marker out. A marker from before (another hash) just means one more copy.
+  // The launch's settings' read of the source where they had one (HI-2268: hashed again only when its files changed).
   let hash: string
   try {
-    hash = await contentHash(s.sourcePath)
+    hash = s.revision || (await contentHash(s.sourcePath))
   } catch (e) {
     // Not copied. Hive's copy from an earlier launch stays, and is what the CLI reads: its revision is what reached the
     // session. A folder of the user's with the name is theirs, not a delivery. Too big lasts until the skill is

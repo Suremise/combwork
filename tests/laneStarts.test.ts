@@ -68,7 +68,7 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.hive'), { recursive: true })
     mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
+    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'h1'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -441,6 +441,23 @@ describe("Hive starts a lane's next card (HI-1990)", () => {
       expect(r.lane.queued).toBeNull()
       // Told in its inbox (a rebrief), as the doorbell typed into it says.
       expect(pty.typed.join('')).toContain('New in your inbox')
+    })
+
+    it("HI-2273: applied now with a reviewer that is no agent, nothing is put back whatever lane runs: refused under the lock, its card in flight left in Doing", async () => {
+      // The lane runs from the start here: the put back is never tried with an unknown reviewer, so a lane another start
+      // makes meanwhile can't have its card put back before the refusal either.
+      const { cards: [x1, x2], lane } = await inFlight('h1', ['H one', 'H two'])
+      const { Workflow } = await import('../src/main/workflow/runtime')
+      const putBack = vi.spyOn(Workflow.prototype, 'putBack')
+      try {
+        await expect(lanes.startLane(w, { project: 'alpha', builder: 'h1', reviewer: null, unknownReviewer: 'Guessed', cards: [x2, x1], by: 'H1 (alpha)', applyNow: true, ownBuilder: true })).rejects.toThrow(`No agent "Guessed" in alpha; this lane's reviewer is R1: leave reviewer out to keep it.`)
+        expect(putBack).not.toHaveBeenCalled()
+      } finally {
+        putBack.mockRestore()
+      }
+      expect(await columnOf(x1)).toBe('doing')
+      const now = await lanes.getLane(w, lane.id)
+      expect([now.state, now.reviewer?.id, now.cards.map((c) => c.number), now.queued]).toEqual(['active', 'r1', [x1, x2], null])
     })
 
     it('refuses while its builder is in a turn, or its card is in Review, changing nothing', async () => {

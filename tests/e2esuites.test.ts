@@ -2617,7 +2617,10 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
       if (running === 'down') throw new Error('ECONNREFUSED')
       return { ok: true, json: async () => ({ running }) }
     }
-    const env = { HIVE_API_URL: 'http://127.0.0.1:47821/', HIVE_API_TOKEN: 't', HIVE_PROJECT: 'web', HIVE_AGENT: 'W1', HIVE_RUN_ID: 'run-new' }
+    // The session's token in its file (HI-2262: sessions never get HIVE_API_TOKEN).
+    const tokenFile = join(tmp, 'launch-token.json')
+    writeFileSync(tokenFile, JSON.stringify({ token: 't' }))
+    const env = { HIVE_API_URL: 'http://127.0.0.1:47821/', HIVE_API_TOKEN_FILE: tokenFile, HIVE_PROJECT: 'web', HIVE_AGENT: 'W1', HIVE_RUN_ID: 'run-new' }
     expect(await launchEnded(claim.owner, env, { fetch: api(false) })).toBe(true)
     expect(asked[0]).toEqual({ url: 'http://127.0.0.1:47821/v1/projects/hive/agents/HB2/launches/run-old', workspace: 'D%3A%2Fws' })
     expect(await launchEnded(claim.owner, env, { fetch: api(true) })).toBe(false)
@@ -2764,7 +2767,10 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
   })
 
   it("the merge slot holder's run: asked of Hive with the session's own variables; anything else is an ordinary run", async () => {
-    const session = { HIVE_API_URL: 'http://127.0.0.1:1/', HIVE_API_TOKEN: 'tok', HIVE_PROJECT: 'hive', HIVE_AGENT: 'HB4', HIVE_WORKSPACE: 'D:/ws' }
+    // The token from its file, as hive-progress reads it (HI-2262: never HIVE_API_TOKEN).
+    const sessionToken = join(tmp, 'session-token.json')
+    writeFileSync(sessionToken, JSON.stringify({ token: 'tok' }))
+    const session = { HIVE_API_URL: 'http://127.0.0.1:1/', HIVE_API_TOKEN_FILE: sessionToken, HIVE_PROJECT: 'hive', HIVE_AGENT: 'HB4', HIVE_WORKSPACE: 'D:/ws' }
     const calls: { url: string; init: RequestInit }[] = []
     const answer = (body: unknown, ok = true) =>
       (async (url: string, init: RequestInit) => {
@@ -2785,13 +2791,13 @@ describe('heavy runs: at most a few at once on the machine, the rest queue in or
     expect(await holdsMergeSlot(session, { fetch: refused })).toBe(false)
     // Not a Hive agent's session: Hive isn't asked.
     const asked = calls.length
-    for (const k of ['HIVE_API_URL', 'HIVE_PROJECT', 'HIVE_AGENT', 'HIVE_API_TOKEN']) expect(await holdsMergeSlot({ ...session, [k]: '' }, { fetch: answer(holder('HB4')) }), k).toBe(false)
+    for (const k of ['HIVE_API_URL', 'HIVE_PROJECT', 'HIVE_AGENT', 'HIVE_API_TOKEN_FILE']) expect(await holdsMergeSlot({ ...session, [k]: '' }, { fetch: answer(holder('HB4')) }), k).toBe(false)
     expect(calls.length).toBe(asked)
-    // The token from its file, as hive-progress reads it, when the variable isn't set.
-    const file = join(tmp, 'token.json')
-    writeFileSync(file, JSON.stringify({ token: 'from-file' }))
-    expect(await holdsMergeSlot({ ...session, HIVE_API_TOKEN: '', HIVE_API_TOKEN_FILE: file }, { fetch: answer(holder('HB4')) })).toBe(true)
-    expect(calls.at(-1)!.init.headers).toMatchObject({ Authorization: 'Bearer from-file' })
+    // HIVE_API_TOKEN alone is no session's (HI-2262): Hive isn't asked; beside the file, the file's is sent.
+    expect(await holdsMergeSlot({ ...session, HIVE_API_TOKEN_FILE: '', HIVE_API_TOKEN: 'tok' }, { fetch: answer(holder('HB4')) })).toBe(false)
+    expect(calls.length).toBe(asked)
+    expect(await holdsMergeSlot({ ...session, HIVE_API_TOKEN: 'other' }, { fetch: answer(holder('HB4')) })).toBe(true)
+    expect(calls.at(-1)!.init.headers).toMatchObject({ Authorization: 'Bearer tok' })
   })
 
   it('--pre-merge goes first without asking; otherwise Hive is asked again at most every 30 s while the run waits', async () => {
