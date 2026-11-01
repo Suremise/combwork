@@ -430,12 +430,20 @@ export class GitPlatform implements PlatformAdapter {
     return this.prefix
   }
 
-  private async badIdentity(base: string, revision: string, commits: string[] | undefined, o: WorkflowOptions): Promise<Maybe<string | null>> {
+  /**
+   * G12: the first commit not authored with the project's identity, as git reads it now (HI-2266: G12's saved value only
+   * means "on"; the Git tab or git config changes the identity, and the guard expects the new one), or `missing`.
+   */
+  private async badIdentity(base: string, revision: string, commits: string[] | undefined, o: WorkflowOptions): Promise<Maybe<{ commit: string; email: string } | 'missing' | null>> {
     if (!o.identity) return null
+    const id = await G.identity(this.project)
+    if (isUnknown(id)) return id
+    if (!id) return 'missing'
     const list = await G.commits(this.project, `${base}..${revision}`)
     if (isUnknown(list)) return list
     const mine = commits ? list.filter((c) => commits.includes(c.commit)) : list
-    return mine.find((c) => c.email.toLowerCase() !== o.identity!.email.toLowerCase())?.commit ?? null
+    const bad = mine.find((c) => c.email.toLowerCase() !== id.email.toLowerCase())
+    return bad ? { commit: bad.commit, email: id.email } : null
   }
 
   async finishInputs(card: CardRecord, s: CardState, o: WorkflowOptions, revision: string | null | undefined): Promise<FinishInputs> {

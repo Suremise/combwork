@@ -67,13 +67,28 @@ describe("Hive's queue commits (#1350)", () => {
     expect(e.wf.state(card).stage).toBe('merging')
   })
 
-  it("G12's identity when on: Hive's merge is authored and committed with it", async () => {
+  it("HI-2266: G12 on, git config changed after it was turned on: Hive's merge is authored and committed as git's identity now, never G12's saved copy", async () => {
     const e = team()
     await queued(e)
-    // Turned on once the card is approved (its own commits are checked against G12 at submit: not this test's).
-    e.options.identity = { name: 'Project Bot', email: 'bot@hive.invalid' }
+    // Turned on once the card is approved (its own commits are checked against G12 at submit: not this test's), saving
+    // the identity of then; the Git tab (or git config) then corrects it.
+    e.options.identity = { name: 'Old Typo', email: 'typo@hive.invalid' }
+    sh(e.project, 'config', 'user.name', 'Project Bot')
+    sh(e.project, 'config', 'user.email', 'bot@hive.invalid')
     expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'integrated' }])
     expect(sh(e.project, 'log', '-1', '--format=%an <%ae> / %cn <%ce>', 'main')).toBe('Project Bot <bot@hive.invalid> / Project Bot <bot@hive.invalid>')
+  })
+
+  it('HI-2266: G12 on with a saved copy, git with no identity: paused identity, the saved copy never used', async () => {
+    const e = team()
+    const card = await queued(e)
+    e.options.identity = { name: 'Old Typo', email: 'typo@hive.invalid' }
+    sh(e.project, 'config', '--unset', 'user.name')
+    sh(e.project, 'config', '--unset', 'user.email')
+    const before = head(e)
+    expect(await e.queue().drain('main')).toMatchObject([{ outcome: 'paused', reason: 'identity', files: [e.project] }])
+    expect(head(e)).toBe(before)
+    expect(e.wf.state(card).stage).toBe('merging')
   })
 
   it("a commit-msg hook exiting 1 returns the card with the hook's output (IntegrationFailed, hook); the hooks ran", async () => {

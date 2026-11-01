@@ -36,8 +36,11 @@ export interface GuardInputs {
   conflicts?: Ans<string[]>
   /** A commit attributed to no card since the agent's last submission, when another card shares the folder. */
   untrailered?: Ans<string | null>
-  /** A commit not authored with the project's identity. */
-  badIdentity?: Ans<string | null>
+  /**
+   * A commit not authored with the project's identity, read from git at the move (HI-2266: never a saved copy), with
+   * that identity's email; `missing` when git has none for the project.
+   */
+  badIdentity?: Ans<{ commit: string; email: string } | 'missing' | null>
   /** Configured checks with no passing, counted run on the revision. */
   checksMissing?: string[]
   /**
@@ -151,8 +154,8 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     const b = i.badIdentity
     if (b === undefined || b === null) return null
     if (isUnknownAnswer(b)) return unknownRefusal(i, 'submit.identity', b)
-    const id = i.ruleset.options.identity
-    return { rule: 'submit.identity', values: { card: i.card.key, commit: short(b), email: id?.email ?? '', command: 'git commit --amend --no-edit --reset-author' } } // i18n-ignore: a git command, as typed
+    if (b === 'missing') return { rule: 'submit.identity', values: { card: i.card.key, missing: 'yes', commit: '', email: '', command: 'git config user.email' } } // i18n-ignore: a select key and a git command, as typed
+    return { rule: 'submit.identity', values: { card: i.card.key, missing: 'no', commit: short(b.commit), email: b.email, command: 'git commit --amend --no-edit --reset-author' } } // i18n-ignore: a select key and a git command, as typed
   },
   'submit.ownRunsStopped': (i) => (i.runsGoing?.length ? { rule: 'submit.ownRunsStopped', values: { card: i.card.key, runs: i.runsGoing.join(', ') } } : null),
   'submit.decisionsReceived': (i) => (i.agent !== null && (i.state.received[i.agent] ?? 0) < i.state.generation ? { rule: 'submit.decisionsReceived', values: { card: i.card.key } } : null),
