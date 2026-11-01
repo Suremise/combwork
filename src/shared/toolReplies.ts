@@ -106,33 +106,23 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   /** Its 1.0 stage (#1223): `column` is the stage's category. Last, after the card's own fields. */
   stage: StageId
   /**
-   * A code card's checks before review, by its own rules, and how to run one as that check of the card (HI-2276):
-   * `checksLine`. Absent where its rules name none, or once it is past review.
+   * A code card's checks before review, by its own rules (HI-2276): their names, as data. Absent where its rules name
+   * none, or once it is past review; `checksHint` then too.
    */
-  checks?: string
+  checks?: string[]
+  /** With `checks`: how to run one as that check of the card, a fixed line with `<name>` (`checksView`). */
+  checksHint?: string
 }
 
 /**
- * The checks a code card's rules name before review and how to run one (HI-2276), in a line: the rule for running them
- * stays in work-on-card, this only says the card has them. `isolated`: its platform can make a check copy.
+ * The checks a code card's rules name before review and how to run one (HI-2276): the names as data and a fixed hint
+ * with a `<name>` placeholder, never a shell command built from a configured name (free text: quoting it for every
+ * shell kept failing, HR1's rounds 1 and 2). The rule for running them stays in work-on-card. `card` is its key;
+ * `isolated`: its platform can make a check copy.
  */
-export function checksLine(names: readonly string[], card: string, isolated: boolean): string | null {
+export function checksView(names: readonly string[], card: string, isolated: boolean): { checks: string[]; checksHint: string } | null {
   if (!names.length) return null
-  // A name is free text (HR1's round 1 finding): each is said as one shell argument, so a spaced one reads as it runs.
-  const args = names.map(checkArg)
-  const one = args.length === 1 ? args[0] : null
-  return `${args.map((a, i) => a ?? JSON.stringify(names[i])).join(', ')}: before review. Run ${args.length === 1 ? 'it' : 'each'} as hive-progress --check ${one ?? '<name>'} --card "${card}"${isolated ? " (--isolated: in a check copy at the card's revision)" : ''}`
-}
-
-/**
- * A check's name as one argument that bash and PowerShell both pass as it is: plain when it is only letters, digits and
- * `._:/+-` (not starting with `-`); else in single quotes (literal in both); else, holding a `'`, in double quotes when
- * neither expands anything in it; null when no one quoting is literal in both.
- */
-export function checkArg(name: string): string | null {
-  if (/^[A-Za-z0-9][A-Za-z0-9._:/+-]*$/.test(name)) return name
-  if (!name.includes("'")) return `'${name}'`
-  return /["$`!\\]/.test(name) ? null : `"${name}"`
+  return { checks: [...names], checksHint: `before review: run one with hive-progress --check <name> --card "${card}"${isolated ? " (--isolated: in a check copy at the card's revision; work-on-card)" : ' (work-on-card)'}` }
 }
 
 /** A card in a listing (GET /v1/tasks?view=short): what it is and where it stands, without its text. */

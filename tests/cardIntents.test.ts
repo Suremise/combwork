@@ -36,7 +36,7 @@ const { providerService } = await import('../src/main/providerService')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { INTENT_ROUTES } = await import('../src/main/servers')
-const { checkArg, checksLine, intentText } = await import('../src/shared/toolReplies')
+const { checksView, intentText } = await import('../src/shared/toolReplies')
 const { armIntentWatch } = await import('../src/main/intentWatch')
 const watches = await import('../src/main/watches')
 const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, HIVE_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
@@ -338,29 +338,29 @@ describe('a card by intent (#1267)', () => {
     const wf = (await service.workflowFor(w, repo))!
     const card = await create(w)
     const key = wf.store.card(card).key
-    const line = `typecheck, lint: before review. Run each as hive-progress --check <name> --card "${key}" (--isolated: in a check copy at the card's revision)`
-    expect(wf.checksLineOf(`#${card}`)).toBe(line)
+    const line = { checks: ['typecheck', 'lint'], checksHint: `before review: run one with hive-progress --check <name> --card "${key}" (--isolated: in a check copy at the card's revision; work-on-card)` }
+    expect(wf.checksOf(`#${card}`)).toEqual(line)
     await act(w, card, builder, { kind: 'start' })
-    expect(wf.checksLineOf(`#${card}`)).toBe(line)
+    expect(wf.checksOf(`#${card}`)).toEqual(line)
     // A no-code card has nothing to check.
     const note = await create(w, 'A design note')
     await store.boardWrite(w, async () => void FactStore.forBoard(w, { project: 'p', key: 'p' }).updateCard(note, { kind: 'no-code' }))
-    expect(wf.checksLineOf(`#${note}`)).toBeNull()
+    expect(wf.checksOf(`#${note}`)).toBeNull()
     // Past review (approved), nothing is left to run before it.
     const { runCheck } = await import('../src/main/workflow/checks')
     const rev = commit(wt, 'c.txt')
     for (const name of ['typecheck', 'lint']) await inWorkspace(w, () => runCheck(wf, { card: wf.store.card(card), name, by: 'a1', revision: rev, exec: async () => ({ ok: true }) }))
     await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
-    expect(wf.checksLineOf(`#${card}`)).toBe(line)
+    expect(wf.checksOf(`#${card}`)).toEqual(line)
     await act(w, card, reviewer, { kind: 'startReview' })
     await act(w, card, reviewer, { kind: 'verdict', pass: true, comment: 'Passed.' })
-    expect(wf.checksLineOf(`#${card}`)).toBeNull()
+    expect(wf.checksOf(`#${card}`)).toBeNull()
   })
 
-  it('rules that name no checks before review: no checks line (HI-2276)', async () => {
+  it('rules that name no checks before review: no checks (HI-2276)', async () => {
     const { w, repo } = await workspace()
     const wf = (await service.workflowFor(w, repo))!
-    expect(wf.checksLineOf(`#${await create(w)}`)).toBeNull()
+    expect(wf.checksOf(`#${await create(w)}`)).toBeNull()
   })
 
   it('no lane, or not its part in it: nothing armed (#1639)', async () => {
@@ -860,41 +860,14 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(intentText({ ok: true, card: 'HI-12', from: 'review', to: 'review', next: { step: 'intents', intents: ['verdict'] } })).toBe('HI-12: still review. Next on it: hive_verdict.')
   })
 
-  it("a card's checks line (HI-2276): one check by its name, several by <name>; --isolated only where a check copy can be made", () => {
-    expect(checksLine(['quick'], 'AL-1', true)).toBe(`quick: before review. Run it as hive-progress --check quick --card "AL-1" (--isolated: in a check copy at the card's revision)`)
-    expect(checksLine(['quick', 'tests'], 'AL-1', false)).toBe('quick, tests: before review. Run each as hive-progress --check <name> --card "AL-1"')
-    expect(checksLine([], 'AL-1', true)).toBeNull()
-    // A name is free text (HR1's round 1 finding): said as one argument, never split or expanded by the shell.
-    expect(checksLine(['unit tests'], 'AL-1', false)).toBe(`'unit tests': before review. Run it as hive-progress --check 'unit tests' --card "AL-1"`)
-    expect(checksLine(['unit tests', 'lint'], 'AL-1', false)).toBe(`'unit tests', lint: before review. Run each as hive-progress --check <name> --card "AL-1"`)
-    expect(checksLine(['a $HOME; rm `x`'], 'AL-1', false)).toBe(`'a $HOME; rm \`x\`': before review. Run it as hive-progress --check 'a $HOME; rm \`x\`' --card "AL-1"`)
-    expect(checksLine(["it's"], 'AL-1', false)).toBe(`"it's": before review. Run it as hive-progress --check "it's" --card "AL-1"`)
-    // No one quoting is literal in both shells: the name as JSON, and the command with <name>.
-    expect(checksLine(["it's $x"], 'AL-1', false)).toBe(`"it's $x": before review. Run it as hive-progress --check <name> --card "AL-1"`)
-    expect(checksLine(['-x'], 'AL-1', false)).toBe(`'-x': before review. Run it as hive-progress --check '-x' --card "AL-1"`)
-  })
-
-  it("each quoted check name reaches hive-progress as one argument, as it is (HI-2276, HR1's round 1 finding)", async () => {
-    const { parseArgs } = await import('../src/main/progressReporters/wrapper')
-    const dir = tempDir('hive-checkarg-')
-    const script = join(dir, 'argv.js').replace(/\\/g, '/')
-    writeFileSync(script, 'console.log(JSON.stringify(process.argv.slice(2)))\n')
-    const node = process.execPath.replace(/\\/g, '/')
-    const powershell = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-    for (const name of ['unit tests', 'a $HOME; rm `x` & echo', "it's", 'plain:name']) {
-      const arg = checkArg(name)!
-      const command = `--check ${arg} --card "AL-1"`
-      // Git Bash's sh and Windows PowerShell, agents' shells, split the suggested command as they would run it.
-      const bash = execFileSync('sh', ['-c', `'${node}' '${script}' ${command}`], { encoding: 'utf8', windowsHide: true })
-      const ps1 = join(dir, 'run.ps1')
-      writeFileSync(ps1, `& '${node}' '${script}' ${command}\n`)
-      const ps = execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ps1], { encoding: 'utf8', windowsHide: true })
-      for (const out of [bash, ps]) {
-        const argv = JSON.parse(out)
-        expect(argv).toEqual(['--check', name, '--card', 'AL-1'])
-        expect(parseArgs(argv)).toMatchObject({ check: name, card: 'AL-1' })
-      }
-    }
+  it("a card's checks (HI-2276): the names as data, a fixed hint with <name>; never a command built from a name", () => {
+    const hint = (iso: boolean) => `before review: run one with hive-progress --check <name> --card "AL-1"${iso ? " (--isolated: in a check copy at the card's revision; work-on-card)" : ' (work-on-card)'}`
+    expect(checksView(['quick'], 'AL-1', true)).toEqual({ checks: ['quick'], checksHint: hint(true) })
+    expect(checksView(['quick', 'tests'], 'AL-1', false)).toEqual({ checks: ['quick', 'tests'], checksHint: hint(false) })
+    expect(checksView([], 'AL-1', true)).toBeNull()
+    // A name is free text (HR1's rounds 1 and 2: spaces, shell characters, typographic quotes): data only, the hint the same.
+    const names = ['unit tests', 'a $HOME; rm `x` & echo', 'user’s tests', '“quoted”']
+    expect(checksView(names, 'AL-1', true)).toEqual({ checks: names, checksHint: hint(true) })
   })
 
   it('every agent has the intent tools, Codex too (#913: enabled_tools is HIVE_TOOLS); the Assistant at Control agents, never start_card', () => {

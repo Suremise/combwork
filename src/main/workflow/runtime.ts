@@ -34,7 +34,7 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
-import { checksLine } from '../../shared/toolReplies'
+import { checksView } from '../../shared/toolReplies'
 
 import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
 
@@ -1874,16 +1874,16 @@ export class Workflow {
   }
 
   /**
-   * A code card's checks before review and how to run one, in a line for agents (HI-2276, toolReplies' `checksLine`);
-   * null for a no-code card, one past review, or rules that name no checks.
+   * A code card's checks before review and how to run one, for agents (HI-2276, toolReplies' `checksView`); null for a
+   * no-code card, one past review, or rules that name no checks.
    */
-  checksLineOf(ref: unknown): string | null {
+  checksOf(ref: unknown): ReturnType<typeof checksView> {
     const card = this.resolve(ref)
     if (isRefusal(card) || card.kind !== 'code') return null
     const s = this.state(card)
     if (s.stage !== 'todo' && s.stage !== 'hold' && s.stage !== 'active' && s.stage !== 'review') return null
     const o = this.rulesetOf(card, s).options
-    return checksLine(o.preChecks, card.key, o.platform !== 'none')
+    return checksView(o.preChecks, card.key, o.platform !== 'none')
   }
 
   /** The merge slot claimed for a card (#1354): refused, and recorded as Refused, when Hive merges it. */
