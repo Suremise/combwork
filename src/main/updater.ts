@@ -12,6 +12,8 @@ import { exitBy } from './exitLog'
 import { testQuiet } from './testQuiet'
 import { installedCopy, runningIdentity } from './buildIdentity'
 import { installDecision, updateDecision, type BuildIdentity } from '../shared/updates'
+import { RELEASES_REPO } from '../shared/defaults'
+import { HiveGitHubProvider } from './updateFeed'
 
 const log = createLogger('updates')
 
@@ -238,6 +240,10 @@ export function initUpdater(opts: { restart: () => void }): void {
     writeFileSync(file, `provider: generic\nurl: ${feed}\nupdaterCacheDirName: ${testCache()}\n`) // i18n-ignore: a file's content, not text
     autoUpdater.updateConfigPath = file
     autoUpdater.forceDevUpdateConfig = true
+  } else if (app.isPackaged) {
+    // GitHub's releases through Hive's provider (HI-2311): with pre-releases on, a pre-release install is offered the
+    // newest version newer by semver (beta, RC or release), not only a later one of its own pre-release name.
+    autoUpdater.setFeedURL({ provider: 'custom', updateProvider: HiveGitHubProvider, ...RELEASES_REPO })
   }
 
   autoUpdater.on('update-available', (info: UpdateInfo) => {

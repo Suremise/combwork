@@ -13,6 +13,7 @@ const st = vi.hoisted(() => ({
   handlers: {} as Record<string, (info: unknown) => void>,
   found: { isUpdateAvailable: false } as Record<string, unknown>,
   installs: [] as [boolean, boolean][],
+  feeds: [] as Record<string, unknown>[],
   toasts: [] as { level: string; title: string; actions?: { label: string; command: string; args?: unknown[] }[] }[]
 }))
 vi.mock('electron-updater', () => ({
@@ -22,7 +23,8 @@ vi.mock('electron-updater', () => ({
       st.checks++
       return st.found
     },
-    quitAndInstall: (silent: boolean, run: boolean) => void st.installs.push([silent, run])
+    quitAndInstall: (silent: boolean, run: boolean) => void st.installs.push([silent, run]),
+    setFeedURL: (options: Record<string, unknown>) => void st.feeds.push(options)
   }
 }))
 vi.mock('../src/main/config', () => ({
@@ -46,6 +48,7 @@ beforeEach(async () => {
   st.handlers = {}
   st.found = { isUpdateAvailable: false }
   st.installs = []
+  st.feeds = []
   st.toasts = []
   delete process.env.HIVE_UPDATE_DELAY
   ;((await import('electron')).app as { isPackaged: boolean }).isPackaged = true
@@ -68,6 +71,18 @@ describe('update checks', () => {
     expect(st.checks).toBe(1)
     await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000)
     expect(st.checks).toBe(2)
+  })
+
+  it("a packaged Hive reads GitHub's releases through Hive's provider (HI-2311); a development build sets no feed", async () => {
+    delete process.env.HIVE_TEST_QUIET
+    const { HiveGitHubProvider } = await import('../src/main/updateFeed')
+    ;(await import('../src/main/updater')).initUpdater({ restart: () => undefined })
+    expect(st.feeds).toEqual([{ provider: 'custom', updateProvider: HiveGitHubProvider, owner: 'Suremise', repo: 'hive-desktop' }])
+    vi.resetModules()
+    st.feeds = []
+    ;((await import('electron')).app as { isPackaged: boolean }).isPackaged = false
+    ;(await import('../src/main/updater')).initUpdater({ restart: () => undefined })
+    expect(st.feeds).toEqual([])
   })
 
   it('a packaged Hive a test started (HIVE_TEST_QUIET=1) never checks, and says so (#1332)', async () => {

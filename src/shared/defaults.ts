@@ -945,6 +945,8 @@ export function unmergedWork(st: AgentBranchStatus | null | undefined, tr?: Tr):
 
 /** Where Hive's releases (and its update feed) are published. */
 export const RELEASES_URL = 'https://github.com/Suremise/hive-desktop/releases'
+/** The same repository, for the updater's feed (HI-2311): electron-builder.yml's publish block names it too (a test checks). */
+export const RELEASES_REPO = { owner: 'Suremise', repo: 'hive-desktop' } as const
 
 // ---------------------------------------------------------------------------
 // Keyboard shortcuts
