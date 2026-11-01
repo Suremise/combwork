@@ -1021,6 +1021,23 @@ export const testHooks: { write: ((path: string, data: unknown) => Promise<void>
  * A run whose processes Hive saw end but whose slot writer couldn't be released (HI-1886: its workspace closed first):
  * kept, so a later start settles that writer once this Hive has gone.
  */
+/**
+ * Runs that took a slot's writer in this Hive and haven't had its release written (HI-2299): only these are kept as
+ * ended at a quit. Every ended run kept instead (130 in a day) went past MAX_RUN_RECORDS, and the oldest dropped were
+ * those a later start needed: a closed workspace's unwritten releases (`keepRunEnded`), kept first.
+ */
+const writerRuns = new Set<string>()
+
+/** A run took a slot's writer (HI-2299). */
+export function runTookWriter(run: string): void {
+  writerRuns.add(run)
+}
+
+/** A run's slot writer was released, its release written (HI-2299): nothing needs its record. */
+export function runWriterReleased(run: string): void {
+  writerRuns.delete(run)
+}
+
 export function keepRunEnded(run: string): void {
   void readRecords().then(() => {
     if (endedRuns.includes(run)) return
@@ -1073,8 +1090,11 @@ export async function recordEndedLaunches(): Promise<void> {
       await new Promise((r) => setTimeout(r, QUIT_LOOK_EVERY_MS))
     }
   }
-  endedRuns = [...new Set([...endedRuns, ...ended])].slice(-MAX_RUN_RECORDS)
-  if (ended.length || pending.size) log.info(`Kept ${ended.length} ended run(s) for their slot writers as Hive quits${pending.size ? `; ${pending.size} launch(es) not seen to end` : ''}`)
+  // Only runs still naming a writer (HI-2299): no other run's record is ever read, and with them the bound dropped the
+  // records that were needed. A slot has one writer, so these are few.
+  const keep = ended.filter((r) => writerRuns.has(r))
+  endedRuns = [...new Set([...endedRuns, ...keep])].slice(-MAX_RUN_RECORDS)
+  if (keep.length || pending.size) log.info(`Kept ${keep.length} ended run(s) for their slot writers as Hive quits${pending.size ? `; ${pending.size} launch(es) not seen to end` : ''}`)
   persist()
 }
 

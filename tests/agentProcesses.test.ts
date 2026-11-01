@@ -228,7 +228,10 @@ else {
   }, 60000)
 
   it("Hive quitting keeps a run as ended for its slot writer only once its job is seen empty, never while what its CLI started still runs (HI-1886)", async () => {
-    const { endedEarlier, launchEnded, recordEndedLaunches, runningProcesses, trackLaunch } = await import('../src/main/agentProcesses')
+    const { endedEarlier, launchEnded, recordEndedLaunches, runningProcesses, runTookWriter, trackLaunch } = await import('../src/main/agentProcesses')
+    // Both slots' writers' runs (HI-2299: only those are kept).
+    runTookWriter('quit1')
+    runTookWriter('quit2')
     // A CLI that started a detached server and exited, its exit not yet seen (Hive quitting): its job isn't empty.
     const out = join(dir, 'quit1.txt')
     const cli = spawn(process.execPath, [script, 'cli', out], { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true })

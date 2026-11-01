@@ -323,6 +323,7 @@ export const AREAS = [
   { paths: ['tests/e2e/slotsessions.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/shared/sessionResume.ts', 'src/shared/resumeAll.ts', 'src/main/sessions.ts'], suites: ['slotsessions', 'legacyworktree'] },
   { paths: ['tests/e2e/legacyworktree.cjs', 'src/main/agentWorktree.ts'], suites: ['legacyworktree', 'slotupgrade'] },
   { paths: ['tests/e2e/slotrelease.cjs', 'src/main/agentFolders.ts', 'src/renderer/src/components/SlotsAndCopies.tsx'], suites: ['slotrelease'] },
+  { paths: ['tests/e2e/slotwindows.cjs', 'src/main/agentFolders.ts', 'src/main/agentProcesses.ts', 'src/main/index.ts'], suites: ['slotwindows'] },
   { paths: ['tests/e2e/slotreleaseapi.cjs', 'src/main/slotRelease.ts', 'src/main/agentFolders.ts', 'src/main/slotMigration.ts'], suites: ['slotreleaseapi'] },
   // The Agent API's agents on slots (#1451): where each is, and adding none in a worktree.
   { paths: ['tests/e2e/agentapislots.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/main/projectAgents.ts', 'src/main/mcp/hive-mcp.ts'], suites: ['agentapislots', 'replysize'] },
