@@ -104,6 +104,24 @@ const until = async (fn, ms = 10000) => {
   fs.writeFileSync(path.join(claudeHome, 'bursts-one-go'), '')
   check('One finishes once released', !!(await until(async () => (await live(alpha, one))?.status === 'finished', 10000)))
 
+  // --- HI-2312: a finish whose agent starts its next turn before the group is told (as Hive's delivery typed at a turn's
+  // end starts one) isn't told: told then, it arrived as the agent worked again, with the last turn's message. Two
+  // finishes and is given more at once; Three finishes a moment later, in the same group, which is told without Two's.
+  await until(async () => (await notes()).some((n) => /One finished/.test(n.title)), HUNG_MS) // One's finish, told on its own
+  clearNotes()
+  await send(alpha, two, 'go work 1')
+  await send(beta, three, 'go work 2')
+  check('Two finishes', !!(await until(async () => (await live(alpha, two))?.status === 'finished', HUNG_MS)))
+  await send(alpha, two, 'more holduntil bursts-two-go')
+  check('Two works again', !!(await until(async () => (await live(alpha, two))?.status === 'working', HUNG_MS)))
+  const finishedNotes = async () => (await notes()).filter((n) => /finished/.test(n.title))
+  const group = await until(async () => ((await finishedNotes()).length ? finishedNotes() : null), HUNG_MS)
+  check("the group is told without Two's finish", group?.length === 1 && /^beta finished$/.test(group[0].title), JSON.stringify(await notes()))
+  clearNotes()
+  fs.writeFileSync(path.join(claudeHome, 'bursts-two-go'), '')
+  const next = await until(async () => (await notes()).find((n) => /finished/.test(n.title)), HUNG_MS)
+  check("Two's next end is told, with that turn's message", !!next && /Two finished/.test(next.title) && /more holduntil/.test(next.body), JSON.stringify(await notes()))
+
   for (const [p, a] of agents) await inv('session:stop', p, a.id).catch(() => undefined)
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

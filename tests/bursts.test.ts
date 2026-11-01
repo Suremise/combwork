@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { join } from 'path'
 import type { BrowserWindow } from 'electron'
-import { chimeAllowed, FINISH_GROUP_MAX_MS, FINISH_GROUP_MS, FinishBatcher, finishedNotice, keepNotices, MAX_BANNERS, noticeRoute, type Finish } from '../src/shared/bursts'
+import { chimeAllowed, FINISH_GROUP_MAX_MS, FINISH_GROUP_MS, FinishBatcher, finishedNotice, keepNotices, MAX_BANNERS, noticeRoute, noticeRouteWhy, type Finish } from '../src/shared/bursts'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { tempDir } from './tempDir'
 
@@ -271,5 +271,88 @@ describe('a group of finishes, when it is shown', () => {
     ;(await settings()).notifyOnWaiting = false
     ;(sessions as unknown as { notify: (...a: unknown[]) => void }).notify(beta, 'beta · Two needs your input', 'Allow Bash?', 'waiting')
     expect(titles()).toEqual(['beta · Two needs your input', 'alpha · One finished'])
+  })
+
+  // HI-2312: an agent whose next turn starts (its status leaves its turn's end for working, starting or waiting) while its
+  // finish waits to be told: that finish isn't told, whatever the new turn ends as.
+  describe('a finish whose agent starts its next turn before it is told', () => {
+    type S = { notify: (...a: unknown[]) => void; emitState: (st: unknown) => void; settleBackground: (l: unknown, woke: boolean) => void }
+    const manager = async () => (await import('../src/main/sessions')).sessions as unknown as S
+    const agent = () => ({ projectPath: alpha, agentId: 'two', agentName: 'Two', status: 'working' as string })
+    /** Its status, as a hook step sets it and reports it. */
+    const goes = async (st: ReturnType<typeof agent>, status: string) => {
+      st.status = status
+      ;(await manager()).emitState(st)
+    }
+    const twoFinishes = async (body: string) => (await manager()).notify(alpha, 'alpha · Two finished', body, 'finished', 'Two', 'two')
+
+    it('working again: left out of the group, which is told without it', async () => {
+      const st = agent()
+      await twoFinishes('Started OV-246.')
+      await goes(st, 'finished')
+      await finished(beta, 'Three')
+      await goes(st, 'working')
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(titles()).toEqual(['beta · Three finished'])
+    })
+
+    it('a second turn ended within the group: only its own finish is told, once', async () => {
+      const st = agent()
+      await twoFinishes('Started OV-246.')
+      await goes(st, 'finished')
+      await goes(st, 'working')
+      await twoFinishes('Merged it.')
+      await goes(st, 'finished')
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(shown.map((n) => [n.title, n.body])).toEqual([['alpha · Two finished', 'Merged it.']])
+    })
+
+    it('a second turn ending into a card watch: nothing told (its own end is a watch, the first is over)', async () => {
+      const st = agent()
+      await twoFinishes('Started OV-246.')
+      await goes(st, 'finished')
+      await goes(st, 'working')
+      await goes(st, 'watching')
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(shown).toEqual([])
+    })
+
+    it('waiting for you in its next turn: that is told at once, and the finish before it never', async () => {
+      const s = await manager()
+      const st = agent()
+      await twoFinishes('Started OV-246.')
+      await goes(st, 'finished')
+      await goes(st, 'waiting')
+      s.notify(alpha, 'alpha · Two needs your input', 'Allow Bash?', 'waiting', undefined, 'two')
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(titles()).toEqual(['alpha · Two needs your input'])
+    })
+
+    it('its background tasks ended (a finish of its own), then a new turn: not told either', async () => {
+      const s = await manager()
+      const st = { ...agent(), status: 'background' }
+      s.emitState(st)
+      s.settleBackground({ state: st, tasks: new Map(), adapter: { descriptor: { capabilities: { backgroundWakes: true } } } }, false)
+      expect(st.status).toBe('finished')
+      await goes(st, 'working')
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(shown).toEqual([])
+      // Without a new turn, the same finish is told.
+      await goes(st, 'background')
+      s.settleBackground({ state: st, tasks: new Map(), adapter: { descriptor: { capabilities: { backgroundWakes: true } } } }, false)
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(shown.map((n) => n.body)).toEqual(['Its background tasks have ended.'])
+    })
+  })
+})
+
+describe('why a notice goes where it goes (noticeRouteWhy, for the log)', () => {
+  const on = { ...DEFAULT_SETTINGS.notifications, bannerScope: 'workspace' as const }
+  const from = { workspacePath: 'C:\\Work\\A', projectPath: 'C:\\Work\\A\\alpha' }
+  it('says the route and its reason', () => {
+    expect(noticeRouteWhy(on, 'finished', null, from)).toEqual({ route: 'windows', why: 'no Hive window focused' })
+    expect(noticeRouteWhy(on, 'finished', { workspacePath: 'C:\\Work\\B', projectPath: null }, from)).toEqual({ route: 'none', why: "banner scope: another workspace's" })
+    expect(noticeRouteWhy(on, 'finished', { workspacePath: 'c:\\work\\a', projectPath: null }, from)).toEqual({ route: 'banner', why: 'banner scope: workspace' })
+    expect(noticeRouteWhy({ ...on, notifyOnFinished: false }, 'finished', null, from).route).toBe(noticeRoute({ ...on, notifyOnFinished: false }, 'finished', null, from))
   })
 })
