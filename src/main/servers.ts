@@ -2068,13 +2068,18 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   // A project agent registers its own lane: it is the builder.
   const builder = a ? (body?.builder !== undefined && body.builder !== '' && (await agentParam(p, body.builder)) !== a.agentId ? null : a.agentId) : await agentParam(p, body?.builder)
   if (!builder) throw new HttpError(403, "An agent starts its own lane, as its builder: a reviewer joins its builder's lane (join)")
-  // A reviewer Hive doesn't know isn't a reason to refuse: the lane starts without one, and its reviewer can join it.
+  // A reviewer Hive doesn't know isn't a reason to refuse a new lane: it starts without one, and its reviewer can join it.
+  // A running lane's start naming one is refused, naming its reviewer (HI-2273: startLane, under its lock).
   let reviewer: string | null | undefined
+  let unknownReviewer: string | undefined
   let note: string | undefined
   if (body?.reviewer === null || body?.reviewer === '') reviewer = null
   else if (body?.reviewer !== undefined) {
     reviewer = await agentParam(p, body.reviewer).catch(() => null)
-    if (!reviewer) note = `No agent "${String(body.reviewer)}" in ${basename(p)}: the lane has no reviewer until one joins it.`
+    if (!reviewer) {
+      unknownReviewer = String(body.reviewer)
+      note = `No agent "${unknownReviewer}" in ${basename(p)}: the lane has no reviewer until one joins it.`
+    }
   }
   // Reviewed by the project's reviewer pool (HI-1581, G17), the Assistant's and a script's: refused as Start Lane…
   // refuses it (the rules have no pool, nobody but the builder reviews), and with a reviewer of its own.
@@ -2097,7 +2102,7 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     }
   }
   const started = async () => {
-    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}) })
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}) })
     // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
     // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
     const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
