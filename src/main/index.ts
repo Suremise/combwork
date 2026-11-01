@@ -550,6 +550,9 @@ async function stopWorkspaceAgents(from: BrowserWindow, scope: 'workspace' | 'sw
   // workspace has closed or switched (ipc clears the flag).
   e.ws.closing = true
   await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
+  // Their slot writers released while the workspace is open (HI-2299: released after it closed, they failed). Each
+  // waits for its run's job to be seen empty (about 2 s), so a bound of 5 s, as the quit's look has.
+  await sessions.writersSettled(5000, (p) => workspaceFor(p) === e.ws)
   return true
 }
 
@@ -571,6 +574,9 @@ async function requestCloseWindow(e: HiveWindow, done: AlreadyAsked = {}): Promi
   }
   e.ws.closing = true
   await sessions.stopWhereAndWait((s) => workspaceFor(s.projectPath) === e.ws, 3000, 'closed')
+  // Their slot writers released while the workspace is open (HI-2299: released after it closed, they failed). Each
+  // waits for its run's job to be seen empty (about 2 s), so a bound of 5 s, as the quit's look has.
+  await sessions.writersSettled(5000, (p) => workspaceFor(p) === e.ws)
   saveWindowsWithout(e)
   // Its workspace closed here, its close command run in it while it is still shown (HI-1368), then the window goes.
   await closeWithCommand(e.ws, 'window', e.win).catch((err) => log.warn("closing the window's workspace", err))

@@ -3946,7 +3946,9 @@ Whether a conversation may resume there is its **hold** (none: it may):
     A refresh clears this Hive's own writer whose processes are proven ended but whose release couldn't be written.
     Hive's quit therefore waits, after the leftovers' look that tells each stopped run's outcome, for those releases
     to be written (at most 3 s, `sessions.writersSettled`) before its workspaces close (HI-1801: a quit that closed
-    them first left the slot held, and the next start there was refused).
+    them first left the slot held, and the next start there was refused). So does a workspace's own close (Close
+    Workspace, a switch, or closing a window that isn't the last), for its projects' writers, after stopping its agents (at most 5 s: each waits for its run's job to be seen empty, about 2 s)
+    (HI-2299: Tools' slots stayed held, their releases tried after it had closed: "No workspace is open").
   - **A gone Hive's writer settled by itself** (HI-1886: after a restart for an install, every builder's resume was
     refused, its slot held by its own ended run, and a lane's slot stayed held after its lease had ended). The proof is the
     one a release needs: the run's job seen empty (its whole membership, what its processes started joining it). Hive
@@ -3955,7 +3957,7 @@ Whether a conversation may resume there is its **hold** (none: it may):
     until empty for at most 5 s (`recordEndedLaunches`), so a CLI slow to exit as Hive quits for an install still
     counts, and so do the leftovers the quit has just ended (`confirming`, HI-2055: rc.11's slot-d stayed held by a run
     whose leftovers the quit ended, as nothing looked again); only from the helper that held its job as the look began, never a run lost meanwhile (a helper started in
-    its place has none of the old jobs and lists any as empty: HR2's round 2). Kept forward until the writer is settled, at most 100; never offered as leftovers. When a writer's Hive is
+    its place has none of the old jobs and lists any as empty: HR2's round 2). Only runs that took a slot's writer and haven't had its release written (HI-2299: every ended run of a busy day, 130, went past the bound and pushed out a closed workspace's records, kept first). Kept forward until the writer is settled, at most 100; never offered as leftovers. When a writer's Hive is
     known to have gone (`alive` false) and its run is kept as ended, it is cleared and drained. A list of the run's
     processes taken earlier (the last run's marker, a crash's) never settles it, even with none of them still running:
     what they started after it isn't in it (HR2's round 1). Nothing kept, a job not seen empty by the quit's end, or

@@ -99,7 +99,9 @@ describe("a run's record for its slot writer (HI-1886)", () => {
     expect(await m.endedEarlier('r-before')).toBe(true)
     expect(await m.endedEarlier('r-none')).toBe(false)
     expect(m.allLeftovers()).toEqual([])
-    // This run: one seen to end, one kept running, one whose release couldn't be written; the earlier one kept too.
+    // This run: one seen to end, one kept running, one whose release couldn't be written; the earlier one kept too. Each
+    // took a slot's writer (HI-2299: only those are kept).
+    for (const r of ['r-done', 'r-kept', 'r-unwritten']) m.runTookWriter(r)
     m.settleRunForTests('r-done', 'ended')
     m.settleRunForTests('r-kept', 'kept')
     m.keepRunEnded('r-unwritten')
@@ -122,9 +124,42 @@ describe("a run's record for its slot writer (HI-1886)", () => {
     expect(await (await restarted()).endedEarlier('r-unwritten')).toBe(true)
   })
 
+  it("a busy day's ended runs never push out those a later start needs (HI-2299)", async () => {
+    // An earlier Hive's record not settled yet (its workspace not reopened since).
+    writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))
+    let m = await restarted()
+    m.runTookWriter('w-earlier')
+    m.keepRunEnded('w-earlier')
+    await m.recordEndedLaunches()
+    await m.leftoversSaved()
+    m = await restarted()
+    // A closed workspace's release that couldn't be written, kept first; then 150 runs end (no writer, or released);
+    // then the last workspace's writer, stopped by the quit, its release not written yet.
+    m.runTookWriter('w-closed')
+    m.settleRunForTests('w-closed', 'ended')
+    m.keepRunEnded('w-closed')
+    for (let i = 0; i < 150; i++) {
+      const run = `busy-${i}`
+      if (i % 2) m.runTookWriter(run)
+      m.settleRunForTests(run, 'ended')
+      if (i % 2) m.runWriterReleased(run)
+    }
+    m.runTookWriter('w-last')
+    m.settleRunForTests('w-last', 'ended')
+    await m.recordEndedLaunches()
+    await m.leftoversSaved()
+    expect(saved().ended?.sort()).toEqual(['w-closed', 'w-earlier', 'w-last'])
+    m = await restarted()
+    expect([await m.endedEarlier('w-earlier'), await m.endedEarlier('w-closed'), await m.endedEarlier('w-last'), await m.endedEarlier('busy-1')]).toEqual([true, true, true, false])
+  })
+
   it.runIf(process.platform === 'win32')("the quit's look keeps a launch as ended only from the helper that held its job: one lost meanwhile keeps none (HR2's round 2)", async () => {
     writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))
-    const track = async (m: typeof import('../src/main/agentProcesses'), runId: string) => expect(await m.trackLaunch({ runId, projectPath: profile.dir, agentId: runId, agentName: runId }, 100)).toEqual({ tracked: true })
+    const track = async (m: typeof import('../src/main/agentProcesses'), runId: string) => {
+      // A slot's writer's run (HI-2299: only those are kept).
+      m.runTookWriter(runId)
+      expect(await m.trackLaunch({ runId, projectPath: profile.dir, agentId: runId, agentName: runId }, 100)).toEqual({ tracked: true })
+    }
     // The helper holding both jobs answers: both empty, both kept.
     jobs.instance = 1
     jobs.onList = () => undefined
@@ -164,7 +199,11 @@ describe("a run's record for its slot writer (HI-1886)", () => {
    * rules: kept as ended only once the helper that held its job sees it empty.
    */
   describe('leftovers Hive ended as it quits (HI-2055)', () => {
-    const track = async (m: typeof import('../src/main/agentProcesses'), runId: string) => expect(await m.trackLaunch({ runId, projectPath: profile.dir, agentId: runId, agentName: runId }, 100)).toEqual({ tracked: true })
+    const track = async (m: typeof import('../src/main/agentProcesses'), runId: string) => {
+      // A slot's writer's run (HI-2299: only those are kept).
+      m.runTookWriter(runId)
+      expect(await m.trackLaunch({ runId, projectPath: profile.dir, agentId: runId, agentName: runId }, 100)).toEqual({ tracked: true })
+    }
     /** A launch that left a process running, ended by Hive quitting: asked, not yet seen gone. */
     async function endedAtQuit(runId: string): Promise<typeof import('../src/main/agentProcesses')> {
       writeFileSync(file, JSON.stringify({ version: 1, launches: [] }))

@@ -1918,11 +1918,13 @@ class SessionManager {
   /**
    * Once the slot writers of the runs that have ended are released (or found held), at most `timeoutMs` (HI-1801: Hive
    * quitting closed the workspace before a stopped run's release was written, its outcome known only after the
-   * leftovers' look, so the next start found the slot held by a Hive that had gone). Hive's quit, after the leftovers.
+   * leftovers' look, so the next start found the slot held by a Hive that had gone). Hive's quit, after the leftovers;
+   * a window's workspace closing, for its own projects' (`which`, HI-2299: closed first, its releases failed).
    */
-  async writersSettled(timeoutMs: number): Promise<void> {
+  async writersSettled(timeoutMs: number, which?: (projectPath: string) => boolean): Promise<void> {
+    const pending = (): Promise<void>[] => (which ? [...this.writerSettlingOf.values()].filter((e) => which(e.projectPath)).map((e) => e.settled) : [...this.writersSettling])
     const all = (async () => {
-      while (this.writersSettling.size) await Promise.allSettled([...this.writersSettling])
+      for (let p = pending(); p.length; p = pending()) await Promise.allSettled(p)
     })()
     let timer: NodeJS.Timeout | undefined
     await Promise.race([all, new Promise<void>((r) => (timer = setTimeout(r, timeoutMs)))])

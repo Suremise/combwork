@@ -14,7 +14,7 @@ import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
-import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperState, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, setHiveIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
+import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperState, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, runTookWriter, runWriterReleased, setHiveIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
 import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n'
 import { SlotStore, type SlotConn } from './slots'
@@ -303,6 +303,8 @@ export async function claimPlace(projectPath: string, agent: FolderAgent, existi
     const head = existing && !o.auto ? await headNow(folder) : null
     const me = await writerHost.self()
     const claimed = await store.conn.write((db) => claimIn(db, store, { facts, folder, agent, existing, ...o, sessionsHost, me, head }))
+    // Kept as ended at a quit until its release is written (HI-2299).
+    runTookWriter(o.run)
     if (existing && claimed.lease !== existing.lease) log.info(`Session ${existing.id} resumes in ${userText(claimed.slot.name)} under lease ${claimed.lease}`)
     return { cwd: claimed.slot.folder, lease: claimed.lease, slot: claimed.slot, foreign: false, done: tracked.done }
   } catch (e) {
@@ -396,6 +398,8 @@ export async function releaseWriter(projectPath: string, run: string): Promise<v
   try {
     const { ws, project } = await hostOf(projectPath)
     for (const slot of await new SlotStore(boardConn(ws), project).clearWriterRun(run)) await writerHost.drained(projectPath, slot)
+    runWriterReleased(run)
+    log.info(`The slot writer ${run} was released`)
   } catch (e) {
     // Its workspace closed meanwhile: the row stays, held, until a refresh of this Hive clears it (writerOver), or, this
     // Hive gone by then, a later one settles it from the run's kept record (HI-1886).
