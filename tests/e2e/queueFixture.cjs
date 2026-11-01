@@ -116,9 +116,10 @@ async function agent(fx, h, name, { worktree = false, project = fx.alpha } = {})
  * The live session's own launch and its token (#1615): the launch of the run live now (its private folder is named by
  * the run), read inside the wait. A run Hive ends meanwhile (superseded: a resumed session keeps its id) has its folder
  * removed with its mcp.json, so a read after the wait failed (ENOENT); here the next poll reads the run live then.
- * `where` narrows the live session (in a folder): { launch, token }, or null if none came.
+ * `where` narrows the live session (in a folder); `stale`, a token an earlier run had, is passed over until a new run's
+ * comes: { launch, token }, or null if none came.
  */
-async function liveToken(fx, live, where = () => true) {
+async function liveToken(fx, live, where = () => true, stale = null) {
   const read = (file) => {
     try {
       return JSON.parse(fs.readFileSync(file, 'utf8'))
@@ -132,8 +133,19 @@ async function liveToken(fx, live, where = () => true) {
     const launch = launches(fx).find((l) => l.opts['--mcp-config'] && path.basename(path.dirname(l.opts['--mcp-config'])) === s.runId)
     const hive = launch ? read(launch.opts['--mcp-config'])?.mcpServers?.hive : null
     const token = hive ? read(hive.env.HIVE_API_TOKEN_FILE)?.token : null
-    return token ? { launch, token } : null
+    return token && token !== stale ? { launch, token } : null
   }, HUNG_MS, 200)
+}
+
+/**
+ * An agent Hive gave a new conversation (HI-2232: a lane recorded for an idle builder outside slots restarts it, now or
+ * once it is free): the new run's token, as each launch has its own (the earlier one's is refused). `project`: the
+ * agent's. The agent with it, or with a null token if no new run came.
+ */
+async function renewed(fx, h, a, project = fx.alpha) {
+  const live = async () => (await h.inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === a.id)
+  const got = await liveToken(fx, live, () => true, a.token)
+  return { ...a, token: got?.token ?? null }
 }
 
 /**
@@ -377,4 +389,4 @@ function otherProfile(fx, suffix) {
   return { ...fx, userData }
 }
 
-module.exports = { HUNG_MS, devSeam, queueProject, prepare, steer, queueOptions, startHive, agent, rejoin, releaseHeld, intent, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }
+module.exports = { HUNG_MS, devSeam, queueProject, prepare, steer, queueOptions, startHive, agent, renewed, rejoin,releaseHeld, intent, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }

@@ -488,7 +488,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     // ===== beta: added with one agent; Solo; S44 through the tab.
     lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.hive/\n' })
     await inv('workspace:refresh')
-    const s =await q.agent(fx, h, 'S1', { project: beta })
+    let s = await q.agent(fx, h, 'S1', { project: beta })
     check('beta: its notice opens the step at Git', await fromNotice('beta'))
     check('…Solo suggested for one agent', !!(await waitHung(async () => (await stepEl.locator('[data-preset="solo"] .vc-step-tag').count()) === 1)) && (await text(stepEl.locator('.vc-step-why'))) === 'Suggested for one agent or none.', await text(stepEl))
     check('Choose → Use Solo: "Workflow: Git · Solo"', await choose('Solo'), await workflowLine())
@@ -499,6 +499,11 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'pro
     // A loop of its one card (registered as the card-loop skill does): Pulse shows it while it runs.
     const sl = await api('POST', '/v1/lanes', { project: 'beta', builder: 'S1', reviewer: null, name: 'solo', cards: [sc] })
     check("beta's lane is registered", sl.status === 200, JSON.stringify(sl))
+    // S1 is idle in the project folder, so the lane gives it a new conversation (HI-2232), now or once it is free: its
+    // calls then carry the new run's token (the one read at its start is refused).
+    check('…S1 given the lane in a new conversation', /Gave S1 the lane in a new conversation|S1 wasn't free/.test(JSON.stringify(sl.body)), JSON.stringify(sl.body))
+    s = await q.renewed(fx, h, s, beta)
+    check("…S1's new run has its own token", !!s.token)
     const soloLane = sl.body?.lane?.id
     await page.getByRole('button', { name: 'Task Board' }).click()
     await showTab('pulse')
