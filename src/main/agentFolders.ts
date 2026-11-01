@@ -14,7 +14,7 @@ import { samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
-import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperState, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, runTookWriter, runWriterReleased, setHiveIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
+import { endedEarlier, endProcessesExactly, forgetEarlierRun, forgetKeeperRun, keepRunEnded, keeperHoldsNothing, keeperState, keeperStillBound, leftoversOfRun, onRunOutcome, runOutcome, runTookWriter, runWriterReleased, setHiveIdentity, settleLeftovers, stillRunningOf, type RunOutcome } from './agentProcesses'
 import { hiveError } from './hiveError'
 import { msg } from '../shared/i18n'
 import { SlotStore, type SlotConn } from './slots'
@@ -527,6 +527,13 @@ export async function goneWriterSettles(projectPath: string, w: { run: string; a
     return Object.freeze({ run: w.run, helper: null })
   }
   const kept = await keeperState(w.run, `${w.pid}:${w.started}`)
+  if (kept?.state === 'live') {
+    // HI-2309's one rule: its keeper's job still has processes, but only Windows' own idle brokers.
+    const helper = await keeperHoldsNothing(w.run, `${w.pid}:${w.started}`, w.agent)
+    if (!helper) return false
+    log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run left only Windows' own idle brokers running (its Hive, process ${w.pid}, gone; seen by its helper ${helper})`)
+    return Object.freeze({ run: w.run, helper })
+  }
   if (kept?.state !== 'ended') return false
   log.info(`The slot writer ${w.run} in ${userText(basename(projectPath))} settled: ${userText(w.agent)}'s ended run left nothing running (its Hive, process ${w.pid}, gone; seen by its helper ${kept.helper})`)
   return Object.freeze({ run: w.run, helper: kept.helper })

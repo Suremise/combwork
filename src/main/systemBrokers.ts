@@ -13,6 +13,8 @@ import { join } from 'path'
 export interface SystemBroker {
   /** What it is, for the log. */
   what: string
+  /** Its executable's file name, lower case: a process named otherwise is no broker, without asking its path. */
+  exe: string
   /** Whether a process's executable path is this broker's. */
   is: (path: string) => boolean
   /** The executables (lower case) whose running means it may still write: while any runs, it is the agent's. */
@@ -39,10 +41,14 @@ export const SYSTEM_BROKERS: readonly SystemBroker[] = [
     // The Sandbox's broker lingers after the Sandbox closes (MB1, 1 Nov). While a Sandbox runs, folders mapped into it
     // (the windows-sandbox server maps a build folder, which may be in the slot) can be written from inside it.
     what: "Windows Sandbox's broker", // i18n-ignore: for the log
+    exe: 'windowssandboxserver.exe',
     is: (path) => inPackage(path, 'MicrosoftWindows.WindowsSandbox', 'WindowsSandboxServer.exe'),
     active: ['windowssandbox.exe', 'windowssandboxclient.exe', 'windowssandboxremotesession.exe', 'vmmemwindowssandbox', 'vmmemwindowssandbox.exe']
   }
 ]
+
+/** Whether a process's executable name may be a known broker's (its path decides): none is, and nothing need be asked. */
+export const mayBeBroker = (name: string): boolean => SYSTEM_BROKERS.some((b) => b.exe === name.toLowerCase())
 
 /** The known broker a process's executable path is, if any. */
 export function brokerOf(path: string | undefined): SystemBroker | null {

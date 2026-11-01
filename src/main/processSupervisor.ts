@@ -28,7 +28,7 @@ const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'Wi
 export type HostFailure = { kind: 'test' } | { kind: 'noPowerShell'; error: string } | { kind: 'slowHelper'; seconds: number } | { kind: 'refused' } | { kind: 'helperFailed'; why: string }
 
 /** The host's requests (HiveJobs.Answer). */
-export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'lineage' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow' | 'keeper' | 'running'
+export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'lineage' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow' | 'keeper' | 'running' | 'paths'
 
 export interface JobHostOptions {
   /** How long it gets to start, and then to answer each request. */
@@ -393,6 +393,39 @@ public static class HiveJobs {
       first = false;
     }
     return b.Append(']').ToString();
+  }
+  [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern bool QueryFullProcessImageNameW(IntPtr p, int flags, StringBuilder name, ref int size);
+  /**
+   * The executables of processes by id and start time ("pid:created,…", HI-2309: a system broker is known by its path),
+   * as JSON {"pid:created": "path"} for each still running as that process; "" where it runs but its path can't be read
+   * (access denied, say). One gone, or whose id names another process by now, is left out.
+   */
+  public static string Paths(string list) {
+    var b = new StringBuilder("{");
+    bool first = true;
+    foreach (var e in Pairs(list)) {
+      string path = "";
+      // PROCESS_QUERY_LIMITED_INFORMATION
+      IntPtr p = OpenProcess(0x1000, false, e.Key);
+      // ERROR_INVALID_PARAMETER: no process has the id. Anything else: one does, unread.
+      if (p == IntPtr.Zero) { if (Marshal.GetLastWin32Error() == 87) continue; }
+      else {
+        try {
+          uint code; long c, x, k, u;
+          if (GetProcessTimes(p, out c, out x, out k, out u)) {
+            if (c != e.Value) continue;
+            if (GetExitCodeProcess(p, out code)) {
+              if (code != 259) continue;
+              var name = new StringBuilder(32768); int n = name.Capacity;
+              if (QueryFullProcessImageNameW(p, 0, name, ref n)) path = name.ToString(0, n);
+            }
+          }
+        } finally { CloseHandle(p); }
+      }
+      b.Append(first ? "" : ",").Append(Q(e.Key + ":" + e.Value)).Append(':').Append(Q(path));
+      first = false;
+    }
+    return b.Append('}').ToString();
   }
   /**
    * Ends processes by id and start time ("pid:created,…", #614), each only while it is still that process: one gone, or
@@ -837,7 +870,7 @@ public static class HiveJobs {
     foreach (string n in found) { b.Append(first ? "" : ",").Append(Q(n)); first = false; }
     return b.Append("]").ToString();
   }
-  /** The job's processes as JSON: how many, and the first max with their names, command lines and executables' paths. */
+  /** The job's processes as JSON: how many, and the first max with their names and command lines. */
   /** The job's processes and the running ones it follows. */
   public static int[] Members(string id) {
     lock (turn) {
@@ -857,9 +890,9 @@ public static class HiveJobs {
       var where = new StringBuilder();
       for (int i = 0; i < all.Length && i < max; i++) where.Append(i > 0 ? " OR " : "").Append("ProcessId=").Append(all[i]);
       bool first = true;
-      using (var q = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId, Name, CommandLine, ExecutablePath FROM Win32_Process WHERE " + where))
+      using (var q = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId, Name, CommandLine FROM Win32_Process WHERE " + where))
         foreach (ManagementObject p in q.Get()) {
-          b.Append(first ? "" : ",").Append("{\"pid\":").Append(Convert.ToInt32(p["ProcessId"])).Append(",\"parent\":").Append(Convert.ToInt32(p["ParentProcessId"])).Append(",\"name\":").Append(Q((string)p["Name"])).Append(",\"cmd\":").Append(Q((string)p["CommandLine"])).Append(",\"path\":").Append(Q((string)p["ExecutablePath"])).Append(",\"created\":\"").Append(CreatedOf(Convert.ToInt32(p["ProcessId"]))).Append("\"}");
+          b.Append(first ? "" : ",").Append("{\"pid\":").Append(Convert.ToInt32(p["ProcessId"])).Append(",\"parent\":").Append(Convert.ToInt32(p["ParentProcessId"])).Append(",\"name\":").Append(Q((string)p["Name"])).Append(",\"cmd\":").Append(Q((string)p["CommandLine"])).Append(",\"created\":\"").Append(CreatedOf(Convert.ToInt32(p["ProcessId"]))).Append("\"}");
           first = false;
         }
     }
@@ -1037,6 +1070,7 @@ public static class HiveJobs {
         case "endtree": r = EndTree(a[2]); break;
         case "memory": r = Memory(a[2]); break;
         case "running": r = Running(a[2]); break;
+        case "paths": r = Paths(a[2]); break;
         case "lineage": r = Lineage(a[2]); break;
         // Its journal's path, in base64url (requests are words).
         case "open": r = Q(Open(a[2], a.Length > 3 ? Encoding.UTF8.GetString(Convert.FromBase64String(a[3].Replace('-', '+').Replace('_', '/').PadRight(a[3].Length + (4 - a[3].Length % 4) % 4, '='))) : null)); break;
@@ -1082,8 +1116,7 @@ export interface JobList {
   total: number
   /** How many of its processes the host adopted after they escaped the job (Sweep, #543). */
   adopted?: number
-  /** `path`: its executable's full path, "" when Windows doesn't say (HI-2304). */
-  processes: { pid: number; parent?: number; name: string; cmd: string; path?: string; created?: string }[]
+  processes: { pid: number; parent?: number; name: string; cmd: string; created?: string }[]
 }
 
 /**

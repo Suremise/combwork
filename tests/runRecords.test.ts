@@ -29,7 +29,10 @@ const jobs = vi.hoisted(() => ({
   /** Processes still running, "pid:created" (HI-2303: an earlier Hive's helper, keeping). */
   alive: new Set<string>(),
   /** The host can't say which still run. */
-  identifyFails: false
+  identifyFails: false,
+  /** Processes' executables by "pid:created" (HI-2309, the helper's "paths"), and the names running on the machine. */
+  paths: new Map<string, string>(),
+  running: [] as string[]
 }))
 vi.mock('../src/main/processSupervisor', async (orig) => {
   const next = (): number => Math.max(2, jobs.last + 1)
@@ -70,6 +73,8 @@ vi.mock('../src/main/processSupervisor', async (orig) => {
       if (cmd === 'keeper') return `${4000 + jobs.instance}:1`
       // Which processes still run (HI-2303: a binding's helper, "pid:created"): those the test says.
       if (cmd === 'identify') return jobs.identifyFails ? null : run!.split(',').filter((id) => jobs.alive.has(id))
+      if (cmd === 'paths') return Object.fromEntries(run!.split(',').filter((id) => jobs.alive.has(id)).map((id) => [id, jobs.paths.get(id) ?? '']))
+      if (cmd === 'running') return run!.split(',').filter((n) => jobs.running.includes(n))
       if (cmd !== 'list') return null
       jobs.listed.push(run!)
       jobs.onList(run!)
@@ -303,6 +308,44 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       expect(await next.keeperState('k-run', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
       plantState('k-run', state('k-run', { state: 'live', total: 2, members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] }))
       expect(await next.keeperState('k-run', HIVE)).toMatchObject({ state: 'live', helper: '4001:1', members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] })
+    })
+
+    // HI-2309's one rule on a gone Hive's keeper: its "live" job with only Windows Sandbox's idle broker holds nothing.
+    it.runIf(process.platform === 'win32')("a keeper's \"live\" job with only the idle broker settles; anything else, or a keeper gone, holds (HI-2309)", async () => {
+      const m = await tracking()
+      expect(await track(m, 'k-broker')).toBe(true)
+      await m.leftoversSaved()
+      const next = await restarted()
+      const C = '133000000000000000'
+      const BROKER = join(process.env.ProgramW6432 || process.env.ProgramFiles || 'C:\\Program Files', 'WindowsApps', 'MicrosoftWindows.WindowsSandbox_0.5.3.0_x64__cw5n1h2txyewy', 'WindowsSandboxServer.exe')
+      const broker = { pid: 7101, created: C, name: 'WindowsSandboxServer.exe' }
+      jobs.paths.set(`7101:${C}`, BROKER)
+      jobs.paths.set(`7102:${C}`, 'C:\\Program Files\\nodejs\\node.exe')
+      jobs.alive = new Set(['4001:1', `7101:${C}`, `7102:${C}`])
+      jobs.running = []
+      try {
+        plantState('k-broker', state('k-broker', { state: 'live', total: 1, members: [broker] }))
+        expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBe('4001:1')
+        // A Sandbox running: its broker may still write.
+        jobs.running = ['windowssandboxclient.exe']
+        expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
+        jobs.running = []
+        // Another member beside it, a member not described, or one ended since the keeper wrote: held.
+        plantState('k-broker', state('k-broker', { state: 'live', total: 2, members: [broker, { pid: 7102, created: C, name: 'node.exe' }] }))
+        expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
+        plantState('k-broker', state('k-broker', { state: 'live', total: 2, members: [broker] }))
+        expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
+        plantState('k-broker', state('k-broker', { state: 'live', total: 1, members: [{ ...broker, pid: 7103 }] }))
+        expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
+        // Its keeper gone: its state may be old.
+        plantState('k-broker', state('k-broker', { state: 'live', total: 1, members: [broker] }))
+        jobs.alive.delete('4001:1')
+        expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
+      } finally {
+        jobs.paths.clear()
+        jobs.alive = new Set()
+        jobs.running = []
+      }
     })
 
     it.runIf(process.platform === 'win32')("none taken unless whole and its own: another helper, Hive or run, a version, an incomplete or non-empty \"ended\", a bad member, malformed or too large", async () => {

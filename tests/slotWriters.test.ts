@@ -54,7 +54,9 @@ const tracker = vi.hoisted(() => ({
   keeperAsked: [] as string[],
   bound: (_run: string, _helper: string): boolean => true,
   reading: () => undefined as void,
-  keeperForgotten: [] as string[]
+  keeperForgotten: [] as string[],
+  /** HI-2309: runs whose keeper's "live" job holds nothing by the one rule (only idle brokers), with that keeper's helper. */
+  holdsNothing: new Map<string, string>()
 }))
 vi.mock('../src/main/agentProcesses', async (orig) => ({
   ...((await orig()) as object),
@@ -78,6 +80,7 @@ vi.mock('../src/main/agentProcesses', async (orig) => ({
     return tracker.keeper.get(run) ?? null
   },
   keeperStillBound: (run: string, helper: string) => tracker.bound(run, helper),
+  keeperHoldsNothing: async (run: string) => tracker.holdsNothing.get(run) ?? null,
   forgetKeeperRun: (run: string) => void tracker.keeperForgotten.push(run)
 }))
 vi.mock('../src/main/lastRun', async (orig) => ({ ...((await orig()) as object), lastUnexpectedClose: () => (tracker.restart.length ? { processes: tracker.restart } : null) }))
@@ -602,6 +605,7 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
     tracker.ended.length = 0
     tracker.writerAt = () => null
     tracker.keeper.clear()
+    tracker.holdsNothing.clear()
     tracker.keeperAsked.length = 0
     tracker.bound = () => true
     tracker.reading = () => undefined
@@ -690,6 +694,29 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
       expect(tracker.keeperAsked).toEqual([hive()])
       expect(tracker.keeperForgotten).toEqual(['r-kept'])
       expect(tracker.endedExactly).toEqual([])
+    })
+
+    it("\"live\" with only Windows Sandbox's idle broker left (HI-2309's one rule): freed at the sweep and by its own start; \"live\" with anything else, held", async () => {
+      hostOn(false)
+      const broker = { pid: 7101, name: 'WindowsSandboxServer.exe', label: 'WindowsSandboxServer', created: '133900000000000002' }
+      await plant('r-live-node', { ended: true })
+      tracker.keeper.set('r-live-node', { state: 'live', helper, members: [node] })
+      await pool.settleGoneWriters()
+      expect(writer()?.run).toBe('r-live-node')
+      expect(tracker.keeperForgotten).toEqual([])
+      await store.clearWriterRun('r-live-node')
+      await plant('r-live-broker', { ended: true })
+      tracker.keeper.set('r-live-broker', { state: 'live', helper, members: [broker] })
+      tracker.holdsNothing.set('r-live-broker', helper)
+      await pool.settleGoneWriters()
+      expect(writer()).toBeNull()
+      expect(tracker.keeperForgotten).toEqual(['r-live-broker'])
+      expect(tracker.endedExactly).toEqual([])
+      await plant('r-live-own')
+      tracker.keeper.set('r-live-own', { state: 'live', helper, members: [broker] })
+      tracker.holdsNothing.set('r-live-own', helper)
+      const state = await start()
+      expect(writer()?.run).toBe(state.runId)
     })
 
     it('"ended": its own agent\'s start (a restart\'s resume) takes the slot back', async () => {
