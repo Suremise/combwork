@@ -1191,6 +1191,14 @@
     "defaultMessage": "Compaction: tool definition tokens field",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
   },
+  "settings.advanced.copilot.exit.armed.desc": {
+    "defaultMessage": "What Copilot shows after one Ctrl+C at its prompt, meaning the next one exits. When Hive stops Copilot, it presses Ctrl+C again once this shows. If it no longer matches, Hive keeps pressing Ctrl+C until Copilot exits, which takes longer.",
+    "description": "What the advanced setting \"Stop: exit hint\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.exit.armed.title": {
+    "defaultMessage": "Stop: exit hint",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Hive."
+  },
   "settings.advanced.copilot.exit.graceSeconds.desc": {
     "defaultMessage": "When Hive stops Copilot (Stop, Restart, closing a project or quitting), how long it gives Copilot to exit by itself after its Ctrl+C before killing it. Copilot writes the session's token totals only as it exits by itself: one killed first loses them. It took up to {took, plural, one {# second} other {# seconds}} on a busy machine (#716); quitting Hive or closing a workspace waits up to this long, and a second more, for a Copilot that hangs.",
     "description": "What the advanced setting \"Stop: exit grace\" is for, and what goes wrong when it is wrong (Settings → Advanced). {took} is the longest Copilot was seen to take, in seconds (2.4)."

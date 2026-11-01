@@ -147,11 +147,13 @@ export class CopilotAdapter implements ProviderAdapter {
     return advanced.pattern('copilot.trust.prompt')
   }
   // Copilot writes a session's token totals (session.shutdown) only as it exits by itself (#465). Ctrl+C cancels what
-  // runs (a turn, a dialog), and twice in a row exits ("ctrl+c again to exit"); three cover a turn or dialog first. It
-  // took 1.7-2.4 s from the first key to exit under load (#716), so the kill waits 10 s by default: only for one that
-  // hangs. The grace is an advanced setting (#727), read at each stop.
-  get exitKeys(): { keys: string[]; gapMs: number; graceMs: number } {
-    return { keys: ['\x03', '\x03', '\x03'], gapMs: 400, graceMs: advanced.number('copilot.exit.graceSeconds') * 1000 }
+  // runs (a turn, a dialog), and twice in a row exits ("ctrl+c again to exit"); three cover a turn or dialog first, at a
+  // lane's end (quit), where its turn is over. Stop types them on conditions instead (HI-2272, exitKeys.ts): a key that
+  // arrived as a cancelled turn wound down was lost under load, and with it the exit. It took 1.7-2.4 s from the first
+  // key to exit under load (#716), so the kill waits 10 s by default: only for one that hangs. The grace and the hint
+  // are advanced settings (#727), read at each stop.
+  get exitKeys(): { keys: string[]; gapMs: number; graceMs: number; armed: RegExp } {
+    return { keys: ['\x03', '\x03', '\x03'], gapMs: 400, graceMs: advanced.number('copilot.exit.graceSeconds') * 1000, armed: advanced.pattern('copilot.exit.armed') }
   }
 
   // Installation, readiness and the install, update and sign-in tasks (#452).

@@ -303,6 +303,8 @@
   "settings.advanced.copilot.compaction.systemTokens.title": "Compaction: system prompt tokens field",
   "settings.advanced.copilot.compaction.toolTokens.desc": "The field of a compaction's start and end, in Copilot's session file, with the tool definitions' tokens: one of the three parts of the context before and after it, in usage and the Sessions tab.",
   "settings.advanced.copilot.compaction.toolTokens.title": "Compaction: tool definition tokens field",
+  "settings.advanced.copilot.exit.armed.desc": "What Copilot shows after one Ctrl+C at its prompt, meaning the next one exits. When Hive stops Copilot, it presses Ctrl+C again once this shows. If it no longer matches, Hive keeps pressing Ctrl+C until Copilot exits, which takes longer.",
+  "settings.advanced.copilot.exit.armed.title": "Stop: exit hint",
   "settings.advanced.copilot.exit.graceSeconds.desc": "When Hive stops Copilot (Stop, Restart, closing a project or quitting), how long it gives Copilot to exit by itself after its Ctrl+C before killing it. Copilot writes the session's token totals only as it exits by itself: one killed first loses them. It took up to {took, plural, one {# second} other {# seconds}} on a busy machine (#716); quitting Hive or closing a workspace waits up to this long, and a second more, for a Copilot that hangs.",
   "settings.advanced.copilot.exit.graceSeconds.title": "Stop: exit grace",
   "settings.advanced.copilot.hooks.knownEvents.desc": "The hook events Hive knows GitHub Copilot sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.",
