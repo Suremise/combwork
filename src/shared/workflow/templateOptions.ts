@@ -5,7 +5,7 @@
 // (`overlayTemplateWorkflow`): a section naming a target, commands or an identity's name never carries them anywhere.
 
 import type { PlatformId } from '../platform/descriptors'
-import { allOff, contradictions, FOCUSED_RUN, FORM_GROUPS, OPTION_TAKES, PRESETS, type OptionKey, type PresetId, type WorkflowOptions } from './options'
+import { allOff, contradictions, FOCUSED_RUN, FORM_GROUPS, identityShown, OPTION_TAKES, PRESETS, sameOptionValue, type OptionKey, type PresetId, type WorkflowOptions } from './options'
 import { stageNameProblems } from './stages'
 
 /**
@@ -180,9 +180,12 @@ export function overlayTemplateWorkflow(section: TemplateWorkflow, base: Workflo
   }
   const own = { ...base.own, ...set }
   const options = { ...base.options, ...set, platform: base.platform } as WorkflowOptions
+  // G12 by on or off, shown as git's identity now (HI-2269): a saved copy that differs from it is neither a change nor
+  // shown as the value now.
+  const shown = (k: keyof WorkflowOptions, v: unknown): unknown => (k === 'identity' ? identityShown(v, base.identity) : v)
   const changes = carriedFor(base.platform)
-    .filter((k) => k in set && JSON.stringify(base.options[k]) !== JSON.stringify(options[k]))
-    .map((k) => ({ key: k as OptionKey, now: base.options[k], next: options[k] }))
+    .filter((k) => k in set && !sameOptionValue(k, base.options[k], options[k]))
+    .map((k) => ({ key: k as OptionKey, now: shown(k, base.options[k]), next: shown(k, options[k]) }))
   const named = [...new Set([...options.preChecks, ...(base.platform === 'git' ? options.mergeChecks : [])])]
   const missingCommands = named.filter((n) => !options.commands[n]?.trim())
   // G20 on where Hive merges needs this project's runner (HI-1949): flagged as a check's command is; saving still refuses it.

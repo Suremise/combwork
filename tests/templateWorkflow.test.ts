@@ -155,6 +155,22 @@ describe("laid over another project's options", () => {
     expect(o.changes.some((c) => (['target', 'commands', 'excluded'] as OptionKey[]).includes(c.key))).toBe(false)
   })
 
+  it("HI-2269: G12 already on with a stale saved copy is no change, and its value now is git's identity now, never the copy", () => {
+    const stale = { ...bOptions, identity: { name: 'Old Typo', email: 'typo@example.com' } }
+    const live = { name: 'B Person', email: 'b@example.com' }
+    // The template turns it on, as it is: not listed.
+    const on = overlayTemplateWorkflow(section, { platform: 'git', options: stale, own: {}, identity: live })
+    expect(on.changes.map((c) => c.key)).not.toContain('identity')
+    // The template turns it off: listed, its value now git's identity, not the saved copy.
+    const off = overlayTemplateWorkflow({ ...section, options: { ...section.options, identity: false } }, { platform: 'git', options: stale, own: {}, identity: live })
+    expect(off.changes.find((c) => c.key === 'identity')).toEqual({ key: 'identity', now: live, next: null })
+    // On with no identity in git now: just on.
+    const none = overlayTemplateWorkflow({ ...section, options: { ...section.options, identity: false } }, { platform: 'git', options: stale, own: {}, identity: null })
+    expect(none.changes.find((c) => c.key === 'identity')).toEqual({ key: 'identity', now: true, next: null })
+    // Off now, turned on: its value next is git's identity.
+    expect(overlayTemplateWorkflow(section, base(live)).changes.find((c) => c.key === 'identity')).toEqual({ key: 'identity', now: null, next: live })
+  })
+
   it('G20 (HI-1949): its runner is flagged where B has none or a blank one, and B still can’t save until it is set; B’s own runner kept, nothing flagged', () => {
     const team = templateWorkflowOf(preset('git', 'team', { quick: [], tests: [], focused: { run: 'npm run focused' } }), 'team')
     const over = (commands: Record<string, string>) => overlayTemplateWorkflow(team, { platform: 'git', options: { ...bOptions, commands }, own: { commands }, identity: null })

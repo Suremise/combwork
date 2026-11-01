@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ProjectInfo, WorkflowChange, WorkflowForm } from '@shared/types'
 import type { PlatformId } from '@shared/platform/descriptors'
-import type { PresetId, WorkflowOptions } from '@shared/workflow/options'
+import { identityShown, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { PRESET_SUMMARY, PRESET_TEXT } from '@shared/workflow/optionTexts'
 import { asksPreset, STEP_PRESETS, suggestPreset } from '@shared/workflow/presetStep'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -113,7 +113,7 @@ export function PresetStep({ project, platform, form }: { project: ProjectInfo; 
       <div className="s-desc vc-step-why" data-suggested={suggested}>
         {tr(M.why, { why: suggested })}
       </div>
-      {details && <ChoicePreview choice={shown.id} name={name(shown.id)} options={shown.options} effective={form.options} valueText={(k, v) => optionValueText(k, v, platform)} />}
+      {details && <ChoicePreview choice={shown.id} name={name(shown.id)} options={shown.options} effective={form.options} valueText={(k, v) => optionValueText(k, k === 'identity' ? identityShown(v, form.identity) : v, platform)} />}
       <div className="vc-step-actions">
         <button type="button" className="btn primary small" data-action="step-choose" disabled={busy} onClick={() => void choose()}>
           {tr(M.choose, { preset: name(shown.id) })}
