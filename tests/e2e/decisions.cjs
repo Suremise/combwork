@@ -305,7 +305,7 @@ const check = (name, ok, extra = '') => {
   const viaMcp = JSON.parse(
     execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_project_status', arguments: {} } }) + '\n',
-      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN: coderToken, HIVE_API_TOKEN_FILE: '', HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }),
+      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN_FILE: lib.tokenFile(coderToken), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }),
       timeout: 60000
     })
       .toString()

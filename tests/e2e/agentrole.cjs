@@ -176,7 +176,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const asTokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
     check('the Assistant starts, with its token', !!(await until(async () => fs.existsSync(asTokenFile), HUNG_MS)))
     const mcp = (method, params, role) => {
-      const extra = role === 'assistant' ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' } : { HIVE_API_TOKEN: token, HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: 'a-hb1' }
+      const extra = role === 'assistant' ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' } : { HIVE_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: 'a-hb1' }
       const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n', env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, ...extra }), timeout: 60000 }).toString()
       return JSON.parse(out.split('\n')[0]).result
     }

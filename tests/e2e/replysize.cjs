@@ -118,7 +118,7 @@ const prose = (seed, n) => {
    * 'own': with the coder's own token, as the agent calls it, where the caller matters: its own lane starts nobody, HI-1933).
    */
   const tool = (name, args, role = 'agent') => {
-    const extra = { HIVE_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', HIVE_JOURNAL: '1', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' } : role === 'own' ? { HIVE_API_TOKEN: coderOwnToken(), HIVE_API_TOKEN_FILE: '', HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id } : { HIVE_API_TOKEN: apiToken, HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }) }
+    const extra = { HIVE_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', HIVE_JOURNAL: '1', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' } : role === 'own' ? { HIVE_API_TOKEN_FILE: lib.tokenFile(coderOwnToken()), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id } : { HIVE_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }) }
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
       env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, ...extra }),
@@ -129,7 +129,7 @@ const prose = (seed, n) => {
   }
   /** The tools a role is offered, as the CLI lists them ('assistant+settings': with Change settings on, every one of its own). */
   const toolList = (role = 'agent') => {
-    const extra = { HIVE_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', HIVE_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' } : { HIVE_API_TOKEN: apiToken, HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }) }
+    const extra = { HIVE_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', HIVE_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' } : { HIVE_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }) }
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) + '\n',
       env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, ...extra }),
@@ -669,7 +669,7 @@ const prose = (seed, n) => {
   const coderToken = launch?.token
   check("metrics: the agent's own token is known", !!coderToken)
   const asCoder = (method, request) =>
-    JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: request }) + '\n', env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, HIVE_API_TOKEN: coderToken, HIVE_API_TOKEN_FILE: '', HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }), timeout: 60000 }).toString().split('\n')[0]).result
+    JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: request }) + '\n', env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, HIVE_API_TOKEN_FILE: lib.tokenFile(coderToken), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }), timeout: 60000 }).toString().split('\n')[0]).result
   const unicode = (await api('POST', '/v1/tasks', { title: 'Ünïcödé 日本語 🐝 "quoted" \\ back', project: 'alpha', description: 'Ελληνικά — ✓ — \n new line' })).body.number
   const expected = {}
   for (const [name, args] of [['hive_list_tasks', {}], ['hive_list_tasks', { details: true }], ['hive_read_task', { number: unicode }], ['hive_read_task', { number: 999999 }]]) {
