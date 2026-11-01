@@ -4428,6 +4428,22 @@ repeating them (#533) [note §8].
   meanwhile sends nothing. Its line says *#12 (HI-B1's card) is in Review, outside a lane: you review it…*. The
   Assistant's `coordinate-agents` starts no reviewer for it (HI-2009's K6).
 - **Card loops**: the builder's watch and wakes are unchanged; the reviewer joins nothing, the assignment is its start.
+- **A pool lane's design step (HI-2310; seen 1 Nov on HI-2304, whose pool builder had nobody to post its design to,
+  built it unchecked and failed round 1 on the design's reach; Darren's option A, 1 Nov)**: `hive_loop_step` `design` on
+  a pool lane's card in Doing isn't refused for want of a reviewer: it writes `assignReviewer` instead of a wake, and the
+  pass gives the open design (the card's fold's `step`, a design) to a free reviewer exactly as a submission, in the same
+  oldest-first order (its time the step's): `ReviewerAssigned { reviewer, submission: <the step's seq>, design: true }`,
+  checked again in the write (the step still open, still the pool's), released as a submission's assignment is, and told
+  once: *HI-12 (HI-B1's card): its builder posted a design for a check (HI-12/s40), which you take from the pool…*.
+  Until one takes it, the lane says *waiting for a reviewer on HI-12*. The design's reviewer is the card's
+  `loopReviewerOf` while it is open (none before it is given: only the user or the Assistant can answer it then), and
+  isn't free for another card meanwhile; its answer, or the step ending (moved, submitted, replaced, `proceed`), frees
+  it. `proceed` on a design nobody took wakes nobody. A loose card's design isn't given out (no lane runs its loop).
+  **Preferred reviewer**: a pool card's submissions and designs go first to its preferred reviewer, the agent who last
+  answered one of its designs (`ok`/`gaps`), else who gave its last verdict, when that agent is free and allowed (not its
+  builder, not one who has seen the submission: with G1b = 2 the second is still another); busy, the next free one takes
+  it as before. Preferences are honoured before the oldest-first hand-out, so an older card doesn't take a reviewer
+  another card prefers. A lane with its own reviewer is unchanged.
   The card-loop skill's line for pools is #1444's.
 - **Off switch**: the option itself (`lane`). With workflow rules off nothing is given out or told, Start Lane offers no
   pool, and the lane's reviewer is whoever the user names.

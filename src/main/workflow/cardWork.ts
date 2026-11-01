@@ -301,12 +301,12 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
       }
       case 'ReviewStarted':
       case 'ReviewerAssigned': {
-        const x = d as FactData['ReviewStarted']
-        return `${x.reviewer} on submission ${x.submission}`
+        const x = d as FactData['ReviewerAssigned']
+        return `${x.reviewer} on ${x.design ? 'design' : 'submission'} ${x.submission}`
       }
       case 'ReviewerReleased': {
         const x = d as FactData['ReviewerReleased']
-        return `${x.reviewer} on submission ${x.submission} (${x.why})`
+        return `${x.reviewer} on ${x.design ? 'design' : 'submission'} ${x.submission} (${x.why})`
       }
       case 'Verdict': {
         const x = d as FactData['Verdict']

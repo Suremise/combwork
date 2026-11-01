@@ -1942,7 +1942,8 @@ export class Workflow {
    * answer (`ok`, `gaps`). A design or a follow-up is named (`<key>/s<seq>`); a design is due `waitMinutes` after its post
    * (Card loops → Design check wait, the caller's), kept in its fact: an answer or `proceed` names the step it is about,
    * and one for an earlier step is refused, so a late reply never settles a newer one. Moves nothing; wakes the other side: the builder's steps its reviewer (the lane's, else the
-   * agent that last reviewed it), an answer its builder. A design or follow-up with no reviewer to check it is refused. With the rules
+   * agent that last reviewed it), an answer its builder. A design or follow-up with no reviewer to check it is refused,
+   * but a pool lane's design (HI-2310): the pool gives it to the next free reviewer and tells it (`assignReviewer`). With the rules
    * off, nothing is checked. `reviewer`: the card's loop reviewer as it is when the write decides (loopReviewer.ts), read
    * inside its board change: an agent's removal publishes under the same lock, so it is either before (refused) or after.
    */
@@ -1972,7 +1973,8 @@ export class Workflow {
             const here = step === 'design' ? now.stage === 'active' : now.stage === 'review' || now.stage === 'approved' || now.stage === 'merging'
             if (!here) return { rule: 'loop.stepNotHere', values: { card: card.key, stage: now.stage, step } } as GuardRefusal
             if (step === 'followUp' && openEntry(now)?.state === 'started') return { rule: 'loop.followUpMerging', values: { card: card.key } } as GuardRefusal
-            if (!reviewer || reviewer === builder) return { rule: 'loop.noReviewer', values: { card: card.key } } as GuardRefusal
+            // A pool lane's design (HI-2310) needs no reviewer yet: the pool gives it to the next free one.
+            if (!(step === 'design' && w.card.reviewerPool) && (!reviewer || reviewer === builder)) return { rule: 'loop.noReviewer', values: { card: card.key } } as GuardRefusal
           } else {
             if (!now.step) return { rule: 'loop.noStep', values: { card: card.key } } as GuardRefusal
             if (opts.design !== now.step.id) return { rule: 'loop.staleStep', values: { card: card.key, design: opts.design ?? '', waiting: now.step.id } } as GuardRefusal
@@ -2003,8 +2005,13 @@ export class Workflow {
           const after = w.state()
           if (step === 'ok' && now.step?.step === 'followUp' && r?.options.finish === 'hiveMerges' && w.current === 'approved' && !openEntry(after) && !notApproved(after, r, card.labels)) this.enqueue(w)
         }
+        // A pool lane's design (HI-2310) is the pool's to give out and tell, as a submission is: no reviewer is woken. Its
+        // builder going ahead wakes the design's reviewer, if the pool gave it to one.
+        if (step === 'design' && w.card.reviewerPool) w.action('assignReviewer', { submission: now.lastSeq + 1 })
         // Its words are the fact's (loopWakes.ts' aboutOf); `why` is the action's own note.
-        if (side === 'builder') this.wake(w, reviewer ?? 'reviewers', `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
+        else if (side === 'builder') {
+          if (reviewer || !w.card.reviewerPool) this.wake(w, reviewer ?? 'reviewers', `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
+        }
         else this.wake(w, now.started?.builder, `${card.key}: ${step}`) // i18n-ignore: a wake, agent-facing
         return null
       },

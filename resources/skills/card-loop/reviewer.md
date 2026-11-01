@@ -2,7 +2,7 @@
 
 ## The lane and your watches
 
-Join the lane: `hive_lane` with `action: "join"`, `builder` (its name) and the cards. A reviewer from the project's reviewer pool joins no lane: Hive tells it of each card it is given to review, in its inbox.
+Join the lane: `hive_lane` with `action: "join"`, `builder` (its name) and the cards. A reviewer from the project's reviewer pool joins no lane: Hive tells it of each card or design it gets, in its inbox.
 
 Your watches:
 - a new card: the card, `column: "review"` (at once if it's already there);

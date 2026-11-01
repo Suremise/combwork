@@ -6,7 +6,7 @@ import { HIVE_DIR, projectAgents } from '../shared/defaults'
 import { agentWorkflowRole } from '../shared/workflow/roles'
 import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { HiveErrorKind, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
-import { reviewingNow } from '../shared/workflow/reviewerPool'
+import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { HiveError } from './hiveError'
@@ -415,7 +415,18 @@ function cardFactsOf(store: FactStore, n: number): LaneCardFacts {
   const asks = forYou(s)
   // Who reviewed and reviews it (#1446: a pool lane's hover names them).
   const last = s.verdicts.at(-1)
-  return { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds, lastVerdict: last ? { reviewer: last.reviewer, pass: last.pass } : null, reviewing: reviewingNow(all, () => true)?.reviewing ?? null, ...(s.requests.some((r) => r.gate === SLOT_DIRTY_GATE) ? { slotDirty: true } : {}) }
+  // A pool lane's design nobody has taken yet (HI-2310): the lane waits for a reviewer, as for a submission.
+  const designWaits = s.stage === 'active' && s.step?.step === 'design' && poolOf(store, n) && !designReviewer(all, () => true)
+  return { stage: s.stage, forYou: asks.length > 0, ...(asks[0] ? { ask: asks[0].kind } : {}), stale: !!s.stale, rounds: s.rounds, lastVerdict: last ? { reviewer: last.reviewer, pass: last.pass } : null, reviewing: reviewingNow(all, () => true)?.reviewing ?? null, ...(s.requests.some((r) => r.gate === SLOT_DIRTY_GATE) ? { slotDirty: true } : {}), ...(designWaits ? { designWaits: true } : {}) }
+}
+
+/** Whether a card's lane is reviewed by the pool (#1443), as the board has it. */
+function poolOf(store: FactStore, n: number): boolean {
+  try {
+    return !!store.card(n).reviewerPool
+  } catch {
+    return false
+  }
 }
 
 /** Each workspace's lane cards' facts as factsOf read them, with their facts' head then; a workspace opened again starts afresh. */
