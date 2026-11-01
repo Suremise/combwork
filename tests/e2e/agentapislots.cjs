@@ -81,7 +81,13 @@ const NOTE = (where) => `# Note\n\nThe ${where} copy.\n`
     }
 
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
+    // HI-2258: a call naming no agent (hive_agent_activity's `agent` left out: `agents//activity`) is the sole agent's,
+    // and with several it is refused saying "agent" is missing, never "No route".
+    const sole = await api('GET', '/v1/projects/alpha/agents//activity')
+    check("HI-2258: no agent named, alone: the sole agent's activity", sole.status === 200 && sole.body?.agent === 'B1', JSON.stringify(sole))
     await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
+    const several = await api('GET', '/v1/projects/alpha/agents//activity')
+    check('…with several: refused (400), saying to name it with "agent"', several.status === 400 && /several agents: say which one with "agent"/.test(several.body?.error ?? ''), JSON.stringify(several))
     // B2: a 0.9 agent with its own worktree, as an upgraded project has one, adopted as its carried slot hb2.
     const b2 = await lib.addAgent(inv, alpha, { location: 'new-worktree', name: 'B2', branch: 'hive/hb2', workflowRole: 'builder' })
     const hb2 = (await inv('workspace:refresh')).projects.find((p) => same(p.path, alpha)).agents.find((a) => a.id === b2.id)?.worktree?.path

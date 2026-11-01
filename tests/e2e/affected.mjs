@@ -26,6 +26,8 @@ export const EVERYTHING = [
   'src/main/workspace.ts',
   'src/main/sessions.ts',
   'src/main/servers.ts',
+  // Every Agent API route is matched through it (HI-2258).
+  'src/main/routePattern.ts',
   'src/main/fsutil.ts',
   // Every workspace's open and close marks it, and every database's open is fenced by that (#1379).
   'src/main/openingFence.ts',
