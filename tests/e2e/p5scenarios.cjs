@@ -40,7 +40,8 @@ const slash = (p) => p.replace(/\\/g, '/')
   // The setup command: node_modules from package.json's dependencies, from scratch (as npm ci would).
   const install = path.join(fx.tools, 'install.js')
   fs.writeFileSync(install, "const fs = require('fs'); fs.rmSync('node_modules', { recursive: true, force: true }); for (const d of Object.keys(JSON.parse(fs.readFileSync('package.json', 'utf8')).dependencies || {})) fs.mkdirSync('node_modules/' + d, { recursive: true })\n")
-  // No global or system git config for this Hive: the repository's identity (none yet) is all the queue can use.
+  // No global or system git config for this Hive: the repository's identity (the fixture's, until S47 removes it) is all
+  // the queue can use.
   const noGlobal = path.join(fx.tools, 'empty.gitconfig')
   fs.writeFileSync(noGlobal, '')
   const h = await q.startHive(fx, { port: PORT, env: { GIT_CONFIG_GLOBAL: noGlobal, GIT_CONFIG_NOSYSTEM: '1' }, keepOptions: true })
@@ -140,6 +141,8 @@ const slash = (p) => p.replace(/\\/g, '/')
 
     // --- S47 (a): no identity for the repository (and none on the machine for this Hive): paused, said in the panel.
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options({ identity: null, mergeInstall: 'onManifestChange' }) })
+    lib.git(fx.alpha, ['config', '--unset', 'user.name'])
+    lib.git(fx.alpha, ['config', '--unset', 'user.email'])
     const beforeId = head()
     const noId = await q.approve(fx, h, reviewer, 'No identity', { 'id.txt': 'id\n' })
     const paused = await waitHung(async () => ((await inv('queue:list', fx.alpha, 'main'))[0]?.paused?.reason === 'identity' ? (await inv('queue:list', fx.alpha, 'main'))[0].paused : null))
@@ -151,6 +154,9 @@ const slash = (p) => p.replace(/\\/g, '/')
     lib.git(fx.alpha, ['config', 'user.email', 'repo@example.com'])
     await tab.card('main').locator('[data-action="resume"]').click()
     check('…the user sets one and resumes: merged, by that identity', (await done(noId.n)) && lib.git(fx.alpha, ['log', '-1', '--format=%cn <%ce>', 'main']).trim() === 'Repo Identity <repo@example.com>', lib.git(fx.alpha, ['log', '-1', '--format=%cn <%ce>', 'main']))
+    // Back to the fixture's identity, the one the later cards commit as with G12 on (HI-2266: G12 reads git's).
+    lib.git(fx.alpha, ['config', 'user.name', fx.identity.name])
+    lib.git(fx.alpha, ['config', 'user.email', fx.identity.email])
 
     // --- S47 (b): a commit-msg hook that rejects Hive's merge commit (its trailers): returned with the hook's output.
     const hook = path.join(fx.alpha, '.git', 'hooks', 'commit-msg')
