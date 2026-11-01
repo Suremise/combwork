@@ -245,14 +245,19 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
       return ''
     }, HUNG_MS)
     check('one notice says what was resumed, and that Watcher was stopped, not ready in time', !!report && report.includes("Not resumed: Watcher (alpha): it didn't get ready in time, so it was stopped."), report)
-    // One at a time: each agent's launch after the one before it was resumed or stopped.
+    // One at a time: each agent's launch after the one before it was resumed or stopped. The queue's order is the record's
+    // (the live sessions' order as Hive closed), which isn't the suite's to fix: the lane's start above gives the idle
+    // Builder a new conversation (HI-2232), so it comes after Reviewer now. So taken in the order they were launched.
     const lines = logLines().slice(before)
     const at = (re) => lines.findIndex((l) => re.test(l))
     const spawned = (a) => at(new RegExp(`\\[pty\\] spawn .*#${a.id}`))
-    const order = ['Worker', 'Watcher', 'Builder', 'Reviewer']
-    const settled = { Worker: at(/Resumed .*Worker.* after Hive restarted/), Watcher: at(/Watcher.* wasn't ready within/), Builder: at(/Resumed .*Builder.* after Hive restarted/) }
-    const serial = order.slice(1).every((n, i) => spawned(agents[n]) > settled[order[i]] && settled[order[i]] >= 0)
-    check('…one at a time: each started after the one before it was resumed, or stopped', serial, JSON.stringify(order.map((n) => [n, spawned(agents[n]), settled[n]])))
+    const settledAt = (n) => {
+      const resumed = at(new RegExp(`Resumed .*${n}.* after Hive restarted`))
+      return resumed >= 0 ? resumed : at(new RegExp(`${n}.* wasn't ready within`))
+    }
+    const order = ['Worker', 'Watcher', 'Builder', 'Reviewer'].sort((a, b) => spawned(agents[a]) - spawned(agents[b]))
+    const serial = order.every((n) => spawned(agents[n]) >= 0) && order.slice(1).every((n, i) => settledAt(order[i]) >= 0 && spawned(agents[n]) > settledAt(order[i]))
+    check('…one at a time: each started after the one before it was resumed, or stopped', serial, JSON.stringify(order.map((n) => [n, spawned(agents[n]), settledAt(n)])))
     check('Watcher was stopped, not left starting', !(await c.live(agents.Watcher.id)))
     check('every agent was told before the quit (its inbox has the line)', (await Promise.all(order.map(async (n) => (await c.api('GET', `/v1/projects/alpha/agents/${n}/deliveries?limit=50`)).body?.deliveries?.some((d) => /Hive is restarting for an update/.test(d.text ?? d.body ?? ''))))).every(Boolean))
     check('the record is gone: every entry has its outcome', !!(await lib.until(() => !fs.existsSync(recordFile), HUNG_MS)), JSON.stringify(record()))
