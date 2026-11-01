@@ -1558,13 +1558,20 @@ module.exports.SCENARIOS = [
       const second = secondMessage(c)
       const reads = ran(o, 'hive_inbox')
       const both = reads.find((x) => /"read"\s*:\s*true/.test(String(x.args)) && first && String(x.args).includes(first.id))
+      // The first acked before the second was left (HI-2261: it acted and acked at once, the second sent once it had
+      // acted): there was no moment to ack one and read the other in one call, so those checks are left out.
+      const overlapped = !(first?.acked && second?.created && Date.parse(first.acked) < Date.parse(second.created))
       return [
         ['both messages were left while it worked', !!first && !!second, `${c.sent} | ${c.sent2}`],
         ['read each through hive_inbox', first?.receivedVia === 'inbox' && second?.receivedVia === 'inbox', JSON.stringify([first, second])],
         ['acked both', first?.state === 'acked' && second?.state === 'acked', JSON.stringify([first, second])],
         // A model's: the fakes ack each as they read it (fake-follow-notices).
-        ['acked the first and read the second in one call (ack with read)', !!both, reads.map((x) => String(x.args)).join(' | ')],
-        ['three hive_inbox calls at most: read, ack with read, ack', reads.length <= 3, String(reads.length)]
+        ...(overlapped
+          ? [
+              ['acked the first and read the second in one call (ack with read)', !!both, reads.map((x) => String(x.args)).join(' | ')],
+              ['three hive_inbox calls at most: read, ack with read, ack', reads.length <= 3, String(reads.length)]
+            ]
+          : [])
       ]
     },
     fakeSkips: ['acked the first and read the second in one call (ack with read)', 'three hive_inbox calls at most: read, ack with read, ack']

@@ -1072,6 +1072,26 @@ describe('the HI-2261 check fixes', () => {
     expect(stale('Round 1: PASSED. The record matches and the tests pass.')).toBe(false)
   })
 
+  it('inbox-ack-and-read: the one-call check stands only when the second was left before the first was acked', () => {
+    const ONE = 'acked the first and read the second in one call'
+    const inbox = (args: object) => ({ tool: 'hive_inbox', args: JSON.stringify(args), ok: true })
+    const run = (firstAcked: string, secondCreated: string, calls: object[]) =>
+      byName('inbox-ack-and-read', { hiveCalls: calls, tools: [] }, {
+        sent: 'left (m1)',
+        sent2: 'left (m2)',
+        got: [
+          { id: 'm1', state: 'acked', receivedVia: 'inbox', acked: firstAcked, created: '2026-11-01T06:00:00Z' },
+          { id: 'm2', state: 'acked', receivedVia: 'inbox', acked: '2026-11-01T06:00:30Z', created: secondCreated }
+        ]
+      })
+    const separately = [inbox({}), inbox({ ack: ['m1'] }), inbox({}), inbox({ ack: ['m2'] })]
+    // Codex's s1 (2026-11-01T06-02-29-codex): it acked the first before the second existed: no moment for one call.
+    expect(ONE in run('2026-11-01T06:00:10Z', '2026-11-01T06:00:12Z', separately)).toBe(false)
+    // Both there at once (Haiku's s1): reading the second without acking the first fails, as before.
+    expect(run('2026-11-01T06:00:25Z', '2026-11-01T06:00:12Z', [inbox({ read: true }), inbox({ read: true }), inbox({ ack: ['m1', 'm2'] })])[ONE]).toBe(false)
+    expect(run('2026-11-01T06:00:25Z', '2026-11-01T06:00:12Z', [inbox({ read: true }), inbox({ read: true, ack: ['m1'] }), inbox({ ack: ['m2'] })])[ONE]).toBe(true)
+  })
+
   it("card-decision: hive_submit's reply flagging the decision counts as the board reply that flagged it", () => {
     const decided = '2026-10-31T21:50:40.169Z'
     const call = (name: string, at: string, reply: string, args: object = { card: 'AL-1' }) => ({ tool: name, at, ok: true, args: JSON.stringify(args), reply })
