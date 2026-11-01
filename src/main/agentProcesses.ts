@@ -136,6 +136,8 @@ const lastListed = new Map<string, LaunchProcesses>()
  * at the next start (HI-2263). That start keeps only those still running by pid and start time (stillRunningOf).
  */
 const untrackedRunning = new Map<string, LaunchProcesses>()
+/** Launches whose CLI has exited, settling (findLeftovers): still in `running` for a moment, but never kept as running. */
+const endingRuns = new Set<string>()
 /**
  * What stopped launches left running, per launch, newest last. `restored`: kept from before Hive restarted (#614), with
  * no job: its processes are known by their ids and start times only.
@@ -545,14 +547,23 @@ export async function leftoversSettled(): Promise<void> {
 }
 
 async function findLeftovers(runId: string): Promise<AgentLeftovers | null> {
-  // Ended: what it had started is no longer the running marker's, kept since the tracker was lost (HI-2263).
+  // Ended: what it had started is no longer the running marker's, kept since the tracker was lost (HI-2263); and a loss
+  // from now on, while it settles, keeps nothing of it (jobsLost skips an ended launch).
+  endingRuns.add(runId)
   untrackedRunning.delete(runId)
   const launch = running.get(runId)
   if (!launch) {
+    endingRuns.delete(runId)
     settleRun(runId, 'unknown')
     return null
   }
-  await new Promise((r) => setTimeout(r, SETTLE_MS))
+  try {
+    await new Promise((r) => setTimeout(r, SETTLE_MS))
+  } finally {
+    // HR1's round 1: a loss during the wait may have kept it all the same; never past its end.
+    untrackedRunning.delete(runId)
+    endingRuns.delete(runId)
+  }
   running.delete(runId)
   looking.set(runId, launch)
   try {
@@ -837,7 +848,7 @@ function jobsLost(why: string): void {
     settleRun(runId, 'unknown')
     // Still running, untracked from now on: what it had started stays in the running marker until it ends (HI-2263).
     const kept = lastListed.get(runId)
-    if (kept) untrackedRunning.set(runId, kept)
+    if (kept && !endingRuns.has(runId)) untrackedRunning.set(runId, kept)
   }
   running.clear()
   lastListed.clear()

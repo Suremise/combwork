@@ -137,4 +137,39 @@ describe.runIf(process.platform === 'win32')('what running agents had started, a
       await mod.closeProcessTracking()
     }
   }, 60_000)
+
+  // HR1's round 1 on HI-2263: the tracker lost while an ended launch settles (its CLI exited; launchEnded waits a moment
+  // before listing what it left). That launch isn't running any more: nothing of it is kept in the marker, then or after.
+  // The wait's timer is faked, so the loss always lands inside it.
+  it('keeps nothing of a launch whose CLI exited, when the tracker is lost as it settles', async () => {
+    const out = join(dir, 'settling.txt')
+    const cli = join(dir, 'settling-cli.cjs')
+    writeFileSync(cli, `process.stdin.once('data', () => { require('child_process').spawn(process.execPath, ['-e', "require('fs').writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 120000)", ${JSON.stringify(out)}], { detached: true, stdio: 'ignore', windowsHide: true, env: process.env }).unref() }); setTimeout(() => {}, 120000)`)
+    const proc = spawn(process.execPath, [cli], { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true, env: baseEnv() })
+    children.push(proc)
+    vi.resetModules()
+    const mod = await import('../src/main/agentProcesses')
+    try {
+      expect(await mod.trackLaunch({ runId: 'r3', projectPath: dir, agentId: 'a3', agentName: 'Site' }, proc.pid!)).toEqual({ tracked: true })
+      proc.stdin!.write('go\n')
+      expect(await until(() => existsSync(out) && readFileSync(out, 'utf8').length > 0, 10_000)).toBe(true)
+      expect((await mod.runningProcesses()).map((l) => l.runId)).toEqual(['r3'])
+
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      // Its CLI has exited: it settles (the faked wait), and the helper ends meanwhile.
+      const settled = mod.launchEnded('r3')
+      const lost = new Promise<string>((resolve) => mod.onRunOutcome((runId, outcome) => runId === 'r3' && resolve(outcome)))
+      process.kill(mod.processSupervisor().pid!)
+      expect(await lost).toBe('unknown')
+      expect(await mod.runningProcesses()).toEqual([])
+      // The wait ends; it is looked at (no job any more) and forgotten.
+      await vi.advanceTimersByTimeAsync(2000)
+      vi.useRealTimers()
+      expect(await settled).toBeNull()
+      expect(await mod.runningProcesses()).toEqual([])
+    } finally {
+      vi.useRealTimers()
+      await mod.closeProcessTracking()
+    }
+  }, 60_000)
 })
