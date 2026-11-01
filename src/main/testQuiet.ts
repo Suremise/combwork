@@ -82,6 +82,7 @@ export function recordTestToken(kind: 'hook' | 'agent' | 'assistant', token: str
   try {
     appendFileSync(file, `${JSON.stringify({ kind, token })}\n`)
   } catch (e) {
+    // i18n-ignore: a test seam's diagnostic for the test that set HIVE_TEST_TOKEN_LOG, never shown in normal use
     throw new Error(`HIVE_TEST_TOKEN_LOG couldn't be written (${(e as NodeJS.ErrnoException)?.code ?? 'error'}): no ${kind} token issued`, { cause: e })
   }
 }
