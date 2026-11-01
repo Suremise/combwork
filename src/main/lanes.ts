@@ -964,7 +964,7 @@ export function refuseWhileTeamPaused(ws: WorkspaceService): void {
  * lane's reviewer (a builder guessing a name dropped its lane's, and its failed round went unwatched).
  */
 function unknownReviewerRefusal(name: string, project: string, lane: LaneRecord): never {
-  const has = lane.reviewer ? `this lane's reviewer is ${lane.reviewer.name}: leave reviewer out to keep it` : lane.pool ? "this lane is reviewed by the project's reviewer pool: leave reviewer out" : `this lane has no reviewer yet: leave reviewer out, or name an agent of ${project}`
+  const has = lane.reviewer ? `this lane's reviewer is ${lane.reviewer.name}: leave reviewer out to keep it` : lane.pool ? "this lane is reviewed by the project's reviewer pool: leave reviewer out" : `this lane has no reviewer yet: leave reviewer out, or name an agent of ${project}` // i18n-ignore: hive_lane's refusal (agents)
   throw new LaneError(404, `No agent "${name}" in ${project}; ${has}.`) // i18n-ignore: hive_lane's refusal (agents)
 }
 
@@ -972,12 +972,6 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   refuseWhileTeamPaused(ws)
   const builder = await agentIn(ws, s.project, s.builder)
   if (!builder) throw new LaneError(404, 'Unknown agent: the builder must be an agent of the project') // i18n-ignore: hive_lane's refusal, which only agents get
-  // HI-2273: a reviewer that is no agent never drops a running lane's: refused before anything is put back, and again
-  // under the lock (a lane started meanwhile).
-  if (s.unknownReviewer !== undefined) {
-    const running0 = (await read(ws)).find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
-    if (running0) unknownReviewerRefusal(s.unknownReviewer, s.project, running0)
-  }
   const reviewer = s.reviewer ? await agentIn(ws, s.project, s.reviewer) : s.reviewer === undefined ? undefined : null
   if (s.reviewer && !reviewer) throw new LaneError(404, 'Unknown agent: the reviewer must be an agent of the project') // i18n-ignore: hive_lane's refusal, which only agents get
   if (reviewer && reviewer.id === builder.id) throw new LaneError(400, "A lane's builder can't be its reviewer") // i18n-ignore: hive_lane's refusal, which only agents get
@@ -995,7 +989,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const scope = s.ownBuilder ? s.project : null
   // A changed list applied now (HI-1995): its card in flight put back first; the edit below then applies the list at
   // once (between cards), bound to that lane.
-  const put = s.applyNow && on ? await putBackForReorder(ws, s, builder) : null
+  // HI-2273: never with a reviewer that is no agent: a running lane's start is then refused (under the lock below), and a
+  // new lane has nothing to put back, so whatever lane a start meanwhile makes, nothing is put back before the refusal.
+  const put = s.applyNow && on && s.unknownReviewer === undefined ? await putBackForReorder(ws, s, builder) : null
   const ruleset = await rulesetNow(ws, s.project)
   const ended: EndedLane[] = []
   let queuedAfter: number | null = null
