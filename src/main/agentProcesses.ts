@@ -126,6 +126,19 @@ interface Launch {
 /** Launches whose CLI is still running (or exited and being looked at). */
 const running = new Map<string, Launch>()
 /**
+ * The running marker's memory of each tracked launch (HI-2263): its processes as runningProcesses last listed them. A
+ * listing that fails (the tracker going as it lists) gives these instead of none.
+ */
+const lastListed = new Map<string, LaunchProcesses>()
+/**
+ * Launches still running when the tracker was lost (jobsLost): no longer tracked, but their processes as last listed stay
+ * in the running marker until each launch ends (launchEnded), so a Hive that then closes unexpectedly still lists them
+ * at the next start (HI-2263). That start keeps only those still running by pid and start time (stillRunningOf).
+ */
+const untrackedRunning = new Map<string, LaunchProcesses>()
+/** Launches whose CLI has exited, settling (findLeftovers): still in `running` for a moment, but never kept as running. */
+const endingRuns = new Set<string>()
+/**
  * What stopped launches left running, per launch, newest last. `restored`: kept from before Hive restarted (#614), with
  * no job: its processes are known by their ids and start times only.
  */
@@ -407,17 +420,36 @@ export async function agentsMemory(): Promise<{ agents: number; bytes: number } 
  * What running agents' launches have started, now (#987): each launch's job, its CLI and all it started, each process by
  * id and start time (one without can't be told from a later process with its id, so it is left out), within the
  * marker's bounds. For the running marker (lastRun.ts), so that after Hive is ended without quitting, the next start
- * knows them. Empty when no launch is tracked; never starts the host.
+ * knows them. A launch whose job can't be listed (the tracker going meanwhile), or that was running when the tracker was
+ * lost, gives its processes as last listed (HI-2263). Empty when no launch is tracked; never starts the host.
  */
 export async function runningProcesses(): Promise<LaunchProcesses[]> {
-  if (process.platform !== 'win32' || !running.size || !host.pid) return []
+  if (process.platform !== 'win32') return []
   const out: LaunchProcesses[] = []
-  for (const l of [...running.values()].slice(-MAX_MARKER_LAUNCHES)) {
-    const list = await listJob(l.runId)
-    const processes = (list?.processes ?? []).filter((p) => p.created).slice(0, MAX_MARKER_PROCESSES)
-    if (processes.length) out.push({ projectPath: l.projectPath, agentId: l.agentId, agentName: l.agentName, runId: l.runId, processes })
+  if (running.size && host.pid) {
+    for (const l of [...running.values()].slice(-MAX_MARKER_LAUNCHES)) {
+      const list = await listJob(l.runId)
+      if (!list) {
+        // Not listed now: as last listed (jobsLost may have moved it meanwhile).
+        const kept = lastListed.get(l.runId) ?? untrackedRunning.get(l.runId)
+        if (kept) out.push(kept)
+        continue
+      }
+      const processes = list.processes.filter((p) => p.created).slice(0, MAX_MARKER_PROCESSES)
+      const entry = { projectPath: l.projectPath, agentId: l.agentId, agentName: l.agentName, runId: l.runId, processes }
+      // Only while it is still tracked: a launch ended (or lost) while it was listed isn't remembered again.
+      if (running.has(l.runId)) {
+        if (processes.length) lastListed.set(l.runId, entry)
+        else lastListed.delete(l.runId)
+      }
+      if (processes.length) out.push(entry)
+    }
   }
-  return out
+  // Forgotten once their launches are no longer tracked (ended, or lost: then kept below).
+  for (const runId of lastListed.keys()) if (!running.has(runId)) lastListed.delete(runId)
+  const listed = new Set(out.map((l) => l.runId))
+  for (const l of untrackedRunning.values()) if (!listed.has(l.runId)) out.push(l)
+  return out.slice(-MAX_MARKER_LAUNCHES)
 }
 
 /**
@@ -515,12 +547,23 @@ export async function leftoversSettled(): Promise<void> {
 }
 
 async function findLeftovers(runId: string): Promise<AgentLeftovers | null> {
+  // Ended: what it had started is no longer the running marker's, kept since the tracker was lost (HI-2263); and a loss
+  // from now on, while it settles, keeps nothing of it (jobsLost skips an ended launch).
+  endingRuns.add(runId)
+  untrackedRunning.delete(runId)
   const launch = running.get(runId)
   if (!launch) {
+    endingRuns.delete(runId)
     settleRun(runId, 'unknown')
     return null
   }
-  await new Promise((r) => setTimeout(r, SETTLE_MS))
+  try {
+    await new Promise((r) => setTimeout(r, SETTLE_MS))
+  } finally {
+    // HR1's round 1: a loss during the wait may have kept it all the same; never past its end.
+    untrackedRunning.delete(runId)
+    endingRuns.delete(runId)
+  }
   running.delete(runId)
   looking.set(runId, launch)
   try {
@@ -801,8 +844,14 @@ function jobsLost(why: string): void {
     return
   }
   const launches = running.size
-  for (const runId of running.keys()) settleRun(runId, 'unknown')
+  for (const runId of running.keys()) {
+    settleRun(runId, 'unknown')
+    // Still running, untracked from now on: what it had started stays in the running marker until it ends (HI-2263).
+    const kept = lastListed.get(runId)
+    if (kept && !endingRuns.has(runId)) untrackedRunning.set(runId, kept)
+  }
   running.clear()
+  lastListed.clear()
   // Jobs asked to end and not yet seen empty: no longer to be seen at all.
   for (const runId of confirming.keys()) settleRun(runId, 'unknown')
   confirming.clear()
