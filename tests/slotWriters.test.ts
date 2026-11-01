@@ -7,7 +7,7 @@
 // interleavings are made with the board's commit callback, never with time.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
@@ -484,6 +484,9 @@ describe('Release Slot… on a held writer (#1506)', () => {
     expect(await heldWriter(project, 'slot-a')).toMatchObject({ run: held, live: false, hive: { self: true, alive: true }, processes: null })
     await releaseHeldWriter(project, 'slot-a', held, { end: false })
     expect(writer()).toBeNull()
+    // Its run's records go with it (HI-2303): its kept record and its keeper's binding.
+    expect(tracker.forgotten).toContain(held)
+    expect(tracker.keeperForgotten).toContain(held)
     expect((await heldSlots(project)).size).toBe(0)
     const again = await start()
     expect(writer()?.run).toBe(again.runId)
@@ -579,6 +582,11 @@ describe('Release Slot… on a held writer (#1506)', () => {
 })
 
 describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () => {
+  // The user's Release Slot… earlier forgets its run's records too (HI-2303): none carried in.
+  beforeEach(() => {
+    tracker.forgotten.length = 0
+    tracker.keeperForgotten.length = 0
+  })
   afterEach(() => {
     tracker.listed.clear()
     tracker.restart = []

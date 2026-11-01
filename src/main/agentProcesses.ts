@@ -159,6 +159,8 @@ function settleRun(runId: string, outcome: RunOutcome): void {
   if (outcomes.has(runId)) return
   outcomes.set(runId, outcome)
   while (outcomes.size > MAX_OUTCOMES) outcomes.delete(outcomes.keys().next().value!)
+  // Its binding is settled once it is known to have taken no slot's writer (HI-2303): no receipt is ever read for it.
+  if (!writerRuns.has(runId)) dropBinding(runId)
   for (const f of outcomeListeners) {
     try {
       f(runId, outcome)
@@ -229,10 +231,11 @@ export async function trackLaunch(launch: Launch, pid: number, cancelled?: Abort
   if (r === 'ok' && !cancelled?.aborted) {
     if (host.usable) problem = null
     // Bound only to the very helper configured as its keeper, which made its job, no loss between (HI-2055).
-    if (keeper && keeper.instance === instance && host.instance === instance && losses === seen) {
+    // Kept by need, never by volume (HI-2303): it goes once settled (dropBinding), however many launches come after.
+    if (keeper && keeper.instance === instance && host.instance === instance && losses === seen && !(outcomes.has(launch.runId) && !writerRuns.has(launch.runId))) {
       runHelpers.delete(launch.runId)
       runHelpers.set(launch.runId, keeper.helper)
-      while (runHelpers.size > MAX_RUN_RECORDS) runHelpers.delete(runHelpers.keys().next().value!)
+      bindingsBound()
       persist()
     }
     return { tracked: true }
@@ -369,10 +372,7 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
 export function forgetKeeperRun(run: string): void {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(run)) return
   void import('original-fs/promises').then(({ unlink }) => unlink(join(keeperDir(), `keeper-${run}.json`))).catch(() => undefined)
-  void readRecords().then(() => {
-    if (!runHelpers.delete(run)) return
-    persist()
-  })
+  dropBinding(run)
 }
 
 /** Keepers' states older than this are let go at the start (HI-2055): their writers stay held (Release Slot…). */
@@ -387,6 +387,41 @@ export async function pruneKeeperStates(now = Date.now()): Promise<void> {
     const s = await stat(f).catch(() => null)
     if (s && now - s.mtimeMs > KEEPER_STALE_MS) await unlink(f).catch(() => undefined)
   }
+  await settleOrphanBindings()
+}
+
+/**
+ * An earlier Hive's bindings that nothing can ever be read for (HI-2303): their helper has gone and wrote no state. Only
+ * that helper writes a run's state, before it exits, so its absence once the helper is gone is final; a helper still
+ * running (keeping), one whose state can't be told, or a state there (even a "live" one) keeps the binding. This lets
+ * go what a slot removed while held, or a binding kept before bindings were kept by need, would otherwise keep forever.
+ */
+async function settleOrphanBindings(): Promise<void> {
+  await readRecords()
+  const helpers = [...new Set(runHelpers.values())]
+  if (!helpers.length || !(await trackingReady())) return
+  const procs = helpers.map((h) => {
+    const [pid, created] = h.split(':')
+    return { pid: Number(pid), name: '', label: '', created }
+  })
+  const alive = await stillRunning(procs)
+  if (!alive) return
+  const running = new Set(alive.processes.map(identity))
+  const { stat } = await import('original-fs/promises')
+  let dropped = 0
+  for (const [run, h] of [...runHelpers]) {
+    if (running.has(h)) continue
+    // This Hive's own helper is running: only an earlier one's bindings get here.
+    if (host.instance !== null && keeperOf?.helper === h) continue
+    // A state there, or one that can't be told absent: kept. Settled or rebound meanwhile: left as it is now.
+    if (await stat(join(keeperDir(), `keeper-${run}.json`)).then(() => true, (e: NodeJS.ErrnoException) => e?.code !== 'ENOENT')) continue
+    if (runHelpers.get(run) !== h) continue
+    runHelpers.delete(run)
+    dropped++
+  }
+  if (!dropped) return
+  log.info(`Let go of ${dropped} keeper binding(s) whose helper has gone and left no state`)
+  persist()
 }
 
 /**
@@ -947,8 +982,39 @@ let keptAny = false
 const MAX_RUN_RECORDS = 100
 /** Those read at this start (kept forward until settled) and this run's own, read once before any write. */
 let endedRuns: string[] = []
-/** Runs' helpers (HI-2055), the newest last, at most MAX_RUN_RECORDS, read at the start and this run's own. */
+/**
+ * Runs' helpers (HI-2055), read at the start and this run's own, kept by need (HI-2303): each until it is settled, never
+ * dropped for the number of others (by age, a busy day's 100 launches pushed out one still holding a slot's writer, so
+ * its keeper's "ended" freed nothing). Settled: its writer released or cleared (`runWriterReleased`, `forgetKeeperRun`),
+ * its run known to have taken none (`settleRun`), its helper revoked, or gone with no state left (`settleOrphanBindings`).
+ * What stays is bounded by the running launches and the held slots; past MAX_BINDINGS it is logged, never cut.
+ */
 let runHelpers = new Map<string, string>()
+const MAX_BINDINGS = 100
+/** Whether past MAX_BINDINGS was logged (once each time it is crossed). */
+let bindingsOver = false
+function bindingsBound(): void {
+  if (runHelpers.size <= MAX_BINDINGS) {
+    bindingsOver = false
+    return
+  }
+  if (bindingsOver) return
+  bindingsOver = true
+  log.warn(`${runHelpers.size} keeper bindings are kept, past ${MAX_BINDINGS}: none is dropped while it may still free a slot's writer`)
+}
+/** A run's binding is settled (HI-2303): it goes, and the kept list is written without it. */
+function dropBinding(run: string): void {
+  if (runHelpers.delete(run)) {
+    bindingsBound()
+    persist()
+  }
+  // One read back at the start may arrive after: dropped from it too.
+  void readRecords().then(() => {
+    if (!runHelpers.delete(run)) return
+    bindingsBound()
+    persist()
+  })
+}
 /** Lost helpers (HI-2055), at most MAX_REVOKED. */
 let revokedHelpers: string[] = []
 const MAX_REVOKED = 50
@@ -965,7 +1031,9 @@ function readRecords(): Promise<void> {
       const allRevoked = new Set([...revoked, ...revokedHelpers])
       revokedHelpers = [...allRevoked].slice(-MAX_REVOKED)
       const helpers = saved?.helpers && typeof saved.helpers === 'object' ? Object.entries(saved.helpers).filter(([r, h]) => r.length <= 100 && typeof h === 'string' && HELPER_ID.test(h) && !allRevoked.has(h)) : []
-      runHelpers = new Map([...helpers, ...runHelpers].filter(([, h]) => !allRevoked.has(h)).slice(-MAX_RUN_RECORDS))
+      // All of them (HI-2303): each was kept because it was still needed.
+      runHelpers = new Map([...helpers, ...runHelpers].filter(([, h]) => !allRevoked.has(h)))
+      bindingsBound()
       if (endedRuns.length || runHelpers.size || revokedHelpers.length) keptAny = true
     },
     () => undefined
@@ -1036,6 +1104,8 @@ export function runTookWriter(run: string): void {
 /** A run's slot writer was released, its release written (HI-2299): nothing needs its record. */
 export function runWriterReleased(run: string): void {
   writerRuns.delete(run)
+  // No receipt is ever read for it now (HI-2303).
+  dropBinding(run)
 }
 
 export function keepRunEnded(run: string): void {
