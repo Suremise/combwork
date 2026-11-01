@@ -145,4 +145,20 @@ describe('builder and reviewer pairs', async () => {
     expect(workflowPairs(agents, [lane('lane-a', 'HB1', 'HR2')]).filter((x) => x.byName)).toEqual([])
     expect(workflowPairs([{ name: 'Solo' }], [])).toEqual([])
   })
+
+  it("a running lane's pair carries its state as hive_lane list says it, the card it is on (HI-2271); pairs by name carry none", async () => {
+    const { laneStateText, laneLine } = await import('../src/shared/lanes')
+    const card = (number: number, column: string, more: object = {}) => ({ number, title: `Card ${number}`, column, blocked: null, round: 1, reviewing: false, ...more })
+    const info = (id: string, builder: string, reviewer: string, state: string, current: number | null, cards: object[], more: object = {}) => ({ id, project: 'alpha', name: null, builder: { id: builder, name: builder }, reviewer: { id: reviewer, name: reviewer }, cards, current, state, pausedOn: null, rounds: 10, waitMinutes: 360, status: null, ...more }) as never
+    const running = info('lane-a', 'HB1', 'HR1', 'active', 2, [card(1, 'done'), card(2, 'review'), card(3, 'todo')])
+    const paused = info('lane-b', 'HB2', 'HR2', 'paused', 4, [card(4, 'doing', { blocked: 'Waits for the API key' })], { pausedOn: 4 })
+    const pairs = workflowPairs([{ name: 'HB1' }, { name: 'HR1' }, { name: 'HB2' }, { name: 'HR2' }, { name: 'HB3' }, { name: 'HR3' }], [running, paused], laneStateText)
+    expect(pairs).toEqual([
+      { builder: 'HB1', reviewer: 'HR1', lane: 'lane-a', state: 'active, on #2' },
+      { builder: 'HB2', reviewer: 'HR2', lane: 'lane-b', state: 'paused, #4 is blocked' },
+      { builder: 'HB3', reviewer: 'HR3', byName: true }
+    ])
+    // The same words as the lane's own line.
+    for (const [p, l] of [[pairs[0], running], [pairs[1], paused]] as const) expect(laneLine(l)).toContain(`: ${p.state}; `)
+  })
 })

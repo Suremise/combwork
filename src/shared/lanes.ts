@@ -538,11 +538,19 @@ const cardWord = (c: LaneCard): string => `${cardRef(c.number)} ${COLUMN_WORD[c.
  */
 export function laneLine(l: LaneInfo): string {
   const pair = `${l.builder.name} / ${l.reviewer?.name ?? (l.pool ? 'the reviewer pool' : 'no reviewer')} (${l.project}${l.slot ? `, in ${l.slot}` : ''})`
+  return `${pair}${l.name ? ` ${l.name}` : ''}: ${laneStateText(l)}; ${l.cards.map(cardWord).join(', ')}; rounds ${l.rounds}, wait ${waitText(l.waitMinutes)}. ${l.id}`
+}
+
+/**
+ * A lane's state in a few words, as its line says it: "active, on #405", "paused, #412 is blocked", "active, every card
+ * passed; waiting: #483 not merged", "ended (merged 3f2a)". Project status's pairs carry it too (HI-2271), so either
+ * tool says which card a lane is on in the same words.
+ */
+export function laneStateText(l: LaneInfo): string {
   const said = l.status ? `; ${laneStatusText(l.status)}` : ''
   const paused = l.cards.find((c) => c.number === l.pausedOn)
   const why = l.status ? laneStatusText(l.status) : `${l.pausedOn !== null ? cardRef(l.pausedOn) : 'a card'} ${paused?.roundLimit && !paused.blocked ? 'waits for the user at its round limit' : 'is blocked'}`
-  const state = l.state === 'paused' ? `paused, ${why}` : l.state === 'active' ? `${l.current !== null ? `active, on ${cardRef(l.current)}` : 'active, every card passed'}${said}` : l.state === 'ended' ? `ended${l.mergeCommit ? ` (merged ${l.mergeCommit})` : ''}` : 'abandoned'
-  return `${pair}${l.name ? ` ${l.name}` : ''}: ${state}; ${l.cards.map(cardWord).join(', ')}; rounds ${l.rounds}, wait ${waitText(l.waitMinutes)}. ${l.id}`
+  return l.state === 'paused' ? `paused, ${why}` : l.state === 'active' ? `${l.current !== null ? `active, on ${cardRef(l.current)}` : 'active, every card passed'}${said}` : l.state === 'ended' ? `ended${l.mergeCommit ? ` (merged ${l.mergeCommit})` : ''}` : 'abandoned'
 }
 
 /** A listing of lanes, a line each. */

@@ -840,6 +840,11 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
       const reorderedLane = measure("hive_reorder_tasks (a lane's cards)", tool('hive_reorder_tasks', { column: 'todo', cards: [b, a] }), 500)
       const reorderLines = reorderedLane.split('\n')
       check("a reorder of a lane's cards: its line, then the lane's, by key", reorderLines.length === 2 && reorderLines[0].startsWith(`Todo now starts ${Kn(b)}, ${Kn(a)}`) && new RegExp(`^${Kn(b)}, ${Kn(a)} are on Coder's lane \\(${second}\\), which keeps its own order and takes them in that order\\. To change it: hive_lane start`).test(reorderLines[1]), reorderedLane)
+      // HI-2271: project status's pair for the running lane carries its state, the card it is on, in the lane line's words.
+      const projectStatus = JSON.parse(tool('hive_project_status', { project: 'alpha' }, 'assistant').text)
+      const pair = (projectStatus.pairs ?? []).find((x) => x.lane === second)
+      const listed = tool('hive_lane', { action: 'list' }, 'own').text.split('\n').find((l) => l.endsWith(second ?? '?')) ?? ''
+      check("project status: the lane's pair says the card it is on, as its lane line does", !!pair && /^active, on [A-Z]{2,4}-\d+/.test(pair.state ?? '') && listed.includes(`: ${pair.state}; `), `${JSON.stringify(pair)} | ${listed}`)
       check('…and that lane ends', endLane(second), second)
     } finally {
       tool('hive_wait_for_tasks', { cancel: true }, 'own')
