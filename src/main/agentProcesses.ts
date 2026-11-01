@@ -662,10 +662,11 @@ async function onlyIdleBrokers(launch: Launch, list: { processes: readonly Activ
 
 /** Which of the executable names (lower case) run on the machine now, or null when it can't be told (HI-2304). */
 async function runningNamed(names: readonly string[]): Promise<readonly string[] | null> {
-  const test = testActive()
-  if (test !== null) return names.filter((n) => test.includes(n))
   const r = await host.request('running', names.join(','))
-  return Array.isArray(r) && r.every((x) => typeof x === 'string') ? (r as string[]) : null
+  const now = Array.isArray(r) && r.every((x) => typeof x === 'string') ? (r as string[]) : null
+  // A test copy's own names stand in only for a real answer (HR1's round 1): the request itself is always made.
+  const test = now ? testActive() : null
+  return test !== null ? names.filter((n) => test.includes(n)) : now
 }
 
 /**

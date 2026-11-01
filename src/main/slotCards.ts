@@ -1130,7 +1130,9 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
 export async function place(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<void> {
   const gone = (): boolean => !workflowEnforced() || ended(ws) || !current(first, n, cycle.seq, l.id)
   for (let r = await placeOnce(ws, projectPath, first, n, cycle, l); r !== 'done'; r = await placeOnce(ws, projectPath, first, n, cycle, l)) {
-    if (!(await nextLook(projectPath, l.agent, gone, r === 'builder', r === 'held'))) break
+    // Held (HI-2304): asked again once its wait listens, so a slot freed while the pass told its card isn't missed.
+    const stillHeld = r === 'held' ? async () => !!(await slotHeldWords(projectPath, cycle.started.slot, (id) => id).catch(() => 'unknown')) : undefined
+    if (!(await nextLook(projectPath, l.agent, gone, r === 'builder', stillHeld))) break
   }
   // Placed, or its cycle obsolete or gone: what it kept is let go (HI-1804). A throw keeps it for ensure's next try.
   releaseTrack(ws, projectPath, n, refOf(n, cycle, l))
@@ -1194,10 +1196,13 @@ const slotFreed = new Set<(projectPath: string) => void>()
  * also what ends each reason that changes no status: Hive's line there done with (typed, or its take checked), the pause
  * after the user typed there over (one timer, at its end), its folder steady again, its hive tools connected. `builder`:
  * the pass waited for that, so it is looked at again once these listen (a change between the pass and them is not lost).
- * `held` (HI-2304): its slot is held by what another run left running there, so what frees it is the slot freed or those
- * processes changing (their run's leftovers told), not the clock: looked at again after HELD_LOOK_MS at most.
+ * `stillHeld` (HI-2304): its slot is held by what another run left running there, so what frees it is the slot freed or
+ * those processes changing (their run's leftovers told), not the clock: looked at again after HELD_LOOK_MS at most. Once
+ * these listen it is asked once whether the slot is still held (HR1's round 1: freed between the pass's look and them,
+ * nothing more would come): no, and it looks again now; a slot that can't be told counts as held.
  */
-function nextLook(projectPath: string, agentId: string, over: () => boolean, builder = false, held = false): Promise<boolean> {
+function nextLook(projectPath: string, agentId: string, over: () => boolean, builder = false, stillHeld?: () => Promise<boolean>): Promise<boolean> {
+  const held = !!stillHeld
   return new Promise((resolve) => {
     const same = (p: string, a: string): boolean => a === agentId && p.toLowerCase() === projectPath.toLowerCase()
     const freed = (p: string): void => {
@@ -1236,6 +1241,13 @@ function nextLook(projectPath: string, agentId: string, over: () => boolean, bui
     // Waiting for its builder (HI-2191, HR3's round 2): what freed it may have come between the pass's look and these
     // listeners (a line done with, the user's pause over), with nothing more to come. Looked at again now they listen.
     if (builder && !whyNoLine(projectPath, agentId, 'free')) finish()
+    if (stillHeld)
+      void stillHeld().then(
+        (yes) => {
+          if (!yes) finish()
+        },
+        () => undefined
+      )
   })
 }
 

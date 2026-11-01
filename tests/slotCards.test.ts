@@ -74,9 +74,22 @@ const state = vi.hoisted(() => ({
   freeAfterLook: null as null | { how: 'line' | 'quiet'; project: string },
   /** What holds the builder's slot (HI-2304, agentFolders.slotHeldWords), or null; and how often it was asked. */
   held: null as string | null,
-  heldLooks: 0
+  heldLooks: 0,
+  /** Freed just after the pass's look (HR1's round 1): before its wait listens, with no event to come. */
+  freeAfterHeldLook: false
 }))
-vi.mock('../src/main/agentFolders', async (orig) => ({ ...(await orig<object>()), slotHeldWords: async () => (state.heldLooks++, state.held) }))
+vi.mock('../src/main/agentFolders', async (orig) => ({
+  ...(await orig<object>()),
+  slotHeldWords: async () => {
+    state.heldLooks++
+    const held = state.held
+    if (held && state.freeAfterHeldLook) {
+      state.freeAfterHeldLook = false
+      state.held = null
+    }
+    return held
+  }
+}))
 vi.mock('../src/main/lineWriter', async (orig) => ({
   ...(await orig<object>()),
   whyNoLine: () => {
@@ -246,7 +259,7 @@ afterEach(() => {
   env?.close()
   env = null
   resetAgentStartsForTests()
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0 })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false })
 })
 
 /**
@@ -1125,9 +1138,11 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     // On the agent, and so the card's stall: why its start waits.
     expect(startNow(e.project, 'B1').waiting).toMatch(/held by WindowsSandboxServer/)
     // Each look while it is still held: nothing started or delivered, not told again.
-    for (const looks of [2, 3]) {
+    // (Each wait also asks once as it starts listening, HR1's round 1.)
+    for (let i = 0; i < 2; i++) {
+      const looked = state.heldLooks
       status()
-      await vi.waitFor(() => expect(state.heldLooks).toBe(looks), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(state.heldLooks).toBeGreaterThan(looked + 1), { timeout: HUNG_MS })
     }
     expect(state.calls).toEqual([])
     expect(state.deliveries).toEqual([])
@@ -1141,6 +1156,18 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     expect(placedHow(e, n)).toEqual(['resumed'])
     expect(startNow(e.project, 'B1').waiting).toBeNull()
   })
+
+  it("its slot freed while the pass told its card, before its wait listens (HR1's round 1): it goes on at once, never waiting the fallback", async () => {
+    const { e, n, cycle, ws } = await owed()
+    state.conv = resume
+    state.held = "slot-a is held by WindowsSandboxServer, left running by B1's last run: it is free once they end"
+    state.freeAfterHeldLook = true
+    // No event comes (no status, no slot freed told): only the wait's own look, once it listens, finds it free.
+    await place(ws, e.project, e.wf, n, cycle, lease)
+    expect(notices(e)).toHaveLength(1)
+    expect(state.calls).toEqual(['resume c1 with the card'])
+    expect(placedHow(e, n)).toEqual(['resumed'])
+  }, HUNG_MS)
 
   it('three failed resumes: the card told, never a new conversation; once its builder runs there (resumed by hand), the card typed in once', async () => {
     const { e, n, slot, cycle, ws } = await owed()

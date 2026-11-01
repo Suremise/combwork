@@ -1262,8 +1262,10 @@ export class JobHost {
    * request starts a new one. So nothing (a launch, End, quitting) waits on it for longer.
    */
   async request(command: HostCommand, job: string, ...args: (number | string | undefined)[]): Promise<unknown> {
-    // A job's id, or (identify, endexact) a list of processes by id and start time: "pid:created,…", or (memory) of jobs: "job,job,…".
-    if (this.failed || !/^[\w:,-]+$/.test(job) || (command === 'follow' && !this.opts.testRequests)) return null
+    // A job's id, or (identify, endexact) a list of processes by id and start time: "pid:created,…", or (memory) of jobs:
+    // "job,job,…", or (running, HI-2304) of executables' names: "name.exe,name.exe" (words, dots and hyphens, no spaces).
+    const word = command === 'running' ? /^[\w.-]+(,[\w.-]+)*$/ : /^[\w:,-]+$/
+    if (this.failed || !word.test(job) || (command === 'follow' && !this.opts.testRequests)) return null
     if (!(await this.start()) || !this.proc) return null
     const p = this.proc
     const n = this.next++
