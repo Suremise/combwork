@@ -136,6 +136,7 @@ interface HiveMessageValues {
   'shell.command.settings.notifications': undefined
   'shell.command.settings.open': undefined
   'shell.command.settings.providers': undefined
+  'shell.command.slot.releaseHeld': undefined
   'shell.command.task.new': undefined
   'shell.command.task.reviewSetAside': undefined
   'shell.command.task.undoArchive': undefined

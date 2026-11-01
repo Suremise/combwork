@@ -1,4 +1,7 @@
 {
+  "slots.idleBroker.body": "{names} ist der untätige Sandbox-Broker von Windows, den die letzte Sitzung von Agent {agent} in einem inzwischen geschlossenen Hive hinterlassen hat. Es läuft keine Sandbox, daher kann der Slot gefahrlos freigegeben werden: „Slot freigeben…“ gibt ihn für andere Arbeit frei, und der Broker läuft weiter.",
+  "slots.idleBroker.release": "Slot freigeben…",
+  "slots.idleBroker.title": "{names} hält {slot}",
   "slots.release.changed": "{slot} hat sich inzwischen geändert: Sein Schreiber ist nicht mehr der angezeigte. Sieh noch einmal nach.",
   "slots.release.live": "Der Schreiber von {slot} läuft noch in diesem Hive: Stoppe zuerst den Agenten oder beende bzw. behalte, was er weiterlaufen ließ.",
   "slots.release.notEnded": "Einige der aufgeführten Prozesse laufen noch: Windows hat Hive sie nicht beenden lassen, daher wurde {slot} nicht freigegeben. Versuche es erneut oder gib ihn frei, ohne sie zu beenden.",

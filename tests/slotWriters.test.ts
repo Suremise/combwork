@@ -55,8 +55,8 @@ const tracker = vi.hoisted(() => ({
   bound: (_run: string, _helper: string): boolean => true,
   reading: () => undefined as void,
   keeperForgotten: [] as string[],
-  /** HI-2309: runs whose keeper's "live" job holds nothing by the one rule (only idle brokers), with that keeper's helper. */
-  holdsNothing: new Map<string, string>()
+  /** HI-2309: what the one rule (nothingHolds) says holds nothing: here, processes named as Windows Sandbox's broker. */
+  idle: (list: Proc[]) => list.length > 0 && list.every((p) => /^WindowsSandboxServer(\.exe)?$/i.test(p.name))
 }))
 vi.mock('../src/main/agentProcesses', async (orig) => ({
   ...((await orig()) as object),
@@ -80,7 +80,7 @@ vi.mock('../src/main/agentProcesses', async (orig) => ({
     return tracker.keeper.get(run) ?? null
   },
   keeperStillBound: (run: string, helper: string) => tracker.bound(run, helper),
-  keeperHoldsNothing: async (run: string) => tracker.holdsNothing.get(run) ?? null,
+  nothingHolds: async (list: Proc[]) => tracker.idle(list),
   forgetKeeperRun: (run: string) => void tracker.keeperForgotten.push(run)
 }))
 vi.mock('../src/main/lastRun', async (orig) => ({ ...((await orig()) as object), lastUnexpectedClose: () => (tracker.restart.length ? { processes: tracker.restart } : null) }))
@@ -93,6 +93,7 @@ const { SlotPool, SlotStore, fileSlotConn } = await import('../src/main/slots')
 const { goneWriterCleared, goneWriterSettles, goneWriterStill, heldSlots, heldWriter, releaseHeldWriter, setWriterHost, writerOver } = await import('../src/main/agentFolders')
 const { releasableSlots, releaseSlot, SlotReleaseRefused } = await import('../src/main/slotRelease')
 const { settleRunForTests } = await import('../src/main/agentProcesses')
+const { onHiveEvent } = await import('../src/main/events')
 const { sessions } = await import('../src/main/sessions')
 const { config } = await import('../src/main/config')
 const { providerService } = await import('../src/main/providerService')
@@ -175,7 +176,7 @@ afterAll(async () => {
  * another Hive (a writer's holder) still runs, as the probe says it (null: can't be told).
  */
 function hostOn(others: boolean | null = true): void {
-  pool = new SlotPool({ store, project, root: base, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 2, runner: async () => ({ ok: true, exitCode: 0, settled: true, logPath: null }), settle: async () => true, holder: { self: async () => me, alive: async () => others, live }, writerOver: (w) => writerOver(w), writerGone: { settles: (w) => goneWriterSettles(project, w), cleared: goneWriterCleared, still: goneWriterStill } })
+  pool = new SlotPool({ store, project, root: base, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 2, runner: async () => ({ ok: true, exitCode: 0, settled: true, logPath: null }), settle: async () => true, holder: { self: async () => me, alive: async () => others, live }, writerOver: (w) => writerOver(w), writerGone: { settles: (w, slot) => goneWriterSettles(project, w, slot), cleared: goneWriterCleared, still: goneWriterStill } })
   setWriterHost({ self: async () => me, alive: async (pid) => (pid === me.pid ? true : others), live, track: async () => pool.trackWriter(), drained: async (_p, slot) => pool.drained(slot) })
 }
 const start = () => inWorkspace(ws, () => sessions.start(project, { agentId: 'b1' }))
@@ -605,7 +606,6 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
     tracker.ended.length = 0
     tracker.writerAt = () => null
     tracker.keeper.clear()
-    tracker.holdsNothing.clear()
     tracker.keeperAsked.length = 0
     tracker.bound = () => true
     tracker.reading = () => undefined
@@ -696,27 +696,42 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
       expect(tracker.endedExactly).toEqual([])
     })
 
-    it("\"live\" with only Windows Sandbox's idle broker left (HI-2309's one rule): freed at the sweep and by its own start; \"live\" with anything else, held", async () => {
+    // HI-2309 (Darren's decision, 1 Nov ~23:25): a keeper's "live" is a snapshot, never proof, so a slot it lists only the
+    // idle broker for stays held (HR1's round 2 repro: a writer joined after that receipt, its next sweep failing); the
+    // user is told once, naming it, that releasing is safe, and Release Slot… says so. Nothing ended.
+    it('"live" with only Windows Sandbox\'s idle broker: held at the sweep and at its own start, told once that releasing is safe; with anything else, held and not told', async () => {
       hostOn(false)
-      const broker = { pid: 7101, name: 'WindowsSandboxServer.exe', label: 'WindowsSandboxServer', created: '133900000000000002' }
-      await plant('r-live-node', { ended: true })
-      tracker.keeper.set('r-live-node', { state: 'live', helper, members: [node] })
-      await pool.settleGoneWriters()
-      expect(writer()?.run).toBe('r-live-node')
-      expect(tracker.keeperForgotten).toEqual([])
-      await store.clearWriterRun('r-live-node')
-      await plant('r-live-broker', { ended: true })
-      tracker.keeper.set('r-live-broker', { state: 'live', helper, members: [broker] })
-      tracker.holdsNothing.set('r-live-broker', helper)
-      await pool.settleGoneWriters()
-      expect(writer()).toBeNull()
-      expect(tracker.keeperForgotten).toEqual(['r-live-broker'])
-      expect(tracker.endedExactly).toEqual([])
-      await plant('r-live-own')
-      tracker.keeper.set('r-live-own', { state: 'live', helper, members: [broker] })
-      tracker.holdsNothing.set('r-live-own', helper)
-      const state = await start()
-      expect(writer()?.run).toBe(state.runId)
+      const toasts: { title: string; message?: string; actions?: { command: string; args?: unknown[] }[] }[] = []
+      const off = onHiveEvent((e) => {
+        if (e.type === 'toast') toasts.push(e.toast)
+      })
+      try {
+        const broker = { pid: 7101, name: 'WindowsSandboxServer', label: 'WindowsSandboxServer', created: '133900000000000002' }
+        await plant('r-live-node', { ended: true })
+        tracker.keeper.set('r-live-node', { state: 'live', helper, members: [broker, node] })
+        await pool.settleGoneWriters()
+        expect(writer()?.run).toBe('r-live-node')
+        expect(toasts).toEqual([])
+        await store.clearWriterRun('r-live-node')
+        await plant('r-live-broker')
+        tracker.keeper.set('r-live-broker', { state: 'live', helper, members: [broker] })
+        await pool.settleGoneWriters()
+        await pool.settleGoneWriters()
+        expect(writer()?.run).toBe('r-live-broker')
+        expect(tracker.keeperForgotten).toEqual([])
+        expect(tracker.endedExactly).toEqual([])
+        expect(await startRefusal()).toMatch(/still has another session in it/)
+        expect(writer()?.run).toBe('r-live-broker')
+        expect(toasts).toHaveLength(1)
+        expect(toasts[0].title).toBe('slot-a is held by WindowsSandboxServer')
+        expect(toasts[0].message).toMatch(/Windows' idle Sandbox broker.*No Sandbox is running, so releasing the slot is safe/)
+        expect(toasts[0].actions).toEqual([expect.objectContaining({ command: 'slot.releaseHeld', args: [project, 'slot-a'] })])
+        // Release Slot…'s question has it too.
+        expect(await heldWriter(project, 'slot-a')).toMatchObject({ run: 'r-live-broker', idleBrokers: true, processes: { from: 'restart' } })
+        await store.clearWriterRun('r-live-broker')
+      } finally {
+        off()
+      }
     })
 
     it('"ended": its own agent\'s start (a restart\'s resume) takes the slot back', async () => {

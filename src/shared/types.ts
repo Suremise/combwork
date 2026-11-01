@@ -1733,6 +1733,8 @@ export interface HeldWriter {
    * the agent's processes that the notice that Hive closed unexpectedly lists and that still run. Null: not known.
    */
   processes: { list: AgentProcess[]; more: number; from: 'leftovers' | 'restart' } | null
+  /** Every process listed is Windows' own idle broker (HI-2309: a Sandbox's, none running): releasing it is safe. */
+  idleBrokers?: true
 }
 
 /** One of a project's review and check copies as the window reads it (#1435, copies.ts): its state and its lease not freed. */

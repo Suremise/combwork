@@ -134,6 +134,7 @@
   "shell.command.settings.notifications": "Ustawienia powiadomień",
   "shell.command.settings.open": "Otwórz ustawienia",
   "shell.command.settings.providers": "Wybierz agentów programistycznych (dostawców)",
+  "shell.command.slot.releaseHeld": "Zwolnij trzymany slot",
   "shell.command.task.new": "Nowa karta…",
   "shell.command.task.reviewSetAside": "Przejrzyj karty utworzone przez starszy Hive…",
   "shell.command.task.undoArchive": "Cofnij archiwizację",

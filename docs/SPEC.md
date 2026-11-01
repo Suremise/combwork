@@ -4007,18 +4007,19 @@ Whether a conversation may resume there is its **hold** (none: it may):
     `WindowsSandboxServer.exe`, which the windows-sandbox server's Sandbox had started and which outlived it).
     **One rule, in one place** (HI-2309, Darren's decision): `agentProcesses.nothingHolds(processes)`, true when nothing
     is left, or when every process left is a known system broker (`systemBrokers.ts`) with none of what it serves
-    running on the whole machine. Every path that decides whether a run's processes have ended uses it:
+    running on the whole machine. Every path that decides from what Hive sees now whether a run's processes have ended
+    uses it:
     - the CLI's exit and each 10 s look at the leftovers (the run settles `ended`, so its writer is released);
     - restored leftovers (#614): not listed at the start, and dropped by a later look;
     - the quit's record (`recordEndedLaunches`, HI-1886), which now also looks once at launches whose leftovers are
       listed;
-    - a gone Hive's keeper (HI-2055, `keeperHoldsNothing`): its `live` state, whole (every member described), from a
-      keeper still running, each member still running as the same process. A `live` receipt is a snapshot, unlike
-      `ended`, so it is taken only while it is current: the keeper rewrites an unchanged one every 3 s after a sweep
-      sure of everything (`KEEPER_BEAT_MS`), and only one whose `at` is under 10 s old (`KEEPER_FRESH_MS`, not ahead of
-      this clock) counts. A sweep or a write that fails leaves it to age, held. A job whose ancestry was let go unsure is
-      written `observed: partial`, never taken. Members are named without `.exe` (`ProcessName`), so the broker's name
-      filter takes either form. The keeper's own `ended` is unchanged.
+    - not a gone Hive's keeper (HI-2055; Darren's decision, 1 Nov ~23:25, after HR1's rounds 1 and 2): its `live`
+      receipt is a snapshot, never proof, since a writer may have joined after it while a later sweep or write of its
+      failed. Its slot stays held, and when the processes it lists that still run are only idle brokers by the rule, the
+      user is told once (a notice naming them, *slot-a is held by WindowsSandboxServer*: no Sandbox is running, so
+      releasing it is safe, with **Release Slot…**). Release Slot…'s question says the same (`HeldWriter.idleBrokers`)
+      and leaves "End these processes first" off. The keeper's own `ended` is unchanged; its current answer is HI-2313,
+      after 1.0. Members are named without `.exe` (`ProcessName`), so the broker's name filter takes either form.
     The broker is never ended, and a job it is the last of is let go. The decision (a known list plus a confirmed
     "nothing it serves is running"):
     - A broker is known only by its executable's full path, asked of the helper by id and start time (`paths`:

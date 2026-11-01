@@ -134,6 +134,7 @@
   "shell.command.settings.notifications": "通知设置",
   "shell.command.settings.open": "打开设置",
   "shell.command.settings.providers": "选择编程智能体（提供方）",
+  "shell.command.slot.releaseHeld": "释放被占用的槽位",
   "shell.command.task.new": "新建卡片…",
   "shell.command.task.reviewSetAside": "查看旧版 Hive 创建的卡片…",
   "shell.command.task.undoArchive": "撤销归档",

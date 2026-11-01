@@ -1882,17 +1882,24 @@ export async function releaseHeldSlot(path: string, slot: string): Promise<void>
   const w = await attempt(tr(msg({ id: 'actions.releaseHeld.readFailed', defaultMessage: "Could not read the slot's writer", description: "An error's title: Hive couldn't read who holds a slot, before Release Slot…'s question." })), () => call('slots:heldWriter', path, slot))
   if (!w) return
   const agent = agentOf(project(path), w.agent)?.name ?? w.agent
-  let end = !!w.processes?.list.length
+  // Only Windows' own idle Sandbox broker left (HI-2309): releasing is safe, and it is left running unless asked.
+  const idle = !!w.idleBrokers && !!w.processes?.list.length
+  let end = !!w.processes?.list.length && !idle
+  const names = idle ? fmt.list(w.processes!.list.map((p) => p.name.replace(/\.exe$/i, '')), 'unit') : ''
   const ok = await confirm({
     title: tr(msg({ id: 'actions.releaseHeld.title', defaultMessage: "Release {agent}'s slot {slot}?", description: "Title of the question before releasing a slot ({slot}, such as slot-b) that an agent's ({agent}) last session there still holds: it has ended, but Hive doesn't know that everything it started has." }), { agent, slot }),
-    message: w.hive.self
+    message: idle
+      ? tr(msg({ id: 'actions.releaseHeld.messageIdleBroker', defaultMessage: "{slot} is held by {names}, Windows' idle Sandbox broker, left by {agent}'s last session there (run {run}). No Sandbox is running, so releasing it is safe.", description: "Release Slot… (HI-2309): the slot ({slot}) is held only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer), which the agent's ({agent}) last session left; no Sandbox runs, so nothing can write in the slot through it. {run} is the session's run id (a code such as 3f9a1c…)." }), { slot, names, agent, run: w.run })
+      : w.hive.self
       ? tr(msg({ id: 'actions.releaseHeld.messageSelf', defaultMessage: "{agent}'s last session in {slot} (run {run}) has ended in this Hive (process {pid}, running), but Hive doesn't know that everything it started there has: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The session of the agent ({agent}) ended in this Hive; its processes were kept running or Hive could not follow them. {run} is the session's run id (a code such as 3f9a1c…), {pid} this Hive's process id: they tell one launch from another." }), { agent, slot, run: w.run, pid: w.hive.pid })
       : tr(msg({ id: 'actions.releaseHeld.messageGone', defaultMessage: "{slot} is held by a session of agent {agent} (run {run}) in a Hive that is no longer running (process {pid}). Hive can't tell whether what it started still runs: until you release it, nothing else uses the slot.", description: "Release Slot…: why the slot ({slot}) is held. The agent ({agent}) ran there in a copy of Hive that quit or closed unexpectedly; {run} is the session's run id (a code such as 3f9a1c…), {pid} that Hive's process id: they tell one launch from another. A noun before the name (glossary §1 rule 4)." }), { agent, slot, run: w.run, pid: w.hive.pid }),
     ...(w.processes?.list.length ? { list: w.processes.list.map((p) => tr(msg({ id: 'actions.releaseHeld.process', defaultMessage: '{label} (process {pid})', description: "Release Slot…: one process the agent's session left running, as listed: what it runs ({label}, such as node serve.js) and its process id ({pid})." }), { label: p.label, pid: p.pid })), listOnly: true } : {}),
-    detail: w.processes?.list.length
+    detail: idle
+      ? tr(msg({ id: 'actions.releaseHeld.detailIdleBroker', defaultMessage: 'Released, the broker is left running: it is Windows’ own, and closes by itself.', description: "Release Slot… (HI-2309), under the question about a slot held only by Windows' idle Sandbox broker: releasing doesn't end it unless the box below is ticked." }))
+      : w.processes?.list.length
       ? tr(msg({ id: 'actions.releaseHeld.detailListed', defaultMessage: '{n, plural, one {Hive lists # process its session left running.} other {Hive lists # processes its session left running.}} Released while they run, they may still write in the slot as other work uses it.', description: "Release Slot…: under the list of processes the agent's session left running ({n}: how many)." }), { n: w.processes.list.length + w.processes.more })
       : tr(msg({ id: 'actions.releaseHeld.detailUnknown', defaultMessage: "Hive doesn't know which of the processes its session started still run. Release it once you know nothing of it still writes in the slot.", description: "Release Slot…: Hive lists no processes the agent's session left running, so it can't say whether any still run." })),
-    ...(w.processes?.list.length ? { check: { label: tr(msg({ id: 'actions.releaseHeld.endFirst', defaultMessage: 'End these processes first', description: "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot." })), initial: true, set: (v: boolean) => (end = v) } } : {}),
+    ...(w.processes?.list.length ? { check: { label: tr(msg({ id: 'actions.releaseHeld.endFirst', defaultMessage: 'End these processes first', description: "Release Slot…: a tick box, on by default: Hive ends the listed processes before releasing the slot." })), initial: !idle, set: (v: boolean) => (end = v) } } : {}),
     confirmLabel: tr(msg({ id: 'actions.releaseHeld.confirm', defaultMessage: 'Release', description: 'Button: releases the slot.' })),
     danger: true,
     run: () => call('slots:releaseWriter', path, slot, w.run, end)

@@ -278,7 +278,7 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       writerOver: (w) => writerOver(w),
       overCleared: (run) => writerCleared(run),
       writerGone: {
-        settles: (w) => goneWriterSettles(projectPath, w),
+        settles: (w, slot) => goneWriterSettles(projectPath, w, slot),
         still: (evidence) => goneWriterStill(evidence),
         cleared: (run, evidence) => {
           goneWriterCleared(run, evidence)

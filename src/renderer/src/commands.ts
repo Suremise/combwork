@@ -566,6 +566,16 @@ const COMMAND_DEFS: CommandDef[] = [
     }
   },
   {
+    id: 'slot.releaseHeld',
+    name: msg({ id: 'shell.command.slot.releaseHeld', defaultMessage: 'Release a Held Slot', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: a notice's button runs it by its name (HI-2309), asking first whether to release a slot that Windows' idle Sandbox broker holds." }),
+    category: 'session',
+    // The notice that a slot is held only by an idle broker (HI-2309): Release Slot…'s question for it.
+    internal: true,
+    run: (path?: unknown, slot?: unknown) => {
+      if (typeof path === 'string' && typeof slot === 'string') void actions.releaseHeldSlot(path, slot)
+    }
+  },
+  {
     id: 'notice.openTarget',
     name: msg({ id: 'shell.command.notice.openTarget', defaultMessage: 'Open What a Notification Is About', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: a click on a notification runs it by its name, to show the agent's pane or the card it names." }),
     category: 'session',

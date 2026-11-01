@@ -135,6 +135,7 @@
   "shell.command.settings.notifications": "Notification Settings",
   "shell.command.settings.open": "Open Settings",
   "shell.command.settings.providers": "Choose Coding Agents (Providers)",
+  "shell.command.slot.releaseHeld": "Release a Held Slot",
   "shell.command.task.new": "New Card…",
   "shell.command.task.reviewSetAside": "Review Cards Made by an Older Hive…",
   "shell.command.task.undoArchive": "Undo Archive",

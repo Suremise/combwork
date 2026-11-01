@@ -134,6 +134,7 @@
   "shell.command.settings.notifications": "通知の設定",
   "shell.command.settings.open": "設定を開く",
   "shell.command.settings.providers": "コーディングエージェント（プロバイダー）を選択",
+  "shell.command.slot.releaseHeld": "保持されたスロットを解放",
   "shell.command.task.new": "新しいカード…",
   "shell.command.task.reviewSetAside": "古いHiveで作られたカードを確認…",
   "shell.command.task.undoArchive": "アーカイブを元に戻す",

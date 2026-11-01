@@ -134,6 +134,7 @@
   "shell.command.settings.notifications": "Benachrichtigungseinstellungen",
   "shell.command.settings.open": "Einstellungen öffnen",
   "shell.command.settings.providers": "Coding-Agenten auswählen (Anbieter)",
+  "shell.command.slot.releaseHeld": "Gehaltenen Slot freigeben",
   "shell.command.task.new": "Neue Karte…",
   "shell.command.task.reviewSetAside": "Karten aus einer älteren Version von Hive ansehen…",
   "shell.command.task.undoArchive": "Archivieren rückgängig machen",

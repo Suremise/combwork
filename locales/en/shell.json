@@ -539,6 +539,10 @@
     "defaultMessage": "Choose Coding Agents (Providers)",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Preferences category."
   },
+  "shell.command.slot.releaseHeld": {
+    "defaultMessage": "Release a Held Slot",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: a notice's button runs it by its name (HI-2309), asking first whether to release a slot that Windows' idle Sandbox broker holds."
+  },
   "shell.command.task.new": {
     "defaultMessage": "New Card…",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Tasks category. The … says it opens a dialog first: keep it."

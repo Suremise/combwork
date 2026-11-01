@@ -4,7 +4,7 @@ import { app } from 'electron'
 import { emit, toast } from './events'
 import { readJson, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
-import { JobHost, KEEPER_FRESH_MS, MAX_LISTED, type HostFailure, type JobList } from './processSupervisor'
+import { JobHost, MAX_LISTED, type HostFailure, type JobList } from './processSupervisor'
 import { brokersOnly, mayBeBroker } from './systemBrokers'
 import { hiveError } from './hiveError'
 import { processLabel, progressRunTitle, type AgentLeftovers, type AgentProcess } from '../shared/agentProcesses'
@@ -329,11 +329,7 @@ export function keeperStillBound(run: string, helper: string): boolean {
 }
 
 /** A keeper's state of a run, as the next Hive reads it (HI-2055). */
-/**
- * `complete` (HI-2309): its whole membership is described (its total is its members, console hosts among them); `at`:
- * when its keeper observed it, in ms (it rewrites an unchanged "live" every KEEPER_BEAT_MS), or null when not said.
- */
-export type KeeperState = { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: AgentProcess[]; complete: boolean; at: number | null }
+export type KeeperState = { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: AgentProcess[] }
 
 const KEEPER_FILE = /^keeper-([A-Za-z0-9_-]{1,64})\.json$/
 const MAX_KEEPER_BYTES = 64 * 1024
@@ -371,33 +367,8 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
   }
   if (total < members.length) return null
   // A console window's host ends with the process it serves: counted (the job isn't empty), never listed (listJob's way).
-  return { state: 'live', helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)), complete: total === members.length, at: fileTimeMs(s.at) }
+  return { state: 'live', helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)) }
 }
-
-/**
- * A gone Hive's run as its keeper sees it now (HI-2309): settled by the one rule (nothingHolds) when its keeper's state
- * is "live", whole (every member described), from a keeper still running (it writes each change of the job, so its
- * state is the job as of its last sweep), with each member still running as the same process, and none of them holds
- * the slot (only Windows' own idle brokers). The helper whose state it was, else null: held. Ends nothing.
- */
-export async function keeperHoldsNothing(run: string, hive: string, who: string, now = Date.now()): Promise<string | null> {
-  const k = await keeperState(run, hive)
-  if (k?.state !== 'live' || !k.complete || !k.members.length) return null
-  // A live receipt is a snapshot, unlike "ended" (HR1 on HI-2309): taken only as the job now while its keeper's last sure
-  // observation is recent. A sweep or a write of its that fails since leaves it to age, and held.
-  if (k.at === null || now - k.at > KEEPER_FRESH_MS || k.at > now + KEEPER_SKEW_MS) return null
-  const [pid, created] = k.helper.split(':')
-  const keeper = await stillRunning([{ pid: Number(pid), name: '', label: '', created }])
-  if (keeper?.processes.length !== 1) return null
-  const members = await stillRunning(k.members)
-  if (!members || members.processes.length !== k.members.length) return null
-  return (await nothingHolds(members.processes, 0, who)) ? k.helper : null
-}
-
-/** How far ahead of this Hive's clock a keeper's "at" may be (another process's clock read): beyond, not taken. */
-const KEEPER_SKEW_MS = 2000
-/** A Windows FILETIME (100 ns since 1601, UTC) as ms since 1970, or null when it isn't one. */
-const fileTimeMs = (t: unknown): number | null => (typeof t === 'number' && Number.isFinite(t) && t > 0 ? t / 10_000 - 11_644_473_600_000 : null)
 
 /** A run's writer settled (HI-2055): its keeper's state and its binding go. */
 export function forgetKeeperRun(run: string): void {
@@ -716,9 +687,10 @@ async function listJob(runId: string, withCommands = false): Promise<{ processes
  * runs as the same process (id and start time) with a known broker's executable, none of their active processes
  * running on the machine. Each executable is asked of the helper by identity, never taken from a name or a command
  * line. Fails closed: a process without a start time, one gone meanwhile (the caller's next look decides), a path
- * not read, anything else, or the helper not answering. Ends nothing. `who`: for the log, when brokers are set aside.
+ * not read, anything else, or the helper not answering. Ends nothing. `who`: for the log, when brokers are set aside
+ * (null: not logged, for a look that doesn't settle anything).
  */
-export async function nothingHolds(processes: readonly AgentProcess[], more: number, who: string): Promise<boolean> {
+export async function nothingHolds(processes: readonly AgentProcess[], more: number, who: string | null): Promise<boolean> {
   if (more > 0) return false
   if (!processes.length) return true
   if (processes.some((p) => !p.created)) return false
@@ -731,7 +703,7 @@ export async function nothingHolds(processes: readonly AgentProcess[], more: num
   if (found.some((p) => p.path === undefined)) return false
   const brokers = await brokersOnly(found, 0, runningNamed).catch(() => null)
   if (!brokers) return false
-  log.info(`${userText(who)}'s run left only ${[...new Set(brokers.map((b) => b.broker.what))].join(', ')} running (${userText(brokers.map((b) => b.process.label).join('; '))}), with none of what it serves running: not its work, so it holds nothing (the process is left running)`)
+  if (who !== null) log.info(`${userText(who)}'s run left only ${[...new Set(brokers.map((b) => b.broker.what))].join(', ')} running (${userText(brokers.map((b) => b.process.label).join('; '))}), with none of what it serves running: not its work, so it holds nothing (the process is left running)`)
   return true
 }
 

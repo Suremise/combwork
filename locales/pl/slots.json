@@ -1,4 +1,7 @@
 {
+  "slots.idleBroker.body": "{names} to bezczynny broker Piaskownicy Windows, który zostawiła ostatnia sesja agenta {agent} w zamkniętym już Hive. Żadna Piaskownica nie działa, więc zwolnienie slotu jest bezpieczne: „Zwolnij slot…” udostępnia go innej pracy, a broker działa dalej.",
+  "slots.idleBroker.release": "Zwolnij slot…",
+  "slots.idleBroker.title": "Slot {slot} trzyma {names}",
   "slots.release.changed": "Slot {slot} zmienił się w międzyczasie: zapisuje w nim już nie ta sesja, która jest pokazana. Sprawdź ponownie.",
   "slots.release.live": "Sesja zapisująca w slocie {slot} nadal działa w tym Hive: najpierw zatrzymaj agenta albo zakończ lub zachowaj to, co zostawił uruchomione.",
   "slots.release.notEnded": "Niektóre z wymienionych procesów nadal działają: Windows nie pozwolił Hive ich zakończyć, więc slot {slot} nie został zwolniony. Spróbuj ponownie albo zwolnij go bez kończenia ich.",

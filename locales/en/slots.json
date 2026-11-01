@@ -1,4 +1,16 @@
 {
+  "slots.idleBroker.body": {
+    "defaultMessage": "{names} is Windows' idle Sandbox broker, left by {agent}'s last session in a Hive that has since closed. No Sandbox is running, so releasing the slot is safe: Release Slot… frees it for other work, and the broker is left running.",
+    "description": "The notice (HI-2309) that a slot stays held only by Windows' idle Windows Sandbox broker after Hive restarted: Hive doesn't release it by itself, and asks the user. {names}: the broker's process names (WindowsSandboxServer); {agent}: the agent whose session left it. Release Slot… is the button's name."
+  },
+  "slots.idleBroker.release": {
+    "defaultMessage": "Release Slot…",
+    "description": "The notice's button (HI-2309): opens the question that frees a slot held only by Windows' idle Sandbox broker."
+  },
+  "slots.idleBroker.title": {
+    "defaultMessage": "{slot} is held by {names}",
+    "description": "A notice's title (HI-2309): a slot (a worktree Hive lends to a card, {slot} such as slot-a) stays held after Hive restarted, only by Windows' own idle Windows Sandbox broker ({names}: its process names, such as WindowsSandboxServer)."
+  },
   "slots.release.changed": {
     "defaultMessage": "{slot} changed meanwhile: its writer is no longer the one shown. Look again.",
     "description": "Release Slot… refused: the slot ({slot}, such as slot-b) was released or taken by another run while the question was open."
