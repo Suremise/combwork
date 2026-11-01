@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { join } from 'path'
 import type { BrowserWindow } from 'electron'
-import { chimeAllowed, FINISH_GROUP_MAX_MS, FINISH_GROUP_MS, FinishBatcher, finishedNotice, keepNotices, MAX_BANNERS, noticeRoute, type Finish } from '../src/shared/bursts'
+import { chimeAllowed, FINISH_GROUP_MAX_MS, FINISH_GROUP_MS, FinishBatcher, finishedNotice, keepNotices, MAX_BANNERS, noticeRoute, noticeRouteWhy, type Finish } from '../src/shared/bursts'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { tempDir } from './tempDir'
 
@@ -271,5 +271,42 @@ describe('a group of finishes, when it is shown', () => {
     ;(await settings()).notifyOnWaiting = false
     ;(sessions as unknown as { notify: (...a: unknown[]) => void }).notify(beta, 'beta · Two needs your input', 'Allow Bash?', 'waiting')
     expect(titles()).toEqual(['beta · Two needs your input', 'alpha · One finished'])
+  })
+
+  it('HI-2312: a finish whose agent works again (or waits for you) by the time the group is told is left out; its next need is told at once', async () => {
+    const { sessions } = await import('../src/main/sessions')
+    const s = sessions as unknown as { notify: (...a: unknown[]) => void; live: Map<string, unknown> }
+    const key = `${alpha.toLowerCase()}#two`
+    const st = { status: 'finished' }
+    s.live.set(key, { state: st })
+    try {
+      for (const busy of ['working', 'waiting']) {
+        s.notify(alpha, 'alpha · Two finished', 'Started OV-246.', 'finished', 'Two', 'two')
+        s.notify(beta, 'beta · Three finished', 'Three is done.', 'finished', 'Three', 'three')
+        // Hive's delivery at the turn's end started its next turn, inside the group's few seconds.
+        st.status = busy
+        if (busy === 'waiting') s.notify(alpha, 'alpha · Two needs your input', 'Allow Bash?', 'waiting', undefined, 'two')
+        await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+        st.status = 'finished'
+      }
+      expect(titles()).toEqual(['beta · Three finished', 'alpha · Two needs your input', 'beta · Three finished'])
+      // Finished still when the group is told: told, with that turn's message.
+      s.notify(alpha, 'alpha · Two finished', 'Merged it.', 'finished', 'Two', 'two')
+      await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
+      expect(shown.at(-1)).toMatchObject({ title: 'alpha · Two finished', body: 'Merged it.' })
+    } finally {
+      s.live.delete(key)
+    }
+  })
+})
+
+describe('why a notice goes where it goes (noticeRouteWhy, for the log)', () => {
+  const on = { ...DEFAULT_SETTINGS.notifications, bannerScope: 'workspace' as const }
+  const from = { workspacePath: 'C:\\Work\\A', projectPath: 'C:\\Work\\A\\alpha' }
+  it('says the route and its reason', () => {
+    expect(noticeRouteWhy(on, 'finished', null, from)).toEqual({ route: 'windows', why: 'no Hive window focused' })
+    expect(noticeRouteWhy(on, 'finished', { workspacePath: 'C:\\Work\\B', projectPath: null }, from)).toEqual({ route: 'none', why: "banner scope: another workspace's" })
+    expect(noticeRouteWhy(on, 'finished', { workspacePath: 'c:\\work\\a', projectPath: null }, from)).toEqual({ route: 'banner', why: 'banner scope: workspace' })
+    expect(noticeRouteWhy({ ...on, notifyOnFinished: false }, 'finished', null, from).route).toBe(noticeRoute({ ...on, notifyOnFinished: false }, 'finished', null, from))
   })
 })

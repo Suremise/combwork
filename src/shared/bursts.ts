@@ -41,16 +41,26 @@ export function noticeRoute(
   focused: FocusedHive | null,
   from: { workspacePath: string | null; projectPath: string | null }
 ): NoticeRoute {
-  if (!n.desktopNotifications) return 'none'
-  if (kind === 'finished' && !n.notifyOnFinished) return 'none'
-  if (kind === 'waiting' && !n.notifyOnWaiting) return 'none'
-  if (!focused) return 'windows'
-  if (n.whileFocused === 'nothing') return 'none'
-  if (n.whileFocused === 'windows') return 'windows'
-  if (!from.projectPath && !from.workspacePath) return 'banner'
-  if (n.bannerScope === 'workspace' && !samePath(focused.workspacePath, from.workspacePath)) return 'none'
-  if (n.bannerScope === 'project' && !samePath(focused.projectPath, from.projectPath)) return 'none'
-  return 'banner'
+  return noticeRouteWhy(n, kind, focused, from).route
+}
+
+/** noticeRoute, with why in a few English words for the log (HI-2312: each notice told is traced there). */
+export function noticeRouteWhy(
+  n: Pick<AppSettings['notifications'], 'desktopNotifications' | 'notifyOnFinished' | 'notifyOnWaiting' | 'whileFocused' | 'bannerScope'>,
+  kind: 'finished' | 'waiting' | 'notice',
+  focused: FocusedHive | null,
+  from: { workspacePath: string | null; projectPath: string | null }
+): { route: NoticeRoute; why: string } {
+  if (!n.desktopNotifications) return { route: 'none', why: 'notifications off' }
+  if (kind === 'finished' && !n.notifyOnFinished) return { route: 'none', why: 'finished notices off' }
+  if (kind === 'waiting' && !n.notifyOnWaiting) return { route: 'none', why: 'waiting notices off' }
+  if (!focused) return { route: 'windows', why: 'no Hive window focused' }
+  if (n.whileFocused === 'nothing') return { route: 'none', why: 'Hive focused, set to show nothing' }
+  if (n.whileFocused === 'windows') return { route: 'windows', why: 'Hive focused, set to Windows notifications' }
+  if (!from.projectPath && !from.workspacePath) return { route: 'banner', why: 'about no project' }
+  if (n.bannerScope === 'workspace' && !samePath(focused.workspacePath, from.workspacePath)) return { route: 'none', why: "banner scope: another workspace's" }
+  if (n.bannerScope === 'project' && !samePath(focused.projectPath, from.projectPath)) return { route: 'none', why: "banner scope: another project's" }
+  return { route: 'banner', why: `banner scope: ${n.bannerScope}` }
 }
 
 /** How many banners show at once (more are behind "+N more"), and how many that close by themselves are kept. */
@@ -74,6 +84,8 @@ export interface Finish {
   /** The project's folder name, and the agent's name. */
   project: string
   agent: string
+  /** The agent's id: a finish whose agent has started its next turn by the time the group is told isn't told (HI-2312). */
+  agentId?: string
   /** The notification it would get alone; `apiTitle`, its title in English for the Agent API (#847), when `title` is translated. */
   title: string
   apiTitle?: string

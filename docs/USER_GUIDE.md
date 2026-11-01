@@ -1882,7 +1882,7 @@ Updates are checked against their published checksum before they install.
 
 When an agent finishes (for one waiting on background tasks, once they have ended) or needs input, Hive plays a chime and tells you: with a **banner in Hive** while you're using it, and with a **Windows notification** when Hive is in the background. Click either to jump to the project. Configure them in **Settings → Notifications**; each project can override the chime.
 
-Agents that finish together don't flood you: they chime once, and get one notice (**3 agents finished in hive**: *Claude, Codex, Agent 3*, or across projects *hive (2), web (1)*), shown a few seconds after the last of them. If you turn notifications off meanwhile, it isn't shown. An agent asking for your input is always told at once, on its own.
+Agents that finish together don't flood you: they chime once, and get one notice (**3 agents finished in hive**: *Claude, Codex, Agent 3*, or across projects *hive (2), web (1)*), shown a few seconds after the last of them. An agent that starts its next turn within those seconds (Hive gave it more work as it finished) isn't told as finished: you hear from it when that turn ends, or at once if it needs you. If you turn notifications off meanwhile, it isn't shown. An agent asking for your input is always told at once, on its own.
 
 ### Banners in Hive <a id="banners-in-hive"></a>
 
