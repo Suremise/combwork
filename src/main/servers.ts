@@ -31,7 +31,7 @@ import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, iso
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
 import type { HandoverAuthor } from '../shared/hiveGuidance'
-import { cardRequests, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
+import { cardRequests, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
 import { STOP_ASK_MS } from './mcp/agentApiCall'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
@@ -3152,7 +3152,9 @@ route('POST', '/v1/tasks/reorder', async ({ body }) => {
     // Short: the agent chose the cards and their order; it only needs to know it worked.
     if (shortReply(body)) {
       const top = (cards as unknown[]).map((x) => Number(String(x).replace(/^#/, '')))
-      return { column, top, count: list.length, ...withNames(top) }
+      // A lane's cards among them (HI-2267): the column's order isn't the lane's, which the reply says.
+      const held = await lanes.lanesHolding(requireWorkspace(), top).catch(() => [])
+      return { column, top, count: list.length, ...withNames([...top, ...held.flatMap((l) => l.cards)]), ...(held.length ? { lanes: held } : {}) }
     }
     const agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()
     return Promise.all(list.map((c) => taskView(c, agents)))
@@ -3539,12 +3541,23 @@ async function reviewCopyAfter(actor: tasks.TaskActor, c: TaskCard, did: { start
   })
 }
 
+/**
+ * A put-back of a card a running lane holds (HI-2267): its reply says the lane keeps its own order and takes the card in
+ * it, and how to change that order (hive_lane start, applyNow), as a line of its own. Any other intent, as it was.
+ */
+async function withLaneOrder(intent: CardIntent, card: TaskCard, done: IntentDone): Promise<IntentDone> {
+  if (intent.kind !== 'putBack') return done
+  const held = await lanes.lanesHolding(requireWorkspace(), [card.number]).catch(() => [])
+  return held.length ? { ...done, warnings: [...(done.warnings ?? []), ...held.map(laneOrderNote)] } : done
+}
+
 async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone> {
   requireWorkspace()
   const ref = intentRef(param)
   const actor = await taskActor()
   if (actor.kind !== 'assistant') {
-    const { done, card } = await runCardIntent(ref, actor, intent)
+    const { done: ran, card } = await runCardIntent(ref, actor, intent)
+    const done = await withLaneOrder(intent, card, ran)
     const copy = await reviewCopyAfter(actor, card, { start: intent.kind === 'startReview', verdict: intent.kind === 'verdict' })
     // A lane's handoff arms its agent's watch (#1639): a builder's submission, a reviewer's failed verdict.
     const self = actor.kind === 'agent' ? actor.self : undefined
@@ -3556,7 +3569,8 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
   const was = await tasks.getTask(ref.n).catch(() => null)
   const what = INTENT_WORDS[intent.kind]
   return assistantChange('agents', `${what} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async () => {
-    const { done, card } = await runCardIntent(ref, actor, intent)
+    const { done: ran, card } = await runCardIntent(ref, actor, intent)
+    const done = await withLaneOrder(intent, card, ran)
     const moved = done.from && done.to && done.from !== done.to ? `, ${done.from} → ${done.to}` : ''
     return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[intent.kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done, ...(INTENT_STAYS[intent.kind] ? { stays: INTENT_STAYS[intent.kind] } : {}) }
   })

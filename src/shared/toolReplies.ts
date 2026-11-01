@@ -370,6 +370,8 @@ export interface TaskReorder {
   count: number
   /** How its text names those cards (#1219), by number (namesOf). */
   names?: Record<string, string>
+  /** The running lanes holding any of them (HI-2267): their own order stands, and the reply says how to change it. */
+  lanes?: LaneHolding[]
 }
 
 /** What a batch change did (reply: "short"): each card changed, and each card refused with why (left as it was). */
@@ -405,7 +407,25 @@ function batchLines(b: TaskBatch): string {
 
 export function reorderText(r: TaskReorder): string {
   const rest = r.count - r.top.length
-  return `${columnLabel(r.column)} now starts ${namedBy(namesFrom(r.names), () => r.top.map(cardRef).join(', '))}${rest > 0 ? `; its other ${rest} card${rest === 1 ? '' : 's'} keep their order below` : ''}.`
+  const line = `${columnLabel(r.column)} now starts ${namedBy(namesFrom(r.names), () => r.top.map(cardRef).join(', '))}${rest > 0 ? `; its other ${rest} card${rest === 1 ? '' : 's'} keep their order below` : ''}.`
+  return [line, ...(r.lanes ?? []).map((l) => namedBy(namesFrom(r.names), () => laneOrderNote(l)))].join('\n')
+}
+
+/** A running lane holding cards a reply is about (HI-2267): its id, its builder's name and those cards. */
+export interface LaneHolding {
+  id: string
+  builder: string
+  cards: number[]
+}
+
+/**
+ * HI-2267: put back or reordered on the board, a lane's card is still where its lane's own list has it, and the lane
+ * takes it again in that order. The Assistant, calling the tools without a skill, reordered the column and was told
+ * nothing of it. "AL-1 is on Coder's lane (lane-3f2a), which keeps its own order: to change it, hive_lane start…".
+ */
+export function laneOrderNote(l: LaneHolding): string {
+  const one = l.cards.length === 1
+  return `${l.cards.map(cardRef).join(', ')} ${one ? 'is' : 'are'} on ${l.builder}'s lane (${l.id}), which keeps its own order and takes ${one ? 'it' : 'them'} in that order. To change it: hive_lane start with its cards in the new order (applyNow: true to apply it now).`
 }
 
 const STATUS: Record<string, string> = { ready: 'idle', finished: 'idle', background: 'waiting on background tasks', waiting: 'waiting for the user', watching: 'waiting for cards', signin: 'waiting for the user to sign in' }
