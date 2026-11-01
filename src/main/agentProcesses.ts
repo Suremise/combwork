@@ -406,11 +406,11 @@ async function settleOrphanBindings(): Promise<void> {
   })
   const alive = await stillRunning(procs)
   if (!alive) return
-  const running = new Set(alive.processes.map(identity))
+  const helpersAlive = new Set(alive.processes.map(identity))
   const { stat } = await import('original-fs/promises')
   let dropped = 0
   for (const [run, h] of [...runHelpers]) {
-    if (running.has(h)) continue
+    if (helpersAlive.has(h)) continue
     // This Hive's own helper is running: only an earlier one's bindings get here.
     if (host.instance !== null && keeperOf?.helper === h) continue
     // A state there, or one that can't be told absent: kept. Settled or rebound meanwhile: left as it is now.
