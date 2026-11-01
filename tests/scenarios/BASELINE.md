@@ -36,6 +36,22 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+## A known Codex habit (accepted for 1.0.0): Codex, fixtures v119–v120, 1 November 2026
+
+**assistant-card-question**, Codex 0 of 2 before and after HI-2265's fixes (and 0 of 3 on df1676127, HI-2190); Haiku
+2 of 2 both times. Asked "Coder has stopped… is that a Hive bug, or is it waiting?", Codex reads the card once with
+`history: true`. That one reply already holds the question in forYou, and its answer is right, in one call. The check
+"didn't read the card's history for it" (HI-1992) fails on that one argument; no guidance asks it not to pass it, and
+HI-2265's nudge in `hive_read_task`'s description ("what waits is in forYou") didn't change it (HI-2267 takes that nudge
+out again, to keep the tool descriptions within replysize's bound). The cost is one larger reply.
+
+Darren accepted it for 1.0.0 as a known Codex habit (HI-2282, 1 Nov), with HI-2265's other residual (below, in the
+Haiku gaps). No check loosened; it goes to the per-model dialects work after 1.0 (HI-2065).
+
+Runs (`--repeat 2`, CLI 0.166.0), in `results/`: before `2026-11-01T07-54-48-codex` (fixtures v119, source
+6b7c3c9e1), after `2026-11-01T08-22-24-codex` (v120, 3458f1f6e, guidance ebb0b9f39a70beb1); both samples fail only
+that check (4/5).
+
 ## Known Haiku gaps (accepted for 1.0.0): Claude Code Haiku and Codex, fixtures v115, 1 November 2026
 
 After HI-2261's fixes, these scenarios still miss on Haiku and pass (or, for one, also miss once) on Codex. Darren
@@ -57,10 +73,16 @@ Both runs: `--repeat 2`, fixtures v115, source 46e7b89b8, guidance 026680618df5c
 | inbox-ack-and-read | 1 of 2 | 1 of 2 | didn't ack the first item with the read of the second (Codex's one miss too, with a fourth hive_inbox call) |
 | coordinator-fact-before-asking | 1 of 2 | 2 of 2 | asked without looking the card or its doc up first |
 | coordinator-follow-up | 1 of 2 | 2 of 2 | put the follow-up card on no lane, not the lane that owns its file |
+| decision-while-waiting (HI-2282) | 0 of 2 | 2 of 2 | s2: doing its own card, refused with "nothing committed", asked the user before committing ("I only commit when asked") |
 
 - **The card's list said 1 of 2 for coordinator-one-card-lane;** the run's summary has both samples failing (1/4
   checks each), so it is recorded here as 0 of 2. **It said each passes on Codex;** inbox-ack-and-read is Codex's one
   miss in its 49 of 50, so it isn't Haiku-only.
+- **decision-while-waiting is a later run, added by HI-2282** (Darren, 1 Nov, with the Codex habit above): HI-2265's
+  after, `results/2026-11-01T08-22-24-claude-code` and `…-codex` (fixtures v120, source 3458f1f6e, guidance
+  ebb0b9f39a70beb1, Haiku CLI 2.1.316). Haiku was 2 of 2 before (`2026-11-01T07-54-48-claude-code`, v119), so s2 is
+  variance against HI-2257's rule (a builder doing the card commits; the refusal says so). s1 missed only "read the
+  work-on-card skill", the same kind as the first two rows.
 - **What these are, and aren't:** 2 samples a side, descriptive totals across fixtures and checks changed by HI-2261, not
   rates (HR1's note on HI-2279). Codex's before (38 of 40 run, 10 skipped for budget) is HI-2261's.
 
