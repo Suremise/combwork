@@ -885,7 +885,7 @@ describe('watches (main/watches.ts)', async () => {
     Object.assign(sessions, { liveFor: (p: string, id: string) => (live(p, id) ? ({ ...live(p, id), startedAt: launched } as never) : null) })
     const asker = { kind: 'agent', name: 'Builder (alpha)' } as const
     const other = { kind: 'agent', name: 'Reviewer (alpha)' } as const
-    const agentWatch = (n: number): WatchCondition => ({ cards: [n], changes: ['agent'] })
+    const agentWatch = (card: number): WatchCondition => ({ cards: [card], changes: ['agent'] })
     // No wake told it of the card: its own comment, then the user takes the card from a2, then the watch.
     const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a2', column: 'review' }, user))
     await inWorkspace(w, () => tasks.commentTask(c.number, 'Please attach the logs.', asker))
