@@ -195,7 +195,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Who may reach it: another project's agent can't; a script can look but not claim.
   const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-  const beaToken = launches.filter((l) => l.cwd.toLowerCase() === beta.toLowerCase()).at(-1)?.env?.HIVE_API_TOKEN
+  const beaToken = launches.filter((l) => l.cwd.toLowerCase() === beta.toLowerCase()).at(-1)?.token
   check("another project's agent can't read or claim it", (await api('GET', '/v1/projects/alpha/merge-slot?branch=main', undefined, beaToken)).status === 403 && (await api('POST', '/v1/projects/alpha/merge-slot/claim', { branch: 'main', timeoutSeconds: 0 }, beaToken)).status === 403)
   check('its own project is fine', (await api('GET', '/v1/projects/beta/merge-slot?branch=main', undefined, beaToken)).status === 200)
   const scriptClaim = await api('POST', '/v1/projects/alpha/merge-slot/claim', { branch: 'main', timeoutSeconds: 0 })

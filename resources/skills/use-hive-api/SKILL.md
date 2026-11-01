@@ -13,8 +13,9 @@ The hive tools wrap this API. Use HTTP only for what they don't cover: a script,
 
 ## Connect
 
-- Sessions started from Hive have `HIVE_API_URL` and `HIVE_API_TOKEN_FILE` (a JSON file whose `token` is this agent's own token for this launch), and also `HIVE_API_TOKEN`.
-- Read the token inside the command that uses it. Never print it, log it, or write it into files or notes. For example, in PowerShell: `$t = (Get-Content $env:HIVE_API_TOKEN_FILE | ConvertFrom-Json).token; Invoke-RestMethod "$env:HIVE_API_URL/v1/status" -Headers @{ Authorization = "Bearer $t" }`.
+- Sessions started from Hive have `HIVE_API_URL` and `HIVE_API_TOKEN_FILE` (a JSON file whose `token` is this agent's own token for this launch), not the token.
+- Read the token in the command that uses it; never print, log or write it into files or notes. In PowerShell: `$t = (Get-Content $env:HIVE_API_TOKEN_FILE | ConvertFrom-Json).token; Invoke-RestMethod "$env:HIVE_API_URL/v1/status" -Headers @{ Authorization = "Bearer $t" }`.
+- Never list the environment (`env`, `set`, `Get-ChildItem env:`): it holds a secret, `HIVE_HOOK_TOKEN`.
 - With several Hive windows open, name the workspace with the `X-Hive-Workspace` header (its path, URL-encoded). An agent's own token always means its own workspace.
 
 ## Discover before you call

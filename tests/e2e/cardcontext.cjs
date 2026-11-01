@@ -82,7 +82,7 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
     // Through the hive tools, as an agent sets them.
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_update_task', arguments: { number: n, context: refs } } }) + '\n',
-      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN: token, HIVE_PROJECT: 'alpha' }),
+      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN_FILE: lib.tokenFile(token), HIVE_PROJECT: 'alpha' }),
       timeout: 60000
     }).toString()
     const said = JSON.parse(out.split('\n')[0]).result.content[0].text

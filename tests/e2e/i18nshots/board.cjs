@@ -33,7 +33,7 @@ async function start(ctx, agents) {
 async function tokenOf(ctx, agent) {
   const [live] = await liveOf(ctx, [agent])
   const launches = fs.readFileSync(path.join(ctx.claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-  const token = launches.filter((l) => l.sessionId === live?.sessionId).at(-1)?.env?.HIVE_API_TOKEN
+  const token = launches.filter((l) => l.sessionId === live?.sessionId).at(-1)?.token
   if (!token) throw new Error(`no API token for ${agent.name} (session ${live?.sessionId})`)
   return token
 }

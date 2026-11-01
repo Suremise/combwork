@@ -54,11 +54,12 @@ const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const WRITERS = /^(Write|Edit|MultiEdit|NotebookEdit|apply_patch)$/i
 
 /**
- * Where an Agent API token was seen (HI-2259): `known` the tokens, each `{ kind, token }` (workspace, agent, assistant),
+ * Where a token was seen (HI-2259): `known` the tokens, each `{ kind, token }` (the Agent API's workspace, agent and
+ * assistant ones, and a launch's hook token: HI-2262),
  * and `seen` what the session printed or said (`tools` and `scripts`, each `{ name, result }`; `replies`, text). Each
  * sighting `{ kind, in: 'tool' | 'script' | 'reply', at, name?, excerpt }`: `at` its place in that list, `excerpt` up to
  * 80 characters before it and 40 after, every known token in it as `<kind token>`, never the token, and any other run
- * of 32 hex or more (the hook token) as `<hex>`.
+ * of 32 hex or more (a token it doesn't know) as `<hex>`.
  */
 function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
   const mask = (s) => known.reduce((x, t) => x.split(t.token).join(`<${t.kind} token>`), s)
@@ -914,7 +915,20 @@ async function runScenario(sc, providerKey, opts = {}) {
     observed.slotLog = readMcpLog(slotLog)
     // Any Agent API token (the workspace's, or an agent's for this launch) in what the session printed or said.
     const tokensIn = (dir, kind) => (fs.existsSync(dir) ? fs.readdirSync(dir).map((f) => ({ kind, token: JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).token })) : [])
-    const known = [{ kind: 'workspace', token: apiToken }, ...tokensIn(path.join(userData, 'agent-api'), 'agent'), ...tokensIn(path.join(userData, 'assistant-api'), 'assistant')].filter((t) => typeof t.token === 'string' && t.token.length >= 16)
+    // Each launch's hook token too (HI-2262, Darren's decision): HIVE_HOOK_TOKEN stays in the session's environment, so
+    // a listing of it would print that; its launch folder holds it while the session runs.
+    const launchesDir = path.join(userData, 'launches')
+    const hookTokens = fs.existsSync(launchesDir)
+      ? fs.readdirSync(launchesDir).flatMap((run) => {
+          try {
+            const m = /Bearer\s+(\S+)/.exec(fs.readFileSync(path.join(launchesDir, run, 'hook-auth.txt'), 'utf8'))
+            return m ? [{ kind: 'hook', token: m[1] }] : []
+          } catch {
+            return []
+          }
+        })
+      : []
+    const known = [{ kind: 'workspace', token: apiToken }, ...tokensIn(path.join(userData, 'agent-api'), 'agent'), ...tokensIn(path.join(userData, 'assistant-api'), 'assistant'), ...hookTokens].filter((t) => typeof t.token === 'string' && t.token.length >= 16)
     const tokens = known.map((t) => t.token)
     // A script's own output too (what it printed), beside its calls'.
     const scripts = code.items.filter((x) => x.kind === 'script').map((x) => ({ name: x.tool.name, result: String(x.tool.result ?? '') }))

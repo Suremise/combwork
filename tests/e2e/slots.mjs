@@ -215,8 +215,9 @@ export function needsSlot({ count, repeat = 1 }, env = process.env) {
 async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, workspace = env.HIVE_WORKSPACE } = {}) {
   const url = env.HIVE_API_URL?.replace(/\/+$/, '')
   if (!url) return null
-  let token = env.HIVE_API_TOKEN && !env.HIVE_API_TOKEN.includes('${') ? env.HIVE_API_TOKEN : ''
-  if (!token && env.HIVE_API_TOKEN_FILE) {
+  // The session's token file, never HIVE_API_TOKEN (HI-2262: sessions no longer get it).
+  let token = ''
+  if (env.HIVE_API_TOKEN_FILE) {
     try {
       token = String(JSON.parse(readFileSync(env.HIVE_API_TOKEN_FILE, 'utf8')).token ?? '')
     } catch {

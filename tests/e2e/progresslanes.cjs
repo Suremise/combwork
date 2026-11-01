@@ -68,7 +68,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check('the agents start', !!(await until(async () => (await statuses()).every((s) => s === 'ready'), 45000)), JSON.stringify(await statuses()))
   const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
   // Each agent's token, by the folder it runs in (B1 and B3 in their worktrees).
-  const tokenOf = (a) => launches.filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase()).at(-1)?.env?.HIVE_API_TOKEN
+  const tokenOf = (a) => launches.filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase()).at(-1)?.token
   const api = async (token, method, route, body) => {
     const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: r.status, body: await r.json().catch(() => null) }

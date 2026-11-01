@@ -178,7 +178,7 @@ const check = (name, ok, extra = '') => {
     // The merge slot taken while it writes its handover: not ended.
     const idleSession = (await live(idle.id)).sessionId
     const launches = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-    const token = launches().find((l) => l.sessionId === idleSession)?.env?.HIVE_API_TOKEN
+    const token = launches().find((l) => l.sessionId === idleSession)?.token
     const slotRun = handOverSelf(idle)
     check('Hive asks Idle for a handover', !!(await asked(idle)) && (await writing('Idle').count()) > 0)
     const claim = await api(token, 'POST', '/v1/projects/alpha/merge-slot/claim', { cards: [], timeoutSeconds: 0 })

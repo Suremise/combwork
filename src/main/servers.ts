@@ -386,15 +386,16 @@ export function assistantApiUrl(): string | null {
 }
 
 /**
- * Environment passed to an agent's session so it (and its hive tools) can reach the API: with the agent's own token
- * for this launch (agentTokens.ts), never the workspace's, so the API knows which project's agent is calling.
+ * Environment passed to an agent's session so it (and its hive tools) can reach the API: the file holding the agent's
+ * own token for this launch (agentTokens.ts), never the workspace's, so the API knows which project's agent is calling.
+ * Never the token itself (HI-2262, Darren's decision): an agent listing its environment printed it (HI-2259).
  */
 export function apiEnv(projectPath: string, agentId: string): Record<string, string> {
   const info = apiInfo()
   const token = agentToken(projectPath, agentId)
   if (!info.running || !info.url || !token) return {}
   // How long hive-progress waits for the API's answers (HI-1892: Settings → Advanced, its reply time).
-  return { HIVE_API_URL: info.url, HIVE_API_TOKEN: token, HIVE_API_TOKEN_FILE: agentTokenFile(projectPath, agentId), HIVE_PROGRESS_REPLY_SECONDS: String(advanced.number('hive.progress.replySeconds')) }
+  return { HIVE_API_URL: info.url, HIVE_API_TOKEN_FILE: agentTokenFile(projectPath, agentId),HIVE_PROGRESS_REPLY_SECONDS: String(advanced.number('hive.progress.replySeconds')) }
 }
 
 /** An open workspace by its folder path or its name. A name two open workspaces share is refused (409): use the path. */

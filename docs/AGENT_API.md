@@ -24,8 +24,7 @@ Sessions started from Hive receive these environment variables, so an agent can 
 | Variable | Value |
 |---|---|
 | `HIVE_API_URL` | Base URL of the API |
-| `HIVE_API_TOKEN` | The agent's own bearer token for this launch (not the workspace token in `agent-api.json`): the API knows from it which project's agent is calling, and it stops working when the agent stops |
-| `HIVE_API_TOKEN_FILE` | Path of the file holding that token, which Hive rewrites at each launch |
+| `HIVE_API_TOKEN_FILE` | Path of a JSON file whose `token` is the agent's own bearer token for this launch (not the workspace token in `agent-api.json`): the API knows from it which project's agent is calling, and it stops working when the agent stops. Hive writes a new one at each launch. The token itself is never in the environment (HI-2262: until 1.0, also `HIVE_API_TOKEN`), so read the file in the command that uses it |
 | `HIVE_PROJECT` | Name of the project the session belongs to |
 | `HIVE_AGENT` | Name of the agent running the session (e.g. `Agent 1`) |
 | `HIVE_PROJECT_PATH` | Full path of the project |
@@ -53,14 +52,14 @@ It holds **no token**. Hive writes it when the Agent API starts listening (at st
 ### Example (PowerShell)
 
 ```powershell
-$h = @{ Authorization = "Bearer $env:HIVE_API_TOKEN" }
-Invoke-RestMethod "$env:HIVE_API_URL/v1/projects" -Headers $h
+$t = (Get-Content $env:HIVE_API_TOKEN_FILE | ConvertFrom-Json).token
+Invoke-RestMethod "$env:HIVE_API_URL/v1/projects" -Headers @{ Authorization = "Bearer $t" }
 ```
 
 ### Example (bash / curl)
 
 ```bash
-curl -s -H "Authorization: Bearer $HIVE_API_TOKEN" "$HIVE_API_URL/v1/projects"
+curl -s -H "Authorization: Bearer $(node -p "require(process.env.HIVE_API_TOKEN_FILE).token")" "$HIVE_API_URL/v1/projects"
 ```
 
 ### Errors
@@ -388,7 +387,7 @@ The workspace's board: cards in six columns, `hold` (On Hold), `todo`, `doing`, 
 
 **Card keys** (#1219, #704). Each project has a key of 2–4 letters (`HI`, `AM`), and its cards are numbered in it: `HI-12`. A card's JSON has `key` (absent for a card with none: one about the workspace, a project with no key yet). A card's number (`number`, the `#N` everywhere before 1.0) stays its id and a permanent alias, and `{n}` and the hive tools' `number` still take it as a bare number (HI-1661: never shown, only taken); give its key, in any case (`HI-12`, `hi-12`), an old key of its project, a key it had in another project before it moved, or `#12`. So do `blockedBy`, `links`, `before`, a reorder's `cards`, `POST /v1/tasks/wait`'s `cards`, a lane's `cards` and the merge slot's `cards`. A key no card has is `404` (`Unknown card HI-99`), and so is, for a project agent, another project's key: it can't tell whether that card exists. So does a progress run's `card` (`POST /v1/progress`, `hive-progress --card HI-12`), and a batch's `numbers`, where a key or `#N` no card has is refused as that card and the others change (the batch is checked whole first: over 100 cards, or a field it can't set, refuses it all before any key is looked up). Existing cards keep their number in their project (`#1061` is `HI-1061`); a new card takes its project's next number; a card moved to another project takes that project's next, its old key kept as an alias (and its old number again if it comes back). Replies, errors, wakes, the inbox and the doorbell name a card by its key alone, `HI-1230` (HI-1661: never with its number; `#1240` only for a card with no key, and for another project's card to a project agent). Replies whose text the hive tools word from their JSON (a listing's `blockedBy`, a reorder, a batch, a wait, the inbox, the merge slot, a lane (each lane in a listing), a message tied to a card) carry `names`: each card's name by its number. Keys are given by Hive (suggested from the folder's name) and changed by the user in Project Settings, the old key kept as an alias.
 
-**Who sees what.** The workspace token (scripts) and the Hive Assistant see and change the whole board, as the user does. A project agent, calling with its own token (`HIVE_API_TOKEN`), sees and changes only its project's cards; who it is comes from the token alone, never from the request:
+**Who sees what.** The workspace token (scripts) and the Hive Assistant see and change the whole board, as the user does. A project agent, calling with its own token (in `HIVE_API_TOKEN_FILE`), sees and changes only its project's cards; who it is comes from the token alone, never from the request:
 
 - `GET /v1/tasks` lists its project's cards; asking for another project (`?project=`) is `403`.
 - Another project's card, or one with no project, answers as if it didn't exist: reading, changing, commenting on or moving it is `404` (`Unknown task #63`), and naming it in `blockedBy`, `links`, `before` or a reorder is `400` (`there is no card #63`).
@@ -829,7 +828,7 @@ Event types:
 **Nothing private is sent, to any token.** Every payload is built from a list of the fields it may carry, so there is no prompt, message, question or reply text, no terminal or CLI output, no command line, no notice body and no setting's value. A `session-status` event's `state` has: `provider`, `projectPath`, `agentId`, `agentName`, `cwd`, `sessionId`, `runId`, `sessionName`, `status`, `statusSince`, `startedAt`, `unseen`, `mergeSlot` and `watch` (Hive's own words: "Waiting for the merge slot (B4 is merging #305)", "Waiting for HI-12 → Review", with the watch's `cards`, `agents`, `lanes`, `column`, `changes`, `since` and `limitAt`), `notWatching`, `question: { since }` (it asked something without stopping; not what), `reviewing: true` (an action under the CLI's automatic review; not which), `signIn: { since }`, `untakenLine: { since }` (a line Hive typed that it hasn't taken), `inbox: { unread: [{ id, from, at, state }], overdue }` (its deliveries not received yet: who from, when and their state, not what they say; and how many weren't acked in time), `permissionMode`, `modeSwitching`, `planMode`, `modelName`, `modelId`, `effort`, `costUsd`, `costEstimated`, `contextWindow`, `backgroundTasks`, `settingUp` and `lockedFiles`. Its status message (the CLI's own words) isn't sent: `GET /v1/projects` gives it. Events cover every open workspace, so the Hive Assistant's token is refused here (403); it follows agents with `hive_wait_for_agents`. The workspace token and viewer tokens get every event. A project agent's own token gets its own project's `session-status`, `session-exit`, `notice`, `notice-resolved` and `agent-added` only (another project's carry their session names, which can name their cards), `progress-changed` and `merge-slots-changed` for its own workspace with its project's runs and slots only, and no `assistant-activity`; the other events carry no more than a path and come to it as to anyone. A client that stops reading (more than 1 MB of events waiting) is disconnected.
 
 ```bash
-curl -N -H "Authorization: Bearer $HIVE_API_TOKEN" "$HIVE_API_URL/v1/events"
+curl -N -H "Authorization: Bearer $(node -p "require(process.env.HIVE_API_TOKEN_FILE).token")" "$HIVE_API_URL/v1/events"
 ```
 
 ### Assistant activity

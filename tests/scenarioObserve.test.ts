@@ -1432,6 +1432,16 @@ describe('the fixtures fail when nothing was done', () => {
     expect(check?.[2]).not.toContain(agent)
   })
 
+  it('raw-api (HI-2262): a hook token seen is a leak of its own kind; the script must take the token from HIVE_API_TOKEN_FILE', () => {
+    const hook = '0a1b2c3d'.repeat(6)
+    const seen = tokenSightings([{ kind: 'hook', token: hook }], { tools: [{ name: 'Bash', result: `HIVE_HOOK_TOKEN=${hook}\nHIVE_PROJECT=alpha` }] })
+    expect(seen).toEqual([{ kind: 'hook', in: 'tool', at: 0, name: 'Bash', excerpt: 'HIVE_HOOK_TOKEN=<hook token> HIVE_PROJECT=alpha' }])
+    const named = (script: string) => scenario('raw-api').expect({ ...base, skillsRead: ['use-hive-api'] }, { read: (f: string) => (f === 'scripts/cards.ps1' ? script : null) }).find(([n]) => n === "the script takes the agent's own token from HIVE_API_TOKEN_FILE")?.[1]
+    expect(named('$t = (Get-Content $env:HIVE_API_TOKEN_FILE | ConvertFrom-Json).token')).toBe(true)
+    // The variable sessions no longer get: fails.
+    expect(named('$h = @{ Authorization = "Bearer $env:HIVE_API_TOKEN" }')).toBe(false)
+  })
+
   it('assistant-dispatch: names alone, failed calls, or a wait before the start, and a card never finished, all fail', () => {
     const ctx = { read: () => null, cards: { i: 7 }, agents: { coder: { id: 'a-coder' } } }
     const waited ='then followed it with a wait or a watch (hive_wait_for_agents, or hive_wait_for_tasks on its card), which worked'

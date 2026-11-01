@@ -152,7 +152,7 @@ const check = (name, ok, extra = '') => {
   // The Assistant's workspace section (#311, #979): Coder's state mark has what it is doing (its progress run) and its
   // cards in its tooltip and its accessible name.
   const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-  const coderToken = launches.filter((l) => l.cwd.toLowerCase() === alpha.toLowerCase()).at(-1)?.env?.HIVE_API_TOKEN
+  const coderToken = launches.filter((l) => l.cwd.toLowerCase() === alpha.toLowerCase()).at(-1)?.token
   const progress = async (p, body) => (await fetch(`http://127.0.0.1:${PORT}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${coderToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json()
   const run = await progress('/v1/progress', { title: 'e2e: 12 suites with a long title to cut short', total: 12, step: 4 })
   check('Coder reports a progress run', !!run?.id, JSON.stringify(run))

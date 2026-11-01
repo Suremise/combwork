@@ -112,7 +112,7 @@ const prose = (seed, n) => {
    * The coder's own Agent API token, as its latest launch was given it (the fake CLI logs its launches, each with its
    * agent's name: other agents of alpha start later, HI-1933).
    */
-  const coderOwnToken = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).reverse().find((l) => l.env?.HIVE_API_TOKEN && l.env.HIVE_AGENT === coder.name && l.cwd.toLowerCase() === alpha.toLowerCase())?.env?.HIVE_API_TOKEN
+  const coderOwnToken = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).reverse().find((l) => l.token && l.env.HIVE_AGENT === coder.name && l.cwd.toLowerCase() === alpha.toLowerCase())?.token
   /**
    * One hive tool call through hive-mcp.js: the text the agent gets (role 'assistant+settings': with Change settings on;
    * 'own': with the coder's own token, as the agent calls it, where the caller matters: its own lane starts nobody, HI-1933).
@@ -665,8 +665,8 @@ const prose = (seed, n) => {
   // token; the API counts route templates, never paths asked for; the bridge's reports aren't API traffic.
   console.log('\n--- Performance metrics')
   const since = new Date(Date.now() - 3600_000).toISOString()
-  const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).reverse().find((l) => l.env?.HIVE_API_TOKEN && l.cwd.toLowerCase() === alpha.toLowerCase())
-  const coderToken = launch?.env?.HIVE_API_TOKEN
+  const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).reverse().find((l) => l.token && l.cwd.toLowerCase() === alpha.toLowerCase())
+  const coderToken = launch?.token
   check("metrics: the agent's own token is known", !!coderToken)
   const asCoder = (method, request) =>
     JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: request }) + '\n', env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, HIVE_API_TOKEN: coderToken, HIVE_API_TOKEN_FILE: '', HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: coder.id }), timeout: 60000 }).toString().split('\n')[0]).result

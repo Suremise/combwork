@@ -61,7 +61,7 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   for (const a of [b, r]) await inv('session:start', alpha, { agentId: a.id })
   check('the agents start', !!(await until(async () => (await live(b.id))?.status === 'ready' && (await live(r.id))?.status === 'ready', 45000)))
   const launches = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
-  const tokenOf = (a) => launches.filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase()).at(-1)?.env?.HIVE_API_TOKEN
+  const tokenOf = (a) => launches.filter((l) => l.cwd.toLowerCase() === (a.worktree?.path ?? alpha).toLowerCase()).at(-1)?.token
   const api = async (token, method, route, body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: res.status, body: await res.json().catch(() => null) }
