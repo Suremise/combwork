@@ -934,7 +934,7 @@ describe('RELEASING.md on the 1.0 path', () => {
       expect(skill).toMatch(/RELEASING\.md's \*\*The user's OK\*\* lists the decisions that are the user's/)
       expect(skill).not.toMatch(/^- creating tags;/m)
       // HR5's #1533 round 1 finding: the current-version candidate is the uploaded release's; a baseline sets its version first.
-      expect(skill).toMatch(/\*\*A baseline install\*\* .* goes version first: its `1\.0\.0-rc\.<n>` is set \(asked\) before its one `npm run dist`, with no current-version candidate before it/)
+      expect(skill).toMatch(/\*\*A baseline install\*\* .* goes version first: its version is set \(asked: a `-beta\.<n>`; 1\.0's were named `1\.0\.0-rc\.<n>`\) before its one `npm run dist`, with no current-version candidate before it/)
       expect(skill).toMatch(/^- \*\*For an uploaded release\*\* \(an RC or the release, RELEASING's Steps\), the release candidate comes first/m)
     }
     expect(section('The 1.0 path')).toMatch(/`1\.0\.0-rc\.<n>` \(asked\), set before the build: no current-version candidate comes first \(that's Step 1, for an uploaded release\)/)
