@@ -756,8 +756,8 @@ export interface HiveRequests {
   'pty:write': (key: string, data: string) => void
   'pty:resize': (key: string, cols: number, rows: number) => void
   'pty:buffer': (key: string) => string
-  /** Its process's size now (null without one): a terminal shown before the window has fitted it draws at that size. */
-  'pty:size': (key: string) => { cols: number; rows: number } | null
+  /** Its process's size now, or the size the next one starts at without one (HI-2250): a terminal shown before the window has fitted it draws at that size. */
+  'pty:size': (key: string) => { cols: number; rows: number }
   'pty:kill': (key: string) => void
   /** A terminal refused its program's OSC 52 clipboard request (#736): logged. */
   'pty:clipboardRefused': (key: string, reason: Osc52Refusal) => void

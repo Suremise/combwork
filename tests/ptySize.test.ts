@@ -75,8 +75,15 @@ describe('the size a process starts at', () => {
     expect(startSize('s4')).toEqual({ cols: PTY_COLS, rows: PTY_ROWS })
   })
 
-  it('has no process size without a process', () => {
-    expect(ptySize('none')).toBeNull()
+  // A session's view is made at its start, before its process is spawned, and asks once: hidden, nothing fits it after,
+  // so it is told the size that process will start at, never nothing (HI-2250: it stayed xterm's 80 × 24).
+  it('is what a view asking before its process exists is told, and the process then has it', () => {
+    expect(ptySize('none')).toEqual({ cols: PTY_COLS, rows: PTY_ROWS })
+    resizePty('s5', 111, 33)
+    const asked = ptySize('s5')
+    expect(asked).toEqual({ cols: 111, rows: 33 })
+    spawnPty('s5', { file: 'fake', args: [], cwd: '.', env: {}, ...startSize('s5') })
+    expect(ptySize('s5')).toEqual(asked)
   })
 })
 
