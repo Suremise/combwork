@@ -81,6 +81,7 @@
   "panes.header.markIdleFailed": "No se pudo marcar el agente como inactivo",
   "panes.header.more": "Más",
   "panes.header.notRunning": "No está en ejecución",
+  "panes.header.slotHeld": "Esperando su slot",
   "panes.header.retryLarge": "Esta conversación es grande y cada solicitud la envía entera. Una conversación nueva (un traspaso y luego una sesión nueva) envía menos, lo que puede ayudar con un límite de solicitudes.",
   "panes.header.retryTip": "{provider} está esperando para volver a enviar su solicitud al modelo: {why, select, limited {el servicio la rechazó por demasiadas solicitudes (límite de solicitudes).} network {no pudo conectar con el servicio.} other {la solicitud falló.}} Lo vuelve a intentar por sí solo{when, select, at { a las {time}} other {}}; no necesitas hacer nada.",
   "panes.header.retrySince": "Reintentando desde las {time}.",

@@ -282,11 +282,11 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
         cleared: (run, evidence) => {
           goneWriterCleared(run, evidence)
           // Free now: a lane waiting for a slot may get it (#1438).
-          slotFreed?.(ws, projectPath)
+          slotFreed(ws, projectPath)
         }
       },
       // A finished card's slot asked about only once its settle is over (HI-2170): the slots' pass looks again.
-      looked: () => slotFreed?.(ws, projectPath),
+      looked: () => slotFreed(ws, projectPath),
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
       renamer: renamerFor(ws, projectPath)
     })
@@ -724,9 +724,25 @@ export async function tidyOpenPools(): Promise<void> {
 }
 
 /** Told when a slot may have come free (its writer drained): slotCards.ts's lanes waiting for a slot try again. */
-let slotFreed: ((ws: WorkspaceService, projectPath: string) => void) | null = null
-export function setSlotFreed(fn: typeof slotFreed): void {
-  slotFreed = fn
+let slotFreedFn: ((ws: WorkspaceService, projectPath: string) => void) | null = null
+export function setSlotFreed(fn: typeof slotFreedFn): void {
+  slotFreedFn = fn
+}
+/** Also told each time (HI-2304): a connection switch whose resume waits for its slot. */
+const freedListeners = new Set<(projectPath: string) => void>()
+function slotFreed(ws: WorkspaceService, projectPath: string): void {
+  slotFreedFn?.(ws, projectPath)
+  for (const fn of freedListeners) {
+    try {
+      fn(projectPath)
+    } catch (e) {
+      log.warn('after a slot came free', e)
+    }
+  }
+}
+sessions.slotFreedWatch = (fn) => {
+  freedListeners.add(fn)
+  return () => freedListeners.delete(fn)
 }
 
 /** Starts the hourly tidy (index.ts, once); a workspace closing closes its pools. */
@@ -750,7 +766,7 @@ export function startSlots(): void {
       if (!ws) return
       await poolFor(ws, projectPath).then((p) => p.drained(slot))
       // Free now, perhaps: what waits for a slot may get it (#1438: a lane waiting for one).
-      slotFreed?.(ws, projectPath)
+      slotFreed(ws, projectPath)
     }
   })
 }

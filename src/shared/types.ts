@@ -1899,8 +1899,11 @@ export interface AgentInfo extends AgentDef {
   connectionName?: string
 }
 
-/** An agent's start as the stall check reads it (HI-1977): under way, or why it failed. */
-export type AgentStart = { starting: true } | { failed: string }
+/**
+ * An agent's start as the stall check reads it (HI-1977): under way, why it failed, or why it waits (HI-2304: its slot
+ * held by what another run left running there; English, as Hive says it).
+ */
+export type AgentStart = { starting: true } | { failed: string } | { waiting: string }
 
 export interface ResumeTarget {
   id: string

@@ -201,6 +201,8 @@
   "session.status.signedInAgain": "Zatrzymany podczas wylogowania",
   "session.status.tasksDropped": "{minutes, plural, one {Przestano liczyć jego zadania w tle po # minucie} few {Przestano liczyć jego zadania w tle po # minutach} many {Przestano liczyć jego zadania w tle po # minutach} other {Przestano liczyć jego zadania w tle po # minuty}}",
   "session.status.waitingForConnection": "Czeka na połączenie…",
+  "session.switch.waits": "{why}. Hive wznowi go, gdy slot będzie wolny.",
+  "session.switch.waitsTitle": "Zmiana połączenia agenta {agent} czeka na slot {slot}",
   "session.tracker.body": "{reason}. {detail} Przyczynę podaje Pomoc → Kopiuj diagnostykę.",
   "session.tracker.detail": "Agenci uruchamiają się normalnie, ale procesy, które zostawiają po zatrzymaniu, nie są wyświetlane i nie można ich stąd zakończyć.",
   "session.tracker.helperFailed": "Pomocnik PowerShell modułu śledzenia procesów Hive się nie uruchomił ({why})",

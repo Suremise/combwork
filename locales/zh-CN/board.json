@@ -851,6 +851,7 @@
   "board.stalled.reviewWaitBusy": "{agent} 正在监视 {card}，但还没开始评审（它正在处理其他工作）：已在“评审”中 {waited}。",
   "board.stalled.reviewWaitSilent": "{agent} 正在监视 {card}，但还没开始评审（它显示为工作中，但已沉默 {silent}，状态未知）：已在“评审”中 {waited}。",
   "board.stalled.startFailed": "{agent} 启动失败：{why}",
+  "board.stalled.startWaiting": "{agent} 正在等待启动：{why}",
   "board.stalled.wakeUntaken": "{agent} 没有接收 Hive 为 {card} 输入的唤醒：它还在输入框中等待。",
   "board.start.busy": "{status}。等它空闲后再选择。",
   "board.start.checkingConnection": "正在检查已安装哪些编程智能体，以选择第一个可以运行的连接…",

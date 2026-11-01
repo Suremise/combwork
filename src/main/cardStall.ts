@@ -1,7 +1,7 @@
 import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
-import { REVIEW_WAIT_STALL_MS, backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, type LaneOrderView, type StallAgent } from '../shared/tasks'
+import { REVIEW_WAIT_STALL_MS, backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, type LaneOrderView, type StallAgent } from '../shared/tasks'
 import type { AgentInfo, AgentStart, LaneStatus, ProgressRun, TaskCard } from '../shared/types'
 import { LOOP_STEP_WAIT_MINUTES, laneStatusText } from '../shared/lanes'
 import { forYouOfCards } from './workflow/cardWork'
@@ -131,8 +131,9 @@ export type { StallAgent }
  */
 export function agentNowOf(projectPath: string, agentId: string, name: string): StallAgent {
   const start = startNow(projectPath, agentId)
-  const running = !!sessions.liveFor(projectPath, agentId) || isResuming(projectPath, agentId) || sessions.startingFor(projectPath, agentId) || start.starting
-  return { name, running, ...(!running && start.failed ? { failed: start.failed } : {}) }
+  // Waiting for its slot (HI-2304): its placement's hold doesn't make it starting, so it says why it waits.
+  const running = !!sessions.liveFor(projectPath, agentId) || isResuming(projectPath, agentId) || sessions.startingFor(projectPath, agentId) || (start.starting && !start.waiting)
+  return { name, running, ...(!running && start.failed ? { failed: start.failed } : {}), ...(!running && !start.failed && start.waiting ? { waiting: start.waiting } : {}) }
 }
 
 /**
@@ -142,6 +143,7 @@ export function agentNowOf(projectPath: string, agentId: string, name: string): 
 export function agentStartOf(projectPath: string, agentId: string): AgentStart | undefined {
   const now = agentNowOf(projectPath, agentId, '')
   if (now.failed) return { failed: now.failed }
+  if (now.waiting) return { waiting: now.waiting }
   return now.running && !sessions.liveFor(projectPath, agentId) ? { starting: true } : undefined
 }
 
@@ -196,7 +198,7 @@ export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: stri
     const why = waited(REVIEW_WAIT_STALL_MS) ? reviewVerdictWaitReason(c, watchers, Date.now(), undefined, job) : null
     return why && wsPath && c.review && ownQuestionOpen(wsPath, c, c.review.agent) ? null : why
   }
-  return startFailedReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? (waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers) : null) ?? verdictWait() ?? (waited(REVIEW_WAIT_STALL_MS) ? laneOrderWaitReason(c, lane, watchers) : null) ?? (waited(REVIEW_WAIT_STALL_MS) ? loopStepWaitReason(c, watchers, stepWaitMs) : null) ?? (waited(IDLE_WATCH_STALL_MS) ? idleWatch(c, lane, live, wsPath) : null) ?? (waited(LANE_NEXT_STALL_MS) ? laneNext(c, lane, live, agentNow) : null) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
+  return startFailedReason(c, agentNow) ?? startWaitingReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? (waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers) : null) ?? verdictWait() ?? (waited(REVIEW_WAIT_STALL_MS) ? laneOrderWaitReason(c, lane, watchers) : null) ?? (waited(REVIEW_WAIT_STALL_MS) ? loopStepWaitReason(c, watchers, stepWaitMs) : null) ?? (waited(IDLE_WATCH_STALL_MS) ? idleWatch(c, lane, live, wsPath) : null) ?? (waited(LANE_NEXT_STALL_MS) ? laneNext(c, lane, live, agentNow) : null) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
 }
 
 /**

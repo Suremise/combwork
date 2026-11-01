@@ -491,6 +491,23 @@ export async function heldWriter(projectPath: string, slot: string): Promise<Hel
   }
 }
 
+/**
+ * Why a start in a slot would be refused now for its writer (HI-2304), in English (agent-facing, and a stall's words),
+ * known before anything is prepared: a run of this Hive's still holds it, its session there or what it left running
+ * there, named. Null when it has no writer, or its writer is another Hive's (a start's claim settles that, HI-1886).
+ * `nameOf`: an agent's name by its id.
+ */
+export async function slotHeldWords(projectPath: string, slot: string, nameOf: (agentId: string) => string): Promise<string | null> {
+  const w = await heldWriter(projectPath, slot)
+  if (!w || !w.hive.self) return null
+  const who = nameOf(w.agent)
+  const list = w.processes?.list ?? []
+  if (!list.length) return w.live ? `${slot} is in use by ${who}'s session there` : `${slot} is still held by ${who}'s last run, not known to have ended (Release Slot… in ${who}'s ⋯ frees it)` // i18n-ignore: agent-facing
+  const more = list.length - 2 + (w.processes?.more ?? 0)
+  const named = list.slice(0, 2).map((p) => p.name.replace(/\.exe$/i, '')).join(', ') + (more > 0 ? ` and ${more} more` : '') // i18n-ignore: agent-facing
+  return `${slot} is held by ${named}, left running by ${who}'s last run: it is free once they end (End in ${who}'s ⋯ ends them)` // i18n-ignore: agent-facing
+}
+
 /** What a run left running, as listed: by this Hive, or kept from before it started (#614's restore names it `restored:`). */
 const runLeftovers = (run: string): ReturnType<typeof leftoversOfRun> => leftoversOfRun(run) ?? leftoversOfRun(`restored:${run}`)
 

@@ -205,6 +205,8 @@
   "session.status.signedInAgain": "Stopped while signed out",
   "session.status.tasksDropped": "{minutes, plural, one {Stopped counting its background tasks after # minute} other {Stopped counting its background tasks after # minutes}}",
   "session.status.waitingForConnection": "Waiting for the connection…",
+  "session.switch.waits": "{why}. Hive resumes it once the slot is free.",
+  "session.switch.waitsTitle": "{agent}'s switch of connection waits for {slot}",
   "session.tracker.body": "{reason}. {detail} Help → Copy Diagnostics says why.",
   "session.tracker.detail": "Agents start as usual, but processes they leave running when they stop aren't listed or offered to end.",
   "session.tracker.helperFailed": "The PowerShell helper of Hive's process tracker didn't start ({why})",

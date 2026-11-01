@@ -81,6 +81,7 @@
   "panes.header.markIdleFailed": "无法将智能体标记为空闲",
   "panes.header.more": "更多",
   "panes.header.notRunning": "未运行",
+  "panes.header.slotHeld": "正在等待其槽位",
   "panes.header.retryLarge": "这个对话很大，每次请求都会发送全部内容。新的对话（先交接，再开新会话）发送的内容更少，在限流时可能有帮助。",
   "panes.header.retryTip": "{provider} 正在等待重新发送它的模型请求：{why, select, limited {服务因请求过多而拒绝了它（限流）。} network {无法连接到服务。} other {请求失败。}}它会{when, select, at {在 {time} } other {}}自动重试，你无需操作。",
   "panes.header.retrySince": "自 {time} 起一直在重试。",

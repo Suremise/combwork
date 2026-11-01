@@ -3997,6 +3997,39 @@ Whether a conversation may resume there is its **hold** (none: it may):
       States older than 7 days are removed at the start.
     - This replaces recording each process as it starts (the card's first idea): a record can't hold what a process
       started after it through one that has since exited; the job's own holder sees it.
+  - **Windows' own brokers don't hold a slot** (HI-2304: MB1's connection switch never resumed, its slot held by
+    `WindowsSandboxServer.exe`, which the windows-sandbox server's Sandbox had started and which outlived it). A
+    launch's job whose remaining processes are all known system brokers (`systemBrokers.ts`), none described beyond
+    them, counts as ended, so its writer is released, while none of what they serve runs on the whole machine. The
+    job is let go and the broker is never ended. The decision (a known list plus a confirmed "nothing it serves is
+    running"):
+    - A broker is known only by its executable's full path, which the helper's listing gives (WMI `ExecutablePath`),
+      directly in its package's folder in `%ProgramFiles%\WindowsApps`. Only Windows writes there, so an agent can't
+      put a look-alike there.
+    - It counts as the agent's while any of its `active` processes runs, because a Sandbox's mapped folders, which can
+      be in the slot, can be written from inside it. The Sandbox's are `WindowsSandbox.exe`, `WindowsSandboxClient.exe`,
+      `WindowsSandboxRemoteSession.exe` and `vmmemWindowsSandbox`, checked from one whole process snapshot (the
+      helper's `running`).
+    - It fails closed: no path, a path elsewhere, another process beside it, or a snapshot not read whole, and the
+      slot stays held as before.
+    - It is checked at the CLI's exit and at each 10 s look at the leftovers.
+    - Not a check of working folders or open handles: reading another process's handles needs rights that are often
+      refused, and a Sandbox's writes come through Hyper-V's share, not through the broker's handles.
+    - The list is code, not an Advanced setting, so a typo can't make a writer not one.
+    - A restored launch (no paths) and a gone Hive's keeper (HI-2055) still hold, for Release Slot….
+  - **A held slot is waited on, not retried** (HI-2304: the lane resumed MB1 every ~20 s, each try spending 15 s and a
+    cancelled delivery).
+    - A placement whose builder isn't running first asks what holds its slot (`slotHeldWords`: a run of this Hive's,
+      its session there or the processes it left, named). Held, it starts nothing and makes no delivery. It tells the
+      card and its builder once (`resumeHeld`, "slot-a is held by WindowsSandboxServer, left running by MB1's last
+      run"), and records the wait on the agent (`agentStarts.startWaits`). The card then stalls with *B1 waits to
+      start: …* on the board and in lane watches, and the pane's status says *Waiting for its slot*.
+    - It looks again when a slot of the project is freed, when leftovers change, or when its builder's status changes,
+      and otherwise after 5 min.
+    - A connection switch whose resume is refused for a busy slot (`busySlot`) waits the same way. It looks first at
+      what holds the slot, cheaply, so a look while the slot is still held starts nothing. It looks again at each
+      change and at each slot freed, tells the user once in a notice (*MB1's switch of connection waits for slot-a*),
+      and resumes once the slot is free. It gives up after a day.
   - **Release Slot…** (#1506, the user's recovery, `agentFolders.ts` `heldWriter`/`releaseHeldWriter`): a writer is
     *held* when its run isn't live in this Hive (its token ended: the session over and its leftovers kept, untracked
     or unreadable) and its Hive is this one or one known to have gone (`writerHeld`). The agent's ⋯ offers Release

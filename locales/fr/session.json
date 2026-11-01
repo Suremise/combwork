@@ -201,6 +201,8 @@
   "session.status.signedInAgain": "Arrêté pendant la déconnexion",
   "session.status.tasksDropped": "{minutes, plural, one {Comptage de ses tâches en arrière-plan arrêté après # minute} many {Comptage de ses tâches en arrière-plan arrêté après # minutes} other {Comptage de ses tâches en arrière-plan arrêté après # minutes}}",
   "session.status.waitingForConnection": "En attente de la connexion…",
+  "session.switch.waits": "{why}. Hive le reprend dès que l’emplacement est libre.",
+  "session.switch.waitsTitle": "Le changement de connexion de l’agent {agent} attend l’emplacement {slot}",
   "session.tracker.body": "{reason}. {detail} Aide → Copier les diagnostics indique pourquoi.",
   "session.tracker.detail": "Les agents démarrent normalement, mais les processus qu’ils laissent tourner à leur arrêt ne sont ni listés ni proposés à l’arrêt.",
   "session.tracker.helperFailed": "Le script d’aide PowerShell du suivi des processus de Hive n’a pas démarré ({why})",

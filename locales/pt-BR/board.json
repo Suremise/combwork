@@ -851,6 +851,7 @@
   "board.stalled.reviewWaitBusy": "O agente {agent} está observando {card}, mas não começou a revisão (está trabalhando em outra coisa): em Revisão há {waited}.",
   "board.stalled.reviewWaitSilent": "O agente {agent} está observando {card}, mas não começou a revisão (aparece como trabalhando, mas está em silêncio há {silent}: estado desconhecido): em Revisão há {waited}.",
   "board.stalled.startFailed": "Não foi possível iniciar o agente {agent}: {why}",
+  "board.stalled.startWaiting": "O agente {agent} aguarda para iniciar: {why}",
   "board.stalled.wakeUntaken": "O agente {agent} não processou a linha de despertar que o Hive digitou para {card}: ela continua esperando no prompt.",
   "board.start.busy": "{status}. Escolha-o quando estiver ocioso.",
   "board.start.checkingConnection": "Verificando quais agentes de código estão instalados, para escolher a primeira conexão que pode rodar…",

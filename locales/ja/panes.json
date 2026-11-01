@@ -81,6 +81,7 @@
   "panes.header.markIdleFailed": "エージェントをアイドルにできませんでした",
   "panes.header.more": "その他",
   "panes.header.notRunning": "停止中",
+  "panes.header.slotHeld": "スロットを待機中",
   "panes.header.retryLarge": "この会話は大きく、リクエストのたびに全体が送信されます。新しい会話（引き継ぎのあと新しいセッション）なら送信量が減り、レート制限の下では役立つことがあります。",
   "panes.header.retryTip": "{provider}はモデルへのリクエストを再送するのを待っています：{why, select, limited {リクエストが多すぎるとしてサービスに拒否されました（レート制限）。} network {サービスに接続できませんでした。} other {リクエストが失敗しました。}}{when, select, at {{time}に} other {}}自動で再試行します。操作は必要ありません。",
   "panes.header.retrySince": "{time}から再試行しています。",

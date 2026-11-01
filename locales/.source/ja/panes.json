@@ -94,6 +94,7 @@
   "panes.header.retryLarge": "This conversation is large, and each request sends all of it. A new conversation (a handover, then a fresh session) sends less, which can help under a rate limit.",
   "panes.header.retrySince": "Retrying since {time}.",
   "panes.header.retryTip": "{provider} is waiting to send its model request again: {why, select, limited {its service refused it as too many requests (rate-limited).} network {it couldn't reach its service.} other {the request failed.}} It tries again by itself{when, select, at { at {time}} other {}}; nothing is needed from you.",
+  "panes.header.slotHeld": "Waiting for its slot",
   "panes.header.stopTip": "Stop this agent (the conversation is kept; resume it any time)",
   "panes.header.unknownTip": "Hive has heard nothing of this agent's turn for a while and sees no sign that it ended: no Stop from its CLI, nothing in its CLI's records, no idle prompt on its screen. Until it hears more, the agent counts as busy and nothing is typed into it. If its terminal shows it waiting at its prompt, mark it idle.",
   "panes.header.untaken": "A line Hive typed wasn't taken",

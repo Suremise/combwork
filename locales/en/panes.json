@@ -339,6 +339,10 @@
     "defaultMessage": "{provider} is waiting to send its model request again: {why, select, limited {its service refused it as too many requests (rate-limited).} network {it couldn't reach its service.} other {the request failed.}} It tries again by itself{when, select, at { at {time}} other {}}; nothing is needed from you.",
     "description": "Tooltip of a pane's status while its coding agent ({provider}, a product name) waits to retry its model request. why: rate-limited, the service unreachable, or failed otherwise. {time} is when it tries again (a clock time)."
   },
+  "panes.header.slotHeld": {
+    "defaultMessage": "Waiting for its slot",
+    "description": "A pane's status (HI-2304): Hive will start or resume the agent in its slot (a worktree Hive lends it) once the processes another run left running there have ended. The tooltip says what holds it."
+  },
   "panes.header.stopTip": {
     "defaultMessage": "Stop this agent (the conversation is kept; resume it any time)",
     "description": "Tooltip of a pane's Stop button."

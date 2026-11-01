@@ -86,6 +86,7 @@ interface HiveMessageValues {
   'panes.header.retryLarge': undefined
   'panes.header.retrySince': { time: string | number }
   'panes.header.retryTip': { provider: string | number; why: string; when: string; time: string | number }
+  'panes.header.slotHeld': undefined
   'panes.header.stopTip': undefined
   'panes.header.unknownTip': undefined
   'panes.header.untaken': undefined

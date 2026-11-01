@@ -442,6 +442,39 @@ $r | ConvertTo-Json -Compress
     expect(JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!)).toEqual({ inOther: true, added: 'the process has exited', taken: true, followed: true, inJob: false, listed: true, ended: true })
   }, 120000)
 
+  // HI-2304: a job's listing gives each process's executable path (a system broker is known by it), and "running" says
+  // which executable names run on the machine (whether a Windows Sandbox does), from a whole snapshot.
+  it("lists each process's executable path, and which executable names run now (HI-2304)", async () => {
+    const { HOST_SOURCE } = await import('../src/main/agentProcesses')
+    const src = join(dir, 'host-running.cs')
+    writeFileSync(src, HOST_SOURCE)
+    const probe = join(dir, 'running.ps1')
+    writeFileSync(
+      probe,
+      `param($src, $node)
+$ErrorActionPreference = 'Stop'
+Add-Type -ReferencedAssemblies System.Management -TypeDefinition (Get-Content -Raw $src)
+$s = [System.Diagnostics.ProcessStartInfo]::new($node, '-e "setTimeout(() => {}, 60000)"'); $s.UseShellExecute = $false; $s.CreateNoWindow = $true
+$a = [System.Diagnostics.Process]::Start($s)
+$r = [ordered]@{}
+$r.added = [HiveJobs]::Add('t', $a.Id)
+$r.listed = [HiveJobs]::Describe('t', 10)
+$r.running = [HiveJobs]::Running('NODE.exe,hive-no-such-process-2304.exe')
+$r.ended = [HiveJobs]::Kill('t') -and $a.WaitForExit(10000)
+if (-not $a.HasExited) { Stop-Process -Id $a.Id -Force }
+$r | ConvertTo-Json -Compress
+`
+    )
+    const out = execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe, src, process.execPath], { windowsHide: true, timeout: 120000 })
+    const r = JSON.parse(String(out).trim().split(/\r?\n/).at(-1)!) as { added: string; listed: string; running: string; ended: boolean }
+    expect(r.added).toBe('ok')
+    expect(r.ended).toBe(true)
+    const listed = JSON.parse(r.listed) as { processes: { name: string; path: string }[] }
+    // Its console host (conhost) is in the job too; main leaves it out of what it lists.
+    expect(listed.processes.find((p) => p.name.toLowerCase() === 'node.exe')?.path.toLowerCase()).toBe(process.execPath.toLowerCase())
+    expect(JSON.parse(r.running)).toEqual(['node.exe'])
+  }, 120000)
+
   // A packaged app's process (the Store's PowerShell) is in no job for its first few ms, until Windows puts it in its
   // package's job (#678). A sweep that sees it then must follow it, not assign it: assigned, Windows nested the package's
   // job in the launch's as it put it there, so the next Store PowerShell anyone started was listed and ended with this

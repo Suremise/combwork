@@ -322,6 +322,7 @@ export const AREAS = [
   { paths: ['tests/e2e/slotupgrade.cjs', 'src/main/slotMigration.ts', 'src/main/workspaceMove.ts'], suites: ['slotupgrade', 'wsmove', 'repairbranches'] },
   { paths: ['tests/e2e/slotsessions.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/shared/sessionResume.ts', 'src/shared/resumeAll.ts', 'src/main/sessions.ts'], suites: ['slotsessions', 'legacyworktree'] },
   { paths: ['tests/e2e/legacyworktree.cjs', 'src/main/agentWorktree.ts'], suites: ['legacyworktree', 'slotupgrade'] },
+  { paths: ['tests/e2e/slotbroker.cjs', 'src/main/systemBrokers.ts', 'src/main/connectionSwitch.ts', 'src/main/agentProcesses.ts', 'src/main/processSupervisor.ts'], suites: ['slotbroker'] },
   { paths: ['tests/e2e/slotrelease.cjs', 'src/main/agentFolders.ts', 'src/renderer/src/components/SlotsAndCopies.tsx'], suites: ['slotrelease'] },
   { paths: ['tests/e2e/slotwindows.cjs', 'src/main/agentFolders.ts', 'src/main/agentProcesses.ts', 'src/main/index.ts'], suites: ['slotwindows'] },
   { paths: ['tests/e2e/slotreleaseapi.cjs', 'src/main/slotRelease.ts', 'src/main/agentFolders.ts', 'src/main/slotMigration.ts'], suites: ['slotreleaseapi'] },

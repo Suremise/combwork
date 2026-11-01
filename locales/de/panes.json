@@ -81,6 +81,7 @@
   "panes.header.markIdleFailed": "Agent konnte nicht als untätig markiert werden",
   "panes.header.more": "Mehr",
   "panes.header.notRunning": "Läuft nicht",
+  "panes.header.slotHeld": "Wartet auf seinen Slot",
   "panes.header.retryLarge": "Diese Unterhaltung ist groß, und jede Anfrage sendet sie ganz. Eine neue Unterhaltung (eine Übergabe, dann eine neue Sitzung) sendet weniger, was bei einem Ratenlimit helfen kann.",
   "panes.header.retryTip": "{provider} wartet darauf, seine Modellanfrage erneut zu senden: {why, select, limited {der Dienst hat sie wegen zu vieler Anfragen abgelehnt (Ratenlimit).} network {der Dienst war nicht erreichbar.} other {die Anfrage ist fehlgeschlagen.}} Es versucht es von selbst erneut{when, select, at { um {time}} other {}}; von dir wird nichts gebraucht.",
   "panes.header.retrySince": "Neue Versuche seit {time}.",

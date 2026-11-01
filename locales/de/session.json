@@ -201,6 +201,8 @@
   "session.status.signedInAgain": "Während der Abmeldung gestoppt",
   "session.status.tasksDropped": "{minutes, plural, one {Hintergrundaufgaben nach # Minute nicht mehr gezählt} other {Hintergrundaufgaben nach # Minuten nicht mehr gezählt}}",
   "session.status.waitingForConnection": "Wartet auf die Verbindung…",
+  "session.switch.waits": "{why}. Hive setzt den Agenten fort, sobald der Slot frei ist.",
+  "session.switch.waitsTitle": "Der Verbindungswechsel von {agent} wartet auf {slot}",
   "session.tracker.body": "{reason}. {detail} Warum, steht unter Hilfe → Diagnosedaten kopieren.",
   "session.tracker.detail": "Agenten starten wie gewohnt, aber Prozesse, die sie beim Stoppen laufen lassen, werden weder aufgeführt noch zum Beenden angeboten.",
   "session.tracker.helperFailed": "Das PowerShell-Hilfsprogramm der Prozessverfolgung von Hive ist nicht gestartet ({why})",
