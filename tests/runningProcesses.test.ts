@@ -103,4 +103,38 @@ describe.runIf(process.platform === 'win32')('what running agents had started, a
       await mod.closeProcessTracking()
     }
   }, 60_000)
+
+  // HI-2263: the tracker (its helper) lost while a launch runs. Its jobs go with it, so nothing can be listed any more,
+  // but what the launch had started is still running: the marker keeps it, as last listed, until the launch ends.
+  it('keeps a running launch’s processes, as last listed, once the tracker is lost, until the launch ends', async () => {
+    const out = join(dir, 'lost.txt')
+    const cli = join(dir, 'lost-cli.cjs')
+    writeFileSync(cli, `process.stdin.once('data', () => { require('child_process').spawn(process.execPath, ['-e', "require('fs').writeFileSync(process.argv[1], String(process.pid)); setTimeout(() => {}, 120000)", ${JSON.stringify(out)}], { detached: true, stdio: 'ignore', windowsHide: true, env: process.env }).unref() }); setTimeout(() => {}, 120000)`)
+    const proc = spawn(process.execPath, [cli], { stdio: ['pipe', 'ignore', 'ignore'], windowsHide: true, env: baseEnv() })
+    children.push(proc)
+    vi.resetModules()
+    const mod = await import('../src/main/agentProcesses')
+    try {
+      expect(await mod.trackLaunch({ runId: 'r2', projectPath: dir, agentId: 'a2', agentName: 'Docs' }, proc.pid!)).toEqual({ tracked: true })
+      proc.stdin!.write('go\n')
+      expect(await until(() => existsSync(out) && readFileSync(out, 'utf8').length > 0, 10_000)).toBe(true)
+      const server = Number(readFileSync(out, 'utf8'))
+      const before = await mod.runningProcesses()
+      expect(before.flatMap((l) => l.processes.map((p) => p.pid)).sort()).toEqual([proc.pid!, server].sort())
+
+      // The helper ends unexpectedly (this test's own): the launch is no longer tracked.
+      const lost = new Promise<string>((resolve) => mod.onRunOutcome((runId, outcome) => runId === 'r2' && resolve(outcome)))
+      process.kill(mod.processSupervisor().pid!)
+      expect(await lost).toBe('unknown')
+      // The marker still lists them, by the same identities, though no job can be listed now.
+      expect(await mod.runningProcesses()).toEqual(before)
+      expect(alive(server)).toBe(true)
+
+      // The launch ends: they are no longer the running marker's.
+      expect(await mod.launchEnded('r2')).toBeNull()
+      expect(await mod.runningProcesses()).toEqual([])
+    } finally {
+      await mod.closeProcessTracking()
+    }
+  }, 60_000)
 })
