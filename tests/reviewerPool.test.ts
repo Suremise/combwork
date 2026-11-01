@@ -659,10 +659,17 @@ describe("a pool lane's design step (HI-2310): given out by the pool, its answer
   const agent = (id: string, o: Partial<PoolAgent> = {}): PoolAgent => ({ id, role: 'reviewer', leased: false, idle: true, ...o })
   const f = (seq: number, kind: string, data: Record<string, unknown>, actor = 'hive') => ({ seq, kind, at: `t${seq}`, actor, data })
 
-  it('a preferred reviewer free and allowed takes its card first, even from an older card; busy or not allowed, the next free one does', () => {
+  it('in its turn, oldest first, a card takes its preferred reviewer if free and allowed; busy or not allowed, the next free one', () => {
     expect(poolAssignments([card(1, 'a'), card(2, 'b', { preferred: 'R1' })], [agent('R1'), agent('R2')])).toEqual([
-      { card: 2, submission: 1, reviewer: 'R1' },
-      { card: 1, submission: 1, reviewer: 'R2' }
+      { card: 1, submission: 1, reviewer: 'R2' },
+      { card: 2, submission: 1, reviewer: 'R1' }
+    ])
+    // HR1's round 1: one free reviewer, the younger card's preferred one: the older card is served first, and the younger waits.
+    expect(poolAssignments([card(1, 'a'), card(2, 'b', { preferred: 'R1' })], [agent('R1')])).toEqual([{ card: 1, submission: 1, reviewer: 'R1' }])
+    // The older card prefers R1 too: it takes R1, the younger the next free one.
+    expect(poolAssignments([card(1, 'a', { preferred: 'R1' }), card(2, 'b', { preferred: 'R1' })], [agent('R2'), agent('R1')])).toEqual([
+      { card: 1, submission: 1, reviewer: 'R1' },
+      { card: 2, submission: 1, reviewer: 'R2' }
     ])
     expect(poolAssignments([card(2, 'b', { preferred: 'R1' })], [agent('R1', { idle: false }), agent('R2')])).toEqual([{ card: 2, submission: 1, reviewer: 'R2' }])
     expect(poolAssignments([card(2, 'b', { preferred: 'R1' })], [agent('R1'), agent('R2')], ['R1'])).toEqual([{ card: 2, submission: 1, reviewer: 'R2' }])

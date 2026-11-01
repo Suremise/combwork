@@ -54,8 +54,8 @@ export interface PoolAssignment {
  * its quorum), oldest submission first, given to the first free agent that reviews, isn't its builder and hasn't seen
  * this submission. Free: its role reviews (reviewer or either), no open dispatch lease, idle, and not reviewing another
  * card (one of `cards`, or of `reviewing`: whoever reviews any other card of the project, or checks a design of one, in
- * a lane or not). A card whose preferred reviewer (HI-2310) is free and allowed gets it first, oldest first; a card no
- * free agent can take doesn't hold up the cards after it.
+ * a lane or not). In its turn a card takes its preferred reviewer (HI-2310) if still free and allowed, else the next
+ * free one; a card no free agent can take doesn't hold up the cards after it.
  */
 export function poolAssignments(cards: readonly PoolCard[], agents: readonly PoolAgent[], reviewing: Iterable<string> = []): PoolAssignment[] {
   const busy = new Set([...reviewing, ...cards.map((c) => c.reviewing).filter((r): r is string => !!r)])
@@ -63,20 +63,13 @@ export function poolAssignments(cards: readonly PoolCard[], agents: readonly Poo
   const waiting = cards.filter((c) => c.pool && !c.reviewing && c.passes < c.quorum).sort((a, b) => a.submittedAt.localeCompare(b.submittedAt) || a.card - b.card)
   const allowed = (c: PoolCard, a: PoolAgent): boolean => !c.builders.includes(a.id) && !c.seen.includes(a.id)
   const out: PoolAssignment[] = []
-  const give = (c: PoolCard, a: PoolAgent): void => {
+  for (const c of waiting) {
+    // In its turn, oldest first: its preferred reviewer (HI-2310: the same eyes on the design and the build) if still
+    // free and allowed, else the next free one. A preference never puts a card ahead of an older one.
+    const a = (c.preferred ? free.find((x) => x.id === c.preferred && allowed(c, x)) : undefined) ?? free.find((x) => allowed(c, x))
+    if (!a) continue
     out.push({ card: c.card, submission: c.submission, reviewer: a.id })
     free.splice(free.indexOf(a), 1)
-  }
-  // Its preferred reviewer first (HI-2310: the same eyes on the design and the build), so an older card doesn't take it.
-  const rest: PoolCard[] = []
-  for (const c of waiting) {
-    const p = c.preferred ? free.find((x) => x.id === c.preferred && allowed(c, x)) : undefined
-    if (p) give(c, p)
-    else rest.push(c)
-  }
-  for (const c of rest) {
-    const a = free.find((x) => allowed(c, x))
-    if (a) give(c, a)
   }
   return out
 }

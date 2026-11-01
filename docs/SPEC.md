@@ -4442,8 +4442,8 @@ repeating them (#533) [note §8].
   **Preferred reviewer**: a pool card's submissions and designs go first to its preferred reviewer, the agent who last
   answered one of its designs (`ok`/`gaps`), else who gave its last verdict, when that agent is free and allowed (not its
   builder, not one who has seen the submission: with G1b = 2 the second is still another); busy, the next free one takes
-  it as before. Preferences are honoured before the oldest-first hand-out, so an older card doesn't take a reviewer
-  another card prefers. A lane with its own reviewer is unchanged.
+  it as before. Each card is served in its oldest-first turn (HR1's round 1): a preference picks which free reviewer a
+  card gets, never puts it ahead of an older one. A lane with its own reviewer is unchanged.
   The card-loop skill's line for pools is #1444's.
 - **Off switch**: the option itself (`lane`). With workflow rules off nothing is given out or told, Start Lane offers no
   pool, and the lane's reviewer is whoever the user names.
