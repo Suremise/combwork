@@ -546,10 +546,13 @@ export function writerCleared(run: string): void {
   forgetKeeperRun(run)
 }
 
-/** A gone Hive's writer cleared (HI-1886): its run's kept record is no longer needed, nor its keeper's (HI-2055). */
-export function goneWriterCleared(run: string, evidence?: GoneEvidence): void {
+/**
+ * A gone Hive's writer cleared (HI-1886): its run's kept record is no longer needed, nor its keeper's (HI-2055), whichever
+ * proof cleared it (HR1 on HI-2303: a run can have both, and one cleared by its kept record left its binding behind).
+ */
+export function goneWriterCleared(run: string, _evidence?: GoneEvidence): void {
   forgetEarlierRun(run)
-  if (evidence?.helper) forgetKeeperRun(run)
+  forgetKeeperRun(run)
 }
 
 /**

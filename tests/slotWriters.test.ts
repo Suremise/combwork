@@ -41,6 +41,8 @@ const tracker = vi.hoisted(() => ({
   /** The runs this profile kept as seen ended (HI-1886), and the records forgotten once their writers were settled. */
   endedRuns: new Set<string>(),
   forgotten: [] as string[],
+  /** Done as a kept ended record is looked up, before it answers (HI-2303: the writer changed meanwhile). */
+  endedLooked: async (_run: string): Promise<void> => undefined,
   /** Which of the processes asked about still run (by default every one). */
   stillRunning: null as null | ((list: Proc[]) => Proc[] | null),
   /**
@@ -64,7 +66,10 @@ vi.mock('../src/main/agentProcesses', async (orig) => ({
   },
   // Every one kept still runs unless a test says (the job host would check each by id and start time).
   stillRunningOf: async (list: Proc[]) => (tracker.stillRunning ? tracker.stillRunning(list) : list),
-  endedEarlier: async (run: string) => tracker.endedRuns.has(run),
+  endedEarlier: async (run: string) => {
+    await tracker.endedLooked(run)
+    return tracker.endedRuns.has(run)
+  },
   forgetEarlierRun: (run: string) => void tracker.forgotten.push(run),
   endProcessesExactly: async (list: Proc[]) => (tracker.endedExactly.push({ list, at: tracker.writerAt() }), tracker.endWorks),
   keeperState: async (run: string, hive: string) => {
@@ -628,6 +633,40 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
     expect(tracker.endedExactly).toEqual([])
   })
 
+  it("its run seen ended and bound to a keeper too: cleared by the ended record, both records go (HR1 on HI-2303)", async () => {
+    hostOn(false)
+    await plant('r-both', { ended: true })
+    tracker.endedRuns.add('r-both')
+    tracker.keeper.set('r-both', { state: 'ended', helper: '4242:133900000000000099' })
+    await pool.settleGoneWriters()
+    expect(writer()).toBeNull()
+    // Settled by its kept record, its keeper's state not even read.
+    expect(tracker.keeperAsked).toEqual([])
+    expect(tracker.forgotten).toEqual(['r-both'])
+    expect(tracker.keeperForgotten).toEqual(['r-both'])
+  })
+
+  it('its run seen ended, but its clear fails (the writer changed meanwhile): both records stay (HI-2303)', async () => {
+    hostOn(false)
+    await plant('r-moved', { ended: true })
+    tracker.endedRuns.add('r-moved')
+    tracker.keeper.set('r-moved', { state: 'ended', helper: '4242:133900000000000099' })
+    tracker.endedLooked = async (run) => {
+      if (run !== 'r-moved') return
+      tracker.endedLooked = async () => undefined
+      await plant('r-other', { ended: true })
+    }
+    try {
+      await pool.settleGoneWriters()
+    } finally {
+      tracker.endedLooked = async () => undefined
+    }
+    expect(writer()?.run).toBe('r-other')
+    expect(tracker.forgotten).toEqual([])
+    expect(tracker.keeperForgotten).toEqual([])
+    await store.clearWriterRun('r-other')
+  })
+
   it("its run seen ended: its own agent's start (a restart's resume) takes the slot back", async () => {
     hostOn(false)
     await plant('r-own')
@@ -635,6 +674,7 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
     const state = await start()
     expect(writer()?.run).toBe(state.runId)
     expect(tracker.forgotten).toEqual(['r-own'])
+    expect(tracker.keeperForgotten).toEqual(['r-own'])
   })
 
   describe("its keeper's state (HI-2055: the helper that held its job, kept past its Hive)", () => {
@@ -670,7 +710,9 @@ describe("a gone Hive's writer settled by itself after a restart (HI-1886)", () 
       }
       await pool.settleGoneWriters()
       expect(writer()?.run).toBe('r-revoked')
+      // A failed clear forgets nothing (HI-2303): its records stay with its held writer.
       expect(tracker.keeperForgotten).toEqual([])
+      expect(tracker.forgotten).toEqual([])
       expect(await startRefusal()).toMatch(/still has another session in it/)
       expect(writer()?.run).toBe('r-revoked')
       await store.clearWriterRun('r-revoked')
