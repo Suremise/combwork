@@ -12,7 +12,14 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 // What the test started that is still running: stopped by its command line (it names the test's folder) and start,
 // never by a pid remembered from earlier (#547).
-const { stopProcessesIn } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { stopProcessesIn: (folder: string, since?: number) => number }
+const { stopProcessesIn, identify, endExactly } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as {
+  stopProcessesIn: (folder: string, since?: number) => number
+  identify: (pids: number[]) => { pid: number; started: number }[]
+  endExactly: (targets: { pid: number; started: number }[]) => number
+}
+// The tracker's helper ended as a crash ends it (HI-2263): by its identity (pid and start time) read while it runs, never
+// a bare pid (#603).
+const endHelper = (pid: number | null): number => (pid ? endExactly(identify([pid])) : 0)
 // Every child gets the run context's allowlisted environment, never the shell's (a NODE_OPTIONS preload, a GIT_DIR).
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 
@@ -124,7 +131,7 @@ describe.runIf(process.platform === 'win32')('what running agents had started, a
 
       // The helper ends unexpectedly (this test's own): the launch is no longer tracked.
       const lost = new Promise<string>((resolve) => mod.onRunOutcome((runId, outcome) => runId === 'r2' && resolve(outcome)))
-      process.kill(mod.processSupervisor().pid!)
+      expect(endHelper(mod.processSupervisor().pid)).toBe(1)
       expect(await lost).toBe('unknown')
       // The marker still lists them, by the same identities, though no job can be listed now.
       expect(await mod.runningProcesses()).toEqual(before)
@@ -159,7 +166,7 @@ describe.runIf(process.platform === 'win32')('what running agents had started, a
       // Its CLI has exited: it settles (the faked wait), and the helper ends meanwhile.
       const settled = mod.launchEnded('r3')
       const lost = new Promise<string>((resolve) => mod.onRunOutcome((runId, outcome) => runId === 'r3' && resolve(outcome)))
-      process.kill(mod.processSupervisor().pid!)
+      expect(endHelper(mod.processSupervisor().pid)).toBe(1)
       expect(await lost).toBe('unknown')
       expect(await mod.runningProcesses()).toEqual([])
       // The wait ends; it is looked at (no job any more) and forgotten.
