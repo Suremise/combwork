@@ -917,6 +917,45 @@ describe('watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
+  it('a limit that fired while the agent was busy is told as its card is when handed over: moved to Review, reviewed, sent back (HI-2295)', async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a1' }, user))
+    const put = (over: Record<string, unknown>) => writeCard(w, c.number, { ...readCard(w, c.number), ...over, updatedAt: new Date().toISOString() })
+    // Doing → Review while the line is held: told in Review.
+    await put({ column: 'doing' })
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    st.status = 'working'
+    await watches.tick(Date.now() + 31 * 60_000)
+    expect(st.typed).toEqual([])
+    await put({ column: 'review' })
+    st.status = 'watching'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(/#\d+ is in Review, waiting for its reviewer\. Watch #\d+ again for its verdict/)
+    expect(st.told[0]).not.toMatch(/tell the user \(hive_notify\)/)
+    // A reviewer starts while the line is held: named.
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    st.status = 'working'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await put({ review: { agent: 'a2', agentName: 'Reviewer', since: new Date().toISOString() } })
+    st.status = 'watching'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
+    expect(st.told[1]).toMatch(/#\d+ is in Review, being reviewed by Reviewer\./)
+    // Review → Doing while the line is held: the line as before, no stale Review.
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    st.status = 'working'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await put({ column: 'doing', review: undefined })
+    st.status = 'watching'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
+    expect(st.told[2]).toMatch(/your card watch has ended\. Tell the user \(hive_notify\) and ask what to do\.$/)
+    expect(st.told[2]).not.toMatch(/in Review/)
+    await disposeWorkspaceService(w)
+  })
+
   it('its limit with no change wakes it to say so; cancel ends it; it is kept on disk and read back', async () => {
     const { w, path, alpha } = await open()
     const st = fake(alpha)
