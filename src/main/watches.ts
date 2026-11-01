@@ -713,7 +713,7 @@ function infoOf(r: WatchRecord): TaskWatchInfo {
   const info = kindInfoOf(r)
   // A usage watch (HI-2195): alone, its accounts are its label; beside cards or lanes, they follow theirs.
   if (!r.usage) return info
-  return usageOnly(r) ? { ...info, label: `Waiting for usage: ${usageWatchLabel(r.usage)}` } : { ...info, label: `${info.label}, and usage: ${usageWatchLabel(r.usage)}` }
+  return usageOnly(r) ? { ...info, usage: true, label: `Waiting for usage: ${usageWatchLabel(r.usage)}` } : { ...info, usage: true, label: `${info.label}, and usage: ${usageWatchLabel(r.usage)}` }
 }
 
 /** A usage watch alone (HI-2195): no cards, agents or lanes. */

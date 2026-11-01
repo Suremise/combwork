@@ -114,12 +114,12 @@ export function laneNextWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column'
 }
 
 /** A workspace's live agents (by its folder): their names, projects, cards left with no watch, card watches (and since when), and how each is now. */
-function liveOf(wsPath: string): { name: string; project: string; agentId: string; notWatching?: number[]; untaken: boolean; cards: number[]; watchSince?: string; status: string; silentMinutes?: number; backgroundTasks?: number; backgroundEndedAt?: string }[] {
+function liveOf(wsPath: string): { name: string; project: string; agentId: string; notWatching?: number[]; untaken: boolean; cards: number[]; watchSince?: string; watchesMore: boolean; status: string; silentMinutes?: number; backgroundTasks?: number; backgroundEndedAt?: string }[] {
   const ws = wsPath.toLowerCase()
   return sessions
     .liveStates()
     .filter((s) => workspaceOf(s.projectPath).path?.toLowerCase() === ws)
-    .map((s) => ({ name: s.agentName ?? s.agentId, project: basename(s.projectPath), agentId: s.agentId, notWatching: s.notWatching, untaken: !!s.untakenLine, cards: s.watch?.cards ?? [], watchSince: s.watch?.since, status: s.status, silentMinutes: agentRuntime(s).silentMinutes, backgroundTasks: s.backgroundTasks, backgroundEndedAt: s.backgroundEndedAt }))
+    .map((s) => ({ name: s.agentName ?? s.agentId, project: basename(s.projectPath), agentId: s.agentId, notWatching: s.notWatching, untaken: !!s.untakenLine, cards: s.watch?.cards ?? [], watchSince: s.watch?.since, watchesMore: !!(s.watch?.usage || s.watch?.lanes || s.watch?.agents?.length), status: s.status, silentMinutes: agentRuntime(s).silentMinutes, backgroundTasks: s.backgroundTasks, backgroundEndedAt: s.backgroundEndedAt }))
 }
 
 export type { StallAgent }

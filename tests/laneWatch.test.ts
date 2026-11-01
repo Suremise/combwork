@@ -1094,7 +1094,8 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     // CB1's case (CL-5, 1 Nov): it committed its plan, watched its card for a comment and ended its turn. First it works
     // with that watch kept: no stall however long.
     let b1Status = 'working'
-    Object.assign(sessions, { liveStates: () => [{ projectPath: alpha, agentId: 'b1', agentName: 'B1', status: b1Status, watch: { cards: [a], changes: ['comment'], label: '', since, limitAt: '' } }] })
+    let usage: true | undefined
+    Object.assign(sessions, { liveStates: () => [{ projectPath: alpha, agentId: 'b1', agentName: 'B1', status: b1Status, watch: { cards: [a], changes: ['comment'], label: '', since, limitAt: '', ...(usage ? { usage } : {}) } }] })
     await watchAll(w, home, st)
     await watches.evaluateWatches(w)
     await watches.settled()
@@ -1105,8 +1106,14 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       await watches.evaluateWatches(w)
       await watches.settled()
       expect(st.typed).toEqual([])
-      // Its turn over, it only watches: stalled.
+      // Its turn over, watching usage beside the card (HR2's round 1: a wait on more than the card): no stall.
       b1Status = 'watching'
+      usage = true
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(st.typed).toEqual([])
+      // It only watches the card: stalled.
+      usage = undefined
       await watches.evaluateWatches(w)
       await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
     } finally {

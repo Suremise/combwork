@@ -60,6 +60,8 @@ describe('only watching it is a stall (HI-2285)', () => {
     expect(idleWatchReason(card(), lane, { ...cb1, status: 'working' }, late)).toBeNull()
     expect(idleWatchReason(card(), lane, { ...cb1, cards: [5, 6] }, late)).toBeNull()
     expect(idleWatchReason(card(), lane, { ...cb1, watchSince: undefined }, late)).toBeNull()
+    // HR2's round 1: usage (or lanes, agents) watched beside the card is a wait on more than it.
+    expect(idleWatchReason(card(), lane, { ...cb1, watchesMore: true }, late)).toBeNull()
   })
   it("not in a paused lane, outside a lane, or when the watcher isn't the lane's builder", () => {
     const late = t0 + 60 * 60_000

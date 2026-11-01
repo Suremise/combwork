@@ -2258,6 +2258,8 @@ export interface TaskWatchInfo {
   agents?: string[]
   /** A lane watch's lanes, by id, or ["all"] (#531; its cards are those beside the lanes, #726). */
   lanes?: string[]
+  /** Accounts' usage watched beside its cards or lanes, or alone (HI-2195; HI-2285: such a watch waits on more than its cards). */
+  usage?: true
   /** "Waiting for #12 → Review", "Waiting for B6 to finish". */
   label: string
   since: string
