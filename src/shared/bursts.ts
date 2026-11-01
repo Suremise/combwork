@@ -51,16 +51,16 @@ export function noticeRouteWhy(
   focused: FocusedHive | null,
   from: { workspacePath: string | null; projectPath: string | null }
 ): { route: NoticeRoute; why: string } {
-  if (!n.desktopNotifications) return { route: 'none', why: 'notifications off' }
-  if (kind === 'finished' && !n.notifyOnFinished) return { route: 'none', why: 'finished notices off' }
-  if (kind === 'waiting' && !n.notifyOnWaiting) return { route: 'none', why: 'waiting notices off' }
-  if (!focused) return { route: 'windows', why: 'no Hive window focused' }
-  if (n.whileFocused === 'nothing') return { route: 'none', why: 'Hive focused, set to show nothing' }
-  if (n.whileFocused === 'windows') return { route: 'windows', why: 'Hive focused, set to Windows notifications' }
-  if (!from.projectPath && !from.workspacePath) return { route: 'banner', why: 'about no project' }
-  if (n.bannerScope === 'workspace' && !samePath(focused.workspacePath, from.workspacePath)) return { route: 'none', why: "banner scope: another workspace's" }
-  if (n.bannerScope === 'project' && !samePath(focused.projectPath, from.projectPath)) return { route: 'none', why: "banner scope: another project's" }
-  return { route: 'banner', why: `banner scope: ${n.bannerScope}` }
+  if (!n.desktopNotifications) return { route: 'none', why: 'notifications off' } // i18n-ignore: the log's reason (English)
+  if (kind === 'finished' && !n.notifyOnFinished) return { route: 'none', why: 'finished notices off' } // i18n-ignore: the log's reason (English)
+  if (kind === 'waiting' && !n.notifyOnWaiting) return { route: 'none', why: 'waiting notices off' } // i18n-ignore: the log's reason (English)
+  if (!focused) return { route: 'windows', why: 'no Hive window focused' } // i18n-ignore: the log's reason (English)
+  if (n.whileFocused === 'nothing') return { route: 'none', why: 'Hive focused, set to show nothing' } // i18n-ignore: the log's reason (English)
+  if (n.whileFocused === 'windows') return { route: 'windows', why: 'Hive focused, set to Windows notifications' } // i18n-ignore: the log's reason (English)
+  if (!from.projectPath && !from.workspacePath) return { route: 'banner', why: 'about no project' } // i18n-ignore: the log's reason (English)
+  if (n.bannerScope === 'workspace' && !samePath(focused.workspacePath, from.workspacePath)) return { route: 'none', why: "banner scope: another workspace's" } // i18n-ignore: the log's reason (English)
+  if (n.bannerScope === 'project' && !samePath(focused.projectPath, from.projectPath)) return { route: 'none', why: "banner scope: another project's" } // i18n-ignore: the log's reason (English)
+  return { route: 'banner', why: `banner scope: ${n.bannerScope}` } // i18n-ignore: the log's reason (English)
 }
 
 /** How many banners show at once (more are behind "+N more"), and how many that close by themselves are kept. */
