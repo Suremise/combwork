@@ -57,7 +57,9 @@ export function boardSkillsLine(off: ReadonlySet<string> = new Set()): string {
     .map(([, what]) => what)
   const list = others.length > 1 ? `${others.slice(0, -1).join(', ')} and ${others[others.length - 1]}` : others[0]
   const route = routes.length ? ` ${routes[0].charAt(0).toUpperCase()}${routes[0].slice(1)}${routes.slice(1).map((r) => `; ${r}`).join('')}.` : ''
-  return `The board shows your project's cards, each named by its key (AM-12).${route}${list ? ` Hive's ${routes.length ? 'other ' : ''}skills cover ${list}.` : ''}`
+  // HI-2265: a skill named here but missing from the workspace stopped Codex's card work ("stop when a necessary skill
+  // cannot be found", its own instructions): the board rules below are Hive's either way, and the work goes on by them.
+  return `The board shows your project's cards, each named by its key (AM-12).${route}${list ? ` Hive's ${routes.length ? 'other ' : ''}skills cover ${list}.` : ''}${routes.length || list ? ' A missing skill isn\'t needed: do the work by the board rules below.' : ''}`
 }
 
 /**

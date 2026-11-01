@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 119
+const FIXTURES_VERSION = 121
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -1309,11 +1309,14 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const decided = historyAt(o.cards.a, /^Recorded a decision: "Use "Welcome back!"/)
       const told = (o.cards.a?.history ?? []).filter((h) => h.by === 'Hive' && /^Told Coder \(alpha\) of 1 new decision$/.test(h.what))
+      // Or its own card watch's wake, which tells the decision in place of a decision line (#1272, decisionWakes' holds:
+      // HI-2265, it asked and watched the card, as while-working.md says, and the watch told it).
+      const viaWatch = (o.wakeLines ?? []).filter((l) => /\(a new decision from the user: read its decisions\)/.test(l))
       const review = handedOnAt(o, c, 'a')
       return [
         ['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')],
         ['asked the user and ended its turn with the card in Doing (the decision came then)', decided > 0, history(o.cards.a).join(' | ')],
-        ['Hive told it once', told.length === 1, history(o.cards.a).join(' | ')],
+        ['Hive told it once (a decision line, or its card watch)', told.length + viaWatch.length === 1, `${history(o.cards.a).join(' | ')}; watch wakes ${viaWatch.length}`],
         ['read the card after the decision', decided > 0 && cardReads(o, c.cards.a).some((t) => t > decided), `decided ${decided}, reads ${cardReads(o, c.cards.a).join(',')}`],
         ['carried on with the decided greeting', /Welcome back!/.test(c.read('greeting.txt') ?? ''), c.read('greeting.txt')],
         ['handed it on after the decision (in Review, or past it by its own submission)', review > decided && handedOn(o, c, 'a'), o.cards.a?.column]
@@ -1508,7 +1511,8 @@ module.exports.SCENARIOS = [
       const msg = sentMessage(c)
       return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))
     },
-    prompt: () => 'Read greeting.txt and tell me what it says. Nothing else for now.',
+    // HI-2265: "Nothing else for now" stood against the Assistant's message to work on the card.
+    prompt: () => 'Read greeting.txt and tell me what it says.',
     fake: () => 'hive hive_list_tasks {}',
     fakeWakes: (c) => [`skill work-on-card then ${fakeStart(c.cards.a)} then ${fakeSubmit(c.cards.a)}`],
     expect: (o, c) => {
@@ -2760,11 +2764,12 @@ module.exports.SCENARIOS = [
     // greet.js as #a left it; #b's fix is its submission, a commit after it (HI-2223: a diff to review).
     files: { 'greet.js': "module.exports = (name) => 'Helo, ' + name\n" },
     async setup(c) {
-      const a = await c.card('a', { title: 'Greeting module', description: 'greet.js exports a greeting function.', column: 'passed', agent: 'implementer', comments: ['Done: greet.js added. Ready for review.', 'Review round 1: PASSED.'] })
+      // #a passed and merged (Done; HI-2265: left in Passed, unmerged, the lane rightly waited on it, one card at a time).
+      const a = await c.card('a', { title: 'Greeting module', description: 'greet.js exports a greeting function.', column: 'done', agent: 'implementer', comments: ['Done: greet.js added. Ready for review.', 'Review round 1: PASSED.'] })
       giveVerdict(c, a, 'passed')
       await reviewedWork(c, 'b', { title: 'Greeting says Hello', description: 'greet.js returns "Hello, <name>".', files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" }, after: ['Done: greet.js says "Hello, <name>". Ready for review.'] }, 'implementer')
     },
-    prompt: (c) => `You are the reviewer of a card loop on #${c.cards.a} then #${c.cards.b}, built by Implementer (rounds: 5). You have just passed #${c.cards.a}. Carry on as the reviewer.`,
+    prompt: (c) => `You are the reviewer of a card loop on #${c.cards.a} then #${c.cards.b}, built by Implementer (rounds: 5). You passed #${c.cards.a}, and it is merged. Carry on as the reviewer.`,
     // The fake waits for #b to arrive in Review (it already has: Already), then reviews it.
     fake: (c) => `skill card-loop hive hive_wait_for_tasks {"cards":[${c.cards.b}],"column":"review","wake":true} then ${fakeStartReview(c.cards.b)} then ${fakeVerdict(c.cards.b, true)}`,
     expect: (o, c) => {
@@ -4702,7 +4707,9 @@ module.exports.SCENARIOS.push(
     async setup(c) {
       await reviewedPair(c)
       // Coder's work committed and submitted (#1537: a card set in Review with nothing committed stayed in Doing).
-      const n = await submittedCard(c, 'r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', after: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
+      // Its test too, as its comment says (HI-2265: with none committed, the reviewer rightly failed it, and a question
+      // about restarting Coder followed).
+      const n = await submittedCard(c, 'r', { title: 'greet() says Hi', description: 'src/greet.js: greet(name) returns "Hi, <name>".', files: { 'src/greet.js': 'module.exports = (name) => `Hi, ${name}`\n', 'test/greet.test.js': "require('assert').strictEqual(require('../src/greet')('Ada'), 'Hi, Ada')\n" }, after: ['Ready: greet() returns "Hi, <name>", with a test. Committed.'] })
       // HI-2046: a loose card in Review is Hive's to give out; the Assistant is woken once it has.
       const given = async () => ((await c.inv('tasks:facts', n).catch(() => null)) ?? []).some((f) => f.kind === 'ReviewerAssigned' && f.data?.reviewer === c.agents.implementer.id)
       if (!(await require('../e2e/lib.cjs').until(given, 30000))) throw new Error(`setup: Hive didn't give #${n} to Implementer`)
@@ -4715,7 +4722,9 @@ module.exports.SCENARIOS.push(
       return [
         ['Hive gave it to Implementer (a ReviewerAssigned fact)', factsOf(o, 'r', 'ReviewerAssigned').some((f) => f.data?.reviewer === c.agents.implementer.id), JSON.stringify(factsOf(o, 'r', 'ReviewerAssigned').map((f) => f.data))],
         ['started no reviewer itself (no brief to Implementer, no lane)', reviewers.length === 0, reviewers.join(' | ').slice(0, 300)],
-        ["didn't ask the user whether it should be reviewed", called(o, 'hive_notify').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)],
+        // A question about its review, as the check says (HI-2265: once the review passed within the trial, a question about
+        // an optional follow-up card isn't one).
+        ["didn't ask the user whether it should be reviewed", called(o, 'hive_notify').length === 0 && !askingSentences(o.finalReply).some((s) => /\breview|\bverdict|Implementer/i.test(s)), (o.finalReply ?? '').slice(0, 300)],
         ['moved the card nowhere and gave no verdict of its own', !called(o, 'hive_update_task').some((x) => cardIs(o, argsOf(x).number, n) && (argsOf(x).column || argsOf(x).review)) && called(o, 'hive_verdict').length === 0, o.hiveCalls.map((x) => x.tool).join(',')]
       ]
     },
