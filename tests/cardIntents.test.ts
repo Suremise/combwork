@@ -36,7 +36,7 @@ const { providerService } = await import('../src/main/providerService')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { INTENT_ROUTES } = await import('../src/main/servers')
-const { checksLine, intentText } = await import('../src/shared/toolReplies')
+const { checkArg, checksLine, intentText } = await import('../src/shared/toolReplies')
 const { armIntentWatch } = await import('../src/main/intentWatch')
 const watches = await import('../src/main/watches')
 const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, HIVE_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
@@ -864,6 +864,37 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(checksLine(['quick'], 'AL-1', true)).toBe(`quick: before review. Run it as hive-progress --check quick --card "AL-1" (--isolated: in a check copy at the card's revision)`)
     expect(checksLine(['quick', 'tests'], 'AL-1', false)).toBe('quick, tests: before review. Run each as hive-progress --check <name> --card "AL-1"')
     expect(checksLine([], 'AL-1', true)).toBeNull()
+    // A name is free text (HR1's round 1 finding): said as one argument, never split or expanded by the shell.
+    expect(checksLine(['unit tests'], 'AL-1', false)).toBe(`'unit tests': before review. Run it as hive-progress --check 'unit tests' --card "AL-1"`)
+    expect(checksLine(['unit tests', 'lint'], 'AL-1', false)).toBe(`'unit tests', lint: before review. Run each as hive-progress --check <name> --card "AL-1"`)
+    expect(checksLine(['a $HOME; rm `x`'], 'AL-1', false)).toBe(`'a $HOME; rm \`x\`': before review. Run it as hive-progress --check 'a $HOME; rm \`x\`' --card "AL-1"`)
+    expect(checksLine(["it's"], 'AL-1', false)).toBe(`"it's": before review. Run it as hive-progress --check "it's" --card "AL-1"`)
+    // No one quoting is literal in both shells: the name as JSON, and the command with <name>.
+    expect(checksLine(["it's $x"], 'AL-1', false)).toBe(`"it's $x": before review. Run it as hive-progress --check <name> --card "AL-1"`)
+    expect(checksLine(['-x'], 'AL-1', false)).toBe(`'-x': before review. Run it as hive-progress --check '-x' --card "AL-1"`)
+  })
+
+  it("each quoted check name reaches hive-progress as one argument, as it is (HI-2276, HR1's round 1 finding)", async () => {
+    const { parseArgs } = await import('../src/main/progressReporters/wrapper')
+    const dir = tempDir('hive-checkarg-')
+    const script = join(dir, 'argv.js').replace(/\\/g, '/')
+    writeFileSync(script, 'console.log(JSON.stringify(process.argv.slice(2)))\n')
+    const node = process.execPath.replace(/\\/g, '/')
+    const powershell = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+    for (const name of ['unit tests', 'a $HOME; rm `x` & echo', "it's", 'plain:name']) {
+      const arg = checkArg(name)!
+      const command = `--check ${arg} --card "AL-1"`
+      // Git Bash's sh and Windows PowerShell, agents' shells, split the suggested command as they would run it.
+      const bash = execFileSync('sh', ['-c', `'${node}' '${script}' ${command}`], { encoding: 'utf8', windowsHide: true })
+      const ps1 = join(dir, 'run.ps1')
+      writeFileSync(ps1, `& '${node}' '${script}' ${command}\n`)
+      const ps = execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ps1], { encoding: 'utf8', windowsHide: true })
+      for (const out of [bash, ps]) {
+        const argv = JSON.parse(out)
+        expect(argv).toEqual(['--check', name, '--card', 'AL-1'])
+        expect(parseArgs(argv)).toMatchObject({ check: name, card: 'AL-1' })
+      }
+    }
   })
 
   it('every agent has the intent tools, Codex too (#913: enabled_tools is HIVE_TOOLS); the Assistant at Control agents, never start_card', () => {
