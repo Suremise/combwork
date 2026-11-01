@@ -1,4 +1,8 @@
 {
+  "workflow.approveNote": {
+    "defaultMessage": "{becomes, select, decision {Note (optional): also recorded as your decision} reason {Note (optional): the reason for what the agent asked} other {Note (optional): added as your comment}}",
+    "description": "The label and placeholder of an optional text box beside Approve (For you, the card dialog's merge queue): a note sent with the approval. It says what the note becomes: on an agent's question (decision), one of the card's decisions as well as the user's comment; on a question that offers one action (reason), the reason for that action; on Hive's own requests (other), the user's comment on the card. Keep the select keys as they are; translate each choice. Glossary: decision."
+  },
   "workflow.contradiction.committedNeedsFolder": {
     "defaultMessage": "“Committed is done” needs everyone in the project folder.",
     "description": "Why workflow options cannot be saved: “Committed is done” was chosen while each card has its own folder."

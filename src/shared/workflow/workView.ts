@@ -71,6 +71,12 @@ export interface ForYouAnswer {
   reason?: string
 }
 
+/** Approve, with the user's optional note as its reply (HI-2286): a bare Approve sends none. */
+export const approveAnswer = (note = ''): ForYouAnswer => (note.trim() ? { outcome: 'approved', reply: note.trim() } : { outcome: 'approved' })
+
+/** Decline, with the user's reason as its reply (required: the window asks for one). */
+export const declineAnswer = (why: string): ForYouAnswer => ({ outcome: 'declined', reply: why.trim() })
+
 /**
  * Whether the user can do an action a question offers on its card now (#1630): Move to Done unless it is Done, Make It
  * No Code on a code card, Unblock on a blocked one, Skip Review before it is in Review; none on an archived card. The

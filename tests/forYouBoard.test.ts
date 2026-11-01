@@ -151,8 +151,11 @@ describe('For you on the board (#1269)', () => {
     expect((await update(w, card, { column: 'passed' })).column).toBe('passed')
     const req = forYou(w).items[0]
     expect(req).toMatchObject({ gate: 'okBefore', kind: 'approve', shown: { id: FOR_YOU.okBefore.id } })
-    await answer(w, card, req.request, { outcome: 'approved', reply: 'Go ahead' })
+    const approved = await answer(w, card, req.request, { outcome: 'approved', reply: 'Go ahead' })
     expect(forYou(w).count).toBe(0)
+    // HI-2286: a note on Hive's own gate is the user's comment only, never a decision.
+    expect(approved.comments.at(-1)).toMatchObject({ by: 'You', text: 'Go ahead' })
+    expect(approved.decisions ?? []).toEqual([])
     const told = await deliveredTo(w, 'a1')
     expect(told).toHaveLength(1)
     expect(told[0]).toContain(`the user approved "p-${card} is approved: OK to merge?": Go ahead. approved: merge it and report the merge`)
@@ -404,6 +407,30 @@ describe('For you on the board (#1269)', () => {
     expect(forYou(w).count).toBe(0)
   })
 
+  it("HI-2286: an agent's Approve question approved with a note: the note is the user's comment, a decision on the card and in the asker's wake; a bare Approve records neither", async () => {
+    const { w } = await workspace({ ...allOff('git'), review: 'agent', finish: 'agentMerges', folder: 'slots' })
+    const card = await create(w)
+    await update(w, card, { column: 'doing', agent: 'a1' })
+    const wf = (await workflowFor(w, join(w.path!, 'p')))!
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'OK to rename the setting?' }))
+    const req = forYou(w).items[0]
+    expect(req).toMatchObject({ kind: 'approve', gate: 'ask', asker: 'a1' })
+    // A decision with no note isn't an approval's (the note is the decision): refused, nothing written.
+    await expect(answer(w, card, req.request, { outcome: 'approved', decision: 'Rename it' })).rejects.toThrow(/doesn't fit the request/)
+    const after = await answer(w, card, req.request, { outcome: 'approved', reply: 'Approved, but keep the old name as an alias.' })
+    expect(after.comments.at(-1)).toMatchObject({ by: 'You', text: 'Approved, but keep the old name as an alias.' })
+    expect(after.decisions?.map((d) => [d.text, d.recordedBy])).toEqual([['Approved, but keep the old name as an alias.', 'You']])
+    expect(facts(w, card).filter((f) => f.kind === 'Approval')).toMatchObject([{ data: { request: req.request, answer: 'approved', note: 'Approved, but keep the old name as an alias.' } }])
+    expect(forYou(w).count).toBe(0)
+    const items = await inboxOf(w, 'a1')
+    expect(items.find((i) => i.kind === 'answer')?.text).toContain('the user approved "OK to rename the setting?": Approved, but keep the old name as an alias.')
+    // A bare Approve: one click, no comment and no decision.
+    await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'approve', text: 'OK to push the tag?' }))
+    const bare = await answer(w, card, forYou(w).items[0].request, { outcome: 'approved' })
+    expect(bare.decisions).toHaveLength(1)
+    expect(bare.comments).toHaveLength(after.comments.length)
+  })
+
   it("at the lane's round limit a failed review given on the board asks the user and pauses the lane; a carry on resumes it", async () => {
     const { w, wt } = await workspace(REVIEWED)
     const card = await create(w)
@@ -647,7 +674,8 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     await answer(w, card, forYou(w).items[0].request, { outcome: 'declined', reply: 'Yes, after the security audit.' })
     expect((await inWorkspace(w, () => tasks.getTask(card, w))).column).toBe('doing')
     const [yes, no] = relayed(w).map((r) => r.body)
-    expect(yes).toMatch(/^This needs you: the user approved .*Their reply, whole: <<<Yes, after the security audit\.>>>\. .*can't move it to Done by itself\. Their approval is a yes, within any conditions its reply sets/)
+    // HI-2286: the approval's note is the card's decision too (two actions: Approve isn't one of them), said once.
+    expect(yes).toMatch(/^This needs you: the user approved .*Their reply, whole, recorded as the card's decision too: <<<Yes, after the security audit\.>>>\. .*can't move it to Done by itself\. Their approval is a yes, within any conditions its reply sets/)
     expect(no).toMatch(/^For your information: the user declined .*Their reply, whole: <<<Yes, after the security audit\.>>>\. .*The user declined: nothing is to be done for it\.$/)
     expect(no).not.toMatch(/This needs you|do it|make it/i)
   })

@@ -2,10 +2,10 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { msg, tr } from '@shared/i18n'
 import type { TaskCard } from '@shared/types'
 import { LANE_MAX_ROUNDS } from '@shared/lanes'
-import { MERGE_CHOICE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type AskActionKind, type CardKind, type RoundChoice } from '@shared/workflow/facts'
-import { FOR_YOU_KIND, ROUND_CHOICE, workflowLine } from '@shared/workflow/texts'
+import { approveNote, MERGE_CHOICE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, type AskActionKind, type CardKind, type RoundChoice } from '@shared/workflow/facts'
+import { APPROVE_NOTE, FOR_YOU_KIND, ROUND_CHOICE, workflowLine } from '@shared/workflow/texts'
 import { gist } from '@shared/gist'
-import { askActionAvailable, type ForYouAnswer, type ForYouItem, type WorkResolved } from '@shared/workflow/workView'
+import { approveAnswer, askActionAvailable, declineAnswer, type ForYouAnswer, type ForYouItem, type WorkResolved } from '@shared/workflow/workView'
 import { formatDateTime } from '@shared/dates'
 import { useCardWork } from '../cardWork'
 import { call, errorMessage } from '../api'
@@ -230,7 +230,7 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
   }
   const decline = async (): Promise<void> => {
     const why = await prompt({ title: tr(M.declineTitle, { request: text }), message: tr(M.declineWhy), validate: (v) => (v.trim() ? null : tr(M.declineNeeds)) })
-    if (why !== null) await answer('decline', { outcome: 'declined', reply: why.trim() })
+    if (why !== null) await answer('decline', declineAnswer(why))
   }
   const busy = (name: string): boolean => action.busy === name
   const limit = item.gate === ROUND_LIMIT_GATE
@@ -347,7 +347,9 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
         </div>
       ) : item.kind === 'approve' ? (
         <div className="for-you-actions">
-          <BusyButton className="primary" busy={busy('approve')} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void answer('approve', { outcome: 'approved' })}>
+          {/* HI-2286: an optional note with Approve, saying what it becomes; empty, Approve stays one click. */}
+          <input className="input for-you-approve-note" aria-label={tr(APPROVE_NOTE, { becomes: approveNote(item) })} placeholder={tr(APPROVE_NOTE, { becomes: approveNote(item) })} value={reply} onChange={(e) => setReply(e.target.value)} />
+          <BusyButton className="primary" busy={busy('approve')} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void answer('approve', approveAnswer(reply))}>
             {tr(M.approve)}
           </BusyButton>
           <BusyButton busy={busy('decline')} busyLabel={tr(M.answering)} disabled={!!action.busy} onClick={() => void decline()}>

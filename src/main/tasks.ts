@@ -27,7 +27,7 @@ import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCar
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, skipReviewOf } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
-import { answerFits, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
+import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
@@ -1935,7 +1935,8 @@ async function doAskAction(n: number, kind: AskActionKind, reason: string | unde
  * an agent or the Assistant). On the intent path (`runIntent`), so the answer, what it moves and the card's 0.9 fields
  * are one transaction, checked there (the request still open, the card where it was asked, its generation current). A
  * decision (a Decide answer) is the card's, added with the answer's write: a new generation, its agents told (#1266). A
- * reply is kept with the answer, added to the card as the user's comment and relayed to the waiting agent. Refused with the rule's text when the request was
+ * reply is kept with the answer, added to the card as the user's comment and relayed to the waiting agent; on an agent's
+ * question approved with one, it is the card's decision too (HI-2286, `approveNote`). Refused with the rule's text when the request was
  * answered or retired meanwhile. An action the question offered (#1630) and the answer are one change of the board
  * (HR5's round 1): the request still open and the action still allowed, checked under its lock, then the action, then
  * the answer; any of them refused, none of it is kept and the question stays open.
@@ -1946,7 +1947,7 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   const bad = (): HiveError => hiveError(BAD_ANSWER, { max: LANE_MAX_ROUNDS }, { kind: 'invalid' })
   if (!a || !['approved', 'declined', 'answered'].includes(a.outcome) || typeof request !== 'string' || !request) throw bad()
   const typed = typeof a.reply === 'string' && a.reply.trim() ? text(a.reply.trim(), MAX_TEXT, 'comment') : undefined
-  const decision = typeof a.decision === 'string' && a.decision.trim() ? text(a.decision.trim(), MAX_DECISION, 'decision') : undefined
+  const decided = typeof a.decision === 'string' && a.decision.trim() ? text(a.decision.trim(), MAX_DECISION, 'decision') : undefined
   const asked = a.action === undefined ? undefined : ASK_ACTIONS.includes(a.action) ? a.action : null
   if (asked === null || (asked && typed)) throw bad()
   // An action's reason, as an override's (setKind's).
@@ -1971,6 +1972,8 @@ export async function answerTask(n: number, request: string, a: ForYouAnswer): P
   const reason = given ?? (one ? (typed ?? one.reason) : undefined)
   const reply = one ? undefined : typed
   const outcome = one ? 'answered' : a.outcome
+  // HI-2286: an agent's question approved with a note: the note is a reply and the user's decision on the card too.
+  const decision = !asked && !one && req.kind === 'approve' && a.outcome === 'approved' && reply && approveNote(req) === 'decision' ? text(reply, MAX_DECISION, 'decision') : decided
   // What each kind takes (answerFits): an approval is approved or declined; at the round limit, a choice (a carry on with
   // its rounds); any other question, a reply or a decision. Checked before anything is written.
   const choice = a.choice as RoundChoice | undefined

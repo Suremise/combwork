@@ -1,4 +1,5 @@
 {
+  "workflow.approveNote": "{becomes, select, decision {备注（可选）：也会记为你的决定} reason {备注（可选）：作为智能体所请求操作的理由} other {备注（可选）：作为你的评论添加}}",
   "workflow.contradiction.committedNeedsFolder": "“提交即完成”要求所有人都在项目文件夹中工作。",
   "workflow.contradiction.focusedNeedsRunner": "每张卡片的针对性测试需要运行它们的命令。",
   "workflow.contradiction.hiveMergesNeedsGit": "合并需要 Git：没有版本控制时，工作在原处接受。",

@@ -198,10 +198,16 @@ const check = (name, ok, extra = '') => {
       await section.screenshot({ path: path.join(lib.WORK, `foryou-dialog-${theme}.png`) })
     }
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    // HI-2286: Approve takes an optional note; on an agent's question it says it is recorded as a decision too.
+    const note = section.locator('.for-you-approve-note')
+    check("Approve's note on an agent's question says it is recorded as your decision", ((await note.getAttribute('placeholder')) ?? '').includes('also recorded as your decision'), await note.getAttribute('placeholder'))
+    await note.fill('Approved, but tag it v2 not v1.')
     await section.getByRole('button', { name: 'Approve' }).click()
     check('Approve clears it at once', !!(await lib.until(async () => (await section.count()) === 0 && (await chip.count()) === 0, HUNG_MS)))
     const approval = (await inv('tasks:facts', q)).find((f) => f.kind === 'Approval')
     check('…records the Approval', approval?.data.answer === 'approved', JSON.stringify(approval))
+    const noted = await card(q)
+    check('…its note as your comment and your decision (HI-2286)', noted?.comments?.at(-1)?.text === 'Approved, but tag it v2 not v1.' && (noted?.decisions ?? []).some((d) => d.text === 'Approved, but tag it v2 not v1.'), JSON.stringify({ comments: noted?.comments, decisions: noted?.decisions }))
     check('…and wakes the builder that asked', !!(await lib.until(async () => wakeAbout('approved "OK to push the release tag?"'), HUNG_MS)), JSON.stringify(wakes('Maker')))
     await page.keyboard.press('Escape')
 
@@ -276,6 +282,8 @@ const check = (name, ok, extra = '') => {
     await rSection.screenshot({ path: path.join(lib.WORK, 'foryou-dialog-pl.png') })
     await speak(base)
     await lib.until(async () => (await rSection.innerText().catch(() => '')).includes('Approve'), HUNG_MS)
+    // HI-2286: on Hive's own OK the note is a comment only.
+    check("Approve's note on Hive's OK says it is your comment", ((await rSection.locator('.for-you-approve-note').getAttribute('placeholder')) ?? '').includes('added as your comment'), await rSection.locator('.for-you-approve-note').getAttribute('placeholder'))
     await rSection.getByRole('button', { name: 'Approve' }).click()
     const toldR = () => wakes('Maker').some((w) => w.startsWith(`[Hive] ${rKey}`) && w.includes('merge it and report the merge'))
     check('the OK given: the builder is told to merge it', !!(await lib.until(async () => toldR() && (await rSection.count()) === 0, HUNG_MS)), JSON.stringify(wakes('Maker')))

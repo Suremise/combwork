@@ -208,6 +208,8 @@
   "tips.forYou.title": "回答待你处理的事项",
   "tips.forYouActions.text": "当智能体的问题涉及只有你才能在其卡片上做的事时，它可以把这件事作为问题下方的按钮提供：移到已完成、改为无代码或解除受阻，并附上它建议的理由，你可以修改。点一下即可完成，并回答智能体。",
   "tips.forYouActions.title": "一键回答",
+  "tips.forYouApproveNote.text": "批准可以附一条可选备注。在智能体的问题上，它会作为你的决定记在卡片上，智能体按它工作，审查者会核对；在 Hive 自己的请求上，它是你的评论。留空时，批准仍是一键完成。",
+  "tips.forYouApproveNote.title": "批准，但要改点东西",
   "tips.generalistRole.text": "在“智能体设置”中把它在工作流程中的角色设为“通才”，它就会在它的窗格中做你要求的任何事：它从不被放进通道，也从不被要求评审。它接手的卡片仍按项目的工作流程进行。",
   "tips.generalistRole.title": "做你要求的任何事的智能体",
   "tips.gitCheck.text": "“帮助”→“配置提供方…”会显示 Hive 找到的 git 及其版本。工作树智能体、合并和“版本控制”标签页的 Git 部分需要 Git for Windows 2.38 或更高版本。",

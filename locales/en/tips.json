@@ -835,6 +835,14 @@
     "defaultMessage": "Answer with one click",
     "description": "A tip's title (#1630)."
   },
+  "tips.forYouApproveNote.text": {
+    "defaultMessage": "Approve takes an optional note. On an agent's question it's recorded as your decision on the card, so the agent works to it and its reviewer checks it; on Hive's own requests it's your comment. Left empty, Approve is one click.",
+    "description": "A tip (HI-2286). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: approve, decision, For you."
+  },
+  "tips.forYouApproveNote.title": {
+    "defaultMessage": "Approve, but change something",
+    "description": "A tip's title (HI-2286): approving a request while asking for a change."
+  },
   "tips.generalistRole.text": {
     "defaultMessage": "Give an agent the Generalist role in the workflow (Agent Settings) and it does whatever you ask in its pane: it is never put in a lane or asked to review. A card it takes still follows the project’s workflow.",
     "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Generalist is a role's name (Glossary: generalist)."

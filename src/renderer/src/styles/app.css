@@ -10505,6 +10505,11 @@ body.pane-resizing-v .monaco-editor {
   align-items: center;
   gap: 6px;
 }
+/* The optional note beside Approve (HI-2286): the row's spare width, its hint readable. */
+.for-you-approve-note {
+  flex: 1 1 18em;
+  min-width: 12em;
+}
 /* The actions an agent's question offers (#1630), as one grid (HI-1689): the buttons share a column as wide as the
    widest label, so every reason box starts and ends at the same place. Narrow, each button is over its box. */
 .for-you-offers-box {
@@ -11058,6 +11063,9 @@ textarea.input.task-blocked-input {
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
+}
+.card-work-queue-note {
+  width: min(100%, 28em);
 }
 .card-work-queue-files [data-side] code,
 .card-work-queue-stuck .card-work-files code {

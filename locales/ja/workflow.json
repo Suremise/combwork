@@ -1,4 +1,5 @@
 {
+  "workflow.approveNote": "{becomes, select, decision {メモ（任意）：あなたの決定事項としても記録されます} reason {メモ（任意）：エージェントが求めた操作の理由になります} other {メモ（任意）：あなたのコメントとして追加されます}}",
   "workflow.contradiction.committedNeedsFolder": "「コミットで完了」には、全員がプロジェクトフォルダーで作業する必要があります。",
   "workflow.contradiction.focusedNeedsRunner": "カードごとの対象テストには、それらを実行するコマンドが必要です。",
   "workflow.contradiction.hiveMergesNeedsGit": "マージにはGitが必要です。バージョン管理がない場合、作業はその場で受け入れられます。",

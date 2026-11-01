@@ -67,7 +67,8 @@ export interface AnswerToRelay {
  */
 export function relayLine(a: AnswerToRelay): string {
   const how = a.outcome === 'approved' ? 'approved' : a.outcome === 'declined' ? 'declined' : 'answered'
-  const words = [a.reply ? `Their reply, whole: <<<${a.reply}>>>` : '', a.decision ? `Recorded as the card's decision, whole: <<<${a.decision}>>>` : ''].filter(Boolean).join(' ')
+  // HI-2286: an approval's note is its reply and the card's decision too: said once.
+  const words = a.reply && a.decision === a.reply ? `Their reply, whole, recorded as the card's decision too: <<<${a.reply}>>>` : [a.reply ? `Their reply, whole: <<<${a.reply}>>>` : '', a.decision ? `Recorded as the card's decision, whole: <<<${a.decision}>>>` : ''].filter(Boolean).join('. ') // i18n-ignore: agent-facing (the Assistant's inbox)
   const said = `the user ${how} ${a.askerName}'s question on ${a.key}. The question, whole: <<<${a.question}>>>.${words ? ` ${words}.` : a.outcome === 'answered' ? '' : ' Nothing was written with it.'} (Both stay on the card: hive_read_task ${a.key}.)` // i18n-ignore: agent-facing (the Assistant's inbox)
   if (a.outcome === 'declined') return `For your information: ${said} The user declined: nothing is to be done for it.` // i18n-ignore: agent-facing (the Assistant's inbox)
   const agrees = a.outcome === 'approved' ? 'Their approval is a yes, within any conditions its reply sets' : 'Do it only if the answer agrees, within any conditions it sets' // i18n-ignore: agent-facing (the Assistant's inbox)
