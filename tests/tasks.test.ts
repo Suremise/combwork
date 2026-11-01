@@ -771,6 +771,24 @@ describe('card decisions', () => {
     expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 3 }]]))).toBe('[Hive] #7 has 1 new decision, #9 has 3 new decisions from the user: read them (hive_read_task) and carry on from where you asked.')
   })
 
+  it("the line for a card's reviewer asks it to read before its next verdict, never to carry on (HI-2261)", () => {
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }]]), new Set([7]))).toBe('[Hive] #7 has 1 new decision from the user: read it (hive_read_task) before your next verdict on it.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 2 }]]), new Set([7]))).toBe('[Hive] #7 has 2 new decisions from the user: read them (hive_read_task) before your next verdict on it.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 1 }]]), new Set([7, 9]))).toBe('[Hive] #7 has 1 new decision, #9 has 1 new decision from the user: read them (hive_read_task) before your next verdict on them.')
+    // A card of its own among them: the builder's line, as it has something to carry on with.
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 1 }]]), new Set([7]))).toMatch(/and carry on from where you asked\.$/)
+  })
+
+  it("the cards an agent only reviews are those another agent has: its own, or one with nobody on it, aren't (HI-2261)", async () => {
+    const mine = (await run(() => tasks.createTask({ title: 'Mine', project: 'alpha', column: 'doing', agent: 'a1' }, user))).number
+    const theirs = (await run(() => tasks.createTask({ title: 'Theirs', project: 'alpha', column: 'doing', agent: 'r1' }, user))).number
+    const nobody = (await run(() => tasks.createTask({ title: 'Nobody', project: 'alpha' }, user))).number
+    const cards = new Map([[mine, { count: 1 }], [theirs, { count: 1 }], [nobody, { count: 1 }]])
+    expect([...(await decisionWakes.reviewingOf(w, 'a1', cards))]).toEqual([theirs])
+    expect([...(await decisionWakes.reviewingOf(w, 'r1', cards))]).toEqual([mine])
+    for (const n of [mine, theirs]) await run(() => tasks.updateTask(n, { column: 'todo' }, user))
+  })
+
   it('tells an agent waiting for the user of new decisions once each: not while it works, the user types there or a line of Hive waits (#401)', async () => {
     const me = { projectPath: alpha, agentId: 'a1' }
     const n = (await run(() => tasks.createTask({ title: 'Waiting for the user', project: 'alpha', column: 'doing', agent: 'a1' }, user))).number

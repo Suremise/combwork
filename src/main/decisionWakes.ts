@@ -62,11 +62,27 @@ onHiveEvent((e) => {
 /** Whether an agent may be told now: its turn has ended, nobody types there, no line of Hive's waits. */
 const ready = (st: LiveSessionState | null): boolean => !!st && (st.status === 'ready' || st.status === 'finished')
 
-/** The line: "[Hive] #392 has 4 new decisions from the user: read them (hive_read_task) and carry on." */
-export function decisionLine(cards: Map<number, { count: number }>): string {
+/**
+ * The line: "[Hive] #392 has 4 new decisions from the user: read them (hive_read_task) and carry on." `reviewing`: the
+ * cards the agent only reviews (another agent's: a loop's wake to its reviewer). When they are all of them, the line asks
+ * for a read before its next verdict (HI-2261: told to "carry on from where you asked", a reviewer that had asked nothing
+ * made the decided change itself), never to carry on.
+ */
+export function decisionLine(cards: Map<number, { count: number }>, reviewing: ReadonlySet<number> = new Set()): string {
   const parts = [...cards].map(([n, d]) => `${cardRef(n)} has ${d.count} new decision${d.count === 1 ? '' : 's'}`)
   const them = parts.length === 1 && [...cards.values()][0].count === 1 ? 'it' : 'them'
-  return `[Hive] ${parts.join(', ')} from the user: read ${them} (hive_read_task) and carry on from where you asked.`
+  const reviewer = cards.size > 0 && [...cards.keys()].every((n) => reviewing.has(n))
+  return `[Hive] ${parts.join(', ')} from the user: read ${them} (hive_read_task) ${reviewer ? `before your next verdict on ${cards.size === 1 ? 'it' : 'them'}.` : 'and carry on from where you asked.'}`
+}
+
+/** The cards among `cards` that are another agent's, so `agentId` only reviews them (decisionLine's `reviewing`). */
+export async function reviewingOf(ws: WorkspaceService, agentId: string, cards: Map<number, unknown>): Promise<Set<number>> {
+  const out = new Set<number>()
+  for (const n of cards.keys()) {
+    const card = await getTask(n, ws).catch(() => null)
+    if (card?.agent && card.agent !== agentId) out.add(n)
+  }
+  return out
 }
 
 /**
@@ -149,7 +165,7 @@ registerSource('decision', {
     made.set(madeKey(host, r.id, v), { ws, gen, reads })
     if (made.size > 500) made.delete(made.keys().next().value!)
     // `gens`: each card's decision generation as this line was made from it, what its receipt records as received (#1216).
-    return { body: decisionLine(cards), meta: { v, cards: encodeCards(cards), self, gens: [...cards].map(([n, d]) => `${n}:${d.generation}`).join(','), ...(loop.size ? { loop: [...loop].join(',') } : {}) } }
+    return { body: decisionLine(cards, await reviewingOf(ws, r.agentId, cards)), meta: { v, cards: encodeCards(cards), self, gens: [...cards].map(([n, d]) => `${n}:${d.generation}`).join(','), ...(loop.size ? { loop: [...loop].join(',') } : {}) } }
   },
   holds: (r, host) => {
     const m = made.get(madeKey(host, r.id, r.meta?.v))
@@ -206,7 +222,7 @@ async function tellNamed(ws: WorkspaceService, projectPath: string, agentId: str
     const cards = fitting(await leftToWatches(ws, projectPath, agentId, self, await newDecisionsOn(ws, agent, self, told.get(key))))
     if (!cards.size) return
     // Made again from the decisions as they are when it is offered (one waiting is that one).
-    await createDelivery(projectPath, { agentId, agentName: self, kind: 'answer', from: USER, card: [...cards.keys()][0], body: decisionLine(cards), source: 'decision', ref: 'decisions', replace: true, need: 'free', meta: { cards: encodeCards(cards), self } })
+    await createDelivery(projectPath, { agentId, agentName: self, kind: 'answer', from: USER, card: [...cards.keys()][0], body: decisionLine(cards, await reviewingOf(ws, agentId, cards)), source: 'decision', ref: 'decisions', replace: true, need: 'free', meta: { cards: encodeCards(cards), self } })
     await offerNow(projectPath, agentId)
   } finally {
     telling.delete(key)
@@ -243,7 +259,7 @@ async function decisionFromAction(a: ActionRow, from: WorkspaceService): Promise
       const cards = fitting(await leftToWatches(ws, projectPath, to.id, self, await newDecisionsOn(ws, { projectPath, agentId: to.id }, self, told.get(keyOf(projectPath, to.id)), loop)))
       if (!cards.size) return
       try {
-        await createDelivery(projectPath, { agentId: to.id, agentName: self, kind: 'answer', from: USER, card: a.card, body: decisionLine(cards), source: 'decision', ref: 'decisions', replace: true, meta: { cards: encodeCards(cards), self, loop: [...loop].join(',') }, action: a.id })
+        await createDelivery(projectPath, { agentId: to.id, agentName: self, kind: 'answer', from: USER, card: a.card, body: decisionLine(cards, await reviewingOf(ws, to.id, cards)), source: 'decision', ref: 'decisions', replace: true, meta: { cards: encodeCards(cards), self, loop: [...loop].join(',') }, action: a.id })
       } catch (e) {
         // Another Hive made it meanwhile (the unique row refused this one's): delivered.
         if (!actionDelivered(projectPath, a.id)) throw e
