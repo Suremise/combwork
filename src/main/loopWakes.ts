@@ -161,9 +161,9 @@ const wakeOf = (r: DeliveryRecord): Wake | null => {
  */
 const kindsOf = (kind: LoopWakeKind): ('column' | 'verdict')[] => (kind === 'review' || kind === 'approved' || kind === 'done' ? ['column'] : isStep(kind) ? [] : ['verdict'])
 /** A card loop's step (#1382): the builder's, to its reviewer, or the reviewer's answer, to its builder. Told by a watch that counts it, as a request. */
-const isStep = (kind: LoopWakeKind): boolean => kind === 'step' || kind === 'stepAnswer' || kind === 'stepNotice'
-/** A builder's step, for its reviewer: a design to check, or its going ahead unchecked (a notice). */
-const toReviewer = (kind: LoopWakeKind): boolean => kind === 'step' || kind === 'stepNotice'
+const isStep = (kind: LoopWakeKind): boolean => kind === 'step' || kind === 'stepAnswer' || kind === 'stepNotice' || kind === 'reply'
+/** A builder's step, for its reviewer: a design to check, its going ahead unchecked (a notice), or its reply (HI-2302). */
+const toReviewer = (kind: LoopWakeKind): boolean => kind === 'step' || kind === 'stepNotice' || kind === 'reply'
 const covered = (projectPath: string, agentId: string, card: TaskCard, kind: LoopWakeKind): boolean =>
   kind !== 'note' && kind !== 'answer' && watchCovers(projectPath, agentId, card.number, kind === 'review' ? 'review' : kind === 'verdict' ? 'verdict' : kind === 'request' || isStep(kind) ? 'request' : 'moved', card.column)
 
@@ -309,7 +309,8 @@ function stillDue(p: Wake & { agentId: string }, card: TaskCard | null, inLane: 
   if (p.kind === 'answer') return true
   // A builder's loop step (#1382, #1467), to its reviewer: due until the reviewer acts on the card; a design or a
   // follow-up to check, only while one still waits (answered by someone else, or the card moved on: nothing left to check).
-  if (toReviewer(p.kind)) return !since.some((h) => same(h.by, p.agentName)) && (p.kind !== 'step' || !!pendingStep(card))
+  // Its reply (HI-2302), while the card is still in Review.
+  if (toReviewer(p.kind)) return !since.some((h) => same(h.by, p.agentName)) && (p.kind !== 'step' || !!pendingStep(card)) && (p.kind !== 'reply' || card.column === 'review')
   if (card.agent !== p.agentId || (card.column === 'done' && !inLane)) return false
   return !since.some((h) => same(h.by, p.agentName) || /^(Moved to (the (top|bottom) of )?Review\b|Returned for review|Started reviewing)/.test(h.what))
 }

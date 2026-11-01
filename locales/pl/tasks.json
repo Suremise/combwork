@@ -101,6 +101,7 @@
   "tasks.history.attachmentsCleaned": "Usunięto {n, plural, one {# załącznik} few {# załączniki} many {# załączników} other {# załącznika}} ({names}): ten projekt usuwa załączniki zarchiwizowanych kart {days, plural, one {# dzień} few {# dni} many {# dni} other {# dnia}} po zarchiwizowaniu (Ustawienia projektu → Miejsce na dysku). {n, plural, one {Jest} few {Są} many {Są} other {Są}} w Koszu.",
   "tasks.history.backWithBatch": "Przywrócono z partią „{label}”",
   "tasks.history.blocked": "Zablokowano: {reason}",
+  "tasks.history.builderReply": "Odpowiedziano recenzentowi: „{text}”",
   "tasks.history.closedByDecision": "Zamknięto pytanie do Ciebie Twoją decyzją: „{question}”",
   "tasks.history.context": "Przeczytaj najpierw: {refs}",
   "tasks.history.contextRemoved": "Usunięto sekcje dokumentów do przeczytania najpierw",

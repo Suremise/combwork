@@ -101,6 +101,7 @@
   "tasks.history.attachmentsCleaned": "{n, plural, one {# anexo removido} other {# anexos removidos}} ({names}): este projeto remove os anexos dos cartões arquivados {days, plural, one {# dia} other {# dias}} depois de arquivá-los (Configurações do projeto → Armazenamento). {n, plural, one {Ele está} other {Eles estão}} na Lixeira.",
   "tasks.history.backWithBatch": "Trazido de volta com o lote ({label})",
   "tasks.history.blocked": "Bloqueado: {reason}",
+  "tasks.history.builderReply": "Respondeu ao revisor: “{text}”",
   "tasks.history.closedByDecision": "Uma pergunta para você foi fechada com a sua decisão: “{question}”",
   "tasks.history.context": "Ler primeiro: {refs}",
   "tasks.history.contextRemoved": "Removidas as seções de documentos para ler primeiro",

@@ -103,6 +103,7 @@ interface HiveMessageValues {
   'tasks.history.attachmentsCleaned': { n: number; names: string | number; days: number }
   'tasks.history.backWithBatch': { label: string | number }
   'tasks.history.blocked': { reason: string | number }
+  'tasks.history.builderReply': { text: string | number }
   'tasks.history.closedByDecision': { question: string | number }
   'tasks.history.context': { refs: string | number }
   'tasks.history.contextRemoved': undefined

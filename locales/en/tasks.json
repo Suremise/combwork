@@ -407,6 +407,10 @@
     "defaultMessage": "Blocked: {reason}",
     "description": "A line in a card's history: the card was marked blocked, with this reason ({reason}, written by whoever blocked it)."
   },
+  "tasks.history.builderReply": {
+    "defaultMessage": "Replied to the reviewer: \"{text}\"",
+    "description": "A line in a card's history (HI-2302): the agent building the card (named beside it) commented on it in Review after its reviewer asked or said something in that round of review, so the reviewer was woken with the reply; {text} is what it said (cut short)."
+  },
   "tasks.history.closedByDecision": {
     "defaultMessage": "Closed a question for you with your decision: \"{question}\"",
     "description": "A line in a card's history (HI-1932): a question waiting for the user (For you) was answered by a decision the user made, recorded on the card (by the user, or by the Hive Assistant writing down the user's words: the history line's author says who). {question} is the question, cut short."
