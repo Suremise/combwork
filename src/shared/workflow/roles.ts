@@ -60,11 +60,19 @@ export interface WorkflowPair {
   reviewer: string | null
   pool?: true
   lane?: string
+  /**
+   * A running lane's state, as its line in `hive_lane list` says it (HI-2271): "active, on AL-1", "paused, AL-2 is
+   * blocked". An Assistant reading project status took the lane's card from the board's Doing column.
+   */
+  state?: string
   byName?: true
 }
 
-export function workflowPairs(agents: readonly { name: string; role?: string; workflowRole?: WorkflowRole }[], lanes: readonly { id: string; state: string; builder: { name: string }; reviewer: { name: string } | null; pool?: boolean }[]): WorkflowPair[] {
-  const out: WorkflowPair[] = lanes.filter((l) => l.state === 'active' || l.state === 'paused').map((l) => ({ builder: l.builder.name, reviewer: l.reviewer?.name ?? null, ...(l.pool ? { pool: true as const } : {}), lane: l.id }))
+type PairLane = { id: string; state: string; builder: { name: string }; reviewer: { name: string } | null; pool?: boolean }
+
+/** `stateOf`: a running lane's state in words (laneStateText), carried by its pair. */
+export function workflowPairs<L extends PairLane>(agents: readonly { name: string; role?: string; workflowRole?: WorkflowRole }[], lanes: readonly L[], stateOf?: (l: L) => string): WorkflowPair[] {
+  const out: WorkflowPair[] = lanes.filter((l) => l.state === 'active' || l.state === 'paused').map((l) => ({ builder: l.builder.name, reviewer: l.reviewer?.name ?? null, ...(l.pool ? { pool: true as const } : {}), lane: l.id, ...(stateOf ? { state: stateOf(l) } : {}) }))
   const taken = new Set(out.flatMap((p) => [p.builder, p.reviewer]).filter((n): n is string => !!n).map((n) => n.toLowerCase()))
   const free = agents.filter((a) => !taken.has(a.name.toLowerCase()))
   const number = (name: string): string | undefined => /(\d+)$/.exec(name.trim())?.[1]

@@ -68,7 +68,7 @@ import { assertInShared, createHandover, handoversFor, NoteConflict, notesTree, 
 import { mergeSlots, slotTestEvent } from './mergeSlotHost'
 import * as lanes from './lanes'
 import { checkLanePool, launchRecordedLane, recordedLaneNote, resumeLaneBuilder, retryFreshStart } from './laneStart'
-import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber, type LaneChange } from '../shared/lanes'
+import { LANE_BRIEF_MAX, laneCards, laneName, laneNumber, laneStateText, type LaneChange } from '../shared/lanes'
 import { briefNote, settleLaneBriefs } from './laneBriefs'
 import { DEFAULT_WAIT_MS, MAX_WAIT_MS, MergeSlotError, slotBranch, slotCards, type SlotAgent } from './mergeSlots'
 import { clashingNumber, watchWhilePlaced } from './watchGuards'
@@ -550,8 +550,9 @@ async function projectSummary(p: string) {
       // Its connection (HI-1771, for a CLI with connections): the one chosen (null: the default), the one its run is on, and a switch waiting.
       ...agentConnectionFields(p, a, a.live?.provider ?? agentProvider(a, config.settings))
     })),
-    // Its builder and reviewer pairs (#1531): its running lanes', then by name; empty without either.
-    pairs: workflowPairs(info.agents, await lanes.listLanes(workspaceOf(p), { project: basename(p) }).catch(() => [])),
+    // Its builder and reviewer pairs (#1531): its running lanes', each with its state as hive_lane list says it (HI-2271:
+    // the card it is on), then by name; empty without either.
+    pairs: workflowPairs(info.agents, await lanes.listLanes(workspaceOf(p), { project: basename(p) }).catch(() => []), laneStateText),
     // The workspace's MCP servers (HI-2059): all available to the project, those added to it running; `on` is `added`'s
     // old name, kept for 1.0 (deprecated).
     mcp: { available: servers.filter((m) => m.def).map((m) => m.name), added: mcpOn, on: mcpOn },
