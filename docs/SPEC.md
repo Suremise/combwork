@@ -5119,7 +5119,11 @@ reason and the remedy. `submit.checksPassed`'s refusal names the reason of the c
 that run passed and didn't count, and its next step is that reason's remedy (commit or remove changes; run it again
 with nothing else writing, or `--isolated` on Git; run it in the card's own folder). A reviewer's runs in a
 review copy count for the revision it holds (§16.10.5). None has no check copies (no isolation, OP-16): its remedy is
-running again when the deliverables are quiet, which the refusal says.
+running again when the deliverables are quiet, which the refusal says. **Named on the card [HI-2276]:** a code card's
+read (`hive_read_task`, the Agent API's `checks` and `checksHint`) lists its rules' pre-review checks by name, as data,
+with a fixed hint, `hive-progress --check <name> --card …` (and `--isolated` where the platform has check copies), until
+it is past Review: agents that never read work-on-card ran the check in the shared folder by hand. No shell command is
+built from a configured name (free text: quoting it for every shell failed review twice). The rule stays in work-on-card.
 **Built [#1435]:** `--isolated` (with `--check` only, by an agent, on Git) asks resolve for a check copy. It is leased at
 the card's revision apart from the request (`IsolatedRequests`: a first setup takes longer than any request may): resolve
 answers within 2 s, with the copy or 409 `wait` and a ticket, and hive-progress asks again with the ticket every 2 s
