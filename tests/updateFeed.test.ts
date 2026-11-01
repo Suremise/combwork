@@ -11,7 +11,7 @@ import { HiveGitHubProvider, pickTag, withFirst } from '../src/main/updateFeed'
 
 // The updater's version is a SemVer of electron-updater's own semver (a copy of its own, nested): another copy's isn't
 // recognised as one, and reads as a stable version.
-const { SemVer } = createRequire(createRequire(import.meta.url).resolve('electron-updater/out/providers/GitHubProvider'))('semver') as typeof import('semver')
+const { SemVer } = createRequire(createRequire(import.meta.url).resolve('electron-updater/out/providers/GitHubProvider'))('semver') as { SemVer: new (version: string) => unknown }
 
 const BASE = 'https://github.com/Suremise/hive-desktop/releases'
 
