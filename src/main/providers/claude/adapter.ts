@@ -10,7 +10,7 @@ import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwit
 import { providerSettings } from '../../../shared/providers'
 import { samePath } from '../../../shared/movePaths'
 import { config } from '../../config'
-import { claudeAutoMemory, claudeFileAllowed, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
+import { claudeAutoMemory, claudeFileAllowed, containsPlace, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
@@ -571,10 +571,14 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     if (ctx.resume) args.push('--resume', ctx.sessionId)
     else args.push('--session-id', ctx.sessionId)
     if (ctx.name) args.push('--name', runsThroughCmd(executable) ? ctx.name.replace(/["%^&|<>!]/g, ' ').replace(/\s+/g, ' ').trim() : ctx.name)
-    args.push('--plugin-dir', join(dir, 'plugin'))
+    const plugin = join(dir, 'plugin')
+    args.push('--plugin-dir', plugin)
     // Folders it may also work in (#1439: a reviewer's review copies), within its permission mode. --add-dir takes several
-    // (2.1.309), so an option always follows it here, never the first prompt.
-    for (const d of ctx.extraDirs ?? []) args.push('--add-dir', d)
+    // (2.1.309), so an option always follows it here, never the first prompt. Its launch plugin too, where that is outside
+    // its folder (HI-2274: a slot's or worktree's session, the plugin in the project's .hive): Claude Code asks before it
+    // reads a skill's reference file there (acceptEdits, 2.1.309), and a session nobody watches waits on that for good.
+    const added = [...(ctx.extraDirs ?? []), ...(containsPlace(ctx.cwd, plugin) ? [] : [plugin])]
+    for (const d of added) args.push('--add-dir', d)
     // Only the workspace's servers; switched off (#1281), Claude Code's own load too, and the --mcp-config ones still win
     // over its own of the same name, hive included (2.1.305: the user's and the project's are never started).
     args.push('--mcp-config', join(ctx.privateDir, 'mcp.json'))
