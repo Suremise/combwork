@@ -20,7 +20,7 @@ export interface ExitKeysIO {
   inTurn(): boolean
   /** Its screen shows the exit armed (the adapter's `armed`). */
   armed(): boolean
-  /** Types the exit key. */
+  /** Types the exit key, only into this session's CLI (the driver also asks `alive` just before). */
   press(): void
   /** Resolves after `ms` (a test's clock, or a timer). */
   wait(ms: number): Promise<void>
@@ -40,19 +40,26 @@ export async function driveExitKeys(io: ExitKeysIO, armMs: number): Promise<void
     }
     return false
   }
+  // Each key only while its CLI is still the one being stopped, checked at the key itself: every wait yields, and its
+  // session can end and a restart take its terminal meanwhile (HR2 on HI-2272).
+  const press = (): boolean => {
+    if (!io.alive()) return false
+    io.press()
+    return true
+  }
   while (io.alive()) {
     // The hint showing wins over Hive's view of a turn, which lags the CLI's: it is at its prompt, armed.
     if (io.inTurn() && !io.armed()) {
-      io.press()
+      if (!press()) return
       // Its end, however long the cancel takes; one that never ends is the kill's. The hint showing means it is over too.
       await until(() => !io.inTurn() || io.armed(), Infinity)
       continue
     }
     if (!io.armed()) {
-      io.press()
+      if (!press()) return
       if (!(await until(io.armed, armMs))) continue
     }
-    io.press()
+    if (!press()) return
     // Its exit (until returns once it has gone), or the hint gone with it still running: armed again from the top.
     await until(() => !io.armed(), Infinity)
   }

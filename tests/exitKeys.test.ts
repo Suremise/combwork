@@ -127,6 +127,43 @@ describe('Stop’s exit keys on conditions (HI-2272)', () => {
     expect(sim.now()).toBeGreaterThanOrEqual(10_000)
   })
 
+  it('its session replaced while a wait yields (a restart taking its terminal): no key after that, at any wait', async () => {
+    // HR2's probe on HI-2272: the hint shows at a wait, and before the driver resumes the session ends and a restart's
+    // takes its terminal (queued behind the wait's resolution). Each key the driver types records whether its session
+    // was still the one being stopped. Replaced at each of the driver's waits in turn: the arm wait, the turn's end, the exit.
+    for (const at of ['arm', 'turn', 'exit'] as const) {
+      let alive = true
+      let armed = false
+      let inTurn = at === 'turn'
+      const presses: boolean[] = []
+      const replace = (): void => void Promise.resolve().then(() => queueMicrotask(() => (alive = false)))
+      const io: ExitKeysIO = {
+        alive: () => alive,
+        inTurn: () => inTurn,
+        armed: () => armed,
+        press: () => void presses.push(alive),
+        wait: async () => {
+          if (at === 'arm' && presses.length === 1) {
+            armed = true
+            replace()
+          }
+          if (at === 'turn' && presses.length === 1) {
+            inTurn = false
+            replace()
+          }
+          if (at === 'exit' && presses.length === 1) armed = true
+          if (at === 'exit' && presses.length === 2) {
+            armed = false
+            replace()
+          }
+        }
+      }
+      await driveExitKeys(io, 400)
+      expect(presses, at).toEqual(presses.map(() => true))
+      expect(alive, at).toBe(false)
+    }
+  })
+
   it('Hive’s view of the turn behind (the hint shows, it still says working): the key that exits goes anyway', async () => {
     // Already at its prompt, but Hive still thinks it in a turn: the first key arms it, and the hint ends the wait.
     const sim = copilotModel({ inTurn: true, cancelMs: 0, absorbMs: 0 })

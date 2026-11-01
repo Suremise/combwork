@@ -2884,7 +2884,8 @@ class SessionManager {
       alive: () => same() && hasPty(key),
       inTurn: () => l.ledger?.active?.state === 'running' || EXIT_IN_TURN.has(l.state.status),
       armed: () => armed.test(l.screen?.text() ?? ''),
-      press: () => writePty(key, exit.keys[0]),
+      // Checked at the write too, as the fixed beat's keys are: never into a restart's terminal.
+      press: () => void (same() && writePty(key, exit.keys[0])),
       wait: (ms) => new Promise((r) => setTimeout(r, ms))
     }
     driveExitKeys(io, exit.gapMs).catch((e) => log.warn(`${userText(this.label(l.state))}: its exit keys stopped: ${(e as Error).message}`))
