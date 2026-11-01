@@ -723,6 +723,8 @@ export const UNIT_SCANS = [
   { test: 'tests/flightRecorder.test.ts', paths: ['locales/pl/'] },
   { test: 'tests/buildFacts.test.ts', paths: ['locales/'] },
   { test: 'tests/laneBar.test.ts', paths: ['locales/'] },
+  // Every workflow refusal rendered in each locale (HI-2281): a translation changed alone imports nothing it sees.
+  { test: 'tests/workflow/texts.test.ts', paths: ['locales/'] },
   // The bundled skills and modes (resources/), and the guidance that names them.
   { test: 'tests/assistant.test.ts', paths: ['resources/modes/'] },
   { test: 'tests/modeDescriptions.test.ts', paths: ['resources/modes/'] },
