@@ -37,7 +37,7 @@ A build's pre-release name says what it is (HI-2308):
 
 Semver orders them `1.1.0-beta.3` < `1.1.0-rc.1` < `1.1.0`, so a version's betas all come before its first RC. Once a version has an RC, a fix to it is the next RC: a beta then would be older than the installed RC. The working builds after 1.0.0 are `1.1.0-beta.<n>`. 1.0 named every installable build `-rc.<n>`: rc.17 on were real candidates, and the earlier ones (rc.10 to rc.16 in particular) were working builds that would now be betas.
 
-What the updater offers (electron-updater's GitHub feed; Hive compares versions by semver, `src/shared/updates.ts`): with **Include pre-releases** off, releases only. With it on, an installed beta is offered later betas and releases, but never an RC; an installed RC is offered later RCs, but not the release (HI-2311). Turning **Include pre-releases** off reaches the release from either.
+What the updater offers (GitHub's releases feed through Hive's provider, `src/main/updateFeed.ts`; versions compared by semver, `src/shared/updates.ts`): with **Include pre-releases** off, releases only. With it on, a pre-release install is offered the newest uploaded version newer than it, beta, RC or release, in that semver order: a beta gets a later RC, an RC the release (HI-2311); a release install takes the feed's newest entry. Builds before 1.0.0-rc.19 lack this: there an installed beta is never offered an RC and an installed RC only a later RC, never the release, so someone on rc.18 or earlier reaches 1.0.0 by updating to the last RC first, or by turning **Include pre-releases** off.
 
 ## A bump and its build: two cards
 
