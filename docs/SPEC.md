@@ -4013,8 +4013,12 @@ Whether a conversation may resume there is its **hold** (none: it may):
     - the quit's record (`recordEndedLaunches`, HI-1886), which now also looks once at launches whose leftovers are
       listed;
     - a gone Hive's keeper (HI-2055, `keeperHoldsNothing`): its `live` state, whole (every member described), from a
-      keeper still running (it writes each change), each member still running as the same process. The keeper's own
-      `ended` is unchanged.
+      keeper still running, each member still running as the same process. A `live` receipt is a snapshot, unlike
+      `ended`, so it is taken only while it is current: the keeper rewrites an unchanged one every 3 s after a sweep
+      sure of everything (`KEEPER_BEAT_MS`), and only one whose `at` is under 10 s old (`KEEPER_FRESH_MS`, not ahead of
+      this clock) counts. A sweep or a write that fails leaves it to age, held. A job whose ancestry was let go unsure is
+      written `observed: partial`, never taken. Members are named without `.exe` (`ProcessName`), so the broker's name
+      filter takes either form. The keeper's own `ended` is unchanged.
     The broker is never ended, and a job it is the last of is let go. The decision (a known list plus a confirmed
     "nothing it serves is running"):
     - A broker is known only by its executable's full path, asked of the helper by id and start time (`paths`:

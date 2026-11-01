@@ -47,8 +47,14 @@ export const SYSTEM_BROKERS: readonly SystemBroker[] = [
   }
 ]
 
-/** Whether a process's executable name may be a known broker's (its path decides): none is, and nothing need be asked. */
-export const mayBeBroker = (name: string): boolean => SYSTEM_BROKERS.some((b) => b.exe === name.toLowerCase())
+/**
+ * Whether a process's executable name may be a known broker's (its path decides): none is, and nothing need be asked.
+ * With or without ".exe" (HR1 on HI-2309: a keeper names its members by Process.ProcessName, which has none).
+ */
+export const mayBeBroker = (name: string): boolean => {
+  const n = name.toLowerCase()
+  return SYSTEM_BROKERS.some((b) => b.exe === n || b.exe === `${n}.exe`)
+}
 
 /** The known broker a process's executable path is, if any. */
 export function brokerOf(path: string | undefined): SystemBroker | null {

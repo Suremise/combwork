@@ -318,27 +318,42 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       const next = await restarted()
       const C = '133000000000000000'
       const BROKER = join(process.env.ProgramW6432 || process.env.ProgramFiles || 'C:\\Program Files', 'WindowsApps', 'MicrosoftWindows.WindowsSandbox_0.5.3.0_x64__cw5n1h2txyewy', 'WindowsSandboxServer.exe')
-      const broker = { pid: 7101, created: C, name: 'WindowsSandboxServer.exe' }
+      // As the real keeper names its members (Process.ProcessName: no ".exe", HR1's round 1), its "at" a FILETIME.
+      const broker = { pid: 7101, created: C, name: 'WindowsSandboxServer' }
+      const fileTime = (ms: number): number => (ms + 11_644_473_600_000) * 10_000
+      const live = (o: Record<string, unknown>) => state('k-broker', { state: 'live', at: fileTime(Date.now()), ...o })
       jobs.paths.set(`7101:${C}`, BROKER)
       jobs.paths.set(`7102:${C}`, 'C:\\Program Files\\nodejs\\node.exe')
       jobs.alive = new Set(['4001:1', `7101:${C}`, `7102:${C}`])
       jobs.running = []
       try {
-        plantState('k-broker', state('k-broker', { state: 'live', total: 1, members: [broker] }))
+        plantState('k-broker', live({ total: 1, members: [broker] }))
         expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBe('4001:1')
+        // The same broker-only receipt, but its keeper's last sure observation old (HR1's round 1: a later sweep or write
+        // of its failed, and meanwhile a writer, 7102, joined the job): not the job now, held. So is one with no "at",
+        // one ahead of this clock, or one its keeper marked partial (its ancestry let go unsure).
+        plantState('k-broker', live({ total: 1, members: [broker], at: fileTime(Date.now() - 60_000) }))
+        expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
+        plantState('k-broker', live({ total: 1, members: [broker], at: undefined }))
+        expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
+        plantState('k-broker', live({ total: 1, members: [broker], at: fileTime(Date.now() + 60_000) }))
+        expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
+        plantState('k-broker', live({ total: 1, members: [broker], observed: 'partial' }))
+        expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
+        plantState('k-broker', live({ total: 1, members: [broker] }))
         // A Sandbox running: its broker may still write.
         jobs.running = ['windowssandboxclient.exe']
         expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
         jobs.running = []
         // Another member beside it, a member not described, or one ended since the keeper wrote: held.
-        plantState('k-broker', state('k-broker', { state: 'live', total: 2, members: [broker, { pid: 7102, created: C, name: 'node.exe' }] }))
+        plantState('k-broker', live({ total: 2, members: [broker, { pid: 7102, created: C, name: 'node.exe' }] }))
         expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
-        plantState('k-broker', state('k-broker', { state: 'live', total: 2, members: [broker] }))
+        plantState('k-broker', live({ total: 2, members: [broker] }))
         expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
-        plantState('k-broker', state('k-broker', { state: 'live', total: 1, members: [{ ...broker, pid: 7103 }] }))
+        plantState('k-broker', live({ total: 1, members: [{ ...broker, pid: 7103 }] }))
         expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
         // Its keeper gone: its state may be old.
-        plantState('k-broker', state('k-broker', { state: 'live', total: 1, members: [broker] }))
+        plantState('k-broker', live({ total: 1, members: [broker] }))
         jobs.alive.delete('4001:1')
         expect(await next.keeperHoldsNothing('k-broker', HIVE, 'MB1')).toBeNull()
       } finally {

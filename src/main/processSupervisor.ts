@@ -19,6 +19,12 @@ import { join } from 'path'
 export const MAX_LISTED = 50
 /** How often the host adopts what escaped its jobs (Sweep, #543), while it holds any; listing and ending sweep first. */
 const SWEEP_MS = 1000
+/**
+ * How often a keeper rewrites a job's unchanged "live" receipt (HI-2309), so its "at" is a recent sure observation; and
+ * how old one may be for a later Hive to take it as the job now (agentProcesses.keeperHoldsNothing).
+ */
+export const KEEPER_BEAT_MS = 3000
+export const KEEPER_FRESH_MS = 10_000
 /** How long the host gathers the exits of a job's processes before sweeping for what they left outside (Listen). */
 const EXIT_BATCH_MS = 250
 
@@ -768,9 +774,9 @@ public static class HiveJobs {
     return members.ToArray();
   }
   /** A job's state written whole (a temp file, then replaced through to the disk): whether it was. */
-  static bool WriteState(string id, string state, int[] members) {
+  static bool WriteState(string id, string state, int[] members, string observed = "complete") {
     if (keepDir == null || !System.Text.RegularExpressions.Regex.IsMatch(id, "^[A-Za-z0-9_-]{1,64}$")) return false;
-    var b = new StringBuilder("{\"v\":1,\"run\":" + Q(id) + ",\"helper\":" + Q(keepSelf) + ",\"hive\":" + Q(keepHive) + ",\"state\":" + Q(state) + ",\"observed\":\"complete\",\"total\":" + members.Length + ",\"members\":[");
+    var b = new StringBuilder("{\"v\":1,\"run\":" + Q(id) + ",\"helper\":" + Q(keepSelf) + ",\"hive\":" + Q(keepHive) + ",\"state\":" + Q(state) + ",\"observed\":" + Q(observed) + ",\"total\":" + members.Length + ",\"members\":[");
     for (int i = 0; i < members.Length && i < ${MAX_LISTED}; i++) {
       string name = "";
       try { using (var p = System.Diagnostics.Process.GetProcessById(members[i])) name = p.ProcessName; } catch { }
@@ -808,6 +814,9 @@ public static class HiveJobs {
     try { Console.Out.WriteLine("keeping"); Console.Out.Flush(); Console.Out.Close(); } catch { }
     Notices = null;
     var last = new Dictionary<string, string>();
+    // When each job's "live" was last written (HI-2309): rewritten unchanged every ${KEEPER_BEAT_MS} ms, so its "at" is the
+    // time of a sure observation; a sweep or a write that fails stops it, and the receipt goes stale (read as held).
+    var wrote = new Dictionary<string, DateTime>();
     while (mine.Count > 0) {
       foreach (var id in new List<string>(mine)) {
         int[] m;
@@ -828,10 +837,14 @@ public static class HiveJobs {
           continue;
         }
         Array.Sort(m);
-        string seen = string.Join(",", m);
+        bool unsure;
+        lock (turn) unsure = ancestryLost.Contains(id);
+        // Its ancestry let go unsure (HI-2309): its membership can't be told complete, written once as "partial".
+        string seen = (unsure ? "partial:" : "") + string.Join(",", m);
         string before;
-        if (last.TryGetValue(id, out before) && before == seen) continue;
-        if (WriteState(id, "live", m)) last[id] = seen;
+        DateTime at;
+        if (last.TryGetValue(id, out before) && before == seen && (unsure || (wrote.TryGetValue(id, out at) && (DateTime.UtcNow - at).TotalMilliseconds < ${KEEPER_BEAT_MS}))) continue;
+        if (WriteState(id, "live", m, unsure ? "partial" : "complete")) { last[id] = seen; wrote[id] = DateTime.UtcNow; }
       }
       if (mine.Count > 0) System.Threading.Thread.Sleep(${SWEEP_MS});
     }

@@ -118,6 +118,10 @@ describe.runIf(process.platform === 'win32')('the keeper (HI-2055)', () => {
     await waitFor(() => expect(k.out).toContain('keeping'))
     // Its console's host is a member too (counted, ended with it).
     await waitFor(() => expect(k.state('j2')).toMatchObject({ state: 'live', members: expect.arrayContaining([expect.objectContaining({ pid: s.pid, name: 'node' })]) }))
+    // Unchanged, it is written again (HI-2309: its "at" a recent sure observation, so a later Hive can tell it current).
+    const first = (k.state('j2') as { at: number }).at
+    await waitFor(() => expect((k.state('j2') as { at: number }).at).toBeGreaterThan(first))
+    expect(k.state('j2')).toMatchObject({ state: 'live', observed: 'complete' })
     expect(k.proc.exitCode).toBeNull()
     s.kill()
     await exited(k.proc)

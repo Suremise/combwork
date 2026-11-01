@@ -8,7 +8,7 @@ import { join } from 'path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { app } from 'electron'
 import { tempDir } from './tempDir'
-import { brokerOf, brokersOnly, inPackage } from '../src/main/systemBrokers'
+import { brokerOf, brokersOnly, inPackage, mayBeBroker } from '../src/main/systemBrokers'
 
 const ROOT = join(process.env.ProgramW6432 || process.env.ProgramFiles || 'C:\\Program Files', 'WindowsApps')
 const BROKER = join(ROOT, 'MicrosoftWindows.WindowsSandbox_0.5.3.0_x64__cw5n1h2txyewy', 'WindowsSandboxServer.exe')
@@ -88,6 +88,11 @@ describe("the broker is known by its executable's path in WindowsApps, never by 
     expect(brokerOf(join(ROOT, 'MicrosoftWindows.WindowsSandbox_0.5.3.0_x64__cw5n1h2txyewy', 'node.exe'))).toBeNull()
     expect(brokerOf(join(ROOT, 'MicrosoftWindows.WindowsSandbox_..', 'WindowsSandboxServer.exe'))).toBeNull()
     expect(brokerOf('')).toBeNull()
+    // Its name only rules others out, with or without ".exe" (a keeper names members without it, HR1 on HI-2309).
+    expect(mayBeBroker('WindowsSandboxServer')).toBe(true)
+    expect(mayBeBroker('WindowsSandboxServer.EXE')).toBe(true)
+    expect(mayBeBroker('node')).toBe(false)
+    expect(mayBeBroker('WindowsSandboxServer.exe.exe')).toBe(false)
     expect(brokerOf(undefined)).toBeNull()
   })
 

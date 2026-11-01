@@ -4,7 +4,7 @@ import { app } from 'electron'
 import { emit, toast } from './events'
 import { readJson, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
-import { JobHost, MAX_LISTED, type HostFailure, type JobList } from './processSupervisor'
+import { JobHost, KEEPER_FRESH_MS, MAX_LISTED, type HostFailure, type JobList } from './processSupervisor'
 import { brokersOnly, mayBeBroker } from './systemBrokers'
 import { hiveError } from './hiveError'
 import { processLabel, progressRunTitle, type AgentLeftovers, type AgentProcess } from '../shared/agentProcesses'
@@ -329,8 +329,11 @@ export function keeperStillBound(run: string, helper: string): boolean {
 }
 
 /** A keeper's state of a run, as the next Hive reads it (HI-2055). */
-/** `complete` (HI-2309): its whole membership is described (its total is its members, console hosts among them). */
-export type KeeperState = { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: AgentProcess[]; complete: boolean }
+/**
+ * `complete` (HI-2309): its whole membership is described (its total is its members, console hosts among them); `at`:
+ * when its keeper observed it, in ms (it rewrites an unchanged "live" every KEEPER_BEAT_MS), or null when not said.
+ */
+export type KeeperState = { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: AgentProcess[]; complete: boolean; at: number | null }
 
 const KEEPER_FILE = /^keeper-([A-Za-z0-9_-]{1,64})\.json$/
 const MAX_KEEPER_BYTES = 64 * 1024
@@ -368,7 +371,7 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
   }
   if (total < members.length) return null
   // A console window's host ends with the process it serves: counted (the job isn't empty), never listed (listJob's way).
-  return { state: 'live', helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)), complete: total === members.length }
+  return { state: 'live', helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)), complete: total === members.length, at: fileTimeMs(s.at) }
 }
 
 /**
@@ -377,16 +380,24 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
  * state is the job as of its last sweep), with each member still running as the same process, and none of them holds
  * the slot (only Windows' own idle brokers). The helper whose state it was, else null: held. Ends nothing.
  */
-export async function keeperHoldsNothing(run: string, hive: string, who: string): Promise<string | null> {
+export async function keeperHoldsNothing(run: string, hive: string, who: string, now = Date.now()): Promise<string | null> {
   const k = await keeperState(run, hive)
   if (k?.state !== 'live' || !k.complete || !k.members.length) return null
+  // A live receipt is a snapshot, unlike "ended" (HR1 on HI-2309): taken only as the job now while its keeper's last sure
+  // observation is recent. A sweep or a write of its that fails since leaves it to age, and held.
+  if (k.at === null || now - k.at > KEEPER_FRESH_MS || k.at > now + KEEPER_SKEW_MS) return null
   const [pid, created] = k.helper.split(':')
   const keeper = await stillRunning([{ pid: Number(pid), name: '', label: '', created }])
   if (keeper?.processes.length !== 1) return null
-  const now = await stillRunning(k.members)
-  if (!now || now.processes.length !== k.members.length) return null
-  return (await nothingHolds(now.processes, 0, who)) ? k.helper : null
+  const members = await stillRunning(k.members)
+  if (!members || members.processes.length !== k.members.length) return null
+  return (await nothingHolds(members.processes, 0, who)) ? k.helper : null
 }
+
+/** How far ahead of this Hive's clock a keeper's "at" may be (another process's clock read): beyond, not taken. */
+const KEEPER_SKEW_MS = 2000
+/** A Windows FILETIME (100 ns since 1601, UTC) as ms since 1970, or null when it isn't one. */
+const fileTimeMs = (t: unknown): number | null => (typeof t === 'number' && Number.isFinite(t) && t > 0 ? t / 10_000 - 11_644_473_600_000 : null)
 
 /** A run's writer settled (HI-2055): its keeper's state and its binding go. */
 export function forgetKeeperRun(run: string): void {
