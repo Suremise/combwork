@@ -3242,11 +3242,14 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'implementer' })
-      // Implementer's lane, the subject (Coder) reviewing; Implementer starts the card and posts its design, with its own token.
-      await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
+      // Implementer starts the card, registers its lane (the subject, Coder, reviewing) and posts its design, with its own
+      // token. The start comes before the lane (HI-2270): over a card in Todo, Hive starts it on Implementer itself once
+      // builderLane stops it (HI-2029), racing this start.
       await c.startAgent('implementer')
       const started = await c.as('implementer', 'POST', `/v1/tasks/%23${n}/start`)
       if (started.status !== 200) throw new Error(`start: ${JSON.stringify(started.body)}`)
+      await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
+      await c.startAgent('implementer')
       const posted = await c.as('implementer', 'POST', `/v1/tasks/%23${n}/loop-step`, { step: 'design', text: 'Design: entries keep their time; reads past 5 minutes miss; a write deletes its key. No tests.' })
       if (posted.status !== 200) throw new Error(`design: ${JSON.stringify(posted.body)}`)
       c.design = posted.body.data.design
@@ -3276,13 +3279,15 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'coder' })
-      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
-      // Coder's round 1, as the user moves it: started (Doing), a commit, submitted (Review).
+      // Coder's round 1, as the user moves it: started (Doing), a commit, submitted (Review). Before its lane is registered
+      // (HI-2270): a lane over the card in Todo has Hive start it on Coder itself once builderLane stops Coder (HI-2029,
+      // laneStarts), which raced this move to Doing and sometimes won.
       await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
       c.git('add', '-A')
       c.git('-c', 'user.name=Coder', '-c', 'user.email=c@example.com', 'commit', '-qm', 'greet says Hi')
       await userMove(c, n, 'review')
+      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
       // The change asked of it since, which Coder has made and committed.
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name.trim()\n")
       c.git('add', '-A')
@@ -3311,13 +3316,15 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
-      // Implementer's lane, the subject (Coder) reviewing; Implementer's round 1 sent for review, then its follow-up, with its own token.
-      await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
+      // Implementer's round 1 sent for review, then its lane (the subject, Coder, reviewing), then its follow-up, with its
+      // own token. The moves come before the lane (HI-2270): over a card in Todo, Hive starts it on Implementer itself once
+      // builderLane stops it (HI-2029), racing the move to Doing.
       await userMove(c, n, 'doing')
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name\n")
       c.git('add', '-A')
       c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet says Hi')
       await userMove(c, n, 'review')
+      await builderLane(c, 'implementer', { builder: c.agents.implementer.id, reviewer: 'Coder', cards: [n] })
       c.write('greet.js', "module.exports = (name) => 'Hi, ' + name.trim()\n")
       c.git('add', '-A')
       c.git('-c', 'user.name=Implementer', '-c', 'user.email=i@example.com', 'commit', '-qm', 'greet trims the name')
@@ -4119,13 +4126,15 @@ async function team(c) {
  * themselves. So the builder is started for its token, registers its lane, and is stopped again (HI-1939). Its reply.
  */
 async function builderLane(c, key, body) {
-  await c.startAgent(key)
+  const id = c.agents[key].id
+  const live = async () => (await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id)
+  // Already running when the setup started its card first (HI-2270: card-loop-design-check).
+  if (!(await live())) await c.startAgent(key)
   const r = await c.as(key, 'POST', '/v1/lanes', { project: 'alpha', ...body })
   if (r.status !== 200) throw new Error(`lane: ${r.status} ${JSON.stringify(r.body)}`)
-  const id = c.agents[key].id
   await c.inv('session:stop', c.alpha, id)
   const lib = require('../e2e/lib.cjs')
-  if (!(await lib.until(async () => !(await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
+  if (!(await lib.until(async () => !(await live()), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
   return r
 }
 /**
