@@ -133,8 +133,8 @@ const BLOCKED_ERR = 'Start-Process : This command cannot be run due to the error
 const SAC_ON = '\r\nHKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\CI\\Policy\r\n    VerifiedAndReputablePolicyState    REG_DWORD    0x1\r\n'
 
 /** Runs the checks on the fakes with these guest commands scripted: two installers in one build folder. */
-function runChecks(name: string, guest: Json[], extra: string[] = [], vars: Json = {}) {
-  const s = scratch(name, { guest })
+function runChecks(name: string, guest: Json[], extra: string[] = [], vars: Json = {}, fail: Json = {}) {
+  const s = scratch(name, { guest, ...fail })
   const previous = path.join(s.dir, 'builds', 'hive', 'previous', 'Hive-Setup-0.5.1.exe')
   fs.mkdirSync(path.dirname(previous))
   fs.writeFileSync(previous, 'MZ')
@@ -179,6 +179,20 @@ test('what the server gets: hive\'s own scripts and fakes mapped from this check
   assert.ok(!run.guests.some((g) => /wsb-mcp/i.test(g)), 'a script from the server\'s own folder')
   assert.match(run.log, new RegExp(`server ${FAKE_SERVER.replace(/[\\.]/g, '\\$&')}`))
   assert.strictEqual(run.json.meta.server, FAKE_SERVER)
+})
+
+test('a Sandbox whose stop is never confirmed: no other Sandbox starts after it, and the kinds left fail (one at a time)', () => {
+  const { s, r, json, log } = runChecks('cleanup-unconfirmed', [], [], {}, { stop: -1 })
+  assert.strictEqual(r.status, 1, r.stdout + r.stderr)
+  const state = s.read()
+  assert.strictEqual(state.calls.filter((c: Json[string][]) => c[0] === 'start').length, 1, 'a second Sandbox was started')
+  assert.strictEqual(state.sandboxes.length, 1)
+  const id = state.sandboxes[0]
+  const failed = json.checks.filter((c: Json) => !c.ok).map((c: Json) => `${c.name}: ${c.detail}`)
+  assert.ok(failed.includes(`CLEANUP: Sandbox ${id} confirmed stopped: CLEANUP NOT CONFIRMED: Sandbox ${id} may still be running`), failed.join('\n'))
+  assert.ok(failed.includes(`Step: upgrade Sandbox: not started: Sandbox ${id} may still be running, and only one runs at a time`), failed.join('\n'))
+  assert.match(log, /upgrade: not started: Sandbox .* may still be running/)
+  assert.match(log, /FAILED: /)
 })
 
 test('Smart App Control blocking the installers → one NOT RUN line with the reason, exit 2, no failed checks (#611)', () => {
@@ -291,18 +305,20 @@ test('what the Sandbox driver relies on in Hive\'s window, IPC and Agent API is 
   const api = fs.readFileSync(path.join(root, 'src', 'shared', 'api.ts'), 'utf8')
   const servers = fs.readFileSync(path.join(root, 'src', 'main', 'servers.ts'), 'utf8')
   const texts = ['Provider Setup', 'Choose providers', 'Check again', 'No coding agents are turned on', 'No coding agent CLI is installed', '{provider} is not installed', '— found via {source}', 'Use {name}', 'Workspace Overview', 'Task Board', 'Shared Notes', 'MCP Servers', 'Hive Assistant']
-  const classes = ['providers-banner', 'setup-tab', 'welcome', 'workbench', 'statusbar', 'status-item', 'data-git']
+  // Selectors, and the palette command it waits for before pressing Enter.
+  const classes = ['providers-banner', 'setup-tab', 'welcome', 'workbench', 'statusbar', 'status-item', 'data-git', 'palette-item', 'data-command', "'help.agentSetup'"]
   const channels = ['provider:info', 'settings:update', 'workspace:open']
   const routes = ['/v1/health', '/v1/providers', '/v1/status', '/v1/projects']
   const missing = [
     ...texts.filter((t) => !english.includes(t)).map((t) => `text "${t}" (locales/en)`),
-    ...classes.filter((c) => !ui.includes(c)).map((c) => `selector ${c} (src/renderer)`),
+    ...classes.filter((c) => !ui.includes(c)).map((c) => `selector or command ${c} (src/renderer)`),
     ...channels.filter((c) => !api.includes(`'${c}'`)).map((c) => `IPC ${c} (src/shared/api.ts)`),
     ...routes.filter((r) => !servers.includes(`'${r}'`)).map((r) => `route ${r} (src/main/servers.ts)`)
   ]
   assert.deepStrictEqual(missing, [])
   // What is checked is what the driver uses: each IPC channel and route above is in it.
   for (const x of [...channels, ...routes]) assert.ok(drive.includes(`'${x}'`), x)
+  for (const x of ['.palette-item.active[data-command="help.agentSetup"]', '.providers-banner', '.setup-tab', '[data-git]']) assert.ok(drive.includes(x), x)
   // The stand-in installer copies the e2e fake Claude Code from where the driver's scenario 3 expects it.
   for (const f of ['fake-claude/fake-claude.cjs', 'fake-bridge.cjs']) assert.ok(fs.existsSync(path.join(__dirname, 'e2e', f)), f)
 })

@@ -324,6 +324,14 @@ async function main(argv) {
   }
   for (const kind of p.ran) {
     const before = ctx.steps.length
+    // One Sandbox at a time: once a Sandbox's stop couldn't be confirmed it may still be running, so no other starts.
+    // The kinds left are failed steps (never a silent gap), and the report's CLEANUP check names the Sandbox.
+    if (ctx.leftRunning.length) {
+      const detail = `not started: Sandbox ${ctx.leftRunning.join(', ')} may still be running, and only one runs at a time`
+      log(`${kind}: ${detail}`)
+      ctx.steps.push({ scenario: SCENARIO_OF[kind], what: `${kind} Sandbox`, ok: false, detail })
+      continue
+    }
     try {
       await inSandbox(srvOpts, kind, start, bodies[kind], [p.root])
     } catch (e) {

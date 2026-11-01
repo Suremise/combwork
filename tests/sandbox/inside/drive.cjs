@@ -30,6 +30,18 @@ const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.strin
 const check = (id, name, ok, detail) => { res.checks.push({ id, scenario: Number(String(id).split('.')[0]) || 0, name, ok: !!ok, detail: ok ? undefined : String(detail ?? '').slice(0, 1500) }); save() }
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 const until = async (fn, ms, every = 250) => { const t0 = Date.now(); for (;;) { const v = await fn().catch(() => null); if (v) return v; if (Date.now() - t0 > ms) return null; await sleep(every) } }
+/** What read() gives once it has settled: the same (as JSON) on three polls in a row, within ms; else null. */
+const settled = async (read, ms) => {
+  let last
+  let same = 0
+  const got = await until(async () => {
+    const v = JSON.stringify(await read())
+    same = v !== undefined && v === last ? same + 1 : 0
+    last = v
+    return same >= 2 && { value: JSON.parse(v) }
+  }, ms)
+  return got ? got.value : null
+}
 const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: 60_000 }).trim()
 const readConfig = () => { try { return JSON.parse(fs.readFileSync(path.join(PROFILE, 'config.json'), 'utf8')) } catch { return null } }
 
@@ -55,17 +67,21 @@ async function launch() {
   res.facts.readyMs = Date.now() - t0
 }
 
+/** The window has painted what it has and runs no finite animation (a dialog's or a theme's fade; a spinner's never ends), within 5 s. */
+const painted = () => until(() => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(document.getAnimations().every(a => a.playState !== 'running' || a.effect?.getTiming().iterations === Infinity)))))), 5000)
+
 async function shot(name) {
   const file = `${prefix}-${name}.png`
-  await sleep(600)
+  await painted()
   await page.screenshot({ path: path.join(OUT, file) })
   res.shots.push(file)
   save()
 }
 
+/** Sets the theme, and waits until the window shows it and Hive has saved it (it saves 300 ms after a change). */
 async function theme(t) {
   await inv('settings:update', { appearance: { theme: t } })
-  await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === t, 5000)
+  await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === t && readConfig()?.settings?.appearance?.theme === t, 5000)
 }
 
 async function api(route) {
@@ -80,10 +96,12 @@ async function providerSetup() {
   if (!(await dialog.count())) {
     await page.keyboard.press('Escape')
     await page.keyboard.press('Control+Shift+P')
-    await sleep(400)
-    await page.keyboard.type('Provider Setup')
-    await sleep(400)
-    await page.keyboard.press('Enter')
+    // Typed only once the palette's box has the focus, and Enter only once Provider Setup's command is the one chosen.
+    const typing = await until(async () => page.evaluate(() => !!document.activeElement?.closest('.palette')), 10_000)
+    if (typing) {
+      await page.keyboard.type('Provider Setup')
+      if (await until(async () => (await page.locator('.palette-item.active[data-command="help.agentSetup"]').count()) === 1, 10_000)) await page.keyboard.press('Enter')
+    }
   }
   return (await until(async () => (await dialog.count()) === 1, 10_000)) ? dialog : null
 }
@@ -179,12 +197,14 @@ const steps = {
     await inv('workspace:open', ws)
     const opened = await until(async () => (await page.locator('.welcome').count()) === 0 && fs.existsSync(path.join(ws, '.hive')), 30_000)
     check('6.workspace-opens', 'A new workspace opens (an empty folder with one project folder)', opened, 'still on the welcome screen')
-    await sleep(3000)
     const tree = (dir, depth) => {
       if (!fs.existsSync(dir)) return null
       return fs.readdirSync(dir, { withFileTypes: true }).map(e => (e.isDirectory() ? { [e.name]: depth > 1 ? tree(path.join(dir, e.name), depth - 1) : '(folder)' } : e.name))
     }
-    res.facts.hive = tree(path.join(ws, '.hive'), 3)
+    // Recorded once Hive has finished setting the workspace up: workspace.json written and the .hive folder unchanged
+    // over three reads (its bundled skills and modes go in after it opens).
+    await until(async () => { try { return !!JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'workspace.json'), 'utf8')) } catch { return false } }, 30_000)
+    res.facts.hive = (await settled(async () => tree(path.join(ws, '.hive'), 3), 30_000)) || tree(path.join(ws, '.hive'), 3)
     res.facts.projectHive = tree(path.join(ws, 'demo', '.hive'), 1)
     try { res.facts.workspaceJson = JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'workspace.json'), 'utf8')) } catch { /* recorded as missing */ }
     check('6.hive-folder', 'Hive creates the workspace\'s .hive folder', Array.isArray(res.facts.hive), 'no .hive folder')
@@ -199,8 +219,10 @@ const steps = {
       const slug = name.toLowerCase().replace(/\s+/g, '-')
       try {
         await page.getByRole('button', { name, exact: true }).first().click({ timeout: 5000 })
-        await sleep(1500)
-        res.facts.views[name] = (await page.evaluate(() => (document.querySelector('.workbench') || document.body).innerText)).slice(0, 1500)
+        // Read once the view has loaded: its text the same over three polls.
+        const text = await settled(() => page.evaluate(() => (document.querySelector('.workbench') || document.body).innerText), 15_000)
+        if (text === null) throw new Error(`the ${name} view didn't settle within 15 s`)
+        res.facts.views[name] = text.slice(0, 1500)
         await shot(slug)
         shown++
       } catch (e) {
@@ -246,7 +268,7 @@ const steps = {
     process.exitCode = 1
   } finally {
     if (app) {
-      await sleep(1000) // Hive saves settings 300 ms after a change
+      // Every settings change above waited for Hive to save it (mark, theme), so it can close now.
       await app.close().catch(e => { res.closeError = String(e) })
     }
     save()
