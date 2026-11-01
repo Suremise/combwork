@@ -4143,21 +4143,33 @@ async function builderLane(c, key, body) {
   if (!(await lib.until(async () => !(await live()), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
   return r
 }
+/** The states of a delivery that has reached its agent's current launch, or been read: never uncertain or ended. */
+const DELIVERY_REACHED = ['offered', 'received', 'acked']
+/**
+ * Whether Hive's start of card `n` has landed in the builder's current launch (HI-2278): the card in Doing, the builder
+ * running and past starting, and the start's task delivery for `n` offered (or read) with its doorbell, which names its
+ * id ("… 1 task (AL-1) (m4) …"), in what the current launch shows (`shown`: its terminal, which Hive drops as a process
+ * exits, #577). A delivery uncertain or ended, one still queued, or one whose line only an earlier launch showed isn't it.
+ */
+function laneStartLanded({ column, live, deliveries, shown }, n) {
+  if (column !== 'doing' || !live || live.status === 'starting') return false
+  return (deliveries ?? []).some((x) => x.kind === 'task' && x.card === n && DELIVERY_REACHED.includes(x.state) && /^m\d+$/.test(x.id) && new RegExp(`\\b${x.id}\\b`).test(shown ?? ''))
+}
 /**
  * Hive's own start of a lane's first card, waited for (HI-2278): over a card in Todo, Hive starts it on the stopped builder
- * (HI-2029, laneStarts) about a second after builderLane. The card is then in Doing, its builder running and its start
- * handed to it (a delivery past queued, its doorbell rung), so nothing of the start is still on its way as the subject
- * looks at the board.
+ * (HI-2029, laneStarts) about a second after builderLane. Waited for until it has landed (laneStartLanded), so nothing of
+ * the start is still on its way as the subject looks at the board.
  */
 async function hiveStartedLaneCard(c, key, n) {
   const lib = require('../e2e/lib.cjs')
-  const started = async () => {
-    if ((await c.api('GET', `/v1/tasks/${n}`)).body?.column !== 'doing') return false
-    const s = await coderLive(c, c.agents[key])
-    if (!s || s.status === 'starting') return false
-    return (await c.deliveries(key)).some((x) => x.kind === 'task' && x.card === n && x.state !== 'queued')
-  }
-  if (!(await lib.until(started, 90000))) throw new Error(`setup: Hive didn't start #${n} on ${key} (its lane's first card, HI-2029)`)
+  const agent = c.agents[key]
+  const landed = async () => laneStartLanded({
+    column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column,
+    live: await coderLive(c, agent),
+    deliveries: await c.deliveries(key),
+    shown: lib.plainText(String(await c.inv('pty:buffer', lib.ptyKey(c.alpha, agent.id)).catch(() => '')))
+  }, n)
+  if (!(await lib.until(landed, 90000))) throw new Error(`setup: Hive's start of #${n} on ${key} (its lane's first card, HI-2029) didn't land in its launch: ${JSON.stringify({ column: (await c.api('GET', `/v1/tasks/${n}`)).body?.column, status: (await coderLive(c, agent))?.status ?? null, deliveries: (await c.deliveries(key)).filter((x) => x.card === n) })}`)
 }
 /**
  * Two running lanes: Coder and Implementer on greet.js (#a, #b), Builder2 and Reviewer2 on the README (#c, and #d if
@@ -5268,4 +5280,4 @@ module.exports.SCENARIOS.push({
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
 })
 
-module.exports.helpers = { readOf, called, ran, asksTheUser, questionsToUser, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { laneStartLanded, readOf, called, ran, asksTheUser, questionsToUser, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
