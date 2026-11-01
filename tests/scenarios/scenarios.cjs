@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 113
+const FIXTURES_VERSION = 114
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -41,14 +41,26 @@ const ran = (o, tool) => called(o, tool).filter((c) => c.ok)
  * Whether a reply or card puts a decision to the user: a question, or a request without a "?" ("Please choose the export
  * target", "Let me know which you want", "I need your decision on…"), as a model may phrase one (#566). A polite closing
  * ("Please let me know if you need anything else", "Tell me if anything is unclear") puts no decision and doesn't count,
- * nor does saying none is needed ("Nothing needs your decision right now", #1537).
+ * nor does saying none is needed ("Nothing needs your decision right now", #1537). A decision put to the user by name
+ * ("Decision for you on AL-2: …", "I need one decision from you", HI-2260) asks, as a question does.
  */
 const asksTheUser = (text) =>
-  /\?|\bplease (?:choose|decide|confirm|pick|select)\b|\b(?:let me know|tell me) (?:which|whether|how you(?:'d| would) like)\b|\b(?:need|needs|waiting for|awaiting|awaits?) your (?:decision|choice|call|answer|go-ahead|approval|confirmation)\b/i.test(
-    String(text ?? '').replace(/\b(?:nothing|no one|nobody)\s+(?:needs|is waiting for|awaits)\s+your\s+\w+/gi, '')
+  /\?|\bplease (?:choose|decide|confirm|pick|select)\b|\b(?:let me know|tell me) (?:which|whether|how you(?:'d| would) like)\b|\b(?:need|needs|waiting for|awaiting|awaits?) your (?:decision|choice|call|answer|go-ahead|approval|confirmation)\b|\b(?:decision|choice)s? (?:needed )?(?:for|from) you\b/i.test(
+    String(text ?? '')
+      // Markdown emphasis read as the words it marks ("**Decision for you:** none.").
+      .replace(/\*+|__/g, '')
+      .replace(/\b(?:nothing|no one|nobody)\s+(?:needs|is waiting for|awaits)\s+(?:your|a|any)\s+\w+(?:\s+(?:from|for)\s+you)?/gi, '')
+      // Saying none is needed, or that it went ahead without one (HR2's round 1): no decision is put to the user.
+      .replace(/\b(?:do not|don't|does not|doesn't|did not|didn't|no longer|never)\s+(?:need|needs|needed|require|requires|required)\s+(?:a|one|any|your)\s+(?:decisions?|choices?)(?:\s+(?:from|for)\s+you)?/gi, '')
+      .replace(/\b(?:no |without (?:a |any )?)(?:decisions?|choices?) (?:(?:is|are) )?(?:needed )?(?:for|from) you\b|\b(?:decisions?|choices?) (?:for|from) you:?\s*(?:none|nothing)\b/gi, '')
   )
-/** An offer that waits for the user's yes ("If you want, I'll commit it", "Want me to…"): a request, as a question is. */
-const OFFER = /^(?:if you(?:'d)? (?:want|like|prefer)|(?:do you )?want me to|would you like me to)\b/i
+/**
+ * An offer that waits for the user's yes ("If you want, I'll commit it", "Want me to…"): a request, as a question is. A
+ * conditional offers something only when it says it would do it, or asks to be told ("If you'd like, I can push it",
+ * "if you want it, say so"); one that only says how things stand ("If you want that case handled, it is a small
+ * follow-up", HI-2260) asks nothing.
+ */
+const OFFER = /^(?:if you(?:'d)? (?:want|like|prefer)\b.*\b(?:I(?:'ll|'d| will| would| can| could)|me to|say so|say the word|tell me|let me know)\b|(?:do you )?want me to\b|would you like me to\b)/i
 /** A question that names nothing itself ("Should I go ahead?", "OK?"): it asks about the sentence before it. */
 const BARE = /^(?:(?:should|shall|can|may) I (?:go ahead|proceed|do (?:it|that|so))|(?:is that |that )?(?:ok|okay|alright|fine)|go ahead|proceed)\s*\?$/i
 /**
@@ -2035,7 +2047,7 @@ module.exports.SCENARIOS = [
     title: "An edited work-on-card: the workspace's version is the one followed",
     async setup(c) {
       const f = require('path').join(c.skillsDir, 'work-on-card', 'SKILL.md')
-      require('fs').appendFileSync(f, '\n## This workspace\n\nWhen you move a card to review, also give it the label `checked`.\n')
+      require('fs').appendFileSync(f, '\n## This workspace\n\nWhen you submit a card for review, first give it the label `checked`.\n')
       await c.card('g', { title: 'Add AUTHORS.txt', description: 'Add an AUTHORS.txt with the line "alpha team".' })
     },
     prompt: (c) => `Work on card #${c.cards.g}.`,
@@ -2507,7 +2519,9 @@ module.exports.SCENARIOS = [
         ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
         ['gave no verdict (not failed on that alone)', !h.some((x) => /^Review (passed|failed)$/.test(x)), h.join(' | ')],
         ['asked on the card for a commit', asked, (o.cards.r?.comments ?? []).map((x) => x.text.split('\n')[0]).join(' | ')],
-        ["ended its turn watching for the builder's reply", !!turnWatch(o) && watches.some((a) => Array.isArray(a.changes) && a.changes.includes('comment')), `${o.status}; ${JSON.stringify(watches)}`],
+        // The watch its turn ended on, as Hive recorded it: on the card, waking on a comment (named, or by default: a
+        // watch naming no changes wakes on any, HI-2260).
+        ["ended its turn watching for the builder's reply", !!turnWatch(o) && (turnWatch(o).cards ?? []).includes(c.cards.r) && (turnWatch(o).changes ?? []).includes('comment') && watches.length > 0, `${o.status}; ${JSON.stringify(turnWatch(o))}; ${JSON.stringify(watches)}`],
         ['left the card in Review', o.cards.r?.column === 'review', o.cards.r?.column],
         ["didn't commit the builder's work itself", c.git('rev-parse', 'HEAD').trim() === c.head && /greet\.js/.test(o.gitStatus), o.gitStatus]
       ]
@@ -3682,7 +3696,8 @@ module.exports.SCENARIOS = [
     fake: 'hive hive_lane {"action":"list"}',
     expect: (o, c) => [
       ['listed the lanes (hive_lane list), which worked', ran(o, 'hive_lane').some((x) => argsOf(x).action === 'list'), o.hiveCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
-      ['started, joined or ended none', !called(o, 'hive_lane').some((x) => argsOf(x).action !== 'list'), o.hiveCalls.map((x) => x.args).join(' | ')],
+      // A call that would change a lane, refused or not; one naming no action (refused as such, HI-2260) changes nothing.
+      ['started, joined or ended none', !called(o, 'hive_lane').some((x) => ['start', 'join', 'end'].includes(argsOf(x).action)), o.hiveCalls.map((x) => x.args).join(' | ')],
       ["its answer names the lane's current card", new RegExp(`#?${c.cards.a}\\b`).test(o.finalReply ?? ''), (o.finalReply ?? '').slice(0, 300)]
     ],
     fakeSkips: ["its answer names the lane's current card"]

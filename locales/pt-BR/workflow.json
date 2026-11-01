@@ -281,7 +281,7 @@
   "workflow.refused.move.doingNobody.next": "{reader, select, you {Escolha: ninguém nele, um agente nele ou um agente iniciado nele.} other {Pergunte ao usuário o que ele quer: ninguém nele (mova-o de novo com override e o motivo dele), um agente nele (agent) ou um agente iniciado nele (hive_start_task).}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {Essas regras são definidas em Controle de versão, onde você pode alterá-las.} other {Essas regras são definidas em Controle de versão, onde o usuário pode alterá-las.}}",
   "workflow.refused.move.needsOverride.message": "Mover o cartão {card} para {stage} pula estas regras: {rules}.",
-  "workflow.refused.move.needsOverride.next": "{reader, select, you {Movê-lo mesmo assim precisa do seu motivo: um que você deu, ou um que você dê depois de saber quais regras isso pula.} other {Mova-o mesmo assim só com o motivo do usuário: um que ele deu, ou um que ele dê depois de saber quais regras isso pula.}}",
+  "workflow.refused.move.needsOverride.next": "{reader, select, you {Movê-lo mesmo assim precisa do seu motivo: um que você deu, ou um que você dê depois de saber quais regras isso pula.} other {Mova-o mesmo assim só com o motivo do usuário. Um que ele deu junto com o pedido basta (“fiz o merge à mão”, por exemplo): mova-o de novo com override e esse motivo, nas palavras dele. Sem nenhum, diga quais regras isso pula e peça o dele.}}",
   "workflow.refused.move.noStage.change": "As etapas de um projeto seguem as opções de Controle de versão.",
   "workflow.refused.move.noStage.message": "{card} não pode ir para {stage}: as regras deste projeto não têm essa etapa.",
   "workflow.refused.move.noStage.next": "Mova-o para uma das etapas: {stages}.",

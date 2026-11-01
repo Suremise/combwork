@@ -281,7 +281,7 @@
   "workflow.refused.move.doingNobody.next": "{reader, select, you {担当者なし、エージェントを割り当てる、エージェントを開始する、のいずれかを選んでください。} other {ユーザーにどれを望むか確認してください：担当者なし（overrideとユーザーの理由を付けて、もう一度移動）、エージェントを割り当てる（agent）、エージェントを開始する（hive_start_task）。}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {これらのルールは「バージョン管理」で設定され、そこで変更できます。} other {これらのルールは「バージョン管理」で設定され、ユーザーが変更できます。}}",
   "workflow.refused.move.needsOverride.message": "{card}を「{stage}」に移動すると、次のルールをスキップします：{rules}。",
-  "workflow.refused.move.needsOverride.next": "{reader, select, you {それでも移動するには理由が必要です。依頼と一緒に示した理由か、どのルールをスキップするかを知った後に示す理由です。} other {ユーザーの理由がある場合だけ、それでも移動してください。依頼と一緒に示された理由か、どのルールをスキップするかを伝えた後に示された理由です。}}",
+  "workflow.refused.move.needsOverride.next": "{reader, select, you {それでも移動するには理由が必要です。依頼と一緒に示した理由か、どのルールをスキップするかを知った後に示す理由です。} other {ユーザーの理由がある場合だけ、それでも移動してください。依頼と一緒に示された理由（「手動でマージした」など）で十分です。その理由をユーザーの言葉のまま override に付けて、もう一度移動してください。理由がなければ、どのルールをスキップするかを伝えて理由を尋ねてください。}}",
   "workflow.refused.move.noStage.change": "プロジェクトのステージは「バージョン管理」のオプションに従います。",
   "workflow.refused.move.noStage.message": "{card}は「{stage}」に移動できません。このプロジェクトのルールにはそのステージがありません。",
   "workflow.refused.move.noStage.next": "次のいずれかのステージに移動してください：{stages}。",
