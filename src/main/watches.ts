@@ -2,7 +2,8 @@ import { randomBytes } from 'crypto'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { projectAgents } from '../shared/defaults'
-import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
+import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type ReviewWhere, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
+import { loopReviewerOf, poolCard } from './loopReviewer'
 import { agentBusy, agentEvent, agentLimitLine, agentMarkOf, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, readSavedAgentMark, replyFirstLine, replyPart, REPLY_CHARS, type AgentEvent, type AgentMark, type AgentNow, type AgentWatchCondition, type WatchedAgent } from '../shared/agentWatch'
 import { isProjectId, type ProjectIdIndex } from '../shared/projectIds'
 import { rebase } from '../shared/movePaths'
@@ -2786,6 +2787,30 @@ async function evaluate(ws: WorkspaceService): Promise<void> {
   await evaluateUsage(store).catch((e) => log.warn('checking usage watches', e))
 }
 
+/**
+ * Where each of a timed-out card watch's cards is now, when it is in Review (HI-2295): its limit line says so instead of
+ * telling the agent to ask the user. From the board as it is: the card's review (being reviewed), else for a pool lane's
+ * card its assigned reviewer or none yet (loopReviewerOf), else waiting for its reviewer. Not a card the watcher reviews
+ * itself, nor one that left the watch.
+ */
+async function reviewWhere(store: Store, rec: WatchRecord): Promise<ReviewWhere[]> {
+  const gone = new Set((rec.released ?? []).map((r) => r.number))
+  const out: ReviewWhere[] = []
+  for (const n of rec.cond.cards) {
+    if (gone.has(n)) continue
+    const card = await cardIn(store, n, rec.scope).catch(() => null)
+    if (!card || card.archived || card.column !== 'review') continue
+    if (card.review) {
+      if (rec.scope !== null && card.review.agent === rec.agentId) continue
+      out.push({ number: n, state: 'reviewing', reviewer: card.review.agentName || card.review.agent })
+    } else if (poolCard(store.ws, card)) {
+      const r = await loopReviewerOf(store.ws, card).catch(() => null)
+      out.push(r ? { number: n, state: 'assigned', reviewer: r.name } : { number: n, state: 'pool' })
+    } else out.push({ number: n, state: 'review' })
+  }
+  return out
+}
+
 /** Told when watched cards move or change hands (after the watches have seen it): a pending quit checks again. */
 let watchedCardsMoved: (() => void) | null = null
 export function onWatchedCardsMoved(fn: () => void): void {
@@ -2800,7 +2825,8 @@ export async function tick(now = Date.now()): Promise<void> {
       let changed = store.dirty
       for (const rec of store.list) {
         if (!rec.fired && Date.parse(rec.limitAt) <= now) {
-          rec.fired = { line: lineFor(store, rec, () => (rec.lanes ? laneLimitLine(rec.lanes, rec.limitMinutes, rec.cond.cards, rec.agents?.agents) : rec.agents ? agentLimitLine(rec.agents, rec.limitMinutes) : usageOnly(rec) ? usageLimitLine(rec.usage!, rec.limitMinutes) : limitLine(rec.cond, rec.limitMinutes, rec.released ?? []))), at: new Date(now).toISOString(), cards: [] }
+          const where = rec.lanes || rec.agents || usageOnly(rec) ? [] : await reviewWhere(store, rec)
+          rec.fired = { line: lineFor(store, rec, () => (rec.lanes ? laneLimitLine(rec.lanes, rec.limitMinutes, rec.cond.cards, rec.agents?.agents) : rec.agents ? agentLimitLine(rec.agents, rec.limitMinutes) : usageOnly(rec) ? usageLimitLine(rec.usage!, rec.limitMinutes) : limitLine(rec.cond, rec.limitMinutes, rec.released ?? [], where))), at: new Date(now).toISOString(), cards: [] }
           changed = true
         }
       }

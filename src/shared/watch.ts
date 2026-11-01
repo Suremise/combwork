@@ -793,18 +793,52 @@ export function releasedLine(released: Released[]): string {
   return `[Hive] ${cards(released.map((r) => r.number))} left your watch (${released.every(over) ? 'done, or its lane ended' : 'reassigned, or reviewed by another'})${tail}`
 }
 
-/** The line Hive types when a watch's overall limit passes with no change. */
-export function limitLine(cond: WatchCondition, minutes: number, released: Released[] = []): string {
+/**
+ * Where a timed-out watch's card is now, when it is in Review (HI-2295), read from the board as the limit passes: being
+ * reviewed (`reviewer`: who), given by the reviewer pool to a reviewer that hasn't started (`assigned`), waiting for the
+ * pool to give it to one (`pool`), or waiting for its reviewer (`review`).
+ */
+export interface ReviewWhere {
+  number: number
+  state: 'reviewing' | 'assigned' | 'pool' | 'review'
+  reviewer?: string
+}
+
+function wherePart(w: ReviewWhere): string {
+  const ref = cardRef(w.number)
+  return w.state === 'reviewing'
+    ? `${ref} is in Review, being reviewed by ${shortName(w.reviewer ?? '')}`
+    : w.state === 'assigned'
+      ? `${ref} is in Review: the reviewer pool gave it to ${shortName(w.reviewer ?? '')}, who hasn't started yet`
+      : w.state === 'pool'
+        ? `${ref} is in Review, waiting for the reviewer pool to give it to a reviewer`
+        : `${ref} is in Review, waiting for its reviewer`
+}
+
+/**
+ * The line Hive types when a watch's overall limit passes with no change. Cards that left the watch meanwhile (#420) are
+ * told first: drop them. A card in Review (HI-2295, `where`) is said to be there, by whom it is reviewed or that it waits for
+ * a reviewer: a review on its way is nothing to tell the user, so only the other cards ask the agent to.
+ */
+export function limitLine(cond: WatchCondition, minutes: number, released: Released[] = [], where: ReviewWhere[] = []): string {
   const dur = minutes >= 60 ? `${Math.round((minutes / 60) * 10) / 10} h` : `${minutes} min`
-  if (!released.length) return `[Hive] No change on ${cards(cond.cards)} in ${dur}: your card watch has ended. Tell the user (hive_notify) and ask what to do.`
-  // Cards that left the watch meanwhile (#420) are told too: drop them; the rest timed out.
-  const one = released.length === 1
-  const tail = `. No change on ${cards(cond.cards)} in ${dur}: your card watch has ended. Drop ${one ? 'the first' : 'those'} from your list; for the rest, tell the user (hive_notify) and ask what to do.`
+  const gone = new Set(released.map((r) => r.number))
+  const inReview = where.filter((w) => cond.cards.includes(w.number) && !gone.has(w.number))
+  const reviewed = new Set(inReview.map((w) => w.number))
+  const rest = cond.cards.filter((n) => !gone.has(n) && !reviewed.has(n))
+  const steps: string[] = []
+  if (released.length) steps.push(`drop ${released.length === 1 ? 'the first' : 'those'} from your list`)
+  if (inReview.length) steps.push(`watch ${cards(inReview.map((w) => w.number))} again for ${inReview.length === 1 ? 'its' : 'their'} verdict (in a card loop, Hive wakes you with it); don't tell the user about ${inReview.length === 1 ? 'it' : 'them'}`)
+  if (rest.length || !steps.length) steps.push(`${steps.length ? 'for the rest, ' : ''}tell the user (hive_notify) and ask what to do`)
+  const todo = steps.join('; ')
+  const ended = `No change on ${cards(cond.cards)} in ${dur}: your card watch has ended. `
+  const tailOf = (full: boolean): string => `${ended}${inReview.length ? `${full ? inReview.map(wherePart).join('; ') : `${cards(inReview.map((w) => w.number))} ${inReview.length === 1 ? 'is' : 'are'} in Review`}. ` : ''}${todo[0].toUpperCase()}${todo.slice(1)}.`
   for (const full of [true, false]) {
-    const line = `[Hive] ${released.map((r) => releasedPart(r, full)).join('; ')}${tail}`
+    const head = released.length ? `${released.map((r) => releasedPart(r, full)).join('; ')}. ` : ''
+    const line = `[Hive] ${head}${tailOf(full)}`
     if (jsonBytes(line) <= WAKE_MAX_BYTES) return line
   }
-  return `[Hive] ${cards(released.map((r) => r.number))} left your watch (reassigned, or reviewed by another)${tail}`
+  return `[Hive] ${released.length ? `${cards(released.map((r) => r.number))} left your watch (reassigned, or reviewed by another). ` : ''}${tailOf(false)}`
 }
 
 const cards = (ns: number[]): string => ns.map((n) => `${cardRef(n)}`).join(', ')
