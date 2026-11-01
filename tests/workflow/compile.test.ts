@@ -26,6 +26,19 @@ describe('compilation', () => {
     }
   })
 
+  it('an unread decision holds a submit with any review or a merge step; all off and Solo stay free (HI-2275)', () => {
+    const holds = (o: ReturnType<typeof allOff>) => mustCompile(o).guards.submit.includes('submit.decisionsReceived')
+    const off = allOff('git')
+    expect(holds(off)).toBe(false)
+    expect(holds(allOff('none'))).toBe(false)
+    expect(holds(preset('git', 'solo'))).toBe(false)
+    expect(holds({ ...off, finish: 'committed' })).toBe(false)
+    expect(holds({ ...off, finish: 'hiveMerges', folder: 'slots' })).toBe(true)
+    expect(holds({ ...off, finish: 'agentMerges', folder: 'slots' })).toBe(true)
+    expect(holds(preset('git', 'pair'))).toBe(true)
+    expect(holds(preset('none', 'team'))).toBe(true)
+  })
+
   it('None rulesets hold no guard that needs Git: no clean, ready or trailer', () => {
     const r = mustCompile(preset('none', 'team', { quick: ['lint'], tests: [] }))
     expect(r.guards.submit).not.toContain('submit.clean')

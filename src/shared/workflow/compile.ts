@@ -102,7 +102,9 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   // G20 (HI-1367): each card's focused tests are chosen, or named by its builder, before it goes to review.
   if (o.focusedTests && o.finish === 'hiveMerges') g.submit.push('submit.focusedChosen')
   if (o.stopOwnRuns) g.submit.push('submit.ownRunsStopped')
-  if (review) g.submit.push('submit.decisionsReceived')
+  // A decision the builder hasn't read holds its submit with any review or a merge step (SPEC §16.5.3, HI-2275): All off
+  // and Solo (committed) stay free.
+  if (review || o.finish === 'hiveMerges' || o.finish === 'agentMerges') g.submit.push('submit.decisionsReceived')
   if (o.finish === 'hiveMerges') g.requeue.push('submit.notDuplicate', 'requeue.allowed', ...(review ? (['integrate.approved'] as const) : []))
   if (agent) {
     if (o.noSelfReview) g.startReview.push('review.notAuthor')

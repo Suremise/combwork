@@ -2066,7 +2066,7 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
 | `submit.checksPassed` | Every configured pre-review check has a passing, counted `CheckRan` on this exact revision (§16.13). | revisions | G3 / N3 |
 | `submit.identity` | Every commit of the change is authored with the project's identity. | authorship | G12 |
 | `submit.ownRunsStopped` | The agent has no runs or background processes it started still running (Progress, background tasks). | — | G13 |
-| `submit.decisionsReceived` | The builder has received every decision on the card (§16.4.6). | — | Any review, and **any ruleset with a merge step** (Hive merges, the agent merges), so a no-review card a decision returned to Active reads it before submitting again; all off stays free [#1118 20 Oct; P4 applies it, the spike holds it with review only] |
+| `submit.decisionsReceived` | The builder has received every decision on the card (§16.4.6). | — | Any review, and **any ruleset with a merge step** (Hive merges, the agent merges), so a no-review card a decision returned to Active reads it before submitting again; all off and Solo (committed) stay free [#1118 20 Oct; HI-2275 applies it] |
 | `review.notAuthor` | The reviewer isn't among the card's builders (Hive's records). | authorship | G2 / N2 (forced on with a reviewer) |
 | `review.decisionsReceived` | The reviewer has received every decision on the card (§16.4.6). | — | Any review |
 | `verdict.reviewing` | The reviewer started a review (`ReviewStarted`) of the submission it names. | — | Any reviewer agent |

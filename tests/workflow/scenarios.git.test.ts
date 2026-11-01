@@ -60,6 +60,24 @@ describe('the agent merges with no review and no OK before merging (no Approved 
     expect(e.wf.state(card).stage).toBe('done')
   })
 
+  it('a decision the builder hasn\'t read refuses its submit, with no review too (HI-2275)', async () => {
+    const e = noReview()
+    const { card } = await started(e)
+    moved(await e.wf.recordDecision(card.key, 'Use the short name'))
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.decisionsReceived')
+    expect(e.wf.state(card).stage).toBe('active')
+    expect(e.wf.state(card).latest).toBeFalsy()
+    await e.wf.received(card.key, 'B1')
+    moved(await e.wf.submit(card.key, B1, { summary: 'meets it' }))
+    // One recorded while the submit is on its way: refused until received.
+    const { card: c2 } = await started(e, 'Second')
+    e.wf.cfg.hooks = { beforeWrite: async () => void (await e.wf.recordDecision(c2.key, 'Changed my mind')) }
+    refusedBy(await e.wf.submit(c2.key, B1, { summary: 'x' }), 'submit.decisionsReceived')
+    e.wf.cfg.hooks = {}
+    await e.wf.received(c2.key, 'B1')
+    moved(await e.wf.submit(c2.key, B1, { summary: 'x' }))
+  })
+
   it('a merge outside Hive while it waits in Active is found and makes it Done', async () => {
     const e = noReview()
     const { card } = await started(e)
