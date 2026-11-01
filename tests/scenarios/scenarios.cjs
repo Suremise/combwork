@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Hive's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 117
+const FIXTURES_VERSION = 118
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -3212,16 +3212,22 @@ module.exports.SCENARIOS = [
     id: 'card-loop-design-first',
     title: "A card loop builder asked for a design first (#1382): it arms its watch, posts the design for its reviewer's check with hive_loop_step, and builds nothing yet",
     files: { 'cache.js': 'module.exports = new Map()\n' },
+    // HI-2278: Hive starts the lane's first card on Coder itself (HI-2029, laneStarts) once builderLane has stopped it, as
+    // card-loop-submit-watch's (HI-2215): the harness's own start raced it, and lost with 3 s between them. So the card's
+    // decision says to have a design checked first, which a model reads once Hive's line has started it; the prompt below
+    // is a model's only as the line says it, and the fake is typed its steps after it, the card already in Doing.
+    startedByHive: true,
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'coder' })
+      await c.inv('tasks:update', n, { decision: 'Have a design checked by the reviewer before you build anything.' })
       // The builder's lane, Implementer reviewing (registered as the card-loop skill does).
-      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n] })
+      await builderLane(c, 'coder', { builder: c.agents.coder.id, reviewer: 'Implementer', cards: [n], rounds: 10, waitMinutes: 360 })
     },
     prompt: (c) =>
-      `You are the builder of card #${c.cards.d} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). The card's decision: have a design checked before you build. Start the card, post your design for the reviewer's check, and wait for it as your loop says. Build nothing yet.`,
+      `You are the builder of card #${c.cards.d} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Hive has started the card for you. The card's decision: have a design checked before you build. Post your design for the reviewer's check, and wait for it as your loop says. Build nothing yet.`,
     fake: (c) =>
-      `skill card-loop then hive hive_start_card {"card":"#${c.cards.d}"} then hive hive_wait_for_tasks {"cards":[${c.cards.d}],"changes":["comment"],"wake":true,"limitMinutes":30} then hive hive_loop_step ${JSON.stringify({ card: `#${c.cards.d}`, step: 'design', text: 'Design: entries keep their time; reads past 5 minutes miss; a write deletes its key. A test for each.' })}`,
+      `skill card-loop then hive hive_wait_for_tasks {"cards":[${c.cards.d}],"changes":["comment"],"wake":true,"limitMinutes":30} then hive hive_loop_step ${JSON.stringify({ card: `#${c.cards.d}`, step: 'design', text: 'Design: entries keep their time; reads past 5 minutes miss; a write deletes its key. A test for each.' })}`,
     expect: (o, c) => {
       const tools = o.hiveCalls.map((x) => x.tool)
       const posted = ran(o, 'hive_loop_step').filter((x) => argsOf(x).step === 'design')
@@ -4138,9 +4144,26 @@ async function builderLane(c, key, body) {
   return r
 }
 /**
+ * Hive's own start of a lane's first card, waited for (HI-2278): over a card in Todo, Hive starts it on the stopped builder
+ * (HI-2029, laneStarts) about a second after builderLane. The card is then in Doing, its builder running and its start
+ * handed to it (a delivery past queued, its doorbell rung), so nothing of the start is still on its way as the subject
+ * looks at the board.
+ */
+async function hiveStartedLaneCard(c, key, n) {
+  const lib = require('../e2e/lib.cjs')
+  const started = async () => {
+    if ((await c.api('GET', `/v1/tasks/${n}`)).body?.column !== 'doing') return false
+    const s = await coderLive(c, c.agents[key])
+    if (!s || s.status === 'starting') return false
+    return (await c.deliveries(key)).some((x) => x.kind === 'task' && x.card === n && x.state !== 'queued')
+  }
+  if (!(await lib.until(started, 90000))) throw new Error(`setup: Hive didn't start #${n} on ${key} (its lane's first card, HI-2029)`)
+}
+/**
  * Two running lanes: Coder and Implementer on greet.js (#a, #b), Builder2 and Reviewer2 on the README (#c, and #d if
- * given). Nothing in Doing unless asked (`aColumn`): the agents aren't running, and a card in Doing would be stalled.
- * Each lane is registered as its builder registers its own (builderLane).
+ * given). Each lane is registered as its builder registers its own (builderLane). Hive then starts each lane's first card
+ * in Todo on its builder (HI-2029), as in life, and that start is waited for (HI-2278: it otherwise raced the subject):
+ * #c, and #a unless `aColumn` puts it elsewhere (Review or Doing: then Coder isn't running, its lane not started by Hive).
  */
 async function twoLanes(c, { d = false, aColumn = 'todo' } = {}) {
   await team(c)
@@ -4148,7 +4171,10 @@ async function twoLanes(c, { d = false, aColumn = 'todo' } = {}) {
   await c.card('b', { title: 'greet() trims the name', description: 'src/greet.js: greet trims spaces around the name.', agent: 'coder' })
   await c.card('c', { title: 'README: usage', description: 'README.md: a Usage section with one example of greet().', agent: 'builder2' })
   if (d) await c.card('d', { title: 'README: licence line', description: 'README.md: a line saying the licence is MIT.', agent: 'builder2' })
-  for (const [key, builder, reviewer, cards] of [['coder', 'Coder', 'Implementer', [c.cards.a, c.cards.b]], ['builder2', 'Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) await builderLane(c, key, { builder, reviewer, cards, name: `${builder}'s lane` })
+  for (const [key, builder, reviewer, cards] of [['coder', 'Coder', 'Implementer', [c.cards.a, c.cards.b]], ['builder2', 'Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) {
+    await builderLane(c, key, { builder, reviewer, cards, name: `${builder}'s lane` })
+    if (key === 'builder2' || aColumn === 'todo') await hiveStartedLaneCard(c, key, cards[0])
+  }
 }
 /** What Hive's card wake to the Assistant ends with while lanes run (src/shared/watch.ts, the same: a unit test checks). */
 const LANES_RUNNING_TAIL = ' Lanes are still running (hive_lane list): before you end your turn, watch them again in one lane watch, with any card outside them as cards (hive_wait_for_tasks with lanes ["all"], cards, wake; run-lanes).'
