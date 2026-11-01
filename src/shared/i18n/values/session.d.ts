@@ -203,6 +203,8 @@ interface HiveMessageValues {
   'session.status.signedInAgain': undefined
   'session.status.tasksDropped': { minutes: number }
   'session.status.waitingForConnection': undefined
+  'session.switch.waits': { why: string | number }
+  'session.switch.waitsTitle': { agent: string | number; slot: string | number }
   'session.tracker.body': { reason: string | number; detail: string | number }
   'session.tracker.detail': undefined
   'session.tracker.helperFailed': { why: string | number }

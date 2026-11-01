@@ -201,6 +201,8 @@
   "session.status.signedInAgain": "Detenido mientras no había sesión iniciada",
   "session.status.tasksDropped": "{minutes, plural, one {Dejó de contar sus tareas en segundo plano después de # minuto} many {Dejó de contar sus tareas en segundo plano después de # minutos} other {Dejó de contar sus tareas en segundo plano después de # minutos}}",
   "session.status.waitingForConnection": "Esperando la conexión…",
+  "session.switch.waits": "{why}. Hive lo reanuda en cuanto el slot quede libre.",
+  "session.switch.waitsTitle": "El cambio de conexión del agente {agent} espera a {slot}",
   "session.tracker.body": "{reason}. {detail} Ayuda → Copiar diagnóstico dice por qué.",
   "session.tracker.detail": "Los agentes se inician como siempre, pero los procesos que dejan en ejecución al detenerse no se muestran ni se ofrece terminarlos.",
   "session.tracker.helperFailed": "El proceso auxiliar de PowerShell del rastreador de procesos de Hive no se inició ({why})",

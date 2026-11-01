@@ -172,12 +172,24 @@ export interface StallAgent {
   name: string
   running: boolean
   failed?: string | null
+  /** Why its start waits (HI-2304: its slot held), in English: not running, and not stalled as failed. */
+  waiting?: string | null
 }
 
 /** An agent of the window's project info as the stall check reads it (HI-1977): starting counts as running, as main's agentNowOf has it. */
 export function stallAgentOf(agent: Pick<AgentInfo, 'name' | 'live' | 'start'>): StallAgent {
   const running = !!agent.live || (!!agent.start && 'starting' in agent.start)
-  return { name: agent.name, running, failed: !running && agent.start && 'failed' in agent.start ? agent.start.failed : null }
+  return { name: agent.name, running, failed: !running && agent.start && 'failed' in agent.start ? agent.start.failed : null, waiting: !running && agent.start && 'waiting' in agent.start ? agent.start.waiting : null }
+}
+
+/**
+ * A Doing card's agent whose start waits for its slot (HI-2304: held by what a run left running there): stalled with
+ * why, so the board and the lane say what holds it rather than "isn't running". In the window's language with tr, else English.
+ */
+export function startWaitingReason(c: Pick<TaskCard, 'column' | 'archived' | 'agent'>, agentNow: StallAgent | null, tr?: Tr): string | null {
+  if (c.archived || c.column !== 'doing' || !c.agent || !agentNow || agentNow.running || !agentNow.waiting) return null
+  if (tr) return tr(msg({ id: 'board.stalled.startWaiting', defaultMessage: '{agent} waits to start: {why}', description: "Why a card in the Active column is stalled (HI-2304): Hive can't start its agent in its slot yet, because the slot is held by processes a run left running there; it starts the agent once the slot is free. {agent} is the agent's name; {why} says what holds the slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\")." }), { agent: agentNow.name, why: agentNow.waiting })
+  return `${agentNow.name} waits to start: ${agentNow.waiting}` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
 /**

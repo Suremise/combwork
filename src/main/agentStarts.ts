@@ -24,6 +24,8 @@ interface Entry {
    * or a launch is still finishing (HR6's rounds 1 and 2).
    */
   failed?: { why: string; by: string }
+  /** Why a start under way waits (HI-2304: its slot held by what a run left there), and whose: until it goes on or ends. */
+  waiting?: { why: string; by: string }
 }
 
 const entries = new Map<string, Entry>()
@@ -63,7 +65,7 @@ function entryOf(projectPath: string, agentId: string): Entry {
 function tidy(projectPath: string, agentId: string): void {
   const key = keyOf(projectPath, agentId)
   const e = entries.get(key)
-  if (e && !e.holds.size && !e.failed) entries.delete(key)
+  if (e && !e.holds.size && !e.failed && !e.waiting) entries.delete(key)
 }
 
 /** A start of the agent begins (or goes on) under `tag`. `fresh`: a new Start, whose agent's earlier failure is over. */
@@ -85,9 +87,28 @@ export function startEnded(projectPath: string, agentId: string, tag: string, ou
   if (!e && !(outcome && 'failed' in outcome)) return
   const entry = e ?? entryOf(projectPath, agentId)
   entry.holds.delete(tag)
+  if (entry.waiting?.by === tag) entry.waiting = undefined
   if (outcome && 'failed' in outcome) entry.failed = { why: oneLine(outcome.failed), by: tag }
   else if (outcome && entry.failed?.by === tag) entry.failed = undefined
   tidy(projectPath, agentId)
+  changed(projectPath, agentId)
+}
+
+/**
+ * The start under `tag` waits (HI-2304), for `why` (English: what holds its slot), or goes on (null). Told only on a
+ * change, so a placement looking again with the same reason tells nothing.
+ */
+export function startWaits(projectPath: string, agentId: string, tag: string, why: string | null): void {
+  const e = why === null ? entries.get(keyOf(projectPath, agentId)) : entryOf(projectPath, agentId)
+  if (!e) return
+  if (why === null) {
+    if (e.waiting?.by !== tag) return
+    e.waiting = undefined
+    tidy(projectPath, agentId)
+  } else {
+    if (e.waiting?.by === tag && e.waiting.why === why) return
+    e.waiting = { why: oneLine(why), by: tag }
+  }
   changed(projectPath, agentId)
 }
 
@@ -110,11 +131,11 @@ export function startBegins(projectPath: string, agentId: string): void {
 }
 
 /** The agent's start as the stall check reads it: failed (why), else starting (a hold not older than START_HOLD_MS). */
-export function startNow(projectPath: string, agentId: string, now = Date.now()): { starting: boolean; failed: string | null } {
+export function startNow(projectPath: string, agentId: string, now = Date.now()): { starting: boolean; failed: string | null; waiting: string | null } {
   const e = entries.get(keyOf(projectPath, agentId))
-  if (!e) return { starting: false, failed: null }
-  if (e.failed) return { starting: false, failed: e.failed.why }
-  return { starting: [...e.holds.values()].some((at) => now - at < START_HOLD_MS), failed: null }
+  if (!e) return { starting: false, failed: null, waiting: null }
+  if (e.failed) return { starting: false, failed: e.failed.why, waiting: null }
+  return { starting: [...e.holds.values()].some((at) => now - at < START_HOLD_MS), failed: null, waiting: e.waiting?.why ?? null }
 }
 
 /** A CLI's error lines as one line, for a stall's reason. */

@@ -1402,6 +1402,11 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
             <Icon name="eye" /> {watchText(live.watch, tr, (l) => fmt.list(l, 'unit'))}
           </span>
         </Tooltip>
+      ) : !live && !failure && a.start && 'waiting' in a.start ? (
+        // Its start waits for its slot (HI-2304): what holds it, in English as Hive says it.
+        <Tooltip content={a.start.waiting}>
+          <span className="faint pane-status asks slot-held">{tr(msg({ id: 'panes.header.slotHeld', defaultMessage: 'Waiting for its slot', description: "A pane's status (HI-2304): Hive will start or resume the agent in its slot (a worktree Hive lends it) once the processes another run left running there have ended. The tooltip says what holds it." }))}</span>
+        </Tooltip>
       ) : (
         <SignInTip live={live}>
           <span className={cx('faint', 'pane-status', !live && failure && 'failed', live?.status === 'signin' && 'signin', !live && !failure && end && 'stopped')} {...(!live && !failure && end ? { 'data-stopped': end.why, title: stoppedLine(end) } : {})}>{live ? statusText(live) : failure ? tr(msg({ id: 'panes.header.failed', defaultMessage: 'Failed to start', description: "A pane's status: the agent's last launch failed." })) : end ? stoppedLabel(end) : tr(msg({ id: 'panes.header.notRunning', defaultMessage: 'Not running', description: "A pane's status: the agent's session isn't running." }))}</span>

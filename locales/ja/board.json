@@ -851,6 +851,7 @@
   "board.stalled.reviewWaitBusy": "{agent}は{card}を監視していますが、レビューを開始していません（別の作業中）：「レビュー」に入って{waited}。",
   "board.stalled.reviewWaitSilent": "{agent}は{card}を監視していますが、レビューを開始していません（作業中と表示されていますが、{silent}応答がなく、状態は不明です）：「レビュー」に入って{waited}。",
   "board.stalled.startFailed": "{agent}を起動できませんでした：{why}",
+  "board.stalled.startWaiting": "{agent}は開始を待っています：{why}",
   "board.stalled.wakeUntaken": "{agent}は、Hiveが{card}のために入力したウェイクを受け取っていません。ウェイクはプロンプトに入力されたままです。",
   "board.start.busy": "{status}。アイドルになってから選んでください。",
   "board.start.checkingConnection": "実行できる最初の接続を選ぶため、インストール済みのコーディングエージェントを確認しています…",

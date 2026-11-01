@@ -28,7 +28,7 @@ const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'Wi
 export type HostFailure = { kind: 'test' } | { kind: 'noPowerShell'; error: string } | { kind: 'slowHelper'; seconds: number } | { kind: 'refused' } | { kind: 'helperFailed'; why: string }
 
 /** The host's requests (HiveJobs.Answer). */
-export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'lineage' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow' | 'keeper'
+export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'lineage' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow' | 'keeper' | 'running'
 
 export interface JobHostOptions {
   /** How long it gets to start, and then to answer each request. */
@@ -813,7 +813,31 @@ public static class HiveJobs {
     }
     return b.Append('"').ToString();
   }
-  /** The job's processes as JSON: how many, and the first max with their names and command lines. */
+  /**
+   * Which of the executable names (lower case, comma separated) some process on the machine runs now, as a JSON array
+   * (HI-2304: whether a Windows Sandbox runs). A snapshot not read whole is an error, never "none".
+   */
+  public static string Running(string names) {
+    var want = new HashSet<string>(names.ToLowerInvariant().Split(','));
+    var found = new HashSet<string>();
+    IntPtr snap = SnapshotFailsForTests() ? IntPtr.Zero : CreateToolhelp32Snapshot(2, 0);
+    if (snap == IntPtr.Zero || snap == new IntPtr(-1)) return Q("error: no snapshot");
+    try {
+      var e = new ProcessEntry(); e.size = (uint)Marshal.SizeOf(typeof(ProcessEntry));
+      if (!Process32FirstW(snap, ref e)) return Q("error: no snapshot");
+      for (bool more = true; more; ) {
+        string n = (e.exe ?? "").ToLowerInvariant();
+        if (want.Contains(n)) found.Add(n);
+        more = Process32NextW(snap, ref e);
+      }
+      if (Marshal.GetLastWin32Error() != 18) return Q("error: snapshot cut short");
+    } finally { CloseHandle(snap); }
+    var b = new StringBuilder("[");
+    bool first = true;
+    foreach (string n in found) { b.Append(first ? "" : ",").Append(Q(n)); first = false; }
+    return b.Append("]").ToString();
+  }
+  /** The job's processes as JSON: how many, and the first max with their names, command lines and executables' paths. */
   /** The job's processes and the running ones it follows. */
   public static int[] Members(string id) {
     lock (turn) {
@@ -833,9 +857,9 @@ public static class HiveJobs {
       var where = new StringBuilder();
       for (int i = 0; i < all.Length && i < max; i++) where.Append(i > 0 ? " OR " : "").Append("ProcessId=").Append(all[i]);
       bool first = true;
-      using (var q = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId, Name, CommandLine FROM Win32_Process WHERE " + where))
+      using (var q = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId, Name, CommandLine, ExecutablePath FROM Win32_Process WHERE " + where))
         foreach (ManagementObject p in q.Get()) {
-          b.Append(first ? "" : ",").Append("{\"pid\":").Append(Convert.ToInt32(p["ProcessId"])).Append(",\"parent\":").Append(Convert.ToInt32(p["ParentProcessId"])).Append(",\"name\":").Append(Q((string)p["Name"])).Append(",\"cmd\":").Append(Q((string)p["CommandLine"])).Append(",\"created\":\"").Append(CreatedOf(Convert.ToInt32(p["ProcessId"]))).Append("\"}");
+          b.Append(first ? "" : ",").Append("{\"pid\":").Append(Convert.ToInt32(p["ProcessId"])).Append(",\"parent\":").Append(Convert.ToInt32(p["ParentProcessId"])).Append(",\"name\":").Append(Q((string)p["Name"])).Append(",\"cmd\":").Append(Q((string)p["CommandLine"])).Append(",\"path\":").Append(Q((string)p["ExecutablePath"])).Append(",\"created\":\"").Append(CreatedOf(Convert.ToInt32(p["ProcessId"]))).Append("\"}");
           first = false;
         }
     }
@@ -1012,6 +1036,7 @@ public static class HiveJobs {
         case "endexact": r = EndExact(a[2]); break;
         case "endtree": r = EndTree(a[2]); break;
         case "memory": r = Memory(a[2]); break;
+        case "running": r = Running(a[2]); break;
         case "lineage": r = Lineage(a[2]); break;
         // Its journal's path, in base64url (requests are words).
         case "open": r = Q(Open(a[2], a.Length > 3 ? Encoding.UTF8.GetString(Convert.FromBase64String(a[3].Replace('-', '+').Replace('_', '/').PadRight(a[3].Length + (4 - a[3].Length % 4) % 4, '='))) : null)); break;
@@ -1057,7 +1082,8 @@ export interface JobList {
   total: number
   /** How many of its processes the host adopted after they escaped the job (Sweep, #543). */
   adopted?: number
-  processes: { pid: number; parent?: number; name: string; cmd: string; created?: string }[]
+  /** `path`: its executable's full path, "" when Windows doesn't say (HI-2304). */
+  processes: { pid: number; parent?: number; name: string; cmd: string; path?: string; created?: string }[]
 }
 
 /**
@@ -1236,8 +1262,10 @@ export class JobHost {
    * request starts a new one. So nothing (a launch, End, quitting) waits on it for longer.
    */
   async request(command: HostCommand, job: string, ...args: (number | string | undefined)[]): Promise<unknown> {
-    // A job's id, or (identify, endexact) a list of processes by id and start time: "pid:created,…", or (memory) of jobs: "job,job,…".
-    if (this.failed || !/^[\w:,-]+$/.test(job) || (command === 'follow' && !this.opts.testRequests)) return null
+    // A job's id, or (identify, endexact) a list of processes by id and start time: "pid:created,…", or (memory) of jobs:
+    // "job,job,…", or (running, HI-2304) of executables' names: "name.exe,name.exe" (words, dots and hyphens, no spaces).
+    const word = command === 'running' ? /^[\w.-]+(,[\w.-]+)*$/ : /^[\w:,-]+$/
+    if (this.failed || !word.test(job) || (command === 'follow' && !this.opts.testRequests)) return null
     if (!(await this.start()) || !this.proc) return null
     const p = this.proc
     const n = this.next++

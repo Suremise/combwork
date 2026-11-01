@@ -851,6 +851,7 @@
   "board.stalled.reviewWaitBusy": "{agent} obserwuje kartę {card}, ale nie zaczyna recenzji (pracuje nad czymś innym): w kolumnie Recenzja od {waited}.",
   "board.stalled.reviewWaitSilent": "Agent {agent} obserwuje kartę {card}, ale nie zaczyna recenzji (widać, że pracuje, ale od {silent} milczy: stan nieznany): w kolumnie Recenzja od {waited}.",
   "board.stalled.startFailed": "Nie udało się uruchomić agenta {agent}: {why}",
+  "board.stalled.startWaiting": "Agent {agent} czeka na uruchomienie: {why}",
   "board.stalled.wakeUntaken": "Agent {agent} nie przyjął wybudzenia wpisanego przez Hive dla karty {card}: czeka ono w jego polu promptu.",
   "board.start.busy": "{status}. Wybierz go, gdy będzie bezczynny.",
   "board.start.checkingConnection": "Sprawdzanie, którzy agenci programistyczni są zainstalowani, aby wybrać pierwsze połączenie, które może działać…",

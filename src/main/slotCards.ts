@@ -36,7 +36,7 @@ import { app } from 'electron'
 import type { DatabaseSync } from 'node:sqlite'
 import { advanced } from './advanced'
 import { exitBy } from './exitLog'
-import { legacyWorktree, rebindSession, slotsMigrated } from './agentFolders'
+import { legacyWorktree, rebindSession, slotHeldWords, slotsMigrated } from './agentFolders'
 import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
 import { onHiveEvent } from './events'
@@ -53,7 +53,7 @@ import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
 import { isResuming, onResumeEntry } from './restartResume'
 import { sessions } from './sessions'
-import { startBegun, startEnded } from './agentStarts'
+import { startBegun, startEnded, startWaits } from './agentStarts'
 import { holder, poolFor, setSlotFreed } from './slotsApp'
 import { quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
@@ -1130,7 +1130,9 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
 export async function place(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<void> {
   const gone = (): boolean => !workflowEnforced() || ended(ws) || !current(first, n, cycle.seq, l.id)
   for (let r = await placeOnce(ws, projectPath, first, n, cycle, l); r !== 'done'; r = await placeOnce(ws, projectPath, first, n, cycle, l)) {
-    if (!(await nextLook(projectPath, l.agent, gone, r === 'builder'))) break
+    // Held (HI-2304): asked again once its wait listens, so a slot freed while the pass told its card isn't missed.
+    const stillHeld = r === 'held' ? async () => !!(await slotHeldWords(projectPath, cycle.started.slot, (id) => id).catch(() => 'unknown')) : undefined
+    if (!(await nextLook(projectPath, l.agent, gone, r === 'builder', stillHeld))) break
   }
   // Placed, or its cycle obsolete or gone: what it kept is let go (HI-1804). A throw keeps it for ensure's next try.
   releaseTrack(ws, projectPath, n, refOf(n, cycle, l))
@@ -1182,6 +1184,9 @@ function keepTracksOf(ws: WorkspaceService, projectPath: string, pending: Readon
 /** Tests: the placements a workspace keeps something for, as card → its cycle's ref and what it keeps. */
 export const placementTracksForTests = (ws: WorkspaceService): Map<string, PlacementTrack> => new Map(tracks.get(ws.lifetime) ?? [])
 
+/** How long a placement waiting for its held slot (HI-2304) goes without a look, when nothing it waits on is told. */
+const HELD_LOOK_MS = 5 * 60_000
+
 /** Told each slot freed (a run's writer released), by its project's folder: a waiting placement looks again. */
 const slotFreed = new Set<(projectPath: string) => void>()
 
@@ -1191,8 +1196,13 @@ const slotFreed = new Set<(projectPath: string) => void>()
  * also what ends each reason that changes no status: Hive's line there done with (typed, or its take checked), the pause
  * after the user typed there over (one timer, at its end), its folder steady again, its hive tools connected. `builder`:
  * the pass waited for that, so it is looked at again once these listen (a change between the pass and them is not lost).
+ * `stillHeld` (HI-2304): its slot is held by what another run left running there, so what frees it is the slot freed or
+ * those processes changing (their run's leftovers told), not the clock: looked at again after HELD_LOOK_MS at most. Once
+ * these listen it is asked once whether the slot is still held (HR1's round 1: freed between the pass's look and them,
+ * nothing more would come): no, and it looks again now; a slot that can't be told counts as held.
  */
-function nextLook(projectPath: string, agentId: string, over: () => boolean, builder = false): Promise<boolean> {
+function nextLook(projectPath: string, agentId: string, over: () => boolean, builder = false, stillHeld?: () => Promise<boolean>): Promise<boolean> {
+  const held = !!stillHeld
   return new Promise((resolve) => {
     const same = (p: string, a: string): boolean => a === agentId && p.toLowerCase() === projectPath.toLowerCase()
     const freed = (p: string): void => {
@@ -1221,20 +1231,27 @@ function nextLook(projectPath: string, agentId: string, over: () => boolean, bui
       resolve(!over())
     }
     const off = onHiveEvent((e) => {
-      if ((e.type === 'session-status' && same(e.state.projectPath, e.state.agentId)) || e.type === 'progress-changed') finish()
+      if ((e.type === 'session-status' && same(e.state.projectPath, e.state.agentId)) || (!held && e.type === 'progress-changed') || (held && e.type === 'agent-leftovers' && e.leftovers.projectPath.toLowerCase() === projectPath.toLowerCase())) finish()
     })
     const offEntry = onResumeEntry((p, a) => {
       if (same(p, a)) finish()
     })
-    const timer = setTimeout(finish, 30_000)
+    const timer = setTimeout(finish, held ? HELD_LOOK_MS : 30_000)
     timer.unref?.()
     // Waiting for its builder (HI-2191, HR3's round 2): what freed it may have come between the pass's look and these
     // listeners (a line done with, the user's pause over), with nothing more to come. Looked at again now they listen.
     if (builder && !whyNoLine(projectPath, agentId, 'free')) finish()
+    if (stillHeld)
+      void stillHeld().then(
+        (yes) => {
+          if (!yes) finish()
+        },
+        () => undefined
+      )
   })
 }
 
-async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<'done' | 'wait' | 'builder'> {
+async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workflow, n: number, cycle: Cycle, l: SlotLease): Promise<'done' | 'wait' | 'builder' | 'held'> {
   let wf = first
   const agentId = l.agent
   const gone = (): boolean => !workflowEnforced() || ended(ws) || !current(wf, n, cycle.seq, l.id)
@@ -1261,7 +1278,8 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
   // a card the user started by hand still is. Asked again just before the launch or the line (below).
   const pausedLane = (): boolean => l.kind === 'lane' && !!teamPauseOf(ws)
   if (pausedLane()) return 'wait'
-  const agent = projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === agentId)
+  const cfgNow = await ws.projectConfig(projectPath)
+  const agent = projectAgents(cfgNow).find((a) => a.id === agentId)
   const card = await getTask(n, ws).catch(() => null)
   if (!agent || !card) return 'done'
   wf = (await workflowFor(ws, projectPath).catch(() => null)) ?? wf
@@ -1286,6 +1304,21 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
   }
   // Its resumes gave up: it waits for the builder to run (the user's Resume, a start by hand), then the card is typed in.
   if (!st && track.gaveUp) return 'wait'
+  // Its slot held by another run of this Hive's (HI-2304: what an ended run left running there, or a session there): a
+  // start would be refused only after its resume's preparation, a delivery made and called off at each look. It waits,
+  // making nothing, for the slot to be freed, saying why once on the card, to its builder and on the agent.
+  const held = !st ? await slotHeldWords(projectPath, cycle.started.slot, (id) => projectAgents(cfgNow).find((a) => a.id === id)?.name ?? id).catch(() => null) : null
+  if (held) {
+    startWaits(projectPath, agentId, `#${n}`, held)
+    const told = `held:${held}`
+    if (!track.told.has(told)) {
+      track.told.add(told)
+      log.info(`#${n} waits for ${userText(cycle.started.slot)} to be freed before ${userText(agent.name)} resumes there: ${userText(held)}`)
+      await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: held }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${held}).`) // i18n-ignore: agent-facing, and the notice's English
+    }
+    return 'held'
+  }
+  startWaits(projectPath, agentId, `#${n}`, null)
   const resumeId = !st && conv?.is === 'resume' ? conv.id : null
   let how: FactData['BuilderPlaced']['how'] = there ? 'typed' : st ? 'newConversation' : resumeId ? 'resumed' : 'started'
   /** The builder's launch here: its lease's conversation resumed, else a new one; a failed resume counted. */

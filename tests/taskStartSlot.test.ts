@@ -99,6 +99,6 @@ describe("a Start of a card started before in a slot, its builder stopped (HI-19
     expect(slot.offered).toHaveLength(1)
     expect(slot.offered[0]).toMatch(/Start with the parser\.$/)
     // B1 is starting until the placement gives it the card (HI-1976): its card isn't stalled meanwhile.
-    expect(startNow(p, 'b1')).toEqual({ starting: true, failed: null })
+    expect(startNow(p, 'b1')).toEqual({ starting: true, failed: null, waiting: null })
   })
 })

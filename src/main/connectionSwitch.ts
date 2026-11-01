@@ -23,12 +23,29 @@ export interface SwitchDeps {
   quit: () => Promise<'sent' | 'held' | 'gone'>
   /** Resumes its last session on its connection as chosen now; refused (its workspace closing, Hive quitting) it throws. */
   resume: () => Promise<void>
-  /** Calls look at each change that may matter (its status, its exit); returns the unsubscribe. */
+  /**
+   * A resume refused only for now (HI-2304: its slot held by what a run left running there): why, in English; null for a
+   * failure. The switch then waits, looking again at each change, until it resumes, fails, or WAIT_MS has passed.
+   */
+  waits?: (e: unknown) => string | null
+  /** Told once for each reason the resume waits (the user's notice). */
+  told?: (why: string) => void
+  /** Calls look at each change that may matter (its status, its exit, a slot freed); returns the unsubscribe. */
   watch: (look: () => void) => () => void
   log: (line: string) => void
 }
 
 export type SwitchEnd = 'resumed' | 'cancelled' | 'gone' | 'failed'
+
+/** A switch's resume refused for now (HI-2304): its slot, held, and what holds it, in English. */
+export class SlotHeld extends Error {
+  constructor(
+    readonly slot: string,
+    readonly why: string
+  ) {
+    super(why)
+  }
+}
 
 export interface SwitchOp {
   /** Typed: its exit was sent, and it waits for that run's exit to resume. */
@@ -37,8 +54,13 @@ export interface SwitchOp {
   cancel: (why: string) => void
 }
 
-export function runSwitch(d: SwitchDeps): SwitchOp {
+/** How long a switch's resume waits for its slot (HI-2304) before it gives up. */
+export const SWITCH_WAIT_MS = 24 * 60 * 60_000
+
+export function runSwitch(d: SwitchDeps, waitMs = SWITCH_WAIT_MS): SwitchOp {
   let over = false
+  let waitingFor: string | null = null
+  let waitTimer: ReturnType<typeof setTimeout> | null = null
   let typed = false
   let looking = false
   let again = false
@@ -49,6 +71,7 @@ export function runSwitch(d: SwitchDeps): SwitchOp {
     if (over) return
     over = true
     unwatch?.()
+    if (waitTimer) clearTimeout(waitTimer)
     d.log(why)
     resolve(e)
   }
@@ -66,18 +89,27 @@ export function runSwitch(d: SwitchDeps): SwitchOp {
       if (r === 'sent') typed = true
       else return
     }
-    // Typed: resumed only once that run has exited.
+    // Typed: resumed only once that run has exited. One step at a time (look), so it is never resumed twice.
     if (d.running()) return
-    over = true
-    unwatch?.()
     try {
       await d.resume()
-      d.log('resumed on its connection')
-      resolve('resumed')
     } catch (e) {
-      d.log(`not resumed: ${(e as Error).message ?? e}`)
-      resolve('failed')
+      const why = over ? null : (d.waits?.(e) ?? null)
+      if (why === null) return finish('failed', `not resumed: ${(e as Error).message ?? e}`) // i18n-ignore: for the log
+      // Its slot held (HI-2304): it waits for what frees it, each change looking again; said once for each reason.
+      if (why !== waitingFor) {
+        // The user is told once; a change of what holds it (fewer processes) only logged.
+        if (waitingFor === null) d.told?.(why)
+        waitingFor = why
+        d.log(`waits to resume: ${why}`)
+      }
+      if (!waitTimer) {
+        waitTimer = setTimeout(() => finish('failed', `not resumed: it waited ${Math.round(waitMs / 3_600_000)} h for its slot (${waitingFor})`), waitMs) // i18n-ignore: for the log
+        waitTimer.unref?.()
+      }
+      return
     }
+    finish('resumed', 'resumed on its connection') // i18n-ignore: for the log
   }
   const look = (): void => {
     if (over) return

@@ -1,9 +1,11 @@
 import { join } from 'path'
+import { readFileSync } from 'original-fs'
 import { app } from 'electron'
 import { emit, toast } from './events'
 import { readJson, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { JobHost, MAX_LISTED, type HostFailure, type JobList } from './processSupervisor'
+import { brokersOnly } from './systemBrokers'
 import { hiveError } from './hiveError'
 import { processLabel, progressRunTitle, type AgentLeftovers, type AgentProcess } from '../shared/agentProcesses'
 import type { ActivityProcess } from '../shared/activity'
@@ -623,7 +625,7 @@ async function lookAt(runId: string, launch: Launch): Promise<AgentLeftovers | n
     list = await listJob(runId)
   }
   // Empty only when its whole membership is: members not described (more) are still members, left as leftovers.
-  if (!list || emptyJob(list)) {
+  if (!list || emptyJob(list) || (await onlyIdleBrokers(launch, list))) {
     void host.request('forget', runId)
     settleRun(runId, list ? 'ended' : 'unknown')
     return null
@@ -660,9 +662,11 @@ export function orphanedCli(processes: readonly AgentProcess[], gate: number): A
   return out
 }
 
-async function listJob(runId: string, withCommands = false): Promise<{ processes: ActivityProcess[]; more: number; adopted: number } | null> {
+async function listJob(runId: string, withCommands = false): Promise<{ processes: ActivityProcess[]; more: number; adopted: number; paths: ReadonlyMap<number, string> } | null> {
   const r = (await host.request('list', runId)) as JobList | string | null
   if (!r || typeof r !== 'object' || !Array.isArray(r.processes)) return null
+  // Each listed process's executable (HI-2304: a system broker is known by it), never shown or kept.
+  const paths = new Map(r.processes.map((p) => [p.pid, testBrokerPath(p.cmd) ?? p.path ?? '']).filter((e): e is [number, string] => !!e[1]))
   const processes = r.processes
     // A console window's host belongs to a process of the job and ends with it: not one to list.
     .filter((p) => !/^(conhost|openconsole)\.exe$/i.test(p.name))
@@ -675,7 +679,47 @@ async function listJob(runId: string, withCommands = false): Promise<{ processes
     .sort((a, b) => a.pid - b.pid)
     .slice(0, MAX_LISTED)
   const hosts = r.processes.length - r.processes.filter((p) => !/^(conhost|openconsole)\.exe$/i.test(p.name)).length
-  return { processes, more: Math.max(0, r.total - hosts - processes.length), adopted: Number(r.adopted) || 0 }
+  return { processes, more: Math.max(0, r.total - hosts - processes.length), adopted: Number(r.adopted) || 0, paths }
+}
+
+/**
+ * Whether what a launch's job still has is only Windows' own brokers, none of whose Sandboxes (or the like) runs now
+ * (HI-2304, systemBrokers.ts): the launch then counts as ended, its writer released, and the brokers are let go, never
+ * ended. Logged once, naming them. Anything else in it, a path not given, or a look at what runs that fails: false.
+ */
+async function onlyIdleBrokers(launch: Launch, list: { processes: readonly ActivityProcess[]; more: number; paths: ReadonlyMap<number, string> }): Promise<boolean> {
+  const withPaths = list.processes.map((p) => ({ ...p, path: list.paths.get(p.pid) }))
+  const brokers = await brokersOnly(withPaths, list.more, runningNamed).catch(() => null)
+  if (!brokers) return false
+  log.info(`${userText(launch.agentName)}'s run left only ${[...new Set(brokers.map((b) => b.broker.what))].join(', ')} running (${userText(brokers.map((b) => b.process.label).join('; '))}), with none of what it serves running: not its work, so its run counts as ended (the process is left running, no longer followed)`)
+  return true
+}
+
+/** Which of the executable names (lower case) run on the machine now, or null when it can't be told (HI-2304). */
+async function runningNamed(names: readonly string[]): Promise<readonly string[] | null> {
+  const r = await host.request('running', names.join(','))
+  const now = Array.isArray(r) && r.every((x) => typeof x === 'string') ? (r as string[]) : null
+  // A test copy's own names stand in only for a real answer (HR1's round 1): the request itself is always made.
+  const test = now ? testActive() : null
+  return test !== null ? names.filter((n) => test.includes(n)) : now
+}
+
+/**
+ * Test copies (unpackaged): a process whose command line has HIVE_TEST_SYSTEM_BROKER in it is taken as Windows Sandbox's
+ * broker (no test can put one in WindowsApps), and HIVE_TEST_SYSTEM_BROKER_ACTIVE (a file) holds the names running now,
+ * one per line: while it is missing, none is.
+ */
+function testBrokerPath(cmd: string | null | undefined): string | undefined {
+  const mark = app.isPackaged ? '' : (process.env.HIVE_TEST_SYSTEM_BROKER ?? '')
+  return mark && cmd?.includes(mark) ? join(process.env.ProgramW6432 || process.env.ProgramFiles || 'C:\\Program Files', 'WindowsApps', 'MicrosoftWindows.WindowsSandbox_0.0.0.0_x64__test', 'WindowsSandboxServer.exe') : undefined
+}
+function testActive(): string[] | null {
+  if (app.isPackaged || !process.env.HIVE_TEST_SYSTEM_BROKER) return null
+  try {
+    return readFileSync(process.env.HIVE_TEST_SYSTEM_BROKER_ACTIVE ?? '', 'utf8').split(/\r?\n/).map((l) => l.trim().toLowerCase()).filter(Boolean)
+  } catch {
+    return []
+  }
 }
 
 /** Keeps the newest launches' leftovers within the bounds, forgetting (not ending) the oldest. */
@@ -699,9 +743,10 @@ function startPolling(): void {
 async function refresh(): Promise<void> {
   const changed = new Set<string>()
   for (const l of [...left.values()]) {
-    const list = l.restored ? await stillRunning(l.processes) : await listJob(l.runId)
+    const list: { processes: AgentProcess[]; more: number; paths?: ReadonlyMap<number, string> } | null = l.restored ? await stillRunning(l.processes) : await listJob(l.runId)
     if (!left.has(l.runId)) continue
-    if (emptyJob(list)) {
+    // Only Windows' own brokers left, idle (HI-2304): ended as an empty job is (a restored launch has no paths: kept).
+    if (emptyJob(list) || (!l.restored && list?.paths && (await onlyIdleBrokers(l, { ...list, paths: list.paths })) && left.has(l.runId))) {
       left.delete(l.runId)
       if (!l.restored) void host.request('forget', l.runId)
       if (!l.restored) settleRun(l.runId, 'ended')

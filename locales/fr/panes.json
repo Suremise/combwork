@@ -81,6 +81,7 @@
   "panes.header.markIdleFailed": "Impossible de marquer l’agent comme inactif",
   "panes.header.more": "Plus",
   "panes.header.notRunning": "Arrêté",
+  "panes.header.slotHeld": "En attente de son emplacement",
   "panes.header.retryLarge": "Cette conversation est longue, et chaque requête l’envoie en entier. Une nouvelle conversation (une passation, puis une nouvelle session) envoie moins, ce qui peut aider face à une limite de débit.",
   "panes.header.retryTip": "{provider} attend pour renvoyer sa requête au modèle : {why, select, limited {le service l’a refusée pour trop de requêtes (limite de débit).} network {il n’a pas pu joindre le service.} other {la requête a échoué.}} Il réessaie tout seul{when, select, at { à {time}} other {}} ; tu n’as rien à faire.",
   "panes.header.retrySince": "Nouveaux essais depuis {time}.",

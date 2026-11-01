@@ -201,6 +201,8 @@
   "session.status.signedInAgain": "サインアウト中に停止",
   "session.status.tasksDropped": "{minutes, plural, other {#分経過したため、バックグラウンドタスクの追跡を終了}}",
   "session.status.waitingForConnection": "接続を待機しています…",
+  "session.switch.waits": "{why}。スロットが空き次第、Hiveが再開します。",
+  "session.switch.waitsTitle": "{agent}の接続の切り替えは{slot}を待っています",
   "session.tracker.body": "{reason}。{detail}理由は「ヘルプ」→「診断情報をコピー」で確認できます。",
   "session.tracker.detail": "エージェントは通常どおり起動しますが、停止時に実行したまま残したプロセスは表示されず、終了もできません。",
   "session.tracker.helperFailed": "HiveのプロセストラッカーのPowerShellヘルパーが起動しませんでした（{why}）",

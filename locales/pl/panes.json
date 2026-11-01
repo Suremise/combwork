@@ -81,6 +81,7 @@
   "panes.header.markIdleFailed": "Nie udało się oznaczyć agenta jako bezczynnego",
   "panes.header.more": "Więcej",
   "panes.header.notRunning": "Nie działa",
+  "panes.header.slotHeld": "Czeka na swój slot",
   "panes.header.retryLarge": "Ta rozmowa jest duża, a każde zapytanie wysyła ją w całości. Nowa rozmowa (przekazanie, potem nowa sesja) wysyła mniej, co może pomóc przy limicie zapytań.",
   "panes.header.retryTip": "{provider} czeka, by ponownie wysłać zapytanie do modelu: {why, select, limited {usługa odrzuciła je z powodu zbyt wielu zapytań (limit zapytań).} network {nie udało się połączyć z usługą.} other {zapytanie się nie powiodło.}} Spróbuje ponownie sam{when, select, at { o {time}} other {}}; nic nie musisz robić.",
   "panes.header.retrySince": "Ponawia od {time}.",

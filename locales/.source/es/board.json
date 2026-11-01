@@ -851,6 +851,7 @@
   "board.stalled.reviewWaitBusy": "{agent} is watching {card} but hasn't started reviewing it (it is working on something else): in Review for {waited}.",
   "board.stalled.reviewWaitSilent": "{agent} is watching {card} but hasn't started reviewing it (it shows working, but has been silent for {silent}: state unknown): in Review for {waited}.",
   "board.stalled.startFailed": "{agent}'s start failed: {why}",
+  "board.stalled.startWaiting": "{agent} waits to start: {why}",
   "board.stalled.wakeUntaken": "{agent} hasn't taken the wake Hive typed for {card}: it waits in its prompt.",
   "board.start.busy": "{status}. Choose it once it's idle.",
   "board.start.checkingConnection": "Finding out which coding agents are installed, to choose the first connection that can run…",

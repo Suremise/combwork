@@ -851,6 +851,7 @@
   "board.stalled.reviewWaitBusy": "L’agent {agent} surveille {card} mais n’a pas commencé à la relire (il travaille sur autre chose) : en Relecture depuis {waited}.",
   "board.stalled.reviewWaitSilent": "L’agent {agent} surveille {card} mais n’a pas commencé à la relire (il apparaît au travail, mais ne donne plus signe de vie depuis {silent} : état inconnu) : en Relecture depuis {waited}.",
   "board.stalled.startFailed": "L’agent {agent} n’a pas pu démarrer : {why}",
+  "board.stalled.startWaiting": "L’agent {agent} attend pour démarrer : {why}",
   "board.stalled.wakeUntaken": "L’agent {agent} n’a pas pris en compte le réveil que Hive a tapé pour {card} : il attend dans son prompt.",
   "board.start.busy": "{status}. Choisis-le une fois qu’il est inactif.",
   "board.start.checkingConnection": "Recherche des agents de code installés, pour choisir la première connexion qui peut fonctionner…",

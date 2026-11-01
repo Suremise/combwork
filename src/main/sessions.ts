@@ -27,7 +27,7 @@ import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type 
 import { holdText } from '../shared/sessionResume'
 import { coalesced, joined } from '../shared/coalesce'
 import { atMost, whenAll } from '../shared/atMost'
-import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter } from './agentFolders'
+import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter, slotHeldWords } from './agentFolders'
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
@@ -65,7 +65,7 @@ import type {
   ToastAction
 } from '../shared/types'
 import { provider as providerAdapter, allProviders } from './providers'
-import { runSwitch, SwitchIntents, type SwitchOp, type UsageIntent } from './connectionSwitch'
+import { runSwitch, SlotHeld, SwitchIntents, type SwitchOp, type UsageIntent } from './connectionSwitch'
 import { agentLaunchView, allAccounts, allConnections, checkAccount, firstUsableAccount, getConnection, launchOnChosen, onConnectionSignedIn, setAccountSessions, type LaunchConnection } from './accounts'
 import { effortUsable, ensureMigrated, migrationDue } from './connectionMoves'
 import { resolveAgentConnection } from '../shared/accounts'
@@ -1869,7 +1869,8 @@ class SessionManager {
       if (w.is === 'hold') throw new HiveError(holdText(w.hold, agent.name), { kind: 'conflict' })
       if (w.is === 'closing') throw hiveError(M.stoppedBeforeStart)
       if (w.is === 'setup') throw hiveError(msg({ id: 'session.start.slotSetup', defaultMessage: '{slot} is still being set up. {agent} can start there once it is ready.', description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): Hive is still setting the slot up (its setup or install command runs), or a command of it hasn't ended yet. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
-      if (w.is === 'busy') throw hiveError(msg({ id: 'session.start.slotBusy', defaultMessage: '{slot} still has another session in it, or processes one left running there. {agent} can start there once they have ended.', description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): another session (of a card that has ended, or of another Hive) still runs in it, or processes a session left running there aren't known to have ended. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
+      // Its slot named (HI-2304): a connection switch's resume waits for that slot to be freed.
+      if (w.is === 'busy') throw Object.assign(hiveError(msg({ id: 'session.start.slotBusy', defaultMessage: '{slot} still has another session in it, or processes one left running there. {agent} can start there once they have ended.', description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): another session (of a card that has ended, or of another Hive) still runs in it, or processes a session left running there aren't known to have ended. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' }), { busySlot: w.slot })
       throw hiveError(msg({ id: 'session.start.slotChanged', defaultMessage: "{slot} isn't {agent}'s any more: its card or lane ended, or another agent's work has it. Start or resume {agent} again.", description: "Starting or resuming an agent in a slot (a worktree Hive lends to a card) is refused (#1434): the slot's lease ended or changed hands while the start was getting ready. {slot} is the slot's name (\"slot-b\"), {agent} the agent's." }), { slot: w.slot, agent: agent.name }, { kind: 'conflict' })
     }
   }
@@ -2235,6 +2236,16 @@ class SessionManager {
    */
   safePointHeld: (projectPath: string, agentId: string, runId: string) => string | null = () => null
 
+  /** Calls fn with a project's folder each time a slot of it may have come free (HI-2304: slotsApp.ts sets it as it loads). */
+  slotFreedWatch: (fn: (projectPath: string) => void) => () => void = () => () => undefined
+
+  /** What holds a slot of the project now, in English (HI-2304, slotHeldWords), or null once nothing of this Hive's does. */
+  private async slotHeldWhy(projectPath: string, slot: string): Promise<string | null> {
+    const cfg = await workspaceOf(projectPath).projectConfig(projectPath).catch(() => null)
+    const agents = cfg ? projectAgents(cfg) : []
+    return slotHeldWords(projectPath, slot, (a) => agents.find((x) => x.id === a)?.name ?? a).catch(() => null)
+  }
+
   /** Switches of connection waiting for their agent's safe point (HI-1755), by liveId: at most one per agent. */
   private switches = new Map<string, SwitchOp>()
   /** Agents whose switch is resuming them now: that start is the switch's, not the user's. */
@@ -2271,6 +2282,8 @@ class SessionManager {
     // Its run counts until it has left the live sessions (start refuses while it is there, whatever its status): its
     // session-exit, emitted once it has, is the change that resumes it.
     const running = (): boolean => this.live.get(id)?.state.runId === runId
+    /** The slot its resume was refused for (HI-2304), while it waits for it. */
+    let heldSlot: string | null = null
     const op = runSwitch({
       running,
       heldNow: () => this.safePointHeld(projectPath, agentId, runId),
@@ -2279,16 +2292,38 @@ class SessionManager {
       quit: () => this.quit(projectPath, agentId, runId, { fenced: hostOpen, why: 'a switch of connection', ready: () => this.safePointHeld(projectPath, agentId, runId) }), // i18n-ignore: for the log
       resume: async () => {
         if (!hostOpen()) throw new Error('its workspace closed') // i18n-ignore: for the log
+        // Its slot held when it last tried (HI-2304): looked at first, so a look while it still is starts nothing.
+        if (heldSlot) {
+          const why = await this.slotHeldWhy(projectPath, heldSlot)
+          if (why) throw new SlotHeld(heldSlot, why)
+        }
         this.switchResuming.add(id)
         try {
           await inWorkspace(workspaceOf(projectPath), () => this.start(projectPath, { agentId, ...(sessionId ? { resumeId: sessionId } : {}) }))
+        } catch (e) {
+          const slot = (e as { busySlot?: unknown }).busySlot
+          if (typeof slot !== 'string' || !hostOpen()) throw e
+          heldSlot = slot
+          throw new SlotHeld(slot, (await this.slotHeldWhy(projectPath, slot)) ?? (e as Error).message)
         } finally {
           this.switchResuming.delete(id)
         }
       },
-      watch: (look) => onHiveEvent((e) => {
-        if ((e.type === 'session-status' && e.state.projectPath === projectPath && e.state.agentId === agentId) || (e.type === 'session-exit' && e.projectPath === projectPath && e.agentId === agentId)) look()
-      }),
+      waits: (e) => (e instanceof SlotHeld ? e.why : null),
+      told: (why) => toast('warning', tr(msg({ id: 'session.switch.waitsTitle', defaultMessage: "{agent}'s switch of connection waits for {slot}", description: "A notice's title (HI-2304): an agent was stopped to switch it to another connection (account), and Hive can't resume it yet because its slot (a worktree Hive lends it, \"slot-a\") is still held. {agent} is the agent's name." }), { agent: l.state.agentName ?? this.label(l.state), slot: heldSlot ?? '' }), tr(msg({ id: 'session.switch.waits', defaultMessage: '{why}. Hive resumes it once the slot is free.', description: "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop." }), { why }), undefined, projectPath),
+      // A slot of its project freed (HI-2304): what its resume waits for, when it does.
+      watch: (look) => {
+        const offEvents = onHiveEvent((e) => {
+          if ((e.type === 'session-status' && e.state.projectPath === projectPath && e.state.agentId === agentId) || (e.type === 'session-exit' && e.projectPath === projectPath && e.agentId === agentId)) look()
+        })
+        const offFreed = this.slotFreedWatch((p) => {
+          if (heldSlot && samePlace(p, projectPath)) look()
+        })
+        return () => {
+          offEvents()
+          offFreed()
+        }
+      },
       log: (line) => log.info(`${label}: connection switch: ${line}`)
     })
     this.switches.set(id, op)

@@ -851,6 +851,7 @@
   "board.stalled.reviewWaitBusy": "Agent {agent} beobachtet {card}, hat das Review aber nicht begonnen (der Agent arbeitet an etwas anderem): seit {waited} in Review.",
   "board.stalled.reviewWaitSilent": "Agent {agent} beobachtet {card}, hat das Review aber nicht begonnen (der Agent zeigt „arbeitet“, ist aber seit {silent} still: Status unbekannt): seit {waited} in Review.",
   "board.stalled.startFailed": "Agent {agent} konnte nicht gestartet werden: {why}",
+  "board.stalled.startWaiting": "Agent {agent} wartet auf den Start: {why}",
   "board.stalled.wakeUntaken": "Agent {agent} hat den Weckruf, den Hive für {card} getippt hat, nicht übernommen: Er wartet in der Eingabe des Agenten.",
   "board.start.busy": "{status}. Wähle den Agenten, sobald er untätig ist.",
   "board.start.checkingConnection": "Hive prüft, welche Coding-Agenten installiert sind, um die erste Verbindung zu wählen, die laufen kann…",

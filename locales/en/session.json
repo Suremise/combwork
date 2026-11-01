@@ -807,6 +807,14 @@
     "defaultMessage": "Waiting for the connection…",
     "description": "An agent's status while Hive waits for its CLI's connection to come back, to resume it (Settings → Advanced, Resume agents after a connection drops)."
   },
+  "session.switch.waits": {
+    "defaultMessage": "{why}. Hive resumes it once the slot is free.",
+    "description": "The notice that an agent's switch of connection waits (HI-2304): {why} says what holds its slot, in English (\"slot-a is held by WindowsSandboxServer, left running by MB1's last run\"), without its full stop."
+  },
+  "session.switch.waitsTitle": {
+    "defaultMessage": "{agent}'s switch of connection waits for {slot}",
+    "description": "A notice's title (HI-2304): an agent was stopped to switch it to another connection (account), and Hive can't resume it yet because its slot (a worktree Hive lends it, \"slot-a\") is still held. {agent} is the agent's name."
+  },
   "session.tracker.body": {
     "defaultMessage": "{reason}. {detail} Help → Copy Diagnostics says why.",
     "description": "The notice that Hive can't track agents' processes. {reason} says why (a clause, without its full stop); {detail} is one or two sentences on what that means. Help → Copy Diagnostics is a menu command."
