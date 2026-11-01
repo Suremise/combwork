@@ -811,19 +811,19 @@ ${require('../../src/shared/hiveGuidance.ts').journalRule(require('../../src/sha
     const NOTE = new RegExp(`^${Kn(a)} is on Coder's lane \\(lane-[0-9a-f]+\\), which keeps its own order and takes it in that order\\. To change it: hive_lane start with its cards in the new order \\(applyNow: true to apply it now\\)\\.$`)
     const column = async (n) => (await api('GET', `/v1/tasks/${n}`)).body?.column
     // Started on Coder (refused if Hive's lane has already started it), then in Doing.
-    const started = async () => {
+    const startedA = async () => {
       if ((await column(a)) !== 'doing') intent('hive_start_card', { card: `#${a}` })
       return !!(await until(async () => (await column(a)) === 'doing', HUNG_MS))
     }
     const laneOver = () => tool('hive_lane', { action: 'start', cards: [a, b], reviewer: 'Tester', name: 'lane order' }, 'own').text.match(/lane-[0-9a-f]+$/)?.[0]
     const endLane = (id) => !!id && tool('hive_lane', { action: 'end', lane: id, abandoned: true }).text.startsWith('Lane abandoned: ')
-    check('a lane over two cards of its own, the first started', await started())
+    check('a lane over two cards of its own, the first started', await startedA())
     const first = laneOver()
     const agentBack = measure('hive_put_back (a lane\'s card)', intent('hive_put_back', { card: `#${a}`, why: 'Not yet.' }), 400)
     const agentLines = agentBack.split('\n')
     check("put back of a lane's card: its usual line, then the lane's as a warning", agentLines.length === 2 && agentLines[0].endsWith(' Next on it: hive_start_card.') && NOTE.test(agentLines[1].replace(/^Warning: /, '')) && agentLines[1].includes(first ?? '?'), agentBack)
     check('…and that lane ends', endLane(first), first)
-    check('…the card started again, on a new lane', await started())
+    check('…the card started again, on a new lane', await startedA())
     const second = laneOver()
     const asBack = measure('hive_put_back (a lane\'s card, as Assistant)', tool('hive_put_back', { card: `#${a}`, why: 'The user wants B first.' }, 'assistant'), 600)
     check("…as the Assistant: the lane's line too", asBack.split('\n').some((l) => NOTE.test(l.replace(/^Warning: /, '')) && l.includes(second ?? '?')), asBack)
