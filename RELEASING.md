@@ -28,6 +28,26 @@ Each of these is a separate decision of the user's, asked for each time (an OK f
 
 An agent takes the OK in its own pane: the release-hive skill says how.
 
+## Betas and RCs
+
+A build's pre-release name says what it is (HI-2308):
+
+- **`-beta.<n>`: a working build**, installed to use while work goes on (`npm run dist`; the journal records it as a beta from its version, or `--kind beta`). Its checks are lighter than a release's, as the baseline's are (The 1.0 path). It isn't uploaded unless the user asks, and then as a GitHub pre-release.
+- **`-rc.<n>`: a real release candidate** only: built after the full checks (What a release checks), and meant to become the release unless something is found.
+
+Semver orders them `1.1.0-beta.3` < `1.1.0-rc.1` < `1.1.0`, so a version's betas all come before its first RC. Once a version has an RC, a fix to it is the next RC: a beta then would be older than the installed RC. The working builds after 1.0.0 are `1.1.0-beta.<n>`. 1.0 named every installable build `-rc.<n>`: rc.17 on were real candidates, and the earlier ones (rc.10 to rc.16 in particular) were working builds that would now be betas.
+
+What the updater offers (electron-updater's GitHub feed; Hive compares versions by semver, `src/shared/updates.ts`): with **Include pre-releases** off, releases only. With it on, an installed beta is offered later betas and releases, but never an RC; an installed RC is offered later RCs, but not the release (HI-2311). Turning **Include pre-releases** off reaches the release from either.
+
+## A bump and its build: two cards
+
+A version change and the build made from it are **two cards in one lane**, in this order:
+
+1. **The version card** (code): the version, `package-lock.json` and the release notes (Steps, step 3), and for an uploaded release the real tier on its final commit and the tested-with manifest (steps 4 and 5). The merge queue merges it.
+2. **The build card** (no code), blocked by the version card: what comes after the merge, from the merged commit. For a working build or the baseline: `npm run dist`, the packaged checks, the Sandbox checks and the install note. For an uploaded release: steps 6 to 8 (`npm run release` in the main checkout at the merged commit, the draft for the user to publish, then the check). Nothing else merges into the target between the two cards: `npm run release` refuses code that differs from the real tier's run, other than the manifest.
+
+A lane ends its builder's session when its last card merges, so steps written after the merge on the version card are lost: rc.17's HI-2297 lost its build that way, and its builder had to be restarted to make it. rc.18 (HI-2300, then HI-2301) and rc.19 were built in this shape.
+
 ## The 1.0 path
 
 1.0 is built on an **integration branch** (`1.0.0`), not on `main`, which carries only 0.9.x fixes meanwhile. A fix made on `main` is merged into the integration branch as well. It goes out in three stages:
@@ -42,13 +62,13 @@ An agent takes the OK in its own pane: the release-hive skill says how.
    - It waits for the last phase's checks card (#1539), the translation review (#1126) and #1582 (Hive's version checks off `fetch()`). Electron's CVE fix (#1503) comes before the RC (#1541), not the baseline (the user, 24 Oct).
    - **Its checks are lighter than a release's** (the user, 24 Oct): the checks on the integration branch's head, where the last checks card's results stand if the branch hasn't moved since (otherwise run them again), with the model trials as a **smoke run**: Claude Code and Codex each run the key scenarios once, with no repeats, no Haiku and no Copilot. The full trials, the full e2e set and the real tier come before a proper release (What a release checks).
    - The release notes (below).
-   - The version is `1.0.0-rc.<n>` (asked), set before the build: no current-version candidate comes first (that's Step 1, for an uploaded release). A pre-release version means the updater never offers a 0.9.x release over it, and a later RC or 1.0.0 updates it.
+   - The version is `1.0.0-rc.<n>` (asked), set before the build: no current-version candidate comes first (that's Step 1, for an uploaded release). (1.0's baselines were named as RCs; a later baseline is a beta: Betas and RCs.) A pre-release version means the updater never offers a 0.9.x release over it, and a later RC or 1.0.0 updates it.
    - `npm run dist -- --kind baseline` (asked), built from the integration branch's head. From a worktree, it copies the installer into the main checkout's `dist` (Notes).
    - `npm run e2e -- packaged-mcp packaged-progress` against `dist/win-unpacked`, and the Sandbox checks (the release-hive skill), including the one-way upgrade from 0.9.3.
    - An install note for the user: back up first, close every 0.9.3 Hive on the workspace, and what to expect. **The user installs.** Nothing is pushed, tagged or uploaded.
 3. **The RC, then the release** (#1541), once the user is happy with what the baseline has become:
    - **An RC** is a draft GitHub pre-release at `1.0.0-rc.<n>`. It follows the Steps below, built from the integration branch, with **Set as a pre-release** ticked. Only installs with **Include pre-releases** on see it.
-   - **The release**: the integration branch is merged into `main` (asked, `--no-ff`), and the Steps run on `main` at `1.0.0`. After that, 1.0.x fixes go to `main`.
+   - **The release**: the integration branch is merged into `main` (asked, `--no-ff`), and the Steps run on `main` at `1.0.0`, as a version card and a build card in one lane (A bump and its build: two cards): the version card holds steps 3 to 5, the build card steps 6 to 8. After that, 1.0.x fixes go to `main`, and 1.1's working builds are `1.1.0-beta.<n>` (Betas and RCs).
 
 Each build `npm run dist` makes is recorded in `dist/build-info.json`, beside its installer: the code, commit and branch it was built from (Notes). Each successful build, by `npm run dist` or `npm run release`, also goes into the Hive Assistant's journal as Hive's entry: its kind (`--kind beta|baseline|rc|release`, else from the version: a `-beta.n` is a beta, an `-rc.n` an RC, and a release version is `npm run release`'s release or `npm run dist`'s candidate for it), version, commit and installer. It's sent to Hive while it's running; otherwise it's recorded when the workspace next opens. **Settings → Advanced → Record builds in the journal** turns it off.
 
