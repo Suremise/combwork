@@ -198,16 +198,25 @@ export interface AnswerShape {
 
 /**
  * Whether an answer fits its request (§16.8.5, #1269): at the round limit, a choice (a carry on with 1 to `maxRounds`
- * more rounds), nothing else; an approval (kind Approve), approved or declined (a reply may say why), never a decision;
- * any other question, answered with a reply or a decision, or with one of the actions it offers (#1630), never both.
+ * more rounds), nothing else; an approval (kind Approve), approved or declined (a reply may say why), never a decision
+ * but one: an agent's question approved with a note, which is its decision too (HI-2286, `approveNote`); any other
+ * question, answered with a reply or a decision, or with one of the actions it offers (#1630), never both.
  */
 export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'gate' | 'actions'>, a: AnswerShape, maxRounds: number): boolean {
   if (req.gate === ROUND_LIMIT_GATE) return a.outcome === 'answered' && !!a.choice && ROUND_CHOICES.includes(a.choice) && !a.decision && !a.action && (a.choice !== 'carryOn' || (Number.isInteger(a.rounds) && a.rounds! >= 1 && a.rounds! <= maxRounds))
   if (a.choice !== undefined) return false
   if (a.action !== undefined) return a.outcome === 'answered' && !a.decision && !!req.actions?.some((x) => x.kind === a.action)
-  if (req.kind === 'approve') return (a.outcome === 'approved' || a.outcome === 'declined') && !a.decision
+  if (req.kind === 'approve') return (a.outcome === 'approved' || a.outcome === 'declined') && (!a.decision || (a.outcome === 'approved' && !!a.reply && approveNote(req) === 'decision'))
   return a.outcome === 'answered' && (!!a.reply || !!a.decision)
 }
+
+/**
+ * What a note given with Approve becomes (HI-2286): on an agent's question (gate `ask`), a reply and the user's decision
+ * on the card (the asker works against decisions, and a reviewer checks them); on one offering a single action, that
+ * action's reason (approving it is the action, HI-1734); on Hive's own gates (the user's review, the OK before merging,
+ * the merge queue's advance), a reply only: approving moves the card on at once, so a decision would come too late.
+ */
+export const approveNote = (r: Pick<FactData['ApprovalRequested'], 'gate' | 'actions'>): 'decision' | 'reason' | 'comment' => (r.actions?.length === 1 ? 'reason' : r.gate === 'ask' ? 'decision' : 'comment')
 
 /**
  * Whether a decision the user made may answer a request (HI-1932, Darren's decision: the Assistant records it naming

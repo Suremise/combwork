@@ -971,6 +971,9 @@ interface HiveMessageValues {
   'board.workQueue.copyFailed': undefined
   'board.workQueue.copyNamed': { purpose: string }
   'board.workQueue.decline': undefined
+  'board.workQueue.declineNeeds': undefined
+  'board.workQueue.declineTitle': { target: string | number }
+  'board.workQueue.declineWhy': undefined
   'board.workQueue.expected': undefined
   'board.workQueue.files': { n: number }
   'board.workQueue.heading': undefined

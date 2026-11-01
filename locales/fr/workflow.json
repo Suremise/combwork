@@ -1,4 +1,5 @@
 {
+  "workflow.approveNote": "{becomes, select, decision {Note (facultative) : enregistrée aussi comme ta décision} reason {Note (facultative) : la raison de ce que l’agent a demandé} other {Note (facultative) : ajoutée comme ton commentaire}}",
   "workflow.contradiction.committedNeedsFolder": "« Un commit suffit » demande que tout le monde travaille dans le dossier du projet.",
   "workflow.contradiction.focusedNeedsRunner": "Les tests ciblés de chaque carte ont besoin de la commande qui les lance.",
   "workflow.contradiction.hiveMergesNeedsGit": "La fusion nécessite Git : sans gestion de versions, le travail est accepté là où il est.",

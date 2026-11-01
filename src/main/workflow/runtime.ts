@@ -1659,8 +1659,8 @@ export class Workflow {
   /**
    * The user answers a request (§16.8.5): only the user (Darren's point 7, #1269: never an agent or the Assistant). An
    * approval satisfies its gate; a decline of a gate's request is a round, the card back to its builder; a reply (`note`)
-   * is relayed. At the round limit the answer is the user's `choice`, and a carry on adds `rounds`. Never a decision (the
-   * board records those). The agent waiting on it is woken: whoever asked (an agent's own question), else the builder;
+   * is relayed. At the round limit the answer is the user's `choice`, and a carry on adds `rounds`. A decision (`decided`:
+   * a Decide answer, or an agent's question approved with a note, HI-2286) is the board's to record, beside this. The agent waiting on it is woken: whoever asked (an agent's own question), else the builder;
    * at the round limit the builder and the reviewer, whose lane paused for it.
    */
   async answer(ref: unknown, request: string, answer: 'approved' | 'declined' | 'answered', opts: { note?: string; choice?: RoundChoice; rounds?: number; decided?: boolean; action?: AskActionKind } = {}): Promise<Reply> {

@@ -208,6 +208,8 @@
   "tips.forYou.title": "Odpowiadaj na to, co czeka na Ciebie",
   "tips.forYouActions.text": "Gdy pytanie agenta dotyczy czegoś, co na jego karcie możesz zrobić tylko Ty, agent może to zaproponować jako przycisk pod pytaniem: Przenieś do Gotowe, Zmień na kartę bez kodu albo Odblokuj, z proponowanym uzasadnieniem, które możesz zmienić. Jedno kliknięcie to robi i odpowiada agentowi.",
   "tips.forYouActions.title": "Odpowiedz jednym kliknięciem",
+  "tips.forYouApproveNote.text": "Zatwierdzenie przyjmuje opcjonalną notatkę. Przy pytaniu agenta zostaje zapisana jako Twoja decyzja na karcie, więc agent się do niej stosuje, a jego recenzent ją sprawdza; przy własnych prośbach Hive jest Twoim komentarzem. Bez notatki zatwierdzenie to jedno kliknięcie.",
+  "tips.forYouApproveNote.title": "Zatwierdź, ale coś zmień",
   "tips.generalistRole.text": "Nadaj agentowi rolę Generalista w przepływie pracy (Ustawienia agenta), a zrobi wszystko, o co poprosisz w jego panelu: nigdy nie trafia do toru ani nie jest proszony o recenzję. Karta, którą weźmie, i tak podlega przepływowi pracy projektu.",
   "tips.generalistRole.title": "Agent do wszystkiego, o co poprosisz",
   "tips.gitCheck.text": "Pomoc → Konfiguracja dostawców… pokazuje, jakiego gita znalazł Hive i w jakiej wersji. Agenci w worktree, scalanie i sekcje Git zakładki Kontrola wersji wymagają Git for Windows 2.38 lub nowszego.",

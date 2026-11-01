@@ -208,6 +208,8 @@
   "tips.forYou.title": "Answer what waits for you",
   "tips.forYouActions.text": "When an agent's question is about something only you can do on its card, it can offer it as a button under the question: Move to Done, Make It No Code or Unblock, with its suggested reason, which you can change. One click does it and answers the agent.",
   "tips.forYouActions.title": "Answer with one click",
+  "tips.forYouApproveNote.text": "Approve takes an optional note. On an agent's question it's recorded as your decision on the card, so the agent works to it and its reviewer checks it; on Hive's own requests it's your comment. Left empty, Approve is one click.",
+  "tips.forYouApproveNote.title": "Approve, but change something",
   "tips.generalistRole.text": "Give an agent the Generalist role in the workflow (Agent Settings) and it does whatever you ask in its pane: it is never put in a lane or asked to review. A card it takes still follows the project’s workflow.",
   "tips.generalistRole.title": "An agent for whatever you ask",
   "tips.gitCheck.text": "Help → Provider Setup… shows the git Hive found and its version. Worktree agents, merging and the Version Control tab’s Git sections need Git for Windows 2.38 or later.",

@@ -3876,8 +3876,20 @@
     "description": "Accessible name of the Copy button beside a command in the card dialog's Work section. Keep the select keys."
   },
   "board.workQueue.decline": {
-    "defaultMessage": "Decline",
-    "description": "A button in the card dialog's Work section: declines updating the checked-out branch now (the same answer as under For you)."
+    "defaultMessage": "Decline…",
+    "description": "A button in the card dialog's Work section: declines updating the checked-out branch now, asking why first (…; the same answer as under For you)."
+  },
+  "board.workQueue.declineNeeds": {
+    "defaultMessage": "Say why you are declining.",
+    "description": "An error in the question when the user declines the merge queue's update of a checked-out branch without a reason: one is needed."
+  },
+  "board.workQueue.declineTitle": {
+    "defaultMessage": "Decline updating {target}",
+    "description": "Title of the question when the user declines the merge queue's update of the checked-out branch {target} (the card dialog's Work section): their reason follows."
+  },
+  "board.workQueue.declineWhy": {
+    "defaultMessage": "Why? Your reason is added to the card as your comment.",
+    "description": "The question when the user declines the merge queue's update of a checked-out branch (the card dialog's Work section): their reason, recorded on the card as their comment."
   },
   "board.workQueue.expected": {
     "defaultMessage": "Before the merge",

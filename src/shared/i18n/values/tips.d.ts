@@ -210,6 +210,8 @@ interface HiveMessageValues {
   'tips.forYou.title': undefined
   'tips.forYouActions.text': undefined
   'tips.forYouActions.title': undefined
+  'tips.forYouApproveNote.text': undefined
+  'tips.forYouApproveNote.title': undefined
   'tips.generalistRole.text': undefined
   'tips.generalistRole.title': undefined
   'tips.gitCheck.text': undefined

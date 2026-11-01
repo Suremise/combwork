@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import { formatDateTime } from '@shared/dates'
 import { pauseText, returnCheck, returnRun, returnWhy, stepText } from '@shared/progressQueue'
-import { QUEUE_ADVANCE_GATE } from '@shared/workflow/facts'
+import { approveNote, QUEUE_ADVANCE_GATE } from '@shared/workflow/facts'
+import { APPROVE_NOTE } from '@shared/workflow/texts'
 import type { QueueRecent, QueueStuck, QueueView } from '@shared/workflow/queue'
-import type { WorkView } from '@shared/workflow/workView'
+import { approveAnswer, declineAnswer, type ForYouAnswer, type WorkView } from '@shared/workflow/workView'
 import type { ConflictFile, ConflictsRecord } from '@shared/workflow/conflicts'
 import type { ProgressRun, TaskCard } from '@shared/types'
 import { attempt } from '../actions'
 import { call, callShared } from '../api'
 import { useForYou } from '../forYou'
 import { showQueueRun } from '../queueSource'
-import { confirm, notify, useStore } from '../store'
+import { confirm, notify, prompt, useStore } from '../store'
 import { timeAgo } from '../util'
 import { Icon } from './ui'
 
@@ -74,7 +75,10 @@ const M = {
   copyFailed: msg({ id: 'board.workQueue.copyFailed', defaultMessage: 'Could not copy the command', description: "A notification: copying a command from the card dialog's Work section failed." }),
   advance: msg({ id: 'board.workQueue.advance', defaultMessage: 'Tested and ready: update {target} in its folder now?', description: "The card dialog's Work section: the merge queue waits for the user's OK before it updates the branch {target}, which is checked out in a folder (its files change there). The same question waits under For you." }),
   approve: msg({ id: 'board.workQueue.approve', defaultMessage: 'Approve', description: "A button in the card dialog's Work section: the user's OK to update the checked-out branch now (the same answer as under For you). Glossary 2.3: Approve." }),
-  decline: msg({ id: 'board.workQueue.decline', defaultMessage: 'Decline', description: "A button in the card dialog's Work section: declines updating the checked-out branch now (the same answer as under For you)." }),
+  declineTitle: msg({ id: 'board.workQueue.declineTitle', defaultMessage: 'Decline updating {target}', description: "Title of the question when the user declines the merge queue's update of the checked-out branch {target} (the card dialog's Work section): their reason follows." }),
+  declineWhy: msg({ id: 'board.workQueue.declineWhy', defaultMessage: 'Why? Your reason is added to the card as your comment.', description: "The question when the user declines the merge queue's update of a checked-out branch (the card dialog's Work section): their reason, recorded on the card as their comment." }),
+  declineNeeds: msg({ id: 'board.workQueue.declineNeeds', defaultMessage: 'Say why you are declining.', description: "An error in the question when the user declines the merge queue's update of a checked-out branch without a reason: one is needed." }),
+  decline: msg({ id: 'board.workQueue.decline', defaultMessage: 'Decline…', description: "A button in the card dialog's Work section: declines updating the checked-out branch now, asking why first (…; the same answer as under For you)." }),
   answerFailed: msg({ id: 'board.workQueue.answerFailed', defaultMessage: "Couldn't answer", description: "An error's title: approving or declining the update of a checked-out branch failed (the card dialog)." })
 }
 
@@ -377,19 +381,29 @@ function Paused({ queue, projectPath }: { queue: QueueView; projectPath: string 
   )
 }
 
-/** The OK an update of a checked-out target waits for (Ask each time): the same answer as For you's. */
+/**
+ * The OK an update of a checked-out target waits for (Ask each time): the same answer as For you's. Approve takes an
+ * optional note, a comment on the card (HI-2286: Hive's own gate, never a decision); Decline asks why, as For you's does.
+ */
 function Advance({ card, request, target }: { card: TaskCard; request: string; target: string }) {
-  const answer = (outcome: 'approved' | 'declined'): Promise<unknown> => attempt(tr(M.answerFailed), () => call('tasks:answer', card.number, request, { outcome }))
+  const [note, setNote] = useState('')
+  const answer = (a: ForYouAnswer): Promise<unknown> => attempt(tr(M.answerFailed), () => call('tasks:answer', card.number, request, a))
+  const decline = async (): Promise<void> => {
+    const why = await prompt({ title: tr(M.declineTitle, { target }), message: tr(M.declineWhy), validate: (v) => (v.trim() ? null : tr(M.declineNeeds)) })
+    if (why !== null) await answer(declineAnswer(why))
+  }
+  const hint = tr(APPROVE_NOTE, { becomes: approveNote({ gate: QUEUE_ADVANCE_GATE }) })
   return (
     <div className="card-work-queue-advance">
       <div className="card-work-queue-line">
         <Icon name="question" /> <span>{tr(M.advance, { target })}</span>
       </div>
+      <input className="input card-work-queue-note" aria-label={hint} placeholder={hint} value={note} onChange={(e) => setNote(e.target.value)} />
       <div className="card-work-queue-actions">
-        <button type="button" className="btn small primary" data-action="approve" onClick={() => void answer('approved')}>
+        <button type="button" className="btn small primary" data-action="approve" onClick={() => void answer(approveAnswer(note))}>
           {tr(M.approve)}
         </button>
-        <button type="button" className="btn small subtle" data-action="decline" onClick={() => void answer('declined')}>
+        <button type="button" className="btn small subtle" data-action="decline" onClick={() => void decline()}>
           {tr(M.decline)}
         </button>
       </div>

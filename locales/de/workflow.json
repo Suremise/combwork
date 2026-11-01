@@ -1,4 +1,5 @@
 {
+  "workflow.approveNote": "{becomes, select, decision {Notiz (optional): auch als deine Entscheidung festgehalten} reason {Notiz (optional): die Begründung für das, worum der Agent gebeten hat} other {Notiz (optional): als dein Kommentar hinzugefügt}}",
   "workflow.contradiction.committedNeedsFolder": "„Committet ist erledigt“ setzt voraus, dass alle im Projektordner arbeiten.",
   "workflow.contradiction.focusedNeedsRunner": "Die gezielten Tests jeder Karte brauchen den Befehl, der sie ausführt.",
   "workflow.contradiction.hiveMergesNeedsGit": "Mergen braucht Git: Ohne Versionsverwaltung wird die Arbeit dort angenommen, wo sie ist.",

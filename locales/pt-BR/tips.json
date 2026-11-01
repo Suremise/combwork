@@ -208,6 +208,8 @@
   "tips.forYou.title": "Responda ao que aguarda você",
   "tips.forYouActions.text": "Quando a pergunta de um agente é sobre algo que só você pode fazer no cartão dele, ele pode oferecer isso como um botão sob a pergunta: Mover para Concluído, Tornar sem código ou Desbloquear, com o motivo sugerido, que você pode mudar. Um clique faz isso e responde o agente.",
   "tips.forYouActions.title": "Responda com um clique",
+  "tips.forYouApproveNote.text": "Aprovar aceita uma nota opcional. Na pergunta de um agente, ela é registrada como sua decisão no cartão, então o agente trabalha de acordo com ela e o revisor a confere; nas solicitações do próprio Hive, é o seu comentário. Vazia, Aprovar continua sendo um clique.",
+  "tips.forYouApproveNote.title": "Aprove, mas mude algo",
   "tips.generalistRole.text": "Dê a um agente o papel Generalista no fluxo de trabalho (Configurações do agente) e ele faz o que você pedir no painel dele: nunca entra numa raia nem é chamado para revisar. Um cartão que ele pegar continua seguindo o fluxo de trabalho do projeto.",
   "tips.generalistRole.title": "Um agente para o que você pedir",
   "tips.gitCheck.text": "Ajuda → Configuração de provedores… mostra o git que o Hive encontrou e a versão dele. Agentes em worktree, o merge e as seções Git da aba Controle de versão precisam do Git for Windows 2.38 ou posterior.",

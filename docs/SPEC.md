@@ -1890,7 +1890,8 @@ these moments).
   to the reviewer, who judges whether the work meets it (passing it says it does).
 - **Approvals are not decisions** [HR2's round 2 finding 5]: answering a request (Approve, Decline, a test result, a
   sign-in) writes `Approval`, never `Decision`, so it can't make the work it approves stale. Only a decision the user
-  records on the card (the card's Decisions) bumps the generation.
+  records on the card (the card's Decisions) bumps the generation: an agent's question approved with a note records
+  the note as one too (HI-2286), beside the `Approval`.
 - **Passes and approvals belong to a generation:** each `Verdict` and `Approval` records the generation current when
   it was given. They count only at the **current** generation: the quorum (G1b) is the number of **distinct reviewers**
   with a pass on this submission (or a change that replays to it) at the current generation, never the number of
@@ -2994,7 +2995,10 @@ sidebar's Waiting for review); the board's toolbar has a **For you** filter (rem
 the search); the card dialog's **For you** section lists each request (its kind, its text in the window's language or
 the agent's words rendered as Markdown the way card comments are, sanitized, single line breaks kept, folded to about
 ten lines with **Show all** (#1637), who asked and when, a Test request's checklist) with its answers: **Approve** / **Decline…** (a
-reason, required) for an approval, a reply (**Send Reply**: the user's comment on the card, and to the agent waiting
+reason, required) for an approval, Approve with an optional note beside it (HI-2286, `approveNote`: on an agent's question,
+gate `ask`, the note is the answer's reply and the user's decision on the card, so the asker works to it and a reviewer
+checks it; on one offering a single action, that action's reason; on Hive's own gates, a reply only, since approving
+moves the card on at once; the box's hint says which; empty, Approve is one click), a reply (**Send Reply**: the user's comment on the card, and to the agent waiting
 on it an `answer` delivery from the user quoting the reply whole, its question quoted short, #1626) or **Record as
 Decision** for a question (each with a tooltip saying what it does), and the four
 ways on (carry on with its rounds) at the round limit. **Actions an agent offers (#1630):** an agent's question may
@@ -3660,7 +3664,8 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   returned with why (a conflict's files, the check by its run's name, the output's last 12 lines, Show log: the run's log,
   else the whole output), and **Retry merge…** (a confirmation: the approved revision requeued unchanged, once);
   taken out with why; the queue paused with why and Resume queue; the OK an update of a checked-out target waits for
-  (**Approve** / **Decline**, the For you answer itself); and §16.9.2's terminal state for its card: the folder, its
+  (**Approve** with an optional note, the user's comment / **Decline…** with a required reason, HI-2286: the For you
+  answer itself); and §16.9.2's terminal state for its card: the folder, its
   branch, the target's ref, the expected and result commits, each listed file and its side, and the commands that
   finish or undo it, each copyable, none run. It shows whatever the project's options are now. The terminal state's
   For you request (`workflow.forYou.queueStuck`) counts the files and names the Work section, and its row in the

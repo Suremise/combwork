@@ -208,6 +208,8 @@
   "tips.forYou.title": "Répondre à ce qui t’attend",
   "tips.forYouActions.text": "Quand la question d’un agent porte sur une chose que toi seul peux faire sur sa carte, il peut la proposer comme bouton sous la question : Déplacer vers Terminé, Passer sans code ou Débloquer, avec la raison qu’il suggère, que tu peux changer. Un clic le fait et répond à l’agent.",
   "tips.forYouActions.title": "Répondre en un clic",
+  "tips.forYouApproveNote.text": "Approuver accepte une note facultative. Sur la question d’un agent, elle est enregistrée comme ta décision sur la carte : l’agent travaille selon elle et son relecteur la vérifie ; sur les demandes propres à Hive, c’est ton commentaire. Laissée vide, Approuver reste un clic.",
+  "tips.forYouApproveNote.title": "Approuver, mais changer quelque chose",
   "tips.generalistRole.text": "Donne à un agent le rôle Généraliste dans le flux de travail (Paramètres de l’agent) et il fait ce que tu lui demandes dans son volet : il n’est jamais placé dans un couloir ni sollicité pour relire. Une carte qu’il prend suit quand même le flux de travail du projet.",
   "tips.generalistRole.title": "Un agent pour tout ce que tu demandes",
   "tips.gitCheck.text": "Aide → Configuration des fournisseurs… montre le git trouvé par Hive et sa version. Les agents en worktree, la fusion et les sections Git de l’onglet Gestion de versions nécessitent Git for Windows 2.38 ou ultérieur.",
