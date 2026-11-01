@@ -660,7 +660,8 @@ describe("a pool lane's design step (HI-2310): given out by the pool, its answer
   const f = (seq: number, kind: string, data: Record<string, unknown>, actor = 'hive') => ({ seq, kind, at: `t${seq}`, actor, data })
 
   it('in its turn, oldest first, a card takes its preferred reviewer if free and allowed; busy or not allowed, the next free one', () => {
-    expect(poolAssignments([card(1, 'a'), card(2, 'b', { preferred: 'R1' })], [agent('R1'), agent('R2')])).toEqual([
+    // R1 listed last: the younger card still gets it, the older one the first free.
+    expect(poolAssignments([card(1, 'a'), card(2, 'b', { preferred: 'R1' })], [agent('R2'), agent('R3'), agent('R1')])).toEqual([
       { card: 1, submission: 1, reviewer: 'R2' },
       { card: 2, submission: 1, reviewer: 'R1' }
     ])
