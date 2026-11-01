@@ -111,6 +111,7 @@ import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decision
 import { actorOf, recordDecisionsReceived } from './workflow/recorder'
 import { workflowFor } from './workflow/service'
 import { unsubmittedOf } from './unsubmitted'
+import { idleOwnWatchOf } from './idleWatch'
 import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
@@ -3377,7 +3378,9 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const mine = me ? await unsubmittedOf(ws, me.projectPath, me.agentId, 'already' in r ? [r.already.number] : cond.cards) : []
     const unsubmitted = mine.length ? { unsubmitted: mine } : {}
     if ('already' in r) return { already: r.already, ...unsubmitted, ...left, ...withNames([r.already.number]) }
-    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, ...unsubmitted, ...left, ...(mine.length ? withNames(mine.map((u) => u.card)) : {}) }
+    // HI-2285: a lane's builder watching only its own card while nothing on it waits on anyone: its reply says so.
+    const idle = me && !usage ? await idleOwnWatchOf(ws, me.agentId, cond.cards) : null
+    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, ...unsubmitted, ...(idle !== null ? { idle } : {}), ...left, ...(mine.length || idle !== null ? withNames([...mine.map((u) => u.card), ...(idle !== null ? [idle] : [])]) : {}) }
   }
   const seconds = body?.timeoutSeconds === undefined ? 300 : Number(body.timeoutSeconds)
   // The longest is Settings → Advanced's (#367), under Codex's timeout for hive's tools.
