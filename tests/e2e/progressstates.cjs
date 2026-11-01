@@ -6,7 +6,7 @@
 // without a report once its process is gone, never "stopped reporting". Screenshots of the waiting and ended runs in both
 // themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
-const { suspendExactly } = require('./folderProcesses.cjs')
+const { suspensions } = require('./folderProcesses.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
@@ -162,12 +162,19 @@ const t = setInterval(() => {
   // one by one, children first, the wrapper outlived its command for the moment between the two: it saw the command
   // killed (exit code 4294967295, Kill's -1), reported a failure and exited before its own turn (HI-2284, under load).
   // Suspended first (by its identity, #603), it sees nothing until it is ended with the rest.
-  const frozen = serverId ? suspendExactly([serverId]) : { done: [], failed: [] }
-  check('the wrapper is held still first, so it sees nothing of its command ending', frozen.done.length === 1, JSON.stringify(frozen.failed))
-  // Its tree, each process as it is now (never taskkill /T on a pid, #603).
-  const ended = serverId ? lib.endTreeExactly(serverId) : 0
-  // Never left suspended: ended by its identity if the tree's ending missed it.
-  if (serverId && lib.stillSame([serverId]).length) lib.endExactly([serverId])
+  // Tracked (suspensions), and released whatever happens: what is still suspended then is resumed, or ended by its
+  // identity if it can't be, so the test never leaves its wrapper held.
+  const held = suspensions()
+  let ended = 0
+  try {
+    const frozen = serverId ? held.suspend([serverId]) : { done: [], failed: [] }
+    check('the wrapper is held still first, so it sees nothing of its command ending', frozen.done.length === 1, JSON.stringify(frozen.failed))
+    // Its tree, each process as it is now (never taskkill /T on a pid, #603).
+    ended = serverId ? lib.endTreeExactly(serverId) : 0
+  } finally {
+    const left = held.release()
+    if (left.failed.length || left.ended.length) console.log(`the wrapper's suspension released: ${JSON.stringify(left)}`)
+  }
   check('its process tree is ended (as an agent stopping it does)', ended >= 1 && lib.stillSame([serverId]).length === 0, `${ended} ended`)
   await server()
   const gone = await until(async () => (await runs()).find((r) => r.id === srv?.id && r.finishedAt !== null), 45000)
