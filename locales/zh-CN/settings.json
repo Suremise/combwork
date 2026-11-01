@@ -297,6 +297,8 @@
   "settings.advanced.copilot.compaction.systemTokens.title": "压缩：系统提示 token 数字段",
   "settings.advanced.copilot.compaction.toolTokens.desc": "Copilot 会话文件中压缩开始和结束时表示工具定义 token 数的字段：用量和“会话”标签页中压缩前后上下文的三个组成部分之一。",
   "settings.advanced.copilot.compaction.toolTokens.title": "压缩：工具定义 token 数字段",
+  "settings.advanced.copilot.exit.armed.desc": "在提示符处按一次 Ctrl+C 后 Copilot 显示的内容，表示再按一次即退出。Hive 停止 Copilot 时，一旦出现此提示就再按一次 Ctrl+C。如果它不再匹配，Hive 会一直按 Ctrl+C 直到 Copilot 退出，耗时更长。",
+  "settings.advanced.copilot.exit.armed.title": "停止：退出提示",
   "settings.advanced.copilot.exit.graceSeconds.desc": "Hive 停止 Copilot（停止、重启、关闭项目或退出）时，在按下 Ctrl+C 后给 Copilot 自行退出的时间，超时则强制结束。Copilot 只在自行退出时写入会话的 Token 总数：先被强制结束就会丢失。在繁忙的机器上最长用了 {took, plural, other {# 秒}}（#716）；退出 Hive 或关闭工作区时，对卡住的 Copilot 最多等待这么久再加一秒。",
   "settings.advanced.copilot.exit.graceSeconds.title": "停止：退出宽限时间",
   "settings.advanced.copilot.hooks.knownEvents.desc": "Hive 已知 GitHub Copilot 会发送的钩子事件。打开“设置”→“高级”→“飞行记录器：捕获来自 CLI 的未知内容”后，如果收到名称不在此列表中的钩子，会保存一条智能体最近事件的捕获记录。",
