@@ -1412,10 +1412,15 @@ describe('the fixtures fail when nothing was done', () => {
     const ws = 'f'.repeat(64)
     const known = [{ kind: 'workspace', token: ws }, { kind: 'agent', token: agent }]
     // The trial's Bash call: `env | grep -i hive`, the token far into its result.
-    const env = `${'x'.repeat(500)}\nHIVE_API_URL=http://127.0.0.1:47822\nHIVE_API_TOKEN=${agent}\nHIVE_API_TOKEN_FILE=C:\\t.json\n`
+    const hook = '9'.repeat(24) + 'abcdef'.repeat(4)
+    const env = `${'x'.repeat(500)}\nHIVE_HOOK_TOKEN=${hook}\nHIVE_API_URL=http://127.0.0.1:47822\nHIVE_API_TOKEN=${agent}\nHIVE_RUN_ID=afec06a7b1c2d3e4f5a6b7c8\nHIVE_API_TOKEN_FILE=C:\\t.json\n`
     const seen = tokenSightings(known, { tools: [{ name: 'Skill', result: 'Launching skill' }, { name: 'Bash', result: env }], scripts: [{ name: 'Script', result: `got ${ws}` }], replies: ['done', `the token is ${agent} and ${ws}`] })
     expect(seen.map((s) => [s.kind, s.in, s.at, s.name])).toEqual([['agent', 'tool', 1, 'Bash'], ['workspace', 'script', 0, 'Script'], ['workspace', 'reply', 1, undefined], ['agent', 'reply', 1, undefined]])
     expect(seen[0].excerpt).toContain('HIVE_API_TOKEN=<agent token>')
+    // The hook token beside it, unknown to the check, is masked too (HR2's round 1); a run id isn't.
+    expect(seen[0].excerpt).toContain('HIVE_HOOK_TOKEN=<hex>')
+    expect(seen[0].excerpt).not.toContain('abcdefabcdef')
+    expect(seen[0].excerpt).toContain('HIVE_RUN_ID=afec06a7b1c2d3e4f5a6b7c8')
     // Masked everywhere: no token, nor a part of one, in an excerpt (the reply's names both).
     for (const s of seen) expect(s.excerpt).not.toMatch(/0123456789abcdef|f{16}/)
     expect(seen[2].excerpt).toBe('the token is <agent token> and <workspace token>')

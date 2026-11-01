@@ -57,7 +57,8 @@ const WRITERS = /^(Write|Edit|MultiEdit|NotebookEdit|apply_patch)$/i
  * Where an Agent API token was seen (HI-2259): `known` the tokens, each `{ kind, token }` (workspace, agent, assistant),
  * and `seen` what the session printed or said (`tools` and `scripts`, each `{ name, result }`; `replies`, text). Each
  * sighting `{ kind, in: 'tool' | 'script' | 'reply', at, name?, excerpt }`: `at` its place in that list, `excerpt` up to
- * 80 characters before it and 40 after, every known token in it as `<kind token>`, never the token.
+ * 80 characters before it and 40 after, every known token in it as `<kind token>`, never the token, and any other run
+ * of 32 hex or more (the hook token) as `<hex>`.
  */
 function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
   const mask = (s) => known.reduce((x, t) => x.split(t.token).join(`<${t.kind} token>`), s)
@@ -70,7 +71,9 @@ function tokenSightings(known, { tools = [], scripts = [], replies = [] }) {
         // Masked whole first, then cut: a cut through another token would leave a part of it.
         const label = `<${t.kind} token>`
         const sentinel = '\u0000'
-        const whole = mask(text.replace(t.token, sentinel))
+        // Any other secret beside it (the hook token, 48 hex, HR2's HI-2259 round 1) is masked too: a run of 32 hex or
+        // more, as Hive's tokens are, never ids (a run id is 24, a session id has dashes).
+        const whole = mask(text.replace(t.token, sentinel)).replace(/[0-9a-fA-F]{32,}/g, '<hex>')
         const i = whole.indexOf(sentinel)
         const excerpt = (whole.slice(Math.max(0, i - 80), i) + label + whole.slice(i + 1, i + 1 + 40)).replace(/\s+/g, ' ').trim()
         out.push({ kind: t.kind, in: where, at, ...(typeof item === 'object' && item?.name ? { name: item.name } : {}), excerpt })
