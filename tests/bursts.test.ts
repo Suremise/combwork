@@ -284,11 +284,11 @@ describe('a group of finishes, when it is shown', () => {
       st.status = status
       ;(await manager()).emitState(st)
     }
-    const finish = async (body: string) => (await manager()).notify(alpha, 'alpha · Two finished', body, 'finished', 'Two', 'two')
+    const twoFinishes = async (body: string) => (await manager()).notify(alpha, 'alpha · Two finished', body, 'finished', 'Two', 'two')
 
     it('working again: left out of the group, which is told without it', async () => {
       const st = agent()
-      await finish('Started OV-246.')
+      await twoFinishes('Started OV-246.')
       await goes(st, 'finished')
       await finished(beta, 'Three')
       await goes(st, 'working')
@@ -298,10 +298,10 @@ describe('a group of finishes, when it is shown', () => {
 
     it('a second turn ended within the group: only its own finish is told, once', async () => {
       const st = agent()
-      await finish('Started OV-246.')
+      await twoFinishes('Started OV-246.')
       await goes(st, 'finished')
       await goes(st, 'working')
-      await finish('Merged it.')
+      await twoFinishes('Merged it.')
       await goes(st, 'finished')
       await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
       expect(shown.map((n) => [n.title, n.body])).toEqual([['alpha · Two finished', 'Merged it.']])
@@ -309,7 +309,7 @@ describe('a group of finishes, when it is shown', () => {
 
     it('a second turn ending into a card watch: nothing told (its own end is a watch, the first is over)', async () => {
       const st = agent()
-      await finish('Started OV-246.')
+      await twoFinishes('Started OV-246.')
       await goes(st, 'finished')
       await goes(st, 'working')
       await goes(st, 'watching')
@@ -320,7 +320,7 @@ describe('a group of finishes, when it is shown', () => {
     it('waiting for you in its next turn: that is told at once, and the finish before it never', async () => {
       const s = await manager()
       const st = agent()
-      await finish('Started OV-246.')
+      await twoFinishes('Started OV-246.')
       await goes(st, 'finished')
       await goes(st, 'waiting')
       s.notify(alpha, 'alpha · Two needs your input', 'Allow Bash?', 'waiting', undefined, 'two')
