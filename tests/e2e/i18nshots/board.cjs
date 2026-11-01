@@ -135,8 +135,20 @@ async function lanes(ctx) {
   await start(ctx, [one])
   const c = ctx.boardCards
   const name = project.split(/[\\/]/).pop()
+  // One, an idle builder outside slots, is given the lane in a new conversation (HI-2232), so a new launch and token. Quiet
+  // first (idle, nothing of Hive's being typed into it or waiting to be), or it would be left as it is mid-turn, or its
+  // new conversation owed until it is free (HI-2252).
+  const twoToken = await tokenOf(ctx, two)
+  const port = ctx.lib.port(47834)
+  if (!(await ctx.lib.until(async () => ctx.lib.agentQuiet(port, name, (await liveOf(ctx, [one]))[0], twoToken), ctx.hungMs))) throw new Error(`One wasn't quiet before its lane: ${JSON.stringify((await liveOf(ctx, [one]))[0])}`)
+  const [before] = await liveOf(ctx, [one])
   await ctx.api('POST', '/v1/lanes', { project: name, builder: one.name, reviewer: two.name, name: 'i18n lane', cards: [c.done, c.passed, c.review, c.doing, c.blocked, c.todo] })
-  ctx.tokens = { one: await tokenOf(ctx, one), two: await tokenOf(ctx, two) }
+  const renewed = async () => {
+    const [now] = await liveOf(ctx, [one])
+    return !!now && now.sessionId !== before?.sessionId && ['ready', 'finished'].includes(now.status) && !!(await tokenOf(ctx, one).catch(() => null))
+  }
+  if (!(await ctx.lib.until(renewed, ctx.hungMs))) throw new Error(`One didn't get its lane in a new conversation: ${JSON.stringify((await liveOf(ctx, [one]))[0])}`)
+  ctx.tokens = { one: await tokenOf(ctx, one), two: twoToken }
   await apiAs(ctx, ctx.tokens.one, 'POST', '/v1/progress', { title: 'Full test set', total: 146, step: 112, stepName: 'mergeslot', estimateMs: 600000 })
   await apiAs(ctx, ctx.tokens.one, 'POST', `/v1/projects/${name}/merge-slot/claim`, { branch: 'main', cards: [c.passed], timeoutSeconds: 0 })
   await apiAs(ctx, ctx.tokens.two, 'POST', `/v1/projects/${name}/merge-slot/claim`, { branch: 'main', cards: [c.review], timeoutSeconds: 0 })
