@@ -47,7 +47,7 @@ export const DEV_SEAMS = [
  * The seams a packaged Hive honours too, when quiet (#1253: lib.hiveEnv starts every test copy quiet), among them the two
  * every test copy is given, HIVE_TEST_TIPS and HIVE_TEST_TRASH_DIR (#1599: takesTestSeams in src/main/testQuiet.ts).
  */
-export const PACKAGED_SEAMS = ['HIVE_TEST_ASK_LEFTOVERS', 'HIVE_TEST_DIALOG_SNAPSHOT', 'HIVE_TEST_NOTIFY_LOG', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_TEST_TRASH_DIR']
+export const PACKAGED_SEAMS = ['HIVE_TEST_ASK_LEFTOVERS', 'HIVE_TEST_DIALOG_SNAPSHOT', 'HIVE_TEST_NOTIFY_LOG', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_TEST_TOKEN_LOG', 'HIVE_TEST_TRASH_DIR']
 /**
  * The test copies' channels a packaged Hive refuses: 0.9 worktree agents (agents:testLegacy; `{ worktree: true })`, an
  * agent asked for in a worktree, as q.agent does; a 0.9 template's worktree modes) and slots:test. A worktree agent asked
