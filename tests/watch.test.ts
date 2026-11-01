@@ -367,6 +367,22 @@ describe('what counts as a change', () => {
     expect(wakeLine(cardChange(7, cardOf({ archived: true }), 'gone'))).toMatch(/^\[Hive\] #7 was archived \(off the board: only the user brings it back\)\. Your card watch has ended/)
     expect(taskWaitText({ changes: [{ number: 7, column: 'gone', changes: 'gone', by: null, comment: null, archived: true }] })).toBe('#7 was archived')
     expect(limitLine({ cards: [7, 8], changes: [] }, 120)).toMatch(/No change on #7, #8 in 2 h/)
+    // HI-2295: a card in Review is said to be there; only the others ask the agent to tell the user.
+    expect(limitLine({ cards: [7], changes: [] }, 30)).toBe('[Hive] No change on #7 in 30 min: your card watch has ended. Tell the user (hive_notify) and ask what to do.')
+    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'reviewing', reviewer: 'CR1 (cli)' }])).toBe("[Hive] No change on #7 in 30 min: your card watch has ended. #7 is in Review, being reviewed by CR1 (cli). Watch #7 again for its verdict (in a card loop, Hive wakes you with it); don't tell the user about it.")
+    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'pool' }])).toMatch(/#7 is in Review, waiting for the reviewer pool to give it to a reviewer\. Watch #7 again/)
+    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'assigned', reviewer: 'CR2' }])).toMatch(/the reviewer pool gave it to CR2, who hasn't started yet\. Watch #7/)
+    expect(limitLine({ cards: [7], changes: [] }, 30, [], [{ number: 7, state: 'review' }])).not.toMatch(/tell the user \(hive_notify\)/)
+    // Mixed: the card in Review, and the rest told as before.
+    expect(limitLine({ cards: [7, 8], changes: [] }, 30, [], [{ number: 7, state: 'pool' }])).toMatch(/don't tell the user about it; for the rest, tell the user \(hive_notify\) and ask what to do\.$/)
+    // With a card that left the watch: dropped first, as before.
+    expect(limitLine({ cards: [7, 8], changes: [] }, 30, [{ number: 9, why: 'done', detail: null }])).toMatch(/^\[Hive\] #9 is in Done \(your watch on it ended\)\. No change on #7, #8 in 30 min: your card watch has ended\. Drop the first from your list; for the rest, tell the user \(hive_notify\) and ask what to do\.$/)
+    expect(limitLine({ cards: [7], changes: [] }, 30, [{ number: 9, why: 'done', detail: null }], [{ number: 7, state: 'review' }])).toMatch(/Drop the first from your list; watch #7 again for its verdict \(in a card loop, Hive wakes you with it\); don't tell the user about it\.$/)
+    // Many cards with long names still fit, shortened.
+    const many = Array.from({ length: 20 }, (_, i) => i + 100)
+    const long = limitLine({ cards: many, changes: [] }, 30, [], many.map((number) => ({ number, state: 'reviewing' as const, reviewer: 'R'.repeat(60) })))
+    expect(Buffer.byteLength(JSON.stringify(long))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
+    expect(long).toMatch(/are in Review\. Watch/)
     expect(watchLabel({ cards: [7], column: 'review' })).toBe('Waiting for #7 → Review')
     expect(taskWaitText({ watching: 'Waiting for #7 → Review', limitAt: 'x' })).toMatch(/End your turn now/)
     expect(taskWaitText({ timedOut: true, since: '@1;' })).toBe('No change.\nsince: @1;')
@@ -869,6 +885,74 @@ describe('watches (main/watches.ts)', async () => {
     st.typing = false
     await watches.tick()
     expect(st.typed).toHaveLength(1)
+    await disposeWorkspaceService(w)
+  })
+
+  it("its limit on a card in Review says it is there and who reviews it, with no 'tell the user' (HI-2295)", async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a1' }, user))
+    const doc = readCard(w, c.number)
+    await writeCard(w, c.number, { ...doc, column: 'review', updatedAt: new Date().toISOString() })
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(/No change on #\d+ in 30 min: your card watch has ended\. #\d+ is in Review, waiting for its reviewer\. Watch #\d+ again for its verdict/)
+    expect(st.told[0]).not.toMatch(/tell the user \(hive_notify\)/)
+    // Being reviewed: named.
+    await writeCard(w, c.number, { ...readCard(w, c.number), review: { agent: 'a2', agentName: 'Reviewer', since: new Date().toISOString() }, updatedAt: new Date().toISOString() })
+    st.status = 'watching'
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
+    expect(st.told[1]).toMatch(/#\d+ is in Review, being reviewed by Reviewer\./)
+    expect(st.told[1]).not.toMatch(/tell the user \(hive_notify\)/)
+    // Back in Doing: the line as before.
+    await writeCard(w, c.number, { ...readCard(w, c.number), column: 'doing', review: undefined, updatedAt: new Date().toISOString() })
+    st.status = 'watching'
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
+    expect(st.told[2]).toMatch(/your card watch has ended\. Tell the user \(hive_notify\) and ask what to do\.$/)
+    await disposeWorkspaceService(w)
+  })
+
+  it('a limit that fired while the agent was busy is told as its card is when handed over: moved to Review, reviewed, sent back (HI-2295)', async () => {
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await inWorkspace(w, () => tasks.createTask({ title: 'A', project: 'alpha', agent: 'a1' }, user))
+    const put = (over: Record<string, unknown>) => writeCard(w, c.number, { ...readCard(w, c.number), ...over, updatedAt: new Date().toISOString() })
+    // Doing → Review while the line is held: told in Review.
+    await put({ column: 'doing' })
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    st.status = 'working'
+    await watches.tick(Date.now() + 31 * 60_000)
+    expect(st.typed).toEqual([])
+    await put({ column: 'review' })
+    st.status = 'watching'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
+    expect(st.told[0]).toMatch(/#\d+ is in Review, waiting for its reviewer\. Watch #\d+ again for its verdict/)
+    expect(st.told[0]).not.toMatch(/tell the user \(hive_notify\)/)
+    // A reviewer starts while the line is held: named.
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    st.status = 'working'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await put({ review: { agent: 'a2', agentName: 'Reviewer', since: new Date().toISOString() } })
+    st.status = 'watching'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(2), { timeout: HUNG_MS })
+    expect(st.told[1]).toMatch(/#\d+ is in Review, being reviewed by Reviewer\./)
+    // Review → Doing while the line is held: the line as before, no stale Review.
+    await watches.registerWatch(w, alpha, 'a1', { cards: [c.number], changes: ['verdict'] }, 30)
+    st.status = 'working'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await put({ column: 'doing', review: undefined })
+    st.status = 'watching'
+    await watches.tick(Date.now() + 31 * 60_000)
+    await vi.waitFor(() => expect(st.told).toHaveLength(3), { timeout: HUNG_MS })
+    expect(st.told[2]).toMatch(/your card watch has ended\. Tell the user \(hive_notify\) and ask what to do\.$/)
+    expect(st.told[2]).not.toMatch(/in Review/)
     await disposeWorkspaceService(w)
   })
 

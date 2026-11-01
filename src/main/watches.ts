@@ -2,7 +2,8 @@ import { randomBytes } from 'crypto'
 import { rename, writeFile } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import { projectAgents } from '../shared/defaults'
-import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
+import { cardChange, carriedOver, changesBetween, handoffsSince, hearsHandoffs, isDecisionEntry, changesSince, entryWithin, ENTRY_KEY, limitLine, markOf, movedIntoSince, seenOf, readMark, readSavedCondition, WAKE_MAX_BYTES, wakeAbout, watchLabel, cardWakeLine, userNameOf, releasedLine, withLanesTail, RELEASE_REASONS, type Released, type ReplyNote, alreadyThere, cardOver, encodeSince, WATCH_DEFAULT_LIMIT_MINUTES, WATCH_MAX_CARDS, WATCH_MAX_LIMIT_MINUTES, type Baseline, type CardChange, type CardMark, type ReviewWhere, type Seen, type WatchChange, type WatchCondition } from '../shared/watch'
+import { loopReviewerOf, poolCard } from './loopReviewer'
 import { agentBusy, agentEvent, agentLimitLine, agentMarkOf, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, readSavedAgentMark, replyFirstLine, replyPart, REPLY_CHARS, type AgentEvent, type AgentMark, type AgentNow, type AgentWatchCondition, type WatchedAgent } from '../shared/agentWatch'
 import { isProjectId, type ProjectIdIndex } from '../shared/projectIds'
 import { rebase } from '../shared/movePaths'
@@ -151,7 +152,7 @@ interface WatchRecord {
    * from before #649 being typed, `sending`, which proves only an attempt): handed over saying it may repeat.
    * `agents`: an agent watch's agents it tells about (by agentKey; none for its limit).
    */
-  fired?: { line: string; at: string; cards: number[]; agents?: string[]; lanes?: true; replies?: true; delivery?: string; laneMarks?: Record<string, LaneMark>; again?: true; sending?: string }
+  fired?: { line: string; at: string; cards: number[]; agents?: string[]; lanes?: true; replies?: true; delivery?: string; laneMarks?: Record<string, LaneMark>; again?: true; sending?: string; limit?: true }
 }
 
 interface Store {
@@ -576,7 +577,7 @@ function readRecord(v: unknown): WatchRecord | null {
         pendingLanes[id] = mark
       }
     }
-    fired = { line: f.line, at: f.at, cards, ...(told?.length ? { agents: told } : {}), ...(f.lanes === true && lanes ? { lanes: true as const } : {}), ...(f.replies === true ? { replies: true as const } : {}), ...(f.delivery ? { delivery: f.delivery as string } : {}), ...(pendingLanes ? { laneMarks: pendingLanes } : {}), ...(f.again === true ? { again: true as const } : {}), ...(f.sending ? { sending: f.sending as string } : {}) }
+    fired = { line: f.line, at: f.at, cards, ...(told?.length ? { agents: told } : {}), ...(f.lanes === true && lanes ? { lanes: true as const } : {}), ...(f.replies === true ? { replies: true as const } : {}), ...(f.delivery ? { delivery: f.delivery as string } : {}), ...(pendingLanes ? { laneMarks: pendingLanes } : {}), ...(f.again === true ? { again: true as const } : {}), ...(f.sending ? { sending: f.sending as string } : {}), ...(f.limit === true ? { limit: true as const } : {}) }
   }
   // Where its view of each card ended (every card, or none from before #224), and whose own changes aren't news.
   let seen: Record<string, Seen> | undefined
@@ -630,7 +631,7 @@ const fileText = (store: Store, list: WatchRecord[], invalid = store.invalid): s
 
 /** The longest a watch's saved form can grow to: fired with the longest line, being typed. */
 const AT = new Date(0).toISOString()
-const atMost = (r: WatchRecord): WatchRecord => ({ ...r, fired: { line: 'x'.repeat(MAX_LINE_BYTES - 2), at: AT, cards: r.cond.cards, ...(r.agentMarks ? { agents: Object.keys(r.agentMarks) } : {}), ...(r.laneMarks ? { laneMarks: r.laneMarks } : {}), delivery: 'm999999999999999', again: true, sending: AT } })
+const atMost = (r: WatchRecord): WatchRecord => ({ ...r, fired: { line: 'x'.repeat(MAX_LINE_BYTES - 2), at: AT, cards: r.cond.cards, ...(r.agentMarks ? { agents: Object.keys(r.agentMarks) } : {}), ...(r.laneMarks ? { laneMarks: r.laneMarks } : {}), delivery: 'm999999999999999', again: true, sending: AT, limit: true } })
 /**
  * The bytes one watch takes in the file (#321): its own JSON as fileText writes it, an entry of the "watches" array, so
  * each of its lines indented by four more spaces.
@@ -2365,6 +2366,11 @@ async function deliver(store: Store, rec: WatchRecord): Promise<void> {
         await withdraw(store, rec, current)
         return
       }
+    } else if (rec.fired.limit) {
+      // A plain card watch's limit (HI-2295): told as its cards are now, not as they were when it fired (the agent may
+      // have been busy since, and submitted its card to Review, or had it sent back).
+      const where = await reviewWhere(store, rec)
+      line = lineFor(store, rec, () => limitLine(rec.cond, rec.limitMinutes, rec.released ?? [], where))
     } else if (rec.fired.agents?.length) {
       // Every agent's latest event since the watch began (#416): one that finished meanwhile is in it too, and one
       // given work again since is still told what it did (and that it is working again).
@@ -2786,6 +2792,30 @@ async function evaluate(ws: WorkspaceService): Promise<void> {
   await evaluateUsage(store).catch((e) => log.warn('checking usage watches', e))
 }
 
+/**
+ * Where each of a timed-out card watch's cards is now, when it is in Review (HI-2295): its limit line says so instead of
+ * telling the agent to ask the user. From the board as it is: the card's review (being reviewed), else for a pool lane's
+ * card its assigned reviewer or none yet (loopReviewerOf), else waiting for its reviewer. Not a card the watcher reviews
+ * itself, nor one that left the watch.
+ */
+async function reviewWhere(store: Store, rec: WatchRecord): Promise<ReviewWhere[]> {
+  const gone = new Set((rec.released ?? []).map((r) => r.number))
+  const out: ReviewWhere[] = []
+  for (const n of rec.cond.cards) {
+    if (gone.has(n)) continue
+    const card = await cardIn(store, n, rec.scope).catch(() => null)
+    if (!card || card.archived || card.column !== 'review') continue
+    if (card.review) {
+      if (rec.scope !== null && card.review.agent === rec.agentId) continue
+      out.push({ number: n, state: 'reviewing', reviewer: card.review.agentName || card.review.agent })
+    } else if (poolCard(store.ws, card)) {
+      const r = await loopReviewerOf(store.ws, card).catch(() => null)
+      out.push(r ? { number: n, state: 'assigned', reviewer: r.name } : { number: n, state: 'pool' })
+    } else out.push({ number: n, state: 'review' })
+  }
+  return out
+}
+
 /** Told when watched cards move or change hands (after the watches have seen it): a pending quit checks again. */
 let watchedCardsMoved: (() => void) | null = null
 export function onWatchedCardsMoved(fn: () => void): void {
@@ -2800,7 +2830,9 @@ export async function tick(now = Date.now()): Promise<void> {
       let changed = store.dirty
       for (const rec of store.list) {
         if (!rec.fired && Date.parse(rec.limitAt) <= now) {
-          rec.fired = { line: lineFor(store, rec, () => (rec.lanes ? laneLimitLine(rec.lanes, rec.limitMinutes, rec.cond.cards, rec.agents?.agents) : rec.agents ? agentLimitLine(rec.agents, rec.limitMinutes) : usageOnly(rec) ? usageLimitLine(rec.usage!, rec.limitMinutes) : limitLine(rec.cond, rec.limitMinutes, rec.released ?? []))), at: new Date(now).toISOString(), cards: [] }
+          const plain = !rec.lanes && !rec.agents && !usageOnly(rec)
+          const where = plain ? await reviewWhere(store, rec) : []
+          rec.fired = { line: lineFor(store, rec, () => (rec.lanes ? laneLimitLine(rec.lanes, rec.limitMinutes, rec.cond.cards, rec.agents?.agents) : rec.agents ? agentLimitLine(rec.agents, rec.limitMinutes) : usageOnly(rec) ? usageLimitLine(rec.usage!, rec.limitMinutes) : limitLine(rec.cond, rec.limitMinutes, rec.released ?? [], where))), at: new Date(now).toISOString(), cards: [], ...(plain ? { limit: true as const } : {}) }
           changed = true
         }
       }
