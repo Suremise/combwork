@@ -2731,7 +2731,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   // A code card's checks before review and how to run one (HI-2276): additive, only when its rules name some.
   const checks = c.project && !c.archived ? await checksFor(c.project, c.number) : null
   const attachments = files.length ? files.map((a) => attachmentForAgents(a, c)) : null
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}), ...(checks ?? {}) }
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}), ...checks }
 }
 
 /** A card attachment as agents read it (HI-1700): its path, name and size, who added it and when, and where it came. */
