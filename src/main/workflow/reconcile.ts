@@ -43,17 +43,25 @@ function sharedFolderCards(wf: Workflow): CardRecord[] {
 /**
  * Attribution in a shared folder (§16.3.2), recorded once when a commit is seen and never recomputed: a commit with a
  * card's trailer is that card's; else, if exactly one card of the folder is unfinished, that card's; else no card's,
- * listed for the user.
+ * listed for the user. A run whose write finds the folder's cards changed since it read them (one started or finished
+ * meanwhile) reads them again and goes on from the cursor, a few times (HI-2287): a submit attributes its card's own
+ * commits this way, and one that gave up there was refused as having nothing committed while the lane started its next
+ * card in the folder.
  */
-export async function attributeFolder(wf: Workflow): Promise<void> {
+export async function attributeFolder(wf: Workflow, hooks: ReconcileHooks = {}): Promise<void> {
+  for (let tries = 0; tries < 5; tries++) if ((await attributeOnce(wf, hooks)) !== 'raced') return
+}
+
+/** One attribution run: `raced` when the folder's cards changed between its read and its write (nothing written then). */
+async function attributeOnce(wf: Workflow, hooks: ReconcileHooks): Promise<'done' | 'raced'> {
   const project = wf.cfg.project
   const cards = sharedFolderCards(wf)
   // Each card's cycle as read: attribution decided on these is written only while they are still the folder's cards.
   const cycles = new Map(cards.map((c) => [c.id, wf.state(c).cycle]))
   const line = await G.branch(project)
-  if (isUnknown(line) || !line) return
+  if (isUnknown(line) || !line) return 'done'
   const head = await G.lineHead(project, line)
-  if (isUnknown(head) || !head) return
+  if (isUnknown(head) || !head) return 'done'
   const seenKey = `seen:${line}`
   let from = wf.store.meta(seenKey)
   if (!from) {
@@ -61,14 +69,15 @@ export async function attributeFolder(wf: Workflow): Promise<void> {
     const bases = cards.map((c) => wf.state(c).started?.base).filter((b): b is string => !!b)
     if (!bases.length) {
       await wf.locked(() => wf.store.setMeta(seenKey, head))
-      return
+      return 'done'
     }
     from = bases[0]
     for (const b of bases.slice(1)) if ((await G.isAncestor(project, b, from)) === true) from = b
   }
-  if (from === head) return
+  if (from === head) return 'done'
   const list = await G.commits(project, `${from}..${head}`)
-  if (isUnknown(list)) return
+  if (isUnknown(list)) return 'done'
+  await hooks.afterRead?.()
   for (const c of list) {
     const byTrailer = c.cards.map((k) => wf.store.cardByKey(k)).find((x): x is CardRecord => !!x)
     const card = byTrailer ?? (cards.length === 1 ? cards[0] : null)
@@ -77,7 +86,7 @@ export async function attributeFolder(wf: Workflow): Promise<void> {
     const kept = await wf.locked(() =>
       wf.store.tx((tx) => {
         // The folder's cards as they are now, under the lock (HR4's #1217 round 1): one started, finished or in a new cycle
-        // since they were read, and this attribution (immutable once written) waits: the next run reads from the cursor.
+        // since they were read, and this attribution (immutable once written) waits: read again, from the cursor.
         const now = sharedFolderCards(wf)
         if (now.length !== cards.length || now.some((x) => cycles.get(x.id) !== wf.state(x).cycle)) return false
         if (!tx.recordFolderCommit(project, c.commit, card?.id ?? null, how)) return true
@@ -92,9 +101,10 @@ export async function attributeFolder(wf: Workflow): Promise<void> {
         return true
       })
     )
-    if (!kept) return
+    if (!kept) return 'raced'
   }
   await wf.locked(() => wf.store.setMeta(seenKey, head))
+  return 'done'
 }
 
 /**

@@ -68,6 +68,25 @@ describe('workflow scenarios, several agents in one folder', () => {
     expect(e.store.folderCommits(e.project).at(-1)).toMatchObject({ card: null, how: 'unattributed' })
   })
 
+  it("HI-2287: a card started in the folder while a submit's attribution reads → it reads again, and the card's own commit is submitted", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: [], mergeChecks: [], target: '' }))
+    const [a, b, c] = ['A', 'B', 'C'].map((t) => e.wf.createCard({ title: t }))
+    moved(await e.wf.start(a.key, B1))
+    moved(await e.wf.start(b.key, B2))
+    const b1 = commit(e.project, { 'b.txt': 'b\n' }, 'b', { trailer: b.key })
+    // As the lane's start of its next card did in reviewcopies: C starts between the read of the folder's cards and the write.
+    let reads = 0
+    await attributeFolder(e.wf, {
+      afterRead: async () => {
+        if (reads++ === 0) moved(await e.wf.start(c.key, B3))
+      }
+    })
+    expect(reads).toBe(2)
+    expect(e.store.folderCommits(e.project).find((x) => x.sha === b1)).toMatchObject({ card: b.id, how: 'trailer' })
+    moved(await e.wf.submit(b.key, B2, { summary: 'B' }))
+    expect(e.wf.state(b).latest).toMatchObject({ revision: b1, commits: [b1] })
+  })
+
   it('S31: check runs: a file edited and restored, HEAD moved and back → uncounted with why; a wrong --revision refused at start', async () => {
     const e = (env = setup({ ...preset('git', 'pair'), preChecks: ['unit'], mergeChecks: [], commands: { unit: 'npm test' } }))
     const card = e.wf.createCard({ title: 'Checked' })
