@@ -1578,8 +1578,8 @@ class SessionManager {
       } else if (!assistant && skillFor(sk.audience, 'agent') && skillOff(sk.name, workspace.config, pc)) {
         skillsOff.push(sk.name)
       } else if (skillFor(sk.audience, assistant ? 'assistant' : 'agent')) {
-        skills.push({ name: sk.name, sourcePath: sk.path })
         skillHashes[sk.name] = await reads.revision(sk.path)
+        skills.push({ name: sk.name, sourcePath: sk.path, ...(skillHashes[sk.name] ? { revision: skillHashes[sk.name] } : {}) })
       }
     }
     // The workspace's servers on in the project (#713); the agent's own choice narrows them (#537): all of them unless

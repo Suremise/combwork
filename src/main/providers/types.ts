@@ -9,6 +9,12 @@ import type { HookListing } from '../../shared/hooks'
 export interface LaunchSkill {
   name: string
   sourcePath: string
+  /**
+   * The source's content hash as the launch's settings read it (HI-2268: revisions.ts's, hashed again only when its
+   * files' sizes or times changed), so agents launched in a row hash an unchanged skill once. Absent (or empty: it
+   * couldn't be read then), the adapter hashes the source itself.
+   */
+  revision?: string
 }
 
 /**
