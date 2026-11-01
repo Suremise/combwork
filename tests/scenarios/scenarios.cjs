@@ -45,10 +45,14 @@ const ran = (o, tool) => called(o, tool).filter((c) => c.ok)
  * ("Decision for you on AL-2: …", "I need one decision from you", HI-2260) asks, as a question does.
  */
 const asksTheUser = (text) =>
-  /\?|\bplease (?:choose|decide|confirm|pick|select)\b|\b(?:let me know|tell me) (?:which|whether|how you(?:'d| would) like)\b|\b(?:need|needs|waiting for|awaiting|awaits?) your (?:decision|choice|call|answer|go-ahead|approval|confirmation)\b|\b(?:decision|choice)s? (?:needed )?(?:for|from) you\b|\bneeds? (?:a|one) (?:decision|choice)\b/i.test(
+  /\?|\bplease (?:choose|decide|confirm|pick|select)\b|\b(?:let me know|tell me) (?:which|whether|how you(?:'d| would) like)\b|\b(?:need|needs|waiting for|awaiting|awaits?) your (?:decision|choice|call|answer|go-ahead|approval|confirmation)\b|\b(?:decision|choice)s? (?:needed )?(?:for|from) you\b/i.test(
     String(text ?? '')
+      // Markdown emphasis read as the words it marks ("**Decision for you:** none.").
+      .replace(/\*+|__/g, '')
       .replace(/\b(?:nothing|no one|nobody)\s+(?:needs|is waiting for|awaits)\s+(?:your|a|any)\s+\w+(?:\s+(?:from|for)\s+you)?/gi, '')
-      .replace(/\bno (?:decisions?|choices?) (?:(?:is|are) )?(?:needed )?(?:for|from) you\b|\b(?:decisions?|choices?) (?:for|from) you:?\s*(?:none|nothing)\b/gi, '')
+      // Saying none is needed, or that it went ahead without one (HR2's round 1): no decision is put to the user.
+      .replace(/\b(?:do not|don't|does not|doesn't|did not|didn't|no longer|never)\s+(?:need|needs|needed|require|requires|required)\s+(?:a|one|any|your)\s+(?:decisions?|choices?)(?:\s+(?:from|for)\s+you)?/gi, '')
+      .replace(/\b(?:no |without (?:a |any )?)(?:decisions?|choices?) (?:(?:is|are) )?(?:needed )?(?:for|from) you\b|\b(?:decisions?|choices?) (?:for|from) you:?\s*(?:none|nothing)\b/gi, '')
   )
 /**
  * An offer that waits for the user's yes ("If you want, I'll commit it", "Want me to…"): a request, as a question is. A

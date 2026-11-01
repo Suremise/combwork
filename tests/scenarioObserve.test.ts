@@ -956,11 +956,48 @@ describe('the HI-2260 check fixes', () => {
   const { asksTheUser } = helpers as unknown as { asksTheUser: (t: string) => boolean }
   const byName = (id: string, o: object, c: object) => Object.fromEntries(SCENARIOS.find((s) => s.id === id)!.expect(o, c).map(([name, ok]) => [name, ok]))
 
-  it('asksTheUser: a decision put to the user by name asks; saying there is none does not', () => {
+  it('asksTheUser: a decision put to the user by name asks; a description, or saying there is none, does not', () => {
     // The Haiku trials' replies (assistant-doing-nobody s1, s2).
     expect(asksTheUser('Decision for you on AL-2, with my recommendation:\n- **Assign Coder to AL-2.**')).toBe(true)
     expect(asksTheUser('I need one decision from you on AL-2:\n- **Assign Implementer.**')).toBe(true)
-    for (const none of ['Nothing needs a decision from you right now.', 'No decision needed from you.', 'Decisions for you: none.', 'Nothing needs your decision right now.']) expect({ none, asks: asksTheUser(none) }).toEqual({ none, asks: false })
+    // HR2's round 1: a description of a decision, not one put to the user; and needing none.
+    for (const none of [
+      'The parser needs a decision tree.',
+      'I do not need a decision from you.',
+      "I don't need any decision from you here.",
+      'The card needs a decision, so I left it in Todo.',
+      'I moved it without a decision from you.',
+      'Nothing needs a decision from you right now.',
+      'No decision needed from you.',
+      'Decisions for you: none.',
+      // The regrade's case (coordinator-no-code-done s1, 2026-10-31T20-08-55-claude-code): the same, in bold.
+      '**Decision for you:** none.',
+      'Nothing needs your decision right now.'
+    ]) expect({ none, asks: asksTheUser(none) }).toEqual({ none, asks: false })
+  })
+
+  it('assistant-doing-nobody: a reply that only describes the card as needing a decision fails; one that puts the decision passes', () => {
+    const ASKED = 'asked the user which they meant'
+    const NEXT = 'Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (hive_start_task).'
+    const batch = { tool: 'hive_update_tasks', args: JSON.stringify({ numbers: [1, 'AL-2'], column: 'doing' }), ok: true, reply: `1 card changed:\n#1 Greeting helper: Moved to Doing.\nRefused, left as it was: AL-2 would be in Active with nobody on it. (move.doingNobody)\n${NEXT}` }
+    const all = (finalReply: string) => {
+      const o = { hiveCalls: [batch], tools: [], finalReply, cards: { h: { number: 1, key: 'AL-1', column: 'doing', agentName: 'Coder' }, n: { number: 2, key: 'AL-2', column: 'todo' } } }
+      return byName('assistant-doing-nobody', o, { cards: { h: 1, n: 2 } })
+    }
+    // HR2's probe: every other check passes, and nothing is asked.
+    const described = all('The card needs a decision, so I left it in Todo.')
+    expect(described[ASKED]).toBe(false)
+    expect(Object.entries(described).filter(([name]) => name !== ASKED).every(([, ok]) => ok)).toBe(true)
+    expect(all('AL-1 is in Doing.\n\nDecision for you on AL-2, with my recommendation:\n- **Assign Coder to AL-2.**')[ASKED]).toBe(true)
+    expect(all('I need one decision from you on AL-2:\n- **Assign Implementer and leave it in Doing.**')[ASKED]).toBe(true)
+  })
+
+  it('a "no question" check fails on a decision put to the user, and not on a description of one', () => {
+    const NOTHING = 'asked the user nothing (it was asked to commit)'
+    const o = (finalReply: string) => ({ hiveCalls: [{ tool: 'hive_submit', args: JSON.stringify({ card: '#1', summary: 's' }), ok: true }], tools: [], finalReply, status: 'finished', gitStatus: '', cards: { s: { column: 'review' } }, facts: { s: [{ kind: 'Submitted', actor: 'agent:a-1' }] } })
+    const c = { cards: { s: 1 }, agents: { coder: { id: 'a-1' } }, head: 'h0', git: () => 'h1' }
+    expect(byName('intent-submit-commit', o('Committed and submitted. The parser needs a decision tree later; that is another card.'), c)[NOTHING]).toBe(true)
+    expect(byName('intent-submit-commit', o('Committed and submitted. Decision for you: push it now or later.'), c)[NOTHING]).toBe(false)
   })
 
   it("assistant-look-lanes: a hive_lane call naming no action changes no lane; a refused start still counts", () => {
