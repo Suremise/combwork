@@ -62,7 +62,18 @@ vi.mock('../src/main/lanes', () => ({
   setLaneSlotWait: async (_ws: unknown, id: string, wait: unknown) => {
     state.slotWaits.push(id)
     state.waits.push(wait)
-  }
+  },
+  // An owed fresh start's entry (HI-2034), changed in `state.lanes` as the lanes' lock would.
+  changeFreshStart: async (_ws: unknown, id: string, entry: string, fn: (f: unknown) => unknown) => {
+    const lane = (state.lanes as { id: string; freshStart?: { id: string }[] }[]).find((l) => l.id === id)
+    const f = lane?.freshStart?.find((x) => x.id === entry)
+    if (!lane || !f) return false
+    const next = fn(f) as { id: string } | null
+    lane.freshStart = next ? lane.freshStart!.map((x) => (x.id === entry ? next : x)) : lane.freshStart!.filter((x) => x.id !== entry)
+    return true
+  },
+  freshStartsNow: (_ws: unknown, id: string) => (state.lanes as { id: string; freshStart?: unknown[] }[]).find((l) => l.id === id)?.freshStart ?? [],
+  listLanes: async () => []
 }))
 // A lane's slot (#1438): lent as `state.lend` says, before its agents start.
 vi.mock('../src/main/slotCards', () => ({
@@ -73,13 +84,23 @@ vi.mock('../src/main/slotCards', () => ({
 }))
 // No line of Hive's on its way (HI-2034: its own conditions are lineWriter's).
 vi.mock('../src/main/lineWriter', () => ({ whyNoLine: () => null }))
+// Each workspace's board (HI-2288): a workspace with `board` has those cards; any other given has alpha's AL-n. Read with
+// no workspace (the default one's, the last focused window's), it is another workspace's card of the same number.
 vi.mock('../src/main/tasks', () => ({
-  getTask: async (n: number) => (state.onGetTask?.(), { number: n, key: `AL-${n}`, title: `Card ${n}`, project: 'alpha', column: 'todo', archived: false })
+  getTask: async (n: number, w?: { board?: Record<number, unknown> }) => {
+    state.onGetTask?.()
+    if (!w) return { number: n, key: `HI-${n}`, title: `Another workspace's card ${n}`, project: 'hive', column: 'todo', archived: false }
+    if (w.board) {
+      if (!w.board[n]) throw new Error(`Unknown card #${n}`)
+      return w.board[n]
+    }
+    return { number: n, key: `AL-${n}`, title: `Card ${n}`, project: 'alpha', column: 'todo', archived: false }
+  }
 }))
 vi.mock('../src/main/workflow/service', () => ({ workflowEnforced: () => state.enforced }))
 vi.mock('../src/main/workflow/rulesets', () => ({ resolvedOf: () => ({ options: state.options }) }))
 
-const { checkLanePool, launchRecordedLane, laneStartInfo, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
+const { checkLanePool, launchFresh, launchRecordedLane, laneStartInfo, recordedLaneNote, resumeLaneBuilder, startLaneFromWindow, startWaitingLane } = await import('../src/main/laneStart')
 const { allOff } = await import('../src/shared/workflow/options')
 
 const ws = {
@@ -518,6 +539,48 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
     state.lanes = [{ id: 'lane-9', state: 'ended', builder: { id: 'b2', name: 'B2' }, reviewer: null, cards: [1], rounds: 3 }]
     expect(await launchRecordedLane(ws, ALPHA, 'lane-9')).toBeNull()
     expect(state.calls).toEqual([])
+  })
+})
+
+describe("a lane's brief names its own workspace's cards, never the default workspace's of the same number (HI-2288)", () => {
+  const ALPHA = 'D:\\ws\\alpha'
+  /** A second workspace, its alpha project's card numbered 324 (OV-238), and beta's 325 in the same workspace. */
+  const second = { ...(ws as object), board: { 324: { number: 324, key: 'OV-238', title: 'Overmark card', project: 'alpha', column: 'todo', archived: false }, 325: { number: 325, key: 'BE-9', title: "Beta's card", project: 'beta', column: 'todo', archived: false } } } as never
+  /** The builder's brief: the lane's cards named, never the other workspace's HI-324. */
+  const named = (brief: string | undefined): void => {
+    expect(brief).toContain('1. OV-238 Overmark card')
+    expect(brief).not.toContain('HI-324')
+    expect(brief).not.toContain("Another workspace's card")
+  }
+
+  it('Start Lane… from the window', async () => {
+    await startLaneFromWindow(second, ALPHA, { builder: 'b1', reviewer: 'r1', cards: [324] })
+    named(state.briefs[0])
+  })
+
+  it('a lane the Assistant or a script recorded (hive_lane start, the reported case)', async () => {
+    state.lanes = [{ id: 'lane-o', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [324], rounds: 3 }]
+    await launchRecordedLane(second, ALPHA, 'lane-o')
+    named(state.briefs[0])
+  })
+
+  it('a lane that waited for a slot (the slot pass runs with no workspace of its own)', async () => {
+    state.lanes = [{ id: 'lane-o', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [324], rounds: 3 }]
+    expect(await startWaitingLane(second, ALPHA, 'lane-o', 'slot-a', () => false)).toBe(true)
+    named(state.briefs[0])
+  })
+
+  it('an owed new conversation (the fresh-start pass runs with no workspace of its own)', async () => {
+    state.lanes = [{ id: 'lane-o', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [324], rounds: 3, freshStart: [{ id: 'f1', agent: 'b1', role: 'builder', since: new Date().toISOString(), oldSession: null }] }]
+    expect(await launchFresh(second, ALPHA, 'lane-o', 'f1')).toBe('launched')
+    named(state.briefs[0])
+  })
+
+  it("another project's card of the lane's workspace is left out of a recorded lane's brief, never named", async () => {
+    state.lanes = [{ id: 'lane-o', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: null, cards: [325, 324], rounds: 3 }]
+    await launchRecordedLane(second, ALPHA, 'lane-o')
+    named(state.briefs[0])
+    expect(state.briefs[0]).not.toContain('BE-9')
   })
 })
 

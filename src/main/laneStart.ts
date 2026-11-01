@@ -69,7 +69,8 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   if (!req.cards.length) throw hiveError(M.noCards, undefined, { kind: 'invalid' })
   const cards: { number: number; key: string; title: string }[] = []
   for (const n of req.cards) {
-    const c = await getTask(n).catch(() => null)
+    // Read in the window's workspace (HI-2288): card numbers overlap between workspaces.
+    const c = await getTask(n, ws).catch(() => null)
     if (!c || c.archived || c.project.toLowerCase() !== project.toLowerCase()) throw hiveError(M.notTheProjects, { card: c ? cardLabel(c) : `#${n}`, project }, { kind: 'invalid' })
     if (c.column === 'done') throw hiveError(M.done, { card: cardLabel(c) }, { kind: 'conflict' })
     cards.push({ number: c.number, key: cardLabel(c), title: c.title })
@@ -164,6 +165,20 @@ export async function laneStartInfo(ws: WorkspaceService, projectPath: string): 
 function briefFor(rounds: number, project: string, cards: { key: string; title: string }[], builder: AgentDef, reviewer: AgentDef | null, pool: string[] | null, options: WorkflowOptions | null, where: { legacy: { path: string; branch: string } | null }, slot: string | null, note: string): (role: LaneRole) => string {
   const input = { project, cards: cards.map(({ key, title }) => ({ key, title })), builder: { name: builder.name, folder: where.legacy?.path ?? null, branch: where.legacy?.branch ?? null, slot }, reviewer: reviewer ? { name: reviewer.name } : null, pool, options, rounds, note }
   return (role) => laneBrief(input, role)
+}
+
+/**
+ * A recorded lane's cards as its brief names them (HI-2288): read in the lane's own workspace, never the default one
+ * (the slot and fresh-start passes run with no workspace of their own, and card numbers overlap between workspaces),
+ * and only its own project's, so a number that names another project's card is left out rather than named.
+ */
+async function laneCards(ws: WorkspaceService, project: string, numbers: readonly number[]): Promise<{ key: string; title: string }[]> {
+  const cards: { key: string; title: string }[] = []
+  for (const n of numbers) {
+    const c = await getTask(n, ws).catch(() => null)
+    if (c && c.project.toLowerCase() === project.toLowerCase()) cards.push({ key: cardLabel(c), title: c.title })
+  }
+  return cards
 }
 
 /** A lane brief's delivery identity (#1438): one per lane and role, so a lane's agents are started with it once. */
@@ -341,11 +356,7 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const only = { left: new Set(leftOut.map((a) => a.id)), renew: new Set(renew ? [renew.id] : []) }
   // Those left out, and those found running at their launch (started meanwhile): the caller tells them.
   const runningOf = (started: LaneStartResult['started']): string[] => [builder, reviewer].filter((a): a is AgentDef => !!a && !started.some((x) => x.agentId === a.id) && (only.left.has(a.id) || !!sessions.liveFor(projectPath, a.id))).map((a) => a.name)
-  const cards: { key: string; title: string }[] = []
-  for (const n of lane.cards) {
-    const c = await getTask(n).catch(() => null)
-    if (c) cards.push({ key: cardLabel(c), title: c.title })
-  }
+  const cards = await laneCards(ws, basename(projectPath), lane.cards)
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   // A running builder takes its slot as it starts the lane's card, as before HI-1900: none is lent for it here.
   if (where.inSlots && !only.left.has(builder.id)) {
@@ -420,11 +431,7 @@ export async function startWaitingLane(ws: WorkspaceService, projectPath: string
   const builder = agents.find((a) => a.id === lane.builder.id)
   const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
   if (!builder || !buildsWork(agentWorkflowRole(builder)) || (lane.reviewer && !reviewer)) return false
-  const cards: { key: string; title: string }[] = []
-  for (const n of lane.cards) {
-    const c = await getTask(n).catch(() => null)
-    if (c) cards.push({ key: cardLabel(c), title: c.title })
-  }
+  const cards = await laneCards(ws, basename(projectPath), lane.cards)
   if (over()) return false
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
@@ -491,11 +498,7 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
     log.warn(`Lane ${laneId}: ${userText(agent.name)}'s new conversation may not have started (a launch began and isn't proven): left for the user to retry`)
     return 'blocked'
   }
-  const cards: { key: string; title: string }[] = []
-  for (const n of lane.cards) {
-    const c = await getTask(n).catch(() => null)
-    if (c) cards.push({ key: cardLabel(c), title: c.title })
-  }
+  const cards = await laneCards(ws, basename(projectPath), lane.cards)
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
