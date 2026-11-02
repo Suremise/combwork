@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
+import { moveFolder } from './moveFolder'
 
 const base = tempDir('hive-attachread-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -143,17 +144,19 @@ describe("a card's attachment read through Hive (HI-1751)", () => {
     const hive = join(root, 'p', '.hive')
     const levels = [folderOf(root, c.number), join(hive, 'attachments', 'cards'), join(hive, 'attachments'), hive]
     for (const level of levels) {
-      // The real folder set aside, a junction to a copy elsewhere in its place (another project's, say).
+      // The real folder set aside, a junction to a copy elsewhere in its place (another project's, say). Each move tried
+      // again while Windows says the folder is in use (HI-2348: under a full run's load, renaming .hive failed with EPERM
+      // once, something holding a file in it for a moment).
       const aside = `${level}-aside`
-      renameSync(level, aside)
+      await moveFolder(level, aside)
       const elsewhere = join(base, `elsewhere-${++n}`)
-      renameSync(aside, elsewhere)
+      await moveFolder(aside, elsewhere)
       junction(elsewhere, level)
       try {
         expect(await read(w, c, 'a.txt'), level).toEqual({ problem: 'outside' })
       } finally {
         rmSync(level)
-        renameSync(elsewhere, level)
+        await moveFolder(elsewhere, level)
       }
       expect(await read(w, c, 'a.txt')).toMatchObject({ kind: 'text', content: 'mine' })
     }
@@ -162,7 +165,7 @@ describe("a card's attachment read through Hive (HI-1751)", () => {
     const row = store.boardRead(w, (db) => db.prepare('SELECT file FROM card_attachments WHERE card = ?').get(c.number) as { file: string })
     const real = join(base, 'linked-target.txt')
     writeFileSync(real, 'elsewhere')
-    renameSync(join(dir, row.file), join(base, 'kept.txt'))
+    await moveFolder(join(dir, row.file), join(base, 'kept.txt'))
     let linked = true
     try {
       symlinkSync(real, join(dir, row.file), 'file')
@@ -173,7 +176,7 @@ describe("a card's attachment read through Hive (HI-1751)", () => {
       expect(await read(w, c, 'a.txt')).toEqual({ problem: 'outside' })
       rmSync(join(dir, row.file))
     }
-    renameSync(join(base, 'kept.txt'), join(dir, row.file))
+    await moveFolder(join(base, 'kept.txt'), join(dir, row.file))
     // A row whose file isn't a plain name (a traversal written into the board): never joined.
     for (const bad of ['..\\..\\project.json', 'sub/a.txt', '..']) {
       await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare('UPDATE card_attachments SET file = ? WHERE card = ?').run(bad, c.number)))
