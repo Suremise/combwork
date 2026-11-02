@@ -456,6 +456,18 @@ function Backdrop(): null {
 export function NotificationCenter() {
   const open = useStore((s) => s.showNotifications)
   const items = useStore((s) => s.notifications)
+  // Escape closes it (HI-2376), after anything else had its turn: not one a handler took (a shortcut being recorded,
+  // a pop-up with the focus), nor while a dialog is open, nor from a field, a terminal or an editor, which use Escape.
+  useEffect(() => {
+    if (!open) return
+    const key = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return
+      if ((e.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return
+      set({ showNotifications: false })
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [open])
   if (!open) return null
   return (
     <div className="notif-panel">
