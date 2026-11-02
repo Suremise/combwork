@@ -2,7 +2,7 @@
 // workspace's), and with it lists, reads, comments on, moves, creates and orders only its project's cards, whatever
 // the request says about who is calling; other projects' cards answer as if they didn't exist, and a linked one
 // shows as a number. Nor can it read another project's agents' conversations (activity, sessions), where a card
-// started on an agent is its prompt, or type into them. The workspace token (scripts) still sees all of it. The agent is the fake Claude Code;
+// started on an agent is its prompt, or type into, hand over, start or stop them (HI-2327). The workspace token (scripts) still sees all of it. The agent is the fake Claude Code;
 // the calls are made with its token as its hive tools would. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -231,7 +231,17 @@ const until = async (fn, ms = 10000) => {
   check('…and its own sessions', r.status === 200 && Array.isArray(r.body), JSON.stringify(r).slice(0, 200))
   r = await as('POST', '/v1/agents/wait', { agents: [{ project: 'beta', agent: other.id }], timeoutSeconds: 1 })
   check("another project's agents' status is still open to it", r.status === 200 && !JSON.stringify(r.body).includes('PRIVATE'), JSON.stringify(r).slice(0, 300))
+  // Nor hand it over, stop it or start it (HI-2327): a hand-over prompts the agent, as typing into it does.
+  const betaRun = (await betaLive())?.runId
+  r = await as('POST', '/v1/projects/beta/handover', { from: other.id, to: other.id, handover: true })
+  check("…nor hand beta's agent over", r.status === 403 && /your own project/.test(r.body?.error ?? ''), JSON.stringify(r))
+  r = await as('POST', `/v1/projects/beta/stop?agent=${encodeURIComponent(other.id)}`)
+  check("…nor stop it", r.status === 403, JSON.stringify(r))
+  check('…and it runs on as it was, given nothing', (await betaLive())?.runId === betaRun && (await betaLive())?.status === 'finished', JSON.stringify(await betaLive()))
   await inv('session:stop', beta, other.id).catch(() => undefined)
+  await until(async () => !(await betaLive()), 10000)
+  r = await as('POST', '/v1/projects/beta/sessions', { agent: other.id })
+  check("…nor start it", r.status === 403 && !(await betaLive()), JSON.stringify(r))
   // Something of alpha's own, so its stream has something to show.
   await inv('pty:write', lib.ptyKey(alpha, agent.id), 'hello')
   await lib.sleep(100)
@@ -272,6 +282,14 @@ const until = async (fn, ms = 10000) => {
   r = await call(workspaceToken, 'PATCH', `/v1/tasks/${busy}`, { column: 'done' })
   check('the workspace token can move it', r.status === 200 && r.body.column === 'done', JSON.stringify(r.body?.column ?? r))
   await inv('tasks:delete', busy)
+
+  // --- Its own project's agents it may still start and stop (HI-2327 confines only another project's).
+  const almaLive = async () => (await inv('session:live')).find((s) => s.agentId === alma.id)
+  r = await as('POST', '/v1/projects/alpha/sessions', { agent: alma.id })
+  check("it starts its own project's agent", r.status === 200 && r.body?.agentId === alma.id && !!(await almaLive()), JSON.stringify(r).slice(0, 300))
+  await until(async () => ['ready', 'finished'].includes((await almaLive())?.status), 20000)
+  r = await as('POST', `/v1/projects/alpha/stop?agent=${encodeURIComponent(alma.id)}`)
+  check('…and stops it', r.status === 200 && !!(await until(async () => !(await almaLive()), 10000)), JSON.stringify(r))
 
   // --- Once the agent stops, its token stops working.
   await inv('session:stop', alpha, agent.id).catch(() => undefined)
