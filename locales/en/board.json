@@ -2211,6 +2211,26 @@
     "defaultMessage": "{card} waits to start: {why, select, watching {{agent} is waiting on other work} queued {a line of Hive’s is on its way to {agent}} failed {{agent}’s last start failed} refused {its start was refused for now, and Hive tries again} other {{agent} is in a turn}}",
     "description": "Why a lane waits, in its header in the Progress panel (HI-2029): its card {card} (its key, such as HI-12) is due to start but isn't started yet. why (select): its builder {agent} (an agent's name) is waiting on other work (a card watch); a line Hive types (a message or a wake) is about to reach it; its last start failed; Hive's start was refused for now and is tried again; or (other) it is in a turn (working, starting, waiting for the user). Translate each. The lane isn't paused."
   },
+  "board.leftOut.detail": {
+    "defaultMessage": "{hasPaths, select, yes {Its paths: {paths}.} other {It has no paths yet.}} A file changed meanwhile may be another card's work or your own: include only what belongs to {card}.",
+    "description": "Under the files listed in the question before submitting a card of a project without version control: its paths now ({paths}, a list of file paths; {hasPaths} is yes or no: keep both as they are), and a warning that a changed file may belong to another card or the user's own edit. {card} is the card's name."
+  },
+  "board.leftOut.include": {
+    "defaultMessage": "{n, plural, one {Include It} other {Include Them}}",
+    "description": "A button of the question before submitting a card of a project without version control: adds the {n} changed files listed to its paths, and submits it with them. Title case, as the dialog's other buttons."
+  },
+  "board.leftOut.leave": {
+    "defaultMessage": "{n, plural, one {Leave It Out} other {Leave Them Out}}",
+    "description": "A button of the question before submitting a card of a project without version control: submits it with its paths as they are, without the {n} changed files listed. Title case, as the dialog's other buttons."
+  },
+  "board.leftOut.message": {
+    "defaultMessage": "{n, plural, one {This file changed since {card} started, but isn't in its paths. Without version control, its work is only the files its paths list, so its review won't see this one:} other {These # files changed since {card} started, but aren't in its paths. Without version control, its work is only the files its paths list, so its review won't see them:}}",
+    "description": "The question before a card of a project without version control is submitted: {n} files changed since the card started that its paths (the files its work is made of) don't list; they are listed below. {card} is the card's name."
+  },
+  "board.leftOut.title": {
+    "defaultMessage": "Include files {card}'s paths leave out?",
+    "description": "Title of the question before a card of a project without version control is submitted (moved to Review): files changed that its paths (the files its work is made of) don't list. {card} is the card's name (its key, such as AM-12, or #12)."
+  },
   "board.links.archivedTitle": {
     "defaultMessage": "{card} {title} · Archived (from {column}) · Ctrl+click to open",
     "description": "The hover of a card number (#12) in a terminal, for an archived card: its name (its key, such as AM-12, or #12 for a card with none), title (the user's own words), the column it was archived from ({column}), and how to open it."

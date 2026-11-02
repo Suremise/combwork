@@ -259,6 +259,34 @@ const MOVE = {
   stopped: msg({ id: 'board.move.stopped', defaultMessage: '{card} stopped in {column}', description: "A toast's title: a drag went part of the way (the card's work started) and stopped in {column} (a board column), for something no exception to the rules can make true. {card} is the card's name. The toast's text says why and what to do." })
 }
 
+/** The question before submitting a card of a project without version control whose paths leave files out (HI-2352). */
+const LEFT_OUT = {
+  title: msg({ id: 'board.leftOut.title', defaultMessage: "Include files {card}'s paths leave out?", description: "Title of the question before a card of a project without version control is submitted (moved to Review): files changed that its paths (the files its work is made of) don't list. {card} is the card's name (its key, such as AM-12, or #12)." }),
+  message: msg({ id: 'board.leftOut.message', defaultMessage: "{n, plural, one {This file changed since {card} started, but isn't in its paths. Without version control, its work is only the files its paths list, so its review won't see this one:} other {These # files changed since {card} started, but aren't in its paths. Without version control, its work is only the files its paths list, so its review won't see them:}}", description: "The question before a card of a project without version control is submitted: {n} files changed since the card started that its paths (the files its work is made of) don't list; they are listed below. {card} is the card's name." }),
+  detail: msg({ id: 'board.leftOut.detail', defaultMessage: "{hasPaths, select, yes {Its paths: {paths}.} other {It has no paths yet.}} A file changed meanwhile may be another card's work or your own: include only what belongs to {card}.", description: "Under the files listed in the question before submitting a card of a project without version control: its paths now ({paths}, a list of file paths; {hasPaths} is yes or no: keep both as they are), and a warning that a changed file may belong to another card or the user's own edit. {card} is the card's name." }),
+  leave: msg({ id: 'board.leftOut.leave', defaultMessage: '{n, plural, one {Leave It Out} other {Leave Them Out}}', description: "A button of the question before submitting a card of a project without version control: submits it with its paths as they are, without the {n} changed files listed. Title case, as the dialog's other buttons." }),
+  include: msg({ id: 'board.leftOut.include', defaultMessage: '{n, plural, one {Include It} other {Include Them}}', description: "A button of the question before submitting a card of a project without version control: adds the {n} changed files listed to its paths, and submits it with them. Title case, as the dialog's other buttons." })
+}
+
+/**
+ * What a None card's submission leaves out of its paths (HI-2352), asked before its move: the paths to submit with
+ * (Include Them: its paths and every file listed), null to submit as it is (Leave Them Out), or undefined on Cancel.
+ */
+async function askLeftOut(name: string, left: { paths: string[]; files: string[] }): Promise<string[] | null | undefined> {
+  const n = left.files.length
+  const choice = await choose({
+    title: tr(LEFT_OUT.title, { card: name }),
+    message: tr(LEFT_OUT.message, { n, card: name }),
+    list: left.files,
+    detail: tr(LEFT_OUT.detail, { hasPaths: left.paths.length ? 'yes' : 'no', paths: fmt.list(left.paths, 'unit'), card: name }),
+    choices: [
+      { label: tr(LEFT_OUT.leave, { n }), value: 'leave' },
+      { label: tr(LEFT_OUT.include, { n }), value: 'include' }
+    ]
+  })
+  return choice === 'include' ? [...left.paths, ...left.files.filter((f) => !left.paths.includes(f))] : choice === 'leave' ? null : undefined
+}
+
 /** A refusal's three sentences, one per line, in the window's language, the card named as the window names it (`name`). */
 const refusalText = (r: Refusal, name: string): string => {
   const l = refusalLines(r.rule, { ...r.values, ...(r.values.card !== undefined ? { card: name } : {}) }, { ...IN_WINDOW, forUser: true })
@@ -290,9 +318,17 @@ function askToSkip(name: string, column: TaskColumn, rules: readonly string[]): 
 export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: TaskColumn, o: { before?: number | null; agent?: string | null; rethrow?: boolean } = {}): Promise<boolean> {
   const name = cardLabelOf(get(), c.number)
   const where = tr(COLUMN_TEXT[column].label)
-  const { rethrow, ...move } = o
+  const { rethrow, ...first } = o
+  let move: typeof first & { paths?: string[] | null } = first
   try {
     let r = await call('tasks:move', c.number, column, move)
+    // Without version control, what its paths leave out is asked first (HI-2352); the choice goes with every later call.
+    if ('leftOut' in r) {
+      const paths = await askLeftOut(name, r.leftOut)
+      if (paths === undefined) return false
+      move = { ...move, paths }
+      r = await call('tasks:move', c.number, column, move)
+    }
     if ('ask' in r) {
       const reason = await askToSkip(name, column, r.ask)
       if (reason === null) return false
@@ -302,7 +338,7 @@ export async function moveCard(c: Pick<TaskCard, 'number' | 'project'>, column: 
       notify('error', tr(MOVE.refused, { card: name, column: where }), refusalText(r.refused, name))
       return false
     }
-    if ('ask' in r) return false
+    if ('ask' in r || 'leftOut' in r) return false
     if (r.stopped) {
       notify('warning', tr(MOVE.stopped, { card: name, column: tr(COLUMN_TEXT[r.moved.column].label) }), refusalText(r.stopped, name))
       return false

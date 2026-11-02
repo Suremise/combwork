@@ -352,6 +352,8 @@
   "tips.paneCells.title": "Umieść agenta w dowolnym panelu",
   "tips.pasteScreenshot.text": "Naciśnij Ctrl+V w terminalu agenta, mając obraz w schowku, albo upuść na niego obraz: agent go zobaczy, a Hive zachowa kopię.",
   "tips.pasteScreenshot.title": "Wklej zrzut ekranu do sesji",
+  "tips.pathsLeftOut.text": "Bez kontroli wersji praca karty to tylko pliki z jej ścieżek. Gdy przeciągniesz kartę do kolumny Recenzja, a od jej rozpoczęcia zmieniły się inne pliki, Hive najpierw je wymieni: dołącz je do jej pracy albo je pomiń.",
+  "tips.pathsLeftOut.title": "Bez kontroli wersji? Sprawdź, co obejmuje karta",
   "tips.pauseTeam.text": "Wstrzymaj zespół, w Torach panelu Postęp, sprawia, że tory nie rozpoczynają kart, a agenci nie są budzeni, każe każdemu agentowi zaparkować i pokazuje, co nadal działa, dopóki instalacja nie będzie bezpieczna: wtedy Zainstaluj teraz.",
   "tips.pauseTeam.title": "Wstrzymaj zespół przed aktualizacją",
   "tips.perfCompare.text": "Wydajność → Porównaj: zachowaj bieżący widok przed zmianą i ponownie po niej i sprawdź, czy ruch Hive spadł, a praca nadal została wykonana.",

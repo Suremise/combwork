@@ -352,6 +352,8 @@
   "tips.paneCells.title": "Einen Agenten in einen beliebigen Bereich setzen",
   "tips.pasteScreenshot.text": "Drück Strg+V im Terminal eines Agenten, während ein Bild in der Zwischenablage ist, oder zieh ein Bild darauf: Der Agent sieht es, und Hive behält eine Kopie.",
   "tips.pasteScreenshot.title": "Einen Screenshot in eine Sitzung einfügen",
+  "tips.pathsLeftOut.text": "Ohne Versionsverwaltung besteht die Arbeit einer Karte nur aus den Dateien, die ihre Pfade nennen. Ziehst du eine nach Review und haben sich seit ihrem Beginn andere Dateien geändert, listet Hive sie zuerst auf: Nimm sie in ihre Arbeit auf oder lass sie weg.",
+  "tips.pathsLeftOut.title": "Keine Versionsverwaltung? Prüfe, was eine Karte umfasst",
   "tips.pauseTeam.text": "„Team pausieren“ unter „Lanes“ im Fortschrittspanel hält Lanes davon ab, Karten zu starten, und Agenten davon, geweckt zu werden, sagt jedem Agenten, er soll parken, und listet auf, was noch läuft, bis die Installation sicher ist: dann „Jetzt installieren“.",
   "tips.pauseTeam.title": "Das Team vor einem Update pausieren",
   "tips.perfCompare.text": "Leistung → Vergleichen: Halte die aktuelle Ansicht vor einer Änderung fest und danach noch einmal, und sieh, ob der Verkehr von Hive gesunken ist, während die Arbeit trotzdem erledigt wurde.",

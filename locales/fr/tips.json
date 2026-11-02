@@ -352,6 +352,8 @@
   "tips.paneCells.title": "Placer un agent dans n’importe quel volet",
   "tips.pasteScreenshot.text": "Appuie sur Ctrl+V dans le terminal d’un agent avec une image dans le presse-papiers, ou dépose une image dessus : l’agent la voit, et Hive en garde une copie.",
   "tips.pasteScreenshot.title": "Coller une capture d’écran dans une session",
+  "tips.pathsLeftOut.text": "Sans gestion de versions, le travail d’une carte se limite aux fichiers que listent ses chemins. Quand tu en fais glisser une vers Relecture et que d’autres fichiers ont changé depuis son début, Hive les liste d’abord : inclus-les dans son travail, ou laisse-les de côté.",
+  "tips.pathsLeftOut.title": "Pas de gestion de versions ? Vérifie ce que couvre une carte",
   "tips.pauseTeam.text": "Mettre l’équipe en pause, dans Couloirs du panneau Progression, empêche les couloirs de lancer des cartes et les agents d’être réveillés, demande à chaque agent de se garer et liste ce qui tourne encore jusqu’à ce que l’installation soit sans risque : alors, Installer maintenant.",
   "tips.pauseTeam.title": "Mets l’équipe en pause avant une mise à jour",
   "tips.perfCompare.text": "Performances → Comparer : garde la vue actuelle avant un changement et de nouveau après, et vois si le trafic de Hive a baissé tout en faisant le même travail.",
